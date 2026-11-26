@@ -204,11 +204,13 @@ export function instantEvalLlmJudgeBodyOf({
   model,
   prompt,
   reasoningEffort,
+  maxOutputTokens,
 }: {
   wire: InstantEvalLlmJudgeWire;
   model: string;
   prompt: InstantEvalLlmJudgePrompt;
   reasoningEffort?: InstantEvalJudgeReasoningEffort;
+  maxOutputTokens?: number;
 }): Record<string, unknown> {
   const { system, user, tool } = prompt;
   return instantEvalLlmToolCallBodyOf({
@@ -216,6 +218,7 @@ export function instantEvalLlmJudgeBodyOf({
     model,
     prompt: { system, user, tools: [tool], forcedTool: tool.name },
     ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
   });
 }
 

@@ -69,7 +69,27 @@ export const INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS = 32_000;
  */
 export const INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS = 300_000;
 
+/**
+ * How fast a reasoning model is taken to write its output, for a backend that sets its own cap:
+ * the slow tenth of measured calls, end to end with the prompt read (ADR-190 decision 12).
+ */
+const REASONING_OUTPUT_TOKENS_PER_SECOND = 50;
+
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * The shortest timeout a reasoning backend may have: the time it takes to write its own output cap
+ * where the table sets one, else the floor for the reasoning cap (ADR-190 decision 12).
+ */
+function instantEvalJudgeReasoningTimeoutFloorMsOf({
+  maxOutputTokens,
+}: {
+  maxOutputTokens?: number | undefined;
+}): number {
+  return maxOutputTokens === undefined
+    ? INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS
+    : Math.ceil((maxOutputTokens * 1_000) / REASONING_OUTPUT_TOKENS_PER_SECOND);
+}
 
 /** Whether an effort asks the model to reason, so the reasoning cap and timeout floor apply. */
 export function isInstantEvalJudgeReasoning(
@@ -80,6 +100,12 @@ export function isInstantEvalJudgeReasoning(
 
 /** The kinds that take a reasoning effort on the wire. */
 const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = [
+  "openai_responses",
+];
+
+/** The kinds whose calls write an answer, so the table may set their output cap. */
+const KINDS_TAKING_AN_OUTPUT_CAP: readonly InstantEvalJudgeBackendKind[] = [
+  "anthropic_messages",
   "openai_responses",
 ];
 
@@ -175,19 +201,24 @@ const backendSchema = z
     /** The provider's model id; a Decisions or LLM backend must name one, there is no default. */
     model: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
-    /** Unset, 30 s, or the reasoning floor when the backend sets an effort other than `none`. */
+    /**
+     * Unset, 30 s, or the reasoning floor when the backend sets an effort other than `none`: the
+     * time to write its own output cap where it sets one.
+     */
     timeoutMs: z.number().int().positive().optional(),
     /** Tried in order when this backend cannot answer. */
     fallbacks: z.array(z.string().min(1)).readonly().default([]),
     /** Sent with every call of an OpenAI Responses backend; unset, the request names none. */
     reasoningEffort: z.enum(INSTANT_EVAL_JUDGE_REASONING_EFFORTS).optional(),
+    /** An LLM backend's output cap, reasoning included; unset, the leg's default cap. */
+    maxOutputTokens: z.number().int().positive().optional(),
   })
   .transform(({ timeoutMs, ...backend }) => ({
     ...backend,
     timeoutMs:
       timeoutMs ??
       (isInstantEvalJudgeReasoning(backend.reasoningEffort)
-        ? INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS
+        ? instantEvalJudgeReasoningTimeoutFloorMsOf(backend)
         : DEFAULT_TIMEOUT_MS),
   }))
   .readonly();
@@ -387,6 +418,32 @@ function backendIssues({
   name: string;
   backend: InstantEvalJudgeBackend;
 }): string[] {
+  const issues = backendKindIssues({ name, backend });
+  const floorMs = instantEvalJudgeReasoningTimeoutFloorMsOf(backend);
+  if (isInstantEvalJudgeReasoning(backend.reasoningEffort) && backend.timeoutMs < floorMs) {
+    const cap =
+      backend.maxOutputTokens === undefined
+        ? ""
+        : ` and maxOutputTokens ${backend.maxOutputTokens}`;
+    issues.push(
+      `backend ${name}: reasoningEffort ${backend.reasoningEffort}${cap} needs a timeoutMs of at least ${floorMs}`,
+    );
+  }
+  for (const fallback of backend.fallbacks) {
+    if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
+    if (fallback === name) issues.push(`backend ${name}: lists itself as a fallback`);
+  }
+  return issues;
+}
+
+/** What the backend's kind allows: a model id, a reasoning effort, an output cap. */
+function backendKindIssues({
+  name,
+  backend,
+}: {
+  name: string;
+  backend: InstantEvalJudgeBackend;
+}): string[] {
   const issues: string[] = [];
   if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
     issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
@@ -404,17 +461,8 @@ function backendIssues({
   ) {
     issues.push(`backend ${name}: a ${backend.kind} backend takes no reasoningEffort`);
   }
-  if (
-    isInstantEvalJudgeReasoning(backend.reasoningEffort) &&
-    backend.timeoutMs < INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS
-  ) {
-    issues.push(
-      `backend ${name}: reasoningEffort ${backend.reasoningEffort} needs a timeoutMs of at least ${INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS}`,
-    );
-  }
-  for (const fallback of backend.fallbacks) {
-    if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
-    if (fallback === name) issues.push(`backend ${name}: lists itself as a fallback`);
+  if (backend.maxOutputTokens !== undefined && !KINDS_TAKING_AN_OUTPUT_CAP.includes(backend.kind)) {
+    issues.push(`backend ${name}: a ${backend.kind} backend takes no maxOutputTokens`);
   }
   return issues;
 }

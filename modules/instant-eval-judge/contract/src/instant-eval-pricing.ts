@@ -86,6 +86,26 @@ export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING: InstantEvalJudgeRoutePric
   },
 };
 
+/**
+ * A routed judged query's cost ceiling per million tokens of the query token budget, in our cost
+ * (ADR-190 decision 13, the one home of the number). The default 4,000,000-token budget gives a
+ * 0.60 USD ceiling and a 0.78 USD hold at the markup.
+ */
+const INSTANT_EVAL_ROUTED_QUERY_CEILING_USD_PER_MILLION = 0.15;
+
+/** A routed judged query's cost ceiling, in nano-USD, for the query token budget it runs under. */
+export function instantEvalRoutedQueryCeilingNanoUsd({
+  queryTokenBudget,
+}: {
+  queryTokenBudget: number;
+}): number {
+  return Math.round(
+    (queryTokenBudget / TOKENS_PER_MILLION) *
+      INSTANT_EVAL_ROUTED_QUERY_CEILING_USD_PER_MILLION *
+      NANO_USD_PER_USD,
+  );
+}
+
 /** The model the ledger names for a routed judgement: one product, whichever backend answered. */
 export const INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL = "langwatch-judge";
 

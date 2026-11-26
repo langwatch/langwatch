@@ -352,6 +352,46 @@ describe("InstantEvalJudgeRouterService", () => {
       },
     );
 
+    /** @scenario "A backend that reasons waits long enough to write its output cap" */
+    it("sends a reasoning leg its own output cap, and an answer cut at it goes to the fallback, both billed", async () => {
+      const table = syntheticRouteTable({
+        backends: {
+          "llm-b": {
+            kind: "openai_responses",
+            model: "llm-model-b",
+            reasoningEffort: "high",
+            maxOutputTokens: 1_100,
+            fallbacks: ["llm-a"],
+          },
+        },
+      });
+      const { classify, llmJudge } = harness({
+        table,
+        decisions: () => judged(0.4),
+        llm: (_signal, request) =>
+          request?.wire === "openai_responses"
+            ? {
+                outcome: "skipped",
+                reason: "classifier_failed",
+                inputTokens: 2000,
+                outputTokens: 1_100,
+              }
+            : llmSays(false),
+      });
+      const judgement = await classify(SHORT);
+      expect(llmJudge.requests[0]).toMatchObject({
+        wire: "openai_responses",
+        reasoningEffort: "high",
+        maxOutputTokens: 1_100,
+        timeoutMs: 22_000,
+      });
+      expect(llmJudge.requests[1]).not.toHaveProperty("maxOutputTokens");
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0 }]);
+      expect(judgement.routing?.flags).toEqual(expect.arrayContaining(["fallback:llm-b->llm-a"]));
+      // decision-a 1000 x 0.1, the cut llm-b 2000 x 1 + 1,100 x 5, llm-a 2000 x 2 + 100 x 8
+      expect(judgement.costNanoUsd).toBe(100_000 + 2_000_000 + 5_500_000 + 4_000_000 + 800_000);
+    });
+
     it("rethrows the classifier's own refusal when nothing else answered, as unrouted calls do", async () => {
       const { classify } = harness({
         hasDecisions: false,

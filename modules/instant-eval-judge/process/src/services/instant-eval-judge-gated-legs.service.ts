@@ -113,10 +113,7 @@ export class InstantEvalJudgeGatedLegsService {
       // The sends waited side by side; a send that failed reports no wait, as any failed leg.
       if (leg.outcome === "answered") gateWaitMs = Math.max(gateWaitMs, leg.limiterWaitMs);
       else this.gateFailed({ backend: gate.backend, leg });
-      const { branch, hasScore } = instantEvalJudgeGateBranchOf({
-        verdict,
-        easyBelow: gate.easyBelow,
-      });
+      const { branch, hasScore } = instantEvalJudgeGateBranchOf({ verdict, gate });
       if (!hasScore) isUnrated = true;
       (branch === "easy" ? easy : hard).push(question);
     });

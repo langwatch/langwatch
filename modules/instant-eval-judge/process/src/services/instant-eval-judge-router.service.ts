@@ -18,7 +18,10 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import { instantEvalJudgeClassifierCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
+import {
+  instantEvalJudgeClassifierCostOf,
+  instantEvalJudgeClassifierWorstCaseNanoUsd,
+} from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeFirstSendLeadsOf,
   instantEvalJudgeKindGroupsOf,
@@ -26,6 +29,7 @@ import {
   type InstantEvalJudgeKindPart,
 } from "../rules/instant-eval-judge-route-merge.rules.ts";
 import { instantEvalJudgeRoutePlanOf } from "../rules/instant-eval-judge-route.rules.ts";
+import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling-send.service.ts";
 import {
   InstantEvalJudgeRouteRunService,
   type InstantEvalJudgeRouteRunDeps,
@@ -35,7 +39,7 @@ import {
 const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:router");
 
 type InstantEvalJudgeRouterServiceDeps = InstantEvalJudgeRouteRunDeps &
-  Readonly<{ logger?: Pick<Logger, "error"> }>;
+  Readonly<{ logger?: Pick<Logger, "error" | "warn"> }>;
 
 /** A routed classification: today's input with the route it carries. */
 type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionModel"> & {
@@ -45,7 +49,7 @@ type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionM
 };
 
 export class InstantEvalJudgeRouterService {
-  private readonly logger: Pick<Logger, "error">;
+  private readonly logger: Pick<Logger, "error" | "warn">;
 
   private constructor(private readonly deps: InstantEvalJudgeRouterServiceDeps) {
     this.logger = deps.logger ?? defaultLogger;
@@ -80,7 +84,7 @@ export class InstantEvalJudgeRouterService {
     input: RoutedClassification;
     groups: readonly { kind: InstantEvalQuestionKind; questions: readonly InstantEvalQuestion[] }[];
   }): Promise<InstantEvalJudgeKindPart>[] {
-    const { projectId, text, signal, route, scenario } = input;
+    const { projectId, text, signal, route, scenario, costCeiling } = input;
     const { table } = this.deps;
     const plans = groups.map(({ kind, questions }) =>
       instantEvalJudgeRoutePlanOf({ route, text, questions, table, kind }),
@@ -93,6 +97,7 @@ export class InstantEvalJudgeRouterService {
         signal,
         logger: this.logger,
         scenario,
+        costCeiling,
       }),
     );
     const leads = instantEvalJudgeFirstSendLeadsOf({ plans, table });
@@ -163,24 +168,50 @@ export class InstantEvalJudgeRouterService {
     return new InstantEvalJudgeStoppedError({ inputTokens, costNanoUsd, cause });
   }
 
+  /** Today's classifier call, priced as routed; under a ceiling it holds its worst case first. */
   private async unrouted({
     projectId,
     text,
     questions,
     signal,
-  }: Omit<RoutedClassification, "route">): Promise<InstantEvalJudgement> {
-    const { classifier, limiter } = this.deps;
+    route,
+    costCeiling,
+  }: RoutedClassification): Promise<InstantEvalJudgement> {
+    const { classifier, limiter, table, pricing } = this.deps;
     if (!classifier) return instantEvalSkipped("classifier_not_configured");
-    const judgement = await classifier.classify(
-      { projectId, text, questions, limiter },
-      ...(signal ? [signal] : []),
-    );
-    const { table, pricing } = this.deps;
-    const { inputTokens, outputTokens = 0 } = judgement;
-    return {
-      ...judgement,
-      costNanoUsd: instantEvalJudgeClassifierCostOf({ table, pricing, inputTokens, outputTokens }),
+    const classify = async (bill: (costNanoUsd: number) => void) => {
+      const judgement = await classifier.classify(
+        { projectId, text, questions, limiter },
+        ...(signal ? [signal] : []),
+      );
+      const { inputTokens, outputTokens = 0 } = judgement;
+      const costNanoUsd = instantEvalJudgeClassifierCostOf({
+        table,
+        pricing,
+        inputTokens,
+        outputTokens,
+      });
+      bill(costNanoUsd);
+      return { ...judgement, costNanoUsd };
     };
+    if (!costCeiling) return classify(() => undefined);
+    const heldNanoUsd = instantEvalJudgeClassifierWorstCaseNanoUsd({
+      table,
+      pricing,
+      job: route.job,
+      text,
+      questions,
+    });
+    const sent = await InstantEvalJudgeCeilingSendService.create({
+      costCeiling,
+      logger: this.logger,
+    }).send({ heldNanoUsd, signal, backend: "classifier", send: classify });
+    if (sent.isHeld) return sent.value;
+    this.logger.warn(
+      { projectId, job: route.job, heldNanoUsd },
+      "Instant Evals unrouted send refused by the query cost ceiling",
+    );
+    return instantEvalSkipped("query_cost_ceiling");
   }
 }
 

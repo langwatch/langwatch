@@ -925,6 +925,31 @@ describe("given the unmetered classify the Api and the judge call share", () => 
     });
   });
 
+  describe("when the routed call carries a cost ceiling with no room", () => {
+    /** @scenario "A send whose worst case passes the ceiling is not sent" */
+    it("hands the ceiling to the router, which sends nothing and skips on the query cost ceiling", async () => {
+      const { service, classifier } = harness();
+      const held: number[] = [];
+
+      const judgement = await service.classifyOnce({
+        ...call,
+        route: { job: "search", tokens: 100 },
+        costCeiling: {
+          hold: async (nanoUsd) => {
+            held.push(nanoUsd);
+            return false;
+          },
+          settle: () => {},
+        },
+      });
+
+      expect(held.length).toBeGreaterThan(0);
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(judgement.skippedReason).toBe("query_cost_ceiling");
+      expect(judgement.costNanoUsd ?? 0).toBe(0);
+    });
+  });
+
   describe("when no classifier is configured but the call carries a route", () => {
     /** @scenario "A routed call needs the hosted classifier key only when its table reaches it" */
     it("asks the router, which answers from the backends it can reach", async () => {

@@ -103,6 +103,7 @@ export class InstantEvalJudgeService {
     signal,
     decisionModel,
     route,
+    costCeiling,
     requestKey,
   }: InstantEvalClassification & {
     requestKey?: string | undefined;
@@ -126,7 +127,14 @@ export class InstantEvalJudgeService {
     const { classifier, limiter, router } = this.deps;
     // The router skips a missing classifier itself, and its table may never reach it.
     if (route) {
-      return router.classify({ projectId, text, questions, route, ...(signal ? { signal } : {}) });
+      return router.classify({
+        projectId,
+        text,
+        questions,
+        route,
+        ...(signal ? { signal } : {}),
+        ...(costCeiling ? { costCeiling } : {}),
+      });
     }
     if (!classifier) return instantEvalSkipped("classifier_not_configured");
     return classifier.classify({ projectId, text, questions, limiter }, ...signalArgs);

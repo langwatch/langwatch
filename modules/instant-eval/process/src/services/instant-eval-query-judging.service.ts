@@ -1,7 +1,7 @@
 /**
- * One synchronous LangWatchQL query's judging (Alex, 2026-10-06, "Judge cycle"): the price of
- * the whole query token budget held first, the rows judged, the spend recorded once, the hold
- * dropped. A spend that never reached the ledger keeps its hold until the hold lapses.
+ * One synchronous LangWatchQL query's judging (Alex, 2026-10-06, "Judge cycle"): held, judged,
+ * recorded once, released; an unrecorded spend keeps its hold until it lapses. A routed query is
+ * held at its cost ceiling, where its sends stop (ADR-190 decision 13).
  * @see specs/lwql/eval-functions.feature
  */
 
@@ -9,10 +9,17 @@ import type {
   InstantEvalQueryJudging,
   InstantEvalQueryJudgingInput,
 } from "@langwatch/instant-eval-contract";
-import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
+import type {
+  InstantEvalJudgeCostCeiling,
+  InstantEvalJudgeRouteRequest,
+  InstantEvalPricing,
+} from "@langwatch/instant-eval-judge-contract";
 import {
+  INSTANT_EVAL_PRICING,
+  NANO_USD_PER_USD,
   instantEvalCostUsd,
   instantEvalPriceUsd,
+  instantEvalRoutedQueryCeilingNanoUsd,
   isInstantEvalSpendBillable,
   pickInstantEvalRoutedSpend,
 } from "@langwatch/instant-eval-judge-contract";
@@ -28,6 +35,16 @@ import type {
   InstantEvalJudgeUsage,
 } from "./instant-eval-judge-rows.service.ts";
 import type { InstantEvalJudgedSpendService } from "./instant-eval-judged-spend.service.ts";
+import { InstantEvalQueryCostCeilingService } from "./instant-eval-query-cost-ceiling.service.ts";
+import type { InstantEvalSearchRoutingService } from "./instant-eval-search-routing.service.ts";
+
+/** The route a routed judged query sends: the table picks its slot and mode. */
+const SEARCH_ROUTE: InstantEvalJudgeRouteRequest = { job: "search" };
+
+/** How one query is judged: unrouted, or routed under its cost ceiling. */
+type InstantEvalQueryRouting =
+  | Readonly<{ isRouted: false }>
+  | Readonly<{ isRouted: true; costCeiling: InstantEvalJudgeCostCeiling; ceilingNanoUsd: number }>;
 
 const logger = createLogger("langwatch:instant-eval:query-judging");
 
@@ -40,6 +57,7 @@ export class InstantEvalQueryJudgingService {
       spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
       holdPricing: () => Promise<InstantEvalPricing>;
       queryTokenBudget: number;
+      searchRouting: Pick<InstantEvalSearchRoutingService, "isRouted">;
       now: () => Instant;
     },
   ) {}
@@ -51,6 +69,7 @@ export class InstantEvalQueryJudgingService {
     spend,
     holdPricing,
     queryTokenBudget,
+    searchRouting,
     now = nowInstant,
   }: {
     rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
@@ -61,6 +80,8 @@ export class InstantEvalQueryJudgingService {
     holdPricing: () => Promise<InstantEvalPricing>;
     /** Input tokens one query may send: the ceiling it is held at and refused past. */
     queryTokenBudget: number;
+    /** Whether a project's queries send the search route, behind its own flag. */
+    searchRouting: Pick<InstantEvalSearchRoutingService, "isRouted">;
     now?: () => Instant;
   }): InstantEvalQueryJudgingService {
     return new InstantEvalQueryJudgingService({
@@ -70,6 +91,7 @@ export class InstantEvalQueryJudgingService {
       spend,
       holdPricing,
       queryTokenBudget,
+      searchRouting,
       now,
     });
   }
@@ -87,7 +109,10 @@ export class InstantEvalQueryJudgingService {
     const { budget, gatewayBudget, queryTokenBudget } = this.options;
     await gatewayBudget.assertWithinGatewayBudget({ projectId });
     const reservationId = instantEvalQueryReservationId();
-    const priceUsd = await this.#holdPriceOf(queryTokenBudget);
+    const routing = await this.#routingOf({ projectId });
+    const priceUsd = routing.isRouted
+      ? this.#ceilingPriceOf(routing.ceilingNanoUsd)
+      : await this.#holdPriceOf(queryTokenBudget);
     await budget.reserve({ projectId, reservationId, priceUsd });
     let isRecorded = true;
     try {
@@ -97,6 +122,7 @@ export class InstantEvalQueryJudgingService {
         questions,
         tokenBudget: queryTokenBudget,
         signal: signal ?? null,
+        ...(routing.isRouted ? { route: SEARCH_ROUTE, costCeiling: routing.costCeiling } : {}),
       });
       // Recorded before a cancel is answered: what was judged was paid for.
       isRecorded = await this.#recordSpend({ projectId, usage: judged.usage });
@@ -111,9 +137,27 @@ export class InstantEvalQueryJudgingService {
     }
   }
 
+  /** Routed behind the project's own flag, under a fresh ceiling for this query alone. */
+  async #routingOf({ projectId }: { projectId: string }): Promise<InstantEvalQueryRouting> {
+    if (!(await this.options.searchRouting.isRouted({ projectId }))) return { isRouted: false };
+    const ceilingNanoUsd = instantEvalRoutedQueryCeilingNanoUsd({
+      queryTokenBudget: this.options.queryTokenBudget,
+    });
+    const costCeiling = InstantEvalQueryCostCeilingService.create({ ceilingNanoUsd });
+    return { isRouted: true, costCeiling, ceilingNanoUsd };
+  }
+
+  /** A routed query's hold: its whole ceiling at the one markup, the most it can be charged. */
+  #ceilingPriceOf(ceilingNanoUsd: number): number {
+    return instantEvalPriceUsd({
+      costUsd: ceilingNanoUsd / NANO_USD_PER_USD,
+      pricing: INSTANT_EVAL_PRICING,
+    });
+  }
+
   /**
-   * The token budget at the dearest base input rate a routed call could reach: a best-effort hold,
-   * not a hard cap on a routed query's spend (ADR-190 decision 7).
+   * The token budget at the dearest base input rate a routed call could reach: an unrouted query's
+   * hold, which no routed send reaches (ADR-190 decision 7).
    */
   async #holdPriceOf(inputTokens: number): Promise<number> {
     const pricing = await this.options.holdPricing();

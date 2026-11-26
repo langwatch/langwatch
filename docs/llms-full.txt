@@ -7490,7 +7490,7 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge, or `langwatch-judge-preview` for a scenario judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge or a routed judged query, or `langwatch-judge-preview` for a scenario judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
 
 A scenario judged by LangWatch Judge (preview) writes one `langwatch-judge-preview` event per turn decision that was paid for, with a request count of 1, and one for the final verdict, whose request count is the number of criteria. A call that billed no tokens writes no event.
 
@@ -41584,6 +41584,12 @@ The rate is 0.0546 USD per million input tokens the judge reads, and output is f
 
 For example, the first run on the [overview](/features/instant-evals/overview) judged 100 conversations, read 107,000 tokens and cost 0.0058 USD, so 10,000 conversations of the same size come to about 0.58 USD.
 
+### Routed search
+
+LangWatch can turn on routed search for your organization; it is off until then. With it on, a judged LangWatchQL query is answered by the LangWatch Judge, which may check a question more than once. Its price is what those checks cost LangWatch, plus 30%, rather than the rate above. Runs keep the rate above.
+
+Each routed query is held at 0.78 USD before it starts, the most it can be charged: its 0.60 USD cost ceiling plus 30%, by default. No check is sent once what the query has spent leaves the ceiling no room for it. That text keeps the answer it already has, or is skipped as `query_cost_ceiling`. Without a paid plan, a routed query needs 0.78 USD of the free budget left to start, and is refused with `instant_eval_free_budget_exhausted` otherwise.
+
 ## Reading the cost before you start
 
 ```bash
@@ -71056,6 +71062,8 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
 
+Routed search is the exception, and LangWatch turns it on per organization. With it on, a judged query is answered by the LangWatch Judge and charged what its judge calls cost LangWatch, plus 30%, at most 0.78 USD per query by default. Runs keep the rate above. See [Limits and cost](/features/instant-evals/limits-and-cost#routed-search).
+
 Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
@@ -77438,7 +77446,7 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 
 On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
 
-Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
+Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. Judging through Connect is never routed, so this rate always applies. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
 ## Managed models
 

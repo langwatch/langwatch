@@ -45,8 +45,9 @@ slice and the priced event's schema. There is no transport.
   the single hosted classifier call.
 - `queryHoldPricing` returns the rate a judged query is held at: the dearest input rate any backend
   a search or LLM-judge route can reach (a scenario-only backend is left out), never below the
-  classifier rate, at the one markup. It is computed once at boot. It is a best-effort hold, not
-  a hard cap on a routed query (ADR-190 decision 7).
+  classifier rate, at the one markup. It is computed once at boot and holds an unrouted query
+  (ADR-190 decision 7). A routed query is held at its cost ceiling, which every routed send
+  holds its worst case against before it is sent (ADR-190 decision 13).
 - `judgeScenario` is the metered scenario judge call (ADR-002), behind the same checks as `judge`:
   a verdict routes each criterion as its own `scenario_judge` question, and a turn decision is the
   judge's own call on the table's `scenarioDecision` backend. Each paid verdict and turn decision

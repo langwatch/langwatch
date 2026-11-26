@@ -118,7 +118,7 @@ classify(input: { projectId: string; text: string; questions: readonly InstantEv
 
 #### `judgeQuery`
 
-One synchronous query's judged columns, their texts in place (Alex, 2026-10-06, "Judge cycle"): holds the query token budget's price, judges, records the spend once, then drops the hold. Refuses an exhausted budget or an oversized query before anything is judged.
+One synchronous query's judged columns, texts in place: holds its price (the token budget at the hold rate, or a routed query's cost ceiling at the markup, ADR-190 d13), judges, records the spend once, then drops the hold. Refuses an exhausted budget or oversized query first.
 
 ```typescript
 judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;

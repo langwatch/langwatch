@@ -30,7 +30,7 @@ const REQUEST = { projectId: "project-1", text: "hello", questions: [] };
 function harness(
   options: { enabled?: boolean; organizationId?: string; answer?: ConnectClassifyAnswer } = {},
 ) {
-  const calls = { enabledReads: 0, classifies: 0 };
+  const calls = { enabledReads: 0, classifies: 0, sent: [] as unknown[] };
   const state = { enabled: options.enabled ?? true, clockMs: 0 };
   const judge = InstantEvalConnectJudgeService.create({
     licensing: {
@@ -38,8 +38,9 @@ function harness(
         calls.enabledReads += 1;
         return state.enabled;
       },
-      classifyThroughConnect: async () => {
+      classifyThroughConnect: async (input) => {
         calls.classifies += 1;
+        calls.sent.push(input);
         return options.answer ?? ANSWER;
       },
     },
@@ -62,6 +63,19 @@ describe("the Connect judge", () => {
       isTextTruncated: false,
     });
     expect(calls.classifies).toBe(1);
+  });
+
+  /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+  it("sends a routed query's text through Connect with no route and no ceiling", async () => {
+    const { judge, calls } = harness();
+
+    await judge.classify({
+      ...REQUEST,
+      route: { job: "search" },
+      costCeiling: { hold: async () => true, settle: () => undefined },
+    });
+
+    expect(calls.sent).toEqual([{ organizationId: "org-acme", text: "hello", questions: [] }]);
   });
 
   it("skips rather than fails where the service is off, sending nothing", async () => {
