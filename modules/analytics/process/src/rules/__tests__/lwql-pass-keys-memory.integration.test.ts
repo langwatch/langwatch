@@ -21,8 +21,8 @@ const ROWS_PER_PART = 66_000;
 const INSERT_BLOCK_ROWS = "2000";
 const ATTRIBUTE_KEYS = 25;
 /**
- * The single read peaks at 700 to 800 MiB on CI's image and the passes near 32 to 52 MiB: 200 MB
- * leaves the passes about 4x headroom across thread counts and still refuses the single read.
+ * The passes peak at up to 75 MiB (ADR-006, `max_threads = 4`) and the single read at 700 to 800
+ * MiB: 200 MB leaves the passes about 2.5x headroom and still refuses the single read.
  */
 const MEMORY_CAP_BYTES = "200000000";
 const SAMPLE_BUCKETS = 3;
