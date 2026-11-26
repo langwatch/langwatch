@@ -1,0 +1,80 @@
+{
+  "model": "openai/langwatch-judge-preview",
+  "messages": [
+    {
+      "role": "system",
+      "content": "<role>\nYou are an LLM as a judge delivering the final verdict on a simulated conversation, determining if the agent under test meets the criteria or not.\n</role>\n\n<goal>\nYour goal is to deliver the final verdict of the scenario below with the finish_test tool, judging each criterion on its own against the conversation and the collected evidence.\n</goal>\n\n<scenario>\nA customer asks for a refund on a late order\n</scenario>\n\n<criteria>\n1. The agent offers a refund\n2. The agent apologises\n</criteria>\n\n<rules>\n- Be strict: a criterion passes only when the conversation or the collected evidence clearly shows it was met.\n- DO NOT make any judgment calls that are not explicitly listed in the success or failure criteria, withhold judgement if necessary. Recomputing a number or following a derivation that a criterion depends on is not an extra judgment call.\n- Judge each criterion on its own: restate it as a positive requirement, check the conversation and the collected evidence for that requirement alone, write the reasoning, then choose its status. The outcome of one criterion never decides another.\n- passed means the agent satisfied the requirement. A criterion phrased as a fail condition (\"fail if X\", \"fail only if X\", \"pass unless X\", \"the agent must not X\") passes when X did not happen and fails when X happened.\n- Before grading a number, date, count or duration, recompute it from the evidence step by step in the reasoning, then compare the result with the agent's answer. A value that differs from the recomputed one fails the criterion, however confident or detailed the answer sounds.\n- Be strict about evidence, not wording: an answer that is equivalent to what the criterion asks for, or that follows from the evidence by a correct derivation (the 21st anniversary of an event first held in 1988 is 2009), satisfies it. A standard unit conversion (2 m is 6.56 ft) is such a derivation, not outside knowledge. Checking that arithmetic or derivation is part of judging the criterion.\n- When the evidence to decide a criterion is not available (the conversation ended before the moment it depends on, or it depends on internal behavior that left no trace), mark it inconclusive and name the missing evidence in its reasoning instead of guessing.\n</rules>"
+    },
+    {
+      "role": "user",
+      "content": "\n    <transcript>\n    user: \"my order is late\"\nassistant: \"I refunded it\"\n    </transcript>\n    <opentelemetry_traces>\n    No spans recorded.\n    </opentelemetry_traces>\n    "
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "finish_test",
+        "description": "Complete the test with a verdict on each criterion, judged one by one",
+        "parameters": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "criteria": {
+              "type": "object",
+              "properties": {
+                "the_agent_offers_a_refund": {
+                  "type": "object",
+                  "properties": {
+                    "requirement": {
+                      "type": "string"
+                    },
+                    "reasoning": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["passed", "failed", "inconclusive"]
+                    }
+                  },
+                  "required": ["requirement", "reasoning", "status"],
+                  "additionalProperties": false
+                },
+                "the_agent_apologises": {
+                  "type": "object",
+                  "properties": {
+                    "requirement": {
+                      "type": "string"
+                    },
+                    "reasoning": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["passed", "failed", "inconclusive"]
+                    }
+                  },
+                  "required": ["requirement", "reasoning", "status"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["the_agent_offers_a_refund", "the_agent_apologises"],
+              "additionalProperties": false
+            },
+            "reasoning": {
+              "type": "string"
+            }
+          },
+          "required": ["criteria", "reasoning"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "tool_choice": {
+    "type": "function",
+    "function": {
+      "name": "finish_test"
+    }
+  }
+}

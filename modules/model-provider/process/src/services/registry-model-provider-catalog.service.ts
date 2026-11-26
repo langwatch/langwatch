@@ -14,6 +14,7 @@ import {
   isModelAllowedForFeature,
   writtenModelId,
   isDecisionModelId,
+  isLangWatchJudgeModelId,
   isModelRole,
   MODEL_ROLES,
   ModelDefaultValidationError,
@@ -37,6 +38,11 @@ function refuseDefault({ key, value }: { key: string; value: string }): never {
   if (isDecisionDefaultKey(key)) {
     throw new ModelDefaultValidationError(
       `"${value}" is not a decision model. Pick one from the Instant Evals list.`,
+    );
+  }
+  if (isLangWatchJudgeModelId(value)) {
+    throw new ModelDefaultValidationError(
+      "LangWatch Judge (preview) judges scenarios and can only be the Judge default.",
     );
   }
   if (isDecisionModelId(value)) {

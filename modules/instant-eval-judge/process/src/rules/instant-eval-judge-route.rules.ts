@@ -440,8 +440,51 @@ export function instantEvalJudgeLegPermitOf({
 }): InstantEvalPermit {
   return {
     tokens: estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),
-    tenantId: `${projectId}:${pool}`,
+    tenantId: instantEvalJudgeLimiterTenantOf({ projectId, pool }),
   };
+}
+
+/**
+ * One send of a caller's own LLM call (the scenario judge's verdict or turn decision): its system
+ * and user messages counted, on the same llm pool a routed LLM leg takes.
+ */
+export function instantEvalJudgeLlmCallPermitOf({
+  projectId,
+  system,
+  user,
+}: {
+  projectId: string;
+  system: string;
+  user: string;
+}): InstantEvalPermit {
+  return {
+    tokens: estimateJudgedTextTokens({ text: system }) + estimateJudgedTextTokens({ text: user }),
+    tenantId: instantEvalJudgeLimiterTenantOf({ projectId, pool: "llm" }),
+  };
+}
+
+/** The limiter's tenant share of a project's sends on one leg pool. */
+function instantEvalJudgeLimiterTenantOf({
+  projectId,
+  pool,
+}: {
+  projectId: string;
+  pool: "decisions" | "llm";
+}): string {
+  return `${projectId}:${pool}`;
+}
+
+/**
+ * The scenario turn decision's backend when it is switched on, then its enabled fallbacks. Boot
+ * checks these and the scenario judge asks them, so both read the same list.
+ */
+export function instantEvalJudgeScenarioDecisionBackendsOf(
+  table: InstantEvalJudgeRouteTable,
+): string[] {
+  const backend = table.scenarioDecision?.backend;
+  if (backend === undefined) return [];
+  const own = table.backends[backend]?.enabled === true ? [backend] : [];
+  return [...own, ...instantEvalJudgeEnabledFallbacksOf({ backend, table })];
 }
 
 /** A leg's own timeout or the stop it caused, as the channels and the limiter throw it. */

@@ -17,6 +17,7 @@ import {
 } from "./repositories/clickhouse/clickhouse.scenario-id-indexes.database.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 import { StalledRunsBackfillService } from "./services/stalled-runs-backfill.service.ts";
+import { judgePreviewRest } from "./transport/judge-preview.rest.ts";
 import { scenarioAgentTestRest } from "./transport/scenario-agent-test.rest.ts";
 import { scenarioEventsRest } from "./transport/scenario-event.rest.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
@@ -40,6 +41,7 @@ export const scenarioProcessModule: PublishedProcessModule<
     createScenarioRest(),
     createSimulationRunsRest(),
     createScenarioVoiceMediaDoor(),
+    judgePreviewRest,
     scenarioAgentTestRest,
     scenarioEventsRest,
     scenarioGenerateRest,

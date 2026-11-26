@@ -13,6 +13,34 @@ export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-preview";
 export const LANGWATCH_EVALS_MODEL_ID = "langwatch/evals-preview";
 
 /**
+ * LangWatch's hosted scenario judge. Not a decision model: it sits in LANGWATCH_DECISION_PREVIEWS
+ * only for its label and the column it fills. Only the Judge column and a scenario's or suite's
+ * judge may hold it.
+ */
+export const LANGWATCH_JUDGE_MODEL_ID = "langwatch/judge-preview";
+
+export function isLangWatchJudgeModelId(id: string): boolean {
+  return id === LANGWATCH_JUDGE_MODEL_ID;
+}
+
+/** The one feature the model serves: the scenario judge, and so the Judge column that feeds it. */
+export const LANGWATCH_JUDGE_FEATURE_KEY = "scenarios.judge";
+
+/** Whether a config about to be stored newly picks LangWatch Judge (preview) under any key. */
+export function picksLangWatchJudgeModel({
+  config,
+  stored = {},
+}: {
+  config: Readonly<Record<string, string>>;
+  /** What the config held before; a value kept as it was is not a new pick. */
+  stored?: Readonly<Record<string, string>>;
+}): boolean {
+  return Object.entries(config).some(
+    ([key, model]) => isLangWatchJudgeModelId(model) && stored[key] !== model,
+  );
+}
+
+/**
  * The id every LangWatch hosted pick is written as, in Default models and judge settings: the one
  * the previous release reads (expand then contract, ADR-182 amendment 2026-11-23). Where the
  * router flag is on, a judge on it is routed. Writing the -preview ids is a planned follow-up.
@@ -67,6 +95,11 @@ export function isLangWatchModelFillingRole(id: string, role: ModelRole): boolea
   );
 }
 
+/** The LangWatch hosted models that fill a Default models column, in catalogue order. */
+export function langWatchModelsFillingRole(role: ModelRole): LangWatchDecisionPreview[] {
+  return LANGWATCH_DECISION_PREVIEWS.filter((preview) => preview.fills.includes(role));
+}
+
 const INSTANT_PREVIEW = {
   label: "LangWatch Instant (preview)",
   description: "Optimized for search and quick classification",
@@ -88,18 +121,19 @@ export type LangWatchDecisionPreview = Readonly<{
 }>;
 
 /**
- * LangWatch's decision models, first in the Instant Evals picker. LangWatch Instant (preview) is
- * hosted for every column; LangWatch Evals (preview) only for LLM judges; the others are listed as
- * coming soon. Making one pickable is adding its column here.
+ * LangWatch's own hosted models and the Default models column each fills: Instant (preview) fills
+ * Instant Evals, Evals (preview) is for LLM judges only, Judge (preview) fills Judge. The Instant
+ * Evals and Judge pickers list what fills their column, so a new pick is a column added here.
  */
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
   { id: LANGWATCH_DECISION_MODEL_ID, ...INSTANT_PREVIEW, fills: ["INSTANT_EVALS"] },
   { id: LANGWATCH_EVALS_MODEL_ID, ...EVALS_PREVIEW, fills: [], isJudgeRouter: true },
   {
-    id: "langwatch/judge-preview",
+    id: LANGWATCH_JUDGE_MODEL_ID,
     label: "LangWatch Judge (preview)",
     description: "Optimized for scenario judge",
-    fills: [],
+    // The Judge pickers list it from this, where the judge preview flag is on.
+    fills: ["JUDGE"],
   },
 ];
 

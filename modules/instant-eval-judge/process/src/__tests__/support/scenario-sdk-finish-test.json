@@ -1,0 +1,73 @@
+{
+  "name": "finish_test",
+  "description": "Complete the test with a verdict on each criterion, judged one by one",
+  "parameters": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "criteria": {
+        "type": "object",
+        "properties": {
+          "criterion_0": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "string"
+              },
+              "reasoning": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["passed", "failed", "inconclusive"]
+              }
+            },
+            "required": ["requirement", "reasoning", "status"],
+            "additionalProperties": false
+          },
+          "criterion_1": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "string"
+              },
+              "reasoning": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["passed", "failed", "inconclusive"]
+              }
+            },
+            "required": ["requirement", "reasoning", "status"],
+            "additionalProperties": false
+          },
+          "criterion_2": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "string"
+              },
+              "reasoning": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["passed", "failed", "inconclusive"]
+              }
+            },
+            "required": ["requirement", "reasoning", "status"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["criterion_0", "criterion_1", "criterion_2"],
+        "additionalProperties": false
+      },
+      "reasoning": {
+        "type": "string"
+      }
+    },
+    "required": ["criteria", "reasoning"],
+    "additionalProperties": false
+  }
+}

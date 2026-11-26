@@ -10,6 +10,7 @@ import {
   instantEvalJudgeRouteSlotsOf,
   instantEvalJudgeRouteTableSchema,
   isInstantEvalJudgeEntryEnabled,
+  isInstantEvalJudgeLlmBackend,
 } from "../instant-eval-judge-route.ts";
 import { instantEvalJudgeConfig } from "../instant-eval-judge.config.ts";
 import {
@@ -192,6 +193,10 @@ describe("judge route table", () => {
         "anthropic_messages",
         { kind: "anthropic_messages", model: "llm-model-a", reasoningEffort: "low" },
       ],
+      [
+        "gemini_generate_content",
+        { kind: "gemini_generate_content", model: "llm-model-c", reasoningEffort: "low" },
+      ],
     ])("refuses a reasoning effort on a %s backend, naming it", (kind, backend) => {
       const parsed = instantEvalJudgeRouteTableSchema.safeParse(
         gatedTable({ backends: { extra: backend } }),
@@ -200,6 +205,39 @@ describe("judge route table", () => {
       expect(JSON.stringify(parsed.error?.issues)).toContain(
         `backend extra: a ${kind} backend takes no reasoningEffort`,
       );
+    });
+
+    /** @scenario "A route table holds a Gemini backend to a bare model id and no reasoning effort" */
+    it("takes a Gemini backend as an LLM that may escalate", () => {
+      const table = gatedTable({
+        backends: { "llm-c": { kind: "gemini_generate_content", model: "llm-model-3.8_c" } },
+        entry: { escalateTo: "llm-c" },
+      });
+      const parsed = instantEvalJudgeRouteTableSchema.parse(table);
+      expect(isInstantEvalJudgeLlmBackend({ backend: "llm-c", table: parsed })).toBe(true);
+      expect(isInstantEvalJudgeLlmBackend({ backend: "decision-a", table: parsed })).toBe(false);
+    });
+
+    /** @scenario "A route table holds a Gemini backend to a bare model id and no reasoning effort" */
+    it.each([
+      ["no model", { kind: "gemini_generate_content" }, "must name its model"],
+      [
+        "a path in its model",
+        { kind: "gemini_generate_content", model: "models/x:other?key=1" },
+        "a gemini_generate_content model is a bare model id",
+      ],
+      [
+        "a parent path in its model",
+        { kind: "gemini_generate_content", model: "../tunedModels/x" },
+        "a gemini_generate_content model is a bare model id",
+      ],
+    ])("refuses a Gemini backend with %s, naming it", (_name, backend, issue) => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        gatedTable({ backends: { extra: backend } }),
+      );
+      expect(parsed.success).toBe(false);
+      expect(JSON.stringify(parsed.error?.issues)).toContain(`backend extra: `);
+      expect(JSON.stringify(parsed.error?.issues)).toContain(issue);
     });
 
     /** @scenario "A backend that reasons waits long enough to write its output cap" */

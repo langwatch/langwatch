@@ -17,6 +17,8 @@ import type {
   InstantEvalLlmJudgeAnswer,
   InstantEvalLlmJudgeChannel,
   InstantEvalLlmJudgeRequest,
+  InstantEvalLlmToolCallAnswer,
+  InstantEvalLlmToolCallRequest,
 } from "../../channels/instant-eval-llm-judge.channel.ts";
 import { InstantEvalJudgeRouterService } from "../../services/instant-eval-judge-router.service.ts";
 
@@ -60,14 +62,44 @@ type LlmJudgeAnswer = (
   signal?: AbortSignal,
 ) => InstantEvalLlmJudgeAnswer | Promise<InstantEvalLlmJudgeAnswer>;
 
-/** The LLM legs' twin: answers each question as scripted and keeps every request. */
+type LlmToolCallAnswer = (
+  request: InstantEvalLlmToolCallRequest,
+  signal?: AbortSignal,
+) => InstantEvalLlmToolCallAnswer | Promise<InstantEvalLlmToolCallAnswer>;
+
+const NO_TOOL_CALL: LlmToolCallAnswer = () => ({
+  outcome: "skipped",
+  reason: "classifier_not_configured",
+  inputTokens: 0,
+  outputTokens: 0,
+});
+
+/** The LLM legs' twin: answers each question or tool call as scripted and keeps every request. */
 export class ScriptedInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChannel {
   readonly requests: InstantEvalLlmJudgeRequest[] = [];
+  readonly calls: InstantEvalLlmToolCallRequest[] = [];
 
-  private constructor(private readonly answer: LlmJudgeAnswer) {}
+  private constructor(
+    private readonly answer: LlmJudgeAnswer,
+    private readonly toolCall: LlmToolCallAnswer,
+  ) {}
 
-  static create({ answer }: { answer: LlmJudgeAnswer }): ScriptedInstantEvalLlmJudgeChannel {
-    return new ScriptedInstantEvalLlmJudgeChannel(answer);
+  static create({
+    answer,
+    toolCall = NO_TOOL_CALL,
+  }: {
+    answer: LlmJudgeAnswer;
+    toolCall?: LlmToolCallAnswer;
+  }): ScriptedInstantEvalLlmJudgeChannel {
+    return new ScriptedInstantEvalLlmJudgeChannel(answer, toolCall);
+  }
+
+  async call(
+    request: InstantEvalLlmToolCallRequest,
+    signal?: AbortSignal,
+  ): Promise<InstantEvalLlmToolCallAnswer> {
+    this.calls.push(request);
+    return this.toolCall(request, signal);
   }
 
   isConfigured(): boolean {

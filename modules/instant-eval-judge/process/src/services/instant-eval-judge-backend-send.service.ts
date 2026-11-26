@@ -6,6 +6,7 @@
  */
 
 import type {
+  InstantEvalJudgeLlmKind,
   InstantEvalJudgeReasoningEffort,
   InstantEvalJudgeRouteTable,
   InstantEvalQuestion,
@@ -22,8 +23,11 @@ import type {
   InstantEvalJudgeLeg as Leg,
   InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
+import { instantEvalScenarioLlmVerdictOf } from "../rules/instant-eval-scenario-judge.rules.ts";
 import { InstantEvalJudgeDecisionLegService } from "./instant-eval-judge-decision-leg.service.ts";
 import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
+import type { InstantEvalJudgeScenarioLeg } from "./instant-eval-judge-route-run.service.ts";
+import type { InstantEvalScenarioLlmVerdictCall } from "./instant-eval-scenario-llm-verdict.service.ts";
 
 /** One send's tokens; `isUsageUnread` when the call went out and no usage came back. */
 export type InstantEvalJudgeSendSpend = {
@@ -45,6 +49,8 @@ type InstantEvalJudgeBackendSendInput = Readonly<{
   logger: Pick<Logger, "error">;
   /** Adds a routing flag to the run's. */
   flag: (flag: string) => void;
+  /** A scenario criterion's run: its LLM legs read the judge's shared verdict call. */
+  scenario?: InstantEvalJudgeScenarioLeg;
 }>;
 
 export class InstantEvalJudgeBackendSendService {
@@ -109,7 +115,7 @@ export class InstantEvalJudgeBackendSendService {
     paid,
   }: {
     backend: string;
-    wire: "anthropic_messages" | "openai_responses";
+    wire: InstantEvalJudgeLlmKind;
     model: string | undefined;
     questions: readonly InstantEvalQuestion[];
     timeoutMs: number;
@@ -119,6 +125,11 @@ export class InstantEvalJudgeBackendSendService {
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
+    const { scenario } = this.input;
+    if (scenario) {
+      const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
+      return this.readScenarioVerdict({ scenario, backend, call, questions, paid });
+    }
     const { llmJudge, limiter, projectId, plan, signal, logger } = this.input;
     const leg = InstantEvalJudgeLlmLegService.create({
       llmJudge,
@@ -140,6 +151,36 @@ export class InstantEvalJudgeBackendSendService {
     const { answers, reason } = await leg.ask({ call, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
     if (answers.size < questions.length) this.input.flag(`${backend}_partial:${reason}`);
+    return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
+  }
+
+  /** The judgement's shared verdict call on this backend, read by this criterion's key. */
+  private async readScenarioVerdict({
+    scenario: { criterionKey, verdicts },
+    backend,
+    call,
+    questions,
+    paid,
+  }: {
+    scenario: InstantEvalJudgeScenarioLeg;
+    backend: string;
+    call: InstantEvalScenarioLlmVerdictCall;
+    questions: readonly InstantEvalQuestion[];
+    paid: (spend: InstantEvalJudgeSendSpend) => void;
+  }): Promise<Leg> {
+    const reading = await verdicts.read({
+      backend,
+      call,
+      paid: (spend) => paid({ backend, ...spend }),
+    });
+    if (reading.outcome === "failed") return { outcome: "failed", reason: reading.reason };
+    const answer = reading.criteria.get(criterionKey);
+    if (answer === undefined) return { outcome: "failed", reason: "classifier_failed" };
+    const verdictOf = (questionId: string) =>
+      instantEvalScenarioLlmVerdictOf({ questionId, answer });
+    const answers = new Map(
+      questions.map(({ id }) => [id, { verdict: verdictOf(id), sureness: 1 }]),
+    );
     return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
   }
 }

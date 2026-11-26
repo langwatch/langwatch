@@ -26,12 +26,14 @@ import {
 import { vi } from "vitest";
 
 import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type { JudgePreviewAvailabilityService } from "../../features/judge-preview/services/judge-preview-availability.service.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
 } from "../../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import type { VoiceTargetReader } from "../../features/prefetch/services/scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "../../services/scenario.service.ts";
+import { judgePreviewAvailabilityFixture } from "./judge-preview.fixture.ts";
 
 export interface ScenarioFetcher {
   getById(input: { projectId: string; id: string }): Promise<{
@@ -128,6 +130,8 @@ export interface ScenarioPrefetchFixture {
   apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">>;
   /** Whether workflow reports per-project engines; absent, it does not. */
   perProjectEngines?: boolean;
+  /** Whether LangWatch Judge (preview) may judge; absent, it may not, as when self-hosted. */
+  judgePreviewAvailability?: JudgePreviewAvailabilityService;
 }
 
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
@@ -389,6 +393,7 @@ export function createTestScenarioExecutionPrefetcherService(
   },
 ): ScenarioExecutionPrefetcherService {
   return ScenarioExecutionPrefetcherService.create({
+    judgePreviewAvailability: deps.judgePreviewAvailability ?? judgePreviewAvailabilityFixture(),
     runSecretSeal: {
       sealRunSecret: ({ plain }) => cipher.encrypt(plain),
       openRunSecret: ({ sealed }) => cipher.decrypt(sealed),
