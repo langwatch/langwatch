@@ -28,7 +28,7 @@ const INVOICED_STATUSES: ReadonlySet<BillingSubscription["status"]> = new Set([
  * How long before a new line a cancelled subscription may have ended and still hand its line
  * on: a replacement cancels the old subscription around the new one's checkout, not to the second.
  */
-export const REPLACEMENT_TOLERANCE_MS = 60_000;
+const REPLACEMENT_TOLERANCE_MS = 60_000;
 
 /** A line on the catalogue's price, or on any price carrying its name: a re-price keeps a key. */
 function isLineOn({ item, priceName, priceId }: { item: BillingSubscriptionItem } & MeterPrice) {

@@ -61,7 +61,7 @@ interface BillingMeter {
   /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
   readonly isProvisioned: () => boolean;
   /** Whether, and since when, the subscription prices this meter, so an event sent is invoiced. */
-  readonly isPriced: (input: {
+  readonly priceLine: (input: {
     stripeCustomerId: string;
     contract: UsageBillingContract;
     billingMonth: string;
@@ -127,7 +127,7 @@ export interface ReportUsageForMonthCommandDeps {
    * unpriced meter event at nothing, and usage bills only from the line (ADR-201 decision 10,
    * ADR-174 decisions 18 and 26). A throw holds the month and counts toward the breaker.
    */
-  subscriptionCarriesPrice: (input: {
+  subscriptionPriceLine: (input: {
     stripeCustomerId: string;
     price: StripePriceName;
     billingMonth: string;
@@ -292,7 +292,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         // Every mode maps the events meter; the catalogue refuses to load without it.
         isProvisioned: () => true,
         // Every Growth subscription carries the events price; checkout cannot leave it out.
-        isPriced: async () => WHOLE_MONTH_LINE,
+        priceLine: async () => WHOLE_MONTH_LINE,
         followsCountedEvent: true,
         ceiling: async () => null,
         // Usage's month_counted total; a command without one leaves this meter untouched.
@@ -308,10 +308,10 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         isProvisioned: deps.isInstantEvalMeterProvisioned,
         // Connected hosted usage is reported as before: which meter its quarterly price bills is
         // unchecked against Stripe (ADR-174 decision 18).
-        isPriced: ({ stripeCustomerId, contract, billingMonth }) =>
+        priceLine: ({ stripeCustomerId, contract, billingMonth }) =>
           contract === "connected"
             ? Promise.resolve(WHOLE_MONTH_LINE)
-            : deps.subscriptionCarriesPrice({
+            : deps.subscriptionPriceLine({
                 stripeCustomerId,
                 price: "GROWTH_INSTANT_EVAL_USD",
                 billingMonth,
@@ -343,8 +343,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       {
         eventName: PII_REDACTION_USD_EVENT_NAME,
         isProvisioned: deps.isPiiRedactionMeterProvisioned,
-        isPriced: ({ stripeCustomerId, billingMonth }) =>
-          deps.subscriptionCarriesPrice({
+        priceLine: ({ stripeCustomerId, billingMonth }) =>
+          deps.subscriptionPriceLine({
             stripeCustomerId,
             price: "GROWTH_PII_REDACTION_USD",
             billingMonth,
@@ -541,7 +541,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     const { meter, organizationId, billingMonth, stripeCustomerId, contract } = input;
     let line: PriceLine;
     try {
-      line = await meter.isPriced({ stripeCustomerId, contract, billingMonth });
+      line = await meter.priceLine({ stripeCustomerId, contract, billingMonth });
     } catch (error) {
       await this.recordPriceReadFailure({ ...input, error: toError(error) });
       return { gate: "failed" };

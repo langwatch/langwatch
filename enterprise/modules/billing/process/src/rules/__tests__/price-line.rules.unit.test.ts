@@ -12,7 +12,7 @@ import type {
   BillingSubscription,
   BillingSubscriptionItem,
 } from "../billing-stripe-shapes.rules.ts";
-import { meterBilledSince, priceLineOf, REPLACEMENT_TOLERANCE_MS } from "../price-line.rules.ts";
+import { meterBilledSince, priceLineOf } from "../price-line.rules.ts";
 
 const PRICE_NAME = "GROWTH_INSTANT_EVAL_USD";
 const PRICE_ID = "price_catalogue";
@@ -25,6 +25,9 @@ const ON_THE_6TH_MS = Date.UTC(2026, 1, 6, 10);
 const ON_THE_10TH_MS = Date.UTC(2026, 1, 10, 9);
 const ON_THE_15TH_MS = Date.UTC(2026, 1, 15, 12);
 const ON_THE_20TH_MS = Date.UTC(2026, 1, 20, 8);
+/** The replacement tolerance is one minute: pinned as instants, not read off the constant. */
+const ONE_MINUTE_BEFORE_THE_15TH_MS = Date.UTC(2026, 1, 15, 11, 59);
+const JUST_OVER_A_MINUTE_BEFORE_THE_15TH_MS = Date.UTC(2026, 1, 15, 11, 58, 59);
 
 function line(
   createdAtMs: number,
@@ -207,7 +210,7 @@ describe("priceLineOf", () => {
           subscription({
             status: "canceled",
             items: [line(BEFORE_THE_MONTH_MS)],
-            endedAtMs: ON_THE_15TH_MS - REPLACEMENT_TOLERANCE_MS,
+            endedAtMs: ONE_MINUTE_BEFORE_THE_15TH_MS,
           }),
           subscription({ items: [line(ON_THE_15TH_MS)] }),
         ]),
@@ -256,7 +259,7 @@ describe("priceLineOf", () => {
           subscription({
             status: "canceled",
             items: [line(BEFORE_THE_MONTH_MS)],
-            endedAtMs: ON_THE_15TH_MS - REPLACEMENT_TOLERANCE_MS - 1_000,
+            endedAtMs: JUST_OVER_A_MINUTE_BEFORE_THE_15TH_MS,
           }),
           subscription({ items: [line(ON_THE_15TH_MS)] }),
         ]),

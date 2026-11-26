@@ -112,7 +112,7 @@ added to the Stripe subscription, never from the month's first day (decision 15)
 14. **The free list has no end date.** Organizations on `release_pii_redaction_model_free` stay
     free for as long as LangWatch keeps them on it. Ending it is an operator change to the flag,
     not a deploy; calls recorded while it was on stay at zero (decision 7).
-15. **Usage is billed only from the day the price line was added (revised 2026-11-26).** All
+15. **Usage is billed only from the moment the price line was added (revised 2026-11-26).** All
     charges start from the day the line is added to the subscription (Sergio, 2026-11-26). The
     month the meter reports starts at the latest of the month's start, the growth-seat
     subscription's start and the creation of the `GROWTH_PII_REDACTION_USD` line, read off the

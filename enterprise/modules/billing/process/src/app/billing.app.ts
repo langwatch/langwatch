@@ -1087,7 +1087,7 @@ export class BillingModule
       isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
       queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
       isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
-      subscriptionCarriesPrice: async ({ stripeCustomerId, price, billingMonth }) =>
+      subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
         stripeSubscriptions === void 0
           ? { carried: false }
           : priceLineOf({

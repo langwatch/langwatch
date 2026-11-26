@@ -492,7 +492,7 @@ describe.skipIf(!goPresent)(
         queryPiiRedactionSpendTotal: (input) =>
           piiRedactionSpend.queryPiiRedactionSpendTotal(input),
         isPiiRedactionMeterProvisioned: () => true,
-        subscriptionCarriesPrice: async ({ stripeCustomerId, price, billingMonth }) =>
+        subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
           priceLineOf({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
@@ -808,7 +808,7 @@ describe.skipIf(!goPresent)(
         isInstantEvalMeterProvisioned: () => true,
         queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
         isPiiRedactionMeterProvisioned: () => false,
-        subscriptionCarriesPrice: async ({ stripeCustomerId, price, billingMonth }) =>
+        subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
           priceLineOf({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,

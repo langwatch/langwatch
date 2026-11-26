@@ -1,4 +1,4 @@
-Feature: Instant Evals and PII redaction usage is billed only from the day its price line was added
+Feature: Instant Evals and PII redaction usage is billed only from the moment its price line was added
 
   All charges start from the day the usage price line is added to the Stripe subscription
   (Sergio, 2026-11-26). Before, the first report after a line was added carried the whole

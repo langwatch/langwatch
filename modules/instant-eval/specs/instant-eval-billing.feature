@@ -226,9 +226,11 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
     @unit
     Scenario: The first report after the Instant Evals price is added bills only from the line
       Given an organization whose usage was held for want of the Instant Evals price
+      And it has no cancelled subscription whose line hands it an earlier start
       When the price is added to its subscription and the month is reported
       Then the spend is read from the moment the line was added, never the month's first day
-      # All charges start from the day the line is added (ADR-174 decision 26).
+      # Charges start from the moment the line is added; a cancelled line that ended with no gap
+      # before it hands on its earlier start instead (ADR-174 decision 26).
 
     # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23, proposed in v22).
     @unit

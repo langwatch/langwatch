@@ -212,7 +212,7 @@ async function createHandler({
     isInstantEvalMeterProvisioned: () => instantEvalMeterProvisioned,
     queryPiiRedactionSpendTotal: mockQueryPiiRedactionSpendTotal,
     isPiiRedactionMeterProvisioned: () => piiRedactionMeterProvisioned,
-    subscriptionCarriesPrice: mockSubscriptionCarriesPrice,
+    subscriptionPriceLine: mockSubscriptionCarriesPrice,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
