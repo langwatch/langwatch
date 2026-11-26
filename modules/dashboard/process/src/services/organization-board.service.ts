@@ -87,7 +87,13 @@ export class OrganizationBoardService {
     return listed.map(({ board, project }) => {
       const author = authorOf({ board, isReadable: project !== null, viewer, ownerNames });
       return libraryRow({
-        board: { ...board, createdById: author.createdById },
+        board: {
+          ...board,
+          createdById: author.createdById,
+          // Only the reader's own mark is named; another member's My dashboard reads as any board.
+          myDashboardOfUserId:
+            board.myDashboardOfUserId === viewer.userId ? board.myDashboardOfUserId : null,
+        },
         project,
         openProject: project ?? guestProject ?? null,
         ownerName: author.ownerName,
@@ -121,7 +127,8 @@ export class OrganizationBoardService {
 
   /**
    * Where a board made outside a project view may be stored: projects with Dashboards on where
-   * the member holds `analytics:create`, by name (ADR-002, decision 3).
+   * the member holds `analytics:create`, by name (ADR-002, decision 3). Another member's
+   * personal project is never one, even to an admin who may create there.
    */
   async findStoreProjects({ organizationId, viewer }: Reading): Promise<DashboardProject[]> {
     const projectIds = await this.#liveIds({ organizationId });
@@ -131,6 +138,7 @@ export class OrganizationBoardService {
       projectIds,
       viewer,
       permission,
+      shouldSkipOthersPersonal: true,
     });
     const enabled = await this.#enabledIds(mayCreate.map(({ id }) => id));
     return byName(mayCreate.filter(({ id }) => enabled.includes(id)));
@@ -215,6 +223,7 @@ function libraryRow({
     createdById,
     scope,
     homeProduct,
+    myDashboardOfUserId: board.myDashboardOfUserId ?? null,
     updatedAt,
     project,
     openProject,
