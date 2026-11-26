@@ -437,16 +437,17 @@ export function InstantEvalRefusalPopover({
 }
 
 /** One way to turn Instant Evals on: what it is, who pays, and its button for an admin. */
+/** A recommended option carries the "Recommended" badge and the one solid button. */
 function TurnOnOption({
   option,
   icon,
-  badge,
+  isRecommended = false,
   canAct,
   testId,
 }: {
   option: { title: string; body: string; action: { label: string; href: string } };
   icon: React.ReactNode;
-  badge?: string;
+  isRecommended?: boolean;
   canAct: boolean;
   testId: string;
 }) {
@@ -457,9 +458,9 @@ function TurnOnOption({
       icon={icon}
       title={option.title}
       badge={
-        badge ? (
+        isRecommended ? (
           <Badge size="sm" colorPalette="orange" variant="subtle">
-            {badge}
+            Recommended
           </Badge>
         ) : undefined
       }
@@ -469,8 +470,8 @@ function TurnOnOption({
           <Button
             asChild
             size="xs"
-            colorPalette={badge ? "orange" : undefined}
-            variant={badge ? "solid" : "outline"}
+            colorPalette={isRecommended ? "orange" : undefined}
+            variant={isRecommended ? "solid" : "outline"}
           >
             {/* A new tab, so the typed query the popover keeps survives the detour. */}
             <RoutedLink href={option.action.href} target="_blank" rel="noopener noreferrer">
@@ -511,7 +512,7 @@ function TurnOnInstantEvals({
       <TurnOnOption
         option={copy.hosted}
         icon={<Sparkles size={16} />}
-        badge="Recommended"
+        isRecommended
         canAct={canManageOrganization}
         testId="instant-eval-turn-on-hosted"
       />
@@ -523,9 +524,7 @@ function TurnOnInstantEvals({
           testId="instant-eval-turn-on-own-model"
         />
       )}
-      {!canManageOrganization && (
-        <AskAnAdmin href={copy.ownModel ? INSTANT_EVALS_SETUP_HREF : CONNECT_SETTINGS_HREF} />
-      )}
+      {!canManageOrganization && <AskAnAdmin href={(copy.ownModel ?? copy.hosted).action.href} />}
       <HStack gap={2}>
         <Text textStyle="xs">
           <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">

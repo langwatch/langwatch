@@ -60,7 +60,7 @@ import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
 import { ModelChip } from "../elements/model-chip.tsx";
 
 /** The address query that opens the Instant Evals picker, which a refused eval links to. */
-export const INSTANT_EVALS_SETUP_QUERY = { key: "setup", value: "instant-evals" } as const;
+const INSTANT_EVALS_SETUP_QUERY = { key: "setup", value: "instant-evals" } as const;
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
 type ConfigRow = WireOf<ModelDefaultConfigSnapshot>;
