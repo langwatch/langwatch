@@ -32,6 +32,13 @@ Feature: A drawer that needs another drawer
       When they go back
       Then the first drawer is on screen again with the parameters it was opened with
 
+    @integration
+    Scenario: A sub-flow hands a result back to the drawer that opened it
+      Given a reader who walked from one drawer into another
+      When the second drawer goes back with a result, such as what it just saved
+      Then the first drawer is on screen again with the parameters it was opened with
+      And it holds the result beside them, with no drawer left beneath it
+
     @integration @unimplemented
     Scenario: A sub-flow is a navigation rather than a second overlay
       Given a drawer with a step that needs another drawer
