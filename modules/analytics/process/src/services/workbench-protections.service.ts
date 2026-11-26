@@ -25,7 +25,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 
 import { LWQL_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
@@ -80,35 +80,32 @@ export class WorkbenchProtectionsService {
     /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
     authorization?: Authorization;
   }): Promise<LangWatchQLProtections> {
-    return this.memberProtections({
-      ...input,
-      isProjectOwner: this.isProjectOwner({ userId: input.userId, projectId: input.projectId }),
-    });
+    return this.memberProtections({ ...input, loaded: undefined });
   }
 
+  /** `loaded` is the read's own project when the caller already holds it, saving a re-read. */
   private async memberProtections(input: {
     userId: string;
     projectId: string;
     authorization?: Authorization;
-    isProjectOwner: Promise<boolean>;
+    loaded: Project | undefined;
   }): Promise<LangWatchQLProtections> {
     const { authz } = this.dependencies;
     const { userId, projectId } = input;
+    const policyProjectIds = input.authorization
+      ? [...new Set([projectId, ...projectIdsReadBy(input.authorization, "analytics:view")])]
+      : [projectId];
     const scope = await this.projectScope(projectId);
     const [catalogue, held, isProjectOwner] = await Promise.all([
       this.catalogueFor({ principal: { type: "user", id: userId }, scope }),
       askViewerRolePermissions((permission) =>
         authz.hasPermission({ userId, permission, projectId }),
       ),
-      input.isProjectOwner,
+      this.ownsEvery({ userId, projectIds: policyProjectIds, loaded: input.loaded }),
     ]);
     const canSeeCosts = holdsCostView(catalogue);
 
-    const policy = await this.policyFor(
-      input.authorization
-        ? [...new Set([projectId, ...projectIdsReadBy(input.authorization, "analytics:view")])]
-        : [projectId],
-    );
+    const policy = await this.policyFor(policyProjectIds);
     if (!policy) {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
@@ -140,8 +137,7 @@ export class WorkbenchProtectionsService {
     if (!project) {
       throw new LangWatchQLProjectNotFoundError();
     }
-    const isProjectOwner = Promise.resolve(project.ownerUserId === input.userId);
-    const protections = await this.memberProtections({ ...input, isProjectOwner });
+    const protections = await this.memberProtections({ ...input, loaded: project });
     return { project: { id: project.id, lwqlKey: project.lwqlKey }, protections };
   }
 
@@ -241,14 +237,26 @@ export class WorkbenchProtectionsService {
     };
   }
 
-  /** Whether the member owns the project, as the trace view reads it; unknown is not. */
-  private async isProjectOwner(input: { userId: string; projectId: string }): Promise<boolean> {
+  /**
+   * Whether the member owns every project whose policy governs the read, as the trace view
+   * reads it: the folded owner-only audience may be another project's. Unknown is not.
+   */
+  private async ownsEvery(input: {
+    userId: string;
+    projectIds: readonly string[];
+    loaded: Project | undefined;
+  }): Promise<boolean> {
+    const { userId, loaded } = input;
     try {
-      const project = await this.dependencies.projects.findById(input.projectId);
-      return project?.ownerUserId != null && project.ownerUserId === input.userId;
+      const projects = await Promise.all(
+        input.projectIds.map((projectId) =>
+          loaded?.id === projectId ? loaded : this.dependencies.projects.findById(projectId),
+        ),
+      );
+      return projects.every((project) => project?.ownerUserId === userId);
     } catch (error) {
       logger.error(
-        { error, projectId: input.projectId },
+        { error, projectIds: input.projectIds },
         "project owner resolution failed; treating the member as not the owner (fail-closed)",
       );
       return false;

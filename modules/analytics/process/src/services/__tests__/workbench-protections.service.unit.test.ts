@@ -322,6 +322,51 @@ describe("resolveMemberProtections", () => {
       expect(resolved.canSeeCapturedInput).toBe(true);
     });
 
+    /** @scenario "Owner-only content stays hidden when a read spans a project the viewer does not own" */
+    it("hides owner-only content when the read also spans a project the member does not own", async () => {
+      const ownerOnly = {
+        disposition: "restrict" as const,
+        audience: {
+          ...bothRestrictedToAdmins().categories.input.audience,
+          admins: false,
+          projectOwner: true,
+        },
+      };
+      const dataPrivacy = createApiFixture<DataPrivacyApi>(
+        {
+          getResolvedForProjects: async () => ({
+            ...PLATFORM_DEFAULT_DATA_PRIVACY,
+            categories: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories, input: ownerOnly },
+          }),
+        },
+        "workbench data privacy",
+      );
+      const projects = createApiFixture<ProjectApi>(
+        {
+          findById: async (id) => ({
+            ...projectWith({ id, lwqlKey: "lwql-secret" }),
+            ownerUserId: id === "project-1" ? "user-1" : "someone-else",
+          }),
+        },
+        "workbench projects",
+      );
+
+      const resolved = await serviceOver({
+        authz: authzAsRole("member").authz,
+        dataPrivacy,
+        projects,
+      }).resolveMemberProtections({
+        userId: "user-1",
+        projectId: "project-1",
+        authorization: analyticsProof({
+          projectId: "project-1",
+          shared: [{ projectId: "project_b", from: 0 }],
+        }),
+      });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+    });
+
     it("hides captured content from a Viewer", async () => {
       const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
 

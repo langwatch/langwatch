@@ -232,14 +232,24 @@ export class TraceViewerProtectionService {
     ) as Protections["contentCategories"];
   }
 
-  /** Whether the viewer owns the project; unknown ownership is not ownership. */
+  /**
+   * Whether the viewer owns every project whose policy governs the read: the folded owner-only
+   * audience may be another project's. Unknown ownership is not ownership.
+   */
   private async isProjectOwner(
-    input: Readonly<{ projectId: string; userId: string | undefined }>,
+    input: Readonly<{
+      projectId: string;
+      userId: string | undefined;
+      authorization?: Authorization;
+    }>,
   ): Promise<boolean> {
-    if (input.userId === undefined) return false;
+    const { userId } = input;
+    if (userId === undefined) return false;
     try {
-      const project = await this.options.projects.findWithTeam(input.projectId);
-      return project?.ownerUserId != null && project.ownerUserId === input.userId;
+      const projects = await Promise.all(
+        policyProjectIdsOf(input).map((projectId) => this.options.projects.findWithTeam(projectId)),
+      );
+      return projects.every((project) => project?.ownerUserId === userId);
     } catch (error) {
       this.logger.error(
         { projectId: input.projectId, error },
