@@ -240,10 +240,9 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    // Only a push source has a secret at all: a pull-mode or pure-S3 source
-    // authenticates outbound, so a minted secret would be stored and shown
-    // without ever authenticating anything. The empty hash is the sentinel for
-    // "there is no secret here", which is what the ingest door reads.
+    // Only a push source has a secret: a pull-mode or pure-S3 source authenticates outbound, so a
+    // minted secret would be stored and shown without authenticating anything. The empty hash is
+    // the sentinel for "there is no secret here", which is what the ingest door reads.
     const ingestSecret = isPushSourceType({ sourceType: input.sourceType })
       ? this.secrets.generate()
       : null;

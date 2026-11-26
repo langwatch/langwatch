@@ -26,7 +26,7 @@ const lastSort = () => asked.at(-1)?.sort;
 const columnHeader = (name: string) =>
   screen.getAllByRole("columnheader").find((cell) => within(cell).queryByRole("button", { name }))!;
 
-describe("Feature: Sorting the Back office users list", () => {
+describe("Feature: Sorting the Admin users list", () => {
   beforeEach(() => {
     asked.length = 0;
   });

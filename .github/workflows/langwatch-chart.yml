@@ -18,6 +18,8 @@ on:
       - "cmd/chartheap/**"
       - "tools/charts3region/**"
       - "cmd/charts3region/**"
+      - "tools/chartnumbers/**"
+      - "cmd/chartnumbers/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -58,6 +60,8 @@ on:
       - "cmd/chartheap/**"
       - "tools/charts3region/**"
       - "cmd/charts3region/**"
+      - "tools/chartnumbers/**"
+      - "cmd/chartnumbers/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -314,6 +318,13 @@ jobs:
         if: "!cancelled()"
         working-directory: .
         run: go run ./cmd/chartheap -prove-node infra/docker/Dockerfile
+
+      # Helm loads a values-file number as float64 and prints 1e6 or more as
+      # "1.8e+07", which the agent cannot parse. `--set` never shows it.
+      - name: "assert langyagent numbers render as digits"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/chartnumbers
 
       # The awsS3 provider's region must reach every container that carries the
       # S3 settings; without it a keyed client signs for the wrong region.
