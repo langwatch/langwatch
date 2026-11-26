@@ -125,6 +125,22 @@ describe.each(backends)(
         ).resolves.toBe(0);
       });
 
+      /** @scenario "A re-time counts from the owner's latest store" */
+      it("moves its start to the latest store when stored again with no end", async () => {
+        const repository = create();
+        await repository.raise(link({ retainUntil: null }));
+        await repository.raise(link({ retainUntil: null, createdAt: day(20) }));
+
+        await repository.retime({ tenantId: ACME, objectIds: [OBJECT], days: 7, at: day(21) });
+
+        await expect(
+          repository.countLive({ tenantId: ACME, objectId: OBJECT, now: day(26) }),
+        ).resolves.toBe(1);
+        await expect(
+          repository.countLive({ tenantId: ACME, objectId: OBJECT, now: day(27) }),
+        ).resolves.toBe(0);
+      });
+
       /** @scenario "An object stored before owner links is never reused for a retained purpose" */
       it("counts every link ever written, ended or not, and none for another tenant", async () => {
         const repository = create();
@@ -204,12 +220,12 @@ describe.each(backends)(
         await expect(
           repository.findExpired({ tenantId: ACME, before: day(2), limit: 1 }),
         ).resolves.toHaveLength(1);
-        await expect(
-          repository.findTenantsWithExpired({ before: day(2), limit: 10 }),
-        ).resolves.toEqual([ACME, OTHER].toSorted());
-        await expect(
-          repository.findTenantsWithExpired({ before: day(0), limit: 10 }),
-        ).resolves.toEqual([]);
+        // Other suites share the test database: assert this suite's tenants, not the whole list.
+        const ended = await repository.findTenantsWithExpired({ before: day(2), limit: 10_000 });
+        expect(ended).toEqual(expect.arrayContaining([ACME, OTHER]));
+        const none = await repository.findTenantsWithExpired({ before: day(0), limit: 10_000 });
+        expect(none).not.toContain(ACME);
+        expect(none).not.toContain(OTHER);
       });
 
       /** @scenario "The memory and Postgres owner-link repositories answer alike" */
@@ -226,9 +242,9 @@ describe.each(backends)(
         await expect(
           repository.countLive({ tenantId: ACME, objectId: OBJECT, now: day(2) }),
         ).resolves.toBe(1);
-        await expect(
-          repository.findTenantsWithExpired({ before: day(2), limit: 10 }),
-        ).resolves.toEqual([OTHER]);
+        const ended = await repository.findTenantsWithExpired({ before: day(2), limit: 10_000 });
+        expect(ended).toContain(OTHER);
+        expect(ended).not.toContain(ACME);
       });
     });
 

@@ -236,6 +236,7 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
          SET "status" = 'deleted',
              "generation" = o."generation" + 1,
              "deletedAt" = ${now},
+             "expiresAt" = ${now},
              "updatedAt" = ${now}
        WHERE o."tenantId" = ${input.tenantId}
          AND o."id" = ${input.id}

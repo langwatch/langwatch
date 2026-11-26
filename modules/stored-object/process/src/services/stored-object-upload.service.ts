@@ -49,6 +49,7 @@ import {
   landedDigestOf,
   movedOn,
 } from "../rules/stored-object-lifecycle.rules.ts";
+import { pendingUploadRecord } from "../rules/stored-object-upload.rules.ts";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectUploadReceiveService } from "./stored-object-upload-receive.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
@@ -133,7 +134,7 @@ export class StoredObjectUploadService {
     }
 
     const record = await this.storeNew({ input, chunks, byteLength });
-    await this.link({ objectId: record.id, owners });
+    await this.linkOrDiscard({ record, owners });
 
     return { reference: storedObjectReferenceOf(record), isDuplicate: false };
   }
@@ -233,6 +234,36 @@ export class StoredObjectUploadService {
     owners: readonly StoredObjectOwnerClaim[];
   }): Promise<void> {
     for (const owner of owners) await this.options.ownerLinks.raise({ ...owner, objectId });
+  }
+
+  /** Links a new object's owners; a failed link deletes it, so no unlinked object is served. */
+  private async linkOrDiscard({
+    record,
+    owners,
+  }: {
+    record: StoredObjectRecord;
+    owners: readonly StoredObjectOwnerClaim[];
+  }): Promise<void> {
+    try {
+      await this.link({ objectId: record.id, owners });
+    } catch (error) {
+      const now = this.options.now();
+      const deleted = movedOn({
+        value: record,
+        now,
+        // Expired, the reaper retries the bytes if their removal here fails.
+        changes: { status: "deleted", deletedAt: now, expiresAt: now },
+      });
+      await StoredObjectUploadService.ignoreStorageFailure(async () => {
+        if (!(await this.options.records.transition({ expected: record, next: deleted }))) return;
+        const address = deleted.storage;
+        if (address) await this.options.storage.delete({ projectId: record.tenantId, address });
+        const cleared = { ...deleted, storage: null, expiresAt: null };
+        await this.options.records.transition({ expected: deleted, next: cleared });
+      });
+
+      throw error;
+    }
   }
 
   /** The row with the caller's audience added; the write changes only a row still available. */
@@ -437,43 +468,4 @@ function refusedField(field: "purpose" | "mediaType", message: string): Validati
 
 async function* streamOf(chunks: readonly Uint8Array[]): StoredObjectByteStream {
   yield* chunks;
-}
-
-/** The row a signed upload leaves behind while its bytes are still in flight. */
-function pendingUploadRecord({
-  input,
-  id,
-  address,
-  expiresAt,
-  now,
-}: {
-  input: CreateStoredObjectUploadInput;
-  id: StoredObjectRecord["id"];
-  address: StoredObjectStorageAddress;
-  expiresAt: Instant;
-  now: Instant;
-}): StoredObjectRecord {
-  return {
-    tenantId: input.projectId,
-    id,
-    status: "pending",
-    purpose: input.purpose,
-    ownerKind: "project",
-    ownerId: input.projectId,
-    filename: input.filename,
-    sha256: "",
-    byteLength: input.byteLength,
-    mediaType: input.mediaType,
-    mediaTypeVerified: false,
-    storage: address,
-    generation: 0,
-    audiences: [purposePolicyOf(input.purpose).readPermission],
-    expiresAt,
-    availableAt: null,
-    deletedAt: null,
-    source: "canonical",
-    legacyFingerprint: null,
-    createdAt: now,
-    updatedAt: now,
-  };
 }

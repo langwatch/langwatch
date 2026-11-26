@@ -95,7 +95,12 @@ export function parseStoredObjectFileReference(
       .split("&")
       .find((pair) => pair.startsWith("filename="))
       ?.slice("filename=".length);
-  const filename = named ? decodeURIComponent(named) : undefined;
+  let filename: string | undefined;
+  try {
+    filename = named ? decodeURIComponent(named) : undefined;
+  } catch {
+    // A malformed escape such as `%ZZ` names no file rather than throwing a `URIError`.
+  }
 
   return second
     ? { projectId: first, storedObjectId: second, filename }

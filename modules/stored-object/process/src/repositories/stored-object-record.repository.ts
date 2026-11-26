@@ -100,9 +100,9 @@ export interface StoredObjectRecordRepository {
   delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void>;
 
   /**
-   * Logically deletes an available row no owner link holds at `now`, the check and the
-   * change in one statement, so a link landing first keeps it (ADR-002 §4). Answers
-   * whether it deleted.
+   * Logically deletes and expires an available row no owner link holds at `now` in one
+   * statement, so a link landing first keeps it (ADR-002 §4) and the reaper retries its
+   * bytes. Answers whether it deleted.
    */
   markDeletedIfUnheld(input: {
     tenantId: StoredObjectProjectId;

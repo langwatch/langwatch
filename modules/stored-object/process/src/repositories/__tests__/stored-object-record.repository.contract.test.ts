@@ -436,6 +436,7 @@ describe.each(backends)(
         ).resolves.toBe(true);
         await expect(records.findById({ tenantId: ACME, id })).resolves.toMatchObject({
           status: "deleted",
+          expiresAt: at(48),
         });
         await expect(
           records.markDeletedIfUnheld({ tenantId: ACME, id, now: at(48) }),

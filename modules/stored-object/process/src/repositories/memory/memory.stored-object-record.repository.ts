@@ -186,6 +186,7 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
       status: "deleted",
       generation: value.generation + 1,
       deletedAt: input.now,
+      expiresAt: input.now,
       updatedAt: input.now,
     });
 

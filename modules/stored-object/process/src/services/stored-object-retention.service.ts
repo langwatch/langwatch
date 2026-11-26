@@ -22,8 +22,8 @@ const RETIME_PAGE_SIZE = 500;
 type StoredObjectRetentionServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   ownerLinks: StoredObjectOwnerLinkRepository;
-  /** The delete path's provider cleanup; bytes it cannot remove wait for the retry. */
-  cleanup: Pick<StoredObjectCleanupService, "deleteStorageBestEffort">;
+  /** The delete path's provider cleanup; bytes it cannot remove wait for the reaper's retry. */
+  cleanup: Pick<StoredObjectCleanupService, "removeBytesOf">;
   now: () => Instant;
   sweepTenantLimit?: number;
   sweepPageSize?: number;
@@ -166,7 +166,10 @@ export class StoredObjectRetentionService {
     return this.options.now().epochMilliseconds - startedAt.epochMilliseconds;
   }
 
-  /** The conditional logical delete, then the delete path's provider cleanup. */
+  /**
+   * The conditional logical delete, then the delete path's provider cleanup. The delete
+   * expires the row, so bytes a refused provider delete leaves wait for the upload reaper.
+   */
   async #deleteIfUnheld(input: {
     tenantId: StoredObjectProjectId;
     id: StoredObjectId;
@@ -175,12 +178,7 @@ export class StoredObjectRetentionService {
     if (!(await this.options.records.markDeletedIfUnheld(input))) return false;
 
     const deleted = await this.options.records.findById({ tenantId: input.tenantId, id: input.id });
-    if (!deleted?.storage) return true;
-    const cleaned = await this.options.cleanup.deleteStorageBestEffort({
-      projectId: input.tenantId,
-      address: deleted.storage,
-    });
-    if (cleaned) await this.options.records.upsert({ ...deleted, storage: null });
+    if (deleted?.status === "deleted") await this.options.cleanup.removeBytesOf(deleted);
 
     return true;
   }

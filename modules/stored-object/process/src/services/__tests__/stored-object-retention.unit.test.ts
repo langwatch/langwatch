@@ -3,147 +3,21 @@
  * The owner-link sweep and the retroactive re-time, over the memory backends.
  * @see modules/stored-object/specs/stored-object-reuse-and-retention.feature
  */
-import { memoryObjectStorage } from "@langwatch/process-stores";
-import type {
-  StoreStoredObjectFromBytesInput,
-  StoredObjectId,
-  StoredObjectProjectId,
-} from "@langwatch/stored-object-contract";
-import { type Instant, Temporal } from "@langwatch/time";
+import type { StoredObjectId } from "@langwatch/stored-object-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  FixedStoredObjectDelivery,
-  GrantedStoredObjectPermissions,
-  MemoryStoredObjectFiles,
-  createStoredObjectTestSigner,
-} from "../../app/__tests__/stored-object.fixture.ts";
-import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
-import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
-import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
-import type { StoredObjectOwnerLinkRepository } from "../../repositories/stored-object-owner-link.repository.ts";
-import { StoredObjectRetentionService } from "../stored-object-retention.service.ts";
-import { StoredObjectService } from "../stored-object.service.ts";
-
-const PROJECT = "project_sweep" as StoredObjectProjectId;
-const OTHER_PROJECT = "project_other" as StoredObjectProjectId;
-const DAY_0 = Temporal.Instant.from("2026-11-16T00:00:00.000Z");
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
-
-function dayOf(day: number): Instant {
-  return DAY_0.add({ hours: day * 24 });
-}
-
-function fixture(input: { sweepPageSize?: number; sweepBudgetMs?: number } = {}) {
-  const memoryLinks = MemoryStoredObjectOwnerLinkRepository.create();
-  const records = MemoryStoredObjectRecordRepository.create([], memoryLinks);
-  const clock = { now: DAY_0 };
-  const retention = { days: 30 };
-  const race: { beforeRaise?: () => Promise<unknown>; afterRaise?: () => Promise<unknown> } = {};
-  const storage = ObjectStorageStoredObjectBytesRepository.create({
-    objectStorage: memoryObjectStorage(),
-  });
-  const cleanup = { refuses: false };
-  const sweepPages = { msEach: 0, refuseTenant: undefined as StoredObjectProjectId | undefined };
-  const ownerLinks: StoredObjectOwnerLinkRepository = {
-    raise: async (link) => {
-      const before = race.beforeRaise;
-      const after = race.afterRaise;
-      race.beforeRaise = undefined;
-      race.afterRaise = undefined;
-      await before?.();
-      await memoryLinks.raise(link);
-      await after?.();
-    },
-    countLive: (query) => memoryLinks.countLive(query),
-    countAll: (query) => memoryLinks.countAll(query),
-    deleteForTenant: (query) => memoryLinks.deleteForTenant(query),
-    findTenantsWithExpired: (query) => memoryLinks.findTenantsWithExpired(query),
-    findExpired: async (query) => {
-      clock.now = clock.now.add({ milliseconds: sweepPages.msEach });
-      return memoryLinks.findExpired(query);
-    },
-    deleteExpired: async (query) => {
-      if (query.tenantId === sweepPages.refuseTenant) throw new Error("interrupted");
-      return memoryLinks.deleteExpired(query);
-    },
-    retime: (query) => memoryLinks.retime(query),
-  };
-  const service = StoredObjectService.create({
-    records,
-    ownerLinks,
-    permissions: new GrantedStoredObjectPermissions(),
-    storage,
-    signer: createStoredObjectTestSigner(),
-    legacy: new MemoryStoredObjectFiles(),
-    delivery: new FixedStoredObjectDelivery(),
-    maximumUploadBytes: 1024 * 1024,
-    uploadExpiryMs: 15 * 60 * 1000,
-    now: () => clock.now,
-  });
-  const sweeper = StoredObjectRetentionService.create({
-    records,
-    ownerLinks,
-    cleanup: {
-      deleteStorageBestEffort: async (target) => {
-        if (cleanup.refuses) return false;
-        await storage.delete(target);
-        return true;
-      },
-    },
-    now: () => clock.now,
-    ...(input.sweepPageSize ? { sweepPageSize: input.sweepPageSize } : {}),
-    ...(input.sweepBudgetMs ? { sweepBudgetMs: input.sweepBudgetMs } : {}),
-  });
-
-  function store(overrides: Partial<StoreStoredObjectFromBytesInput> = {}) {
-    return service.storeFromBytes({
-      projectId: PROJECT,
-      purpose: "trace_content",
-      ownerKind: "trace",
-      ownerId: "t1",
-      filename: "image.png",
-      mediaType: "image/png",
-      audience: "traces:view",
-      bytes: PNG,
-      retentionDays: retention.days,
-      ...overrides,
-    });
-  }
-
-  async function rowOf(id: string, projectId: StoredObjectProjectId = PROJECT) {
-    return records.findById({ tenantId: projectId, id: id as StoredObjectId });
-  }
-
-  async function linksOf(id: string, projectId: StoredObjectProjectId = PROJECT) {
-    const all = await memoryLinks.findExpired({
-      tenantId: projectId,
-      before: dayOf(100_000),
-      limit: 1_000,
-    });
-    return all.filter((link) => link.objectId === id);
-  }
-
-  return {
-    service,
-    sweeper,
-    records,
-    memoryLinks,
-    clock,
-    retention,
-    race,
-    cleanup,
-    sweepPages,
-    store,
-    rowOf,
-    linksOf,
-  };
-}
+  OTHER_PROJECT,
+  PROJECT,
+  type RetentionFixture,
+  dayOf,
+  retentionFixture as fixture,
+} from "./support/stored-object-retention.support.ts";
 
 describe("StoredObjectRetentionService.sweep", () => {
   describe("given an object whose only link ended yesterday", () => {
-    let f: ReturnType<typeof fixture>;
-    let reference: Awaited<ReturnType<ReturnType<typeof fixture>["store"]>>["reference"];
+    let f: RetentionFixture;
+    let reference: Awaited<ReturnType<RetentionFixture["store"]>>["reference"];
 
     beforeEach(async () => {
       f = fixture();
@@ -175,6 +49,22 @@ describe("StoredObjectRetentionService.sweep", () => {
       const queued = await f.records.findPage({ tenantId: PROJECT, status: "deleted", limit: 10 });
       expect(queued.map((value) => value.id)).toEqual([reference.id]);
     });
+
+    /** @scenario "An object is deleted once its last owner's retention has passed" */
+    it("retries a refused provider delete on the reaper's next pass", async () => {
+      f.cleanup.refuses = true;
+      await f.sweeper.sweep();
+      f.cleanup.refuses = false;
+
+      await expect(f.reaper.reap()).resolves.toBe(1);
+
+      expect(await f.rowOf(reference.id)).toMatchObject({
+        status: "deleted",
+        storage: null,
+        expiresAt: null,
+      });
+      await expect(f.reaper.reap()).resolves.toBe(0);
+    });
   });
 
   describe("given an object one owner held until yesterday and another holds until next week", () => {
@@ -194,8 +84,8 @@ describe("StoredObjectRetentionService.sweep", () => {
   });
 
   describe("given an object whose only link has ended", () => {
-    let f: ReturnType<typeof fixture>;
-    let first: Awaited<ReturnType<ReturnType<typeof fixture>["store"]>>;
+    let f: RetentionFixture;
+    let first: Awaited<ReturnType<RetentionFixture["store"]>>;
 
     beforeEach(async () => {
       f = fixture();
@@ -229,7 +119,7 @@ describe("StoredObjectRetentionService.sweep", () => {
   });
 
   describe("given more ended links than one sweep page, across two tenants", () => {
-    async function threeEachSide(f: ReturnType<typeof fixture>) {
+    async function threeEachSide(f: RetentionFixture) {
       for (const byte of [1, 2, 3]) {
         await f.store({ bytes: new Uint8Array([byte]), ownerId: `t${byte}` });
         await f.store({ bytes: new Uint8Array([byte]), projectId: OTHER_PROJECT });
@@ -340,6 +230,28 @@ describe("StoredObjectRetentionService.sweep", () => {
         }),
       ).resolves.toBe(1);
       expect((await f.rowOf(reference.id))?.status).toBe("available");
+    });
+  });
+});
+
+describe("StoredObjectService.storeFromBytes", () => {
+  describe("given new bytes whose owner link cannot be written", () => {
+    /** @scenario "A store whose owner link fails leaves no object behind" */
+    it("deletes the new object and its bytes, then fails the store", async () => {
+      const f = fixture();
+      let written: Awaited<ReturnType<RetentionFixture["records"]["findPage"]>> = [];
+      f.race.beforeRaise = async () => {
+        written = await f.records.findPage({ tenantId: PROJECT, limit: 10 });
+        throw new Error("the link was refused");
+      };
+
+      await expect(f.store()).rejects.toThrow("the link was refused");
+
+      const [row] = written;
+      const address = row?.storage;
+      if (!row || !address) throw new Error("the store wrote no row before linking");
+      expect(await f.rowOf(row.id)).toMatchObject({ status: "deleted", storage: null });
+      await expect(f.storage.exists({ projectId: PROJECT, address })).resolves.toBe(false);
     });
   });
 });

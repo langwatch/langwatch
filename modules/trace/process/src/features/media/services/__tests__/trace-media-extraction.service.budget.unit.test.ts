@@ -85,6 +85,40 @@ describe("extraction budget", () => {
       expect(inline).toHaveLength(4);
     });
   });
+
+  describe("given a store still in flight when the span's deadline passes", () => {
+    /** @scenario Extraction cost inside the collector request is bounded */
+    it("leaves that part inline, counts it as a deadline drop and ignores its late answer", async () => {
+      let finishLate: () => void = () => {};
+      let calls = 0;
+      const store: TraceMediaStore = {
+        purpose: "trace_content",
+        ownerKind: "trace",
+        storeFromBytes: async () => {
+          calls += 1;
+          const id = `so-${calls}`;
+          if (calls === 2) await new Promise<void>((resolve) => (finishLate = resolve));
+          return { id, isDuplicate: false };
+        },
+      };
+      const extraction = extractionOver(store);
+      const budget = { ...extraction.createExtractionBudget(), deadlineAt: Date.now() + 50 };
+
+      const result = await extraction.extractFromValue({
+        value: contentWith(2),
+        budget,
+        ...PARAMS,
+      });
+      finishLate();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(budget.droppedByDeadline).toBe(1);
+      expect(result.refs.map((ref) => ref.id)).toEqual(["so-1"]);
+      const parts = (result.value as { content: { image_url: { url: string } }[] }[])[0]!.content;
+      expect(parts[0]!.image_url.url).toMatch(/^\/api\/files\//);
+      expect(parts[1]!.image_url.url).toMatch(/^data:/);
+    });
+  });
 });
 
 describe("the marker gate", () => {
