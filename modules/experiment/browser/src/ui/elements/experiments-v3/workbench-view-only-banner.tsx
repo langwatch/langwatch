@@ -1,8 +1,7 @@
 import { Banner } from "@langwatch/design-system/banner";
 
 import {
-  VIEW_ONLY_TITLE,
-  viewOnlyDescription,
+  viewOnlyNotice,
   type WorkbenchAccess,
 } from "../../../model/experiments-v3/workbench-access.ts";
 
@@ -14,7 +13,7 @@ import {
 export function WorkbenchViewOnlyBanner({ access }: { access: WorkbenchAccess }) {
   return (
     <Banner status="info" placement="top" data-testid="workbench-view-only-banner">
-      {VIEW_ONLY_TITLE}. {viewOnlyDescription(access)}
+      {viewOnlyNotice(access)}
     </Banner>
   );
 }

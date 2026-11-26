@@ -1,4 +1,4 @@
-import { readSlice } from "@langwatch/browser-host/global-store";
+import { defineSlice, readSlice } from "@langwatch/browser-host/global-store";
 import { WORKFLOW_HOST_SLICE, type WorkflowHostSlice } from "@langwatch/workflow-contract";
 
 import {
@@ -12,21 +12,44 @@ const useHostReader = readSlice<WorkflowHostSlice | null>({
   absent: null,
 });
 
+type AccessRefusal = { refused: boolean; markRefused: () => void; reset: () => void };
+
+/** Set once the server refused a save for the reader's role; cleared when the page closes. */
+export const useWorkbenchAccessRefusal = defineSlice<AccessRefusal>({
+  name: "experiment:workbench-access-refusal",
+  create: (set) => ({
+    refused: false,
+    markRefused: () => set({ refused: true }),
+    reset: () => set({ refused: false }),
+  }),
+});
+
+const accessOf = ({
+  host,
+  refused,
+}: {
+  host: WorkflowHostSlice | null;
+  refused: boolean;
+}): WorkbenchAccess => ({
+  maySave: !refused && (host?.hasPermission(WORKBENCH_SAVE_PERMISSION) ?? true),
+  mayRun: !refused && (host?.hasPermission(WORKBENCH_RUN_PERMISSION) ?? true),
+});
+
 /**
- * What the reader may do on the workbench, from their grants. With no host
- * published the page offers every control: the server still decides.
+ * What the reader may do on the workbench: their grants, narrowed by a role
+ * refusal the server sent this visit. With no host published the page offers
+ * every control; the server still decides.
  */
 export function useWorkbenchAccess(): WorkbenchAccess {
-  const maySave = useHostReader((host) => host?.hasPermission(WORKBENCH_SAVE_PERMISSION) ?? true);
-  const mayRun = useHostReader((host) => host?.hasPermission(WORKBENCH_RUN_PERMISSION) ?? true);
-  return { maySave, mayRun };
+  const host = useHostReader();
+  const refused = useWorkbenchAccessRefusal((state) => state.refused);
+  return accessOf({ host, refused });
 }
 
-/** The same answer read outside render, for a run started from a handler. */
+/** The same answer read outside render, for a save or run started from a handler. */
 export function readWorkbenchAccess(): WorkbenchAccess {
-  const host = useHostReader.getState();
-  return {
-    maySave: host?.hasPermission(WORKBENCH_SAVE_PERMISSION) ?? true,
-    mayRun: host?.hasPermission(WORKBENCH_RUN_PERMISSION) ?? true,
-  };
+  return accessOf({
+    host: useHostReader.getState(),
+    refused: useWorkbenchAccessRefusal.getState().refused,
+  });
 }

@@ -14,7 +14,10 @@ import { useOptimizeWithLangy } from "../../../behavior/experiments-v3/use-optim
 import { useReportPageActivityToLangy } from "../../../behavior/experiments-v3/use-report-page-activity-to-langy.ts";
 import { useSavedDatasetLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
-import { useWorkbenchAccess } from "../../../behavior/experiments-v3/use-workbench-access.ts";
+import {
+  useWorkbenchAccess,
+  useWorkbenchAccessRefusal,
+} from "../../../behavior/experiments-v3/use-workbench-access.ts";
 import {
   useDatasetProposalHandlers,
   useEvaluatorProposalHandlers,
@@ -96,6 +99,7 @@ export default function ExperimentsWorkbenchPage() {
 
   // What the reader's role allows; a refused save narrows it for the rest of the visit.
   const access = useWorkbenchAccess();
+  const resetAccessRefusal = useWorkbenchAccessRefusal((state) => state.reset);
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
@@ -107,13 +111,8 @@ export default function ExperimentsWorkbenchPage() {
     isDirty,
     reloadFromServer,
     saveNow,
-    accessRefused,
-  } = useAutosaveEvaluationsV3({ maySave: access.maySave });
-  const effectiveAccess = {
-    maySave: access.maySave && !accessRefused,
-    mayRun: access.mayRun && !accessRefused,
-  };
-  const isViewOnly = !effectiveAccess.maySave || !effectiveAccess.mayRun;
+  } = useAutosaveEvaluationsV3();
+  const isViewOnly = !access.maySave || !access.mayRun;
 
   // A save that lands elsewhere (Langy's backend fallback, the API, another
   // tab) reloads a clean workbench silently and banners a dirty one.
@@ -169,6 +168,7 @@ export default function ExperimentsWorkbenchPage() {
     return () => {
       resetAutosave();
       reset();
+      resetAccessRefusal();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -223,7 +223,7 @@ export default function ExperimentsWorkbenchPage() {
                 />
               ) : (
                 <AutosaveStatus
-                  viewOnly={!effectiveAccess.maySave}
+                  viewOnly={!access.maySave}
                   evaluationState={autosaveStatus.evaluation}
                   datasetState={autosaveStatus.dataset}
                   evaluationError={autosaveStatus.evaluationError}
@@ -236,7 +236,7 @@ export default function ExperimentsWorkbenchPage() {
               <VersionHistoryButton disabled={isLoadingExperiment} />
               <RunEvaluationButton
                 disabled={isLoadingExperiment || isLoadingDatasets}
-                mayRun={effectiveAccess.mayRun}
+                mayRun={access.mayRun}
               />
             </>
           }
@@ -249,7 +249,7 @@ export default function ExperimentsWorkbenchPage() {
           />
         </PageLayout.Header>
 
-        {isViewOnly && <WorkbenchViewOnlyBanner access={effectiveAccess} />}
+        {isViewOnly && <WorkbenchViewOnlyBanner access={access} />}
         {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
 
         {/* The grid: one framed, scrolling surface inset like every page body. */}

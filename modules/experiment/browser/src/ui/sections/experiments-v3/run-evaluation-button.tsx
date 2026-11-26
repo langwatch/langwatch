@@ -3,7 +3,7 @@
  */
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { Box, Button, Spinner } from "@langwatch/design-system/primitives";
+import { Button, Spinner } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { validateWorkbench } from "@langwatch/experiment-contract/mapping-validation";
 import { LuPlay, LuSquare } from "react-icons/lu";
@@ -105,8 +105,12 @@ export const RunEvaluationButton = ({
       datasets,
     });
 
+  // Denied, not disabled: the button keeps focus so the hint reaches keyboard users too.
+  const isDenied = !mayRun && !isRunning;
+
   const handleClick = async () => {
     if (isRunning) return abort();
+    if (isDenied) return;
     if (!hasTargets) return openDrawer("targetTypeSelector", {});
     const validation = validate();
     if (validation.isValid) return execute({ type: "full" });
@@ -124,19 +128,17 @@ export const RunEvaluationButton = ({
       positioning={{ placement: "bottom" }}
       openDelay={200}
     >
-      {/* A disabled button takes no pointer events, so the hint hangs on a wrapper. */}
-      <Box display="inline-flex" data-testid="run-evaluation-button-trigger">
-        <Button
-          size="sm"
-          colorPalette="accent"
-          variant="solid"
-          onClick={handleClick}
-          disabled={disabled || isAborting || (!mayRun && !isRunning)}
-          data-testid="run-evaluation-button"
-        >
-          <RunButtonLabel isAborting={isAborting} isRunning={isRunning} />
-        </Button>
-      </Box>
+      <Button
+        size="sm"
+        colorPalette="accent"
+        variant="solid"
+        onClick={handleClick}
+        disabled={disabled || isAborting}
+        aria-disabled={isDenied || undefined}
+        data-testid="run-evaluation-button"
+      >
+        <RunButtonLabel isAborting={isAborting} isRunning={isRunning} />
+      </Button>
     </Tooltip>
   );
 };

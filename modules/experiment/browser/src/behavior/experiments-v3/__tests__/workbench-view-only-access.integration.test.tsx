@@ -5,14 +5,18 @@
  * @see modules/experiment/specs/workbench-view-only-access.feature
  */
 import { FetchSSERefusedError } from "@langwatch/browser-host/fetch-sse";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { WORKFLOW_HOST_SLICE } from "@langwatch/workflow-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
+import { useWorkbenchAccessRefusal } from "../use-workbench-access.ts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -21,23 +25,44 @@ const mocks = vi.hoisted(() => ({
   fetchSSE: vi.fn(),
   showErrorToast: vi.fn(),
   toast: vi.fn(),
-  access: { maySave: true, mayRun: true },
 }));
 
-vi.mock("../../experiment-api.ts", () => ({
-  experimentApi: {
-    useUtils: () => ({
-      experiments: {
-        getEvaluationsV3BySlug: { invalidate: vi.fn(), reset: vi.fn(), fetch: vi.fn() },
-      },
-    }),
+/** The slice of the experiment client the autosave hook reads, and nothing more. */
+type WorkbenchClient = {
+  useUtils: () => {
     experiments: {
-      saveEvaluationsV3: {
-        useMutation: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
-      },
-      getEvaluationsV3BySlug: { useQuery: () => ({ data: null, isLoading: false }) },
+      getEvaluationsV3BySlug: { invalidate: () => void; reset: () => void; fetch: () => void };
+    };
+  };
+  experiments: WorkbenchProcedures;
+};
+type WorkbenchProcedures = {
+  saveEvaluationsV3: {
+    useMutation: () => { mutateAsync: typeof mocks.mutateAsync; isPending: boolean };
+  };
+  getEvaluationsV3BySlug: { useQuery: () => { data: null; isLoading: boolean } };
+};
+
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: createApiFixture<WorkbenchClient>(
+    {
+      useUtils: () => ({
+        experiments: {
+          getEvaluationsV3BySlug: { invalidate: vi.fn(), reset: vi.fn(), fetch: vi.fn() },
+        },
+      }),
+      experiments: createApiFixture<WorkbenchProcedures>(
+        {
+          saveEvaluationsV3: {
+            useMutation: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
+          },
+          getEvaluationsV3BySlug: { useQuery: () => ({ data: null, isLoading: false }) },
+        },
+        "experimentApi.experiments",
+      ),
     },
-  },
+    "experimentApi",
+  ),
 }));
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
@@ -65,11 +90,6 @@ vi.mock("@langwatch/experiment-contract", async (importOriginal) => ({
   buildExecutionRequest: () => ({ request: { projectId: "project-1" }, executionCells: [] }),
 }));
 
-vi.mock("../use-workbench-access.ts", () => ({
-  useWorkbenchAccess: () => mocks.access,
-  readWorkbenchAccess: () => mocks.access,
-}));
-
 vi.mock("../../../model/posthog-error-capture.ts", () => ({
   captureException: vi.fn(),
   toError: (error: unknown) => (error instanceof Error ? error : new Error(String(error))),
@@ -77,6 +97,14 @@ vi.mock("../../../model/posthog-error-capture.ts", () => ({
 
 import { useAutosaveEvaluationsV3 } from "../use-autosave-evaluations-v3.ts";
 import { useExecuteEvaluation } from "../use-execute-evaluation.ts";
+
+/** The workflow host the page reads grants from, publishing exactly these grants. */
+const grants = { current: new Set<string>() };
+defineSlice<{ hasPermission: (permission: string) => boolean }>({
+  name: WORKFLOW_HOST_SLICE,
+  create: () => ({ hasPermission: (permission) => grants.current.has(permission) }),
+});
+const FULL_ACCESS = ["experiments:update", "evaluations:manage"];
 
 /** The tRPC failure a Lite Member's save gets: the handled payload under `data.error`. */
 const liteMemberSaveRefusal = () =>
@@ -93,8 +121,8 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 let autosave: ReturnType<typeof useAutosaveEvaluationsV3> | null = null;
-function AutosaveProbe({ maySave }: { maySave: boolean }) {
-  autosave = useAutosaveEvaluationsV3({ maySave });
+function AutosaveProbe() {
+  autosave = useAutosaveEvaluationsV3();
   return null;
 }
 
@@ -123,7 +151,8 @@ describe("a workbench the reader's role cannot change", () => {
     queryClient.clear();
     autosave = null;
     execution = null;
-    mocks.access = { maySave: true, mayRun: true };
+    grants.current = new Set(FULL_ACCESS);
+    useWorkbenchAccessRefusal.getState().reset();
     mocks.mutateAsync.mockResolvedValue({ id: "exp-1", slug: "test-slug", version: 2 });
     useEvaluationsV3Store.getState().reset();
     useEvaluationsV3Store.setState({ experimentSlug: "test-slug", experimentId: "exp-1" });
@@ -136,34 +165,41 @@ describe("a workbench the reader's role cannot change", () => {
 
   describe("given a role that can view experiments but not change them", () => {
     /** @scenario "A view-only workbench does not send my edits to the server" */
-    it("keeps an edited cell in the tab without sending a save", async () => {
+    it("keeps an edited cell in the tab without sending a save, even when asked to save now", async () => {
+      grants.current = new Set(["evaluations:manage"]);
       renderWithDesignSystem(
         <Wrapper>
-          <AutosaveProbe maySave={false} />
+          <AutosaveProbe />
         </Wrapper>,
       );
 
       await editACell("edited");
+      let outcome: string | undefined;
+      await act(async () => {
+        outcome = await autosave?.saveNow();
+      });
 
       expect(mocks.mutateAsync).not.toHaveBeenCalled();
+      expect(outcome).toBe("failed");
     });
   });
 
   describe("given the page offered saving", () => {
     describe("when the server refuses a save for the reader's role", () => {
       /** @scenario "A save the server refuses for my role stops autosave and says why" */
-      it("reports the refusal once, turns the page view only, and sends no further save", async () => {
+      it("reports the refusal once, turns the page view only, and sends no further save or run", async () => {
         mocks.mutateAsync.mockRejectedValue(liteMemberSaveRefusal());
         renderWithDesignSystem(
           <Wrapper>
-            <AutosaveProbe maySave={true} />
+            <AutosaveProbe />
+            <ExecuteProbe />
           </Wrapper>,
         );
 
         await editACell("first");
 
         expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
-        expect(autosave?.accessRefused).toBe(true);
+        expect(useWorkbenchAccessRefusal.getState().refused).toBe(true);
         expect(mocks.showErrorToast).toHaveBeenCalledTimes(1);
         const reported = mocks.showErrorToast.mock.calls[0]?.[0] as { error: unknown };
         expect(readHandledError(reported.error)?.code).toBe("lite_member_restricted");
@@ -171,17 +207,26 @@ describe("a workbench the reader's role cannot change", () => {
         expect(mocks.toast).not.toHaveBeenCalled();
 
         await editACell("second");
+        await act(async () => {
+          await autosave?.saveNow();
+          await execution?.execute({ type: "full" });
+        });
 
         expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+        expect(mocks.showErrorToast).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchSSE).not.toHaveBeenCalled();
       });
     });
   });
 
   describe("given a role that can view experiments but not run evaluations", () => {
+    beforeEach(() => {
+      grants.current = new Set(["experiments:update"]);
+    });
+
     describe("when one cell is run", () => {
       /** @scenario "Running part of a view-only workbench explains instead of calling the server" */
       it("sends no run request and says the role can't run evaluations", async () => {
-        mocks.access = { maySave: false, mayRun: false };
         renderWithDesignSystem(<ExecuteProbe />);
 
         await act(async () => {
@@ -193,6 +238,20 @@ describe("a workbench the reader's role cannot change", () => {
           expect.objectContaining({ title: "Your role can't run evaluations", type: "error" }),
         );
         expect(execution?.status).toBe("idle");
+      });
+    });
+
+    describe("when one evaluator is rerun", () => {
+      it("leaves the evaluator's existing result alone", async () => {
+        renderWithDesignSystem(<ExecuteProbe />);
+        const before = useEvaluationsV3Store.getState().results.evaluatorResults;
+
+        await act(async () => {
+          await execution?.rerunEvaluator(0, "target-1", "evaluator-1");
+        });
+
+        expect(mocks.fetchSSE).not.toHaveBeenCalled();
+        expect(useEvaluationsV3Store.getState().results.evaluatorResults).toEqual(before);
       });
     });
   });

@@ -27,13 +27,12 @@ export function isAccessRefusal(error: unknown): boolean {
   return code !== undefined && ACCESS_REFUSAL_CODES.has(code);
 }
 
-export const VIEW_ONLY_TITLE = "You can view this experiment, but not change it";
-
-/** The notice body, naming what the role leaves out. */
-export function viewOnlyDescription({ maySave, mayRun }: WorkbenchAccess): string {
-  let missing = "run evaluations";
-  if (!maySave) missing = mayRun ? "save changes" : "save or run experiments";
-  return `Your role can't ${missing}, so edits you make here stay in this tab. Ask an organization admin for access.`;
+/** The notice for a role missing a workbench grant, naming only what it leaves out. */
+export function viewOnlyNotice({ maySave, mayRun }: WorkbenchAccess): string {
+  const ask = "Ask an organization admin for access.";
+  if (maySave) return `You can edit this experiment, but your role can't run evaluations. ${ask}`;
+  const missing = mayRun ? "save changes" : "save or run experiments";
+  return `You can view this experiment, but not change it. Your role can't ${missing}, so edits you make here stay in this tab. ${ask}`;
 }
 
 export const RUN_NOT_ALLOWED_TITLE = "Your role can't run evaluations";

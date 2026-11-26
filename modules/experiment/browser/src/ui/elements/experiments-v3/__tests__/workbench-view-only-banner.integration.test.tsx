@@ -19,10 +19,11 @@ vi.mock("../../../../behavior/experiments-v3/use-open-evaluator-mappings.ts", ()
 vi.mock("../../../../behavior/experiments-v3/use-prompt-template-fields.ts", () => ({
   usePromptTemplateFields: () => ({}),
 }));
+const execute = vi.hoisted(() => vi.fn());
 vi.mock("../../../../behavior/experiments-v3/use-execute-evaluation.ts", () => ({
   useExecuteEvaluation: () => ({
     status: "idle",
-    execute: vi.fn(),
+    execute,
     abort: vi.fn(),
     isAborting: false,
   }),
@@ -56,7 +57,7 @@ describe("the workbench for a role that cannot change it", () => {
 
   describe("given a role that can view experiments but not run evaluations", () => {
     /** @scenario "The Run button says why a role that cannot run evaluations cannot use it" */
-    it("disables Run, and its hint and the notice say the role can't run evaluations", async () => {
+    it("marks Run unavailable, ignores a click, and its focus hint and the notice say why", async () => {
       renderWithDesignSystem(
         <>
           <RunEvaluationButton mayRun={false} />
@@ -64,16 +65,22 @@ describe("the workbench for a role that cannot change it", () => {
         </>,
       );
 
-      expect(screen.getByTestId("run-evaluation-button")).toBeDisabled();
-      await userEvent.hover(screen.getByTestId("run-evaluation-button-trigger"));
+      const run = screen.getByTestId("run-evaluation-button");
+      expect(run).toHaveAttribute("aria-disabled", "true");
+      // Keyboard users reach the hint too: the button keeps its focus.
+      await userEvent.tab();
+      expect(run).toHaveFocus();
       expect(
         await screen.findByText(
           "Your role can't run evaluations. Ask an organization admin for access.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("workbench-view-only-banner")).toHaveTextContent(
-        "Your role can't run evaluations",
-      );
+      await userEvent.click(run);
+      expect(execute).not.toHaveBeenCalled();
+      const notice = screen.getByTestId("workbench-view-only-banner");
+      expect(notice).toHaveTextContent(/role can.t run evaluations/i);
+      // Saving still works for this role, so the notice does not say edits stay in the tab.
+      expect(notice).not.toHaveTextContent("stay in this tab");
     });
   });
 });

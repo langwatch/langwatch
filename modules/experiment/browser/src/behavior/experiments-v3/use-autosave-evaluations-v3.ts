@@ -5,7 +5,7 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../model/experiments-v3/constants.ts";
@@ -18,6 +18,11 @@ import { isAccessRefusal } from "../../model/experiments-v3/workbench-access.ts"
 import { captureException, toError } from "../../model/posthog-error-capture.ts";
 import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
+import {
+  readWorkbenchAccess,
+  useWorkbenchAccess,
+  useWorkbenchAccessRefusal,
+} from "./use-workbench-access.ts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
@@ -134,19 +139,17 @@ const handleAutosaveFailure = ({
   error,
   snapshot,
   projectId,
-  onAccessRefused,
 }: {
   analytics: UiAnalytics;
   error: unknown;
   snapshot: string;
   projectId: string | undefined;
-  onAccessRefused: () => void;
 }): RefusalOutcome => {
   const state = useEvaluationsV3Store.getState();
   if (isAccessRefusal(error)) {
     // The role, not the edit, is refused: every later save would be too.
     state.setAutosaveStatus("evaluation", "idle");
-    onAccessRefused();
+    useWorkbenchAccessRefusal.getState().markRefused();
     showErrorToast({ error, fallbackTitle: "Couldn't save the experiment" });
     return "failed";
   }
@@ -239,7 +242,6 @@ const attemptSave = async ({
   lastSavedRef,
   markSaved,
   isRetry,
-  onAccessRefused,
 }: {
   analytics: UiAnalytics;
   projectId: string | undefined;
@@ -247,10 +249,11 @@ const attemptSave = async ({
   lastSavedRef: { current: string | null };
   markSaved: () => void;
   isRetry: boolean;
-  onAccessRefused: () => void;
 }): Promise<AutosaveOutcome> => {
   const state = useEvaluationsV3Store.getState();
   if (!projectId || !state.experimentId || !state.name) return "unchanged";
+  // Read when the save starts, so a save queued behind a role refusal sends nothing.
+  if (!readWorkbenchAccess().maySave) return "failed";
   if (state.staleWorkbench) return "refused";
   const persisted = buildPersistedState(state);
   const snapshot = JSON.stringify(persisted);
@@ -274,7 +277,6 @@ const attemptSave = async ({
       error,
       snapshot,
       projectId,
-      onAccessRefused,
     });
     if (outcome !== "adopted") return outcome;
     // Retried once only: looping would spin against whoever is actually ahead.
@@ -287,7 +289,6 @@ const attemptSave = async ({
           lastSavedRef,
           markSaved,
           isRetry: true,
-          onAccessRefused,
         });
   }
 };
@@ -435,11 +436,11 @@ const useWorkbenchLoad = ({
 
 /**
  * Manages syncing the evaluations v3 state with the database. Uses workbenchState field
- * in the Experiment model for persistence. `maySave` false (a role that cannot change
- * experiments) keeps edits in the tab instead of sending saves the server refuses.
+ * in the Experiment model for persistence. A role that cannot change experiments
+ * (`useWorkbenchAccess`) keeps edits in the tab instead of sending saves the server refuses.
  */
-export const useAutosaveEvaluationsV3 = ({ maySave = true }: { maySave?: boolean } = {}) => {
-  const [accessRefused, setAccessRefused] = useState(false);
+export const useAutosaveEvaluationsV3 = () => {
+  const { maySave } = useWorkbenchAccess();
   const { project } = useOrganizationTeamProject();
   const analytics = useUiAnalytics();
   const queryClient = useQueryClient();
@@ -559,7 +560,6 @@ export const useAutosaveEvaluationsV3 = ({ maySave = true }: { maySave?: boolean
           lastSavedRef,
           markSaved,
           isRetry: false,
-          onAccessRefused: () => setAccessRefused(true),
         }),
       )
       .catch((error) => {
@@ -582,7 +582,7 @@ export const useAutosaveEvaluationsV3 = ({ maySave = true }: { maySave?: boolean
       return;
     }
     const isDue = autosaveIsDue({
-      maySave: maySave && !accessRefused,
+      maySave,
       hasProject: !!project,
       isLoadingExisting: existingExperiment.isLoading,
       shouldLoadExisting,
@@ -611,7 +611,6 @@ export const useAutosaveEvaluationsV3 = ({ maySave = true }: { maySave?: boolean
     staleWorkbench,
     workbenchVersion,
     maySave,
-    accessRefused,
   ]);
 
   // Determine if experiment was truly not found
@@ -660,8 +659,6 @@ export const useAutosaveEvaluationsV3 = ({ maySave = true }: { maySave?: boolean
     /** True when the store differs from the last state the server acknowledged. */
     isDirty: lastSavedRef.current !== null && stringifiedState !== lastSavedRef.current,
     reloadFromServer,
-    /** True once the server refused a save because of the reader's role. */
-    accessRefused,
     /**
      * Persist the current store immediately instead of waiting out the debounce.
      */

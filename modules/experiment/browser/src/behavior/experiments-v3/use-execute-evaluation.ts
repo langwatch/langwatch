@@ -587,6 +587,11 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
       const traceId = state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
+      // A role that cannot run leaves the existing result alone.
+      if (!readWorkbenchAccess().mayRun) {
+        toastRunNotAllowed();
+        return;
+      }
       // Immediately set the evaluator result to "running" for UI feedback
       writeEvaluatorResult({ rowIndex, targetId, evaluatorId, result: { status: "running" } });
 
