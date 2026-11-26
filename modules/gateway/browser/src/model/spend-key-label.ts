@@ -11,12 +11,14 @@ export interface SpendKeyLabelInput {
 /** The label of each request type whose spend rows carry no virtual key of their own. */
 const KEYLESS_REQUEST_TYPE_LABELS: ReadonlyMap<string, string> = new Map([
   ["instant_eval", "Instant Evals"],
+  ["instant_eval_decision_model", "Instant Evals (own model)"],
   ["pii_redaction", "PII redaction"],
 ]);
 
 /**
  * A spend row without a virtual key names the request type instead; an
- * instant eval judgment and a PII redaction model call carry no key of their own.
+ * instant eval judgment, a judgment on an organization's own decision model and a PII
+ * redaction model call carry no key of their own.
  */
 export function spendKeyLabel({ row, virtualKeyName }: SpendKeyLabelInput): string {
   if (!row.virtualKeyId) {

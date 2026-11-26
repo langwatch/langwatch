@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { BillableEventsTotalResult } from "../rules/billing-month.rules.ts";
 import {
-  billingMonthWindowMs,
+  instantEvalWindowMs,
   nanoUsdToInstantEvalMeterUnits,
 } from "../rules/instant-eval-meter.rules.ts";
 
@@ -41,13 +41,16 @@ export class InstantEvalSpendQueryService {
   /**
    * `unavailable` where there is no ledger, which the caller treats as "not
    * now" rather than as a verified zero it would checkpoint against.
+   * The month starts no earlier than `usageBilledSinceMs` (ADR-174 decision 23, proposed in v22).
    */
   async queryInstantEvalSpendTotal({
     organizationId,
     billingMonth,
+    usageBilledSinceMs,
   }: {
     organizationId: string;
     billingMonth: string;
+    usageBilledSinceMs: number | null;
   }): Promise<BillableEventsTotalResult> {
     if (!this.peers.isSpendSourceAvailable()) {
       logger.warn({ organizationId }, "no spend ledger, skipping the Instant Eval spend query");
@@ -58,7 +61,7 @@ export class InstantEvalSpendQueryService {
     const nanoUsd = await this.peers.sumSpendNanoUsdByRequestType({
       tenantIds: await this.peers.listProjectIds({ organizationId }),
       requestType: INSTANT_EVAL_REQUEST_TYPE,
-      ...billingMonthWindowMs(billingMonth),
+      ...instantEvalWindowMs({ billingMonth, usageBilledSinceMs }),
     });
 
     return { outcome: "counted", total: nanoUsdToInstantEvalMeterUnits(nanoUsd) };

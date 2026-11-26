@@ -30,7 +30,6 @@ const config: NotificationServerConfig = {
   smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
   publicBaseUrl: undefined,
   webPushServiceBase: undefined,
-  isSaas: false,
   outboundProxy: {
     HTTPS_PROXY: undefined,
     https_proxy: undefined,

@@ -28,7 +28,6 @@ import {
 } from "../channels/email-delivery.channel.ts";
 import { emailGatewayOpener } from "../channels/email-gateway-channels.registry.ts";
 import { HttpWebPushGatewayChannel } from "../channels/http/http.web-push-gateway.channel.ts";
-import type { NotificationChannels } from "../channels/notification.channels.ts";
 import { emailProxyResolver } from "../channels/ses/ses.email-gateway.channel.ts";
 import {
   buildWebPushPipeline,
@@ -45,8 +44,7 @@ import { WebPushService, type WebPushQueue } from "../services/web-push.service.
 type NotificationSetup = FeatureSetup<
   typeof NotificationModule.dependencies,
   NotificationServerConfig,
-  NotificationRepositories,
-  NotificationChannels
+  NotificationRepositories
 >;
 
 export class NotificationModule implements NotificationApiContract {
@@ -86,7 +84,6 @@ export class NotificationModule implements NotificationApiContract {
 
   static async create({
     repositories,
-    channels,
     config,
     secrets,
     resources,
@@ -111,13 +108,7 @@ export class NotificationModule implements NotificationApiContract {
       }),
     });
     resources.own("Notification mail gateway", () => delivery.close());
-    const mailDelivery = MailDeliveryService.create({
-      settings: async () => settings,
-      delivery,
-      // Self-hosted never asks: its mail path is the one it always had. On Cloud nurturing
-      // answers `off` until it holds the Customer.io App API key.
-      customerIo: config.isSaas ? channels.customerIoMail : undefined,
-    });
+    const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
     return new NotificationModule(repositories, mailDelivery, {
       settings: { publicBaseUrl: config.publicBaseUrl },
       pushServiceBase: config.webPushServiceBase,

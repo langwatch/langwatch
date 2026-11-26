@@ -20,7 +20,13 @@ function billed({
 } = {}): BillingReportOrganizationLookup {
   return {
     outcome: "usage_billed",
-    organization: { id: "org-1", stripeCustomerId, subscriptions, contract },
+    organization: {
+      id: "org-1",
+      stripeCustomerId,
+      subscriptions,
+      contract,
+      growthSeatPeriods: [],
+    },
   };
 }
 

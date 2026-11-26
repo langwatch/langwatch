@@ -24,7 +24,6 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/egress": "workspace:*",
-    "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -43,7 +42,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/mail": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
