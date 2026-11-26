@@ -65,6 +65,9 @@
       "path": "../../../packages/span-normalisation/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/otlp/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
