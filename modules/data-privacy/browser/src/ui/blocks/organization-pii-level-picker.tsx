@@ -103,7 +103,15 @@ function LevelCard({
 }
 
 /** Essential and Strict side by side; Strict carries the model, its price and the New badge. */
-function LevelCards({ free, licensed }: { free: boolean; licensed: boolean }) {
+function LevelCards({
+  free,
+  licensed,
+  split,
+}: {
+  free: boolean;
+  licensed: boolean;
+  split: boolean;
+}) {
   return (
     <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
       <LevelCard
@@ -124,7 +132,7 @@ function LevelCards({ free, licensed }: { free: boolean; licensed: boolean }) {
           </Badge>
         }
         subtitle={PII_REDACTION_MODEL_NAME}
-        price={<PiiRedactionModelPrice free={free} licensed={licensed} />}
+        price={<PiiRedactionModelPrice free={free} licensed={licensed} split={split} />}
         points={[
           "Names and full street addresses in 8 languages",
           "Plus everything Essential finds",
@@ -184,6 +192,7 @@ export function OrganizationPiiLevelPicker({
   otherLevelLabel,
   free,
   licensed = false,
+  split = false,
   canWrite,
   isSaving,
   onPick,
@@ -194,6 +203,8 @@ export function OrganizationPiiLevelPicker({
   free: boolean;
   /** Self-hosted: included with the Enterprise licence rather than for the organization. */
   licensed?: boolean;
+  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
+  split?: boolean;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
@@ -229,7 +240,7 @@ export function OrganizationPiiLevelPicker({
             }
           }}
         >
-          <LevelCards free={free} licensed={licensed} />
+          <LevelCards free={free} licensed={licensed} split={split} />
         </RadioCard.Root>
         {level && <LevelExample level={level} />}
         {level === "strict" && !free && (
