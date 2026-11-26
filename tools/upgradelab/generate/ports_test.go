@@ -47,6 +47,7 @@ func TestPortsHandedOutOnceSkipAPortTheOSOffersAgain(t *testing.T) {
 	}
 }
 
+// @scenario "A generation run stops when the OS offers only ports already handed out"
 func TestPortsGiveUpWhenTheOSOffersNothingNew(t *testing.T) {
 	handed := newHandedOutPorts()
 	if _, err := freePortsFrom(scriptedListen(40001, 40002, 40003, 40004, 40005), handed); err != nil {
