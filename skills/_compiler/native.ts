@@ -8,6 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import {
+  copySkillAssets,
   listNativeSkills,
   listPublishedSkills,
   type PublishedSkill,
@@ -91,6 +92,7 @@ function main() {
     const dir = path.join(outDir, skill.slug); // flattened — recipes included
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "SKILL.md"), renderSkill(skill, target));
+    copySkillAssets({ skill, toDir: dir });
   }
   console.log(`Generated ${skills.length} ${target} skills in ${outDir}/`);
   for (const skill of skills) {
