@@ -162,6 +162,14 @@ Feature: Data privacy policy configuration
     Then the request is rejected as forbidden, naming project:manage
     And a project Admin may still set it
 
+  @unit
+  Scenario: A project Member sees the policy that applies but not the project rule to edit
+    Given a rule on "web-app" that restricts trace input to admins
+    When a project Member opens the Data Privacy page for "web-app"
+    Then the page shows the policy in force on "web-app"
+    And it lists no project rule and offers no project to write one at
+    And a project Admin opening the same page sees the rule and may write at "web-app"
+
   @integration
   Scenario: Removing a project rule falls back to the next tier
     Given an organization rule that drops trace input
