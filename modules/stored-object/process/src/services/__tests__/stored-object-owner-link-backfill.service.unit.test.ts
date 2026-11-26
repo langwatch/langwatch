@@ -64,7 +64,7 @@ function fixture({ days, rows }: { days: number; rows: StoredObjectRecord[] }) {
   const sweeper = StoredObjectRetentionService.create({
     records,
     ownerLinks,
-    cleanup: { deleteStorageBestEffort: async () => true },
+    cleanup: { removeBytesOf: async () => true },
     now: () => clock.now,
   });
   const linksOf = async (id: string) =>
