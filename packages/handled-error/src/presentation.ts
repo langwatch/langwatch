@@ -6045,6 +6045,10 @@ const presentations = {
   },
 
   // ---- NLP engine ----
+  invalid_images: {
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
+  },
   invalid_workflow: {
     title: "This workflow isn't valid",
     describe: () => "Check the steps and try again.",
