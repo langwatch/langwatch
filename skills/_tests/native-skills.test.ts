@@ -33,6 +33,15 @@ function routingRows(): { skill: string; commands: string }[] {
     });
 }
 
+/** Every file under a skill directory, relative to it, stray caches included. */
+function skillFiles(dir: string): string[] {
+  return fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
+    .toSorted();
+}
+
 // Phrases only the excluded login and key-setup partials carry ("log in" alone also
 // matches sample data such as "i cant log in", so it is not one of them).
 const SIGN_IN_COPY = [
@@ -60,10 +69,16 @@ function expectSameSkillFile({
   embedRoot: string;
   nativeDir: string;
 }) {
-  const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
-  expect(embedded, `${slug}: Go embed copy is stale`).toBe(
-    fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
+  const embeddedFiles = skillFiles(path.join(embedRoot, slug));
+  expect(embeddedFiles, `${slug}: Go embed file list is stale`).toEqual(
+    skillFiles(path.join(nativeDir, slug)),
   );
+  for (const rel of embeddedFiles) {
+    expect(
+      fs.readFileSync(path.join(embedRoot, slug, rel), "utf8"),
+      `${slug}/${rel}: Go embed copy is stale`,
+    ).toBe(fs.readFileSync(path.join(nativeDir, slug, rel), "utf8"));
+  }
 }
 
 // Backs specs/langy/langy-native-skills.feature. Langy loads every published
