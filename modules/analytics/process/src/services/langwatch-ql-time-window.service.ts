@@ -17,7 +17,6 @@ import {
   isLangWatchQLGranularityParameterType,
   isLangWatchQLSurfaceParameter,
   isLangWatchQLTimeWindowParameter,
-  isLangWatchQLTimeZoneParameterType,
   type LangWatchQLTimeWindow,
   type LangWatchQLTimeWindowParameter,
   LWQL_ACCEPTED_GRANULARITY_STEPS,
@@ -26,8 +25,6 @@ import {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
-  LWQL_DEFAULT_TIME_ZONE,
-  LWQL_TIME_ZONE_PARAMETER,
 } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -35,6 +32,11 @@ import {
   bindListParameters,
   mistypedListParameters,
 } from "../rules/langwatch-ql-reserved-lists.rules.ts";
+import {
+  bindTimeZone,
+  findInjected,
+  mistypedTimeZoneParameter,
+} from "../rules/langwatch-ql-surface-binding.rules.ts";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
@@ -65,44 +67,6 @@ function valueFor(name: LangWatchQLTimeWindowParameter, timeWindow: LangWatchQLT
   return formatLangWatchQLDateTimeParameter(
     name === LWQL_PERIOD_START_PARAMETER ? timeWindow.start : timeWindow.end,
   );
-}
-
-/** The zone a statement declaring the time zone is bound to: the surface's, else UTC. */
-function bindTimeZone({
-  declared,
-  timeZone,
-}: {
-  declared: readonly LangWatchQLParameter[];
-  timeZone: string | undefined;
-}): Readonly<Record<string, string>> {
-  const declaresTimeZone = declared.some(
-    (parameter) => parameter.name === LWQL_TIME_ZONE_PARAMETER,
-  );
-
-  return declaresTimeZone ? { [LWQL_TIME_ZONE_PARAMETER]: timeZone ?? LWQL_DEFAULT_TIME_ZONE } : {};
-}
-
-/** The declared time-zone name when its type is not `String`. */
-function mistypedTimeZoneParameter(declared: readonly LangWatchQLParameter[]): string[] {
-  return declared
-    .filter(
-      (parameter) =>
-        parameter.name === LWQL_TIME_ZONE_PARAMETER &&
-        !isLangWatchQLTimeZoneParameterType(parameter.type),
-    )
-    .map((parameter) => parameter.name);
-}
-
-function findInjected({
-  parameters,
-  injected,
-}: {
-  parameters: Readonly<Record<string, unknown>> | undefined;
-  injected: Readonly<Record<string, unknown>>;
-}): Readonly<Record<string, unknown>> | undefined {
-  const merged = { ...parameters, ...injected };
-
-  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 /**

@@ -198,9 +198,9 @@ interface LwApi {
 
   /**
    * Reads a time from a query row as a \`Date\`: a ClickHouse
-   * \`"YYYY-MM-DD hh:mm:ss"\` (UTC), an ISO string, epoch milliseconds or a Date.
+   * \`"YYYY-MM-DD hh:mm:ss"\` (UTC), an ISO string, epoch milliseconds or a Date; anything else is read as text.
    */
-  parseTime: (value: string | number | Date) => Date;
+  parseTime: (value: unknown) => Date;
 
   /**
    * Writes a time on the reader's clock (\`LW.dashboardContext.timezone\`),
@@ -208,7 +208,7 @@ interface LwApi {
    * to the day at a day or week grain; \`options\` replaces them
    * (\`Intl.DateTimeFormat\` options; the zone stays the reader's unless they name one).
    */
-  formatTime: (value: string | number | Date, options?: Intl.DateTimeFormatOptions) => string;
+  formatTime: (value: unknown, options?: Intl.DateTimeFormatOptions) => string;
 
   /**
    * Runs one of the widget's declared queries by name, forwarding the given
