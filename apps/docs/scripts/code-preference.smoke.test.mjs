@@ -45,17 +45,14 @@ await it("switches filenames and copied code together and remembers the language
           .filter({ has: page.locator("[data-docs-code-title]", { hasText: "chat.ts" }) })
           .first();
         await frame.getByRole("button", { name: "Copy code", exact: true }).click();
-        // The copy lands asynchronously: poll the clipboard, then assert on the text that landed.
-        const landed = await page.waitForFunction(
-          () =>
-            navigator.clipboard
-              .readText()
-              .then((text) => (text.includes("import { OpenAI }") ? text : false))
-              .catch(() => false),
-          undefined,
-          { polling: 100, timeout: 30_000 },
-        );
-        const copied = String(await landed.jsonValue());
+        // The copy lands asynchronously. waitForFunction takes a returned promise as truthy and
+        // resolves at once, so poll from here with a 30s deadline and assert on the last read.
+        let copied = "";
+        for (const deadline = Date.now() + 30_000; Date.now() < deadline; ) {
+          copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+          if (copied.includes("import { OpenAI }")) break;
+          await page.waitForTimeout(100);
+        }
         assert.match(copied, /import \{ OpenAI \}/);
         assert.match(copied, /async function chat/);
         assert.doesNotMatch(copied, /from openai import/);
