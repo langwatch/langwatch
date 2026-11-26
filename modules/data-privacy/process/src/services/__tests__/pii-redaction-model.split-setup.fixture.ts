@@ -66,6 +66,7 @@ function observations() {
     usage: [] as PiiRedactionModelUsage[],
     priced: [] as PiiRedactionSpendPricedEventData[],
     contexts: [] as ModelCallContext[],
+    warnings: [] as string[],
     splitFlagReads: 0,
   };
 }
@@ -105,7 +106,7 @@ function analysisOver({
   presidio: MemoryPresidioChannel;
   channel: PresidioChannel;
   slots: ConcurrencyLimiter | undefined;
-  splitFlag: boolean;
+  splitFlag: boolean | "unreadable";
   seen: Observations;
 }) {
   return PiiAnalysisService.create({
@@ -126,6 +127,7 @@ function analysisOver({
         isEnabled: async (key) => {
           if (key !== PII_REDACTION_MODEL_SPLIT_FLAG) return true;
           seen.splitFlagReads++;
+          if (splitFlag === "unreadable") throw new Error("feature flag service unreachable");
           return splitFlag;
         },
       }),
@@ -147,7 +149,10 @@ function analysisOver({
       metrics: { modelFellBack: (reason) => seen.fallbacks.push(reason) },
       log: {
         info: (fields) => seen.usage.push(fields),
-        warn: (fields) => seen.usage.push(fields),
+        warn: (fields, message) => {
+          if ("outcome" in fields) seen.usage.push(fields);
+          else seen.warnings.push(message);
+        },
       },
       now: () => Date.now(),
     }),
@@ -170,8 +175,8 @@ export function setup({
   turns?: FakeTurn[];
   /** Whether the one model channel can split: a Lambda channel can, an HTTP one cannot. */
   split?: boolean;
-  /** The organization's split flag (ADR-207 decision 9). */
-  splitFlag?: boolean;
+  /** The organization's split flag (ADR-207 decision 9); `unreadable` when its read throws. */
+  splitFlag?: boolean | "unreadable";
   slots?: ConcurrencyLimiter;
 } = {}) {
   const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
@@ -202,6 +207,7 @@ export function setup({
     flagReads: () => seen.splitFlagReads,
     fallbacks: seen.fallbacks,
     usage: seen.usage,
+    warnings: seen.warnings,
     priced: seen.priced,
   };
 }

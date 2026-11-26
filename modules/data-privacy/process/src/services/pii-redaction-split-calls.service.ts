@@ -87,7 +87,8 @@ export class PiiRedactionSplitCallsService {
         onUnavailable,
         answer: (splitCall) =>
           model.answers({
-            texts: splitCall.pieces.map((piece) => pieceTextOf({ texts: input.texts, piece })),
+            pieces: splitCall.pieces,
+            textOf: (piece) => pieceTextOf({ texts: input.texts, piece }),
             piiRedactionLevel: input.piiRedactionLevel,
             entities: input.entities,
             projectId: input.projectId,
@@ -119,7 +120,7 @@ type SplitRun = {
   readonly answers: PieceAnswer[];
   readonly callDurationsMs: number[];
   ended: boolean;
-  readonly answer: (call: SplitCall) => Promise<{ findings: unknown; anonymized: unknown }[]>;
+  readonly answer: (call: SplitCall) => Promise<PieceAnswer[]>;
   readonly end: (outcome: SplitOutcome) => void;
   /** A call timed out or was throttled, even after the span ended: the breaker must hear it. */
   readonly onUnavailable: () => void;
@@ -147,14 +148,10 @@ async function runSplitCall({
   // Monotonic, as the single call's: a wall-clock step never makes a duration or a hold wrong.
   const startedAt = performance.now();
   try {
+    // One answer per piece, or `answers` threw: a missing one fails the span, never stores raw.
     const answered = await run.answer(splitCall);
     run.callDurationsMs.push(Math.round(performance.now() - startedAt));
-    for (const [i, piece] of splitCall.pieces.entries()) {
-      const answer = answered[i];
-      // A missing answer fails the span: a default of no findings would store the piece raw.
-      if (!answer) throw new Error("PII redaction model left a split piece unanswered");
-      run.answers.push({ piece, ...answer });
-    }
+    run.answers.push(...answered);
     if (run.callDurationsMs.length === run.calls.length) {
       run.end({ kind: "answered", answers: run.answers, callDurationsMs: run.callDurationsMs });
     }

@@ -108,28 +108,33 @@ export class PresidioRedactionService {
   }
 
   /**
-   * The service's raw answer per text, for pieces of a split span (ADR-207): its findings and its
-   * own masked text, sent as a split call on the one channel. Aborted by `signal` or at the time
-   * cap; any refusal, or a channel that cannot split, throws.
+   * The service's raw answer per piece of a split span (ADR-207): its findings and its own masked
+   * text, sent as a split call on the one channel. Aborted by `signal` or at the time cap; any
+   * refusal, a missing result or a channel that cannot split throws.
    */
-  async answers(input: {
-    texts: readonly string[];
+  async answers<Piece>(input: {
+    pieces: readonly Piece[];
+    textOf: (piece: Piece) => string;
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
     signal: AbortSignal;
-  }): Promise<{ findings: unknown; anonymized: unknown }[]> {
+  }): Promise<{ piece: Piece; findings: unknown; anonymized: unknown }[]> {
     const channel = this.deps.presidio;
     if (!canSplit(channel)) throw new Error("the model's channel takes no split calls");
     this.deps.metrics.analysisCalled(this.deps.method);
     const startedAt = performance.now();
     const outcome = await this.#detect({
-      ...input,
+      texts: input.pieces.map(input.textOf),
+      piiRedactionLevel: input.piiRedactionLevel,
+      entities: input.entities,
+      projectId: input.projectId,
+      signal: input.signal,
       send: (request) => channel.detect(request, { context: "split" }),
     });
     this.deps.metrics.analysisObserved(performance.now() - startedAt, this.deps.method);
     if (outcome.kind === "not_configured") throw new Error("the model is not configured");
-    return input.texts.map((_text, i) => {
+    return input.pieces.map((piece, i) => {
       const result = outcome.results[i];
       if (!result) throw new Error(`the model returned no result for split text ${i}`);
       this.deps.metrics.analysisFinished(result.status, this.deps.method);
@@ -139,6 +144,7 @@ export class PresidioRedactionService {
           ? (result.raw_response ?? {})
           : {};
       return {
+        piece,
         // No list is not an empty one: a whole text then keeps the model's own masked text.
         findings: "results" in response ? response.results : undefined,
         anonymized: "anonymized" in response ? response.anonymized : null,

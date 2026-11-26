@@ -35,6 +35,16 @@ describe("planSpan", () => {
       "too_long",
     ]);
     expect(planSpan({ texts: [filler(4_000), filler(4_001)], splitting: true }).kind).toBe("split");
+    const cut = splitCalls([filler(4_000), filler(4_001)]).flatMap((call) =>
+      call.pieces.filter((piece) => piece.text === 1),
+    );
+    // The cut falls at 3,999, before a space; the character 200 before it (3,799) is a space, so
+    // the second piece starts on the word ending there, at 3,796, and runs to the end.
+    expect([filler(4_001)[3_999], filler(4_001)[3_799]]).toEqual([" ", " "]);
+    expect(cut.map(({ start, end, whole }) => ({ start, end, whole }))).toEqual([
+      { start: 0, end: 3_999, whole: false },
+      { start: 3_796, end: 4_001, whole: false },
+    ]);
   });
 
   /** @scenario "Splitting is on only where the model is a Lambda function and the organization's split flag is on" */
@@ -72,6 +82,7 @@ describe("planSpan", () => {
     }
   });
 
+  /** @scenario "With splitting on, a long batch is split across model calls and masked where the model found it" */
   it("packs texts of 4,000 or less whole, sharing calls, never past 4,000 characters a call", () => {
     const texts = [filler(9_000), filler(1_500), filler(2_000), filler(4_000)];
     const calls = splitCalls(texts);
@@ -103,6 +114,30 @@ describe("planSpan", () => {
     for (const [i, piece] of pieces.slice(1).entries()) {
       expect(pieces[i]!.end - piece.start).toBeGreaterThanOrEqual(200);
     }
+  });
+
+  /** @scenario "With splitting on, a long batch is split across model calls and masked where the model found it" */
+  it("cuts at whitespace that leaves 2,000 characters, and inside a word when it leaves 1,999", () => {
+    const firstPiece = (head: number) =>
+      splitCalls([`${"a".repeat(head)} ${"b".repeat(7_000)}`]).flatMap((call) => call.pieces)[0];
+
+    expect(firstPiece(2_000)).toMatchObject({ start: 0, end: 2_000 });
+    expect(firstPiece(1_999)).toMatchObject({
+      start: 0,
+      end: PII_REDACTION_MODEL_PIECE_CHARACTERS,
+    });
+  });
+
+  /** @scenario "With splitting on, a long batch is split across model calls and masked where the model found it" */
+  it("repeats less only after a whitespace run covering the 800 characters before the overlap", () => {
+    // A cut at 3,950 puts the overlap at 3,750; the run ends at 3,900, before 50 y's.
+    const secondStart = (run: number) =>
+      splitCalls([
+        `${"x".repeat(3_900 - run)}${" ".repeat(run)}${"y".repeat(50)} ${"z".repeat(5_000)}`,
+      ]).flatMap((call) => call.pieces)[1]?.start;
+
+    expect(secondStart(950)).toBe(3_900);
+    expect(secondStart(949)).toBe(2_950);
   });
 
   /** @scenario "A name, an address or an IBAN across a cut is masked whole and nothing found is left unmasked" */

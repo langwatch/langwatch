@@ -124,7 +124,7 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     const line = `{"log":"${"step\\n".repeat(600)}","payee":"NL91ABNA0417164300"}`;
     const text = [line, line, line].join("\n");
     const unescaped = text.replaceAll("\\n", " n");
-    const { clear, presidio, presidioCalls, splitModel } = setup({
+    const { clear, presidio, presidioCalls, splitModel, usage, fallbacks } = setup({
       planted: [{ value: "NL91ABNA0417164300", entity: "IBAN_CODE", score: 0.9 }],
     });
     expect(await clear([unescaped])).toEqual([
@@ -138,6 +138,12 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     expect(cleared).toEqual([PRESIDIO_MASK]);
     expect(presidioCalls()).toHaveLength(1);
     expect(splitModel.calls).toHaveLength(splitCalls);
+    expect(fallbacks).toEqual(["unplaceable"]);
+    expect(usage.at(-1)).toMatchObject({
+      outcome: "unplaceable",
+      durationMs: 0,
+      calls: planSpanCalls([text]).length,
+    });
   });
 
   /** @scenario "A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio" */
@@ -149,10 +155,18 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     ]);
     const honest = setup({ planted });
     expect(await honest.clear([text])).toEqual([expected]);
-    const { clear, presidio } = setup({ planted, turns: Array<FakeTurn>(8).fill("lie") });
+    const { clear, presidio, fallbacks, usage, splitModel } = setup({
+      planted,
+      turns: Array<FakeTurn>(8).fill("lie"),
+    });
     presidio.answerWith(presidioAnswer(1));
 
     expect(await clear([text])).toEqual([PRESIDIO_MASK]);
+    expect(splitModel.calls).toHaveLength(planSpanCalls([text]).length);
+    expect(fallbacks).toEqual(["unplaceable"]);
+    expect(usage).toEqual([
+      expect.objectContaining({ outcome: "unplaceable", calls: planSpanCalls([text]).length }),
+    ]);
   });
 
   /** @scenario "A whole text in a split call keeps the model's own masked text" */
@@ -192,8 +206,9 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
       rawResponse: { anonymized: "<DATE_TIME>" },
       spareNamesAndPlaces: true,
     });
-    const [answer] = await split.answers({
-      texts: ["June 12"],
+    const answers = await split.answers({
+      pieces: [{ text: 0, start: 0, end: 7, whole: true }],
+      textOf: () => "June 12",
       piiRedactionLevel: "STRICT",
       signal: new AbortController().signal,
     });
@@ -201,7 +216,7 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     expect(
       clearSplitSpan({
         texts: ["June 12"],
-        answers: [{ piece: { text: 0, start: 0, end: 7, whole: true }, ...answer! }],
+        answers,
         spareNamesAndPlaces: [true],
       }),
     ).toEqual([singleCallClearing.kind === "redacted" ? singleCallClearing.text : ""]);
@@ -247,6 +262,21 @@ describe("PiiRedactionModelService, where splitting is on (ADR-207 v3)", () => {
     await on.clear([filler(8_001)]);
     expect(on.contexts.length).toBeGreaterThan(1);
     expect(on.fallbacks).toEqual([]);
+  });
+
+  /** @scenario "Splitting is on only where the model is a Lambda function and the organization's split flag is on" */
+  it("sends 8,001 characters to Presidio as too_long, with one warning, when the flag cannot be read", async () => {
+    const { clear, presidio, single, splitModel, usage, priced, warnings } = setup({
+      splitFlag: "unreadable",
+    });
+    presidio.answerWith(presidioAnswer(1));
+
+    expect(await clear([filler(8_001)])).toEqual([PRESIDIO_MASK]);
+    expect(single.calls).toHaveLength(0);
+    expect(splitModel.calls).toHaveLength(0);
+    expect(priced).toEqual([]);
+    expect(usage.map((line) => line.outcome)).toEqual(["too_long"]);
+    expect(warnings).toEqual(["PII redaction model split flag could not be read; not splitting"]);
   });
 
   /** @scenario "Splitting is on only where the model is a Lambda function and the organization's split flag is on" */

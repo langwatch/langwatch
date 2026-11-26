@@ -37,10 +37,13 @@ import { ProjectLookupCacheService } from "./project-lookup-cache.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:pii-redaction-model");
 
-/** Where the usage line goes: the module's logger, or a recorder in a test. */
+/** A routing read that failed, so the batch took the safe path. */
+type RoutingWarning = { projectId: string; reason: string };
+
+/** Where the usage line and routing warnings go: the module's logger, or a recorder in a test. */
 type UsageLogger = {
   info(fields: PiiRedactionModelUsage, message: string): void;
-  warn(fields: PiiRedactionModelUsage, message: string): void;
+  warn(fields: PiiRedactionModelUsage | RoutingWarning, message: string): void;
 };
 
 /**
@@ -416,7 +419,7 @@ export class PiiRedactionModelService {
         organizationId,
       });
     } catch (error) {
-      logger.warn(
+      this.log.warn(
         { projectId, reason: failureName(error) },
         "PII redaction model split flag could not be read; not splitting",
       );

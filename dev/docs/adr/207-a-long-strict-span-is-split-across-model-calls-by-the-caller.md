@@ -5,8 +5,8 @@
 **Status:** Accepted (v3: one endpoint, call context)
 
 > One line: a Strict span batch of **8,001 to 32,000 characters** is cut by data-privacy into
-> **pieces of about 4,000** that the model answers in **parallel calls under a fleet-sized
-> limit**; findings are placed back **only on pieces the model cannot have reshaped**, merged
+> **pieces of about 4,000** that the model answers in **parallel calls, **2 at a time per
+> process**; findings are placed back **only on pieces the model cannot have reshaped**, merged
 > by widest union (the model's own name rule across pieces follows, decision 7), and the span
 > is **billed once**;
 > any doubt sends the **whole span to Presidio**, as today.
@@ -107,11 +107,12 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
    8 split calls per process (25 pods x 8 = 200 against a shared reserve of 50).
 10. **All or nothing.** If any call of a span fails, the span falls back at once and its other
     answers are discarded; nothing is stored unmasked and no partial result is used.
-11. **A breaker of its own**, a row of `MODEL_CALL_RULES`. A timeout or throttle on a split call opens a split-only breaker
+11. **A breaker of its own**, one per `ModelCallContext` (kept by the service, not a row of
+    `MODEL_CALL_RULES`). A timeout or throttle on a split call opens a split-only breaker
     (same 2 min cool-down), so long spans go to Presidio while short spans keep calling the model.
     Rejected: one shared breaker (a long span's throttle would push short spans, which work today,
     off the model).
-12. **One usage line per span**, with a new `calls` count; fallback reasons gain `busy`.
+12. **One usage line per span**, with a new `calls` count; fallback reasons gain `busy` and `unplaceable`.
 13. **One-off, not shared.** The planner and merge live in data-privacy rules; no shared package.
 
 ## Constants
@@ -143,7 +144,7 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 | assumption                                                                             | what breaks if false                                                                                                              |
 | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | a 4,000-character call takes about 9 to 10 s warm (interpolated from 2,000 and 20,000) | an estimate: an aarch64 dev box measured 18.5 s; if Cloud is that slow, 32,000 misses the 50 s budget and the cap drops (R3 gate) |
-| at most 25 pods call the model at once on Cloud                                        | the reserve of 100 is shared thinner; throttles rise (R3's load test)                                                             |
+| at most 25 pods call the model at once on Cloud                                        | the reserve of 50 is shared thinner; throttles rise (R3's load test)                                                              |
 | long texts with backslashes (escaped JSON) are a minority of long spans                | most long spans keep falling back (R3 counts it on real-shaped traces)                                                            |
 | the model's prep and name rule stay as read on 2026-11-25                              | the guard keeps offsets safe (it falls back), but parity of the name rule drifts; the parity fixture catches it on the next run   |
 

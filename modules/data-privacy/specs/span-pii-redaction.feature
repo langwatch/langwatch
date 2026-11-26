@@ -437,6 +437,7 @@ Feature: Redacting personal data out of a span at ingestion
     When one call fails, times out or is throttled while the other is still running
     Then Presidio's answer for the whole batch is returned without waiting for the other call
     And no answer of the other call is used
+    And a call the model refuses (not configured, a result missing or failed) counts as failed
 
   @unit
   Scenario: With no free split slot, a long batch goes to Presidio at once as busy
@@ -489,6 +490,8 @@ Feature: Redacting personal data out of a span at ingestion
     When the model is reached over HTTP, or the organization's release_pii_redaction_model_split_enabled flag is off
     And a strict batch of 8,001 characters arrives
     Then Presidio answers it as today, with the outcome too_long
+    When the flag cannot be read
+    Then Presidio answers it as too_long, with one warning, and nothing is priced
     When the model is reached as a Lambda function and the flag is on
     Then the batch is split
 
