@@ -352,7 +352,7 @@ jobs:
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
-      - uses: langwatch/langwatch-pr-review-bot@a195e391e88364f0019e883c3598f5725e23bb28 # feat/approve-clean-reviews 2026-11-26
+      - uses: langwatch/langwatch-pr-review-bot@37cd3ca1858a9370daa0126cf75df342255e1306 # feat/approve-clean-reviews 2026-11-26
         with:
           slack_notify: "false"
           # A review with no blocking finding approves, and the ruleset counts it as
