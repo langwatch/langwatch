@@ -1,3 +1,4 @@
+import { isPrivateTarget } from "../runner/schema-applier.ts";
 import type { FirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { UPGRADE_COMMAND } from "./serving-gate.ts";
 
@@ -5,6 +6,24 @@ import { UPGRADE_COMMAND } from "./serving-gate.ts";
 export const TARGET_CATCH_UP_EVERY_MS = 60_000;
 
 type CatchUpWarn = (message: string, fields: Record<string, unknown>) => void;
+
+/**
+ * The private targets a pass should catch up: those the ledger records behind, plus every
+ * configured one with no rows at all, which the runner's preflight seeds behind on that pass.
+ */
+export function privateTargetsBehind({
+  behind,
+  recorded,
+  configured,
+}: {
+  behind: readonly string[];
+  recorded: readonly string[];
+  configured: readonly string[];
+}): string[] {
+  const known = new Set(recorded);
+  const unrecorded = configured.filter((target) => !known.has(target));
+  return [...new Set([...behind, ...unrecorded].filter((target) => isPrivateTarget({ target })))];
+}
 
 /**
  * While a held private ClickHouse target is behind and no run holds the lease, an admitted worker
