@@ -2,6 +2,7 @@ import {
   AUXILIARY_SESSION_FACT,
   type CodingAgentSessionContextUsage,
   classifyToolCall,
+  isUsableSessionTitle,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 
@@ -379,7 +380,7 @@ export class CodingAgentSessionStateProjection {
   }): CodingAgentSessionData {
     const title = value?.trim() || null;
     if (title === null) return state;
-    if (source === "prompt" && state.title !== null) return state;
+    if (source === "prompt" && isUsableSessionTitle(state.title)) return state;
     const untitledRank = state.title !== null ? TITLE_RANK.generated : 0;
     const current = state.titleSource !== null ? TITLE_RANK[state.titleSource] : untitledRank;
     if (TITLE_RANK[source] < current) return state;

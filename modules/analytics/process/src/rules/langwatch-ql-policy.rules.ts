@@ -84,7 +84,7 @@ export interface ResolvedLangWatchQLPolicy {
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;
-  /** `allowedTables` as written, sorted and deduplicated, for a refusal to list. */
+  /** `allowedTables` as a caller writes them, bare, sorted and deduplicated for a refusal. */
   readonly availableViews: readonly string[];
   /** `viewColumns`, keyed by the qualified table name. */
   readonly viewColumns: ReadonlyMap<string, readonly string[]>;
@@ -110,6 +110,21 @@ export function qualifyTableName({
   if (explicit) return `${explicit}.${trimmed}`;
   if (trimmed.includes(".")) return trimmed;
   return defaultDatabase ? `${defaultDatabase}.${trimmed}` : trimmed;
+}
+
+/** A catalog entry as a caller writes it: without the deployment's own database. */
+export function bareViewName({
+  table,
+  defaultDatabase,
+}: {
+  table: string;
+  defaultDatabase: string;
+}): string {
+  const trimmed = table.trim();
+  const prefix = `${defaultDatabase}.`;
+  if (defaultDatabase && trimmed.toLowerCase().startsWith(prefix))
+    return trimmed.slice(prefix.length);
+  return trimmed;
 }
 
 /** The sorted, deduplicated form a refusal lists names in. */

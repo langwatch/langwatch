@@ -49,6 +49,8 @@ import type {
   LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
+  ProjectSlugHolder,
+  ProjectSlugMove,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
@@ -262,6 +264,32 @@ export class PrismaProjectRepository
     return projects.map(({ id }) => id);
   }
 
+  async findSlugHolders({ slug }: { slug: string }): Promise<ProjectSlugHolder[]> {
+    return this.prisma.project.findMany({
+      where: { slug },
+      select: { id: true, name: true, slug: true },
+    });
+  }
+
+  async replaceSlug(input: {
+    projectId: string;
+    from: string;
+    to: string;
+  }): Promise<ProjectSlugMove> {
+    try {
+      const result = await this.prisma.project.updateMany({
+        where: { id: input.projectId, slug: input.from },
+        data: { slug: input.to },
+      });
+      return result.count > 0 ? "moved" : "gone";
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return "taken";
+      }
+      throw error;
+    }
+  }
+
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {
     return this.mapInternal(await this.prisma.project.findUnique({ where: { slug } }));
   }
@@ -430,6 +458,8 @@ export class PrismaProjectRepository
         createdAt: true,
         teamId: true,
         isPersonal: true,
+        ownerUserId: true,
+        firstMessage: true,
         departmentId: true,
         presenceEnabled: true,
         archivedAt: true,
@@ -466,6 +496,8 @@ export class PrismaProjectRepository
           presenceEnabled: row.presenceEnabled,
           isArchived: row.archivedAt !== null,
           adminUserId: organization.members[0]?.userId ?? null,
+          ownerUserId: row.ownerUserId,
+          firstMessage: row.firstMessage,
         },
       };
     });

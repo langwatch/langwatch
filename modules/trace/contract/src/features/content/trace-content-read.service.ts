@@ -9,6 +9,7 @@ import type {
   TraceSummaryPage,
   TracesForProjectResult,
 } from "../../trace-read.contract.ts";
+import type { TracePageSizeBound } from "../../trace.errors.ts";
 import type { CompiledProjection } from "../ingest/trace-projection.types.ts";
 
 export type TraceListTracesInput = {
@@ -27,8 +28,8 @@ export type TraceListTracesInput = {
     filterWhere?: { sql: string; params: Record<string, unknown> };
     /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */
     authorization?: Authorization;
-    /** Refuse above this plan bound instead of clamping to the list bound. */
-    refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+    /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */
+    refuseAbove?: TracePageSizeBound;
   };
 };
 
@@ -74,6 +75,18 @@ export type TraceReadThreadsTracesInput = {
   maxTraces?: number;
 };
 
+export type TraceReadThreadsTraceIdsInput = {
+  projectId: string;
+  threadIds: string[];
+  maxTraces?: number;
+};
+
+/** One thread's trace ids, oldest first. */
+export type ThreadTraceIds = {
+  threadId: string;
+  traceIds: string[];
+};
+
 export type TraceReadSampleTracesInput = {
   query: TraceLegacyListInput;
   protections: unknown;
@@ -95,6 +108,8 @@ export abstract class TraceContentReadService {
   abstract readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]>;
   /** `maxTraces` is the ceiling across every thread asked for, not per thread. */
   abstract readThreadsTraces(input: TraceReadThreadsTracesInput): Promise<Trace[]>;
+  /** `maxTraces` is the ceiling across every thread asked for, not per thread. */
+  abstract readThreadsTraceIds(input: TraceReadThreadsTraceIdsInput): Promise<ThreadTraceIds[]>;
   abstract readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]>;
 }
 

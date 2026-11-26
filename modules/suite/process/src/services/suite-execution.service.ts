@@ -40,6 +40,9 @@ type SuiteExecutionRequest = {
    */
   simulatorModel?: string | null;
   judgeModel?: string | null;
+  /** The plan's judge trace wait in ms, stamped on every run it queues. */
+  traceQuietPeriodMs?: number | null;
+  traceWaitTimeoutMs?: number | null;
 };
 
 /** One scenario, against one target, on one repeat. */
@@ -306,6 +309,8 @@ export class SuiteExecutionService implements SuiteExecution {
           actor: input.actor,
           simulatorModel: input.simulatorModel,
           judgeModel: input.judgeModel,
+          traceQuietPeriodMs: input.traceQuietPeriodMs,
+          traceWaitTimeoutMs: input.traceWaitTimeoutMs,
           resolvedModels: resolvedModelsByScenarioId.get(item.scenarioId) ?? null,
           evaluators: evaluatorsByScenarioId.get(item.scenarioId),
         });

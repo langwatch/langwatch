@@ -1,11 +1,15 @@
 import type { Named } from "@langwatch/module";
 import { fixed64Schema } from "@langwatch/otlp/trace-request";
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
+  EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS,
+  EVALUATION_OUTCOME_RECORDED_EVENT_TYPE,
+  EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
   LOG_CONTRIBUTED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
@@ -34,6 +38,7 @@ import {
   piiRedactionLevelSchema,
   recordTraceSpanEventDataSchema,
 } from "./trace-processing.commands.ts";
+import { firstUsableAnchor } from "./trace-storage-anchor.ts";
 
 export {
   isSpanReceivedEvent,
@@ -184,6 +189,22 @@ function parseStartTimeUnixMs(value: unknown): number | null {
 
   if (!Number.isFinite(nano) || nano <= 0) return null;
   return Math.floor(nano / 1e6);
+}
+
+/**
+ * The business time a trace fold's read window also covers (ADR-087 amendment): a span's own
+ * start time, where a backfilled trace's first span filed its row, since a span's occurredAt is
+ * its arrival. Every other event, and a span with no usable start, keeps its occurredAt.
+ */
+export function traceFoldReadAnchorMs(
+  event: { type: string; occurredAt: number; data?: unknown },
+  now: number = nowInstant().epochMilliseconds,
+): number {
+  if (!isSpanReceivedEvent(event)) return event.occurredAt;
+  const span: Partial<SpanReceivedEvent["data"]["span"]> =
+    (event.data as Partial<SpanReceivedEvent["data"]> | undefined)?.span ?? {};
+  const startTimeUnixMs = parseStartTimeUnixMs(span.startTimeUnixNano) ?? undefined;
+  return firstUsableAnchor({ candidates: [startTimeUnixMs, event.occurredAt], now });
 }
 
 /**
@@ -499,6 +520,43 @@ export type TraceNameChangedEventData = z.infer<typeof traceNameChangedEventData
 export type TraceNameChangedEvent = z.infer<typeof traceNameChangedEventSchema>;
 
 /**
+ * One evaluation's outcome on its trace. `occurredAt` is the trace's own (the fold reads back
+ * around it); the evaluation's time and event id ride in the data and order its outcomes.
+ */
+const evaluationOutcomeRecordedEventDataSchemaDefinition = z.object({
+  evaluationId: z.string().min(1),
+  evaluatorName: z.string().max(EVALUATION_OUTCOME_TEXT_MAX_LENGTH).nullable(),
+  isGuardrail: z.boolean(),
+  status: z.enum(["processed", "error", "skipped"]),
+  passed: z.boolean().nullable(),
+  label: z.string().max(EVALUATION_OUTCOME_TEXT_MAX_LENGTH).nullable(),
+  evaluationOccurredAt: z.number().int().nonnegative().max(EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS),
+  sourceEventId: z.string().min(1),
+});
+export interface EvaluationOutcomeRecordedEventDataSchema extends Named<
+  typeof evaluationOutcomeRecordedEventDataSchemaDefinition
+> {}
+export const evaluationOutcomeRecordedEventDataSchema: EvaluationOutcomeRecordedEventDataSchema =
+  evaluationOutcomeRecordedEventDataSchemaDefinition;
+
+const evaluationOutcomeRecordedEventSchemaDefinition = z.object({
+  ...traceEventSchema.shape,
+  type: z.literal(EVALUATION_OUTCOME_RECORDED_EVENT_TYPE),
+  data: evaluationOutcomeRecordedEventDataSchema,
+  metadata: eventMetadataBaseSchema.optional(),
+});
+export interface EvaluationOutcomeRecordedEventSchema extends Named<
+  typeof evaluationOutcomeRecordedEventSchemaDefinition
+> {}
+export const evaluationOutcomeRecordedEventSchema: EvaluationOutcomeRecordedEventSchema =
+  evaluationOutcomeRecordedEventSchemaDefinition;
+
+export type EvaluationOutcomeRecordedEventData = z.infer<
+  typeof evaluationOutcomeRecordedEventDataSchema
+>;
+export type EvaluationOutcomeRecordedEvent = z.infer<typeof evaluationOutcomeRecordedEventSchema>;
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
@@ -512,4 +570,5 @@ export type TraceProcessingEvent =
   | AnnotationAddedEvent
   | AnnotationRemovedEvent
   | AnnotationsBulkSyncedEvent
-  | TraceNameChangedEvent;
+  | TraceNameChangedEvent
+  | EvaluationOutcomeRecordedEvent;

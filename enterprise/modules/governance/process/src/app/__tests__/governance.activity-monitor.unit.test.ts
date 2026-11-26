@@ -12,6 +12,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
@@ -44,6 +45,7 @@ function planOfType(type: string): Plan {
     free: type === "FREE",
     maxMembers: 10,
     maxMembersLite: 10,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
@@ -62,6 +64,7 @@ async function buildApp(
     repositories: { ...MemoryGovernanceRepositories.create(), activityMonitor: activity },
     dependencies: {
       webhooks: createApiFixture<WebhookApi>(),
+      notifications: createApiFixture<NotificationService>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({
         findInternal: async () =>

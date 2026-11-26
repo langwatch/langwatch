@@ -14,7 +14,7 @@ import {
 import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
 import {
@@ -24,9 +24,13 @@ import {
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { directoryOwnershipCopy } from "../../model/group-source.ts";
+import { BILLING_ONLY_SEAT, type InviteSeat } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { IdentityChip } from "../elements/identity-row.tsx";
-import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
+import {
+  OrganizationUserRoleField,
+  orgRoleOptions,
+} from "../elements/organization-user-role-field.tsx";
 import {
   GrantInputRow,
   type GrantInputRowHandle,
@@ -171,16 +175,25 @@ export function MemberAccessEditor({
   organizationId,
   userId,
   memberRole,
+  memberBillingOnly = false,
   canManage,
   isCurrentUser,
 }: {
   organizationId: string;
   userId: string;
   memberRole: OrganizationUserRole;
+  /** Billing only (ADR-205): shown as its own seat; moving to any role ends it. */
+  memberBillingOnly?: boolean;
   canManage: boolean;
   isCurrentUser: boolean;
 }) {
-  const editor = useMemberAccessEditor({ organizationId, userId, memberRole, canManage });
+  const editor = useMemberAccessEditor({
+    organizationId,
+    userId,
+    memberRole,
+    memberBillingOnly,
+    canManage,
+  });
 
   return (
     <VStack gap={5} align="stretch" width="full">
@@ -194,9 +207,10 @@ export function MemberAccessEditor({
               You cannot change your own organization role.
             </Text>
           ) : (
-            <OrganizationUserRoleField
-              value={editor.pendingRole}
-              onChange={editor.setPendingRole}
+            <OrganizationUserRoleField<InviteSeat>
+              value={editor.pendingSeat}
+              onChange={editor.setPendingSeat}
+              roles={seatsOffered({ memberBillingOnly })}
             />
           )}
         </Box>
@@ -217,14 +231,7 @@ export function MemberAccessEditor({
               editor.setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== index))
             }
           />
-          {/* A Developer seat (ADR-171) can be given no shared access at all, so
-              there is no row to add: the seat is the whole answer. */}
-          {editor.pendingRole === OrganizationUserRole.DEVELOPER ? (
-            <Text fontSize="xs" color="fg.muted" data-testid="developer-no-access">
-              A Developer seat works in its own project only. Move them to a Member seat to give
-              them access to a team or project.
-            </Text>
-          ) : (
+          <NoAccessNote seat={editor.pendingSeat}>
             <GrantInputRow
               ref={editor.grantInputRef}
               organizationId={organizationId}
@@ -233,7 +240,7 @@ export function MemberAccessEditor({
               organizationRole={editor.pendingRole}
               buttonLabel="Assign role"
             />
-          )}
+          </NoAccessNote>
         </Box>
       )}
 
@@ -459,22 +466,56 @@ function MemberGroups({
  * Staged edits, the seat constraint and the save. The role goes first (licence and plan checks),
  * then the assignments as one batch; a failure between the two re-reads the staged view.
  */
+/** Billing only and a Developer seat (ADR-171) take no shared access: a note replaces the row. */
+function NoAccessNote({ seat, children }: { seat: InviteSeat; children: ReactNode }) {
+  if (seat === BILLING_ONLY_SEAT) {
+    return (
+      <Text fontSize="xs" color="fg.muted" data-testid="billing-only-no-access">
+        Billing only covers the plan and invoices. Move them to a seat to give them access to a team
+        or project.
+      </Text>
+    );
+  }
+  if (seat === OrganizationUserRole.DEVELOPER) {
+    return (
+      <Text fontSize="xs" color="fg.muted" data-testid="developer-no-access">
+        A Developer seat works in its own project only. Move them to a Member seat to give them
+        access to a team or project.
+      </Text>
+    );
+  }
+  return children;
+}
+
+/** The seats the picker offers: Billing only only to show a member who already holds it. */
+function seatsOffered({ memberBillingOnly }: { memberBillingOnly: boolean }): InviteSeat[] {
+  return orgRoleOptions
+    .map((option) => option.value)
+    .filter((seat) => memberBillingOnly || seat !== BILLING_ONLY_SEAT);
+}
+
 function useMemberAccessEditor({
   organizationId,
   userId,
   memberRole,
+  memberBillingOnly,
   canManage,
 }: {
   organizationId: string;
   userId: string;
   memberRole: OrganizationUserRole;
+  memberBillingOnly: boolean;
   canManage: boolean;
 }) {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
 
-  const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(memberRole);
+  const memberSeat: InviteSeat = memberBillingOnly ? BILLING_ONLY_SEAT : memberRole;
+  const [pendingSeat, setPendingSeat] = useState<InviteSeat>(memberSeat);
+  // Billing only is stored as EXTERNAL; saving any other seat clears the flag (ADR-205).
+  const pendingRole: OrganizationUserRole =
+    pendingSeat === BILLING_ONLY_SEAT ? OrganizationUserRole.EXTERNAL : pendingSeat;
   const [pendingGrantRemovals, setPendingGrantRemovals] = useState<Set<string>>(new Set());
   const [pendingGrantAdditions, setPendingGrantAdditions] = useState<PendingGrant[]>([]);
   // A complete draft never added still counts as a change; the save flushes it.
@@ -483,13 +524,13 @@ function useMemberAccessEditor({
   const grantInputRef = useRef<GrantInputRowHandle>(null);
 
   const reset = () => {
-    setPendingRole(memberRole);
+    setPendingSeat(memberSeat);
     setPendingGrantRemovals(new Set());
     setPendingGrantAdditions([]);
     setHasDraftGrant(false);
   };
   // Staged rows belong to the member they were staged for, never the next one opened.
-  useEffect(reset, [userId, memberRole]);
+  useEffect(reset, [userId, memberSeat]);
 
   const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
@@ -499,7 +540,7 @@ function useMemberAccessEditor({
   const updateOrgRole = api.organization.updateMemberRole.useMutation();
   const applyMemberGrants = api.authz.applyMemberGrants.useMutation();
 
-  const roleChanged = pendingRole !== memberRole;
+  const roleChanged = pendingSeat !== memberSeat;
   const hasChanges =
     pendingGrantRemovals.size > 0 ||
     pendingGrantAdditions.length > 0 ||
@@ -517,15 +558,16 @@ function useMemberAccessEditor({
   };
 
   useEffect(() => {
-    // A Developer seat (ADR-171) holds nothing shared: every staged row goes,
-    // the way the save deletes every stored one.
-    if (pendingRole === OrganizationUserRole.DEVELOPER) {
+    // Developer (ADR-171) and Billing only (ADR-205) hold nothing shared: every
+    // staged row and draft goes, the way the save deletes every stored one.
+    if (pendingSeat === OrganizationUserRole.DEVELOPER || pendingSeat === BILLING_ONLY_SEAT) {
       setPendingGrantAdditions([]);
+      setHasDraftGrant(false);
       return;
     }
-    if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
+    if (pendingSeat !== OrganizationUserRole.EXTERNAL) return;
     setPendingGrantAdditions(stagedRowsForLiteSeat);
-  }, [pendingRole]);
+  }, [pendingSeat]);
 
   // A role change moves the member between full and Lite seats, so seat usage is re-read too.
   const refreshAccessQueries = () =>
@@ -540,7 +582,8 @@ function useMemberAccessEditor({
     ]);
 
   const handleSave = async () => {
-    const uncommitted = grantInputRef.current?.flush() ?? null;
+    const uncommitted =
+      pendingSeat === BILLING_ONLY_SEAT ? null : (grantInputRef.current?.flush() ?? null);
     const additions = newGrantAdditions({
       staged: uncommitted ? [...pendingGrantAdditions, uncommitted] : pendingGrantAdditions,
       held: directGrants.data ?? [],
@@ -591,7 +634,8 @@ function useMemberAccessEditor({
 
   return {
     pendingRole,
-    setPendingRole,
+    pendingSeat,
+    setPendingSeat,
     pendingGrantRemovals,
     setPendingGrantRemovals,
     pendingGrantAdditions,

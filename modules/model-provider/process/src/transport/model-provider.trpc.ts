@@ -62,7 +62,10 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
   .procedure("listAllForProjectForFrontend")
   .withPermission("project:view")
   .handle(async ({ app, input }) =>
-    (await app.listForProject({ projectId: input.projectId })).map(toListEntry),
+    (await app.listForProjectWithServedModels({ projectId: input.projectId })).map((provider) => ({
+      ...toListEntry(provider),
+      servedModels: provider.servedModels,
+    })),
   )
 
   .procedure("listDecisionModelsForProject")
@@ -125,7 +128,10 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
       actor,
     );
 
-    return toListEntry(saved);
+    return {
+      ...toListEntry(saved),
+      ...(saved.modelImport && { modelImport: saved.modelImport }),
+    };
   })
 
   .procedure("delete")

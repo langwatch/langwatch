@@ -5,6 +5,7 @@ import {
   type BillableEventRecord,
   type DayMeterCount,
   type EventTypeFilter,
+  type EventTypeMeterCount,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
@@ -111,6 +112,24 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
     return [...keysByDay]
       .toSorted(([a], [b]) => a.localeCompare(b))
       .map(([day, keys]) => ({ day, count: keys.size }));
+  }
+
+  /** Exact per event type, as `countByDay` is exact per day. */
+  async countByType(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<EventTypeMeterCount[]> {
+    const keysByType = new Map<string, Set<string>>();
+    for (const row of this.#inWindow(input)) {
+      if (!input.projectIds.includes(row.tenantId)) continue;
+      const keys = keysByType.get(row.eventType) ?? new Set<string>();
+      keys.add(row.deduplicationKey);
+      keysByType.set(row.eventType, keys);
+    }
+    return [...keysByType]
+      .toSorted(([a], [b]) => a.localeCompare(b))
+      .map(([eventType, keys]) => ({ eventType, count: keys.size }));
   }
 
   #inWindow(input: { organizationId: string; window: MeterWindow }): BillableEventRecord[] {

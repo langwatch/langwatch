@@ -138,6 +138,7 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
       recordAgentInstance: async () => {},
       recordCutAtLimit: async () => {},
       recordHooks: async () => {},
+      recordRedTeamReport: async () => {},
     } satisfies SimulationService;
 
     scenarios = ScenarioService.create({

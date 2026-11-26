@@ -18,10 +18,16 @@ import { governanceActivityMonitorEventing } from "./eventing/governance-activit
 import { GOVERNANCE_COST_CHARGE_PROJECTION_NAME } from "./eventing/governance-cost-charge.projection.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
+import { ingestionSourceLifecycleEventing } from "./eventing/ingestion-source-lifecycle.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
+import { agentStopEventing } from "./features/kill-switch/eventing/agent-stop.pipeline.ts";
+import { ocsfPushEventing } from "./features/ocsf/eventing/ocsf-push.pipeline.ts";
+import { agentRegistryEventing } from "./features/registry/eventing/agent-registry.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
+import { agentKillSwitchRest } from "./transport/agent-kill-switch.rest.ts";
+import { agentRegistryRest } from "./transport/agent-registry.rest.ts";
 import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
 import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
@@ -29,18 +35,42 @@ import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trp
 import { governanceCliRest } from "./transport/governance-cli.rest.ts";
 import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts";
 import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
+import { governanceKillSwitchTrpcTransport } from "./transport/governance-kill-switch.trpc.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
+import { governanceRegistryTrpcTransport } from "./transport/governance-registry.trpc.ts";
 import { governanceRest } from "./transport/governance.rest.ts";
 import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
 import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
 import { ingestionSourcesTrpcTransport } from "./transport/ingestion-sources.trpc.ts";
 import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
 import { meUsageRest } from "./transport/me-usage.rest.ts";
+import { ocsfSiemRest } from "./transport/ocsf-siem.rest.ts";
 import { personalSessionsTrpcTransport } from "./transport/personal-sessions.trpc.ts";
 import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 
 /** How far back a pull may still restate a day, so the drift check can still compare it. */
 const COST_CHARGES_REPLAY_WINDOW_HOURS = GOVERNANCE_SETTLING_WINDOW_DAYS * 24;
+
+/** The deploy step that builds every organisation's agent registry once. */
+function seedAgentRegistryStep(app: GovernanceModule) {
+  return defineMigrationStep({
+    id: "governance:seed-agent-registry",
+    kind: "data",
+    mode: "background",
+    description: "Builds each organisation's agent registry from its agents, sources and traffic.",
+    needsOldWritersGone: false,
+    run: async ({ checkpoint, dryRun, signal }) => {
+      if (dryRun) return { dryRun, organizations: 0 };
+      const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+      const report = await app.agentRegistry.seedAll({
+        after: typeof resumed === "string" ? resumed : undefined,
+        signal,
+        onPage: (page) => checkpoint.save({ report: page }),
+      });
+      return { ...report, dryRun };
+    },
+  });
+}
 
 /**
  * The whole module, declared: one application and the families it answers.
@@ -51,6 +81,9 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withApi(GovernanceModule)
     .withTransports(
       governanceRest,
+      agentRegistryRest,
+      agentKillSwitchRest,
+      ocsfSiemRest,
       governanceCliRest,
       governanceIngestRest,
       meUsageRest,
@@ -61,11 +94,13 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
       governanceTrpcTransport,
       anomalyRulesTrpcTransport,
       activityMonitorTrpcTransport,
+      governanceKillSwitchTrpcTransport,
       personalSessionsTrpcTransport,
       ingestionKeyTrpcTransport,
       sessionPolicyTrpcTransport,
       governancePeopleTrpcTransport,
       governanceAgentsTrpcTransport,
+      governanceRegistryTrpcTransport,
       governanceCostTrpcTransport,
     )
     // The member behind the project credential, which surface asked, and the CLI token door. A
@@ -108,6 +143,10 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withEventing(ingestionPullReconcileEventing)
     .withEventing(governanceActivityMonitorEventing)
     .withEventing(codingAssistantBillingEventing)
+    .withEventing(ingestionSourceLifecycleEventing)
+    .withEventing(agentRegistryEventing)
+    .withEventing(agentStopEventing)
+    .withEventing(ocsfPushEventing)
     // Background, after old writers are gone: an older image edits coding-assistant configs
     // without a fact and appends pulled usage without a charge (governance-deploy-steps.feature).
     .withMigrations(({ app, replayer }) => [
@@ -168,6 +207,8 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
           return { ...report, dryRun };
         },
       }),
+      // Fills the registry once for every organisation; after it, facts and the traffic pass keep it.
+      seedAgentRegistryStep(app),
       defineProjectionReplayStep({
         id: "governance:replay-cost-charges",
         description:

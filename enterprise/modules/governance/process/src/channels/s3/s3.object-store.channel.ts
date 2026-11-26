@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
-import { AwsClientConfiguration } from "@langwatch/aws-client";
-import { createSsrfUrlValidator } from "@langwatch/egress";
+import {
+  AwsClientConfiguration,
+  defaultS3Host,
+  pinnedEndpointConfig,
+  s3RegionOf,
+} from "@langwatch/aws-client";
+import { createSsrfUrlValidator, type SsrfUrlValidator } from "@langwatch/egress";
 
+import type { GovernanceEgressPolicy } from "../http/http.governance-http.channel.ts";
 import type {
   GovernanceObjectStorageCredentials,
   GovernanceObjectStore,
@@ -17,11 +23,6 @@ type ObjectStoreTarget = {
   endpoint?: string;
   credentials: GovernanceObjectStorageCredentials;
 };
-
-function defaultS3Host(region: string): string {
-  const suffix = region.startsWith("cn-") ? ".amazonaws.com.cn" : ".amazonaws.com";
-  return `s3.${region}${suffix}`;
-}
 
 function appendListedKeys(
   keys: string[],
@@ -37,19 +38,23 @@ function appendListedKeys(
 
 /**
  * A source's own bucket, read with the source's own credentials: a fresh client per call so a
- * rotated credential is honoured on the next tick, its host judged by the egress fence first.
+ * rotated credential is honoured on the next tick. An endpoint override is judged by the egress fence.
  */
 export class S3ObjectStoreChannel implements GovernanceObjectStore {
   // Main's pullers reached S3 directly, never through the platform's outbound proxy.
   readonly #aws = AwsClientConfiguration.create({
     outboundProxy: { tryResolveForHost: () => undefined },
   });
-  readonly #validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
+  readonly #validate: SsrfUrlValidator;
 
-  private constructor() {}
+  private constructor(egress: GovernanceEgressPolicy) {
+    // AWS endpoints, VPC endpoints included, are named overrides; their addresses are still judged.
+    this.#validate = createSsrfUrlValidator({ ...egress, allowAwsServiceHosts: true });
+  }
 
-  static create(): S3ObjectStoreChannel {
-    return new S3ObjectStoreChannel();
+  /** `egress` is the pull fence; an endpoint override is judged by it, cloud metadata always refused. */
+  static create({ egress }: { egress?: GovernanceEgressPolicy } = {}): S3ObjectStoreChannel {
+    return new S3ObjectStoreChannel(egress ?? { blockLocal: true, allowedHosts: [] });
   }
 
   async list(
@@ -81,6 +86,10 @@ export class S3ObjectStoreChannel implements GovernanceObjectStore {
   }
 
   async readText(input: Parameters<GovernanceObjectStore["readText"]>[0]): Promise<string> {
+    return new TextDecoder().decode(await this.readBytes(input));
+  }
+
+  async readBytes(input: Parameters<GovernanceObjectStore["readText"]>[0]): Promise<Uint8Array> {
     return this.#withClient(input, async (client) => {
       const where = `s3://${input.bucket}/${input.key}`;
       const response = await client.send(
@@ -91,17 +100,11 @@ export class S3ObjectStoreChannel implements GovernanceObjectStore {
       if (!(Symbol.asyncIterator in response.Body)) {
         throw new Error(`streaming body unavailable for ${where}`);
       }
-      const chunks: Uint8Array[] = [];
-      let totalBytes = 0;
-      for await (const chunk of response.Body) {
-        if (input.signal?.aborted) throw new Error(`aborted while reading ${where}`);
-        totalBytes += chunk.byteLength;
-        if (totalBytes > input.maxBytes) {
-          throw new Error(`file exceeds ${input.maxBytes} bytes: ${where}`);
-        }
-        chunks.push(chunk);
+      const declared = response.ContentLength;
+      if (declared !== undefined && declared > input.maxBytes) {
+        throw new Error(`file exceeds ${input.maxBytes} bytes: ${where}`);
       }
-      return new TextDecoder().decode(Buffer.concat(chunks));
+      return collectBody({ body: response.Body, declared, input, where });
     });
   }
 
@@ -109,16 +112,25 @@ export class S3ObjectStoreChannel implements GovernanceObjectStore {
     input: ObjectStoreTarget,
     operation: (client: S3Client) => Promise<T>,
   ): Promise<T> {
-    const targetHost = input.endpoint ? new URL(input.endpoint).host : defaultS3Host(input.region);
-    await this.#validate(input.endpoint ?? `https://${targetHost}/`);
-    const { accessKeyId, secretAccessKey, sessionToken } = input.credentials;
+    const region = s3RegionOf({ region: input.region, endpoint: input.endpoint });
+    const targetHost = input.endpoint ? new URL(input.endpoint).host : defaultS3Host(region);
+    // The regional AWS host is reached through the SDK's own resolution; only an override is fenced.
+    const pinned =
+      input.endpoint === undefined
+        ? {}
+        : pinnedEndpointConfig(await this.#validate(input.endpoint));
+    const { accessKeyId, secretAccessKey, sessionToken, assumeRole, requireStaticKeys } =
+      input.credentials;
     const client = new S3Client({
       ...this.#aws.build({
-        region: input.region,
+        region,
         endpoint: input.endpoint,
         targetHost,
         staticCredentials: { accessKeyId, secretAccessKey, sessionToken },
+        assumeRole: assumeRole ?? null,
+        requireStatic: requireStaticKeys === true,
       }),
+      ...pinned,
       forcePathStyle: input.endpoint !== undefined,
     });
     try {
@@ -127,4 +139,45 @@ export class S3ObjectStoreChannel implements GovernanceObjectStore {
       client.destroy();
     }
   }
+}
+
+/**
+ * The body in one buffer that owns its whole `ArrayBuffer`, so a reader can hand `.buffer` on with
+ * no copy. A declared length fills one buffer as chunks arrive; without one the chunks are joined once.
+ */
+async function collectBody({
+  body,
+  declared,
+  input,
+  where,
+}: {
+  body: AsyncIterable<Uint8Array>;
+  declared: number | undefined;
+  input: { maxBytes: number; signal?: AbortSignal };
+  where: string;
+}): Promise<Uint8Array> {
+  const filled = declared === undefined ? undefined : new Uint8Array(declared);
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  for await (const chunk of body) {
+    if (input.signal?.aborted) throw new Error(`aborted while reading ${where}`);
+    const end = totalBytes + chunk.byteLength;
+    if (end > input.maxBytes || (filled !== undefined && end > filled.byteLength)) {
+      throw new Error(`file exceeds ${filled?.byteLength ?? input.maxBytes} bytes: ${where}`);
+    }
+    if (filled === undefined) chunks.push(chunk);
+    else filled.set(chunk, totalBytes);
+    totalBytes = end;
+  }
+  if (filled !== undefined) {
+    if (totalBytes !== filled.byteLength) throw new Error(`body ended early: ${where}`);
+    return filled;
+  }
+  const joined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return joined;
 }

@@ -21,7 +21,12 @@ export const DASHBOARDS_BOUNDARY = "dashboards";
 export type DashboardKind = "stored" | "curated";
 
 /** How a board was made. */
-export type DashboardCreatedFrom = "blank" | "template" | "duplicate" | "duplicate_curated";
+export type DashboardCreatedFrom =
+  | "blank"
+  | "template"
+  | "duplicate"
+  | "duplicate_curated"
+  | "widget_curated";
 
 /** How a widget landed on a board. */
 export type WidgetAddedFrom = "catalogue" | "editor" | "duplicate";

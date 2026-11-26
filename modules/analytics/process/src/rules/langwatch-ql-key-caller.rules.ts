@@ -28,3 +28,9 @@ export function keyRunTelemetry({
   if (reach.kind === "apiKey" && reach.isLangySessionKey === true) return { caller: "langy" };
   return { caller: door };
 }
+
+/** The project a key resolved to on its own, for a failed run's line; empty for a wider key. */
+export function keyReachProjectIds({ reach }: { reach: LangWatchQLKeyReach }): readonly string[] {
+  if (reach.kind === "project" || reach.kind === "cliAccessToken") return [reach.projectId];
+  return reach.resolvedProject ? [reach.resolvedProject.id] : [];
+}

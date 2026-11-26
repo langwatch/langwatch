@@ -32,12 +32,15 @@ type EvaluationJudgingDeps = Readonly<{
   decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
-  /** Whether the project's organization has the judge router flag (ADR-190 decision 8). */
+  /** What the project's organization's flags say about LangWatch's hosted judge. */
   judgeRouting: EvaluationJudgeRouting;
 }>;
 
 export type EvaluationJudgeRouting = Readonly<{
+  /** The judge router flag (ADR-190 decision 8). */
   isRouted: (input: { projectId: string }) => Promise<boolean>;
+  /** Whether LangWatch switched its hosted model off for the organization, whatever its plan. */
+  isHostedOff: (input: { projectId: string }) => Promise<boolean>;
 }>;
 
 /** What an LLM-as-judge evaluator asks the router for; the table picks its slot and mode. */
@@ -64,6 +67,8 @@ export class EvaluationJudgingService {
     droppedCategories: string[];
     /** The decision model this judge picked; the resolver weighs it, the guards are unchanged. */
     decisionModel?: string | undefined;
+    /** The judge picked LangWatch Evals (preview), so the router flag decides if it is routed. */
+    isRoutable?: boolean | undefined;
     /** Only a queued monitor command carries one; it becomes the retry key (decision 9). */
     idempotencyKey?: string | undefined;
     guardrailDirection?: GuardrailCheckDirection | undefined;
@@ -87,6 +92,7 @@ export class EvaluationJudgingService {
     guardrailDirection,
     signal,
     decisionModel,
+    isRoutable = false,
   }: {
     projectId: string;
     judge: InstantEvalJudge;
@@ -95,6 +101,7 @@ export class EvaluationJudgingService {
     guardrailDirection?: GuardrailCheckDirection | undefined;
     signal?: AbortSignal | undefined;
     decisionModel?: string | undefined;
+    isRoutable?: boolean | undefined;
   }): Promise<SingleEvaluationResult> {
     const guardrailSkip = instantEvalGuardrailSkipOf({ direction: guardrailDirection });
     if (guardrailSkip.kind === "skipped") return guardrailSkip.result;
@@ -111,9 +118,19 @@ export class EvaluationJudgingService {
     if (resolved.kind === "own_unavailable") {
       return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));
     }
-    // An own decision model is never routed, so the flag is read on LangWatch's model only.
+    // An organization LangWatch keeps on its own models never reaches the hosted judge.
+    if (
+      resolved.kind === "langwatch" &&
+      (await this.deps.judgeRouting.isHostedOff({ projectId }))
+    ) {
+      return instantEvalSkipResultOf("classifier_not_configured");
+    }
+    // Only LangWatch Evals (preview) is routed: never LangWatch Instant (preview), never an own
+    // decision model.
     const isRouted =
-      resolved.kind === "langwatch" && (await this.deps.judgeRouting.isRouted({ projectId }));
+      isRoutable &&
+      resolved.kind === "langwatch" &&
+      (await this.deps.judgeRouting.isRouted({ projectId }));
     const answer = await this.deps.judges.judge({
       projectId,
       text: request.text,

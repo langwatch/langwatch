@@ -29,6 +29,7 @@ import {
   type EvaluatorServerConfig,
   type EvaluatorResultAugmentationInput,
   type EvaluatorSyncFromSourceResult,
+  type EvaluatorType,
   type EvaluatorUpdateInput,
   type EvaluatorWithFields,
   type EvaluatorWorkflowFields,
@@ -42,6 +43,7 @@ import {
   type EvaluatorVersionSelector,
   type RemoveEvaluatorLabelInput,
   parseEvaluatorAddress,
+  withCodeEvaluatorOutputFields,
 } from "@langwatch/evaluator-contract";
 import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/evaluation-types";
 import { ValidationError } from "@langwatch/handled-error";
@@ -503,18 +505,43 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   }
 
   /**
-   * Creates an evaluator against the project's resolved models: the public API
-   * names a config but no model, so `evaluator.create_default` is what it runs
-   * on. The embeddings model is optional where the default model is not.
+   * Creates an evaluator for the public API. A built-in one runs on the project's
+   * resolved models, the embeddings model optional where the default is not; a code
+   * or workflow one needs no model and is stored exactly as the editor stores it.
    */
   async createWithResolvedDefaults(input: {
     projectId: string;
     name: string;
+    type?: EvaluatorType;
     config: EvaluatorConfig;
+    workflowId?: string;
     id?: string;
     caller?: EvaluatorCaller;
   }): Promise<Evaluator> {
+    const type = input.type ?? "evaluator";
+    assertWorkflowLink(type, input.workflowId);
     await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
+    if (type !== "evaluator") {
+      const created = await this.#createGuarded({
+        id: input.id ?? newEvaluatorId(),
+        projectId: input.projectId,
+        name: input.name,
+        type,
+        config: type === "code" ? withCodeEvaluatorOutputFields(input.config) : input.config,
+        ...(input.workflowId !== void 0 && { workflowId: input.workflowId }),
+        caller: input.caller,
+      });
+      // Flagged only once the row exists: a refused create (workflow_not_found included, from
+      // the create's project-scoped lookup) leaves the workflow as it was. A flag write that
+      // fails here leaves the evaluator listed as a component until the Studio switch is used.
+      if (input.workflowId !== void 0) {
+        await this.#dependencies.publications.markAsEvaluator({
+          workflowId: input.workflowId,
+          projectId: input.projectId,
+        });
+      }
+      return created;
+    }
     const [resolvedDefault, resolvedEmbedding] = await Promise.all([
       this.#dependencies.modelProviders.resolveModelForFeature({
         projectId: input.projectId,
@@ -776,6 +803,23 @@ function usesEmbeddingsModel(config: EvaluatorConfig): boolean {
   if (!definition || !("settings" in definition)) return false;
 
   return "embeddings_model" in definition.settings;
+}
+
+/**
+ * Only a workflow evaluator links a workflow, and it always does: an unlinked one would
+ * fall back to native execution, and a linked code one would archive the workflow with it.
+ */
+function assertWorkflowLink(type: EvaluatorType, workflowId: string | undefined): void {
+  if ((type === "workflow") === Boolean(workflowId)) return;
+
+  const message =
+    type === "workflow"
+      ? 'A "workflow" evaluator needs the workflowId of the workflow it wraps.'
+      : 'Only a "workflow" evaluator names a workflowId.';
+  throw new ValidationError(message, {
+    fault: "customer",
+    meta: { fieldErrors: { workflowId: [message] }, formErrors: [] },
+  });
 }
 
 /** Code evaluators carry their program on `config`; nothing else can run one. */

@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type {
+  CioBatchCall,
+  NurturingSignal,
+  NurturingSignalOf,
+} from "@langwatch/enterprise-nurturing-contract";
 import type {
   ScenarioRunGraceEndedEventData,
   ScenarioRunsThresholdReachedEventData,
@@ -7,9 +11,14 @@ import type {
 import { Temporal } from "@langwatch/time";
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";
+import { fireCodingOrApp, isCodingOrAppSignal } from "./nurturing-coding-delivery.rules.ts";
 
 type ScenarioRunCapKind = "scenario_runs_threshold_reached" | "scenario_run_grace_ended";
 type ScenarioRunCapSignal = NurturingSignalOf<ScenarioRunCapKind>;
+const SCENARIO_RUN_CAP_KINDS: readonly string[] = [
+  "scenario_runs_threshold_reached",
+  "scenario_run_grace_ended",
+] satisfies ScenarioRunCapKind[];
 type Source = Readonly<{ aggregateId: string; tenantId: string; memberUserIds: string[] }>;
 
 /** Entitlement's threshold fact as the signal every member of the organization is told. */
@@ -87,4 +96,20 @@ export function fireScenarioRunCapPostHog(signal: ScenarioRunCapSignal): PostHog
     $groups: { organization: signal.organizationId },
   };
   return signal.memberUserIds.map((userId) => ({ userId, event: signal.kind, properties }));
+}
+
+function isScenarioRunCapSignal(signal: NurturingSignal): signal is ScenarioRunCapSignal {
+  return SCENARIO_RUN_CAP_KINDS.includes(signal.kind);
+}
+
+/** How a signal reaches Customer.io: as calls that need no claim or read, or routed by its kind. */
+export type CustomerIoRoute = { kind: "direct"; calls: CioBatchCall[] } | { kind: "routed" };
+
+/** Coding, app and run cap facts go straight out; every other signal is routed by its kind. */
+export function customerIoRouteOf(signal: NurturingSignal): CustomerIoRoute {
+  if (isCodingOrAppSignal(signal)) return { kind: "direct", calls: fireCodingOrApp(signal) };
+  if (isScenarioRunCapSignal(signal)) {
+    return { kind: "direct", calls: fireScenarioRunCapCustomerIo(signal) };
+  }
+  return { kind: "routed" };
 }

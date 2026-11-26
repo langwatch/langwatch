@@ -103,6 +103,7 @@ func TestAgentsTemplate_ReportsSandboxCredentialFailureAsInternalError(t *testin
 		"never claim you lack the CLI or tools",
 		"say you hit an internal error, name the read or write that failed",
 		"`forbidden` or `permission_denied` is a permission refusal: name the access they lack",
+		"if `meta.denialReason` is `owner-ceiling`, `no-membership` or `membership-disabled`, their access was removed or reduced",
 	} {
 		if !strings.Contains(tmpl, phrase) {
 			t.Errorf("AGENTS.md failure rule never says %q", phrase)
@@ -184,6 +185,33 @@ func TestAgentsTemplate_RoutesGuidedKickoffToTheSkill(t *testing.T) {
 	// is ever read.
 	if strings.Contains(row, "complete-path") {
 		t.Errorf("the kickoff routing row names a command the model then runs instead of loading the skill: %s", row)
+	}
+}
+
+// Asked with a dashboard open, "Is our AI saving us time?" got a text answer
+// and a chart card in the chat but nothing on the board, because the row only
+// matched requests naming a dashboard or a chart. The row now takes any data
+// question asked with a dashboard open, and says the answer is a widget on it.
+//
+// @scenario "AC264 Langy widgets: a data question asked with a dashboard open becomes a widget on it"
+func TestAgentsTemplate_RoutesDashboardQuestionsToAWidget(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	var row string
+	for _, line := range strings.Split(tmpl, "\n") {
+		if strings.HasPrefix(line, "|") && strings.Contains(line, "build a chart") {
+			row = line
+		}
+	}
+	if row == "" {
+		t.Fatal("AGENTS.md has no routing row for charts")
+	}
+	for _, want := range []string{"a data question with a dashboard open", "`dashboard-widgets`", "a widget on it, not a card"} {
+		if !strings.Contains(row, want) {
+			t.Errorf("the chart routing row lacks %q: %s", want, row)
+		}
 	}
 }
 
@@ -284,9 +312,9 @@ func TestChartSkills_PlaceOnTheDashboardInContextOrAsk(t *testing.T) {
 	// A widget goes on a Dashboards dashboard; a saved chart on an Analytics Report.
 	wants := map[string][]string{
 		"dashboard-widgets": {
-			"dashboard in the user's context",
+			"place on the dashboard the user named; if they named none, on the dashboard they are on",
 			"ask which one with the `question` tool",
-			"Never choose a dashboard for the user.",
+			"Never choose between existing dashboards for the user.",
 		},
 		"lwql-charts": {
 			"Analytics Report in the user's context",
@@ -335,6 +363,36 @@ func TestDashboardWidgetsSkill_TeachesBoardCommands(t *testing.T) {
 	} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("the dashboard-widgets skill lacks %q", want)
+		}
+	}
+}
+
+// The clone starts with none of the repository's dependencies, so the skill
+// has to send Langy to install them before a test, and to CI when it cannot.
+//
+// @scenario "The github skill installs the clone's dependencies before running its tests"
+// @scenario "The github skill gives the file tools the clone's absolute path"
+func TestGithubSkill_InstallsDependenciesAndNamesAbsolutePaths(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "github", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read github skill: %v", err)
+	}
+	skill := string(body)
+	for _, want := range []string{
+		"Install them first",
+		"`uv sync`",
+		"uv pip install -r requirements.txt",
+		"`npm ci`",
+		"When the install fails",
+		"`gh workflow run <file> --ref <branch>`",
+		"the absolute path `pwd` printed",
+	} {
+		if !strings.Contains(skill, want) {
+			t.Errorf("the github skill lacks %q", want)
 		}
 	}
 }

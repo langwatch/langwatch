@@ -44,6 +44,9 @@
       "path": "../../suite/contract/tsconfig.build.json"
     },
     {
+      "path": "../../stored-object/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../slack/contract/tsconfig.build.json"
     },
     {

@@ -8,12 +8,9 @@ import {
   DECISION_MODELS,
   decisionModelPickerTitle,
   findDecisionModel,
-  findModelProviderDefinition,
-  isOwnDecisionModelId,
-  LANGWATCH_DECISION_MODEL_ID,
   LANGWATCH_DECISION_PREVIEWS,
+  ownDecisionModelPickerOptions,
   type BuiltInModel,
-  type DecisionModelEntry,
   type LangWatchDecisionPreview,
   type ModelPickerOption,
   type ModelRole,
@@ -24,45 +21,32 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
   DECISION_MODELS.map((entry) => [entry.id, decisionModelPickerTitle(entry)]),
 );
 
-/** Evals Preview's line when the judge router answers for it (ADR-190). */
-export const ROUTED_HOSTED_DECISION_MODEL_SUBTITLE = "Optimized for evals, routed";
+/** Offers that leave LangWatch's own model one switch away: the organization's, or its admin's. */
+const HOSTED_ONE_SWITCH_AWAY: ReadonlySet<string> = new Set(["enable", "ask_admin"]);
+
+/**
+ * Whether the column may offer LangWatch Instant (preview): released, or one switch away. Not
+ * answered yet counts as offered, so a released organization never sees it flicker to "Not set".
+ */
+export function isHostedDecisionModelOffered(
+  access: { hostedReleased: boolean; offer: string } | undefined,
+): boolean {
+  if (!access) return true;
+  return access.hostedReleased || HOSTED_ONE_SWITCH_AWAY.has(access.offer);
+}
 
 /** Whether the column can show a stored id; an id the catalogue dropped reads as unset. */
 export function isShownDecisionModel(id: string | null | undefined): id is string {
   return !!id && !!findDecisionModel(id);
 }
 
-/** The line on a decision model whose provider has no key at the picked scopes. */
-function addKeyHint(provider: string): string {
-  const name = findModelProviderDefinition(provider)?.name ?? provider;
-  const article = /^[aeiou]/i.test(name) ? "an" : "a";
-  return `Add ${article} ${name} key in Model Providers to use it.`;
-}
-
-function ownModelOption({
-  entry,
-  offered,
-}: {
-  entry: DecisionModelEntry;
-  offered: ReadonlySet<string>;
-}): ModelPickerOption {
-  const label = decisionModelPickerTitle(entry);
-  if (offered.has(entry.id)) return { label, value: entry.id, subtitle: entry.description };
-  return {
-    label,
-    value: entry.id,
-    subtitle: addKeyHint(entry.provider),
-    disabled: true,
-  };
-}
-
 /** The tag on a LangWatch decision model that has no model behind it yet. */
 const COMING_SOON_HINT = "Coming soon";
 
 /**
- * LangWatch's decision models in the Instant Evals picker: pickable where the catalogue says it
- * fills the column, otherwise listed as coming soon. The judge router flag (ADR-190) shows the
- * rest; off, only the ones that fill the column are listed.
+ * LangWatch's decision models in the Instant Evals picker: pickable where they fill the column,
+ * else coming soon, shown only with the judge router flag (ADR-190). Never LangWatch Evals
+ * (preview): only an LLM judge picks it, and nothing the column feeds is routed.
  */
 function langwatchDecisionOptions({
   isJudgeRouted,
@@ -72,15 +56,10 @@ function langwatchDecisionOptions({
   const fillsColumn = (preview: LangWatchDecisionPreview) =>
     preview.fills.includes("INSTANT_EVALS");
   const shown = LANGWATCH_DECISION_PREVIEWS.filter(
-    (preview) => isJudgeRouted || fillsColumn(preview),
+    (preview) => !preview.isJudgeRouter && (isJudgeRouted || fillsColumn(preview)),
   );
   return shown.map((preview) => {
-    const isRouted = isJudgeRouted && preview.id === LANGWATCH_DECISION_MODEL_ID;
-    const option = {
-      label: preview.label,
-      value: preview.id,
-      subtitle: isRouted ? ROUTED_HOSTED_DECISION_MODEL_SUBTITLE : preview.description,
-    };
+    const option = { label: preview.label, value: preview.id, subtitle: preview.description };
     if (fillsColumn(preview)) return option;
     return { ...option, disabled: true, hint: COMING_SOON_HINT };
   });
@@ -95,28 +74,27 @@ function ownDecisionOptions({
   isOwnModelEnabled: boolean;
 }): ModelPickerOption[] {
   if (!isOwnModelEnabled || pickable === undefined) return [];
-  const offered = new Set(pickable.map((model) => model.value));
-  return DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id)).map((entry) =>
-    ownModelOption({ entry, offered }),
-  );
+  return ownDecisionModelPickerOptions(pickable);
 }
 
 /**
- * The decision model picker: LangWatch's models first, then the own-key catalogue in order. Only
- * what the server says would run can be picked; with own models on, the rest say which key to
- * add. `pickable` undefined means not loaded (or no scope picked), so no own models yet.
+ * The decision model picker: LangWatch's models (when offered) first, then the own-key catalogue.
+ * Only what the server says would run can be picked; with own models on, the rest say which key
+ * to add. `pickable` undefined means not loaded (or no scope picked), so no own models yet.
  */
 export function decisionModelPickerOptions({
   pickable,
   isJudgeRouted,
   isOwnModelEnabled,
+  isHostedOffered = true,
 }: {
   pickable: readonly BuiltInModel[] | undefined;
   isJudgeRouted: boolean;
   isOwnModelEnabled: boolean;
+  isHostedOffered?: boolean;
 }): ModelPickerOption[] {
   return [
-    ...langwatchDecisionOptions({ isJudgeRouted }),
+    ...(isHostedOffered ? langwatchDecisionOptions({ isJudgeRouted }) : []),
     ...ownDecisionOptions({ pickable, isOwnModelEnabled }),
   ];
 }

@@ -12,6 +12,7 @@ import {
   FilterValueRefusedError,
   type LangWatchQLTraceFilter,
   type LangWatchQLTraceFilterValue,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   type TagToken,
   type TranslationContext,
@@ -22,6 +23,7 @@ import {
   numericComparisonHandler,
   stringEqualityHandler,
 } from "./trace-query-translators.rules.ts";
+import { hintForUnknownTraceFilterField } from "./trace-query-unknown-field.rules.ts";
 import {
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
@@ -49,7 +51,7 @@ const STRING_FIELDS: Readonly<Record<string, LangWatchQLTraceFilterField>> = {
   traceId: { expression: "TraceId", param: "traceId" },
   user: { expression: "Attributes['langwatch.user_id']", param: "userId", facetKey: "user" },
   conversation: {
-    expression: "Attributes['gen_ai.conversation.id']",
+    expression: TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
     param: "conversationId",
     facetKey: "conversation",
   },
@@ -201,7 +203,14 @@ function handlerFor(name: string): FieldHandler {
     const field = NUMBER_FIELDS[name];
     if (field) return numericComparisonHandler(field.expression, field.param);
   }
-  throw new FilterFieldUnknownError(name, [...LANGWATCH_QL_TRACE_FILTER_FIELDS]);
+  throw new FilterFieldUnknownError(
+    name,
+    [...LANGWATCH_QL_TRACE_FILTER_FIELDS],
+    hintForUnknownTraceFilterField({
+      field: name,
+      knownFields: [...LANGWATCH_QL_TRACE_FILTER_FIELDS],
+    }),
+  );
 }
 
 /** `status:error` only: telling ok from warning needs a column the view lacks. */

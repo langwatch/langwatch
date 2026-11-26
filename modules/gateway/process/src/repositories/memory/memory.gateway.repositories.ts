@@ -12,6 +12,7 @@ import type {
   GatewayTransactionRepository,
 } from "../gateway-transaction.repository.ts";
 import type { GatewayRepositories } from "../gateway.repositories.ts";
+import { MemoryGatewayA2aTargetRepository } from "./memory.gateway-a2a-target.repository.ts";
 import { MemoryGatewayAgentCacheEntryRepository } from "./memory.gateway-agent-cache.repository.ts";
 import { MemoryGatewayBudgetSpendRepository } from "./memory.gateway-budget-spend.repository.ts";
 import { MemoryGatewayBudgetRepository } from "./memory.gateway-budget.repository.ts";
@@ -78,6 +79,7 @@ export class MemoryGatewayRepositories {
       directBudgets: MemoryVirtualKeyDirectBudgetRepository.create(store),
       spendScope: MemoryGatewaySpendScopeRepository.create(store),
       connectUpstream: MemoryGatewayConnectUpstreamRepository.create(),
+      a2aTargets: MemoryGatewayA2aTargetRepository.create(),
       realtimeSessions: MemoryGatewayRealtimeSessionRepository.create(),
       internalStore: MemoryGatewayInternalStoreRepository.create(),
       traceExportKeys: MemoryGatewayTraceExportKeyRepository.create(),

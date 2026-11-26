@@ -6,7 +6,7 @@ The server half of [entitlement](../README.md). What a plan allows, and what has
 
 ## Installation
 
-`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing)`, `src/entitlement.module.ts:17`.
+`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing).withMigrations(…)`, `src/entitlement.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -119,7 +119,7 @@ Contract `../contract/src/entitlement.trpc.ts:17`, router `src/transport/plan.tr
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:41
+type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:62
 ```
 
 ### `limits`
@@ -139,7 +139,7 @@ type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:108
 
 // limits.getMonthBreakdown
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
-type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:144
+type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:170
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43

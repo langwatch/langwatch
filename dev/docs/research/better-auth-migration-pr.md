@@ -342,10 +342,14 @@ verified.
 7. **OAuth errors bypassed `/auth/error` UI page** — BetterAuth's
    default `errorURL` is `${baseURL}/error` which hits the built-in
    BetterAuth HTML error page, not our `/auth/error` with friendly
-   messages. Fix: `onAPIError: { errorURL: \`${env.NEXTAUTH_URL}/auth/error\` }`.
-Plus a `normalizeErrorCode` helper maps BetterAuth's native codes
-(`email_doesn't_match`, `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) to
-the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
+   messages. Fix: ``onAPIError: { errorURL: `${env.NEXTAUTH_URL}/auth/error` }``.
+   Plus a `normalizeErrorCode` helper maps BetterAuth's redirect codes to
+   the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`). At the time of this
+   PR (v1.6.2) the library redirected with `email_doesn't_match`; v1.7.x
+   redirects with `email_does_not_match`.
+   `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED` is only an API error body code of
+   `/link-social`, never a redirect code, and was dropped in #9752. The
+   current codes are pinned by a test against the installed library.
 
 8. **OAuth callback path mismatch breaks Auth0/Okta** — BetterAuth's
    genericOAuth plugin uses `/api/auth/oauth2/callback/{provider}`, but
@@ -1003,8 +1007,8 @@ this is okay.
 
 1. Manually visit `/auth/error?error=email_doesn't_match`. **Expected:**
    friendly message about linking a different email.
-2. Manually visit `/auth/error?error=LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`.
-   **Expected:** same friendly message (both map to the
+2. Manually visit `/auth/error?error=email_does_not_match` (the 1.7.x
+   spelling). **Expected:** same friendly message (both map to the
    `DIFFERENT_EMAIL_NOT_ALLOWED` legacy UI code).
 3. Visit `/auth/error?error=OAuthAccountNotLinked`. **Expected:**
    the original NextAuth-era message still works.

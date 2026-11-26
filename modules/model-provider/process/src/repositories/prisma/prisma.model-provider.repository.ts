@@ -391,6 +391,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       langySkipPermissionsModels: input.langySkipPermissionsModels
         ? PrismaModelProviderRepository.toPrismaInputJson(input.langySkipPermissionsModels)
         : Prisma.JsonNull,
+      ...PrismaModelProviderRepository.lastListedModelIdsWrite(input),
       scopes: { create: input.scopes },
     } satisfies Prisma.ModelProviderCreateInput;
   }
@@ -423,6 +424,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       langySkipPermissionsModels: input.langySkipPermissionsModels
         ? PrismaModelProviderRepository.toPrismaInputJson(input.langySkipPermissionsModels)
         : Prisma.JsonNull,
+      ...PrismaModelProviderRepository.lastListedModelIdsWrite(input),
       scopes: { deleteMany: {}, create: input.scopes },
     } satisfies Prisma.ModelProviderUpdateInput;
   }
@@ -492,6 +494,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       langySkipPermissionsModels: readStoredSkipList(row.langySkipPermissionsModels).length
         ? readStoredSkipList(row.langySkipPermissionsModels)
         : null,
+      lastListedModelIds: PrismaModelProviderRepository.asIds(row.lastListedModelIds),
       deploymentMapping: PrismaModelProviderRepository.asStringRecord(row.deploymentMapping),
       healthStatus: row.healthStatus,
       circuitOpenedAt: row.circuitOpenedAt ?? null,
@@ -500,6 +503,24 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });
+  }
+
+  /** Written only when the save names it, so a write that never listed leaves the column alone. */
+  private static lastListedModelIdsWrite(input: ModelProvider): {
+    lastListedModelIds?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+  } {
+    if (input.lastListedModelIds === undefined) return {};
+    return {
+      lastListedModelIds:
+        input.lastListedModelIds === null
+          ? Prisma.JsonNull
+          : PrismaModelProviderRepository.toPrismaInputJson(input.lastListedModelIds),
+    };
+  }
+
+  private static asIds(value: unknown): string[] | null {
+    if (!Array.isArray(value)) return null;
+    return value.filter((id): id is string => typeof id === "string");
   }
 
   private static asRecord(value: unknown): Record<string, unknown> | null {

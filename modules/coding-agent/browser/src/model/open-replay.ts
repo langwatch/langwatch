@@ -6,7 +6,7 @@ import type { CodingAgentRouter } from "../behavior/coding-agent-router.ts";
 export type ConversationTurn = { traceId: string; timestamp: number };
 
 /** The conversation read for a session; a group project's names the member that recorded it. */
-export function conversationContextInput({
+function conversationContextInput({
   projectId,
   sessionId,
   tenantId,
@@ -18,7 +18,11 @@ export function conversationContextInput({
   return { projectId, conversationId: sessionId, ...(tenantId ? { tenantId } : {}) };
 }
 
-/** The session's last stored turn, or null when none of them was stored. */
+/**
+ * The session's newest stored turn, or null when none was stored. The session's own trace map
+ * answers first (newest stored trace); the conversation read, which pages from the oldest turn,
+ * is the fallback for a session the map does not hold.
+ */
 export async function lastTurnOfSession({
   utils,
   projectId,
@@ -30,6 +34,12 @@ export async function lastTurnOfSession({
   sessionId: string;
   tenantId: string | undefined;
 }): Promise<ConversationTurn | null> {
+  const mapped = await utils.codingAgents.lastTurn.fetch({
+    projectId: tenantId ?? projectId,
+    sessionId,
+  });
+  if (mapped) return { traceId: mapped.traceId, timestamp: mapped.occurredAtMs };
+
   const context = await utils.traces.conversationContext.fetch(
     conversationContextInput({ projectId, sessionId, tenantId }),
   );
@@ -59,12 +69,15 @@ export function openReplayHere({
   projectId,
   tenantId,
   router,
+  alsoRemove = {},
 }: {
   turn: ConversationTurn;
   projectId: string;
   /** The member project that owns the trace, on a group project. */
   tenantId: string | undefined;
   router: CodingAgentRouter;
+  /** Other address keys dropped in the same write, such as the link that asked for the replay. */
+  alsoRemove?: Readonly<Record<string, undefined>>;
 }): void {
   // The project travels with the trace, since the chrome is still sitting in
   // whichever project was last visited, and a drawer resolving its own
@@ -76,6 +89,7 @@ export function openReplayHere({
   }
   router.setQueryParams({
     ...cleared,
+    ...alsoRemove,
     "drawer.open": "traceV2Details",
     "drawer.traceId": turn.traceId,
     "drawer.t": String(turn.timestamp),

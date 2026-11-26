@@ -112,4 +112,25 @@ describe("gateway JWT minting", () => {
       expect(adapter.verify(token)).not.toHaveProperty("connect_services");
     });
   });
+
+  describe("when a previous secret is presented inside its rotation grace", () => {
+    it("carries the grace end as its own claim and ends the token there", () => {
+      const notAfter = nowInstant().add({ milliseconds: 24 * 60 * 60 * 1000 });
+      const secretNotAfter = nowInstant().add({ milliseconds: 60 * 1000 });
+      const graceEnd = Math.floor(secretNotAfter.epochMilliseconds / 1000);
+
+      const { jwt: token, expiresAt } = adapter.sign({ ...identity, notAfter, secretNotAfter });
+      const claims = adapter.verify(token);
+
+      expect(claims.secret_valid_until).toBe(graceEnd);
+      expect(claims.vk_expires_at).toBe(Math.floor(notAfter.epochMilliseconds / 1000));
+      expect(expiresAt).toBe(graceEnd);
+    });
+
+    it("leaves the claim out for any other credential", () => {
+      const { jwt: token } = adapter.sign({ ...identity, secretNotAfter: null });
+
+      expect(adapter.verify(token)).not.toHaveProperty("secret_valid_until");
+    });
+  });
 });

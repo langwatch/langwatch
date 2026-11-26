@@ -920,7 +920,7 @@ jobs:
           NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-          # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
+          # Each suite gets two vitest workers (patches/vitest@5.0.5.patch), so one
           # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.
@@ -1031,9 +1031,20 @@ jobs:
       - name: Check the workspace invariants (ADR-076)
         run: pnpm --filter @langwatch/server run test:invariants
 
+      # On a format failure, print the fix as a diff so it can be applied by hand.
       - name: Oxfmt (blocking)
         if: ${{ !cancelled() }}
-        run: pnpm format:check
+        run: |
+          if pnpm format:check; then exit 0; fi
+          format_ok=1
+          pnpm format || format_ok=0
+          git --no-pager diff --stat || true
+          git --no-pager diff | head -n 2000 || true
+          git checkout -- . || true
+          test -z "$(git status --porcelain)" || { git status --porcelain; echo "::error::could not restore the worktree after pnpm format"; exit 1; }
+          if [ "$format_ok" = 0 ]; then echo "::error::pnpm format failed, so there is no fix diff to show; run it locally"; exit 1; fi
+          echo "::error::oxfmt found unformatted files; the diff above is the fix (cut at 2000 lines)"
+          exit 1
 
       - name: Architecture policy tests (blocking)
         if: ${{ !cancelled() }}
@@ -1457,9 +1468,6 @@ jobs:
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
-      - name: Test release-docs.sh
-        run: bash .github/scripts/__tests__/release-docs.test.sh
-
       - name: Test run-package-suites.ts
         run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
 
@@ -1490,6 +1498,11 @@ jobs:
 
       - name: Test guard-breaking-change-scope.ts
         run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
+
+      - name: Test dedupe-release-notes.ts
+        run: |
+          node --test --experimental-strip-types .github/scripts/dedupe-release-notes.test.ts
+          bash -n .github/scripts/dedupe-release-notes.sh
 
       - name: Test that every generated file is marked generated
         run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts

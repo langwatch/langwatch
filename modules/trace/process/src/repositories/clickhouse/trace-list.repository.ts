@@ -20,6 +20,8 @@ import {
   type FacetTableName,
   type EventMetricValues,
   EVENT_METRIC_SEP,
+  latestTraceVersionOnly,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -85,13 +87,13 @@ const listSummaryRowSchema = z.looseObject({
   AttrLabels: chString,
   AttrInputMediaRefs: chString,
   AttrOutputMediaRefs: chString,
-  OccurredAt: chNumber,
-  /** The row's projection stamp; see the OccurredAt decode in `toTraceListRow`. */
+  OccurredAtMs: chNumber,
+  /** The row's projection stamp; see the OccurredAtMs decode in `toTraceListRow`. */
   Version: chString.optional(),
   /** The span timing baseline column added by migration 00072 (ADR-087). */
   EarliestSpanStartMs: chNumber.optional(),
   CreatedAt: chNumber,
-  UpdatedAt: chNumber,
+  UpdatedAtMs: chNumber,
   ComputedIOSchemaVersion: chString,
   ComputedInput: chString.nullable(),
   ComputedOutput: chString.nullable(),
@@ -281,12 +283,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // Latest-version dedup, shared by the page's inner stage and the count,
     // decided on base predicates alone. A whole-window aggregate, so state
     // it once per read — the outer stage below reuses this result.
-    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM ${TABLE_NAME}
-          WHERE ${baseWhereClause}
-          GROUP BY TenantId, TraceId
-        )`;
+    const dedupFilter = latestTraceVersionOnly({ where: baseWhereClause });
 
     // Two-stage: page light columns first, then read heavy payloads for page only.
     const [result, countResult] = await Promise.all([
@@ -308,11 +305,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrReasoningTokens,
           AttrContextSizeTokens,
           AttrLabels,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs,
           Version,
           EarliestSpanStartMs,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
           ComputedIOSchemaVersion,
           ComputedInput,
           ComputedOutput,
@@ -354,7 +351,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TenantId,
             Attributes['langwatch.span.name'] AS AttrSpanName,
             Attributes['service.name'] AS AttrServiceName,
-            Attributes['gen_ai.conversation.id'] AS AttrConversationId,
+            ${TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION} AS AttrConversationId,
             Attributes['langwatch.user_id'] AS AttrUserId,
             Attributes['langwatch.origin'] AS AttrOrigin,
             Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
@@ -492,13 +489,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         FROM ${TABLE_NAME}
         WHERE ${whereClause}
           AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhereClause}
-              AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
-            GROUP BY TenantId, TraceId
-          )
+          AND ${latestTraceVersionOnly({ where: `${baseWhereClause} AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})` })}
       `,
       query_params: { ...queryParams, since: params.since },
       format: "JSONEachRow",
@@ -526,7 +517,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const client = this.clickhouse.as(params.authorization, {
       reads: "traces",
     });
-    // Two unmerged versions can tie on max(UpdatedAt), so the dedup tuple
+    // Two unmerged versions can tie on the latest UpdatedAt, so the dedup
     // can pass a trace twice; LIMIT 1 BY keeps one per trace. It reads only
     // the two key columns, so none of the heavy-column cost LIMIT BY carries
     // on a wide select applies here.
@@ -535,12 +526,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         SELECT TenantId, TraceId
         FROM ${TABLE_NAME}
         WHERE ${whereClause}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhereClause}
-            GROUP BY TenantId, TraceId
-          )
+          AND ${latestTraceVersionOnly({ where: baseWhereClause })}
         ORDER BY OccurredAt DESC, TenantId, TraceId
         LIMIT 1 BY TenantId, TraceId
         LIMIT {limit:UInt32}
@@ -576,13 +562,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         WHERE ${tenantScope("OccurredAt")}
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND ${params.column} LIKE {prefix:String}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${tenantScope("OccurredAt")}
-              AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            GROUP BY TenantId, TraceId
-          )
+          AND ${latestTraceVersionOnly({ where: `${tenantScope("OccurredAt")} AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})` })}
         LIMIT {limit:UInt32}
       `,
       query_params: {
@@ -624,14 +604,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // re-projected trace. Other tables (evaluation_runs, stored_spans) keep
     // their own row identity per evaluation/span, so we don't dedup there.
     const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
+    const dedupFilter = needsDedup ? `AND ${latestTraceVersionOnly({ where: whereClause })}` : "";
 
     const client = this.clickhouse.as(params.authorization, {
       reads: "traces",
@@ -684,14 +657,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // Same ReplacingMergeTree dedup as findCategoricalFacet — only
     // trace_summaries re-projects a logical trace across versions.
     const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
+    const dedupFilter = needsDedup ? `AND ${latestTraceVersionOnly({ where: whereClause })}` : "";
 
     const client = this.clickhouse.as(params.authorization, {
       reads: "traces",
@@ -771,14 +737,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // min/max envelope until merges run. Other facet tables keep one row
     // per logical entity (eval/span) and don't need it.
     const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
+    const dedupFilter = needsDedup ? `AND ${latestTraceVersionOnly({ where: whereClause })}` : "";
 
     const client = this.clickhouse.as(params.authorization, {
       reads: "traces",
@@ -954,14 +913,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // can have multiple `UpdatedAt` versions until merge runs. The other facet
     // tables (`evaluation_runs`, `stored_spans`) keep row identity per record.
     const needsDedup = params.table === "trace_summaries";
-    const dedupFilter = needsDedup
-      ? `AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${params.table}
-            WHERE ${whereClause}
-            GROUP BY TenantId, TraceId
-          )`
-      : "";
+    const dedupFilter = needsDedup ? `AND ${latestTraceVersionOnly({ where: whereClause })}` : "";
 
     const client = this.clickhouse.as(params.authorization, { reads: "traces" });
     const shared = {
@@ -1242,12 +1194,12 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       // `EarliestSpanStartMs` is the span timing baseline it used to double as.
       // A row at an older stamp predates the split and carries both in the one
       // column, which is why this is version-gated rather than a bare read.
-      storageAnchorMs: Number(row.OccurredAt),
+      storageAnchorMs: Number(row.OccurredAtMs),
       occurredAt: isStorageAnchoredVersion(row.Version)
         ? Number(row.EarliestSpanStartMs ?? 0)
-        : Number(row.OccurredAt),
+        : Number(row.OccurredAtMs),
       createdAt: Number(row.CreatedAt),
-      updatedAt: Number(row.UpdatedAt),
+      updatedAt: Number(row.UpdatedAtMs),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
     };
   }

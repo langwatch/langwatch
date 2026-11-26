@@ -46,6 +46,8 @@ export abstract class TeamRepository {
     userIds: string[];
     organizationId: string;
     activeOnly?: boolean;
+    /** The caller grants these people team or group access: a Billing-only member is refused. */
+    grantingAccess?: boolean;
   }) => Promise<string[]>;
   /**
    * Which of the named organizations this person belongs to, in one read — avoiding a

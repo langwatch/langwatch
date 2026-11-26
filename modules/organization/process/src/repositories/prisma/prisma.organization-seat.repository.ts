@@ -1,4 +1,10 @@
-import { countMemberSeats, isFullMember } from "@langwatch/entitlement-contract";
+import {
+  classifyMemberType,
+  countedSeatHolds,
+  countMemberSeats,
+  isFullMember,
+  type MemberType,
+} from "@langwatch/entitlement-contract";
 import {
   type OrganizationMemberSeats,
   SeatChangeBusyError,
@@ -18,9 +24,17 @@ import {
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
+import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
+import { seatKindOf } from "../../rules/seat-change.rules.ts";
+import { suppressedHoldings } from "../../rules/seat-holder.rules.ts";
+import {
+  type CountedSeatHold,
+  type OrganizationSeatHolding,
+  OrganizationSeatRepository,
+  type SeatLease,
+} from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
@@ -78,14 +92,32 @@ const permissionsSchema = z.array(z.string());
  * Fetched once and shared between getMemberCount and getMembersLiteCount.
  */
 interface MemberClassificationContext {
-  users: { userId: string; role: OrganizationUserRole }[];
+  users: { userId: string; role: OrganizationUserRole; billingOnly: boolean }[];
   customRoleMap: Map<string, string[]>;
   userPermissionsMap: Map<string, string[]>;
   pendingInvites: {
+    id: string;
+    expiresAt: number | null;
     role: OrganizationUserRole;
     email: string;
     teamAssignments: TeamAssignment[] | null;
+    billingOnly: boolean;
   }[];
+}
+
+/**
+ * A membership that holds a seat: a disabled membership and a deactivated person hold no access,
+ * so they hold no seat; billing for them would be charging for a locked door.
+ * See seat-reconciliation.feature.
+ */
+const SEAT_HOLDING_MEMBER = { disabledAt: null, user: { deactivatedAt: null } } as const;
+
+/** A pending invitation holds its seat until it expires. */
+function seatHoldingInvitation(): Prisma.OrganizationInviteWhereInput {
+  return {
+    status: INVITE_STATUS.PENDING,
+    OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+  };
 }
 
 /** Seat counts over organization's own membership and invitation rows. */
@@ -195,11 +227,13 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
           role: user.role,
           permissions: context.userPermissionsMap.get(user.userId),
           userId: user.userId,
+          billingOnly: user.billingOnly,
         })),
         ...context.pendingInvites.map((invite) => ({
           role: invite.role,
           email: invite.email,
           permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+          billingOnly: invite.billingOnly,
         })),
       ],
       holds,
@@ -213,6 +247,161 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       .map((user) => user.userId);
   }
 
+  /** Every holder classified by the rule the counts above use, so the two cannot disagree. */
+  async findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    const members = context.users.map((user) => ({
+      userId: user.userId,
+      role: user.role,
+      permissions: context.userPermissionsMap.get(user.userId),
+      billingOnly: user.billingOnly,
+    }));
+    const invitations = context.pendingInvites.map((invite) => ({
+      ...invite,
+      permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+    }));
+    const holds = (
+      await this.prisma.seatHold.findMany({
+        where: { organizationId, heldUntil: { gt: new Date() } },
+        select: { userId: true, email: true, heldUntil: true },
+      })
+    ).map((hold) => ({ ...hold, expiresAt: fromDate(hold.heldUntil).epochMilliseconds }));
+    const isFull = (holder: { role: OrganizationUserRole; permissions: string[] | undefined }) =>
+      classifyMemberType(holder.role, holder.permissions) === "FullMember";
+    const seatOf = (holder: {
+      role: OrganizationUserRole;
+      permissions: string[] | undefined;
+      billingOnly: boolean;
+    }) =>
+      seatKindOf(
+        classifyMemberType(holder.role, holder.permissions, { billingOnly: holder.billingOnly }),
+      );
+    return [
+      ...countedSeatHolds({ holders: [...members, ...invitations], holds }).map((hold) => ({
+        holder: { kind: "hold" as const, userId: hold.userId, expiresAt: hold.expiresAt },
+        seat: "full" as const,
+      })),
+      ...suppressedHoldings({
+        holds,
+        fullUserIds: new Set(members.filter(isFull).map(({ userId }) => userId)),
+        fullInvitations: invitations.filter(isFull),
+      }),
+      ...members.map((member) => ({
+        holder: { kind: "member" as const, userId: member.userId },
+        seat: seatOf(member),
+      })),
+      ...invitations.map((invitation) => ({
+        holder: {
+          kind: "invitation" as const,
+          inviteId: invitation.id,
+          expiresAt: invitation.expiresAt,
+        },
+        seat: seatOf(invitation),
+      })),
+    ];
+  }
+
+  /** One member's seat by the rule the count uses; null when they hold none. */
+  async findMemberSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberType | null> {
+    const user = await this.prisma.organizationUser.findFirst({
+      where: { organizationId, userId, ...SEAT_HOLDING_MEMBER },
+      select: { userId: true, role: true, billingOnly: true },
+    });
+    if (user === null) return null;
+    if (user.role !== OrganizationUserRole.EXTERNAL) {
+      return classifyMemberType(user.role, undefined);
+    }
+    const permissions = await this.getUserPermissionsMap(
+      organizationId,
+      [user],
+      await this.getCustomRoleMap(organizationId),
+    );
+    return classifyMemberType(user.role, permissions.get(userId), {
+      billingOnly: user.billingOnly,
+    });
+  }
+
+  /** The person's live hold, unless they hold a full seat again as a member or by invitation. */
+  async findCountedHold({
+    organizationId,
+    userId,
+    ignoringInviteId,
+  }: {
+    organizationId: string;
+    userId: string;
+    ignoringInviteId?: string;
+  }): Promise<CountedSeatHold[]> {
+    const hold = await this.prisma.seatHold.findFirst({
+      where: { organizationId, userId, heldUntil: { gt: new Date() } },
+      select: { email: true, heldUntil: true },
+    });
+    if (hold === null) return [];
+    if ((await this.findMemberSeat({ organizationId, userId })) === "FullMember") return [];
+    const invites = hold.email
+      ? await this.prisma.organizationInvite.findMany({
+          where: {
+            organizationId,
+            email: { equals: hold.email, mode: "insensitive" },
+            ...(ignoringInviteId === undefined ? {} : { id: { not: ignoringInviteId } }),
+            ...seatHoldingInvitation(),
+          },
+          select: { id: true },
+        })
+      : [];
+    for (const invite of invites) {
+      const seat = await this.findInvitationSeat({ organizationId, inviteId: invite.id });
+      if (seat === "FullMember") return [];
+    }
+    return [{ userId, heldUntil: fromDate(hold.heldUntil).epochMilliseconds }];
+  }
+
+  async findHoldUserIdsByEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<string[]> {
+    const holds = await this.prisma.seatHold.findMany({
+      where: {
+        organizationId,
+        email: { equals: email, mode: "insensitive" },
+        heldUntil: { gt: new Date() },
+      },
+      select: { userId: true },
+    });
+    return holds.map((hold) => hold.userId);
+  }
+
+  /** One invitation's seat by the rule the count uses; null when it holds none. */
+  async findInvitationSeat({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId, ...seatHoldingInvitation() },
+      select: { role: true, teamAssignments: true, billingOnly: true },
+    });
+    if (invite === null) return null;
+    const teamAssignments = teamAssignmentsSchema.safeParse(invite.teamAssignments).data ?? null;
+    if (teamAssignments === null || teamAssignments.length === 0) {
+      return classifyMemberType(invite.role, undefined, { billingOnly: invite.billingOnly });
+    }
+    return classifyMemberType(
+      invite.role,
+      this.getInvitePermissions(teamAssignments, await this.getCustomRoleMap(organizationId)),
+    );
+  }
+
   /**
    * Fetches all data needed for member classification.
    * Shared between getMemberCount and getMembersLiteCount.
@@ -220,12 +409,9 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
-    // A disabled membership and a deactivated person hold no access, so they
-    // hold no seat: billing for them would be charging for a locked door.
-    // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
-      select: { userId: true, role: true },
+      where: { organizationId, ...SEAT_HOLDING_MEMBER },
+      select: { userId: true, role: true, billingOnly: true },
     });
 
     const customRoleMap = await this.getCustomRoleMap(organizationId);
@@ -236,12 +422,15 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     );
 
     const pendingInvites = await this.prisma.organizationInvite.findMany({
-      where: {
-        organizationId,
-        status: INVITE_STATUS.PENDING,
-        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      where: { organizationId, ...seatHoldingInvitation() },
+      select: {
+        id: true,
+        expiration: true,
+        role: true,
+        teamAssignments: true,
+        email: true,
+        billingOnly: true,
       },
-      select: { role: true, teamAssignments: true, email: true },
     });
 
     return {
@@ -249,9 +438,12 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       customRoleMap,
       userPermissionsMap,
       pendingInvites: pendingInvites.map((i) => ({
+        id: i.id,
+        expiresAt: i.expiration ? fromDate(i.expiration).epochMilliseconds : null,
         role: i.role,
         email: i.email,
         teamAssignments: teamAssignmentsSchema.safeParse(i.teamAssignments).data ?? null,
+        billingOnly: i.billingOnly,
       })),
     };
   }

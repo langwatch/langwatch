@@ -15,6 +15,9 @@ const { queryImpls, utils } = vi.hoisted(() => ({
     traces: {
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
+    codingAgents: {
+      lastTurn: { fetch: vi.fn(), prefetch: vi.fn() },
+    },
   },
 }));
 
@@ -146,8 +149,8 @@ const tableElement = () => <SessionsTable projectId="proj-personal" projectSlug=
 /** The surface the table is mounted in, rebuilt per render. */
 let host: FakeCodingAgentActivityHost;
 
-function renderTable() {
-  host = fakeCodingAgentActivityHost();
+function renderTable(query: Record<string, string> = {}) {
+  host = fakeCodingAgentActivityHost({ query });
   return render(tableElement(), { wrapper: codingAgentHostWrapper(host) });
 }
 
@@ -193,6 +196,7 @@ beforeEach(() => {
   for (const key of Object.keys(queryImpls)) delete queryImpls[key];
   vi.clearAllMocks();
   pinTurns([turn({ traceId: "trace-first", timestamp: LONG_AGO }), turn()]);
+  utils.codingAgents.lastTurn.fetch.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -224,6 +228,18 @@ describe("the personal Sessions table", () => {
 
       expect(screen.getByText("$12.50")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Open pull request #4218" })).toBeInTheDocument();
+    });
+
+    /** @scenario "Active and waiting time, and compactions and cache rebuilds, share one text size" */
+    it("draws active and waiting time, and compactions and rebuilds, at one text size", () => {
+      pinSessions([sessionRow()]);
+
+      renderTable();
+
+      const fontSizeOf = (text: string) => getComputedStyle(screen.getByText(text)).fontSize;
+      expect(fontSizeOf("4h 12m active")).not.toBe("");
+      expect(fontSizeOf("38m waiting")).toBe(fontSizeOf("4h 12m active"));
+      expect(fontSizeOf("2 cache rebuilds")).toBe(fontSizeOf("3 compactions"));
     });
 
     it("explains what the two context figures each count", async () => {
@@ -272,23 +288,37 @@ describe("the personal Sessions table", () => {
       expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
       expect(screen.queryByRole("table")).not.toBeInTheDocument();
     });
+
+    /** @scenario "A link to a session that is not listed says so" */
+    it("still says a linked session is not listed when there are none", async () => {
+      pinSessions([]);
+
+      renderTable({ session: "ghost-session" });
+
+      await waitFor(() =>
+        expect(host.recording.infos).toContainEqual(
+          expect.objectContaining({ title: "That session is not listed here" }),
+        ),
+      );
+      expect(writtenQueries()).toEqual([{}]);
+    });
   });
 
   describe("given a session whose agent never generated a title", () => {
-    /** @scenario "A session with no title reads as untitled" */
-    it("names it as an untitled session and still says where it ran", () => {
+    /** @scenario "A session with no title is named by its agent and the day it started" */
+    it("names it by its agent and start day and still says where it ran", () => {
       pinSessions([sessionRow({ title: null })]);
 
       renderTable();
 
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^Claude Code session · \w{3} \d{1,2}/)).toBeInTheDocument();
       expect(screen.getByText("acme/widgets · feat/git-context")).toBeInTheDocument();
     });
   });
 
   describe("given a pi session, whose spans carry no prompt and no title", () => {
-    /** @scenario "A pi session falls back to untitled rather than to a span name" */
-    it("names it as an untitled session, never after a span name or pi's session id", () => {
+    /** @scenario "A pi session falls back to its agent's name rather than to a span name" */
+    it("names it by its agent, never after a span name or pi's session id", () => {
       const sessionId = "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
       pinSessions([
         sessionRow({
@@ -302,7 +332,7 @@ describe("the personal Sessions table", () => {
 
       renderTable();
 
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^pi session/)).toBeInTheDocument();
       expect(screen.queryByText(/pi\.harness|pi\.ai\.request/)).not.toBeInTheDocument();
       expect(screen.queryByText(sessionId)).not.toBeInTheDocument();
     });
@@ -614,9 +644,9 @@ describe("the personal Sessions table", () => {
 
       await user.hover(screen.getByText("Link sessions to pull requests"));
 
-      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
+      expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
-        conversationId: "session-1",
+        sessionId: "session-1",
       });
     });
 
@@ -635,6 +665,137 @@ describe("the personal Sessions table", () => {
         ),
       );
       expect(writtenQueries()).toEqual([]);
+    });
+
+    /** @scenario "A session whose traces are filed under its launcher's thread still replays" */
+    it("opens the session's own latest trace when its conversation is named by a launcher", async () => {
+      pinTurns([]);
+      utils.codingAgents.lastTurn.fetch.mockResolvedValue({
+        traceId: "trace-mapped",
+        occurredAtMs: LONG_AGO + 9_000,
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      await user.click(screen.getByText("Link sessions to pull requests"));
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-mapped",
+            "drawer.t": String(LONG_AGO + 9_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+      expect(utils.codingAgents.lastTurn.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        sessionId: "session-1",
+      });
+      expect(host.recording.infos).toEqual([]);
+    });
+
+    /** @scenario "The replay opens on the session's newest stored turn, not the first page of its history" */
+    it("opens the session's newest stored trace over the last turn of the first conversation page", async () => {
+      utils.codingAgents.lastTurn.fetch.mockResolvedValue({
+        traceId: "trace-newest",
+        occurredAtMs: LONG_AGO + 90_000,
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      await user.click(screen.getByText("Link sessions to pull requests"));
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-newest",
+            "drawer.t": String(LONG_AGO + 90_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+      expect(utils.traces.conversationContext.fetch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A session link opens that session's terminal replay" */
+    it("opens the linked session's replay and drops the link, keeping Langy's question", async () => {
+      renderTable({ session: "session-1", langy: "open", langyPrompt: "Why so many tokens?" });
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            langy: "open",
+            langyPrompt: "Why so many tokens?",
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": String(LONG_AGO + 5_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+    });
+
+    /** @scenario "A session name link opens the newest session with that name" */
+    it("opens the newest session with the linked name", async () => {
+      pinSessions([
+        sessionRow({ sessionId: "older", title: "Scout", lastEventOccurredAtMs: LONG_AGO }),
+        sessionRow({
+          sessionId: "newer",
+          title: "Scout",
+          lastEventOccurredAtMs: LONG_AGO + DAY_MS,
+        }),
+      ]);
+      renderTable({ sessionName: "Scout" });
+
+      await waitFor(() => expect(writtenQueries()).toHaveLength(1));
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        conversationId: "newer",
+      });
+    });
+
+    /** @scenario "A link to a session that is not listed says so" */
+    it("says so when the linked session is not listed, and opens nothing", async () => {
+      renderTable({ sessionName: "Ghost" });
+
+      await waitFor(() =>
+        expect(host.recording.infos).toContainEqual(
+          expect.objectContaining({ title: "That session is not listed here" }),
+        ),
+      );
+      expect(writtenQueries()).toEqual([{}]);
+    });
+
+    /** @scenario "A session link opens that session's terminal replay" */
+    it("drops a lookup the project moved on from while the new list loads", async () => {
+      let failFirst: (error: Error) => void = () => {};
+      utils.traces.conversationContext.fetch
+        .mockReturnValueOnce(
+          new Promise((_, reject) => {
+            failFirst = reject;
+          }),
+        )
+        .mockReturnValue(new Promise(() => {}));
+      const { rerender } = renderTable({ session: "session-1" });
+      await waitFor(() => expect(utils.traces.conversationContext.fetch).toHaveBeenCalled());
+
+      queryImpls["codingAgents.sessionsList"] = () => ({
+        data: undefined,
+        isLoading: true,
+        isError: false,
+        isFetched: false,
+      });
+      rerender(<SessionsTable projectId="proj-other" projectSlug="acme-other" />);
+      failFirst(new Error("clickhouse is down"));
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(host.recording.failures).toEqual([]);
     });
 
     it("reports a failed lookup rather than opening an empty replay", async () => {
@@ -821,10 +982,9 @@ describe("the group project's Sessions table", () => {
 
       await user.hover(screen.getByText("Session from member B"));
 
-      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
-        projectId: "proj-group",
-        conversationId: "shared",
-        tenantId: "member-b",
+      expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
+        projectId: "member-b",
+        sessionId: "shared",
       });
     });
   });

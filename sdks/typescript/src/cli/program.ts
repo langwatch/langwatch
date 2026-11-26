@@ -36,6 +36,13 @@ import {
   projectSelectorOf,
   QUERY_PROJECT_FLAG_HELP,
 } from "./utils/projectOption";
+import {
+  DEFAULT_LOOKBACK,
+  endDateHelp,
+  SINCE_HELP,
+  startDateHelp,
+  WIDENED_LOOKBACK,
+} from "./utils/timeWindow";
 
 declare const __CLI_VERSION__: string;
 
@@ -116,6 +123,8 @@ const TRIGGER_FILTERS_HELP =
   'Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {"traces.error":["true"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {"evaluations.passed":{"<monitorId>":["false"]}}; metadata.value keys by metadata key, e.g. {"metadata.value":{"<key>":["true"]}}. A keyed field sent flat is refused';
 
 const REPEAT_FLAG_HELP = "How many times to run each scenario against each target, from 1 to 5.";
+const EXPERIMENT_REPEAT_FLAG_HELP =
+  "How many times to run each dataset row against each target, from 1 to 5. With --wait, the output adds each row's pass rate over its runs.";
 
 const SIMULATOR_MODEL_FLAG_HELP =
   "The model that plays the user in this run. Left out, the project default is used.";
@@ -540,7 +549,7 @@ function registerOpenCommands(program: Command): void {
   program
     .command("open [path]")
     .description(
-      "Open the LangWatch app in your browser. No path: /me in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
+      "Open the LangWatch app in your browser. No path: your coding agents page (/me, which newer servers redirect to /coding-agents) in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
     )
     .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
     .action(async (path: string | undefined, options: { browser?: string }) => {
@@ -1081,7 +1090,7 @@ function registerGovernanceCommands(program: Command): void {
   const templatesCmd = governanceCmd
     .command("ingestion-templates")
     .description(
-      "CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.",
+      "CRUD on IngestionTemplate rows, with your device login. Every verb needs aiTools:manage.",
     );
 
   templatesCmd
@@ -1626,13 +1635,22 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("create <name>")
-      .description("Create a new evaluator")
-      .requiredOption(
+      .description("Create a new evaluator: a built-in one (--type) or a custom code one (--code)")
+      .option(
         "--type <evaluatorType>",
-        "Evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+        "Built-in evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+      )
+      .option(
+        "--code <file>",
+        "Python file for a custom code evaluator (a class Code with __call__)",
+      )
+      .option(
+        "--input <name[:type]>",
+        "An input of the code evaluator, type defaulting to str (repeatable)",
+        collectParam,
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { type: string }) => {
+    async (name: string, options: { type?: string; code?: string; input?: string[] }) => {
       try {
         const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
         return await impl(name, options);
@@ -1710,6 +1728,10 @@ function registerExperimentCommands(program: Command): void {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option(
+        "--fail-on-evaluator-failures",
+        "With --wait, exit 1 when an evaluation fails or errors, a cell errors, or the server reports no evaluator results (the summary still prints)",
+      )
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option(
         "--concurrency <n>",
@@ -1720,10 +1742,18 @@ function registerExperimentCommands(program: Command): void {
         "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
         parseDatasetVersionFlag,
       )
+      .option("--repeat <n>", EXPERIMENT_REPEAT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       slug: string,
-      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+      options: {
+        wait?: boolean;
+        failOnEvaluatorFailures?: boolean;
+        param?: string[];
+        concurrency?: string;
+        datasetVersion?: number;
+        repeat?: string;
+      },
     ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
@@ -1958,21 +1988,27 @@ function registerLangyCommands(program: Command): void {
         "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
       )
       .option(
+        "--as <email>",
+        "The email of the person who asked Langy, as the card's command names it; a login that is someone else's offers to sign in as them",
+      )
+      .option(
         "-o, --output <format>",
         "Not available: this command is an interactive session and prints as it goes",
       ),
-  ).action(async (options: { shareControl?: boolean; output?: string }, command: Command) => {
-    // `--json` and `--jq` are global, so they never reach the command's own
-    // options. They are read here and passed on, or the refusal below would
-    // miss them now that the format gate lets this command through.
-    const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
-    const { langyCommand: impl } = await import("./commands/langy/index.js");
-    return impl({
-      ...options,
-      ...(globals.json !== undefined ? { json: true } : {}),
-      ...(globals.jq !== undefined ? { jq: true } : {}),
-    });
-  });
+  ).action(
+    async (options: { shareControl?: boolean; as?: string; output?: string }, command: Command) => {
+      // `--json` and `--jq` are global, so they never reach the command's own
+      // options. They are read here and passed on, or the refusal below would
+      // miss them now that the format gate lets this command through.
+      const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
+      const { langyCommand: impl } = await import("./commands/langy/index.js");
+      return impl({
+        ...options,
+        ...(globals.json !== undefined ? { json: true } : {}),
+        ...(globals.jq !== undefined ? { jq: true } : {}),
+      });
+    },
+  );
 }
 
 function registerAgentCommands(program: Command): void {
@@ -3289,7 +3325,7 @@ function registerQueryCommands(program: Command): void {
       .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
       .option("--limit <n>", "Rows to keep from the result")
       .option(
-        "--format <format>",
+        "-f, --format <format>",
         "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
         "table",
       )
@@ -3374,8 +3410,9 @@ function registerAnalyticsCommands(program: Command): void {
         "-a, --aggregation <aggregation>",
         "Aggregation type: cardinality, avg, sum, min, max, p95, p99",
       )
-      .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
-      .option("--end-date <date>", "End date (ISO string, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--group-by <field>", "Group by field (e.g. metadata.model)")
       .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
       .option(
@@ -3388,6 +3425,7 @@ function registerAnalyticsCommands(program: Command): void {
       aggregation?: string;
       startDate?: string;
       endDate?: string;
+      since?: string;
       groupBy?: string;
       timeScale?: string;
       includeLangy?: boolean;
@@ -3613,17 +3651,20 @@ function registerTraceCommands(program: Command): void {
   rendersOwnResult(
     traceCmd
       .command("search")
-      .description("Search traces with optional text query and date range")
+      .description(
+        `Search traces by text, filter and time window. Reads the last ${DEFAULT_LOOKBACK} by default; when that finds nothing and no window was given, it searches the last ${WIDENED_LOOKBACK} once and says so. An empty answer names the project, window and filters it read`,
+      )
       .option(
         "-q, --query <query>",
-        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+        "Text search over the trace input, output and span names; no filter field holds the input or output text. Plain text only: AND, OR and NOT are matched as words, not as operators",
       )
       .option(
         "--filter <filter>",
-        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
+        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "label:production" (the metadata labels), "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail", and a quoted phrase with no field for the input and output text. Combined with -q and the other flags. `langwatch trace fields` lists every field',
       )
-      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--limit <n>", "Max results to return (default: 25)")
       .option(
         "--origin <origins>",
@@ -3645,9 +3686,12 @@ function registerTraceCommands(program: Command): void {
 
   traceCmd
     .command("export")
-    .description("Export traces as CSV, JSONL, or JSON")
-    .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
-    .option("--end-date <date>", "End date (ISO string, default: now)")
+    .description(
+      `Export traces as CSV, JSONL, or JSON. Reads the last ${DEFAULT_LOOKBACK} by default; an empty export says on stderr what it read`,
+    )
+    .option("--start-date <date>", startDateHelp())
+    .option("--end-date <date>", endDateHelp())
+    .option("--since <lookback>", SINCE_HELP)
     .option(
       "-q, --query <query>",
       "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
@@ -3672,6 +3716,7 @@ function registerTraceCommands(program: Command): void {
       async (options: {
         startDate?: string;
         endDate?: string;
+        since?: string;
         query?: string;
         origin?: string;
         format?: string;
@@ -3688,7 +3733,9 @@ function registerTraceCommands(program: Command): void {
   rendersOwnResult(
     traceCmd
       .command("get <traceId>")
-      .description("Get full trace details by ID")
+      .description(
+        "Get full trace details by ID. Also accepts a span ID or a scenario run ID, any case. Retries briefly while a just-sent trace is still being stored.",
+      )
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option(
         "-f, --format <format>",
@@ -3723,8 +3770,9 @@ function registerTraceCommands(program: Command): void {
       )
       .option("--prefix <prefix>", "Only values starting with this. Needs a field")
       .option("--limit <n>", "Values to return, 1 to 1000 (default: 50). Needs a field")
-      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (field: string | undefined, options: Record<string, string>) => {
@@ -4138,6 +4186,47 @@ function registerTestSuiteCommands(program: Command): void {
     },
   );
 
+  emitsResult(
+    testSuiteCmd
+      .command("templates")
+      .description("List the suite templates: everyday archetypes and red team packs")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSuiteTemplatesCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    testSuiteCmd
+      .command("apply-template <templateId>")
+      .description("Create a test suite from a template, fitted to the agent under test")
+      .requiredOption("--agent-name <name>", "The name of the agent under test")
+      .option("--tool <tool>", "A tool the agent can call. Repeat for more.", collectParam)
+      .option(
+        "--must-never <rule>",
+        "Something the agent must never do. Repeat for more.",
+        collectParam,
+      )
+      .option("--name <name>", "The suite name. Defaults to the template title.")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      templateId: string,
+      options: { agentName: string; tool?: string[]; mustNever?: string[]; name?: string },
+    ) => {
+      const { applySuiteTemplateCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl({
+        templateId,
+        agentName: options.agentName,
+        tools: options.tool,
+        mustNever: options.mustNever,
+        name: options.name,
+      });
+    },
+  );
+
   rendersOwnResult(
     testSuiteCmd
       .command("run <suite>")
@@ -4197,8 +4286,8 @@ function registerGraphCommands(program: Command): void {
       .option("--dashboard-id <id>", "Dashboard to add the graph to")
       .option("--graph <json>", "Graph definition as JSON")
       .option("--filters <json>", "Filter conditions as JSON")
-      .option("--col-span <n>", "Column span (1-2)")
-      .option("--row-span <n>", "Row span (1-2)")
+      .option("--col-span <n>", "Column span (1-8)")
+      .option("--row-span <n>", "Row span (1-20)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       name: string,
@@ -4894,6 +4983,17 @@ function registerOnboardingCommands(program: Command): void {
       const { onboardingCompletePathCommand: impl } =
         await import("./commands/onboarding/complete-path.js");
       return impl(path);
+    },
+  );
+
+  emitsResult(
+    onboardingCmd
+      .command("start <start>")
+      .description("Record the start picked on Langy's governance opener: coding or call")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (start: string) => {
+      const { onboardingStartCommand: impl } = await import("./commands/onboarding/start.js");
+      return impl(start);
     },
   );
 }

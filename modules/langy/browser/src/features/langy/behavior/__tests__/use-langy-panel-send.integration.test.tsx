@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyMessageQueue } from "../../../composer/behavior/langy-message-queue.store.ts";
 import {
   RecordingAnalyticsProvider,
   RecordingUiAnalytics,
@@ -37,8 +38,9 @@ function render() {
 }
 
 beforeEach(() => {
+  useLangyMessageQueue.setState({ messages: [], held: {} });
   tracked.events.length = 0;
-  useLangyStore.setState({ draft: "" });
+  useLangyStore.setState({ draft: "", turnPhase: "idle" });
 });
 
 describe("useLangyPanelSend", () => {

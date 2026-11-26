@@ -45,6 +45,19 @@ vi.mock("../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
+/** The address the reader is on, and every address the panel sent them to. */
+const reader = { pathname: "", pushed: [] as string[] };
+
+vi.mock("@langwatch/browser-host/use-router", () => ({
+  useRouter: () => ({
+    pathname: reader.pathname,
+    push: (to: string) => {
+      reader.pushed.push(to);
+      return Promise.resolve(true);
+    },
+  }),
+}));
+
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   useLangyEngineHistorySync,
@@ -59,10 +72,12 @@ const toolMessage = ({
   command,
   state = "output-available",
   id = "call-1",
+  output = "{}",
 }: {
   command: string;
   state?: string;
   id?: string;
+  output?: unknown;
 }) => ({
   id: `m-${id}`,
   role: "assistant" as const,
@@ -73,7 +88,7 @@ const toolMessage = ({
       toolCallId: id,
       state,
       input: { command },
-      output: "{}",
+      output,
     },
   ],
 });
@@ -84,6 +99,61 @@ describe("useLangyChatEngine write refresh", () => {
   beforeEach(() => {
     invalidatedRouters.length = 0;
     chatMessages = [];
+    reader.pathname = "";
+    reader.pushed = [];
+  });
+
+  describe("when Langy makes a board", () => {
+    const created = toolMessage({
+      command: 'langwatch dashboard create "Weekly usage" -f json',
+      output: JSON.stringify({
+        kind: "card",
+        card: "resourceCreated",
+        payload: { id: "dash_new", name: "Weekly usage" },
+      }),
+    });
+
+    /** @scenario "A board Langy makes refreshes the boards list" */
+    it("invalidates the boards router the board screen and sidebar read", () => {
+      chatMessages = [created];
+      renderHook(() => useLangyChatEngine({ transport }));
+
+      expect(invalidatedPaths()).toContain("boards");
+    });
+
+    /** @scenario "A board Langy makes opens when the reader is on a dashboards page" */
+    it("takes a reader on a dashboard to the new board", () => {
+      reader.pathname = "/demo/dashboards/dash_42";
+      chatMessages = [created];
+      renderHook(() => useLangyChatEngine({ transport }));
+
+      expect(reader.pushed).toEqual(["/demo/dashboards/dash_new"]);
+    });
+
+    /** @scenario "A board Langy makes off the dashboards pages leaves the reader where they are" */
+    it("leaves a reader on another page where they are", () => {
+      reader.pathname = "/demo/traces";
+      chatMessages = [created];
+      renderHook(() => useLangyChatEngine({ transport }));
+
+      expect(reader.pushed).toEqual([]);
+    });
+  });
+
+  describe("when Langy adds a widget to a board", () => {
+    /** @scenario "A widget Langy adds does not move the reader" */
+    it("leaves the reader on their dashboard", () => {
+      reader.pathname = "/demo/dashboards/dash_42";
+      chatMessages = [
+        toolMessage({
+          command: "langwatch dashboard widget add dash_42 --name Burn --code-file w.tsx",
+          output: JSON.stringify({ id: "widget_1", dashboardId: "dash_42" }),
+        }),
+      ];
+      renderHook(() => useLangyChatEngine({ transport }));
+
+      expect(reader.pushed).toEqual([]);
+    });
   });
 
   describe("when Langy creates a scenario", () => {

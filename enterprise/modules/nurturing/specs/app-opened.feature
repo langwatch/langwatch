@@ -74,7 +74,7 @@ Feature: App opens reach Customer.io on the opening user
 
   @integration
   Scenario: The personal overview announces its open as a usage page
-    When a person opens /me
+    When a person opens /coding-agents
     Then the screen records me_overview
 
   @integration
@@ -82,3 +82,12 @@ Feature: App opens reach Customer.io on the opening user
     Given a self-hosted deployment, or one that has not answered yet
     When a person opens the usage, plans or subscription screen
     Then no page opened is recorded
+
+  # Langy's first message (2026-11-10): langy records first_message_seen against the
+  # conversation's owner; the trait is the person's, not the organization's.
+  @unit
+  Scenario: Langy's first answer to a person sets saw_langy_first_message on them, once
+    Given langy recorded that a person got an answer from Langy in a project
+    When nurturing delivers it
+    Then Customer.io identifies saw_langy_first_message true on that person
+    And the send is claimed once per person, so a later answer in another project sends nothing

@@ -16,9 +16,30 @@ Feature: Actionable documentation and restrained reading surfaces
     Given a generated documentation page
     Then its md, claude and agent exports contain the same page source
     And robots, humans, agents and sitemap metadata are available
+    And the IndexNow key is served at indexnow.txt, for the deploy to name when it submits changed pages
     And canonical, sitemap and llms.txt addresses name https://langwatch.ai/docs, where the docs are served
     And the sitemap dates each page by its last commit when the full history is available
     And llms-full.txt holds every page's Markdown in reading order, after the agent guidance
+  @unit
+  Scenario: Split the documentation into one file per section
+    Given llms-full.txt is too large for an agent to read whole
+    When the discovery files are generated
+    Then each top-level section's pages are one file under llms-full/, in reading order, after the agent guidance
+    And llms.txt names every section file, with its page count, before the page directory
+    And a page reached only through its section file still counts as listed in llms.txt
+  @unit
+  Scenario: Split a section too large to read whole by its groups
+    Given a section whose pages come to more than about 100k tokens
+    When the discovery files are generated
+    Then the section is one file per navigation group under llms-full/<section>/, split again while a group is still over
+    And llms.txt names each of those files, with its page count, instead of the section file
+    And a section under the budget stays one file
+  @unit
+  Scenario: List the API reference once per resource
+    Given the API reference holds one page per operation
+    When llms.txt is generated
+    Then each API resource is one entry, linking its overview and giving its page count
+    And its operations are left to the API reference section file
   @unit
   Scenario: Describe every page to search engines
     Given an API page whose page and operation both lack a description
@@ -87,10 +108,31 @@ Feature: Actionable documentation and restrained reading surfaces
     But a page opened by a full load shows its content at once, with no rise
 
   @unit
-  Scenario: Reserve a heading's link icon room on touch screens
-    Given a touch screen, where a heading shows its link icon after its text
+  Scenario: Reserve a heading's link icon room after its last word
+    Given a heading of any level shows its link icon after its last word, never over its text
+    And a pointer reader sees the icon on hover or focus, a touch reader always
     Then the heading reserves the icon's room at its end
     And the icon's margins cancel that room, so the heading breaks its lines as if the icon had no width
+
+  @unit
+  Scenario: Find text inside collapsed panels with find-in-page
+    Given an accordion, an expandable field list or an unselected tab holds text
+    Then the prerendered page hides its panel as hidden until found, not as plain hidden
+    And panels that are not collapsible keep plain hidden
+
+  @integration
+  Scenario: A panel find-in-page opens shows as open
+    Given find-in-page opened a collapsed accordion panel or an unselected tab's panel
+    Then the accordion's trigger reports it expanded, and the tab strip selects that panel's tab
+    And a panel opened before the page's script loaded is marked the same way once it loads
+
+  @unit
+  Scenario: Hand a coding agent a prompt for the request
+    Given an API operation with an API key scheme and a JSON body
+    When the reader opens the request examples
+    Then an Agent prompt tab comes before Python, though Python stays the default
+    And its prompt names the method and URL, links the operation's reference and sends the body as JSON
+    And it tells the agent to read the key from LANGWATCH_API_KEY, never hard-coding it
 
   @unit
   Scenario: Answer a followed link at once while the next page loads
@@ -146,6 +188,13 @@ Feature: Actionable documentation and restrained reading surfaces
     When I navigate to a subsection
     Then the active path follows that subsection
     And reduced motion disables the path animation
+  @integration
+  Scenario: Mark the section at the reading line after the page or window changes
+    Given the contents rail lists a page's sections
+    When the reader scrolls a heading past the reading line
+    Then the rail marks that section as current
+    And after an in-place page change or a resize the rail measures the new headings
+    And a scroll that stays in one section changes nothing on the rail
   @e2e
   Scenario: Choose an agent and copy the complete setup prompt
     Given the sidebar command and setup prompt card are visible

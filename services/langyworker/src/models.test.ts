@@ -1,3 +1,4 @@
+import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { describe, expect, it } from "vitest";
 
 import type { LangyWorkerModelConfig } from "./config.js";
@@ -142,9 +143,26 @@ describe("buildModelsJson", () => {
           reasoning: true,
           contextWindow: 272000,
           maxTokens: 32000,
+          input: ["text", "image"],
           compat: { supportsStore: false },
         });
       }
+    });
+
+    /** @scenario A model pi's catalog does not list is told it can see images */
+    it("declares text and image input unless the config names its own", () => {
+      const env = { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" };
+      const entryFor = (config: LangyWorkerModelConfig) =>
+        (
+          buildModelsJson({ model: config, env }).providers[PROVIDER_ID] as {
+            models: Record<string, unknown>[];
+          }
+        ).models[0];
+      const unknown = { ...model, id: "gemini/gemini-3-flash", api: "openai-completions" as const };
+      expect(entryFor(unknown)?.input).toEqual(["text", "image"]);
+      expect(entryFor({ ...unknown, input: ["text"] } as LangyWorkerModelConfig)?.input).toEqual([
+        "text",
+      ]);
     });
   });
 
@@ -193,6 +211,109 @@ describe("buildModelsJson", () => {
       for (const id of ["anthropic/claude-opus-4-20250514", "anthropic/claude-3-7-sonnet-latest"]) {
         expect(claude(id).compat, id).toBeUndefined();
       }
+    });
+  });
+
+  describe("when an OpenAI Responses model meets pi's catalog", () => {
+    const env = { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "k" };
+    const openai = (id: string): Record<string, unknown> => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api: "openai-responses",
+          baseUrlEnv: "OPENAI_BASE_URL",
+          apiKeyEnv: "OPENAI_API_KEY",
+          reasoning: true,
+          compat: { supportsLongCacheRetention: true },
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0] as Record<string, unknown>;
+    };
+
+    /** @scenario A model that does not reason is never sent reasoning fields */
+    it("takes the catalog's reasoning flag over the lane's blanket one", () => {
+      const notReasoning = Object.entries(OPENAI_MODELS)
+        .filter(([, entry]) => entry.api === "openai-responses" && entry.reasoning === false)
+        .map(([id]) => `openai/${id}`);
+      expect(notReasoning.length).toBeGreaterThan(0);
+      for (const id of notReasoning) {
+        expect(openai(id).reasoning, id).toBe(false);
+      }
+      expect(openai("openai/gpt-5.6-luna").reasoning).toBe(true);
+    });
+
+    /** @scenario A GPT newer than pi's catalog gets its newest sibling's shape */
+    it("gives a GPT newer than the catalog the newest same-tier sibling's shape", () => {
+      const sibling = openai("openai/gpt-5.6-luna");
+      for (const id of ["openai/gpt-6-luna", "openai/gpt-6.1-luna"]) {
+        const entry = openai(id);
+        expect(entry.id, id).toBe(id);
+        expect(entry.reasoning, id).toBe(true);
+        expect(entry.contextWindow, id).toBe(sibling.contextWindow);
+        expect(entry.thinkingLevelMap, id).toEqual(sibling.thinkingLevelMap);
+        expect(entry.input, id).toEqual(sibling.input);
+        expect(entry.compat, id).toMatchObject({ supportsLongCacheRetention: true });
+        expect(entry.name, id).toBeUndefined();
+        expect(entry.cost, id).toBeUndefined();
+      }
+      expect(openai("openai/gpt-6-terra").contextWindow).toBe(
+        openai("openai/gpt-5.6-terra").contextWindow,
+      );
+    });
+
+    /** @scenario A GPT newer than pi's catalog gets its newest sibling's shape */
+    it("leaves ids with no newer sibling to the manager's config", () => {
+      for (const id of ["openai/gpt-6-astra", "openai/gpt-6-sol-pro", "openai/my-finetune"]) {
+        expect(openai(id).contextWindow, id).toBeUndefined();
+      }
+    });
+  });
+
+  describe("when the manager leaves reasoning unsaid", () => {
+    const env = { LLM_BASE_URL: "http://127.0.0.1:41234", LLM_API_KEY: "k" };
+    const reasoningOf = (id: string, api: LangyWorkerModelConfig["api"], reasoning?: boolean) => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api,
+          baseUrlEnv: "LLM_BASE_URL",
+          apiKeyEnv: "LLM_API_KEY",
+          ...(reasoning === undefined ? {} : { reasoning }),
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0]?.reasoning;
+    };
+    const [nonReasoningId] =
+      Object.entries(OPENAI_MODELS).find(
+        ([, entry]) => !entry.reasoning && entry.api === "openai-responses",
+      ) ?? [];
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("takes reasoning off for a catalogued model that cannot reason", () => {
+      expect(nonReasoningId).toBeDefined();
+      expect(reasoningOf(`openai/${nonReasoningId}`, "openai-responses")).toBe(false);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("keeps reasoning on for a catalogued model that reasons", () => {
+      expect(reasoningOf("openai/gpt-5-mini", "openai-responses")).toBe(true);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("assumes reasoning for an uncatalogued Responses or Messages model", () => {
+      expect(reasoningOf("openai_codex/gpt-5-codex", "openai-responses")).toBe(true);
+      expect(reasoningOf("anthropic/claude-acme-1", "anthropic-messages")).toBe(true);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("leaves an uncatalogued chat-completions model without reasoning", () => {
+      expect(reasoningOf("gemini/gemini-2.5-pro", "openai-completions")).toBeUndefined();
+    });
+
+    it("lets an explicit setting win over the default", () => {
+      expect(reasoningOf("openai_codex/gpt-5-codex", "openai-responses", false)).toBe(false);
     });
   });
 

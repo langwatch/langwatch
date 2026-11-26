@@ -8,6 +8,7 @@ import {
 } from "@langwatch/api-key-contract/docs-session-frame";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { type HealthRoute, processConfig, Server, type ProcessServer } from "@langwatch/process";
+import { STORED_OBJECT_UPLOAD_REQUEST_BODY } from "@langwatch/stored-object-contract";
 import { servingUpgradeGate } from "@langwatch/upgrade/gate";
 
 import { processEnvironment } from "./config.ts";
@@ -46,6 +47,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     )
     .withProcessOwnership(options.ownsProcess ?? true)
     .withHealthPort(options.port)
+    .withLongRequestBodies([STORED_OBJECT_UPLOAD_REQUEST_BODY])
     .withUpgradeGate({ role: "api", gate: servingUpgradeGate });
   const server = await (
     (options.ownsTelemetry ?? true)

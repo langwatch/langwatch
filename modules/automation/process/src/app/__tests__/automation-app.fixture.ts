@@ -185,6 +185,7 @@ export function createCanonicalAutomationApp(): {
     listEntityHistory: vi.fn(async () => []),
     hasRecordedSince: vi.fn(async () => false),
     findByTargetKind: vi.fn(async () => []),
+    findForOrganization: vi.fn(async () => []),
   };
   return {
     app: AutomationModule.fromInfrastructure({

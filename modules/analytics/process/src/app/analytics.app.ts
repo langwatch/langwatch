@@ -35,6 +35,8 @@ import {
   type LangWatchQLAppFunctionCall,
   type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
+  type LangWatchQLSpanDataFloor,
+  type LangWatchQLManagedPromptVersionFloor,
   type LangWatchQLService,
   type LangWatchQLKeyStatementRequest,
   type LangWatchQLTextHydrationInput,
@@ -59,6 +61,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
@@ -73,7 +76,14 @@ import {
   type ScopedSecrets,
 } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
-import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
+import {
+  filtersReadSpanType,
+  type SpanAnalyticsFloor,
+  TraceApi,
+  type ThreadTraceIds,
+  type Trace,
+  TRACE_FILTER_EXAMPLES,
+} from "@langwatch/trace-contract";
 
 import type { AnalyticsChannels } from "../channels/analytics.channels.ts";
 import { lwqlHydrationKeyCap } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
@@ -82,6 +92,7 @@ import { statementMightCallEvalFunction } from "../features/app-functions/rules/
 import { LangWatchQLHydrationComputeService } from "../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceIdsReadInput,
   type LangWatchQLThreadTraceReadInput,
   type LangWatchQLTraceReadInput,
   type LangWatchQLTraceSource,
@@ -94,7 +105,6 @@ import type {
   AnalyticsRepositories,
   LangWatchQlSupply,
 } from "../repositories/analytics.repositories.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
@@ -108,10 +118,18 @@ import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.t
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
-import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
+import { keyReachProjectIds, keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
-import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import {
+  langWatchQLQueryHashKey,
+  langWatchQLRunProjectIds,
+} from "../rules/langwatch-ql-run-telemetry.rules.ts";
+import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import {
+  derivedRestrictedUser,
+  type LwqlCredentials,
+  resolveLwqlCredentials,
+} from "../rules/lwql-default-credentials.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -125,6 +143,10 @@ import {
 } from "../services/langwatch-ql-connection.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
 import {
+  type LangWatchQLPlacementTarget,
+  LangWatchQLPlacementGateService,
+} from "../services/langwatch-ql-placement-gate.service.ts";
+import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
@@ -136,6 +158,7 @@ import {
   DEFAULT_LWQL_DATABASE,
   LangWatchQLService as LangWatchQLServiceClass,
 } from "../services/langwatch-ql.service.ts";
+import { SpanAnalyticsFloorReadService } from "../services/span-analytics-floor-read.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
 import {
   convergeLwqlAccessModel,
@@ -179,6 +202,8 @@ type AnalyticsFilterOptionsLookup = Readonly<{
       endDate: number;
       scope?: { conditions: string[]; params: Record<string, unknown> };
       authorization: Authorization;
+      /** Where span_analytics is complete, for a span-type picker or scope. */
+      spanAnalyticsFloor?: SpanAnalyticsFloor;
     }>,
   ): Promise<AnalyticsFilterOption[]>;
 }>;
@@ -215,6 +240,8 @@ interface AnalyticsAppDependencies {
   dataPrivacy: DataPrivacyApi;
   /** The SAME project peer the rollout gate and the run-caller's identity read. */
   projects: ProjectApi;
+  /** Instant Evals' answer to whether a project may call an eval function (ADR-182). */
+  instantEvals: Pick<InstantEvalApi, "isEnabled">;
   /** The per-project window every LangWatchQL execution is counted against. */
   lwqlBounds: LangWatchQLBoundsService;
   /** The peer every app-function value is read and rendered through. */
@@ -253,6 +280,11 @@ type LwqlProvisioningOperations = Readonly<{
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
+/** Where a run leaves the projects its scope resolved to, for its failed-run line. */
+interface ResolvedProjectIds {
+  projectIds: readonly string[] | undefined;
+}
+
 const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
 const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
@@ -265,6 +297,35 @@ const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
 
+/** The gate's provisioning read: who owns the access model on the admin target (ADR-200). */
+function lwqlAccessModelProbe({
+  admin,
+  connection,
+}: {
+  admin: LangWatchQlSupply["admin"];
+  connection: LangWatchQLConnection | null;
+}): { configured: boolean; probeOwner(): Promise<LwqlAccessModelOwner> } {
+  if (!admin.configured || !connection) {
+    return { configured: false, probeOwner: () => Promise.resolve("none") };
+  }
+  const names = LangWatchQLProductionProvisioningService.create().names({ connection });
+  const repository = ClickHouseLangWatchQLProvisioningRepository.create({
+    statements: admin.statements,
+  });
+  return { configured: true, probeOwner: () => repository.probeOwner({ names }) };
+}
+
+/** The server LangWatchQL queries, by origin, for the placement gate to compare (ADR-200). */
+function lwqlTargetOf({
+  connection,
+}: {
+  connection: LangWatchQLConnection | null;
+}): LangWatchQLPlacementTarget {
+  return connection
+    ? { configured: true, origin: new URL(connection.url).origin }
+    : { configured: false };
+}
+
 /** The reconvergence watch's operations and the key-map fill, over the admin seam (ADR-159). */
 function lwqlProvisioningOperations({
   admin,
@@ -272,6 +333,7 @@ function lwqlProvisioningOperations({
   database,
   connection,
   readerPassword,
+  isDerived,
   settings,
   projectKeys,
 }: {
@@ -280,6 +342,8 @@ function lwqlProvisioningOperations({
   database: LangWatchQlSupply["database"];
   connection: LangWatchQLConnection;
   readerPassword: string | undefined;
+  /** The passwords came from the key pepper: a provisioning failure warns instead of failing. */
+  isDerived: boolean;
   settings: AnalyticsServerConfig["langwatchQl"];
   projectKeys: ProjectApi;
 }): LwqlProvisioningOperations {
@@ -316,7 +380,11 @@ function lwqlProvisioningOperations({
     converge: async () => {
       // SQL mode only: in rendered mode a config store owns the access entities.
       if (settings.accessModelMode !== "sql" || readerPassword === undefined) return;
-      await convergeLwqlAccessModel({ database: database(), plan: plan(readerPassword) });
+      await convergeLwqlAccessModel({
+        database: database(),
+        plan: plan(readerPassword),
+        isDerived,
+      });
     },
     // Rendered mode only: SQL mode keeps its owner-probe re-provision, unchanged.
     findAppOwnedDrift: async () => {
@@ -329,6 +397,7 @@ function lwqlProvisioningOperations({
         database: database(),
         plan: plan(readerPassword),
         failOnError: true,
+        isDerived,
         only: drift,
       });
     },
@@ -373,6 +442,34 @@ type AnalyticsSetup = FeatureSetup<
   AnalyticsRepositories,
   AnalyticsChannels
 >;
+
+/**
+ * LangWatchQL's passwords and access model mode: the explicit secrets, or, where none is set,
+ * derived from the key pepper (analytics-lwql-default-credentials.feature).
+ */
+function lwqlCredentials({
+  secrets,
+  settings,
+}: {
+  secrets: ScopedSecrets;
+  settings: AnalyticsServerConfig["langwatchQl"];
+}): Promise<LwqlCredentials> {
+  return secrets.into(AnalyticsModule.secrets.lwqlClickHousePassword, (clickHousePassword) =>
+    secrets.into(AnalyticsModule.secrets.lwqlPostgresReaderPassword, (postgresReaderPassword) =>
+      intoKeyPepper(secrets, (keyPepper) =>
+        resolveLwqlCredentials({
+          clickHousePassword:
+            typeof clickHousePassword === "string" ? clickHousePassword : undefined,
+          postgresReaderPassword:
+            typeof postgresReaderPassword === "string" ? postgresReaderPassword : undefined,
+          accessModelMode: settings.accessModelMode,
+          installMethod: settings.installMethod,
+          keyPepper,
+        }),
+      ),
+    ),
+  );
+}
 
 /**
  * The deployment secret the query-hash key derives from, first set wins: API_KEY_PEPPER,
@@ -420,6 +517,14 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
       maxTraces,
     });
   }
+
+  readThreadTraceIds({
+    projectId,
+    threadKeys,
+    maxTraces,
+  }: LangWatchQLThreadTraceIdsReadInput): Promise<readonly ThreadTraceIds[]> {
+    return this.traces.readThreadsTraceIds({ projectId, threadIds: [...threadKeys], maxTraces });
+  }
 }
 
 /**
@@ -455,9 +560,7 @@ export class AnalyticsModule
   } as const;
 
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
-    const { sessions, langWatchQl, evaluations } = setup.repositories;
-    const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
-      sessions.resolve(tenantId);
+    const { langWatchQl, evaluations } = setup.repositories;
     // Data retention owns the default retention days; a second claim refuses the process.
     const evaluationRepository = evaluations.open({
       defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
@@ -475,6 +578,9 @@ export class AnalyticsModule
         overloadErrorFactory: new OverloadedRefusal(),
       }),
       maxMembers: setup.config.langwatchQl.aggregateMaxMembers,
+      spanAnalyticsFloor: SpanAnalyticsFloorReadService.create({
+        read: () => setup.dependencies.traces.getSpanAnalyticsFloor(),
+      }),
       tripwire: LoggingAnalyticsTripwireService.create({
         isEnabled: (projectId) =>
           setup.dependencies.featureFlags.isEnabled(ANALYTICS_READ_TRIPWIRE_FLAG, {
@@ -483,7 +589,14 @@ export class AnalyticsModule
           }),
       }),
     });
-    const lwqlConfig = setup.config.langwatchQl;
+    const credentials = await lwqlCredentials({
+      secrets: setup.secrets,
+      settings: setup.config.langwatchQl,
+    });
+    const lwqlConfig = {
+      ...setup.config.langwatchQl,
+      accessModelMode: credentials.accessModelMode,
+    };
     const { admin, postgres, database } = langWatchQl;
     const target = admin.configured
       ? LangWatchQLConnectionService.create().applyTargetOverrides({
@@ -492,34 +605,32 @@ export class AnalyticsModule
           explicitDatabase: lwqlConfig.database,
         })
       : { available: false as const };
-    const connection: LangWatchQLConnection | null = target.available
-      ? await setup.secrets.into(AnalyticsModule.secrets.lwqlClickHousePassword, (password) =>
-          typeof password === "string" && password
-            ? {
-                url: target.url,
-                database: target.database,
-                username: lwqlConfig.username ?? LWQL_CONNECTION_DEFAULTS.restrictedUser,
-                tenantSetting: lwqlConfig.tenantSetting ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
-                password,
-              }
-            : null,
-        )
-      : null;
+    const connection: LangWatchQLConnection | null =
+      target.available && credentials.clickHousePassword !== undefined
+        ? {
+            url: target.url,
+            database: target.database,
+            username:
+              lwqlConfig.username ??
+              (credentials.isDerived
+                ? derivedRestrictedUser({ database: target.database })
+                : LWQL_CONNECTION_DEFAULTS.restrictedUser),
+            tenantSetting: lwqlConfig.tenantSetting ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
+            password: credentials.clickHousePassword,
+          }
+        : null;
     const lwqlProvisioning =
       admin.configured && postgres.configured && connection
-        ? await setup.secrets.into(
-            AnalyticsModule.secrets.lwqlPostgresReaderPassword,
-            (readerPassword) =>
-              lwqlProvisioningOperations({
-                admin,
-                postgres,
-                database,
-                connection,
-                readerPassword: typeof readerPassword === "string" ? readerPassword : undefined,
-                settings: lwqlConfig,
-                projectKeys: setup.dependencies.projects,
-              }),
-          )
+        ? lwqlProvisioningOperations({
+            admin,
+            postgres,
+            database,
+            connection,
+            readerPassword: credentials.postgresReaderPassword,
+            isDerived: credentials.isDerived,
+            settings: lwqlConfig,
+            projectKeys: setup.dependencies.projects,
+          })
         : LWQL_UNAVAILABLE;
     const hydration = LangWatchQLHydrationService.create({
       reads: LangWatchQLHydrationReadService.create({
@@ -534,6 +645,12 @@ export class AnalyticsModule
     });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
+      placement: LangWatchQLPlacementGateService.create({
+        placement: setup.repositories.lwqlPlacement,
+        target: lwqlTargetOf({ connection }),
+        accessModel: lwqlAccessModelProbe({ admin, connection }),
+        answers: setup.repositories.lwqlAccessModelAnswer,
+      }),
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
       judging: setup.channels.judge,
@@ -551,6 +668,7 @@ export class AnalyticsModule
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
         projects: setup.dependencies.projects,
+        instantEvals: setup.channels.judge,
         lwqlBounds: LangWatchQLBoundsService.create({
           entitlement: setup.dependencies.plans,
           projects: setup.dependencies.projects,
@@ -561,10 +679,17 @@ export class AnalyticsModule
         recency: setup.repositories.recency,
         lwqlProvisioning,
         lwqlKeyMap: LwqlKeyMapService.create({
-          repository: LwqlKeyMapClickHouseRepository.create({ resolveClient }),
           projects: setup.dependencies.projects,
           ...(admin.configured && connection
-            ? { target: { connection, sourceDatabase: admin.target.database } }
+            ? {
+                target: {
+                  connection,
+                  sourceDatabase: admin.target.database,
+                  repository: LwqlKeyMapClickHouseRepository.create({
+                    statements: admin.statements,
+                  }),
+                },
+              }
             : {}),
         }),
         ...(lwqlConfig.aggregateMaxMembers === undefined
@@ -587,6 +712,7 @@ export class AnalyticsModule
   #runScope: LangWatchQLRunScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
+  #spanAnalyticsFloor: SpanAnalyticsFloorReadService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
@@ -612,6 +738,9 @@ export class AnalyticsModule
     this.#publicBaseUrl = publicBaseUrl;
     this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
     this.#hydration = dependencies.hydration;
+    this.#spanAnalyticsFloor = SpanAnalyticsFloorReadService.create({
+      read: () => dependencies.traces.getSpanAnalyticsFloor(),
+    });
   }
 
   /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */
@@ -642,6 +771,11 @@ export class AnalyticsModule
   /** Writes a created project's key-map row; throws on a failed insert so the queue retries. */
   syncLwqlKeyMapRow(input: { projectId: string }): Promise<void> {
     return this.#dependencies.lwqlKeyMap.syncProject(input);
+  }
+
+  /** Whether the project's key-map row is there, written first when missing; never throws. */
+  ensureLwqlKeyMapRow(input: Readonly<{ projectId: string }>): Promise<boolean> {
+    return this.#dependencies.lwqlKeyMap.ensureProject(input);
   }
 
   /**
@@ -691,7 +825,7 @@ export class AnalyticsModule
    * — never by the field's own selection, or the picker could only re-offer what's already
    * chosen. Forgetting this exclusion wouldn't fail; it would quietly narrow the answer.
    */
-  filterOptions(
+  async filterOptions(
     request: AnalyticsFilterOptionsRequest,
     { authorization }: { authorization: Authorization },
   ): Promise<AnalyticsFilterOption[]> {
@@ -704,11 +838,15 @@ export class AnalyticsModule
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
+    const floorField = await this.#spanAnalyticsFloor.floorFieldFor(
+      request.field === "spans.type" || filtersReadSpanType(scopeFilters),
+    );
     // Trace owns the filter grammar because it owns the tables the scope reads. The picker
     // reads through the proof's fence, so the scope names no tenant of its own.
     const scope = this.#dependencies.traces.translateLegacyFilters({
       filters: scopeFilters,
       fenced: true,
+      ...floorField,
     });
 
     return this.#dependencies.filterOptions.getFilterOptions({
@@ -721,6 +859,7 @@ export class AnalyticsModule
       endDate: request.endDate,
       scope,
       authorization,
+      ...floorField,
     });
   }
 
@@ -801,10 +940,22 @@ export class AnalyticsModule
   ): Promise<LangWatchQLQueryResult> {
     // The caller, on its runs that answer and on those refused before the engine.
     const telemetry = keyRunTelemetry({ reach: input.reach, door: input.door ?? "rest_api" });
+    const resolved: ResolvedProjectIds = { projectIds: undefined };
     try {
-      return await this.#runLangWatchQLForKey({ ...input, telemetry });
+      return await this.#runLangWatchQLForKey({ ...input, telemetry, resolved });
     } catch (error) {
-      this.#dependencies.runTelemetry.recordFailed({ telemetry, sql: input.sql, error });
+      this.#dependencies.runTelemetry.recordFailed({
+        telemetry,
+        sql: input.sql,
+        error,
+        // A wide key names no project on its own, so the resolved scope speaks when it finished.
+        projectIds:
+          resolved.projectIds ??
+          langWatchQLRunProjectIds({
+            own: [...keyReachProjectIds({ reach: input.reach }), input.projectId],
+            named: input.projects,
+          }),
+      });
       throw error;
     }
   }
@@ -815,6 +966,7 @@ export class AnalyticsModule
         reach: LangWatchQLKeyReach;
         signal?: AbortSignal;
         telemetry: LangWatchQLRunTelemetry;
+        resolved: ResolvedProjectIds;
       } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
@@ -828,6 +980,7 @@ export class AnalyticsModule
           requireProjects: true,
           ...(wanted === undefined ? {} : { projects: wanted }),
         });
+    input.resolved.projectIds = projects.map(({ id }) => id);
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     }
@@ -900,7 +1053,6 @@ export class AnalyticsModule
     return buildQueryReference({
       protections: input.protections,
       lwqlEnabled: input.canRunLangWatchQL,
-      database,
       schema: input.canRunLangWatchQL
         ? await input.schema()
         : { database, functions: [], views: [], appFunctions: [] },
@@ -922,8 +1074,9 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
+    const resolved: ResolvedProjectIds = { projectIds: undefined };
     try {
-      return await this.#executeLangWatchQL(input);
+      return await this.#executeLangWatchQL({ ...input, resolved });
     } catch (error) {
       // Every refusal on the way counts, the window and the project scope included, not only
       // the database's: a gate that turns most widget runs away is the failure worth an alert.
@@ -931,17 +1084,23 @@ export class AnalyticsModule
         telemetry: input.telemetry,
         sql: input.sql,
         error,
+        // The resolved scope speaks when it finished; a run refused earlier names what it asked.
+        projectIds:
+          resolved.projectIds ??
+          langWatchQLRunProjectIds({ own: [input.project.id], named: input.projects }),
       });
       throw error;
     }
   }
 
   async #executeLangWatchQL(
-    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+    input: LangWatchQLExecuteInput &
+      Readonly<{ authorization?: Authorization; resolved: ResolvedProjectIds }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, projects: asked, userId, ...run } = input;
+    const { authorization, project, projects: asked, userId, resolved, ...run } = input;
     const selection = this.#runScope.select({ projects: asked });
     const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
+    if (scope.kind !== "own") resolved.projectIds = scope.projects.map(({ id }) => id);
 
     if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.
@@ -963,7 +1122,7 @@ export class AnalyticsModule
 
     // Resolved before the engine validates, because whether an eval function
     // may be called is part of that verdict — and only for a statement that
-    // names one, since the answer costs a project read and a flag evaluation.
+    // names one, since the answer costs a call into Instant Evals.
     const isInstantEvalsEnabled =
       statementMightCallEvalFunction(input.sql) &&
       (await this.#isInstantEvalsEnabled(input.project.id));
@@ -995,13 +1154,12 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.executePass(input);
   }
 
-  /** This project's eval-function rollout, the answer a member's own statement reads. */
+  /**
+   * Whether a member's own statement may call an eval function: Instant Evals' answer, so an own
+   * decision model or an opted-in organization counts, not the release flag alone.
+   */
   #isInstantEvalsEnabled(projectId: string): Promise<boolean> {
-    return instantEvalsEnabled({
-      featureFlags: this.#dependencies.featureFlags,
-      projectId,
-      projects: this.#dependencies.projects,
-    });
+    return this.#dependencies.instantEvals.isEnabled({ projectId });
   }
 
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void> {
@@ -1041,6 +1199,16 @@ export class AnalyticsModule
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** Where span_metrics' history starts, from trace's span_analytics replay (ADR-006). */
+  async spanDataFloor(): Promise<LangWatchQLSpanDataFloor> {
+    return this.#dependencies.traces.getSpanAnalyticsFloor();
+  }
+
+  /** Where LastUsedPromptVersionId is known from, from trace's managed prompt version replay. */
+  async managedPromptVersionFloor(): Promise<LangWatchQLManagedPromptVersionFloor> {
+    return this.#dependencies.traces.getManagedPromptVersionFloor();
   }
 
   /** The projects a card's editor may offer this member. */

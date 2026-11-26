@@ -11,6 +11,7 @@ import type {
   AuthzAttachBindingsOutput,
   AuthzRevokeBindingsWhereInput,
   AuthzRevokeBindingsWhereOutput,
+  AuthzSetBillingRoleInput,
   GrantScopeTier,
 } from "@langwatch/authz-contract";
 import type { PlanProvider, Plan } from "@langwatch/entitlement-contract";
@@ -69,6 +70,31 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     binding: Pick<FakeBinding, "scopeType" | "scopeId" | "userId" | "role" | "customRoleId">,
   ): string {
     return `${binding.scopeType}:${binding.scopeId}:${binding.userId}:${binding.role}:${binding.customRoleId ?? ""}`;
+  }
+
+  /** Who holds the Billing role, per organization, keyed by the last command that set it. */
+  private readonly billingHolders = new Map<string, AuthzSetBillingRoleInput>();
+
+  /** The Billing role write a user holds in an organization, if any. */
+  billingRoleOf({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): AuthzSetBillingRoleInput | undefined {
+    return this.billingHolders.get(`${organizationId}:${userId}`);
+  }
+
+  async setBillingRole(input: AuthzSetBillingRoleInput): Promise<void> {
+    const key = `${input.organizationId}:${input.userId}`;
+    if (input.holds) this.billingHolders.set(key, input);
+    else this.billingHolders.delete(key);
+  }
+
+  /** The Billing grant goes without the Billing switch, the state ADR-205's repair covers. */
+  dropBillingGrant({ organizationId, userId }: { organizationId: string; userId: string }): void {
+    this.billingHolders.delete(`${organizationId}:${userId}`);
   }
 
   /** Every binding currently held for one user, for assertions. */
@@ -178,6 +204,7 @@ function authzApiFromFake(grants: FakeAuthzGrantsService): AuthzApi {
   return createApiFixture<AuthzApi>({
     attachBindings: (input) => grants.attachBindings(input),
     revokeBindingsWhere: (input) => grants.revokeBindingsWhere(input),
+    setBillingRole: (input) => grants.setBillingRole(input),
   });
 }
 
@@ -704,6 +731,7 @@ export function makePlanProvider(plan: Partial<Plan> = {}): PlanProvider {
     free: true,
     maxMembers: 1_000_000,
     maxMembersLite: 1_000_000,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1_000_000,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

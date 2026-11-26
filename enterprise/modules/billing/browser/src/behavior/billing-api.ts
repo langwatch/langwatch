@@ -5,6 +5,10 @@
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
+  OrganizationRetention,
+  OrganizationStorageEstimate,
+} from "@langwatch/data-retention-contract";
+import type {
   Currency,
   currencyTrpc,
   SubscriptionBillingInterval,
@@ -35,6 +39,7 @@ export type UsageRead = {
   usageUnit?: string;
   membersCount: number;
   membersLiteCount: number;
+  membersDeveloperCount: number;
   currentMonthMessagesCount: number | null;
   /** Seats used against the plan, counted the way enforcement counts them. */
   seatLimitInfo?: SeatLimitInfo;
@@ -46,6 +51,8 @@ export type UsageRead = {
 export type OrganizationMemberRead = {
   userId: string;
   role: OrganizationUserRole;
+  /** A Lite membership that pays and takes no seat (ADR-205). */
+  billingOnly?: boolean;
   user: { id: string; name: string | null; email: string | null };
 };
 
@@ -54,12 +61,24 @@ export type PendingInviteRead = {
   id: string;
   email: string;
   role: OrganizationUserRole;
+  billingOnly?: boolean;
   status: string;
   displayStatus: string;
 };
 
-/** Procedures from features not yet split: plan, license, organization, invite. */
+/** Procedures from features not yet split: plan, license, organization, invite, data retention. */
 type BorrowedProcedures = {
+  dataRetention: {
+    /** The organization's stored bytes, for the upgrade dialog's storage estimate. */
+    getOrganizationStorageEstimate: {
+      query: { input: OrganizationScope; output: OrganizationStorageEstimate };
+    };
+    /** The organization's traces retention, for the current plan card. */
+    getOrganizationRetention: {
+      query: { input: OrganizationScope; output: OrganizationRetention };
+    };
+  };
+
   plan: {
     getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
   };
@@ -113,6 +132,7 @@ type BorrowedProcedures = {
           billingInterval?: SubscriptionBillingInterval;
           totalSeats: number;
           invites: { email: string; role: OrganizationUserRole }[];
+          retentionDays?: number;
         };
         output: { url: string | null };
       };

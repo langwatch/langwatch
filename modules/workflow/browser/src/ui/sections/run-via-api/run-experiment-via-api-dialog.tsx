@@ -69,7 +69,7 @@ export function RunExperimentViaApiDialog({
         </HStack>
       }
       title="Run via API"
-      description="Trigger this evaluation from a script or a CI pipeline and read the per-row results back. Sequential runs one cell at a time in row order."
+      description="Trigger this evaluation from a script or a CI pipeline and read the per-row results back. Auto lets the server pick the concurrency; Sequential runs one cell at a time in row order."
     />
   );
 }

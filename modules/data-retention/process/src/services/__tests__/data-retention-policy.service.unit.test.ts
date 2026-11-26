@@ -33,6 +33,11 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [];
   }
+  async findOrganizationCreatedAt(): ReturnType<
+    DataRetentionDirectoryReader["findOrganizationCreatedAt"]
+  > {
+    return [];
+  }
 }
 
 class StubPlans implements Pick<RetentionPlanService, "getPlan"> {
@@ -55,7 +60,7 @@ function policy(options: {
     permissions: RetentionPermissionsService.create({
       authz: createDataRetentionTestAuthz(options.allow ?? true, options.admin ?? false),
     }),
-    plans: new StubPlans(options.plan ?? { free: false, uncapped: false }),
+    plans: new StubPlans(options.plan ?? { free: false, uncapped: false, billsStorage: false }),
   });
 }
 
@@ -75,10 +80,12 @@ describe("given a plan-gated write", () => {
     /** @scenario "A retention rule saved on a free plan is refused by name" */
     it("refuses by name", async () => {
       await expect(
-        policy({ plan: { free: true, uncapped: false } }).assertPlanForProject({
-          actor: ACTOR,
-          projectId: "proj_a",
-        }),
+        policy({ plan: { free: true, uncapped: false, billsStorage: false } }).assertPlanForProject(
+          {
+            actor: ACTOR,
+            projectId: "proj_a",
+          },
+        ),
       ).rejects.toMatchObject({ code: "data_retention_not_on_plan", httpStatus: 403 });
     });
   });
@@ -102,12 +109,15 @@ describe("given a value a plan may or may not persist", () => {
    * @scenario "A paid organization cannot save an off-menu retention value"
    */
   it("allows only the fixed presets on a capped plan", () => {
-    const capped = { free: false, uncapped: false };
+    const capped = { free: false, uncapped: false, billsStorage: false };
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 35),
     ).not.toThrow();
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 63),
+    ).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 91),
     ).not.toThrow();
     expect(
       refusalOf(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 98)),
@@ -119,7 +129,7 @@ describe("given a value a plan may or may not persist", () => {
    * @scenario "An enterprise organization gets the full menu and a custom value"
    */
   it("allows any whole-week value at or above the floor on an uncapped plan", () => {
-    const uncapped = { free: false, uncapped: true };
+    const uncapped = { free: false, uncapped: true, billsStorage: false };
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 49),
     ).not.toThrow();
@@ -141,7 +151,7 @@ describe("given a value a plan may or may not persist", () => {
   it("leaves the indefinite sentinel to the platform-administrator gate", () => {
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(
-        { free: false, uncapped: false },
+        { free: false, uncapped: false, billsStorage: false },
         0,
       ),
     ).not.toThrow();
@@ -181,7 +191,7 @@ describe("given the read side's configurable flag", () => {
 
   it("reports false on a free plan and true otherwise", async () => {
     await expect(
-      policy({ plan: { free: true, uncapped: false } }).canConfigureRetention({
+      policy({ plan: { free: true, uncapped: false, billsStorage: false } }).canConfigureRetention({
         organizationId: "org_1",
         actor: ACTOR,
       }),

@@ -13,7 +13,7 @@ function buildRouting({ organizationId }: { organizationId: string | undefined }
 }
 
 describe("EvaluationJudgeRoutingService", () => {
-  /** @scenario "An LLM judge on LangWatch Evals Preview is routed when the flag is on" */
+  /** @scenario "An LLM judge on LangWatch Evals (preview) is routed when the flag is on" */
   it("reads the router flag for the project within its organization", async () => {
     const { routing, isEnabled } = buildRouting({ organizationId: "org-1" });
 
@@ -29,6 +29,24 @@ describe("EvaluationJudgeRoutingService", () => {
     const { routing, isEnabled } = buildRouting({ organizationId: undefined });
 
     await expect(routing.isRouted({ projectId: "proj-1" })).resolves.toBe(false);
+    expect(isEnabled).not.toHaveBeenCalled();
+  });
+
+  it("reads the hosted switch for the project within its organization", async () => {
+    const { routing, isEnabled } = buildRouting({ organizationId: "org-1" });
+
+    await expect(routing.isHostedOff({ projectId: "proj-1" })).resolves.toBe(true);
+    expect(isEnabled).toHaveBeenCalledWith("instant_evals_hosted_disabled", {
+      kind: "project",
+      projectId: "proj-1",
+      organizationId: "org-1",
+    });
+  });
+
+  it("never reads the hosted switch for a project with no organization", async () => {
+    const { routing, isEnabled } = buildRouting({ organizationId: undefined });
+
+    await expect(routing.isHostedOff({ projectId: "proj-1" })).resolves.toBe(false);
     expect(isEnabled).not.toHaveBeenCalled();
   });
 });

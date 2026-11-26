@@ -14,7 +14,7 @@ export const storedObjectTrpcTransport: TrpcRouterDeclaration<
   .procedure("headById")
   .withPermission({
     kind: "permission-any",
-    permissions: ["traces:view", "scenarios:view", "datasets:view"],
+    permissions: ["traces:view", "scenarios:view", "datasets:view", "langy:view"],
   })
   .handle(async ({ app, input, actor }) =>
     app.headById({ projectId: input.projectId, id: input.id }, actor),
@@ -24,7 +24,7 @@ export const storedObjectTrpcTransport: TrpcRouterDeclaration<
   .procedure("getReadUrl")
   .withPermission({
     kind: "permission-any",
-    permissions: ["traces:view", "scenarios:view", "datasets:view"],
+    permissions: ["traces:view", "scenarios:view", "datasets:view", "langy:view"],
   })
   .handle(async ({ app, input, actor }) => app.getReadUrl(input, actor))
 

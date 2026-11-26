@@ -270,6 +270,45 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it("folds a CLI console whose exit code is not zero as a failed step", async () => {
+      const user = userEvent.setup();
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-text",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({
+          kind: "text",
+          text: "exit code: 1\n\nstdout:\n(empty)\n\nstderr:\nError: dataset not found.",
+        }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("dataset not found");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
+    it("folds a CLI console with no exit code whose output opens with an Error line as failed", async () => {
+      const user = userEvent.setup();
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-no-exit-code",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({ kind: "text", text: "Error: dataset not found." }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("dataset not found");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();
@@ -544,6 +583,54 @@ describe("a failed step", () => {
       expect(screen.getByText(/on our side/)).toBeTruthy();
     });
 
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("says the same when the CLI printed only its not-logged-in text", async () => {
+      const user = userEvent.setup();
+      const textOnly = failedStep({
+        id: "missing-key-text-1",
+        command: "langwatch trace list",
+        errorText: [
+          "\u001b[31mError: you're not logged in, and LANGWATCH_API_KEY is not set.\u001b[39m",
+          "",
+          "Sign in with your browser, interactively:",
+          "  langwatch login",
+        ].join("\n"),
+      });
+      const { container } = renderActivity({ parts: [textOnly, reply], live: false });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+      expect(container.textContent).toContain("$ langwatch trace list");
+      expect(container.textContent).not.toMatch(/log ?in|sign in|LANGWATCH_API_KEY/i);
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("shows Langy's copy, never the CLI's sign-in steps, once opened", async () => {
+      const user = userEvent.setup();
+      const missingKey = failedStep({
+        id: "missing-key-json-1",
+        command: "langwatch trace list",
+        errorText: JSON.stringify({
+          ok: false,
+          error: {
+            code: "missing_api_key",
+            message:
+              "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login`.",
+            httpStatus: 0,
+            isHandled: true,
+          },
+        }),
+      });
+      const { container } = renderActivity({ parts: [missingKey, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+      expect(container.textContent).not.toMatch(/log ?in|sign in|LANGWATCH_API_KEY/i);
+    });
+
     /** @scenario "A failure no retry can fix keeps its card" */
     it("keeps its card when a local tool failed on the reader's own login", () => {
       const localUnauthorized = {
@@ -774,5 +861,55 @@ describe("the receipt header while the turn runs", () => {
     renderActivity({ parts: [failA, failB], live: true });
 
     expect(receiptHeader().textContent).toMatch(/^2 actions failed/);
+  });
+});
+
+describe("a CLI step that only mentions an error", () => {
+  /** @scenario "A failed step folds into the record of the work" */
+  it("keeps a CLI text envelope that only mentions error mid-line as completed", () => {
+    const finished = {
+      type: "tool-bash",
+      toolCallId: "ok-error-word",
+      state: "output-available",
+      input: { command: "langwatch trace list" },
+      output: JSON.stringify({ kind: "text", text: "0 error: none found" }),
+    } as never;
+    renderActivity({ parts: [finished, reply], live: false });
+
+    expect(receiptHeader().textContent).toContain("1 action completed");
+  });
+
+  /** @scenario "A failed step folds into the record of the work" */
+  it("keeps a successful CLI read with an indented Error field label as completed", () => {
+    const finished = {
+      type: "tool-bash",
+      toolCallId: "ok-error-field",
+      state: "output-available",
+      input: { command: "langwatch simulation-run get abc" },
+      output: JSON.stringify({
+        kind: "text",
+        text: "Run abc\n    Error:    judge timed out",
+      }),
+    } as never;
+    renderActivity({ parts: [finished, reply], live: false });
+
+    expect(receiptHeader().textContent).toContain("1 action completed");
+  });
+
+  /** @scenario "A failed step folds into the record of the work" */
+  it("trusts a zero exit code over an unindented Error line in the output", () => {
+    const finished = {
+      type: "tool-bash",
+      toolCallId: "ok-exit-zero",
+      state: "output-available",
+      input: { command: "langwatch trace list" },
+      output: JSON.stringify({
+        kind: "text",
+        text: "exit code: 0\n\nstdout:\nError: none in the last hour\n\nstderr:\n(empty)",
+      }),
+    } as never;
+    renderActivity({ parts: [finished, reply], live: false });
+
+    expect(receiptHeader().textContent).toContain("1 action completed");
   });
 });

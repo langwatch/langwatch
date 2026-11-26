@@ -22,7 +22,12 @@ import (
 
 // --- stubs implementing the app ports ---
 
-type stubWorker struct{ claimOK bool }
+type stubWorker struct {
+	claimOK bool
+	// posted receives the images of each PostMessage when non-nil; the turn
+	// runs on a detached goroutine, so a test waits on it.
+	posted chan []domain.TurnImage
+}
 
 func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 	if w.claimOK {
@@ -39,7 +44,10 @@ func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time, *dom
 
 func (w *stubWorker) SetTurnTraceContext(trace.SpanContext) {}
 func (w *stubWorker) LastLLMError() (herr.E, bool)          { return herr.E{}, false }
-func (w *stubWorker) PostMessage(context.Context, string, string, string, string) error {
+func (w *stubWorker) PostMessage(_ context.Context, _, _, _, _ string, images []domain.TurnImage) error {
+	if w.posted != nil {
+		w.posted <- images
+	}
 	return nil
 }
 func (w *stubWorker) StreamEvents(_ context.Context, sink app.ChatSink) error {
@@ -63,7 +71,7 @@ func (p *stubPool) HasLiveWorker(_ string, sig domain.CredentialSignature) bool 
 	return p.liveWorker
 }
 
-func (p *stubPool) Acquire(_ context.Context, _ string, creds domain.Credentials) (app.Worker, error) {
+func (p *stubPool) Acquire(_ context.Context, _, _ string, creds domain.Credentials) (app.Worker, error) {
 	p.lastCreds = creds
 	if p.acquireErr != nil {
 		return nil, p.acquireErr
@@ -71,7 +79,7 @@ func (p *stubPool) Acquire(_ context.Context, _ string, creds domain.Credentials
 	return p.worker, nil
 }
 func (p *stubPool) AcquireWarm(ctx context.Context, id string, creds domain.Credentials) (app.Worker, error) {
-	return p.Acquire(ctx, id, creds)
+	return p.Acquire(ctx, id, "", creds)
 }
 func (p *stubPool) Status() (int, int)         { return 2, 20 }
 func (p *stubPool) KillSessionVanished(string) {}
@@ -257,6 +265,61 @@ func TestChat_HappyPathReturns202(t *testing.T) {
 	}
 	if pool.lastCreds.ProjectID != "project-1" || pool.lastCreds.ActorUserID != "user-a" {
 		t.Fatalf("worker principal = %q/%q", pool.lastCreds.ProjectID, pool.lastCreds.ActorUserID)
+	}
+}
+
+func chatBodyWithImages(images string) string {
+	return `{"conversationId":"c1","projectId":"project-1","userId":"user-a","prompt":"what is this?","images":` + images +
+		`,"credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`
+}
+
+// @scenario "A turn's images reach pi as image input"
+func TestChat_ImagesReachTheWorker(t *testing.T) {
+	worker := &stubWorker{claimOK: true, posted: make(chan []domain.TurnImage, 1)}
+	router := newTestRouter(&stubPool{worker: worker})
+	body := chatBodyWithImages(`[{"name":"pasted-7bd830.png","mediaType":"image/png","data":"iVBORw0KGgo="}]`)
+
+	rec := postChat(t, router, "Bearer "+internalSecret, body)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 (%s)", rec.Code, rec.Body.String())
+	}
+	select {
+	case images := <-worker.posted:
+		want := []domain.TurnImage{{Name: "pasted-7bd830.png", MediaType: "image/png", Data: "iVBORw0KGgo="}}
+		if len(images) != 1 || images[0] != want[0] {
+			t.Fatalf("posted images = %+v, want %+v", images, want)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the turn never posted its message")
+	}
+}
+
+// @scenario "A turn whose images break the limits is refused before it reaches a worker"
+func TestChat_InvalidImagesAreRejected(t *testing.T) {
+	router := newTestRouter(&stubPool{worker: &stubWorker{claimOK: true}})
+	auth := "Bearer " + internalSecret
+	png := `{"mediaType":"image/png","data":"iVBORw0KGgo="}`
+
+	cases := []struct {
+		name   string
+		images string
+	}{
+		{"unsupported media type", `[{"mediaType":"image/svg+xml","data":"PHN2Zz4="}]`},
+		{"empty data", `[{"mediaType":"image/png","data":""}]`},
+		{"not base64", `[{"mediaType":"image/png","data":"not base64!"}]`},
+		{"data URL prefix", `[{"mediaType":"image/png","data":"data:image/png;base64,iVBORw0KGgo="}]`},
+		{"too many images", "[" + strings.Repeat(png+",", domain.MaxTurnImages) + png + "]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := postChat(t, router, auth, chatBodyWithImages(tc.images))
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want 422", rec.Code)
+			}
+			if got := errorType(t, rec.Body.String()); got != string(domain.ErrInvalidImages) {
+				t.Errorf("error.type = %q, want invalid_images", got)
+			}
+		})
 	}
 }
 

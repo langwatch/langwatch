@@ -20,7 +20,11 @@ export class MemoryNullTraceLegacyReadRepository extends TraceLegacyReadReposito
   findTracesByThreadId = refuse;
   findTracesWithSpans = refuse;
   findTracesWithSpansByThreadIds = refuse;
+  findTraceIdsByThreadIds = refuse;
   resolveTraceIdByPrefix = refuse;
+  resolveTraceIdsBySpanId = refuse;
+  resolveTraceIdsByScenarioRunId = refuse;
+  findTraceFromStoredSpans = refuse;
   findSpanForPromptStudio = refuse;
 }
 

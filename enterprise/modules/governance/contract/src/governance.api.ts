@@ -94,6 +94,8 @@ import type {
 import type {
   IngestionSourceCreateInput,
   IngestionSourceUpdateInput,
+  TestAgentListingInput,
+  TestAgentListingResult,
 } from "./features/ingestion/ingestion-sources.trpc.ts";
 import type {
   ArchiveIngestionTemplateInput,
@@ -107,6 +109,32 @@ import type {
   QuarantineFillInput,
   QuarantineFillStats,
 } from "./features/ingestion/quarantine-fill.ts";
+import type {
+  AgentKillSwitchSummary,
+  AgentStopCaller,
+  AgentStopPage,
+  AgentStopPlan,
+  AgentStopSeverity,
+  AgentStopStatus,
+  AgentStopTarget,
+  AgentStopView,
+  AwsConnectionInput,
+  AwsConnectionView,
+} from "./features/kill-switch/agent-kill-switch.ts";
+import type {
+  OcsfEventsPage,
+  OcsfIngestRequest,
+  OcsfIngestResponse,
+} from "./features/ocsf/ocsf-siem.ts";
+import type {
+  SecurityLakeConnectionTest,
+  SecurityLakeConnectionTestInput,
+  SecurityLakeSource,
+  SecurityLakeSourceCreateInput,
+  SecurityLakeCallers,
+  SecurityLakeSourceHealth,
+  SecurityLakeSourceUpdateInput,
+} from "./features/ocsf/security-lake.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -116,6 +144,19 @@ import type {
   PersonalUsageRollup,
   PersonalUsageWindow,
 } from "./features/personal/personal-usage.ts";
+import type {
+  ArdManifest,
+  ArdSearchRequest,
+  ArdSearchResponse,
+} from "./features/registry/agent-registry-ard.ts";
+import type { AgentRegistrySettings } from "./features/registry/agent-registry-settings.ts";
+import type {
+  AgentRegistryEntry,
+  AgentRegistryEventPage,
+  AgentRegistryPage,
+  AgentRegistryPosture,
+  AgentRegistryStatus,
+} from "./features/registry/agent-registry.ts";
 import type {
   AgentListingRequestResult,
   AgentSyncSourceListing,
@@ -127,7 +168,7 @@ import type {
   PeopleScreenPerson,
   PeopleScreenSuggestion,
 } from "./governance-people.ts";
-import type { GovernanceActorWorkspace } from "./governance.responses.ts";
+import type { GovernanceActorWorkspaceLookup } from "./governance.responses.ts";
 import type { GovernanceSetupState } from "./governance.ts";
 import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
@@ -299,7 +340,11 @@ export interface GovernanceRestApi {
   aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;
+  /** The member shape, at `aiTools:view`: `ottlRules` is empty, as in `templateListForUser`. */
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate>;
   templateCreateOrg(input: CreateIngestionTemplateInput): Promise<IngestionTemplate>;
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
@@ -392,6 +437,13 @@ export interface GovernanceRestApi {
   }): Promise<IngestionSourceDto>;
   ingestionSourceValidateOttl(input: { statements: string[] }): Promise<OttlValidationResult>;
   ingestionSourceOttlStarter(input: { sourceType: string }): OttlStarterTemplate;
+  /** Lists the provider's agents for an unsaved configuration, recording nothing. */
+  ingestionSourceTestAgentListing(input: TestAgentListingInput): Promise<TestAgentListingResult>;
+  /** Lists a saved source's agents, recording nothing; another organisation's source is a 404. */
+  ingestionSourceTestAgentListingForSource(input: {
+    organizationId: string;
+    sourceId: string;
+  }): Promise<TestAgentListingResult>;
   governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState>;
   governanceResolveHome(
     input: { organizationId: string },
@@ -405,10 +457,10 @@ export interface GovernanceRestApi {
   governanceRecordWorkspaceView(
     input: RecordWorkspaceViewInput,
   ): Promise<RecordWorkspaceViewResult>;
-  findActorWorkspace(input: {
+  getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null>;
+  }): Promise<GovernanceActorWorkspaceLookup>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
   departmentAssignments(input: {
     organizationId: string;
@@ -461,6 +513,164 @@ export interface GovernanceRestApi {
     input: { organizationId: string },
     by: GovernanceCaller,
   ): Promise<CliBootstrapResult>;
+  /** The organisation's agent registry, a page at a time (specs/agent-registry.feature). */
+  listRegistryAgents(input: {
+    organizationId: string;
+    limit: number;
+    cursor?: string;
+    updatedSince?: string;
+    status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
+  }): Promise<AgentRegistryPage>;
+  /** Throws `agent_registry_entry_not_found` for an id outside the organisation. */
+  getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry>;
+  /** One agent's changes after a sequence, oldest first; each carries the entry at its version. */
+  listRegistryAgentVersions(input: {
+    organizationId: string;
+    id: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage>;
+  /** The organisation's change feed after a sequence, in order. */
+  listRegistryEvents(input: {
+    organizationId: string;
+    after?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage>;
+  getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest>;
+  searchRegistryArd(input: {
+    organizationId: string;
+    request: ArdSearchRequest;
+  }): Promise<ArdSearchResponse>;
+  /** The organisation's dormancy window; 30 days until it saves one. */
+  getRegistrySettings(input: { organizationId: string }): Promise<AgentRegistrySettings>;
+  saveRegistrySettings(input: {
+    organizationId: string;
+    dormantAfterDays: number;
+  }): Promise<AgentRegistrySettings>;
+
+  // The agent kill switch (specs/agent-kill-switch.feature).
+  findAgentKillSwitchSummaries(input: {
+    organizationId: string;
+  }): Promise<AgentKillSwitchSummary[]>;
+  findPendingAgentStops(input: { organizationId: string }): Promise<AgentStopView[]>;
+  /** Throws `agent_registry_entry_not_found` for an agent outside the organisation. */
+  getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<AgentStopPlan>;
+  /**
+   * Throws `agent_stop_target_invalid` for a target the organisation does not hold, and
+   * `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since.
+   * Writes one audit row naming the agent and `caller`, refused saves included.
+   */
+  setAgentStopPlan(input: {
+    organizationId: string;
+    agentId: string;
+    targets: readonly AgentStopTarget[];
+    expectedVersion?: number;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopPlan>;
+  findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
+  /** Writes an audit row naming `userId`, the person who added it. */
+  createAwsConnection(input: {
+    organizationId: string;
+    connection: AwsConnectionInput;
+    userId: string | null;
+    /** The operator behind an impersonated person, recorded beside `userId`. */
+    impersonatorId?: string;
+  }): Promise<AwsConnectionView>;
+  /**
+   * Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it; a
+   * delete that removed a connection writes an audit row naming `userId`.
+   */
+  deleteAwsConnection(input: {
+    organizationId: string;
+    connectionId: string;
+    userId: string | null;
+    /** The operator behind an impersonated person, recorded beside `userId`. */
+    impersonatorId?: string;
+  }): Promise<{ deleted: boolean }>;
+  requestAgentStop(input: {
+    organizationId: string;
+    agentId: string;
+    reason: string;
+    severity: AgentStopSeverity;
+    /** Throws `agent_stop_plan_changed` when given and the plan no longer holds exactly these. */
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  approveAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    /** Throws `agent_stop_plan_changed` when given and the stop no longer holds exactly these. */
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  denyAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  restoreAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  /**
+   * Applies again every target the stop has not stopped, plus plan targets added since; throws
+   * `agent_stop_not_retryable` unless the stop is quarantined, stop_failed or restore_failed.
+   */
+  retryAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView>;
+  /** The agent's latest stop; throws `agent_stop_not_found` when it was never stopped. */
+  getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView>;
+  /** Latest request first, `limit` at a time; a cursor it never returned is a validation error. */
+  listAgentStops(input: {
+    organizationId: string;
+    statuses?: readonly AgentStopStatus[];
+    limit: number;
+    cursor?: string;
+  }): Promise<AgentStopPage>;
+  /** The organisation's governance events as OCSF 1.9.0, after the cursor. */
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage>;
+  /** The organisation's project traces as OCSF 1.9.0, one event per trace. */
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage>;
+  /** The organisation's audit log as OCSF 1.9.0, oldest first. */
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage>;
+  /** Stores OCSF events another source sent; one row per (source, metadata.uid). */
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse>;
+  securityLakeSourceCreate(
+    input: SecurityLakeSourceCreateInput & { organizationId: string; actorUserId: string | null },
+  ): Promise<SecurityLakeSource>;
+  securityLakeSourceUpdate(
+    input: SecurityLakeSourceUpdateInput & { id: string; organizationId: string },
+  ): Promise<SecurityLakeSource>;
+  /** The source with the external id LangWatch generated, for the trust policy. */
+  securityLakeSourceGet(input: { id: string; organizationId: string }): Promise<SecurityLakeSource>;
+  securityLakeSourceTest(
+    input: SecurityLakeConnectionTestInput & { id: string; organizationId: string },
+  ): Promise<SecurityLakeConnectionTest>;
+  securityLakeSourceHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<SecurityLakeSourceHealth>;
+  securityLakeCallersWithoutTraces(input: { organizationId: string }): Promise<SecurityLakeCallers>;
 }
+
+/** The window and cursor every OCSF export stream takes. */
+export type OcsfExportWindow = {
+  organizationId: string;
+  limit: number;
+  since?: string;
+  until?: string;
+  cursor?: string;
+};
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

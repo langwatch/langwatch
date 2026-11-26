@@ -44,6 +44,8 @@ import type {
   LiveLegacyKey,
   ProjectBackfillEntry,
   ProjectRepository,
+  ProjectSlugHolder,
+  ProjectSlugMove,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
@@ -140,6 +142,25 @@ export class MemoryProjectRepository implements ProjectRepository {
       .projects()
       .filter((row) => row.kind === kind && row.archivedAt === null)
       .map((row) => row.id);
+  }
+
+  async findSlugHolders({ slug }: { slug: string }): Promise<ProjectSlugHolder[]> {
+    return this.#database
+      .projects()
+      .filter((row) => row.slug === slug)
+      .map(({ id, name, slug: held }) => ({ id, name, slug: held }));
+  }
+
+  async replaceSlug(input: {
+    projectId: string;
+    from: string;
+    to: string;
+  }): Promise<ProjectSlugMove> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || project.slug !== input.from) return "gone";
+    if (this.#database.projects().some((row) => row.slug === input.to)) return "taken";
+    this.#database.putProject({ ...project, slug: input.to });
+    return "moved";
   }
 
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {
@@ -268,6 +289,8 @@ export class MemoryProjectRepository implements ProjectRepository {
           presenceEnabled: project.presenceEnabled,
           isArchived: project.archivedAt !== null,
           adminUserId: organization.adminUserIds[0] ?? null,
+          ownerUserId: project.ownerUserId,
+          firstMessage: project.firstMessage,
         },
       };
     });

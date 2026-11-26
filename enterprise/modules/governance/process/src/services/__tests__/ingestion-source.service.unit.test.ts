@@ -15,6 +15,7 @@ import {
   findPullCredentialComplaints,
 } from "../../features/ingestion-pull/rules/pull-config-shape.rules.ts";
 import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
+import { IngestionSourceFactsService } from "../../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import { IngestionSourceReadService } from "../../features/ingestion-source/services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -91,6 +92,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
     this.row = source({ ...this.row, ...rowPatchOf(input) });
     return this.row;
   });
+  recordEventReceived = vi.fn(async () => ({ wentLive: false }));
   getUnpricedUsageWindow = vi.fn(async () => ({ since: null, through: null }));
   updateUnpricedUsageWindow = vi.fn(async () => undefined);
   findUnpricedUsageWindows = vi.fn(async () => []);
@@ -157,6 +159,7 @@ function harness({ ottl = MemoryOttlTransformChannel.create() } = {}) {
     diagnostics: new FakeDiagnostics(),
     ottl,
     now: () => NOW,
+    facts: IngestionSourceFactsService.create({ reportError: () => {} }),
   });
   return { service, repository, projects, findWithTeam, entitlements, lifecycle };
 }
@@ -637,7 +640,7 @@ describe("IngestionSourceService", () => {
             region: "us-east-1",
             prefix: "logs/",
             schedule: "*/30 * * * *",
-            credentials: { accessKeyId: "AKIA", secretAccessKey: "secret" },
+            credentials: { aws_access_key_id: "AKIA", aws_secret_access_key: "secret" },
           },
           pullSchedule: "*/30 * * * *",
           actorUserId: "user-1",
@@ -1031,6 +1034,102 @@ describe("IngestionSourceService", () => {
         expect(findPullConfigComplaints({ adapter })).toEqual([]);
         expect(findPullCredentialComplaints({ adapter })).toEqual([]);
       }
+    });
+  });
+
+  describe("given a Google Cloud source holding a service account key", () => {
+    describe("when an admin reads it back", () => {
+      /** @scenario "The service account key is sealed and never read back" */
+      it("shows the source without the key's value", async () => {
+        const { service, repository, projects } = harness();
+        repository.row = source({
+          sourceType: "gcp_vertex_agent_engine",
+          parserConfig: {
+            adapter: "gcp_vertex_agent_engine",
+            targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+            credentials: { serviceAccountJson: '{"private_key":"-----BEGIN KEY-----"}' },
+          },
+        });
+        const reads = IngestionSourceReadService.create({
+          sources: service,
+          pullRuns: MemoryIngestionPullRunRepository.create(),
+          projects,
+        });
+
+        const [listed] = await reads.list("org-1");
+
+        expect(listed?.parserConfig).toEqual({
+          adapter: "gcp_vertex_agent_engine",
+          targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+        });
+        expect(JSON.stringify(listed)).not.toContain("BEGIN KEY");
+      });
+    });
+  });
+});
+
+describe("the generic ingestion source routes and the Security Lake adapter", () => {
+  const securityLakeConfig = {
+    adapter: "aws_security_lake",
+    region: "eu-west-1",
+    subscriberRoleArn: "arn:aws:iam::123456789012:role/attacker-chosen",
+    queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/lake",
+    credentials: { external_id: "attacker-chosen", aws_access_key_id: "AKIA1" },
+  };
+
+  describe("given an organisation with or without the Enterprise plan", () => {
+    describe.each([
+      ["parserConfig", { parserConfig: securityLakeConfig }],
+      ["pullConfig", { pullConfig: securityLakeConfig }],
+    ])("when the generic create names the adapter in its %s", (_where, config) => {
+      /** @scenario The generic source create refuses the Security Lake adapter under another source type */
+      it("refuses it as an unsupported source type and stores nothing", async () => {
+        const { service, repository, entitlements } = harness();
+        entitlements.enterprise = false;
+
+        await expect(
+          service.assertGenericallyManaged({
+            organizationId: "org-1",
+            sourceType: "otel_generic",
+            ...config,
+          }),
+        ).rejects.toThrow(/Unsupported sourceType "security_lake"/);
+        expect(repository.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a push source with no stored pull adapter", () => {
+    describe("when the generic edit sets the adapter to aws_security_lake", () => {
+      /** @scenario The generic source edit refuses to give a source the Security Lake adapter */
+      it("refuses it as an unsupported source type and changes nothing", async () => {
+        const { service, repository } = harness();
+        repository.row = source({ sourceType: "otel_generic", parserConfig: {} });
+
+        await expect(
+          service.assertGenericallyManaged({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: securityLakeConfig,
+          }),
+        ).rejects.toThrow(/Unsupported sourceType "security_lake"/);
+        expect(repository.update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the generic edit leaves the adapter alone", () => {
+      it("lets the edit through", async () => {
+        const { service, repository } = harness();
+        repository.row = source({ sourceType: "otel_generic", parserConfig: {} });
+
+        await expect(
+          service.assertGenericallyManaged({
+            id: "source-1",
+            organizationId: "org-1",
+            parserConfig: { ottlStatements: [] },
+          }),
+        ).resolves.toBeUndefined();
+      });
     });
   });
 });

@@ -86,7 +86,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       clickhouse:
-        image: clickhouse/clickhouse-server:25.10.2.65
+        image: clickhouse/clickhouse-server:26.8.36.3
         ports:
           - 8123:8123
         env:
@@ -198,6 +198,38 @@ jobs:
             --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/workspace"
           pnpm start:prepare:files
           pnpm ensure:built
+
+      # Head's upgrade provisions the LangWatchQL access model. Give the server what our
+      # ClickHouse ships (haven's clickhouse.go, infra/clickhouse-serverless): the admin grants
+      # and the custom_ settings prefix, which only a restart applies.
+      - name: Configure ClickHouse as the shipped image does for LangWatchQL
+        run: |
+          set -euo pipefail
+          container="${{ job.services.clickhouse.id }}"
+          docker exec -i "$container" \
+            sh -c 'cat > /etc/clickhouse-server/users.d/zz-lwql-access-management.xml' <<'XML'
+          <clickhouse>
+            <users>
+              <default>
+                <access_management>1</access_management>
+                <named_collection_control>1</named_collection_control>
+                <show_named_collections>1</show_named_collections>
+              </default>
+            </users>
+          </clickhouse>
+          XML
+          docker exec -i "$container" \
+            sh -c 'cat > /etc/clickhouse-server/config.d/zz-lwql-custom-settings.xml' <<'XML'
+          <clickhouse>
+            <custom_settings_prefixes>SQL_,custom_</custom_settings_prefixes>
+          </clickhouse>
+          XML
+          docker restart "$container"
+          for _ in $(seq 1 60); do
+            curl -fsS "${CLICKHOUSE_BASE_URL}/ping" > /dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS "${CLICKHOUSE_BASE_URL}/" --data-binary "SELECT 1 SETTINGS custom_lwql_probe = 1"
 
       # Head's upgrade, as its pre-roll Job runs it: the schema plus the ledger a
       # gated base api reads before it serves (specs/upgrade/entry-points.feature).
@@ -484,7 +516,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       clickhouse:
-        image: clickhouse/clickhouse-server:25.10.2.65
+        image: clickhouse/clickhouse-server:26.8.36.3
         ports:
           - 8123:8123
         env:
@@ -550,6 +582,38 @@ jobs:
             --filter "@langwatch/ui..." --filter "@langwatch/tasks..." --filter "@langwatch/workspace"
           pnpm start:prepare:files
           pnpm ensure:built
+
+      # Head's upgrade provisions the LangWatchQL access model. Give the server what our
+      # ClickHouse ships (haven's clickhouse.go, infra/clickhouse-serverless): the admin grants
+      # and the custom_ settings prefix, which only a restart applies.
+      - name: Configure ClickHouse as the shipped image does for LangWatchQL
+        run: |
+          set -euo pipefail
+          container="${{ job.services.clickhouse.id }}"
+          docker exec -i "$container" \
+            sh -c 'cat > /etc/clickhouse-server/users.d/zz-lwql-access-management.xml' <<'XML'
+          <clickhouse>
+            <users>
+              <default>
+                <access_management>1</access_management>
+                <named_collection_control>1</named_collection_control>
+                <show_named_collections>1</show_named_collections>
+              </default>
+            </users>
+          </clickhouse>
+          XML
+          docker exec -i "$container" \
+            sh -c 'cat > /etc/clickhouse-server/config.d/zz-lwql-custom-settings.xml' <<'XML'
+          <clickhouse>
+            <custom_settings_prefixes>SQL_,custom_</custom_settings_prefixes>
+          </clickhouse>
+          XML
+          docker restart "$container"
+          for _ in $(seq 1 60); do
+            curl -fsS "${CLICKHOUSE_BASE_URL}/ping" > /dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS "${CLICKHOUSE_BASE_URL}/" --data-binary "SELECT 1 SETTINGS custom_lwql_probe = 1"
 
       - name: Migrate with head's tasks
         env:

@@ -42,8 +42,13 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | [`openai_compliance`](/ai-governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
 | [`claude_compliance`](/ai-governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
 | `http_custom` | Pull (BYO REST API) | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping |
+| [`aws_bedrock_agents`](/ai-governance/cloud-agent-discovery#set-up-aws) | Pull (Bedrock and AgentCore list APIs) | Agent listing | Agent registry | **Listing-only**: lists Bedrock Agents and AgentCore runtimes, no usage events |
+| [`gcp_vertex_agent_engine`](/ai-governance/cloud-agent-discovery#set-up-google-cloud) | Pull (Vertex AI API) | Agent listing | Agent registry | **Listing-only**: lists Agent Engine reasoning engines, no usage events |
+| [`ard_registry`](/ai-governance/cloud-agent-discovery#set-up-an-ard-registry) | Pull (ARD v0.91 manifest and search) | Agent listing | Agent registry | **Listing-only**: lists `urn:air:` entries, no usage events |
 
 **Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost, token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
+
+**Listing-only** = the source lists agents into the agent registry on its schedule and sends no usage events, so it has no cost, token deltas or trace drill-down. See [cloud agent discovery](/ai-governance/cloud-agent-discovery).
 
 **Receiver works** = endpoint accepts and ack's traffic, source flips to `active`, the unified store has the event with origin metadata stamped, but per-platform deeper attribute extraction beyond the default OTLP/JSON shape is pending. Drill-down still works, but column displays may show generic labels until the platform-specific adapter ships.
 
@@ -72,7 +77,9 @@ For source types where the puller worker is not yet wired (the three "setup-cont
 
 ## Auth contract: same shape across every receiver
 
-All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
+All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `vk-lw-` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists.
+
+A disabled source answers its own secret with `403 ingestion_source_disabled` and keeps no part of the batch; set it back to active and the same secret works again. Disabling never deletes the source's history. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
 
 ## Verification: same loop for every active source
 

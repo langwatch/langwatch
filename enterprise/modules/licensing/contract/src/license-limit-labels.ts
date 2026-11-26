@@ -6,6 +6,7 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   members: "team members",
   membersLite: "lite members",
   scenarios: "scenarios",
+  scenarioSets: "suites",
   scenarioRuns: "scenario runs a month",
   evaluators: "custom evaluators",
 } as const;
@@ -15,6 +16,7 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   members: "Team Members",
   membersLite: "Lite Members",
   scenarios: "Scenarios",
+  scenarioSets: "Suites",
   scenarioRuns: "Scenario Runs This Month",
   evaluators: "Custom Evaluators",
 } as const;
@@ -34,6 +36,7 @@ export const limitTypes = [
   "members",
   "membersLite",
   "scenarios",
+  "scenarioSets",
   "scenarioRuns",
   "evaluators",
 ] as const;
@@ -45,4 +48,4 @@ export type LimitType = (typeof limitTypes)[number];
  * server-decided (role, custom-role permissions); seat pricing, usage
  * display and limit enforcement all must name the same two values.
  */
-export type MemberType = "FullMember" | "LiteMember" | "Developer";
+export type MemberType = "FullMember" | "LiteMember" | "Developer" | "BillingOnly";

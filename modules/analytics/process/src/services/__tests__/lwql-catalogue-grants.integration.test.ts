@@ -15,7 +15,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { WorkbenchProtectionsService } from "../workbench-protections.service.ts";
@@ -28,6 +31,7 @@ import {
 const PROJECT_ID = "project-1";
 const lwql = LangWatchQLService.create({
   runTelemetry: TEST_RUN_TELEMETRY,
+  placement: ADMIT_EVERY_PLACEMENT,
   executor: null,
   database: "analytics",
 });
@@ -90,17 +94,18 @@ describe("given a member holding analytics:view but not virtualKeys:view", () =>
       }
     ).meta.violations;
     expect(violations.flatMap((violation) => violation.availableViews ?? [])).not.toContain(
-      "analytics.virtual_keys",
+      "virtual_keys",
     );
+    expect(violations.flatMap((violation) => violation.availableViews ?? [])).toContain("traces");
   });
 
   /** @scenario "The schema omits a table the caller cannot read" */
   it("omits the table from the schema", async () => {
     const protections = await memberWithout("virtualKeys:view");
 
-    expect(schemaViews(protections)).not.toContain("analytics.virtual_keys");
+    expect(schemaViews(protections)).not.toContain("virtual_keys");
     expect(schemaViews({ ...protections, catalogue: EVERY_CATALOGUE_PERMISSION })).toContain(
-      "analytics.virtual_keys",
+      "virtual_keys",
     );
   });
 });
@@ -114,6 +119,7 @@ describe("given one table of allOf access and another of anyOf", () => {
     ];
     const service = LangWatchQLService.create({
       runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
       executor: null,
       database: "analytics",
       catalog: {
@@ -186,7 +192,7 @@ describe("given a member without cost:view", () => {
 
     const traces = lwql
       .describeSchema({ protections })
-      .views.find((view) => view.name === "analytics.traces");
+      .views.find((view) => view.name === "traces");
     expect(traces?.columns.find((column) => column.name === "TotalCost")).toMatchObject({
       available: false,
       gates: expect.arrayContaining(["cost:view"]),
@@ -256,8 +262,8 @@ describe("given a data-privacy policy that cannot be read", () => {
     }).resolveMemberProtections({ userId: "user-1", projectId: PROJECT_ID });
 
     const columns =
-      lwql.describeSchema({ protections }).views.find((view) => view.name === "analytics.traces")
-        ?.columns ?? [];
+      lwql.describeSchema({ protections }).views.find((view) => view.name === "traces")?.columns ??
+      [];
     const unavailable = columns.filter((column) => !column.available).map((column) => column.name);
     expect(unavailable).toEqual(expect.arrayContaining(["CapturedInput", "CapturedOutput"]));
     expect(

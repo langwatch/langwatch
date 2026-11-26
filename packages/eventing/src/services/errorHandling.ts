@@ -273,6 +273,39 @@ export class UnroutableQueuedJobError extends RecoverableError {
 }
 
 /**
+ * A fold's store missed state the event log says it should hold, most likely because the
+ * replica that answered has not caught up with the write yet. The queue holds the job a few
+ * seconds and retries it rather than replaying the aggregate's history at once.
+ */
+export class FoldStateNotVisibleError extends RecoverableError {
+  override readonly name = "FoldStateNotVisibleError";
+  readonly projectionName: string;
+  /** `state`: earlier events exist but no saved state; `log`: the log lacks the event itself. */
+  readonly missing: "state" | "log";
+
+  constructor({
+    projectionName,
+    aggregateId,
+    missing,
+    deliveryAttempt,
+  }: {
+    projectionName: string;
+    aggregateId: string;
+    missing: "state" | "log";
+    deliveryAttempt: number;
+  }) {
+    super(
+      missing === "state"
+        ? `Fold ${projectionName} found no saved state for aggregate ${aggregateId}, whose event log has earlier events; waiting for it to become visible`
+        : `Fold ${projectionName} could not see the delivered event for aggregate ${aggregateId} in the event log yet; waiting before deciding it is new`,
+      { projectionName, aggregateId, missing, deliveryAttempt },
+    );
+    this.projectionName = projectionName;
+    this.missing = missing;
+  }
+}
+
+/**
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {
@@ -573,6 +606,9 @@ const CLICKHOUSE_TRANSIENT_CODES = new Set([
  */
 const TRANSIENT_HANDLED_CODES = new Set<string>(["clickhouse_overloaded"]);
 
+/** Handled codes meaning a statement was shed for want of a slot, not transience at large. */
+const SLOT_SHED_HANDLED_CODES: ReadonlySet<string> = new Set(["clickhouse_overloaded"]);
+
 /**
  * Message-fragment matchers for the same conditions as
  * CLICKHOUSE_TRANSIENT_CODES, used when the code is embedded in
@@ -640,6 +676,37 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
   return ErrorCategory.CRITICAL;
 }
 
+/** ClickHouse's TOO_MANY_SIMULTANEOUS_QUERIES, by code or by the message an HTTP answer carries. */
+const SIMULTANEOUS_QUERIES_FRAGMENTS = [
+  "Too many simultaneous queries",
+  "TOO_MANY_SIMULTANEOUS_QUERIES",
+] as const;
+
+/**
+ * Whether a failure says ClickHouse had no statement slot for it: the server's
+ * TOO_MANY_SIMULTANEOUS_QUERIES (202), or a statement the client shed for want of a slot.
+ * Retrying such work at once only takes a slot back from the work that is draining.
+ */
+export function isOutOfStatementSlots(error: unknown): boolean {
+  if (HandledError.isHandled(error)) {
+    if (SLOT_SHED_HANDLED_CODES.has(error.code)) return true;
+    return (error.reasons ?? []).some(isTooManySimultaneousQueries);
+  }
+  return isTooManySimultaneousQueries(error);
+}
+
+function isTooManySimultaneousQueries(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  if (typeof error === "object" && "code" in error && String(error.code) === "202") return true;
+  const message = messageOf(error);
+  return SIMULTANEOUS_QUERIES_FRAGMENTS.some((fragment) => message.includes(fragment));
+}
+
+function messageOf(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" ? error : "";
+}
+
 function isTransientClickHouseError(error: unknown): boolean {
   if (error != null && typeof error === "object" && "code" in error) {
     const code = String((error as { code: unknown }).code);
@@ -660,6 +727,89 @@ function isTransientClickHouseError(error: unknown): boolean {
   }
 
   return false;
+}
+
+/**
+ * ClickHouse's refusals of the data itself, by error name and code: a value that does not parse
+ * or does not fit its column fails the same way on every attempt. A missing column or table is
+ * left out, as a rolling deploy may add it moments later.
+ */
+const CLICKHOUSE_PERMANENT_DATA_ERRORS: ReadonlyMap<string, string> = new Map([
+  ["CANNOT_PARSE_TEXT", "6"],
+  ["CANNOT_PARSE_ESCAPE_SEQUENCE", "25"],
+  ["CANNOT_PARSE_QUOTED_STRING", "26"],
+  ["CANNOT_PARSE_INPUT_ASSERTION_FAILED", "27"],
+  ["CANNOT_PARSE_DATE", "38"],
+  ["CANNOT_PARSE_DATETIME", "41"],
+  ["ILLEGAL_TYPE_OF_ARGUMENT", "43"],
+  ["TYPE_MISMATCH", "53"],
+  ["CANNOT_CONVERT_TYPE", "70"],
+  ["CANNOT_PARSE_NUMBER", "72"],
+  ["INCORRECT_DATA", "117"],
+  ["CANNOT_INSERT_NULL_IN_ORDINARY_COLUMN", "349"],
+]);
+
+const CLICKHOUSE_PERMANENT_DATA_NAMES_BY_CODE: ReadonlyMap<string, string> = new Map(
+  [...CLICKHOUSE_PERMANENT_DATA_ERRORS].map(([name, code]) => [code, name]),
+);
+
+/** Refusals of the data only when an insert met them: on a read, a column may be changing type. */
+const CLICKHOUSE_INSERT_ONLY_DATA_ERRORS: ReadonlySet<string> = new Set([
+  "ILLEGAL_TYPE_OF_ARGUMENT",
+  "TYPE_MISMATCH",
+]);
+
+/**
+ * Whether ClickHouse refused the data itself (a parse or type error), read through causes and
+ * handled reasons, with no transient failure among them. A code counts only on an error that
+ * also carries ClickHouse's error name, so another library's numeric code is never read as one.
+ */
+export function isPermanentClickHouseError(error: unknown): boolean {
+  const nodes = causeGraphOf({ error, depth: 0 });
+  if (nodes.some((node) => classifyClickHouseError(node) === ErrorCategory.RECOVERABLE)) {
+    return false;
+  }
+  return nodes.some(refusesTheData);
+}
+
+/** Every error object reachable through causes and handled reasons, to MAX_CAUSE_DEPTH. */
+function causeGraphOf({ error, depth }: { error: unknown; depth: number }): object[] {
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return [];
+  const reasons: readonly unknown[] = HandledError.isHandled(error) ? (error.reasons ?? []) : [];
+  return [
+    error,
+    ...reasons.flatMap((reason) => causeGraphOf({ error: reason, depth: depth + 1 })),
+    ...causeGraphOf({ error: Reflect.get(error, "cause"), depth: depth + 1 }),
+  ];
+}
+
+function refusesTheData(error: object): boolean {
+  const refusal = dataRefusalNameOf(error);
+  if (refusal === "") return false;
+  return !CLICKHOUSE_INSERT_ONLY_DATA_ERRORS.has(refusal) || isInsertFailure(error);
+}
+
+/** The ClickHouse client's insert mark, by its registered name: eventing may not import it. */
+const INSERT_FAILURE_MARK = Symbol.for("langwatch.clickhouse.insert-failure");
+
+function isInsertFailure(error: object): boolean {
+  return Reflect.get(error, INSERT_FAILURE_MARK) === true;
+}
+
+/** The ClickHouse error name of a refusal of the data, or "" when the error is none. */
+function dataRefusalNameOf(error: object): string {
+  const type = Reflect.get(error, "type");
+  if (typeof type === "string") {
+    if (CLICKHOUSE_PERMANENT_DATA_ERRORS.has(type)) return type;
+    const code = String(Reflect.get(error, "code"));
+    const named = CLICKHOUSE_PERMANENT_DATA_NAMES_BY_CODE.get(code);
+    if (named !== undefined) return named;
+  }
+  const message = error instanceof Error ? error.message : "";
+  for (const name of CLICKHOUSE_PERMANENT_DATA_ERRORS.keys()) {
+    if (message.includes(name)) return name;
+  }
+  return "";
 }
 
 const PROJECT_GONE_NAME = "ProjectNotFoundError";
@@ -687,4 +837,56 @@ function projectGoneAt({ error, depth }: { error: unknown; depth: number }): boo
   if (Reflect.get(error, "name") === PROJECT_GONE_NAME) return true;
   if (Reflect.get(error, "code") === PROJECT_GONE_CODE) return true;
   return projectGoneAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
+}
+
+/** ClickHouse's per-query memory limit, in both its older and newer wording. */
+const QUERY_MEMORY_LIMIT_FRAGMENTS = [
+  "Query memory limit exceeded",
+  "Memory limit (for query) exceeded",
+] as const;
+
+/**
+ * Whether one statement outgrew its own memory limit, read through causes and handled
+ * reasons. The server-wide `(total)` limit and the client's own shedding are load, not size.
+ */
+export function isQueryMemoryLimitExceeded(error: unknown): boolean {
+  return memoryLimitAt({ error, fragments: QUERY_MEMORY_LIMIT_FRAGMENTS, depth: 0 });
+}
+
+/** Any ClickHouse memory limit, in every wording the server uses, the `(total)` one included. */
+const ANY_MEMORY_LIMIT_FRAGMENTS = [
+  "memory limit exceeded",
+  "Memory limit (for query) exceeded",
+  "Memory limit (total) exceeded",
+] as const;
+
+/**
+ * Whether a statement stopped on any memory limit, the server-wide one included: what a reader
+ * that sent nothing on yet may answer by reading less at a time.
+ */
+export function isAnyMemoryLimitExceeded(error: unknown): boolean {
+  return memoryLimitAt({ error, fragments: ANY_MEMORY_LIMIT_FRAGMENTS, depth: 0 });
+}
+
+function memoryLimitAt({
+  error,
+  fragments,
+  depth,
+}: {
+  error: unknown;
+  fragments: readonly string[];
+  depth: number;
+}): boolean {
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
+  const message = Reflect.get(error, "message");
+  if (typeof message === "string" && fragments.some((fragment) => message.includes(fragment))) {
+    return true;
+  }
+  const reasons: unknown = HandledError.isHandled(error) ? error.reasons : undefined;
+  if (Array.isArray(reasons)) {
+    for (const reason of reasons) {
+      if (memoryLimitAt({ error: reason, fragments, depth: depth + 1 })) return true;
+    }
+  }
+  return memoryLimitAt({ error: Reflect.get(error, "cause"), fragments, depth: depth + 1 });
 }

@@ -434,6 +434,7 @@ export function LangyTranscript({
   waitingCards,
   queuedPrompt,
   workingLine,
+  queuedMessages = null,
 }: {
   floating: boolean;
   messages: UIMessage[];
@@ -442,6 +443,8 @@ export function LangyTranscript({
   waitingCards: ReactNode;
   queuedPrompt: string | null;
   workingLine: ReactNode;
+  /** Messages sent while Langy works, after the running turn they wait on. */
+  queuedMessages?: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
   const gutter = panelGutter(floating);
@@ -466,6 +469,7 @@ export function LangyTranscript({
       {cardAnchorIndex === -1 ? waitingCards : null}
       {queuedPrompt ? <QueuedPrompt prompt={queuedPrompt} reduceMotion={reduceMotion} /> : null}
       {workingLine}
+      {queuedMessages}
     </VStack>
   );
 }

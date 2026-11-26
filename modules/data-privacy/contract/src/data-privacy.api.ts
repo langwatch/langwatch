@@ -30,12 +30,22 @@ export type DataPrivacyLogRecord = {
   attributes: Record<string, string>;
   resourceAttributes: Record<string, string>;
   attributeNames?: Record<string, string>;
+  /**
+   * The record this is, which the PII redaction model's priced request id is derived from: a
+   * repeat of the same text in another record is another call (ADR-201).
+   */
+  recordKey?: string;
 };
 
 export type DataPrivacyMetricAttributes = {
   attributes: Record<string, string>;
   resourceAttributes: Record<string, string>;
   attributeNames?: Record<string, string>;
+  /**
+   * The record this is, which the PII redaction model's priced request id is derived from: a
+   * repeat of the same text in another record is another call (ADR-201).
+   */
+  recordKey?: string;
 };
 
 /** What one span's content drop removed: the only record of it, as the span is stored stripped. */

@@ -52,6 +52,7 @@ function plan(overrides: Record<string, unknown>) {
     free: false,
     maxMembers: 1,
     maxMembersLite: 1,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: 1,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },

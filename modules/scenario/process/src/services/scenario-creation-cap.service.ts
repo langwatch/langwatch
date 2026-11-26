@@ -3,7 +3,9 @@ import { planCreationCap, type EntitlementApi } from "@langwatch/entitlement-con
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioEventType, simulationRunStartKey } from "@langwatch/scenario-contract";
 
-import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
+import type { ScenarioRepository, TestSuiteCap } from "../repositories/scenario.repository.ts";
+
+type TestSuiteCreationCap = { kind: "uncapped" } | { kind: "capped"; cap: TestSuiteCap };
 
 type ScenarioCreationCapDependencies = Readonly<{
   plans: Pick<EntitlementApi, "getActivePlan" | "assertScenarioRunAllowed">;
@@ -12,8 +14,8 @@ type ScenarioCreationCapDependencies = Readonly<{
 }>;
 
 /**
- * The cloud Free caps on scenarios and on scenario runs. Only creating one more
- * scenario, or starting a run past the month's cap, is refused.
+ * The cloud Free caps on scenarios, template-made suites and scenario runs. Only creating one
+ * more scenario or template suite, or starting a run past the month's cap, is refused.
  * @see specs/licensing/cloud-free-creation-caps.feature
  */
 export class ScenarioCreationCapService {
@@ -27,7 +29,9 @@ export class ScenarioCreationCapService {
   async assertScenarioCreationAllowed(input: {
     projectId: string;
     operatorId?: string | undefined;
+    sourceTemplateId?: string | undefined;
   }): Promise<void> {
+    if (input.sourceTemplateId) return;
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     const plan = await this.deps.plans.getActivePlan({
       organizationId,
@@ -39,6 +43,33 @@ export class ScenarioCreationCapService {
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
     const current = await this.deps.scenarios.countActiveByProjects({ projectIds });
     if (current >= cap.max) throw new LimitExceededError("scenarios", current, cap.max);
+  }
+
+  /**
+   * A template's scenarios skip the scenario cap inside their own suite, so a template apply is
+   * bounded twice: by the suite cap this returns for the locked write, and by counted scenarios.
+   * @throws LimitExceededError (`scenarios`) when counted scenarios already exceed the cap.
+   */
+  async testSuiteCreationCap(input: {
+    projectId: string;
+    templateId?: string | undefined;
+  }): Promise<TestSuiteCreationCap> {
+    if (!input.templateId) return { kind: "uncapped" };
+    const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
+    const plan = await this.deps.plans.getActivePlan({ organizationId });
+    const suiteCap = planCreationCap({ plan, limitType: "scenarioSets" });
+    const scenarioCap = planCreationCap({ plan, limitType: "scenarios" });
+    if (!suiteCap.capped && !scenarioCap.capped) return { kind: "uncapped" };
+
+    const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
+    if (scenarioCap.capped) {
+      const scenarios = await this.deps.scenarios.countActiveByProjects({ projectIds });
+      if (scenarios > scenarioCap.max) {
+        throw new LimitExceededError("scenarios", scenarios, scenarioCap.max);
+      }
+    }
+    if (!suiteCap.capped) return { kind: "uncapped" };
+    return { kind: "capped", cap: { organizationId, projectIds, max: suiteCap.max } };
   }
 
   /**

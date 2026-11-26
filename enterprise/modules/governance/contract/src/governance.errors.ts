@@ -8,7 +8,7 @@ import {
 export class GovernanceValidationError extends ValidationError {
   constructor(
     message: string,
-    readonly meta: { formErrors: string[] },
+    readonly meta: { formErrors: string[]; fieldErrors?: Record<string, string[]> },
   ) {
     super(message, { meta });
     this.name = "GovernanceValidationError";
@@ -32,6 +32,17 @@ export class IngestionSourceNotFoundError extends NotFoundError {
   constructor(sourceId: string) {
     super("ingestion_source_not_found", { resource: "Ingestion source", id: sourceId });
     this.name = "IngestionSourceNotFoundError";
+  }
+}
+
+export class AgentRegistryEntryNotFoundError extends NotFoundError {
+  constructor(entryId: string) {
+    super(
+      "agent_registry_entry_not_found",
+      { resource: "Agent registry entry", id: entryId },
+      remediation("agent_registry_entry_not_found"),
+    );
+    this.name = "AgentRegistryEntryNotFoundError";
   }
 }
 
@@ -291,6 +302,23 @@ export class IngestionSourceUnauthorizedError extends HandledError {
   }
 }
 
+/**
+ * The secret and the path name the same source, but an admin disabled it. The caller has proved
+ * it holds the secret, so naming the state leaks nothing, and OTLP exporters drop a 403 for good.
+ */
+export class IngestionSourceDisabledError extends HandledError {
+  declare readonly code: "ingestion_source_disabled";
+
+  constructor() {
+    super("ingestion_source_disabled", "This ingestion source is disabled.", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("ingestion_source_disabled"),
+    });
+    this.name = "IngestionSourceDisabledError";
+  }
+}
+
 /** One caller sent more to the push receivers than the window allows; it retries after the wait. */
 export class IngestionRateLimitedError extends HandledError {
   declare readonly code: "ingestion_rate_limited";
@@ -331,5 +359,200 @@ export class IngestionReceiverUnavailableError extends HandledError {
       fault: "platform",
     });
     this.name = "IngestionReceiverUnavailableError";
+  }
+}
+
+// ── Agent kill switch (specs/agent-kill-switch.feature) ─────────────────────
+
+/** A plan target names a source, AWS connection or virtual key the organisation does not hold. */
+export class AgentStopTargetInvalidError extends HandledError {
+  declare readonly code: "agent_stop_target_invalid";
+
+  constructor(meta: { position: number; kind: string; reason: string }) {
+    super("agent_stop_target_invalid", "A stop plan target is not valid for this organisation.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_target_invalid"),
+    });
+    this.name = "AgentStopTargetInvalidError";
+  }
+}
+
+/** A plan target names a Bedrock alias or a serving endpoint its platform does not have. */
+export class AgentStopTargetNotFoundError extends HandledError {
+  declare readonly code: "agent_stop_target_not_found";
+
+  constructor(meta: { position: number; kind: string }) {
+    super("agent_stop_target_not_found", "A stop plan target does not exist on its platform.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_target_not_found"),
+    });
+    this.name = "AgentStopTargetNotFoundError";
+  }
+}
+
+export class AgentStopPlanEmptyError extends HandledError {
+  declare readonly code: "agent_stop_plan_empty";
+
+  constructor(agentId: string) {
+    super("agent_stop_plan_empty", "The agent has no stop plan to apply.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId },
+      ...remediation("agent_stop_plan_empty"),
+    });
+    this.name = "AgentStopPlanEmptyError";
+  }
+}
+
+/** The plan changed after the caller read it, so the stop would act on unconfirmed targets. */
+export class AgentStopPlanChangedError extends HandledError {
+  declare readonly code: "agent_stop_plan_changed";
+
+  constructor(agentId: string) {
+    super("agent_stop_plan_changed", "The agent's stop plan changed since it was read.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId },
+      ...remediation("agent_stop_plan_changed"),
+    });
+    this.name = "AgentStopPlanChangedError";
+  }
+}
+
+/** The plan was saved by someone else after the caller read it; the newer plan is kept. */
+export class AgentStopPlanConflictError extends HandledError {
+  declare readonly code: "agent_stop_plan_conflict";
+
+  constructor({
+    agentId,
+    expectedVersion,
+    version,
+  }: {
+    agentId: string;
+    expectedVersion: number;
+    version: number;
+  }) {
+    super("agent_stop_plan_conflict", "The agent's stop plan was saved since it was read.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId, expectedVersion, version },
+      ...remediation("agent_stop_plan_conflict"),
+    });
+    this.name = "AgentStopPlanConflictError";
+  }
+}
+
+/** A plan target or an unrestored stop still signs with the connection. */
+export class GovernanceAwsConnectionInUseError extends HandledError {
+  declare readonly code: "governance_aws_connection_in_use";
+
+  constructor(meta: { connectionId: string; agentIds: string[] }) {
+    super(
+      "governance_aws_connection_in_use",
+      "A stop plan or an open stop still uses this AWS connection.",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta,
+        ...remediation("governance_aws_connection_in_use"),
+      },
+    );
+    this.name = "GovernanceAwsConnectionInUseError";
+  }
+}
+
+export class AgentStopAlreadyOpenError extends HandledError {
+  declare readonly code: "agent_stop_already_open";
+
+  constructor(meta: { agentId: string; stopId: string }) {
+    super("agent_stop_already_open", "The agent already has an open stop.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_already_open"),
+    });
+    this.name = "AgentStopAlreadyOpenError";
+  }
+}
+
+export class AgentStopNotPendingError extends HandledError {
+  declare readonly code: "agent_stop_not_pending";
+
+  constructor(meta: { stopId: string; status: string }) {
+    super("agent_stop_not_pending", "The stop is no longer waiting for an approval.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_not_pending"),
+    });
+    this.name = "AgentStopNotPendingError";
+  }
+}
+
+export class AgentStopSelfApprovalError extends HandledError {
+  declare readonly code: "agent_stop_self_approval";
+
+  constructor(stopId: string) {
+    super("agent_stop_self_approval", "The credential that requested a stop cannot approve it.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { stopId },
+      ...remediation("agent_stop_self_approval"),
+    });
+    this.name = "AgentStopSelfApprovalError";
+  }
+}
+
+export class AgentStopNotRestorableError extends HandledError {
+  declare readonly code: "agent_stop_not_restorable";
+
+  constructor(meta: { stopId: string; status: string }) {
+    super("agent_stop_not_restorable", "The stop cannot be restored in its current status.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_not_restorable"),
+    });
+    this.name = "AgentStopNotRestorableError";
+  }
+}
+
+export class AgentStopNotRetryableError extends HandledError {
+  declare readonly code: "agent_stop_not_retryable";
+
+  constructor(meta: { stopId: string; status: string }) {
+    super("agent_stop_not_retryable", "The stop cannot be retried in its current status.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta,
+      ...remediation("agent_stop_not_retryable"),
+    });
+    this.name = "AgentStopNotRetryableError";
+  }
+}
+
+export class AgentStopNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(
+      "agent_stop_not_found",
+      { resource: "Agent stop", id },
+      remediation("agent_stop_not_found"),
+    );
+    this.name = "AgentStopNotFoundError";
+  }
+}
+
+export class GovernanceAwsConnectionNotFoundError extends NotFoundError {
+  constructor(id: string) {
+    super(
+      "governance_aws_connection_not_found",
+      { resource: "AWS connection", id },
+      remediation("governance_aws_connection_not_found"),
+    );
+    this.name = "GovernanceAwsConnectionNotFoundError";
   }
 }

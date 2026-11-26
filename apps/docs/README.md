@@ -54,7 +54,8 @@ page into `apps/docs/dist`. It emits:
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
 - `search-index.json` with each article word written once with the pages it appears on, navigation trails and headings, plus
   lossless `.br` and `.gz` variants for hosts supporting precompressed delivery.
-- `llms.txt`, a directory of configured pages linking to their Markdown, and
+- `llms.txt`, a directory of configured pages linking to their Markdown (the API reference once
+  per resource), `llms-full/<section>.txt`, each top-level section's Markdown in one file, and
   `llms-full.txt`, every page's Markdown in reading order.
 - `sitemap.xml` dated by each page's last commit (no dates from a shallow clone,
   so the deploy checkout needs full history), plus `robots.txt` and `agents.txt`.
@@ -226,8 +227,8 @@ export names, under hashed names: screenshots as AVIF and WebP at 840 and 1680px
 videos as AV1 WebM and H.264 MP4 with a WebP poster (ffmpeg, cached in
 `node_modules/.cache/docs-media`). Logos, the favicon and the social card keep
 their names, with a short cache lifetime. These are hosting requirements, not cloud
-configuration emitted by the compiler. The existing Mintlify release workflow
-and DNS cutover remain separate decisions.
+configuration emitted by the compiler. The cutover from Mintlify is done: these
+docs are served on langwatch.ai/docs and the Mintlify release workflow is gone.
 
 ## Static-first performance
 

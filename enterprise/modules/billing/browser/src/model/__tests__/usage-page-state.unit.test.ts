@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   breakdownGapMessage,
+  categoryRows,
   dailyBars,
   chartAxis,
+  developerSeats,
   fullSeats,
   liteRow,
   monthEvents,
@@ -19,6 +21,7 @@ const FREE: UsagePagePlan = {
   free: true,
   maxMembers: 2,
   maxMembersLite: 0,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 50_000,
   planSource: "free",
 };
@@ -183,6 +186,43 @@ describe("fullSeats", () => {
   it("shows only the count where the plan does not cap seats", () => {
     expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999 } })).toBe("12");
   });
+
+  it("shows only the count where a licence writes no cap as 1M or more", () => {
+    expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: Number.MAX_SAFE_INTEGER } })).toBe(
+      "12",
+    );
+  });
+
+  it("keeps a finite cap above the catalogue's stand-in as a cap", () => {
+    expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 10_000 } })).toBe("12 / 10,000");
+  });
+
+  it("keeps a licence's 9,999 as a cap, not the catalogue's stand-in", () => {
+    expect(
+      fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999, planSource: "license" } }),
+    ).toBe("12 / 9,999");
+  });
+});
+
+describe("developerSeats", () => {
+  /** @scenario The usage page shows Developer seats against the Developer seats paid for */
+  it("counts Developer seats against the Developer seats paid for", () => {
+    expect(developerSeats({ used: 3, plan: { ...FREE, maxMembersDeveloper: 4 } })).toBe("3 / 4");
+  });
+
+  it("shows no row where none are paid for and none are held", () => {
+    expect(developerSeats({ used: 0, plan: FREE })).toBeNull();
+  });
+
+  it("still shows a Developer held over a cap of none", () => {
+    expect(developerSeats({ used: 2, plan: FREE })).toBe("2 / 0");
+  });
+
+  it("shows only the count where the plan does not cap Developer seats", () => {
+    expect(
+      developerSeats({ used: 7, plan: { ...FREE, maxMembersDeveloper: Number.MAX_SAFE_INTEGER } }),
+    ).toBe("7");
+  });
 });
 
 describe("breakdownGapMessage", () => {
@@ -197,6 +237,46 @@ describe("breakdownGapMessage", () => {
     expect(breakdownGapMessage({ ...ok, isProjectsUnavailable: true })).toMatch(
       /^The month by project /,
     );
-    expect(breakdownGapMessage({ ...ok, isError: true })).toMatch(/by day and by project/);
+    expect(breakdownGapMessage({ ...ok, isError: true })).toMatch(
+      /^The month by day, by type and by project could not be loaded\./,
+    );
+    expect(breakdownGapMessage({ ...ok, isByCategoryUnavailable: true })).toMatch(
+      /^The month by type /,
+    );
+  });
+
+  it("lists every failed part in page order", () => {
+    expect(
+      breakdownGapMessage({
+        isError: false,
+        isDailyUnavailable: true,
+        isByCategoryUnavailable: true,
+        isProjectsUnavailable: true,
+      }),
+    ).toMatch(/^The month by day, by type and by project could not be loaded\./);
+    expect(
+      breakdownGapMessage({ ...ok, isDailyUnavailable: true, isProjectsUnavailable: true }),
+    ).toMatch(/^The month by day and by project could not be loaded\./);
+  });
+});
+
+describe("categoryRows", () => {
+  it("labels each type, explains metrics and gives each its share", () => {
+    const rows = categoryRows([
+      { category: "spans", count: 3 },
+      { category: "metrics", count: 1 },
+      { category: "scenarios", count: 0 },
+    ]);
+    expect(rows).toEqual([
+      { category: "spans", label: "Spans", hint: null, count: 3, share: 0.75 },
+      {
+        category: "metrics",
+        label: "Metrics",
+        hint: "1 per series per hour",
+        count: 1,
+        share: 0.25,
+      },
+      { category: "scenarios", label: "Scenarios", hint: null, count: 0, share: 0 },
+    ]);
   });
 });

@@ -15,6 +15,9 @@ import {
   annotationRemovedEventSchema,
   type AnnotationsBulkSyncedEvent,
   annotationsBulkSyncedEventSchema,
+  type EvaluationOutcomeRecordedEvent,
+  type EvaluationOutcomeRecordedEventData,
+  evaluationOutcomeRecordedEventSchema,
   firstUsableAnchor,
   foldSpanIntoTraceAnalytics,
   type LogContributedEvent,
@@ -45,12 +48,21 @@ import {
   type TraceSummaryData,
   trimAttributesForAnalytics,
   UNSTORABLE_SPAN_SKIPPED,
+  traceFoldReadAnchorMs,
 } from "@langwatch/trace-contract";
 
 import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
+import { isFresherOutcome, keepsEvaluation } from "../rules/trace-evaluation-analytics.rules.ts";
+import {
+  type TraceAnalyticsMetadataColumns,
+  traceAnalyticsMetadataColumns,
+} from "../rules/trace-widget-columns.rules.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
+
+/** The fold's name, which is also its replay lane (analytics ADR-006). */
+export const TRACE_ANALYTICS_PROJECTION_NAME = "traceAnalytics";
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted
@@ -69,14 +81,21 @@ const traceAnalyticsEvents = [
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  evaluationOutcomeRecordedEventSchema,
 ] as const;
 
 /**
- * Schema-snapshot version (calendar date), bumped on derivation/trim
- * changes. 2026-07-29 = ADR-071 step 3 split; NOT a refold trigger, see
- * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
+ * Schema-snapshot version (calendar date), bumped on derivation/trim changes; NOT a refold
+ * trigger, see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}. 2026-11-17 = the managed
+ * prompt version the trace last used (goose 00133); replayed rows win a tie on `UpdatedAt` by it.
  */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
+export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-11-17" as const;
+
+/** The stamp before the fold wrote LastUsedPromptVersionId; its rows decode with no version. */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_PROMPT_VERSION = "2026-11-12" as const;
+
+/** The stamp before the fold wrote its metadata columns; its rows decode the same way. */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA = "2026-07-29" as const;
 
 /**
  * How far OccurredAt (frozen anchor, ADR-071 step 3) may sit from a read's
@@ -89,6 +108,9 @@ const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * platform default (500); must stay below MAX_APPLIED_EVENT_IDS.
  */
 const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
+
+/** One evaluation's outcome as the trace keeps it, keyed by its evaluation id. */
+export type TraceEvaluationOutcome = Omit<EvaluationOutcomeRecordedEventData, "evaluationId">;
 
 /**
  * The slim row in `trace_analytics`. Field names 1:1 to ClickHouse columns.
@@ -145,6 +167,13 @@ export interface TraceAnalyticsRow {
 
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
+  /**
+   * The `metadata.*` keys the stock widgets read, as columns, from the trimmed map. The fold
+   * always sets it; absent, the repository derives the same values from `attributes`.
+   */
+  metadataColumns?: TraceAnalyticsMetadataColumns;
+  /** `LastUsedPromptVersionId`: the managed prompt version the latest prompt span used, or ''. */
+  lastUsedPromptVersionId?: string;
 
   /**
    * The persistable-signal verdict. NOT a table column — readers derive it
@@ -171,6 +200,10 @@ export interface TraceAnalyticsRow {
   traceNameUserOverridden: boolean;
   /** The fold's out-of-order checkpoint (distinct from OccurredAt). */
   lastEventOccurredAt: number;
+  /** `EvaluationOutcomes` (JSON): the outcomes the fold keeps; absent reads as none. */
+  evaluationOutcomes?: Readonly<Record<string, TraceEvaluationOutcome>>;
+  /** `EvaluationRowsDigest`: the trace_evaluation_analytics rows last written for this state. */
+  evaluationRowsDigest?: string;
 }
 
 /**
@@ -249,6 +282,20 @@ export interface TraceAnalyticsData {
    *  the metadata stand-in is still in place). */
   rootMetadataFromFallback?: boolean;
 
+  /** Each evaluation's freshest outcome; absent (as in an older release's state) means none. */
+  evaluations?: Readonly<Record<string, TraceEvaluationOutcome>>;
+  /** The digest of the evaluation rows the last write left; set by the store, never the fold. */
+  evaluationRowsDigest?: string;
+
+  /** The managed prompt version of the latest prompt span; absent until one is folded. */
+  lastUsedPromptVersionId?: string | null;
+  /**
+   * That span's id and start, which decide the latest (TracePromptAccumulationService). The row
+   * keeps only the version, so after a read-back the next prompt span wins, as on trace_summaries.
+   */
+  lastUsedPromptSpanId?: string | null;
+  lastUsedPromptStartTimeMs?: number | null;
+
   // Auto-managed by AbstractFoldProjection
   createdAt: number;
   updatedAt: number;
@@ -304,7 +351,7 @@ export class TraceAnalyticsFoldProjection
 {
   private readonly traceCanonicalisation: TraceCanonicalisationService;
   private readonly runtime: TraceProjectionRuntimeService;
-  readonly name = "traceAnalytics";
+  readonly name = TRACE_ANALYTICS_PROJECTION_NAME;
   readonly version = TRACE_ANALYTICS_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceAnalyticsData>;
 
@@ -318,7 +365,7 @@ export class TraceAnalyticsFoldProjection
     refoldOnStoreMiss: true,
     trustAbsentMiss: true,
     refoldOnOutOfOrder: false,
-    readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS },
+    readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS, anchorOf: traceFoldReadAnchorMs },
     coalesceMaxBatch: TRACE_ANALYTICS_COALESCE_MAX_BATCH,
     // Order-insensitive (refoldOnOutOfOrder false): a redriven event folds late, not wrong (§9).
     onExhausted: "dead-letter",
@@ -456,6 +503,7 @@ export class TraceAnalyticsFoldProjection
       scopeName: event.data.scopeName,
       body: event.data.body,
       attributes: event.data.attributes,
+      resourceAttributes: event.data.resourceAttributes,
     }).attributes;
 
     return TraceAnalyticsFoldProjection.applyLogContribution({
@@ -575,6 +623,23 @@ export class TraceAnalyticsFoldProjection
     };
   }
 
+  handleTraceEvaluationOutcomeRecorded(
+    event: EvaluationOutcomeRecordedEvent,
+    state: TraceAnalyticsData,
+  ): TraceAnalyticsData {
+    const { evaluationId, ...outcome } = event.data;
+    const current = state.evaluations?.[evaluationId];
+    if (current && !isFresherOutcome({ outcome, than: current })) {
+      return state;
+    }
+    if (!keepsEvaluation({ evaluations: state.evaluations, evaluationId })) return state;
+    return {
+      ...state,
+      traceId: state.traceId || event.aggregateId,
+      evaluations: { ...state.evaluations, [evaluationId]: outcome },
+    };
+  }
+
   private static readNullableString(value: string | undefined): string | null {
     if (typeof value !== "string" || value.length === 0) return null;
     return value;
@@ -645,9 +710,9 @@ export class TraceAnalyticsFoldProjection
       selectedPromptStartTimeMs: null,
       lastUsedPromptId: null,
       lastUsedPromptVersionNumber: null,
-      lastUsedPromptVersionId: null,
-      lastUsedPromptSpanId: null,
-      lastUsedPromptStartTimeMs: null,
+      lastUsedPromptVersionId: state.lastUsedPromptVersionId ?? null,
+      lastUsedPromptSpanId: state.lastUsedPromptSpanId ?? null,
+      lastUsedPromptStartTimeMs: state.lastUsedPromptStartTimeMs ?? null,
       topicId: state.topicId,
       subTopicId: state.subTopicId,
       annotationIds: state.annotationIds,
@@ -773,6 +838,7 @@ export class TraceAnalyticsFoldProjection
     const labels = TraceAnalyticsFoldProjection.parseLabels(
       attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS],
     );
+    const attributes = trimAttributesForAnalytics(attrs);
 
     return {
       tenantId,
@@ -822,7 +888,9 @@ export class TraceAnalyticsFoldProjection
       hasError: state.containsErrorStatus,
       hasAnnotation: state.annotationIds && state.annotationIds.length > 0 ? true : null,
 
-      attributes: trimAttributesForAnalytics(attrs),
+      attributes,
+      metadataColumns: traceAnalyticsMetadataColumns(attributes),
+      lastUsedPromptVersionId: state.lastUsedPromptVersionId ?? "",
 
       hasSignal: TraceAnalyticsFoldProjection.hasPersistableSignal(state),
 
@@ -834,6 +902,8 @@ export class TraceAnalyticsFoldProjection
       rootMetadataFromFallback: state.rootMetadataFromFallback ?? false,
       traceNameUserOverridden: state.traceNameUserOverridden ?? false,
       lastEventOccurredAt: state.LastEventOccurredAt,
+      evaluationOutcomes: state.evaluations ?? {},
+      evaluationRowsDigest: state.evaluationRowsDigest ?? "",
     };
   }
 
@@ -902,15 +972,39 @@ export class TraceAnalyticsFoldProjection
       traceNameFromFallback: row.traceNameFromFallback,
       rootMetadataFromFallback: row.rootMetadataFromFallback,
 
+      // Absent rather than empty, so a decoded trace without outcomes equals a folded one.
+      ...(row.evaluationOutcomes && Object.keys(row.evaluationOutcomes).length > 0
+        ? { evaluations: row.evaluationOutcomes }
+        : {}),
+      ...(row.evaluationRowsDigest ? { evaluationRowsDigest: row.evaluationRowsDigest } : {}),
+      ...(row.lastUsedPromptVersionId
+        ? { lastUsedPromptVersionId: row.lastUsedPromptVersionId }
+        : {}),
+
       createdAt: row.createdAtMs,
       updatedAt: row.updatedAtMs,
       LastEventOccurredAt: row.lastEventOccurredAt,
     };
   }
 
+  /** The last-used prompt fields to keep; none until a prompt span has been folded. */
+  private static lastUsedPromptOf(
+    rollup: ReturnType<TraceProjectionRuntimeService["tracePrompt"]["accumulate"]>,
+  ): Pick<
+    TraceAnalyticsData,
+    "lastUsedPromptVersionId" | "lastUsedPromptSpanId" | "lastUsedPromptStartTimeMs"
+  > {
+    if (rollup.lastUsedPromptSpanId === null) return {};
+    return {
+      lastUsedPromptVersionId: rollup.lastUsedPromptVersionId,
+      lastUsedPromptSpanId: rollup.lastUsedPromptSpanId,
+      lastUsedPromptStartTimeMs: rollup.lastUsedPromptStartTimeMs,
+    };
+  }
+
   /**
-   * Apply a normalized span to slim state — mirrors `applySpanToSummary` but
-   * skips IO/prompt accumulation and heavy bookkeeping.
+   * Apply a normalized span to slim state — mirrors `applySpanToSummary` but skips IO
+   * accumulation and heavy bookkeeping; of the prompt rollup it keeps the last-used version only.
    * @internal Exported for unit testing.
    */
   static applySpanToAnalytics({
@@ -927,13 +1021,15 @@ export class TraceAnalyticsFoldProjection
       return state;
     }
 
+    const view = TraceAnalyticsFoldProjection.asTraceSummaryStateView(state);
     const spanCost = runtime.spanCost.estimateAccumulatedSpanCost(span);
     const next = foldSpanIntoTraceAnalytics({
-      state: TraceAnalyticsFoldProjection.asTraceSummaryStateView(state),
+      state: view,
       span,
       spanCost,
       spanUnpriced: spanCost <= 0 && runtime.spanCost.isAccumulatedSpanUnpriced(span),
     });
+    const promptRollup = runtime.tracePrompt.accumulate({ state: view, span });
 
     return {
       ...state,
@@ -956,6 +1052,7 @@ export class TraceAnalyticsFoldProjection
       tokensPerSecond: next.tokensPerSecond,
       containsErrorStatus: next.containsErrorStatus,
       attributes: next.attributes,
+      ...TraceAnalyticsFoldProjection.lastUsedPromptOf(promptRollup),
     };
   }
 }

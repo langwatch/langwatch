@@ -12,6 +12,7 @@ import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../tes
 import { DefaultModelsSection } from "../default-models-section.tsx";
 import "@testing-library/jest-dom/vitest";
 
+const mockInstantEvalAccess = vi.fn();
 const mockGetDefaultModels = vi.fn();
 const mockInvalidate = vi.fn();
 const mockDelete = vi.fn();
@@ -23,6 +24,7 @@ vi.mock("@langwatch/feature-flag-client", () => ({
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
+    instantEval: { access: { useQuery: () => mockInstantEvalAccess() } },
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
@@ -133,6 +135,10 @@ function renderSection({
 describe("given the Default Models table", () => {
   beforeEach(() => {
     mockGetDefaultModels.mockReturnValue({ data: FAKE_PAYLOAD, isLoading: false });
+    mockInstantEvalAccess.mockReturnValue({
+      data: { hostedReleased: true, offer: "enable" },
+      isLoading: false,
+    });
     mockInvalidate.mockReset();
     mockDelete.mockReset();
   });
@@ -222,14 +228,123 @@ describe("given the Default Models table", () => {
   });
 
   describe("given the Instant Evals column", () => {
-    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Evals Preview" */
-    it("reads Evals Preview where nothing is set, never Not configured", () => {
+    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview) where nothing is set, never Not configured", () => {
       renderSection();
 
       expect(screen.getByRole("columnheader", { name: "Instant Evals" })).toBeInTheDocument();
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-      expect(cell.textContent).toBe("Evals Preview");
+      expect(cell.textContent).toBe("LangWatch Instant (preview)");
       expect(cell.textContent).not.toMatch(/Not configured/);
+    });
+
+    /** @scenario "Default models names the written id LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview) where the row stores the written id", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...FAKE_PAYLOAD,
+          configs: [
+            { ...FAKE_PAYLOAD.configs[0]!, config: { INSTANT_EVALS: "langwatch/instant-evals" } },
+          ],
+        },
+        isLoading: false,
+      });
+      renderSection();
+
+      expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+        "LangWatch Instant (preview)",
+      );
+    });
+
+    /** @scenario "Default models names the written id LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview) on an instant_eval.judge feature chip that stores the written id", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...FAKE_PAYLOAD,
+          configs: [
+            {
+              ...FAKE_PAYLOAD.configs[0]!,
+              config: {
+                INSTANT_EVALS: "inception/decisions:mercury-decide",
+                "instant_eval.judge": "langwatch/instant-evals",
+              },
+            },
+          ],
+          features: [
+            ...FAKE_PAYLOAD.features,
+            {
+              key: "instant_eval.judge",
+              role: "INSTANT_EVALS",
+              displayName: "Instant Evals",
+              description: "The decision model Instant Evals and their judged columns run on.",
+            },
+          ],
+        },
+        isLoading: false,
+      });
+      renderSection();
+
+      const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
+      expect(cell.textContent).toContain("LangWatch Instant (preview)");
+      expect(cell.textContent).not.toContain("instant-evals");
+    });
+
+    describe("when LangWatch Instant (preview) is neither released nor one switch away", () => {
+      beforeEach(() => {
+        mockInstantEvalAccess.mockReturnValue({
+          data: { hostedReleased: false, offer: "contact_us" },
+          isLoading: false,
+        });
+      });
+
+      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column reads Not set" */
+      it("reads Not set where nothing is set, never LangWatch Instant (preview)", () => {
+        renderSection();
+
+        const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
+        expect(cell.textContent).toBe("Not set");
+      });
+
+      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column reads Not set" */
+      it("reads Not set where the row pins LangWatch Instant (preview)", () => {
+        mockGetDefaultModels.mockReturnValue({
+          data: {
+            ...FAKE_PAYLOAD,
+            configs: [
+              {
+                ...FAKE_PAYLOAD.configs[0]!,
+                config: { INSTANT_EVALS: "langwatch/instant-preview" },
+              },
+            ],
+          },
+          isLoading: false,
+        });
+        renderSection();
+
+        expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+          "Not set",
+        );
+      });
+
+      it("still reads the project's own decision model", () => {
+        mockGetDefaultModels.mockReturnValue({
+          data: {
+            ...FAKE_PAYLOAD,
+            configs: [
+              {
+                ...FAKE_PAYLOAD.configs[0]!,
+                config: { INSTANT_EVALS: "inception/decisions:mercury-decide" },
+              },
+            ],
+          },
+          isLoading: false,
+        });
+        renderSection();
+
+        expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+          "Inception Mercury Decide",
+        );
+      });
     });
 
     it("reads the picked decision model's label, not its id", () => {

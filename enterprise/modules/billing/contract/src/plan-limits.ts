@@ -1,5 +1,6 @@
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import {
+  isUncappedSeats as isNoSeatCap,
   planCatalogue,
   quotedLimitsOfPlan,
   UNLIMITED_MESSAGES as NO_MESSAGE_CAP,
@@ -12,6 +13,9 @@ import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
  * When a limit is set to this value, it means there is no limit.
  */
 export const UNLIMITED_MESSAGES = NO_MESSAGE_CAP;
+
+/** Whether a seat cap means no cap; a finite licence cap such as 9,999 or 10,000 stays a number. */
+export const isUncappedSeats = isNoSeatCap;
 
 /**
  * One catalogue plan, in the field names a resolved plan is quoted under.
@@ -31,19 +35,23 @@ function presetOf(type: PlanType): PlanInfo {
 }
 
 /**
- * Caps on the cloud Free plan. Paid plans leave them unset, which means
- * uncapped. Creation caps refuse only one more; scenario runs are capped per
- * UTC month once the grace after the first run is over.
+ * Caps on the cloud Free plan; paid plans leave them unset (uncapped). Creation caps refuse only
+ * one more (suites only on a template apply); runs are capped per UTC month after the grace.
  * @see specs/licensing/cloud-free-creation-caps.feature
  */
 export const FREE_PLAN_CREATION_CAPS = {
   maxScenarios: 3,
+  maxScenarioSets: 3,
   maxEvaluators: 3,
   maxScenarioRunsPerMonth: 100,
   scenarioRunGraceDays: 14,
 } as const satisfies Pick<
   PlanInfo,
-  "maxScenarios" | "maxEvaluators" | "maxScenarioRunsPerMonth" | "scenarioRunGraceDays"
+  | "maxScenarios"
+  | "maxScenarioSets"
+  | "maxEvaluators"
+  | "maxScenarioRunsPerMonth"
+  | "scenarioRunGraceDays"
 >;
 
 export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {

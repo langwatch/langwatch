@@ -14,6 +14,20 @@ export type TestSuite = NonNullable<
   paths["/api/v1/test-suites"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
+/** One suite template as `GET /api/v1/test-suites/templates` answers it. */
+export type SuiteTemplate = NonNullable<
+  paths["/api/v1/test-suites/templates"]["get"]["responses"]["200"]["content"]["application/json"]
+>[number];
+
+/** The body `POST /api/v1/test-suites/templates/{templateId}/apply` takes. */
+export type ApplySuiteTemplateBody = NonNullable<
+  paths["/api/v1/test-suites/templates/{templateId}/apply"]["post"]["requestBody"]
+>["content"]["application/json"];
+
+/** The suite and scenarios a template apply created. */
+export type AppliedSuiteTemplate =
+  paths["/api/v1/test-suites/templates/{templateId}/apply"]["post"]["responses"]["201"]["content"]["application/json"];
+
 /** One test suite read on its own, with its scenarios named. */
 export type TestSuiteDetail =
   paths["/api/v1/test-suites/{id}"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -194,5 +208,38 @@ export class TestSuitesApiService {
       response,
       onError: this.handleApiError.bind(this),
     }) as unknown as TestSuiteRunResult;
+  }
+
+  /** Lists the suite templates that ship with LangWatch, scenarios included. */
+  async listTemplates(): Promise<SuiteTemplate[]> {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites/templates");
+    return unwrapApiResult({
+      operation: "list suite templates",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SuiteTemplate[];
+  }
+
+  /** Creates a test suite from a template, fitted to the agent under test. */
+  async applyTemplate({
+    templateId,
+    body,
+  }: {
+    templateId: string;
+    body: ApplySuiteTemplateBody;
+  }): Promise<AppliedSuiteTemplate> {
+    const { data, error, response } = await this.apiClient.POST(
+      "/api/v1/test-suites/templates/{templateId}/apply",
+      { params: { path: { templateId } }, body },
+    );
+    return unwrapApiResult({
+      operation: `apply suite template "${templateId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AppliedSuiteTemplate;
   }
 }

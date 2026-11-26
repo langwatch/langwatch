@@ -198,8 +198,7 @@
       "pricing": {
         "inputCostPerToken": 2.5e-6,
         "outputCostPerToken": 1e-5,
-        "audioCostPerToken": 2.5e-6,
-        "inputCostPerSecond": 0.0001
+        "audioCostPerToken": 2.5e-6
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -220,8 +219,7 @@
       "pricing": {
         "inputCostPerToken": 1.25e-6,
         "outputCostPerToken": 5e-6,
-        "audioCostPerToken": 1.25e-6,
-        "inputCostPerSecond": 5e-5
+        "audioCostPerToken": 1.25e-6
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -597,7 +595,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o4-mini-deep-research": {
       "id": "openai/o4-mini-deep-research",
@@ -619,7 +618,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.3-chat": {
       "id": "openai/gpt-5.3-chat",
@@ -641,7 +641,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "mistralai/devstral-2512": {
       "id": "mistralai/devstral-2512",

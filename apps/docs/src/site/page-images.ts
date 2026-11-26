@@ -180,9 +180,10 @@ export function deferBelowFoldPosters({ html }: { html: string }) {
 }
 
 /* Without scripts the deferred copy is hidden and this one, poster and all, takes its place;
-   with scripts a browser never parses it, so it costs no fetch. */
+   with scripts a browser never parses it, so it costs no fetch. The rule is !important because a
+   clip carries an inline display:block, which would otherwise keep the deferred copy on screen. */
 function noScriptCopy({ video }: { video: string }) {
-  return `<noscript><style>video[data-docs-poster]{display:none}</style>${video}</noscript>`;
+  return `<noscript><style>video[data-docs-poster]{display:none!important}</style>${video}</noscript>`;
 }
 
 /** The largest WebP encoding, which an `<img>` names so the original need not be published. */

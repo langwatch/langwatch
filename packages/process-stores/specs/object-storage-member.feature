@@ -113,3 +113,63 @@ Feature: The object-storage member
     Given object storage on Azure Blob
     When a key segment holds a space, "?", "#" or "%"
     Then the request and the signed URL name the blob with each segment percent-encoded
+
+  @integration @regression
+  Scenario: An existence check asks for the object's headers and opens no body
+    Given object storage on S3
+    When a module asks whether an object exists
+    Then the member sends a HEAD request and never a GET
+    And it answers true for a held object and false for one S3 does not hold
+
+  @unit @regression
+  Scenario: Azure and filesystem existence checks read no body
+    Given object storage on Azure Blob, or on the local filesystem
+    When a module asks whether an object exists
+    Then Azure sends a HEAD request and the filesystem reads only the file's metadata
+    And each answers true for a held object and false for an absent one
+    And a refusal other than absence fails the check instead of answering false
+
+  @integration @regression
+  Scenario: A body a reader stops early gives its connection back
+    Given object storage on S3 with a pool of 50 sockets
+    When more readers than the pool holds open a body and stop before reading a byte
+    Then each reader's connection is closed
+    And a later read still gets a socket and answers
+
+  @integration @regression
+  Scenario: An S3 request that gets no answer fails within the request timeout
+    Given an S3 client
+    When S3 accepts a request and never answers it
+    Then the request fails with a TimeoutError instead of holding its socket
+    And a download whose body keeps arriving, or an upload still being acknowledged, is not cut
+
+  @integration @regression
+  Scenario: A body that stops arriving is cut after the idle limit
+    Given object storage on S3
+    When an object's headers arrive and its bytes then stop for longer than the idle limit
+    Then the read fails with a TimeoutError
+    And the connection is closed, so its socket returns to the pool
+    # The limit counts silence on the socket, whichever side caused it: a reader
+    # that holds a body and reads nothing for longer, such as a client pausing an
+    # /api/files download, loses it the same way.
+
+  @integration @regression
+  Scenario: An upload that stops moving is cut after the idle limit
+    Given an S3 client
+    When S3 stops taking an upload's bytes and never answers, for longer than the idle limit
+    Then the write fails with a TimeoutError
+    And the connection is closed, so its socket returns to the pool
+
+  @unit @regression
+  Scenario: An Azure refusal of the credentials says to check them, not to grant a role
+    Given object storage on Azure Blob with an account key Azure does not accept
+    When a module writes, reads, checks, removes or probes an object
+    Then the refusal carries the code "storage_credentials_refused", a platform fault
+    And its remediation points at the account name and key or the identity, not a role grant
+
+  @unit @regression
+  Scenario: An Azure refusal for missing data permissions names the role to grant
+    Given object storage on Azure Blob whose identity Azure accepts but lacks data access
+    When a module reads or checks an object
+    Then the refusal carries the code "storage_permission_denied", a platform fault
+    And its remediation names the "Storage Blob Data Contributor" role to grant

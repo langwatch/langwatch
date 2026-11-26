@@ -19,12 +19,13 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { ScopeNameBadge } from "@langwatch/design-system/scope-name-badge";
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { ChevronDown, TriangleAlert } from "lucide-react";
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
@@ -418,7 +419,7 @@ function useGapFocus() {
   };
 }
 
-/** What the key will carry, said in one line so a closed Advanced section hides nothing. */
+/** What the key will carry, in one line so a closed Advanced hides nothing; the name is a badge. */
 function keySummary({
   keyType,
   permissionMode,
@@ -433,7 +434,7 @@ function keySummary({
   orgProjects: OrgProject[];
   orgTeams: OrgTeam[];
   organizationName: string | undefined;
-}): string {
+}): ReactNode {
   const kind = keyType === "service" ? "Service key" : "Personal key";
   const access = permissionMode === "all" ? "all permissions" : "restricted permissions";
   const [only] = selectedScopes;
@@ -441,7 +442,11 @@ function keySummary({
   if (selectedScopes.length > 1)
     return `${kind} with ${access} on ${selectedScopes.length} scopes.`;
   const named = scopeName({ scope: only, orgProjects, orgTeams, organizationName });
-  return `${kind} with ${access} on ${named ?? "the selected scope"}.`;
+  return (
+    <>
+      {kind} with {access} on {named ? <ScopeNameBadge name={named} /> : "the selected scope"}.
+    </>
+  );
 }
 
 function AdvancedSection({
@@ -452,7 +457,7 @@ function AdvancedSection({
 }: {
   open: boolean;
   onOpenChange: (next: boolean) => void;
-  summary: string;
+  summary: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -578,20 +583,16 @@ export function CreateApiKeyDrawer({
 
   // Recomputed on every open rather than once, so a drawer opened just after
   // midnight cannot offer yesterday as the earliest custom expiry.
-  const minCustomDate = useMemo(() => earliestCustomExpiration(), []);
+  const minCustomDate = earliestCustomExpiration();
 
-  const expirationCollection = useMemo(
-    () => createListCollection({ items: EXPIRATION_OPTIONS }),
-    [],
-  );
+  const expirationCollection = createListCollection({ items: EXPIRATION_OPTIONS });
 
-  const memberCollection = useMemo(() => {
-    const items = (orgMembers.data ?? []).map((m) => ({
+  const memberCollection = createListCollection({
+    items: (orgMembers.data ?? []).map((m) => ({
       label: m.name ?? m.email ?? m.id,
       value: m.id,
-    }));
-    return createListCollection({ items });
-  }, [orgMembers.data]);
+    })),
+  });
 
   const primaryScope = selectedScopes[0] ?? {
     scopeType: "PROJECT" as const,

@@ -23,6 +23,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
 import { AdminDate, EmptyCell, dateInputToISO, formatDate } from "../elements/admin-cells.tsx";
+import { PendingLimitsNotice } from "../elements/pending-limits-notice.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 
 /** The controls a failed submit can land on; wrappers that carry the state are skipped. */
@@ -39,6 +40,7 @@ interface AdminSubscription {
   lastPaymentFailedDate: string | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
+  maxMembersDeveloper: number | null;
   maxTeams: number | null;
   maxProjects: number | null;
   maxWorkflows: number | null;
@@ -85,6 +87,7 @@ const LIMIT_FIELDS: {
 }[] = [
   { key: "maxMembers", label: "Max members", group: "Members" },
   { key: "maxMembersLite", label: "Max lite members", group: "Members" },
+  { key: "maxMembersDeveloper", label: "Max developer members", group: "Members" },
   { key: "maxTeams", label: "Max teams", group: "Members" },
 
   { key: "maxProjects", label: "Max projects", group: "Resources" },
@@ -257,6 +260,7 @@ function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) 
 type LimitKey =
   | "maxMembers"
   | "maxMembersLite"
+  | "maxMembersDeveloper"
   | "maxTeams"
   | "maxProjects"
   | "maxWorkflows"
@@ -453,6 +457,11 @@ function SubscriptionDrawer({
               />
             </Field.Root>
           </HStack>
+
+          <PendingLimitsNotice
+            status={form.status}
+            hasLimits={LIMIT_FIELDS.some((f) => form[f.key as LimitKey].trim() !== "")}
+          />
 
           {GROUPED_LIMITS.map(([group, fields]) => (
             <VStack key={group} gap={3} align="stretch">

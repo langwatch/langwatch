@@ -1,5 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
+import type { ScenarioKind } from "./scenario.ts";
+
 /**
  * The author-assist answered this project one generation too many inside the
  * window. `fault` stays customer: it is their generation rate, and the
@@ -303,5 +305,21 @@ export class ScenarioSimulationWritesUnavailableError extends HandledError {
       { httpStatus: 503, fault: "platform" },
     );
     this.name = "ScenarioSimulationWritesUnavailableError";
+  }
+}
+
+/** A create whose kind and red team config disagree: red_team needs one, standard takes none. */
+export class ScenarioRedTeamConfigError extends HandledError {
+  declare readonly code: "scenario_red_team_config_mismatch";
+
+  constructor(input: { kind: ScenarioKind }) {
+    super(
+      "scenario_red_team_config_mismatch",
+      input.kind === "red_team"
+        ? "A red team scenario needs a red team config"
+        : "A standard scenario takes no red team config",
+      { httpStatus: 422, fault: "customer", meta: { kind: input.kind } },
+    );
+    this.name = "ScenarioRedTeamConfigError";
   }
 }

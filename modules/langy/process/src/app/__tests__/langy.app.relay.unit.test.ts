@@ -33,6 +33,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -115,6 +116,7 @@ async function composedRelay() {
       onboarding: createApiFixture<OnboardingApi>(),
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
+      storedObjects: createApiFixture<StoredObjectApi>(),
     },
     config: {
       agentUrl: undefined,
@@ -150,7 +152,6 @@ async function composedRelay() {
       organizationId: "org_1",
     },
     runToken: RUN_TOKEN,
-    permitReserved: false,
   });
   const relay = app.openRelayConnection();
   const buffer = repositories.tokenBuffer.open();
