@@ -448,6 +448,29 @@ Feature: Product sidebars
     Given I opened a dashboard from LLM Ops
     Then the device remembers "llm-ops" for the organization, not "dashboards"
 
+  # Each product's Dashboards section pins one From LangWatch board on top. LLM Ops pins My agent
+  # at a glance (opens under the project); Gateway pins Gateway costs and Coding agents pins Coding
+  # agent costs (both open at the organization address); Governance pins none.
+  @integration
+  Scenario: Each product pins its own From LangWatch board first
+    Given I can reach Dashboards in every product
+    When I am in LLM Ops
+    Then the Dashboards section lists "My agent at a glance" above my own boards
+    And it opens the From LangWatch board "My agent at a glance" at its curated address
+    When I am in Gateway
+    Then the Dashboards section lists "Gateway costs" above my own boards
+    When I am in Coding agents
+    Then the Dashboards section lists "Coding agent costs" above my own boards
+    When I am in Governance
+    Then that product's Dashboards section pins no From LangWatch board
+
+  @integration
+  Scenario: The Add dashboard row stays under a product's boards
+    Given I can create a board in LLM Ops
+    When I open the LLM Ops Dashboards section
+    Then the last row is a dotted "Add dashboard" row
+    And choosing it opens the same create dialog as the "+" button
+
   # Product owner, 2026-11-24: an organization younger than three weeks never had the old
   # Analytics, so the LLM Ops sidebar offers no Analytics entry that only leads to Dashboards.
   # The age is read from the organization's createdAt: 21 days or more shows the entry, any
@@ -489,3 +512,13 @@ Feature: Product sidebars
   Scenario: An organization whose creation date has not arrived keeps the Analytics entry
     Given my organization's creation date is not known
     Then the Analytics entry is offered
+
+  # A From LangWatch board pinned in a product's sidebar opens in that product,
+  # so clicking it keeps the reader's sidebar. Boards pinned to no product, and
+  # any id not pinned at all, stay in LLM Ops.
+  @unit
+  Scenario: A product's pinned board opens inside that product
+    Given a From LangWatch board pinned to the gateway or Coding agents product
+    When I open that board from the product's sidebar
+    Then the board's home product is the one I clicked it from
+    And a From LangWatch board not pinned to a product opens in LLM Ops

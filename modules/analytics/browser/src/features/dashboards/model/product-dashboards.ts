@@ -6,6 +6,12 @@
 
 import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
 
+import { curatedBoardPath, organizationCuratedBoardPath } from "./boards.ts";
+import {
+  type CuratedBoard,
+  curatedBoardById,
+  PRODUCT_DEFAULT_BOARD_IDS,
+} from "./curated-boards.ts";
 import { isOwnMyDashboard, type LibraryBoard, libraryBoardPath } from "./organization-library.ts";
 
 /** Boards a sidebar section or library group shows before "Show N more". */
@@ -42,6 +48,42 @@ export function productSidebarBoards({
     .filter((board) => !isDefault(board))
     .toSorted((a, b) => a.name.localeCompare(b.name));
   return [...listed.filter(isDefault), ...others];
+}
+
+/** The pinned row's words and address. */
+export interface PinnedBoard {
+  readonly templateId: string;
+  readonly name: string;
+  readonly href: string;
+}
+
+/**
+ * The From LangWatch board a product's section pins above its own boards, or undefined where
+ * the product pins none, or pins a project board while no project is in view.
+ */
+export function productDefaultBoard({
+  product,
+  projectSlug,
+}: {
+  product: DashboardHomeProduct;
+  projectSlug: string | undefined;
+}): PinnedBoard | undefined {
+  const pinned = PRODUCT_DEFAULT_BOARD_IDS[product];
+  const board: CuratedBoard | undefined = pinned && curatedBoardById(pinned.templateId);
+  if (!pinned || !board) return undefined;
+  if (pinned.at === "organization") {
+    return {
+      templateId: board.templateId,
+      name: board.name,
+      href: organizationCuratedBoardPath({ templateId: board.templateId }),
+    };
+  }
+  if (projectSlug === undefined) return undefined;
+  return {
+    templateId: board.templateId,
+    name: board.name,
+    href: curatedBoardPath({ projectSlug, templateId: board.templateId }),
+  };
 }
 
 /** Who sees a board, as its row's icon says on hover. */

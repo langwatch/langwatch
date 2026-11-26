@@ -1,14 +1,13 @@
 /**
- * Product sidebar "Dashboards" section: My dashboard, then the product's boards, each with the
- * library's "⋮" menu on hover. "No dashboards yet" when empty, in every product. "Browse
- * templates" only in LLM Ops: templates read its data.
+ * "Dashboards" section: the pinned From LangWatch board, its boards, then the dotted row.
+ * No boards and nothing pinned: "No dashboards yet". "Browse templates" only in LLM Ops.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import type { ProductDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { LayoutDashboard, LayoutTemplate, Lock } from "lucide-react";
+import { LayoutDashboard, LayoutTemplate, Lock, Pin } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -26,7 +25,12 @@ import {
   libraryBoardPath,
   namesInProduct,
 } from "../../model/organization-library.ts";
-import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
+import {
+  PRODUCT_BOARDS_SHOWN_MAX,
+  productDefaultBoard,
+  sharingTitle,
+} from "../../model/product-dashboards.ts";
+import { AddDashboardRow } from "../blocks/add-dashboard-row.tsx";
 import { BoardMenu } from "../blocks/board-menu.tsx";
 import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
@@ -47,22 +51,38 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const { duplicateBoard } = useLibraryDuplicate();
   if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
+  const pinned = productDefaultBoard({ product, projectSlug });
+  // One gate for the "+" and the dotted row, so neither offers a create the other would not.
+  const canCreate =
+    Boolean(store.storeProject) && hasSharingChoice({ product, mayShare: store.mayShare });
   const isDraftOpen = projectSlug !== void 0 && host.route().params.dashboardId === DRAFT_SEGMENT;
 
   return (
     <VStack as="section" aria-label={LABEL} align="stretch" gap={0.5} width="full">
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
         <SidebarSectionLabel label={LABEL} />
-        {store.storeProject && hasSharingChoice({ product, mayShare: store.mayShare }) && (
-          <NewDashboardButton onCreate={() => setIsNewDialogOpen(true)} />
-        )}
+        {canCreate && <NewDashboardButton onCreate={() => setIsNewDialogOpen(true)} />}
       </HStack>
       {isDraftOpen && (
         <RowList label="New dashboard">
           <DraftRow projectSlug={projectSlug} />
         </RowList>
       )}
-      {!(isDraftOpen && boards.length === 0) && (
+      {boards.length === 0 && !pinned && !isDraftOpen && (
+        <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
+          No dashboards yet
+        </Text>
+      )}
+      <RowList label={LABEL}>
+        {pinned && (
+          <SidebarLinkRow
+            name={pinned.name}
+            href={pinned.href}
+            icon={<Pin size={SIDEBAR_ROW_ICON_SIZE} />}
+            iconTitle="Pinned: From LangWatch"
+            isActive={host.route().params.templateId === pinned.templateId}
+          />
+        )}
         <BoardRows
           boards={boards}
           openId={host.route().params.dashboardId}
@@ -73,7 +93,8 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           onMove={setPendingMove}
           onDelete={setPendingDelete}
         />
-      )}
+        {canCreate && <AddDashboardRow onAdd={() => setIsNewDialogOpen(true)} />}
+      </RowList>
       {projectSlug && product === "llm-ops" && (
         <RowList label="Templates">
           <SidebarLinkRow
@@ -101,7 +122,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   );
 }
 
-/** The section's boards, the first few then "Show N more", or "No dashboards yet". */
+/** The section's boards, the first few then "Show N more"; rows of the section's list. */
 function BoardRows({
   boards,
   openId,
@@ -119,17 +140,10 @@ function BoardRows({
   onMove: (board: LibraryBoard) => void;
   onDelete: (board: LibraryBoard) => void;
 }) {
-  if (boards.length === 0) {
-    return (
-      <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
-        No dashboards yet
-      </Text>
-    );
-  }
   const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
   const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
   return (
-    <RowList label={LABEL}>
+    <>
       {shownRows.map((board) => (
         <BoardRow
           key={board.id}
@@ -147,7 +161,7 @@ function BoardRows({
           </ToggleRow>
         </Box>
       )}
-    </RowList>
+    </>
   );
 }
 

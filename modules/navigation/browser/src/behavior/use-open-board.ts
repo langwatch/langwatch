@@ -6,11 +6,14 @@
 import { createContext, useContext } from "react";
 
 import { useNavigationHost } from "../model/navigation-host.ts";
-import { isOrganizationCuratedPath, type OpenBoard, openBoardIdAt } from "../model/open-board.ts";
+import {
+  curatedBoardHomeProduct,
+  isOrganizationCuratedPath,
+  type OpenBoard,
+  openBoardIdAt,
+  organizationCuratedTemplateId,
+} from "../model/open-board.ts";
 import { navigationApi } from "./navigation-api.ts";
-
-/** Every From LangWatch board is homed in LLM Ops and read for the project in view (D5). */
-const CURATED_BOARD: OpenBoard = { homeProduct: "llm-ops", isProjectShared: false };
 
 export function useOpenBoard({ enabled }: { enabled: boolean }): {
   openBoard: OpenBoard | null;
@@ -27,7 +30,10 @@ export function useOpenBoard({ enabled }: { enabled: boolean }): {
     { enabled: asks },
   );
   if (enabled && isOrganizationCuratedPath(pathname)) {
-    return { openBoard: CURATED_BOARD, isLoading: false };
+    // A From LangWatch board opens in the product it was pinned from (D5).
+    const templateId = organizationCuratedTemplateId(pathname) ?? "";
+    const homeProduct = curatedBoardHomeProduct(templateId);
+    return { openBoard: { homeProduct, isProjectShared: false }, isLoading: false };
   }
   if (!asks) return { openBoard: null, isLoading: false };
   if (resolved.data) {

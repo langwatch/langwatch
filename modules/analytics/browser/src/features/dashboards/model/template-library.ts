@@ -186,6 +186,16 @@ const CATALOGUE_BY_ID = new Map(
   [...CATALOGUE_TEMPLATES, ...TEMPLATE_VARIANTS].map((template) => [template.id, template]),
 );
 
+/**
+ * One template's card by id, org boards included: the finder hides them, but a product's pinned
+ * board still needs its card. Undefined for an id with no board.
+ */
+export function templateCardById(templateId: string): LibraryTemplate | undefined {
+  const board = BOARD_TEMPLATES.find(({ id }) => id === templateId);
+  const template = CATALOGUE_BY_ID.get(templateId);
+  return board && template ? libraryTemplate({ board, template }) : undefined;
+}
+
 function libraryOf(boards: readonly BoardTemplate[]): LibraryTemplate[] {
   return boards.flatMap((board) => {
     const template = CATALOGUE_BY_ID.get(board.id);
