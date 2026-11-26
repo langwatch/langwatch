@@ -25,8 +25,26 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
   }
 
   async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
+    const deadline = new AbortController();
+    const timer = setTimeout(
+      () => deadline.abort(new Error("The managed Bedrock role hops ran out of time")),
+      ROLE_HOP_BUDGET_MS,
+    );
+    try {
+      return await this.hop({ config, abortSignal: deadline.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async hop({
+    config,
+    abortSignal,
+  }: {
+    config: ManagedBedrockConfig;
+    abortSignal: AbortSignal;
+  }): Promise<ManagedProviderCredentials> {
     const endpoint = this.stsBase === undefined ? {} : { endpoint: this.stsBase };
-    const abortSignal = AbortSignal.timeout(ROLE_HOP_BUDGET_MS);
     const proxyClient = new STSClient({
       region: config.region,
       ...endpoint,

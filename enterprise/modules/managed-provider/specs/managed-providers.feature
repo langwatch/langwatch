@@ -115,10 +115,10 @@ Feature: Managed model providers
 
     @unit
     Scenario: A stalled role hop gives up inside the gateway's config fetch
-      Given assuming the customer's role does not answer
+      Given assuming the proxy role does not answer
       When the managed Bedrock credentials are minted
-      Then both role hops share one deadline shorter than the gateway's config fetch
-      And the row falls back to its stored keys instead of holding up the key's other providers
+      Then the role hops give up at their shared deadline, inside the gateway's config fetch
+      And the customer role is never asked
 
     @unit
     Scenario: The gateway bundle sends a managed Bedrock row to the private endpoint

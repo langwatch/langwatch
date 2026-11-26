@@ -1,5 +1,5 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpManagedProviderCredentialsChannel } from "../http.managed-provider-credentials.channel.ts";
 
@@ -11,6 +11,7 @@ const sts = vi.hoisted(() => ({
   }[],
   assumed: [] as { clientIndex: number; roleArn: string; abortSignal?: AbortSignal }[],
   proxyReturnsCredentials: true,
+  proxyStalls: false,
 }));
 
 vi.mock("@aws-sdk/client-sts", () => {
@@ -43,6 +44,13 @@ vi.mock("@aws-sdk/client-sts", () => {
       });
 
       if (this.index === 0) {
+        if (sts.proxyStalls) {
+          return new Promise((_resolve, reject) => {
+            options?.abortSignal?.addEventListener("abort", () =>
+              reject(options.abortSignal?.reason),
+            );
+          });
+        }
         if (!sts.proxyReturnsCredentials) {
           return {};
         }
@@ -83,6 +91,11 @@ describe("HttpManagedProviderCredentialsChannel", () => {
     sts.clients.length = 0;
     sts.assumed.length = 0;
     sts.proxyReturnsCredentials = true;
+    sts.proxyStalls = false;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("given a managed Bedrock configuration naming both roles", () => {
@@ -115,8 +128,27 @@ describe("HttpManagedProviderCredentialsChannel", () => {
       });
     });
 
-    describe("when the role hops run", () => {
+    describe("when the proxy role hop never answers", () => {
       /** @scenario "A stalled role hop gives up inside the gateway's config fetch" */
+      it("gives up at 1.5s, inside the gateway's 2s config fetch, without reaching the customer role", async () => {
+        vi.useFakeTimers();
+        sts.proxyStalls = true;
+        const outcome = HttpManagedProviderCredentialsChannel.create()
+          .assumeCustomerRole(CONFIG)
+          .then(
+            () => "resolved",
+            (error: Error) => error.message,
+          );
+
+        await vi.advanceTimersByTimeAsync(1499);
+        const early = await Promise.race([outcome, Promise.resolve("still waiting")]);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(early).toBe("still waiting");
+        await expect(outcome).resolves.toBe("The managed Bedrock role hops ran out of time");
+        expect(sts.assumed.map((call) => call.roleArn)).toEqual([CONFIG.proxyRoleArn]);
+      });
+
       it("bounds both hops with one deadline", async () => {
         await HttpManagedProviderCredentialsChannel.create().assumeCustomerRole(CONFIG);
 

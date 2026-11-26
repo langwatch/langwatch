@@ -388,7 +388,7 @@ getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKe
 
 #### `getGatewayCustomKeys`
 
-The keys the AI gateway runs a row with: its stored keys, plus for a managed Bedrock organization the customer role's session and private endpoint (as `base_url`).
+The keys the AI gateway runs a row with: its stored keys, plus for a managed Bedrock organization the customer role's session and private endpoint (as the runtime endpoint key).
 
 ```typescript
 getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;

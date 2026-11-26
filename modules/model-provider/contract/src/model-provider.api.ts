@@ -393,7 +393,7 @@ export interface ModelProviderApi {
   getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
   /**
    * The keys the AI gateway runs a row with: its stored keys, plus for a managed Bedrock
-   * organization the customer role's session and private endpoint (as `base_url`).
+   * organization the customer role's session and private endpoint (as the runtime endpoint key).
    */
   getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
 }
