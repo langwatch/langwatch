@@ -28,6 +28,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, "clipboard");
   document.body.innerHTML = "";
 });
 
