@@ -26,7 +26,7 @@ runs:
       shell: bash
       run: |
         install() {
-          sudo apt-get -o Acquire::Retries=3 update
+          sudo timeout 120 apt-get -o Acquire::Retries=3 update
           timeout 600 pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
         }
         install || { echo "::warning::Playwright install failed, retrying once in 30s"; sleep 30; install; }
