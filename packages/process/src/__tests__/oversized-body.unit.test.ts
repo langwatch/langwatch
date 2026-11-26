@@ -10,7 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   startLivenessThread,
@@ -24,7 +25,7 @@ const CAP_BYTES = 64 * 1024 * 1024;
 /** Far enough over the cap that no socket buffer absorbs the rest of the body. */
 const OVERSIZED_BYTES = 80 * 1024 * 1024;
 const CHUNK = Buffer.alloc(1024 * 1024, 120);
-const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const { logger } = createTestLogger();
 const servers: Server[] = [];
 const threads: LivenessThread[] = [];
 const listeners: http.Server[] = [];
@@ -43,7 +44,6 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
-  vi.clearAllMocks();
   await Promise.all(threads.splice(0).map((thread) => thread.close({ graceMs: 50 })));
   await Promise.all(servers.splice(0).map((server) => server.close()));
   for (const listener of listeners.splice(0)) {
@@ -113,7 +113,8 @@ function trickle({
 }): Promise<Trickle> {
   return new Promise((resolve) => {
     const started = Date.now();
-    const socket = net.connect({ port, host: "127.0.0.1" });
+    // Half-open, as a client still sending after the door's FIN: only the door's close ends it.
+    const socket = net.connect({ port, host: "127.0.0.1", allowHalfOpen: true });
     let answer = "";
     let sent = 0;
     const pacing = setInterval(() => {
@@ -266,20 +267,22 @@ describe("given a door that answered 413 while the body is still arriving", () =
     });
   });
 
-  describe("when the client stops sending and holds the connection open", () => {
+  describe("when the client goes quiet for longer than the idle budget", () => {
     /** @scenario "A body over the cap is answered 413, never a reset" */
-    it("closes it after the quiet spell", async () => {
+    it("closes it after the quiet spell, not at the hard cap", async () => {
       const door = await doorBeforeRefusingApi({ idleMs: 200, maxMs: 10_000, maxBytes: 1024 ** 3 });
 
+      // A byte every 600 ms: the first lands on the closed socket, which is how the client learns.
       const answer = await trickle({
         port: door.port,
         declared: OVERSIZED_BYTES,
-        bytes: 64 * 1024,
-        chunkBytes: 64 * 1024,
-        gapMs: 10,
+        bytes: OVERSIZED_BYTES,
+        chunkBytes: 1,
+        gapMs: 600,
       });
 
       expect(answer.statusLine).toBe("HTTP/1.1 413 Payload Too Large");
+      expect(answer.closedAfterMs).toBeGreaterThanOrEqual(200);
       expect(answer.closedAfterMs).toBeLessThan(5_000);
     });
   });
@@ -298,6 +301,7 @@ describe("given a door that answered 413 while the body is still arriving", () =
       });
 
       expect(answer.statusLine).toBe("HTTP/1.1 413 Payload Too Large");
+      expect(answer.closedAfterMs).toBeGreaterThanOrEqual(400);
       expect(answer.closedAfterMs).toBeLessThan(5_000);
     });
   });
@@ -319,6 +323,7 @@ describe("given a door that answered 413 while the body is still arriving", () =
         gapMs: 5,
       });
 
+      expect(answer.sent).toBeGreaterThanOrEqual(2 * 1024 * 1024);
       expect(answer.sent).toBeLessThan(OVERSIZED_BYTES);
     });
   });

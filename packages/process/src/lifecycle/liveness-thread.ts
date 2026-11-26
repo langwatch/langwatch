@@ -312,6 +312,7 @@ const lingerThenClose = (req) => {
     socket.once("close", () => clearInterval(watch));
     if (req.complete) return close();
     req.once("end", close);
+    socket.once("end", close);
     req.unpipe();
     req.resume();
   };
