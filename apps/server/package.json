@@ -42,7 +42,7 @@
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm.test.ts test/app-archive.test.ts"
+    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm.test.ts test/app-archive.test.ts test/services/pipe-to-bus.test.ts"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
