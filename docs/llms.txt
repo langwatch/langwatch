@@ -579,6 +579,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Dashboards
 
 - [The /governance overview](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): What the /governance page shows today, where each governance number actually lives, and the setup-state signal behind the section.
+- [Costs](https://langwatch.ai/docs/ai-governance/costs.md): Read provider bills, LangWatch AI Gateway metering, seats, providers, models and spender breakdowns without treating them as one AI spend total.
+- [Inventory](https://langwatch.ai/docs/ai-governance/inventory.md): Manage the AI tool catalog, environments and ingestion sources that LangWatch uses to describe what your organization runs.
+- [Agents](https://langwatch.ai/docs/ai-governance/agents.md): See registered and provider-discovered agents across the organization, their owner context, source, models, health and recent usage.
 - [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
 
 ## Agent Registry

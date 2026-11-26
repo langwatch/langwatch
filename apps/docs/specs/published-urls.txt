@@ -113,6 +113,7 @@
 /ai-gateway/troubleshooting
 /ai-gateway/virtual-keys
 /ai-governance
+/ai-governance/agents
 /ai-governance/anomaly-rules
 /ai-governance/api
 /ai-governance/cli
@@ -120,6 +121,7 @@
 /ai-governance/cloud-agent-discovery
 /ai-governance/compliance-architecture
 /ai-governance/control-plane
+/ai-governance/costs
 /ai-governance/getting-started-admin
 /ai-governance/getting-started-developer
 /ai-governance/governance-dashboard
@@ -134,6 +136,7 @@
 /ai-governance/ingestion-sources/workato
 /ai-governance/ingestion-templates
 /ai-governance/ingestion-templates/index
+/ai-governance/inventory
 /ai-governance/mcp
 /ai-governance/no-spy-mode
 /ai-governance/open-core-licensing

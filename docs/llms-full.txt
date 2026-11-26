@@ -15706,6 +15706,53 @@ Field by field: [Virtual keys API reference](/api-reference/gateway-virtual-keys
 
 ---
 
+# FILE: ./ai-governance/agents.mdx
+
+---
+title: Agents
+description: See registered and provider-discovered agents across the organization, their owner context, source, models, health and recent usage.
+sidebarTitle: Agents
+keywords: agents, agent inventory, discovered agents, registered agents, governance
+---
+
+Open **AI Governance > Agents** (`/governance/agents`) to see the agents and AI applications LangWatch can identify across the organization. The page combines agents that register themselves with agents discovered from connected providers.
+
+## What the list shows
+
+The default list view shows one row per agent. Columns include **Agent**, **Environment**, **Owner**, **Source**, **Models**, **Health**, **Cost · 30 days**, **Requests · 30 days**, **Last active** and **Registered**.
+
+Some values can be unavailable. A dash means LangWatch has not measured that value for the agent yet. It does not mean the value is zero.
+
+## What the summary shows
+
+The summary strip counts the same rows as the table. It shows fleet-level status, registration, activity and spend only from data the page has already read.
+
+Sample data is an explicit mode. Turning it on replaces the list with invented rows and shows a banner that the data is not real.
+
+## How to filter and change layout
+
+Use the source, ownership and sort filters to narrow the list. Use the layout control to switch between the table and cards. Both layouts read the same agent rows, so a missing value has the same meaning in both views.
+
+If filters hide every row, use **Clear filters** to return to the full list.
+
+## How syncing works
+
+Use **Sync agents** to ask connected providers for their current agent list. The button is visible even when you cannot press it, so the page can explain whether a provider is connected, whether a sync is already running or whether your role cannot request one.
+
+Provider-discovered agents are governance metadata. Syncing them does not grant access to the provider, change provider permissions or create a running agent.
+
+## How registration works
+
+Use **Register agent** for a first-party agent that runs in your own process. The drawer gives you a snippet to add to that running agent. LangWatch does not create a real first-party agent from a name typed into the UI alone.
+
+## Permissions
+
+Opening Agents needs `governance:view`. Registering an agent and requesting provider discovery need `governance:manage`. Provider listing also depends on the connected source and the provider credentials behind it.
+
+**Also check:** [Inventory](/ai-governance/inventory) for connected sources, [Ingestion sources](/ai-governance/ingestion-sources/index) for provider connectors, and [People](/ai-governance/people) for ownership and department context.
+
+---
+
 # FILE: ./ai-governance/anomaly-rules.mdx
 
 ---
@@ -17194,6 +17241,59 @@ tail`): [CLI ingest debug](/ai-governance/cli-debug).
 
 ---
 
+# FILE: ./ai-governance/costs.mdx
+
+---
+title: Costs
+description: Read provider bills, LangWatch AI Gateway metering, seats, providers, models and spender breakdowns without treating them as one AI spend total.
+sidebarTitle: Costs
+keywords: ai cost, governance cost, provider bills, gateway spend, seats, spend attribution
+---
+
+Open **AI Governance > Costs** (`/governance/costs`) to read the money signals LangWatch has measured for the organization. The page keeps provider bills, LangWatch AI Gateway metering and seat counts separate because those sources can overlap, arrive at different times and measure different things.
+
+Opening the page needs the Enterprise plan and `governanceCost:view`.
+
+## What the top lanes show
+
+The top of the page shows three lanes:
+
+| Lane | What it shows | Boundary |
+|---|---|---|
+| **Billed by provider** | Provider-reported costs imported from billing or admin reports | It is not added to LangWatch AI Gateway metering as if the two were independent |
+| **Metered by gateway** | Spend recorded by the LangWatch AI Gateway as it served traffic | It does not cover traffic that bypassed the gateway |
+| **Seats** | License pools and assigned seat counts where a provider reports them | It never creates a price from a seat count |
+
+A missing figure stays missing. LangWatch does not show `$0.00` unless the source reported zero spend.
+
+## How to change the view
+
+Use **Time frame** and **Time interval** to change the window and bucket size. Figures cover the last 12 months when the selected frame reaches further back.
+
+Use the department filter to focus the charts on one department. Department labels come from the People side of governance, so person and department breakdowns need both `governanceCost:view` and `governance:view`.
+
+## What the breakdowns mean
+
+The page can show provider cost over time, cost by provider, cost by model, cost by department, provider-reported spend by user, metered spend by person and seat adoption.
+
+Provider-reported spend by user uses the user identifier the provider reports. Shared API keys can make one provider row represent more than one person, so the panel states that boundary instead of assigning the money to a single person.
+
+## Why a total can be unavailable
+
+LangWatch withholds a total when part of the source data has no trustworthy amount for that total. For example, a provider can report non-USD money or rows without a USD figure. Adding the priced subset would make a partial number look complete.
+
+Seat counts follow the same rule in a different form. The Seats lane reports bought and assigned seats, but it does not multiply those counts by a guessed price.
+
+## Where the data comes from
+
+Provider billed rows come from governance ingestion sources and provider admin pullers. LangWatch AI Gateway metering comes from the gateway ledger. The cost screen reads a daily governance rollup for provider billed rows and reads gateway metering separately.
+
+Use **Refresh** to ask the page to read again. If there is still no connected cost source, the page shows the empty state rather than a zero-cost claim.
+
+**Also check:** [Inventory](/ai-governance/inventory) for connected sources, [People](/ai-governance/people) for departments and identity labels, and [Pull-mode connectors](/ai-governance/pull-mode-connectors) for provider API polling.
+
+---
+
 # FILE: ./ai-governance/getting-started-admin.mdx
 
 ---
@@ -17493,58 +17593,34 @@ description: What the /governance page shows today, where each governance number
 sidebarTitle: /governance dashboard
 ---
 
-`/governance` is the way into the AI Governance section rather than an oversight dashboard of its own. It opens with a greeting, one field for asking a question or jumping to a screen, an **Add Source** action for admins who may manage ingestion sources, and shortcuts to add people, an agent or a tool.
+`/governance` is the entry page for AI Governance. It opens with a greeting, a field for asking a question or jumping to a screen, **Add Source** for admins who can manage ingestion sources, and shortcuts to add people, an agent or a tool.
 
-Under those sit two lists. **Insights** fills once your ingestion sources are pulling, and **Recent activity** lists the screens you were last on. Before your first source reports an event, each list carries one line saying what will fill it.
+The page also shows **Insights** and **Recent activity** lists. Before your first source reports an event, each list says what will appear there.
 
-The page issues no spend, anomaly or source-health read of its own. That is deliberate: it used to carry a panel per subject, each on its own permission, so a reader whose plan or role did not cover one met an error before they met the page.
+The overview page does not read every governance metric itself. Costs, Inventory, Agents and People each own their own data, permissions and empty states.
 
-<Info>**Pairs with:** [AI Governance](/ai-governance/overview), which describes this screen and the rest of the section in full.</Info>
-
-## Where the numbers live
-
-This page carries no strips of metrics. Each subject has its own screen in the section:
+## Where to find each number
 
 | To see | Go to |
 |---|---|
-| The systems reporting AI activity, and the tool catalog | [Inventory](/ai-governance/ingestion-sources/index) |
-| The agents and applications detected across the organization | **Agents** in the sidebar |
-| Departments, and how spend rolls up by them | [People](/ai-governance/people) |
+| Provider bills, LangWatch AI Gateway metering, seats and spender breakdowns | [Costs](/ai-governance/costs) |
+| The tool catalog, environments and connected activity sources | [Inventory](/ai-governance/inventory) |
+| Agents and AI applications detected across the organization | [Agents](/ai-governance/agents) |
+| People, departments and spend attribution labels | [People](/ai-governance/people) |
 
-Alerts raised by the anomaly detector are listed on none of these. See [Anomaly rules](/ai-governance/anomaly-rules) for where an alert does reach you.
+## When admins land here
 
-## When the section becomes an admin's landing page
+LangWatch can send an organization admin to `/governance` when the organization has active governance setup. The signal includes personal keys, routing policies, ingestion sources and recent governance activity.
 
-A setup-state signal decides whether an org admin is sent here, read by the `governance.setupState({ organizationId })` tRPC procedure:
-
-```ts
-{
-  hasPersonalVKs:       boolean,  // any user has minted a personal VK
-  hasRoutingPolicies:   boolean,  // at least one routing policy exists
-  hasIngestionSources:  boolean,  // at least one source exists
-  hasAnomalyRules:      boolean,  // at least one rule defined
-  hasRecentActivity:    boolean,  // any governance event in the last 30d
-  hasApplicationTraces: boolean,  // an application project has traces
-}
-```
-
-Governance reads as active when **any one** of the first five is true. `hasApplicationTraces` is reported alongside them and does not feed that answer.
-
-The same signal backs the `langwatch governance status` output, so the CLI and the app agree on whether an organization has activated governance.
+Application traces alone do not make AI Governance the landing page. An organization that only uses LLMOps project traces still opens on its project workspace.
 
 ## Permissions
 
 Opening `/governance` needs `governance:view`, which an organization Admin holds by default.
 
-The reads behind the section's other screens are permissioned separately. The activity-monitor procedures cap at `activityMonitor:view`, the permission to grant a security analyst who should see activity without managing rules.
+The screens linked from the overview can require narrower permissions. For example, Costs needs `governanceCost:view`, and source management uses `ingestionSources:view` or `ingestionSources:manage`.
 
-## Where to next
-
-- **The section and its four pages**: [AI Governance](/ai-governance/overview).
-- **What the detector evaluates, and where an alert goes**: [Anomaly rules](/ai-governance/anomaly-rules).
-- **Inspect ingestion-source health from the terminal**: [CLI debug](/ai-governance/cli-debug).
-- **Export to your SIEM**: [Compliance architecture](/ai-governance/compliance-architecture).
-- **Audit who did what when**: [Audit log](/platform/audit-log).
+**Also check:** [AI Governance](/ai-governance/overview) for the whole section, [CLI debug](/ai-governance/cli-debug) for source health from the terminal, and [Compliance architecture](/ai-governance/compliance-architecture) for SIEM and audit coverage.
 
 ---
 
@@ -18772,6 +18848,61 @@ and we'll evaluate.
 
 ---
 
+# FILE: ./ai-governance/inventory.mdx
+
+---
+title: Inventory
+description: Manage the AI tool catalog, environments and ingestion sources that LangWatch uses to describe what your organization runs.
+sidebarTitle: Inventory
+keywords: ai inventory, ingestion sources, tool catalog, governance sources, environments
+---
+
+Open **AI Governance > Inventory** (`/governance/inventory`) to manage what LangWatch knows about your organization's AI tools and activity sources. The page has three tabs: **Catalog**, **Environments** and **Sources**.
+
+## What Catalog is for
+
+**Catalog** lists the AI tool entries that power the personal portal at `/coding-agents`. Use it to publish coding assistants, model providers and external tools, then scope each tile to the organization or to specific departments.
+
+<Frame caption="The Catalog tab shows the tools that can appear on each developer's personal home page.">
+  ![The Catalog tab of the AI Governance inventory](/images/ai-governance/governance-inventory-catalog.png)
+</Frame>
+
+Use the catalog when a developer should find an approved tool in `/coding-agents`. For tile types, scoping and starter-pack import, see [AI Tools Portal admin catalog editor](/ai-governance/personal-portal/admin-catalog).
+
+## What Environments is for
+
+**Environments** lists the places your connected AI systems run, such as a Power Platform environment or a Databricks workspace. LangWatch discovers environments from sources that name one.
+
+You can also add an environment by hand. Manual environment rows are not stored yet, so they stay on screen only until you leave the page.
+
+The table shows the environment name, description, created date and creator. If no source names an environment yet, the tab shows **No environments yet**.
+
+## What Sources is for
+
+**Sources** lists the systems that send or expose AI activity to LangWatch. A source can push events in real time, or LangWatch can pull from a provider API, S3 export or Dataverse table on a schedule.
+
+<Frame caption="The Sources tab shows connected feeds, their status and their last activity.">
+  ![The Sources tab of the AI Governance inventory](/images/ai-governance/governance-inventory-sources.png)
+</Frame>
+
+Use **Add source** to choose a vendor, enter the connector fields and set the trace destination when the connector supports conversation traces. Source secrets are shown only when they are created or rotated.
+
+## How source health works
+
+A new source starts as **Awaiting first event**. It becomes **Active** after the first event arrives or the first pull records data. The table also shows failure counts, last success and how far the last pull read when the connector reports those fields.
+
+A source can point at an archived or removed trace project. In that case, the row says the destination is archived so you can change it before more conversations are pulled.
+
+## Permissions
+
+Opening Inventory needs `governance:view`. Reading sources needs `ingestionSources:view`. Creating and changing sources needs `ingestionSources:manage`.
+
+Catalog editing follows the management permissions described in the catalog docs. Environments are discovered from sources, so readers without source access cannot read the environment list.
+
+**Also check:** [Ingestion sources](/ai-governance/ingestion-sources/index) for connector setup, [AI Tools Portal admin catalog editor](/ai-governance/personal-portal/admin-catalog) for catalog tiles, and [CLI debug](/ai-governance/cli-debug) for source health from the terminal.
+
+---
+
 # FILE: ./ai-governance/mcp.mdx
 
 ---
@@ -19133,71 +19264,66 @@ sidebarTitle: Overview
 keywords: ai governance, ai inventory, ingestion sources, tool catalog, agents, departments, langwatch
 ---
 
-AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
+AI Governance is the part of LangWatch where platform and IT teams manage approved AI tools, connected activity sources, agent inventory, spend attribution and each developer's personal tool portal.
 
-The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Agents** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/coding-agents`.
+The section is in the sidebar under **AI Governance**. The main pages are **Overview**, **Costs**, **Inventory**, **Agents** and **People**. Opening the section needs `governance:view`, which an organization Admin holds by default.
 
-## The overview page
+## What the overview shows
 
-The overview at `/governance` is the way into the section rather than a dashboard of its own. It opens with a greeting, one field for asking a question or jumping to a screen, an **Add Source** action for admins who may manage ingestion sources, and shortcuts to add people, an agent or a tool.
+The overview at `/governance` is the way into the section rather than a metrics dashboard. It opens with a greeting, a field for asking a question or jumping to a screen, **Add Source** for admins who can manage ingestion sources, and shortcuts to add people, an agent or a tool.
 
-Under those sit two lists. **Insights** fills once your ingestion sources are pulling, and **Recent activity** lists the screens you were last on. LangWatch AI Gateway traffic is under **Gateway > Usage**.
-
-Before your first ingestion source reports an event the page looks the same: each of the two lists carries one line saying what will fill it.
-
-<Frame caption="The overview as an earlier build drew it, with a setup checklist. The page no longer shows this checklist.">
-  ![The AI Governance overview with the setup checklist](/images/ai-governance/governance-overview.png)
+<Frame caption="The AI Governance overview orients admins before they move into Costs, Inventory, Agents or People.">
+  ![The AI Governance overview](/images/ai-governance/governance-overview.png)
 </Frame>
 
-## Inventory
+## What Inventory shows
 
-The inventory has two tabs. **Sources** lists the systems that report AI activity, in two groups: real-time streams that push events as they happen, and sources synced on a schedule. A new source reads **Awaiting first event** until its first event arrives, then **Active**.
+Inventory has three tabs: **Catalog**, **Environments** and **Sources**.
 
-<Frame caption="The Sources tab with two real-time sources, a Claude Code source and a generic OpenTelemetry source, both awaiting their first event.">
-  ![The Sources tab of the inventory](/images/ai-governance/governance-inventory-sources.png)
-</Frame>
+**Catalog** holds the AI tool tiles that developers see on `/coding-agents`. Use it to publish coding assistants, model providers and external tools, then scope each tile to the organization or to departments.
 
-**Catalog** holds the tool tiles that developers see on their personal home page, in three groups: coding assistants, model providers and internal tools. Each tile carries its scope.
-
-<Frame caption="The Catalog tab after the starter pack import: four coding assistants and four model providers, each scoped to the organization.">
+<Frame caption="The Catalog tab after the starter pack import, with coding assistants and model providers scoped to the organization.">
   ![The Catalog tab of the inventory](/images/ai-governance/governance-inventory-catalog.png)
 </Frame>
 
-## Personal home page
+**Sources** lists the systems that report AI activity. A source can push events in real time, or LangWatch can pull from a provider API, S3 export or Dataverse table on a schedule.
 
-`/coding-agents` shows each developer the tools published in the catalog, the budgets that apply to them, and their usage this month.
+<Frame caption="The Sources tab with connected feeds and their current status.">
+  ![The Sources tab of the inventory](/images/ai-governance/governance-inventory-sources.png)
+</Frame>
 
-<Frame caption="The personal home page: the tool tiles, the personal and organization budgets, and the Spent, Requests and Most-used model cards.">
+## What the personal home page shows
+
+`/coding-agents` shows each developer the tools published for them, the budgets that apply to them and their usage this month.
+
+<Frame caption="The personal home page shows tool tiles, budgets and usage for the signed-in developer.">
   ![The personal home page](/images/ai-governance/me-home.png)
 </Frame>
 
 ## Pages
 
 <CardGroup cols={2}>
-  <Card title="Inventory: sources" icon="plug" href="/ai-governance/ingestion-sources/index">
-    The systems that report AI activity to LangWatch: Claude Code, generic OpenTelemetry, Workato, Microsoft Copilot Studio, the OpenAI and Anthropic compliance and admin APIs, Databricks Genie, and custom S3 or HTTP audit logs. Each source shows whether it is active, awaiting its first event or disabled.
+  <Card title="Costs" icon="coins" href="/ai-governance/costs">
+    Provider bills, LangWatch AI Gateway metering, seats, provider breakdowns and spender breakdowns.
   </Card>
-  <Card title="Inventory: tool catalog" icon="grid-2" href="/ai-governance/personal-portal/admin-catalog">
-    The coding assistants, model providers and internal tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
+  <Card title="Inventory" icon="grid-2" href="/ai-governance/inventory">
+    The AI tool catalog, environments and connected sources that report activity to LangWatch.
   </Card>
-  <Card title="Anomaly Rules" icon="triangle-exclamation" href="/ai-governance/anomaly-rules">
-    What the anomaly detector evaluates and what a rule is made of. Rules cannot be created or edited in LangWatch today. Available on Enterprise plans.
+  <Card title="Agents" icon="robot" href="/ai-governance/agents">
+    Registered and provider-discovered agents across the organization, with source, owner context, health and recent usage.
   </Card>
   <Card title="People" icon="users" href="/ai-governance/people">
-    Departments: the accounting label that spend rolls up by. Assign people, teams and projects to a department, and personal AI use follows the person.
+    People, departments and the accounting labels used for spend attribution.
   </Card>
   <Card title="Personal home page" icon="house-user" href="/ai-governance/personal-portal/overview">
-    `/coding-agents` shows each developer the tools they may use, the budgets that apply to them, and their spend, requests and most-used model this month.
+    `/coding-agents` shows each developer the tools they may use, the budgets that apply to them and their usage this month.
   </Card>
   <Card title="Roles and permissions" icon="user-shield" href="/platform/rbac">
-    Who can open the governance pages and who can change them: `governance:view` and `governance:manage`, plus the permissions for ingestion sources, anomaly rules and the tool catalog.
-  </Card>
-  <Card title="Audit log" icon="scroll" href="/platform/audit-log">
-    Every change made in the settings, the API and the LangWatch AI Gateway, with who made it and from where.
+    Who can open the governance pages and who can change sources, catalog entries, departments and cost views.
   </Card>
 </CardGroup>
 
-**Also check:** [Coding Agents](/coding-agents/overview) for the cost and activity of each coding agent session, and [LangWatch AI Gateway](/ai-gateway/overview) for virtual keys and budgets.
+**Also check:** [Coding Agents](/coding-agents/overview) for coding-agent sessions and pull requests, and [LangWatch AI Gateway](/ai-gateway/overview) for virtual keys, routing and budgets.
 
 ---
 
@@ -19210,35 +19336,41 @@ sidebarTitle: People
 keywords: departments, people, spend attribution, cost center, scim, langwatch
 ---
 
-A department is an accounting label for AI spend. You create departments on the **People** page, assign people, teams and projects to them on the members and teams pages, and every request's spend is counted under one department.
+Open **AI Governance > People** (`/governance/people`) to review people named by connected sources, match provider identities and manage departments for spend accounting. Departments change where spend is counted. They never grant or restrict access.
 
-A department never grants or restricts access. Assigning a person to Engineering changes only where their spend is counted. For access, see [Access Control (RBAC)](/platform/rbac).
+For access control, use [Access Control (RBAC)](/platform/rbac).
 
-## Manage departments
+## What the People tab shows
 
-Open **AI Governance > People** (`/governance/people`). The page has:
+The **People** tab lists people LangWatch knows about from directory data, connected providers and usage. Rows can include identity evidence, department assignment, source, spend and recent activity when those reads are available.
 
-- **Create a department**: type a name and click **Create**.
-- The department list, with **Edit** to rename and **Archive** in the row menu.
-- **Assigning departments**: links to the members and teams pages, where you assign each person, team and project.
+Use filters to narrow the list by department, source and match state. A missing value means LangWatch has not measured that value for the person yet, not that the value is zero.
 
-<Frame caption="The People page with two departments and the assignment guide below the list.">
+<Frame caption="The People page lists people and departments used for spend attribution.">
   ![The People page](/images/ai-governance/governance-people.png)
 </Frame>
 
-Reading the list needs `governance:view`. Creating, renaming, archiving and assigning need `governance:manage`. Without it the page shows the list only.
+## What the Departments tab shows
 
-## Assign people, teams and projects
+The **Departments** tab lists the active departments used for accounting. Create, rename and archive departments from this tab when you have `governance:manage`.
 
-The People page does not list assignments per person, so it stays usable in a large organization. Assign on the pages that already list the people and teams:
+Archiving removes a department from pickers. It does not delete historical rows. Spend that no longer matches an active department is counted under **Unassigned**.
+
+## How identity matching works
+
+**Run match pass** asks LangWatch to review provider identities against known people. The pass creates suggestions where the evidence is strong enough to review, and it leaves uncertain identities unmatched instead of guessing.
+
+Confirming a suggestion links the provider identity to the person for governance reporting. It does not create a login, change a role or grant access to anything.
+
+## Assign departments
+
+Assign departments from the People page, or from the organization settings pages that already list people, teams and projects.
 
 | What | Where | Effect |
-|------|-------|--------|
-| A person | **Settings > Members**, the **Department** column | The person's spend, including their personal AI use, rolls up to this department |
-| A team | **Settings > Teams & Projects**, the picker on the team row | The default for the team's members and projects that have no department of their own |
-| A project | **Settings > Teams & Projects**, the picker on the project row | Spend of agents that run in the project with no person behind the request |
-
-The Department column and the pickers appear once the organization has at least one department, for a viewer with `organization:manage`.
+|---|---|---|
+| A person | **AI Governance > People**, or **Settings > Members** | The person's spend, including personal AI use, rolls up to this department |
+| A team | **Settings > Teams & Projects** | Members and projects inherit this department when they have no department of their own |
+| A project | **Settings > Teams & Projects** | Agent spend with no human principal rolls up to this department |
 
 <Frame caption="The Department column on Settings > Members, with each person assigned to Engineering or Marketing.">
   ![The Department column on Settings > Members](/images/ai-governance/governance-people-member-assignment.png)
@@ -19248,37 +19380,33 @@ The Department column and the pickers appear once the organization has at least 
   ![The department pickers on Settings > Teams & Projects](/images/ai-governance/governance-people-team-assignment.png)
 </Frame>
 
-## How spend is attributed
+## How spend rolls up
 
 Each request counts once, in exactly one department.
 
-For a request made by a person, LangWatch uses the first of these that is set: the person's own department, the department of their team, the department of the project the request ran in. For a request with no person behind it, for example an autonomous agent, LangWatch uses the department of the project. A project's department is its own, or the one inherited from its team.
+For a request made by a person, LangWatch uses the first department it can prove in this order: the person's department, the person's team department, then the project department. For a request with no person behind it, such as an autonomous agent, LangWatch uses the project department.
 
-A request that matches none of these is counted under **Unassigned**.
-
-The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The department breakdown on **Governance > Analytics** is in preview; spend per team is on the Teams page at `/governance/teams` and spend per person on **Governance > People** today.
-
-## Archive a department
-
-Archive removes the department from the pickers. Spend already attributed to it is counted under **Unassigned** from then on. The assignments stay stored; archive deletes no data. You can create a new department with the same name as an archived one.
+A request that matches none of these is counted under **Unassigned**. Read the department breakdown on [Costs](/ai-governance/costs).
 
 ## Assign departments through SCIM
 
-When your identity provider provisions users through SCIM, LangWatch reads the `costCenter` attribute of the SCIM Enterprise User extension:
+When your identity provider provisions users through SCIM, LangWatch reads the `costCenter` attribute of the SCIM Enterprise User extension.
 
 | The identity provider sends | LangWatch |
-|-----------------------------|-----------|
+|---|---|
 | A `costCenter` that matches an active department | Assigns the user to it |
 | A `costCenter` that matches no active department | Creates the department and assigns the user |
 | A new `costCenter` value on an update | Replaces the assignment |
-| An empty `costCenter`, or removes the attribute | Clears the assignment; the user's spend counts under Unassigned |
+| An empty `costCenter`, or removes the attribute | Clears the assignment |
 | No `costCenter` in the request | Leaves the assignment as it is |
 
-## Where else a department applies
+## Permissions
 
-A [data privacy](/platform/data-privacy) rule can be written at department scope, and a tile in the [tool catalog](/ai-governance/personal-portal/admin-catalog) can be scoped to departments.
+Reading People needs `governance:view`. Running a match pass, confirming a suggestion and changing departments need `governance:manage`.
 
-**Also check:** [SCIM](/platform/scim) for provisioning setup, and [Members and Teams](/platform/members-and-teams) for the pages where you assign departments.
+Department assignment in **Settings > Members** and **Settings > Teams & Projects** needs the organization management permissions for those settings pages.
+
+**Also check:** [Costs](/ai-governance/costs) for department spend, [SCIM](/platform/scim) for provisioning setup, and [Members and Teams](/platform/members-and-teams) for organization membership settings.
 
 ---
 
