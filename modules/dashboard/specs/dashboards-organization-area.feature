@@ -885,6 +885,13 @@ Feature: Organization-wide Dashboards area
     And Escape while moving puts the board back where it was and saves nothing
     # Evidence: haven browser screenshot with the handle focused
 
+  @integration
+  Scenario: A reorder the server refuses puts back the last saved order
+    Given my saved LLM Ops order is "Gamma", "Alpha" and "Beta"
+    When I move "Beta" above "Gamma" and the save fails
+    Then the section lists My dashboard, "Gamma", "Alpha" and "Beta" again with no new read
+    And it says "Couldn't save the order of your dashboards"
+
   @unit
   Scenario: A board my order does not name is listed after the ones it does, by name
     Given my order in LLM Ops names "Beta" then "Alpha"

@@ -5,6 +5,7 @@
  */
 
 import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
+import { useRef } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
@@ -35,6 +36,9 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     enabled: organizationId !== "",
   });
   const save = analyticsApi.boards.reorderSidebar.useMutation();
+  // The order the server last confirmed, and how many saves are still out; read in callbacks only.
+  const confirmed = useRef<readonly string[]>([]);
+  const pending = useRef(0);
   const stored = order.data?.dashboardIds ?? [];
   const allBoards = (list.data ?? []).map(libraryBoardOf);
   const boards = productSidebarBoards({
@@ -46,18 +50,22 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
   });
 
   const reorder = (shownIds: readonly string[]) => {
+    // With no save out, the cached order is the one the server holds.
+    if (pending.current === 0) confirmed.current = stored;
+    pending.current += 1;
     const dashboardIds = nextSidebarOrder({ stored, shown: shownIds });
     utils.boards.sidebarOrder.setData(orderInput, { dashboardIds });
-    save.mutate(
-      { ...orderInput, dashboardIds },
-      {
-        // Read back what the server holds, so overlapping failed saves cannot leave a guess.
-        onError: (error) => {
-          void utils.boards.sidebarOrder.invalidate(orderInput);
-          host.failed({ error, fallbackTitle: "Couldn't save the order of your dashboards" });
-        },
-      },
-    );
+    save
+      .mutateAsync({ ...orderInput, dashboardIds })
+      .then(() => {
+        confirmed.current = dashboardIds;
+        pending.current -= 1;
+      })
+      .catch((error: unknown) => {
+        pending.current -= 1;
+        utils.boards.sidebarOrder.setData(orderInput, { dashboardIds: [...confirmed.current] });
+        host.failed({ error, fallbackTitle: "Couldn't save the order of your dashboards" });
+      });
   };
 
   // A failed order read lists the boards by name rather than hiding the section.

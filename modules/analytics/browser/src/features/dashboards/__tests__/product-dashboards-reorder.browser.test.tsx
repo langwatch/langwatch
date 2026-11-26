@@ -46,10 +46,13 @@ const LISTED = [
   board({ id: "gamma", name: "Gamma" }),
 ];
 
-function renderSection() {
+function renderSection({
+  saved = [],
+  isSaveRefused = false,
+}: { saved?: readonly string[]; isSaveRefused?: boolean } = {}) {
   const host = new StubAnalyticsHost();
   const calls: UiProcedureCall[] = [];
-  let stored: readonly string[] = [];
+  let stored = saved;
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.listInOrganization") return Promise.resolve(LISTED);
@@ -58,6 +61,7 @@ function renderSection() {
     if (call.path === "boards.getAll") return Promise.resolve([]);
     if (call.path === "boards.sidebarOrder") return Promise.resolve({ dashboardIds: stored });
     if (call.path === "boards.reorderSidebar") {
+      if (isSaveRefused) return Promise.reject(new Error("refused"));
       stored = (call.input as { dashboardIds: readonly string[] }).dashboardIds;
       return Promise.resolve({ success: true });
     }
@@ -156,5 +160,33 @@ describe("a product's Dashboards section, reordered", () => {
         "Dropped Gamma at Alpha's place.",
       ),
     );
+  });
+
+  /** @scenario "A reorder the server refuses puts back the last saved order" */
+  it("puts the saved order back without a new read when the save fails", async () => {
+    const { host, calls, user } = renderSection({
+      saved: ["gamma", "alpha", "beta"],
+      isSaveRefused: true,
+    });
+    await waitFor(async () =>
+      expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]),
+    );
+    const reads = () => calls.filter((call) => call.path === "boards.sidebarOrder").length;
+    const readsBefore = reads();
+
+    screen.getByRole("button", { name: "Reorder Beta" }).focus();
+    await user.keyboard(" ");
+    await user.keyboard("{ArrowUp}");
+    await user.keyboard("{ArrowUp}");
+    await user.keyboard(" ");
+
+    await waitFor(() =>
+      expect(host.failures).toEqual([
+        expect.objectContaining({ fallbackTitle: "Couldn't save the order of your dashboards" }),
+      ]),
+    );
+    expect(savedOrders(calls)).toEqual([["beta", "gamma", "alpha"]]);
+    expect(await listed()).toEqual(["My dashboard", "Gamma", "Alpha", "Beta"]);
+    expect(reads()).toBe(readsBefore);
   });
 });
