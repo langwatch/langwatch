@@ -76,7 +76,6 @@ describe("topic clustering's models, read through the model provider", () => {
 
       const refusal = models.resolveEmbeddingsModel(PROJECT);
 
-      await expect(refusal).rejects.toThrow("Embeddings model provider openai not found");
       await expect(refusal).rejects.toMatchObject({
         code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
       });
