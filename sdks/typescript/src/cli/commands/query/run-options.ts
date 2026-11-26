@@ -41,7 +41,7 @@ export function resolveStatement({ sql, sqlFile }: { sql?: string; sqlFile?: str
   }
   if (sql === undefined || sql.trim().length === 0) {
     refuse(
-      'give a statement: langwatch query "SELECT count() FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1)"',
+      'give a statement: langwatch query "SELECT count() FROM traces WHERE OccurredAt >= subtractDays(now(), 1)"',
     );
   }
   return sql;

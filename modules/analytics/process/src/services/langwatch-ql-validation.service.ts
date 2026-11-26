@@ -12,6 +12,7 @@ import {
 } from "../rules/langwatch-ql-parser.rules.ts";
 import {
   type LangWatchQLPolicy,
+  bareViewName,
   qualifyTableName,
   RESERVED_DATABASES,
   type ResolvedLangWatchQLPolicy,
@@ -105,7 +106,9 @@ export class LangWatchQLValidationService {
       reservedDatabases: new Set(RESERVED_DATABASES),
       defaultDatabase,
       limits: policy.limits ?? DEFAULT_LWQL_LIMITS,
-      availableViews: sortedUnique(policy.allowedTables),
+      availableViews: sortedUnique(
+        policy.allowedTables.map((entry) => bareViewName({ table: entry, defaultDatabase })),
+      ),
       viewColumns: new Map(
         Object.entries(policy.viewColumns ?? {}).map(([table, columns]) => [
           qualifyTableName({ table, defaultDatabase }),
