@@ -19,14 +19,14 @@ async function waitUntil(ready: () => boolean | Promise<boolean>, what: string):
   throw new Error(`waited for ${what} and it never happened`);
 }
 
-/** Whether an UPDATE of this table is parked on another transaction's row lock. */
-async function updateIsWaitingOnALock({
+/** How many UPDATEs of this table are parked on another transaction's row lock. */
+async function updatesWaitingOnALock({
   prisma,
   table,
 }: {
   prisma: PrismaClient;
   table: string;
-}): Promise<boolean> {
+}): Promise<number> {
   const rows = await prisma.$queryRaw<{ waiting: bigint }[]>`
     ${skipTenantCheck({
       // Reads the server's own activity view, which holds no tenant data.
@@ -40,18 +40,23 @@ async function updateIsWaitingOnALock({
        AND query ILIKE '%UPDATE%'
        AND query ILIKE ${`%${table}%`}
   `;
-  return Number(rows[0]?.waiting ?? 0) > 0;
+  return Number(rows[0]?.waiting ?? 0);
 }
 
-/** Runs `first`, parks `second` behind it on the row lock, then commits `first`. */
+/**
+ * Runs `first`, waits until `parked` UPDATEs (one by default) from `second` wait on the row
+ * lock, then commits `first`. A `second` that sends several writes at once names how many.
+ */
 export async function raceOnOneRow<T>({
   prisma,
   table,
+  parked = 1,
   first,
   second,
 }: {
   prisma: PrismaClient;
   table: string;
+  parked?: number;
   first: (tx: Prisma.TransactionClient) => Promise<T>;
   second: (tx: Prisma.TransactionClient) => Promise<T>;
 }): Promise<{ first: T; second: T }> {
@@ -89,10 +94,13 @@ export async function raceOnOneRow<T>({
     });
     secondRuns.catch(() => void 0);
 
-    await waitUntil(() => {
-      stillRunning();
-      return updateIsWaitingOnALock({ prisma, table });
-    }, `an UPDATE of ${table} to park on the row lock`);
+    await waitUntil(
+      async () => {
+        stillRunning();
+        return (await updatesWaitingOnALock({ prisma, table })) >= parked;
+      },
+      `${parked} UPDATE${parked === 1 ? "" : "s"} of ${table} to park on the row lock`,
+    );
   } finally {
     release();
   }
