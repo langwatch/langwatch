@@ -1,7 +1,7 @@
 /**
- * The failure contract of a run's three steps: an attempt below the cap is
- * rethrown so the outbox retries it, the final attempt records the run as
- * failed and retires the message, and a lost outcome write never costs a page.
+ * A run's three steps fail like this: an attempt below the cap is rethrown for
+ * the outbox to retry; the last records the failure (a page's own, or the run's
+ * for a plan or finish) and retires the message; a lost write never costs a page.
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
