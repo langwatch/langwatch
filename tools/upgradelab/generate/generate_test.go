@@ -6,12 +6,21 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/langwatch/langwatch/tools/upgradelab/seed"
 )
+
+const repoRoot = "../../.."
+
+// declaringGlobs are the repo paths that declare migration steps; go-ci's
+// `upgradelab` filter must list each one (TestGoCIRunsOnDeclaredSteps).
+var declaringGlobs = []string{"modules/*/process/src/*.module.ts", "enterprise/modules/*/process/src/*.module.ts"}
 
 var anchor = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 
@@ -132,8 +141,8 @@ func TestEveryDeclaredStepIsCovered(t *testing.T) {
 	}
 	declared := regexp.MustCompile(`define(?:MigrationStep|ProjectionReplayStep)\(\{\s*id: "([^"]+)"`)
 	found := 0
-	for _, glob := range []string{"../../../modules/*/process/src/*.module.ts", "../../../enterprise/modules/*/process/src/*.module.ts"} {
-		paths, _ := filepath.Glob(glob)
+	for _, glob := range declaringGlobs {
+		paths, _ := filepath.Glob(filepath.Join(repoRoot, glob))
 		for _, path := range paths {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -150,6 +159,71 @@ func TestEveryDeclaredStepIsCovered(t *testing.T) {
 	}
 	if found < 15 {
 		t.Fatalf("found %d declared steps; the declaration pattern drifted", found)
+	}
+}
+
+// goCI is the part of go-ci.yaml that decides whether a pull request runs the coverage test.
+type goCI struct {
+	On struct {
+		PullRequest struct {
+			Paths []string `yaml:"paths"`
+		} `yaml:"pull_request"`
+	} `yaml:"on"`
+	Jobs map[string]struct {
+		If    string `yaml:"if"`
+		Steps []struct {
+			Run  string            `yaml:"run"`
+			With map[string]string `yaml:"with"`
+		} `yaml:"steps"`
+	} `yaml:"jobs"`
+}
+
+func loadGoCI(t *testing.T) goCI {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "go-ci.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow goCI
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	return workflow
+}
+
+// upgradelabFilter is the `upgradelab` key of the changes job's paths filter.
+func upgradelabFilter(t *testing.T, workflow goCI) []string {
+	t.Helper()
+	for _, step := range workflow.Jobs["changes"].Steps {
+		if step.With["filters"] == "" {
+			continue
+		}
+		var filters map[string][]string
+		if err := yaml.Unmarshal([]byte(step.With["filters"]), &filters); err != nil {
+			t.Fatal(err)
+		}
+		return filters["upgradelab"]
+	}
+	t.Fatal("go-ci's changes job has no paths filter")
+	return nil
+}
+
+// @scenario "go-ci runs the coverage test when a module declares a step"
+func TestGoCIRunsOnDeclaredSteps(t *testing.T) {
+	workflow := loadGoCI(t)
+	filter := upgradelabFilter(t, workflow)
+	for _, glob := range declaringGlobs {
+		if !slices.Contains(workflow.On.PullRequest.Paths, glob) {
+			t.Errorf("go-ci's on.pull_request.paths misses %s, so a pull request declaring a step there starts no run", glob)
+		}
+		if !slices.Contains(filter, glob) {
+			t.Errorf("go-ci's upgradelab filter misses %s, so the coverage test skips on it", glob)
+		}
+	}
+	job := workflow.Jobs["upgradelab"]
+	if !strings.Contains(job.If, "needs.changes.outputs.upgradelab == 'true'") || len(job.Steps) == 0 ||
+		job.Steps[len(job.Steps)-1].Run != "go test ./tools/upgradelab/..." {
+		t.Error("go-ci's upgradelab job must run go test ./tools/upgradelab/... when the upgradelab filter matches")
 	}
 }
 

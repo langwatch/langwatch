@@ -11,7 +11,7 @@ on:
   pull_request:
     # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
     types: [opened, synchronize, reopened, ready_for_review]
-    # The union of the `go` and `ciguards` filters below, plus go.work: a pull
+    # The union of the `go`, `upgradelab` and `ciguards` filters below, plus go.work: a pull
     # request with no Go and no workflow change starts no run. No check from
     # this workflow is required, so it has no aggregator.
     paths:
@@ -60,6 +60,8 @@ jobs:
       # ciguard reads workflow files, not Go source, so it needs its own key:
       # a checkout added to langwatch-app-ci touches no .go file.
       ciguards: ${{ steps.filter.outputs.ciguards || steps.force.outputs.go }}
+      # A module's declared steps feed one upgradelab test, not the whole Go suite.
+      upgradelab: ${{ steps.filter.outputs.upgradelab }}
       # Draft PRs keep lint + vet (seconds) and skip the race-detector test
       # run and the build. Both come back on ready_for_review.
       # A PR labelled `ci:full` runs it all, draft or not.
@@ -112,13 +114,15 @@ jobs:
               - 'sdks/go/**'
               - 'infra/clickhouse-serverless/**'
               - 'packages/handled-error/**'
-              # upgradelab's coverage test reads every module's declared steps.
-              - 'modules/*/process/src/*.module.ts'
-              - 'enterprise/modules/*/process/src/*.module.ts'
               - '*/go.mod'
               - '*/go.sum'
               - '.golangci.yml'
               - '.github/workflows/go-ci.yaml'
+            # upgradelab's coverage test reads every module's declared migration
+            # steps; tools/upgradelab/generate/generate_test.go pins these globs.
+            upgradelab:
+              - 'modules/*/process/src/*.module.ts'
+              - 'enterprise/modules/*/process/src/*.module.ts'
             ciguards:
               - '.github/workflows/**'
               - '.github/pr-filters.yml'
@@ -181,6 +185,20 @@ jobs:
           cache-dependency-path: "*/go.sum"
       - run: go test ./tools/ciguard/...
       - run: go run ./cmd/ciguard
+
+  # The full `test` job covers upgradelab whenever `go` matches.
+  upgradelab:
+    needs: changes
+    if: ${{ needs.changes.outputs.upgradelab == 'true' && needs.changes.outputs.go != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - run: go test ./tools/upgradelab/...
 
   test:
     needs: changes
