@@ -136,6 +136,11 @@
       "cells": ["C1", "C2"],
       "note": "rows the old image changed after the copy, and accounts identity reopened, reach the new steps"
     },
+    "trace:link-unowned-trace-media": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs trace media stored without an owner link, as the previous release wrote it"
+    },
     "trace:send-month-trace-ids": {
       "status": "seeded",
       "seed": "traffic:otlp",
