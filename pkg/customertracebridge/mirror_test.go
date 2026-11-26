@@ -49,8 +49,13 @@ func startCapturingIngest(t *testing.T) *capturingIngest {
 	return ci
 }
 
+// resourcePrefix marks a resource attribute in the flattened maps
+// spansByProject returns, so a test can tell span from resource placement.
+const resourcePrefix = "resource:"
+
 // spansByProject decodes every captured body and buckets spans by their
-// langwatch.project_id attribute.
+// langwatch.project_id span attribute. Each span's map also holds its
+// resource's attributes, keyed with resourcePrefix.
 func (c *capturingIngest) spansByProject(t *testing.T) map[string][]map[string]string {
 	t.Helper()
 	c.mu.Lock()
@@ -65,6 +70,9 @@ func (c *capturingIngest) spansByProject(t *testing.T) map[string][]map[string]s
 			for _, ss := range rs.ScopeSpans {
 				for _, span := range ss.Spans {
 					attrs := map[string]string{}
+					for _, a := range rs.GetResource().GetAttributes() {
+						attrs[resourcePrefix+a.GetKey()] = attrValue(a)
+					}
 					for _, a := range span.Attributes {
 						attrs[a.GetKey()] = attrValue(a)
 					}
@@ -168,23 +176,36 @@ func TestMirrorLeg(t *testing.T) {
 			assert.Contains(t, spans[0][string(attrOutputMessages)], mirrorTestCompletion)
 		})
 
-		t.Run("the mirror copy attributes the source organization", func(t *testing.T) {
-			assert.Equal(t, "org-acme", byProject["proj-mirror"][0][string(attrOrgID)])
+		// @scenario "Mirrored model calls name the customer they came from"
+		t.Run("the mirror copy's resource names the source organization and project", func(t *testing.T) {
+			attrs := byProject["proj-mirror"][0]
+			assert.Equal(t, "org-acme", attrs[resourcePrefix+string(attrOrgID)])
+			assert.Equal(t, "proj-customer", attrs[resourcePrefix+string(attrProjectID)])
+			assert.Equal(t, "gateway", attrs[resourcePrefix+"langwatch.origin"],
+				"the policy's own stamp still holds on the mirror copy")
 		})
 
-		t.Run("the source organization never rides the customer's copy", func(t *testing.T) {
-			_, present := byProject["proj-customer"][0][string(attrOrgID)]
-			assert.False(t, present,
-				"source-tenant attribution is mirror-only")
+		t.Run("the mirror copy still routes to the mirror project", func(t *testing.T) {
+			assert.Equal(t, "proj-mirror", byProject["proj-mirror"][0][string(attrProjectID)])
+			_, spanOrg := byProject["proj-mirror"][0][string(attrOrgID)]
+			assert.False(t, spanOrg, "the source tenant lives on the resource, not the span")
+		})
+
+		t.Run("the source tenant never rides the customer's copy", func(t *testing.T) {
+			attrs := byProject["proj-customer"][0]
+			for _, key := range []string{string(attrOrgID), resourcePrefix + string(attrOrgID), resourcePrefix + string(attrProjectID)} {
+				_, present := attrs[key]
+				assert.False(t, present, "source-tenant attribution %s is mirror-only", key)
+			}
 		})
 
 		t.Run("neither copy carries the reserved mirror markers", func(t *testing.T) {
 			for project, spans := range byProject {
 				for _, attrs := range spans {
-					_, hasTier := attrs[string(attrMirrorTier)]
-					_, hasOrgMarker := attrs[string(attrMirrorSourceOrg)]
-					assert.False(t, hasTier, "%s carries the reserved tier marker", project)
-					assert.False(t, hasOrgMarker, "%s carries the reserved source marker", project)
+					for key := range attrs {
+						assert.NotContains(t, key, "langwatch.reserved.mirror",
+							"%s carries a reserved mirror marker", project)
+					}
 				}
 			}
 		})
@@ -207,7 +228,8 @@ func TestMirrorLeg(t *testing.T) {
 
 		t.Run("the mirror copy keeps usage, model and attribution", func(t *testing.T) {
 			attrs := byProject["proj-mirror"][0]
-			assert.Equal(t, "org-acme", attrs[string(attrOrgID)])
+			assert.Equal(t, "org-acme", attrs[resourcePrefix+string(attrOrgID)])
+			assert.Equal(t, "proj-customer", attrs[resourcePrefix+string(attrProjectID)])
 			assert.NotEmpty(t, attrs["gen_ai.request.model"])
 		})
 

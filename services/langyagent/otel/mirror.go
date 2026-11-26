@@ -103,7 +103,8 @@ func MirrorCopy(td ptrace.Traces, p MirrorParams) ptrace.Traces {
 }
 
 // reparentPreservingHierarchy rewrites every span's trace id to the turn's and
-// re-parents batch-root/orphan spans onto the turn span, KEEPING the worker's
+// re-parents batch-root/orphan spans onto the turn span (never the turn span
+// itself, which the relay mirrors as the trace root), KEEPING the worker's
 // internal parent/child links — so the mirror shows the same call tree the
 // customer sees. No-op when the turn context is not yet valid (a batch racing
 // the first turn), leaving the worker's own ids so the batch is at least
@@ -125,6 +126,10 @@ func reparentPreservingHierarchy(td ptrace.Traces, turn trace.SpanContext) {
 	})
 	forEachMirrorSpan(td, func(sp ptrace.Span) {
 		sp.SetTraceID(turnTraceID)
+		if sp.SpanID() == turnSpanID {
+			// the turn root itself keeps its own (empty) parent
+			return
+		}
 		parent := sp.ParentSpanID()
 		if _, inBatch := batchSpanIDs[parent]; parent.IsEmpty() || !inBatch {
 			sp.SetParentSpanID(turnSpanID)
