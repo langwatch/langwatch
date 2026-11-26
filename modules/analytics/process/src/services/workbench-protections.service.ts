@@ -250,7 +250,9 @@ export class WorkbenchProtectionsService {
     try {
       const projects = await Promise.all(
         input.projectIds.map((projectId) =>
-          loaded?.id === projectId ? loaded : this.dependencies.projects.findById(projectId),
+          loaded?.id === projectId
+            ? Promise.resolve(loaded)
+            : this.dependencies.projects.findById(projectId),
         ),
       );
       return projects.every((project) => project?.ownerUserId === userId);
