@@ -11,7 +11,7 @@ export const name = "langwatch-remote-cache";
 
 let ownUrl = null;
 
-export const githubCliToken = () => {
+const githubCliToken = () => {
   const out = spawnSync("gh", ["auth", "token", "--hostname", "github.com"], {
     encoding: "utf8",
     timeout: 5000,

@@ -50,6 +50,7 @@ app:
   - "pkg/**"
   - "services/langevals/**"
   - "dev/scripts/**"
+  - "dev/nx/**"
   - ".gitattributes"
   - ".github/workflows/pr.yml"
   - ".github/pr-filters.yml"

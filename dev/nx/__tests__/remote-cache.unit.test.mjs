@@ -446,6 +446,15 @@ describe("Nx remote cache", () => {
     );
     assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).action, "say");
     assert.equal(setupStep({ ...base, loggedIn: false, interactive: false }).remember, undefined);
+    // A person was told once; agents and scripts on the same machine still are, every time.
+    assert.equal(
+      setupStep({ ...base, loggedIn: false, interactive: false, remembered: "told" }).action,
+      "say",
+    );
+    assert.equal(
+      setupStep({ ...base, loggedIn: false, interactive: false, remembered: "no-gh" }).action,
+      "say",
+    );
     const noGh = setupStep({ ...base, ghInstalled: false, loggedIn: false, interactive: true });
     assert.equal(noGh.remember, "no-gh");
     assert.match(noGh.line, /install the GitHub CLI/);

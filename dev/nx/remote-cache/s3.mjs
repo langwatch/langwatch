@@ -56,7 +56,7 @@ export const signedHeaders = ({
   };
 };
 
-export const objectPath = (key) => {
+const objectPath = (key) => {
   if (!/^[A-Za-z0-9._/-]+$/.test(key)) throw new Error(`unsafe cache key ${key}`);
   return `/${key}`;
 };

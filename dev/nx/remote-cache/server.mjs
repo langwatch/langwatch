@@ -129,7 +129,7 @@ export const createCacheServer = ({
 }) =>
   createServer(route({ scope, store, maxUploadBytes, log, state: { tainted: false } }, token, id));
 
-export const s3Store = ({ bucket, region, credentials }) => ({
+const s3Store = ({ bucket, region, credentials }) => ({
   get: async (key) => {
     const creds = await credentials();
     if (!creds) return null;

@@ -2,7 +2,7 @@
 // passes in the environment. Laptops hold none; they go through the cache gate (gate.mjs).
 const REFRESH_BEFORE_MS = 5 * 60_000;
 
-export const fromEnvironment = (env) =>
+const fromEnvironment = (env) =>
   env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
     ? {
         accessKeyId: env.AWS_ACCESS_KEY_ID,

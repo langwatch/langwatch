@@ -10,8 +10,8 @@ import { cacheScope } from "./scope.mjs";
 // that point Nx at it. The plugin calls it for a laptop, which goes through the cache gate
 // with its GitHub token; CI runs it as a script from the nx-remote-cache action, so the
 // role's credentials stay in the server's environment only.
-export const BUCKET = "langwatch-dev-nx-remote-cache";
-export const REGION = "eu-central-1";
+const BUCKET = "langwatch-dev-nx-remote-cache";
+const REGION = "eu-central-1";
 const SERVER = fileURLToPath(new URL("./server.mjs", import.meta.url));
 
 // What /health says about the server on that port: its pid and key, or null.
@@ -68,8 +68,7 @@ export const serverConfig = ({ workspaceRoot, scope, gate = null, githubToken = 
   };
 };
 
-export const logFileFor = (workspaceRoot) =>
-  join(workspaceRoot, ".nx", "remote-cache", "server.log");
+const logFileFor = (workspaceRoot) => join(workspaceRoot, ".nx", "remote-cache", "server.log");
 
 export const ensureServer = async ({
   workspaceRoot,
@@ -118,7 +117,7 @@ export const nxEnvironment = (state) => ({
 
 // The cache server's whole environment in CI: PATH and the role's session from
 // NX_CACHE_AWS_*. Nothing else from the job reaches it, and no step ever sees AWS_*.
-export const ciServerEnv = (env) => ({
+const ciServerEnv = (env) => ({
   PATH: env.PATH,
   AWS_ACCESS_KEY_ID: env.NX_CACHE_AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY: env.NX_CACHE_AWS_SECRET_ACCESS_KEY,

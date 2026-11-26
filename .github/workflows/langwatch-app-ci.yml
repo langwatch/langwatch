@@ -216,6 +216,7 @@ jobs:
               - 'pkg/**'
               - 'services/langevals/**'
               - 'dev/scripts/**'
+              - 'dev/nx/**'
               - '.github/scripts/**'
               - '.gitattributes'
               - '.github/workflows/langwatch-app-ci.yml'

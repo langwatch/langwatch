@@ -1,11 +1,11 @@
 // Where a run reads and writes Nx remote cache entries. The trust rule is in
 // specs/ci/nx-remote-cache.feature: main trusts only CI, a laptop writes only its branch.
 // The bucket policy enforces the same split, so a bug here cannot widen it.
-export const MAIN = "main/";
-export const PR = "pr/";
+const MAIN = "main/";
+const PR = "pr/";
 
 // Branch names go into an S3 key: anything outside [A-Za-z0-9._-] becomes "_".
-export const branchPrefix = (branch) =>
+const branchPrefix = (branch) =>
   `branch/${String(branch)
     .replace(/[^A-Za-z0-9._-]+/g, "_")
     .slice(0, 200)}/`;

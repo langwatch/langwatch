@@ -26,10 +26,10 @@ export const setupStep = ({ env, gate, ghInstalled, loggedIn, remembered, intera
     return { action: "none" };
   if (!gate) return { action: "none" };
   if (loggedIn) return { action: "none", remember: remembered === "on" ? undefined : "on" };
-  if (remembered && remembered !== "on") return { action: "none" };
   const line = ghInstalled ? OFF_LINE : NO_GH_LINE;
   // With no one at a terminal (an agent, a script), say it every time and remember nothing.
   if (!interactive) return { action: "say", line };
+  if (remembered && remembered !== "on") return { action: "none" };
   return { action: "say", line, remember: ghInstalled ? "told" : "no-gh" };
 };
 
