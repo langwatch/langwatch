@@ -370,4 +370,40 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
       expect(await notices.countRefusedForDay({ organizationId, dayKey: "2026-11-07" })).toBe(0);
     });
   });
+
+  describe("when a request is approved and asked again while its seat is being given", () => {
+    /** @scenario "Asking again while an approval is giving its seat reopens nothing" */
+    it("leaves the approval in place, and reopens only once the seat is settled", async () => {
+      const ask = (id: string, at: number) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "mia@acme.example",
+          userId: "user-mia",
+          name: "Mia",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          at,
+        });
+      const first = await ask(`${namespace}-mia-a`, 1_000);
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "APPROVED",
+        resolvedByUserId: "user-ada",
+        at: 2_000,
+      });
+
+      const during = await ask(`${namespace}-mia-b`, 2_500);
+      await requests.settleSeat({ organizationId, id: first.request.id, at: 2_000 });
+      const after = await ask(`${namespace}-mia-c`, 3_000);
+
+      expect(during).toMatchObject({
+        outcome: "resolved_meanwhile",
+        request: { status: "APPROVED" },
+      });
+      expect(after).toMatchObject({ outcome: "reopened", request: { status: "OPEN" } });
+    });
+  });
 });

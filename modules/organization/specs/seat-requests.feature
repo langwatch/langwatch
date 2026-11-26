@@ -612,6 +612,19 @@ Feature: Seat requests when an organization is over its seat limit
       Then the answer is failed and the seat request stays open
 
     @unit
+    Scenario: A Stripe page from before a decline never approves the request opened again
+      Given an approval is waiting on a Stripe page for Lena's request
+      And an administrator declines the request and Lena asks again
+      When the old Stripe page is completed
+      Then it refuses with seat_request_not_found and the new request stays open
+
+    @unit
+    Scenario: Asking again while an approval is giving its seat reopens nothing
+      Given an administrator approves with a seat and the purchase is still running
+      When Lena asks for access again
+      Then the approval stands, one seat is bought and nothing is reopened
+
+    @unit
     Scenario: A payment reference that does not parse is refused
       When an administrator completes an approval with a payment reference that is not one
       Then it refuses with validation_error and nothing is approved
@@ -635,3 +648,10 @@ Feature: Seat requests when an organization is over its seat limit
       Then the Stripe page opens in a new tab and the row says it waits on the payment
       When the payment is paid
       Then the request is approved
+
+    @integration
+    Scenario: An approval waiting on its Stripe page stops waiting once the request is answered elsewhere
+      Given an approval waits on its Stripe page
+      And another administrator declines the request
+      When the administrator comes back to the window
+      Then the row stops waiting, says the request was already answered and the list is read again

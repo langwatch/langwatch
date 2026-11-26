@@ -379,11 +379,28 @@ describe("MemberRoleSeatPurchaseService", () => {
       expect(state.roleWrites).toBe(0);
     });
 
+    /** @scenario "A newer role change replaces the one waiting on its payment" */
+    it("never applies the waiting change once a newer role write for the member succeeded", async () => {
+      const { state, service, pay } = await waiting();
+      state.paid += 1;
+
+      const newer = await service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+      pay("in_seat");
+      await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
+
+      expect(newer).toMatchObject({ status: "changed", seatAdded: false });
+      expect(state.roles.get(SAM)).toBe("MEMBER");
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "seat_only",
+        reason: "a later role change for this member replaced it",
+      });
+    });
+
     /** @scenario "A paid fact that cannot apply yet is delivered again" */
     it("throws on the paid fact while another applier holds the change", async () => {
       const { service, pay, pending } = await waiting();
       pay("in_seat");
-      await pending.claim({ id: "change_1" });
+      await pending.claim({ id: "change_1", token: "another-applier" });
 
       await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
         /could not apply yet/,

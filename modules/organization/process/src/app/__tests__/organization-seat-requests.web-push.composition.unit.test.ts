@@ -161,6 +161,17 @@ describe("given a Lite Member whose arrival already opened a seat request", () =
     });
   });
 
+  describe("when she presses Request access the same day her arrival was mailed", () => {
+    /** @scenario "Administrators and Billing members get an in-app push when a member asks" */
+    it("still pushes the administrators and Billing members about her ask", async () => {
+      const { push, arrival } = await arrivedThenAsked({ nextDay: false });
+
+      const asked = push.pushes.filter((sent) => sent.topic === `seat-request:${arrival.id}`);
+      expect(asked.map((sent) => sent.userId).toSorted()).toEqual([ADA.id, BILL.id].toSorted());
+      expect(asked[0]?.body).toBe("To run the workbench");
+    });
+  });
+
   describe("when she presses Request access and an administrator declines it", () => {
     /** @scenario "The member who asked gets an in-app push with the answer" */
     it("keeps the request as hers and pushes her the answer", async () => {

@@ -23,6 +23,7 @@ const { calls, openSeats, state } = vi.hoisted(() => ({
   state: {
     open: undefined as unknown,
     failing: new Set<string>(),
+    errors: {} as Record<string, unknown>,
     answers: {} as Record<string, unknown[]>,
   },
 }));
@@ -39,6 +40,7 @@ vi.mock("../organization-api.ts", () => {
       mutateAsync: async (input: unknown) => {
         calls.push({ path, input });
         if (state.failing.has(path)) throw new Error(`${path} failed`);
+        if (path in state.errors) throw state.errors[path];
         const queued = state.answers[path];
         return queued && queued.length > 1 ? queued.shift() : (queued?.[0] ?? {});
       },
@@ -127,6 +129,7 @@ describe("useSeatRequests approve", () => {
     openSeats.mockReset();
     state.failing.clear();
     state.answers = {};
+    state.errors = {};
     opened.mockRestore();
     vi.useRealTimers();
   });
@@ -299,6 +302,34 @@ describe("useSeatRequests approve", () => {
         ]);
         expect(screen.getByText(`Waiting on ${REQUEST.id}`)).toBeInTheDocument();
       });
+    });
+
+    /** @scenario "An approval waiting on its Stripe page stops waiting once the request is answered elsewhere" */
+    it("stops waiting once the request was answered elsewhere, so other approvals can buy", async () => {
+      state.open = stripeSeats();
+      answer("seatRequest.approveWithSeat", {
+        status: "payment_required",
+        url: "https://invoice.stripe.example/i/1",
+        paymentRef: "ref-1",
+      });
+      state.errors["seatRequest.completeSeatApproval"] = {
+        data: { error: { code: "seat_request_not_found", httpStatus: 404 } },
+      };
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+      await screen.findByText(`Waiting on ${REQUEST.id}`);
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      await waitFor(() => expect(screen.queryByText(`Waiting on ${REQUEST.id}`)).toBeNull());
+      expect(host.failures).toEqual([
+        expect.objectContaining({
+          fallbackTitle: "The seat request from Lena was already answered",
+        }),
+      ]);
+      expect(calls.map((call) => call.path)).toContain("seatRequest.listOpen:invalidate");
     });
 
     it("says the seat payment was not completed when the Stripe page ended unpaid", async () => {

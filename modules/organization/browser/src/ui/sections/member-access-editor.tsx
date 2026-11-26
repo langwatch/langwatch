@@ -26,7 +26,11 @@ import {
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import { useSeatRoleChange, withArticle } from "../../behavior/use-seat-role-change.ts";
+import {
+  type SeatRoleChanged,
+  useSeatRoleChange,
+  withArticle,
+} from "../../behavior/use-seat-role-change.ts";
 import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import { BILLING_ONLY_SEAT, type InviteSeat } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
@@ -636,12 +640,17 @@ function useMemberAccessEditor({
     pendingSeat,
     setPendingSeat,
     memberSeat,
-    onChanged: async ({ teamsLeftWithoutAdmin }) => {
-      try {
-        await applyStagedGrants();
-      } finally {
-        await refreshAccessQueries();
+    onChanged: async ({ teamsLeftWithoutAdmin, roleChanged }) => {
+      // Staged rows were staged against the new role, so a refused role keeps them unsaved.
+      if (roleChanged) {
+        await applyStagedGrants().catch((error: unknown) => {
+          showErrorToast({
+            error,
+            fallbackTitle: "The role changed, but the access rows did not save",
+          });
+        });
       }
+      await refreshAccessQueries();
       return teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
     },
   });
@@ -715,7 +724,7 @@ function useSeatRolePanel({
   pendingSeat: InviteSeat;
   setPendingSeat: (seat: InviteSeat) => void;
   memberSeat: InviteSeat;
-  onChanged: (change: { teamsLeftWithoutAdmin: { name: string }[] }) => Promise<string | undefined>;
+  onChanged: (change: SeatRoleChanged) => Promise<string | undefined>;
 }) {
   const member = api.organization.getMemberById.useQuery(
     { organizationId, userId },

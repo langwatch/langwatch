@@ -1025,6 +1025,60 @@ describe("<MemberAccessEditor/>", () => {
       expect(mockInvalidateGetUsage).toHaveBeenCalled();
     });
 
+    /** @scenario "A seat bought for a refused role saves none of the staged access rows" */
+    it("saves no staged access row when only the seat was bought", async () => {
+      mockMemberGrantsData.current = [
+        {
+          id: "grant-1",
+          role: "MEMBER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: GrantScopeTier.TEAM,
+          scopeId: "team-1",
+          scopeName: "Team One",
+        },
+      ];
+      mockChangeWithSeat.mockResolvedValue({ status: "seat_only", reason: "the role was refused" });
+      renderLite();
+      fireEvent.click(screen.getByRole("button", { name: /remove assignment/i }));
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(mockInvalidateGetUsage).toHaveBeenCalled();
+      });
+      expect(mockApplyMemberGrants).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Access rows that do not save after the paid role change are named" */
+    it("names access rows that did not save and still says the role changed", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      mockApplyMemberGrants.mockRejectedValueOnce(new Error("boom"));
+      renderLite();
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      pickAdmin();
+
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "The role changed, but the access rows did not save",
+            type: "error",
+          }),
+        );
+      });
+      expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Sam is now an Admin", type: "success" }),
+      );
+    });
+
     /** @scenario "A payment the customer must finish waits, then applies" */
     it("waits in the drawer with a new-tab payment link, then applies when it is paid", async () => {
       mockChangeWithSeat.mockResolvedValue({

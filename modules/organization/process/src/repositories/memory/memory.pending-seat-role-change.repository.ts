@@ -9,7 +9,7 @@ import type {
 /** The changes waiting on a seat payment, held in the process; nothing expires. */
 export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleChangeRepository {
   private readonly records = new Map<string, PendingSeatRoleChangeRecord>();
-  private readonly claims = new Set<string>();
+  private readonly claims = new Map<string, string>();
 
   static create(): MemoryPendingSeatRoleChangeRepository {
     return new MemoryPendingSeatRoleChangeRepository();
@@ -62,14 +62,18 @@ export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleCha
     );
   }
 
-  async claim({ id }: { id: string }): Promise<boolean> {
+  async claim({ id, token }: { id: string; token: string }): Promise<boolean> {
     if (this.claims.has(id)) return false;
-    this.claims.add(id);
+    this.claims.set(id, token);
     return true;
   }
 
-  async release({ id }: { id: string }): Promise<void> {
-    this.claims.delete(id);
+  async holds({ id, token }: { id: string; token: string }): Promise<boolean> {
+    return this.claims.get(id) === token;
+  }
+
+  async release({ id, token }: { id: string; token: string }): Promise<void> {
+    if (this.claims.get(id) === token) this.claims.delete(id);
   }
 
   async settle({

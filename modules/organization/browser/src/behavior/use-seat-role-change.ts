@@ -73,7 +73,7 @@ async function settleAnswer({
   refused,
 }: {
   answer: SeatChangeAnswer;
-  refresh: (teamsLeftWithoutAdmin: { name: string }[]) => Promise<string | undefined>;
+  refresh: (change: SeatRoleChanged) => Promise<string | undefined>;
   announce: (change: { seatAdded: boolean; extra?: string }) => void;
   refused: (error: unknown) => void;
 }): Promise<void> {
@@ -85,12 +85,18 @@ async function settleAnswer({
   if (answer.status === "payment_required") return;
   // The seat was paid even when the role was refused, so the counts are read again.
   if (answer.status === "seat_only") {
-    await refresh([]);
+    await refresh({ teamsLeftWithoutAdmin: [], roleChanged: false });
     return;
   }
-  const extra = await refresh(answer.teamsLeftWithoutAdmin);
+  const extra = await refresh({
+    teamsLeftWithoutAdmin: answer.teamsLeftWithoutAdmin,
+    roleChanged: true,
+  });
   announce({ seatAdded: answer.seatAdded, extra });
 }
+
+/** What a seat-paid change did: `roleChanged` is false when only the seat was bought. */
+export type SeatRoleChanged = { teamsLeftWithoutAdmin: { name: string }[]; roleChanged: boolean };
 
 /** "an Admin", "a Member". */
 export function withArticle(label: string): string {
@@ -236,8 +242,9 @@ export function useSeatRoleChange({
   userId: string;
   memberName: string;
   enabled: boolean;
-  /** Applies whatever else was staged, re-reads what the change touched, names adminless teams. */
-  onChanged: (change: { teamsLeftWithoutAdmin: { name: string }[] }) => Promise<string | undefined>;
+  /** Applies what was staged once the role changed, re-reads what it touched, names teams left
+   * without an admin. */
+  onChanged: (change: SeatRoleChanged) => Promise<string | undefined>;
   describeRole: (role: OrganizationUserRole) => string;
 }) {
   const toaster = useOrganizationToaster();
@@ -251,7 +258,7 @@ export function useSeatRoleChange({
     generation.current += 1;
     setFlow({ step: "idle" });
     setOfferKind(undefined);
-  }, [userId]);
+  }, [organizationId, userId]);
   const [amountDue, setAmountDue] = useState<string | undefined>(undefined);
   const changeWithSeat = api.organization.changeMemberRoleWithSeat.useMutation();
   const complete = api.organization.completeSeatRoleChange.useMutation();
@@ -269,8 +276,8 @@ export function useSeatRoleChange({
     toaster.create(roleChangedToast({ ...change, memberName, amountDue, describeRole }));
 
   /** Re-reads every seat count and list the change touched; a failed re-read hides no toast. */
-  const refresh = (teamsLeftWithoutAdmin: { name: string }[]) =>
-    onChanged({ teamsLeftWithoutAdmin }).catch((error: unknown) => {
+  const refresh = (change: SeatRoleChanged) =>
+    onChanged(change).catch((error: unknown) => {
       reportUnexpected(error, { action: "seatRoleChangeRefresh" });
       return undefined;
     });
@@ -282,9 +289,11 @@ export function useSeatRoleChange({
     onSettled: (settled, role) => {
       setFlow(flowOnSettled({ settled, role }));
       if (settled.status === "failed") return;
-      void refresh([]).then((extra) => {
-        if (settled.status === "applied") announce({ role, seatAdded: true, extra });
-      });
+      void refresh({ teamsLeftWithoutAdmin: [], roleChanged: settled.status === "applied" }).then(
+        (extra) => {
+          if (settled.status === "applied") announce({ role, seatAdded: true, extra });
+        },
+      );
     },
   });
 

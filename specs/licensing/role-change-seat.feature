@@ -162,6 +162,13 @@ Feature: Adding a seat with a role change
       Then the seat stays and the role is not changed, with the reason
 
     @unit
+    Scenario: A newer role change replaces the one waiting on its payment
+      Given "Sam" waits to become an Admin on a seat invoice
+      And a seat frees up and an administrator makes "Sam" a Member
+      When billing records that the seat invoice was paid
+      Then "Sam" stays a Member and the waiting change ends as seat only
+
+    @unit
     Scenario: A paid fact that cannot apply yet is delivered again
       Given "Sam" waits to become an Admin on a seat invoice
       And another applier holds the change
@@ -246,6 +253,21 @@ Feature: Adding a seat with a role change
       Then the role changes with the seat bought at the quoted price
       And the drawer says "Sam is now an Admin"
       And a toast says "Sam is now an Admin" and "1 seat added, $5.19 paid."
+
+    @integration
+    Scenario: A seat bought for a refused role saves none of the staged access rows
+      Given I staged the removal of one of Sam's access rows
+      And the seat offer shows under the role field
+      When I press the offer's button and the role is refused after the seat was bought
+      Then the staged access rows are not saved and the seat counts are read again
+
+    @integration
+    Scenario: Access rows that do not save after the paid role change are named
+      Given I staged a new access row for Sam
+      And the seat offer shows under the role field
+      When I press the offer's button and the role changes but the access rows are refused
+      Then a toast says "Sam is now an Admin"
+      And another toast says "The role changed, but the access rows did not save"
 
     @integration
     Scenario: The done state says what was paid

@@ -74,8 +74,12 @@ export class PrismaSeatRequestRepository
         });
         return { request: rowOf(updated), outcome: "already_open" as const };
       }
-      if (current.resolvedAt?.getTime() !== existing.resolvedAt?.getTime()) {
-        // Answered after this arrival was read: that answer covers it, so nothing reopens.
+      if (
+        current.resolvedAt?.getTime() !== existing.resolvedAt?.getTime() ||
+        current.seatPendingSince !== null
+      ) {
+        // Answered after this arrival was read, or an approval is still giving its seat (a
+        // stranded one is reopened by reopenStranded): that answer covers it, nothing reopens.
         return { request: rowOf(current), outcome: "resolved_meanwhile" as const };
       }
       const reopened = await transaction.seatRequest.update({

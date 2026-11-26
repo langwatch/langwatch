@@ -94,17 +94,20 @@ export class OrganizationAccessNoticeService {
       dayKey: dayKeyOf(at),
       at,
     });
-    if (!notice) return { recorded: false, mailed: false };
-
-    const [claimed] = await notices.markMailed({ ids: [notice.id], at });
-    if (!claimed) return { recorded: true, mailed: false };
+    // A member's own ask is pushed even when today's notice was already mailed; the push dedupes.
     if (input.askedFor && input.seatRequestId) {
       await this.pushAsked({
-        notice,
+        organizationId: input.organizationId,
+        who: input.name ?? input.email,
+        dayKey: dayKeyOf(at),
         seatRequestId: input.seatRequestId,
         reason: input.askedFor.reason,
       });
     }
+    if (!notice) return { recorded: false, mailed: false };
+
+    const [claimed] = await notices.markMailed({ ids: [notice.id], at });
+    if (!claimed) return { recorded: true, mailed: false };
     const reached = await this.mailOne({
       notice,
       heldWithoutAccess: input.heldWithoutAccess ?? true,
@@ -183,27 +186,29 @@ export class OrganizationAccessNoticeService {
 
   /** Pushes a member's own ask to everyone the mail goes to; a failed push is only logged. */
   private async pushAsked({
-    notice,
+    organizationId,
+    who,
+    dayKey,
     seatRequestId,
     reason,
   }: {
-    notice: AccessNoticeRow;
+    organizationId: string;
+    who: string;
+    dayKey: string;
     seatRequestId: string;
     reason: string | null;
   }): Promise<void> {
     const { context, push, logger } = this.dependencies;
-    const { organizationId } = notice;
     const recipients = await context.recipients({ organizationId }).catch((error: unknown) => {
       logger.warn({ organizationId, error }, "seat request push found no recipients");
       return [];
     });
-    const who = notice.name ?? notice.email;
     const outcomes = await Promise.allSettled(
       recipients.map((recipient) =>
         push.push({
           userId: recipient.userId,
           organizationId,
-          idempotencyKey: `seat-request-push:${seatRequestId}:${recipient.userId}:${notice.dayKey}`,
+          idempotencyKey: `seat-request-push:${seatRequestId}:${recipient.userId}:${dayKey}`,
           topic: `seat-request:${seatRequestId}`,
           title: `${who} asked for a full seat`,
           body: reason ? `To ${reason}` : `${who} asked for a full seat.`,

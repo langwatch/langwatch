@@ -6,6 +6,7 @@ import type {
 } from "@langwatch/organization-contract";
 import { useEffect, useRef, useState } from "react";
 
+import { readHandledError } from "./handled-error-form.tsx";
 import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 import { reportUnexpected } from "./report-unexpected.ts";
@@ -24,6 +25,9 @@ type CompleteApproval = (input: {
   paymentRef: string;
 }) => Promise<SeatApprovalCompletion>;
 
+/** What one ask settles to; `closed` when the request was answered or reopened meanwhile. */
+type SeatApprovalSettled = SeatApprovalCompletion | { status: "closed" };
+
 /** Asks once whether the seat payment landed; a failed ask leaves the approval waiting. */
 async function askPaid({
   complete,
@@ -31,7 +35,7 @@ async function askPaid({
 }: {
   complete: CompleteApproval;
   waiting: WaitingSeatApproval;
-}): Promise<SeatApprovalCompletion> {
+}): Promise<SeatApprovalSettled> {
   try {
     return await complete({
       organizationId: waiting.organizationId,
@@ -39,6 +43,7 @@ async function askPaid({
       paymentRef: waiting.paymentRef,
     });
   } catch (error) {
+    if (readHandledError(error)?.code === "seat_request_not_found") return { status: "closed" };
     reportUnexpected(error, { action: "completeSeatApproval" });
     return { status: "waiting" };
   }
@@ -52,7 +57,7 @@ function useWaitForSeatPayment({
 }: {
   waiting: WaitingSeatApproval | undefined;
   complete: CompleteApproval;
-  onSettled: (settled: SeatApprovalCompletion, waiting: WaitingSeatApproval) => void;
+  onSettled: (settled: SeatApprovalSettled, waiting: WaitingSeatApproval) => void;
 }) {
   // The latest callbacks, read by the timer without restarting it on every render.
   const latest = useRef({ complete, onSettled, waiting });
@@ -81,6 +86,13 @@ function useWaitForSeatPayment({
       window.removeEventListener("focus", onFocus);
     };
   }, [paymentRef]);
+}
+
+/** Why an approval stopped waiting without approving. */
+function unsettledTitle({ settled, name }: { settled: SeatApprovalSettled; name: string }): string {
+  return settled.status === "closed"
+    ? `The seat request from ${name} was already answered`
+    : "The seat payment was not completed";
 }
 
 /** Approve buys the seat only with none free on a live Stripe seat subscription. */
@@ -168,7 +180,10 @@ export function useSeatRequests({
         approved({ request: settledWaiting.request, seatAdded: true });
         return;
       }
-      toaster.create({ title: "The seat payment was not completed", type: "error" });
+      toaster.create({
+        title: unsettledTitle({ settled, name: nameOf(settledWaiting.request) }),
+        type: "error",
+      });
       refresh();
     },
   });

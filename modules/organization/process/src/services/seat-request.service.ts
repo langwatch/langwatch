@@ -283,6 +283,10 @@ export class SeatRequestService {
     by: OrganizationPlanUser;
   }): Promise<SeatApprovalWithSeat> {
     const { organizationId } = input;
+    const { openedAt } = await this.dependencies.requests.getOpen({
+      organizationId,
+      id: input.seatRequestId,
+    });
     const bought: { purchase?: SeatPurchase } = {};
     const buySeat = async () => {
       const { path } = await this.approvalOf({ organizationId });
@@ -303,7 +307,7 @@ export class SeatRequestService {
         return {
           status: "payment_required",
           url: purchase.url,
-          paymentRef: JSON.stringify(purchase.payment),
+          paymentRef: JSON.stringify({ payment: purchase.payment, openedAt }),
         };
       }
       throw error;
@@ -318,8 +322,10 @@ export class SeatRequestService {
     by: OrganizationPlanUser;
   }): Promise<SeatApprovalCompletion> {
     const { organizationId, seatRequestId, by } = input;
-    const payment = parsePaymentRef(input.paymentRef);
-    await this.dependencies.requests.getOpen({ organizationId, id: seatRequestId });
+    const { payment, openedAt } = parsePaymentRef(input.paymentRef);
+    const request = await this.dependencies.requests.getOpen({ organizationId, id: seatRequestId });
+    // A payment opened before a decline and a new ask never approves the new opening.
+    if (request.openedAt !== openedAt) throw new SeatRequestNotFoundError(seatRequestId);
     const { status } = await this.dependencies.peers.settleSeatPayment({ organizationId, payment });
     if (status === "open") return { status: "waiting" };
     if (status === "failed") return { status: "failed" };
@@ -635,14 +641,18 @@ const ACCESS_STATUS: Record<SeatRequestRow["status"], MyAccessRequest["status"]>
 };
 
 /** The payment reference `approveWithSeat` handed out, read back; anything else is refused. */
-function parsePaymentRef(paymentRef: string): SeatPayment {
-  let candidate: unknown;
+function parsePaymentRef(paymentRef: string): { payment: SeatPayment; openedAt: number } {
+  let candidate: { payment?: unknown; openedAt?: unknown } | null;
   try {
     candidate = JSON.parse(paymentRef);
   } catch {
     throw new ValidationError("The seat payment reference is not one this approval handed out");
   }
-  const parsed = seatPaymentSchema.safeParse(candidate);
+  const openedAt = candidate?.openedAt;
+  if (typeof openedAt !== "number") {
+    throw new ValidationError("The seat payment reference is not one this approval handed out");
+  }
+  const parsed = seatPaymentSchema.safeParse(candidate?.payment);
   if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
-  return parsed.data;
+  return { payment: parsed.data, openedAt };
 }

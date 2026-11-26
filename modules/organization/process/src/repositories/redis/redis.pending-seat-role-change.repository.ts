@@ -11,6 +11,15 @@ const PREFIX = "organization:seat-role-change";
 const KEEP_SECONDS = 7 * 24 * 60 * 60;
 /** Long enough for one role write; a crashed applier frees the change after it. */
 const CLAIM_SECONDS = 120;
+/** Reserves the payment and writes the record and both indexes in one step, or writes nothing. */
+const SAVE_SCRIPT =
+  "if not redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[3], 'NX') then return 0 end " +
+  "redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[3]) " +
+  "redis.call('SET', KEYS[3], ARGV[1], 'EX', ARGV[3]) " +
+  "redis.call('SET', KEYS[4], ARGV[1], 'EX', ARGV[3]) " +
+  "return 1";
+const RELEASE_SCRIPT =
+  "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0";
 
 /** The changes waiting on a seat payment, in process Redis with a week's expiry. */
 export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChangeRepository {
@@ -22,15 +31,18 @@ export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChan
 
   async save(record: PendingSeatRoleChangeRecord): Promise<boolean> {
     const payment = `${PREFIX}:payment:${paymentKey(record.payment)}`;
-    const taken = await this.redis.set(payment, record.id, "EX", KEEP_SECONDS, "NX");
-    if (taken !== "OK") return false;
-    await this.redis
-      .multi()
-      .set(recordKey(record.id), JSON.stringify(record), "EX", KEEP_SECONDS)
-      .set(memberKey(record), record.id, "EX", KEEP_SECONDS)
-      .set(organizationKey(record), record.id, "EX", KEEP_SECONDS)
-      .exec();
-    return true;
+    const saved = await this.redis.eval(
+      SAVE_SCRIPT,
+      4,
+      payment,
+      recordKey(record.id),
+      memberKey(record),
+      organizationKey(record),
+      record.id,
+      JSON.stringify(record),
+      KEEP_SECONDS,
+    );
+    return saved === 1;
   }
 
   async findById({ id }: { id: string }): Promise<PendingSeatRoleChangeRecord[]> {
@@ -63,13 +75,17 @@ export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChan
     return found.filter((record) => record.status === "waiting");
   }
 
-  async claim({ id }: { id: string }): Promise<boolean> {
-    const taken = await this.redis.set(`${recordKey(id)}:claim`, "1", "EX", CLAIM_SECONDS, "NX");
+  async claim({ id, token }: { id: string; token: string }): Promise<boolean> {
+    const taken = await this.redis.set(claimKey(id), token, "EX", CLAIM_SECONDS, "NX");
     return taken === "OK";
   }
 
-  async release({ id }: { id: string }): Promise<void> {
-    await this.redis.del(`${recordKey(id)}:claim`);
+  async holds({ id, token }: { id: string; token: string }): Promise<boolean> {
+    return (await this.redis.get(claimKey(id))) === token;
+  }
+
+  async release({ id, token }: { id: string; token: string }): Promise<void> {
+    await this.redis.eval(RELEASE_SCRIPT, 1, claimKey(id), token);
   }
 
   async settle({
@@ -90,6 +106,10 @@ export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChan
 
 function recordKey(id: string): string {
   return `${PREFIX}:${id}`;
+}
+
+function claimKey(id: string): string {
+  return `${recordKey(id)}:claim`;
 }
 
 function organizationKey({ organizationId }: { organizationId: string }): string {

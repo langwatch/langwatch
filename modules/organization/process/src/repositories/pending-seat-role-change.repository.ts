@@ -38,9 +38,12 @@ export interface PendingSeatRoleChangeRepository {
   findWaitingForOrganization(input: {
     organizationId: string;
   }): Promise<PendingSeatRoleChangeRecord[]>;
-  /** True for the one caller that may apply the change now; false while another holds it. */
-  claim(input: { id: string }): Promise<boolean>;
-  release(input: { id: string }): Promise<void>;
+  /** True for the one caller that may apply the change now, holding it under its own token. */
+  claim(input: { id: string; token: string }): Promise<boolean>;
+  /** True while the token is still the claim on the change, false once it expired or moved. */
+  holds(input: { id: string; token: string }): Promise<boolean>;
+  /** Frees the claim only when the token still holds it. */
+  release(input: { id: string; token: string }): Promise<void>;
   settle(input: {
     id: string;
     status: Exclude<SeatRoleChangeStatus, "waiting">;

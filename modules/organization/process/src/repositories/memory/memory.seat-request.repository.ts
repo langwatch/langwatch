@@ -57,6 +57,9 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
       this.rows[index] = request;
       return { request, outcome: "already_open" };
     }
+    // An approval still giving its seat keeps the row; reopenStranded reopens a stranded one.
+    if (this.seatPendingSince.has(existing.id))
+      return { request: existing, outcome: "resolved_meanwhile" };
     const request: SeatRequestRow = {
       ...existing,
       userId: input.userId ?? existing.userId,

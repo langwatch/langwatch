@@ -390,38 +390,17 @@ func (s *Server) listSessions(_ *http.Request, p params) (any, error) {
 // createRefund refunds a paid invoice's payment, named by payment_intent or charge, in full
 // or by amount; a payment already given back is refused as Stripe refuses it.
 func (s *Server) createRefund(_ *http.Request, p params) (any, error) {
-	intent := p.str("payment_intent")
-	if charge := p.str("charge"); intent == "" && charge != "" {
-		intent = "pi_" + strings.TrimPrefix(charge, "ch_")
+	intent, err := refundIntent(p)
+	if err != nil {
+		return nil, err
 	}
-	if intent == "" {
-		return nil, invalid("payment_intent", "One of the following params should be provided for this request: payment_intent or charge.")
-	}
-	var inv *Invoice
-	for _, each := range s.st.invoices {
-		if deref(each.PaymentIntent) == intent {
-			inv = each
-		}
-	}
+	inv := s.invoiceByIntent(intent)
 	if inv == nil {
 		return nil, noSuch("payment_intent", intent)
 	}
-	refunded := int64(0)
-	for _, each := range s.st.refunds {
-		if each.PaymentIntent == intent {
-			refunded += each.Amount
-		}
-	}
-	left := inv.AmountPaid - refunded
-	amount, given := p.integer("amount")
-	if !given {
-		amount = left
-	}
-	if left <= 0 {
-		return nil, &apiError{status: http.StatusBadRequest, errType: "invalid_request_error", code: "charge_already_refunded", message: "Charge " + "ch_" + strings.TrimPrefix(intent, "pi_") + " has already been refunded."}
-	}
-	if amount <= 0 || amount > left {
-		return nil, invalid("amount", "Refund amount (%d) is greater than unrefunded amount on charge (%d)", amount, left)
+	amount, err := refundAmount(p, intent, inv.AmountPaid-s.refundedOn(intent))
+	if err != nil {
+		return nil, err
 	}
 	refund := &Refund{
 		ID: s.st.id("re"), Object: "refund", Amount: amount, Charge: "ch_" + strings.TrimPrefix(intent, "pi_"),
@@ -430,6 +409,55 @@ func (s *Server) createRefund(_ *http.Request, p params) (any, error) {
 	s.st.refunds = append(s.st.refunds, refund)
 	s.emit("refund.created", refund, nil)
 	return refund, nil
+}
+
+// refundIntent names the payment a refund is for, from payment_intent or else from charge.
+func refundIntent(p params) (string, error) {
+	intent := p.str("payment_intent")
+	if charge := p.str("charge"); intent == "" && charge != "" {
+		intent = "pi_" + strings.TrimPrefix(charge, "ch_")
+	}
+	if intent == "" {
+		return "", invalid("payment_intent", "One of the following params should be provided for this request: payment_intent or charge.")
+	}
+	return intent, nil
+}
+
+// invoiceByIntent is the invoice paid by the payment intent, the last one when several match.
+func (s *Server) invoiceByIntent(intent string) *Invoice {
+	var inv *Invoice
+	for _, each := range s.st.invoices {
+		if deref(each.PaymentIntent) == intent {
+			inv = each
+		}
+	}
+	return inv
+}
+
+// refundedOn is the total already given back on the payment intent.
+func (s *Server) refundedOn(intent string) int64 {
+	refunded := int64(0)
+	for _, each := range s.st.refunds {
+		if each.PaymentIntent == intent {
+			refunded += each.Amount
+		}
+	}
+	return refunded
+}
+
+// refundAmount is the amount to give back, all that is left when none is named.
+func refundAmount(p params, intent string, left int64) (int64, error) {
+	amount, given := p.integer("amount")
+	if !given {
+		amount = left
+	}
+	if left <= 0 {
+		return 0, &apiError{status: http.StatusBadRequest, errType: "invalid_request_error", code: "charge_already_refunded", message: "Charge " + "ch_" + strings.TrimPrefix(intent, "pi_") + " has already been refunded."}
+	}
+	if amount <= 0 || amount > left {
+		return 0, invalid("amount", "Refund amount (%d) is greater than unrefunded amount on charge (%d)", amount, left)
+	}
+	return amount, nil
 }
 
 // expireSession closes an open session so it can no longer be paid, as Stripe does.
