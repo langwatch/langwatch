@@ -1,4 +1,6 @@
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import {
+  type EntitlementApi,
   type MonthCountedEventData,
   type Plan,
   planSchema,
@@ -6,7 +8,10 @@ import {
 } from "@langwatch/entitlement-contract";
 import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import { createTenantId, type Event, EventUtils } from "@langwatch/eventing";
+import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "@langwatch/log-contract";
+import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "@langwatch/metric-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +19,7 @@ import { BillableEventsMeterProjection } from "../../eventing/billable-events-me
 import { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
 import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
+import type { TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import { decideLimit } from "../../rules/usage-limit.rules.ts";
 import { BillableEventsMeterAppendService } from "../billable-events-meter-append.service.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
@@ -21,6 +27,19 @@ import { UsageCountingService } from "../usage-counting.service.ts";
 const ORGANIZATION = "org_1";
 const MONTH = "2026-10";
 const OCCURRED_AT = Date.UTC(2026, 9, 15);
+
+/** The plan and pricing peers, fail-closed on any operation the count does not ask. */
+function peersFor({ allowance, pricingModel }: { allowance: number; pricingModel: PricingModel }) {
+  return {
+    plans: createApiFixture<EntitlementApi>({ getActivePlan: async () => plan({ allowance }) }),
+    billing: createApiFixture<BillingApi>({ getPricingModel: async () => ({ pricingModel }) }),
+  };
+}
+
+/** Every project placed in the test organization. */
+const placedProjects = createApiFixture<TenancyRepository>({
+  getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: ORGANIZATION }),
+});
 
 function plan({ allowance }: { allowance: number }): Plan {
   return planSchema.parse({
@@ -74,6 +93,10 @@ class UnreachableMeter extends BillableEventsMeterRepository {
   async countByDay(): Promise<never> {
     throw new Error("ClickHouse is unreachable");
   }
+
+  async countByType(): Promise<never> {
+    throw new Error("ClickHouse is unreachable");
+  }
 }
 
 function compose({
@@ -98,8 +121,7 @@ function compose({
   const counting = UsageCountingService.create({
     meter,
     traceMeter,
-    plans: { getActivePlan: async () => plan({ allowance }) },
-    billing: { getPricingModel: async () => ({ pricingModel }) },
+    ...peersFor({ allowance, pricingModel }),
     logger: log,
   });
   const countMonth = () =>
@@ -192,12 +214,7 @@ describe("UsageCountingService", () => {
         const meter = MemoryBillableEventsMeterRepository.create();
         const append = BillableEventsMeterAppendService.create({
           meter,
-          projects: {
-            getProjectPlacement: async () => ({
-              kind: "placed" as const,
-              organizationId: ORGANIZATION,
-            }),
-          },
+          projects: placedProjects,
         });
         const projection = BillableEventsMeterProjection.create(append).build();
         const types = [
@@ -225,8 +242,7 @@ describe("UsageCountingService", () => {
         const counting = UsageCountingService.create({
           meter,
           traceMeter: new ReadCountingTraceMeter(),
-          plans: { getActivePlan: async () => plan({ allowance: 1_000 }) },
-          billing: { getPricingModel: async () => ({ pricingModel: PricingModel.SEAT_EVENT }) },
+          ...peersFor({ allowance: 1_000, pricingModel: PricingModel.SEAT_EVENT }),
         });
 
         const counted = await counting.countMonth({
@@ -237,6 +253,61 @@ describe("UsageCountingService", () => {
 
         expect(projection.eventTypes).toEqual(expect.arrayContaining(types));
         expect(counted.billableEvents).toBe(types.length);
+      });
+    });
+  });
+
+  describe("given a month made of log records and metric series-hours", () => {
+    describe("when the month is counted from the meter", () => {
+      /** @scenario "Log records and metric series count toward the monthly allowance" */
+      it("counts each log record and each series-hour once in the allowance count", async () => {
+        const meter = MemoryBillableEventsMeterRepository.create();
+        const append = BillableEventsMeterAppendService.create({
+          meter,
+          projects: placedProjects,
+        });
+        const projection = BillableEventsMeterProjection.create(append).build();
+        const event = (type: string, data: unknown, key: string, minute: number): Event => ({
+          ...EventUtils.createEvent<Event>({
+            aggregateType: "log",
+            aggregateId: key,
+            tenantId: createTenantId("project_a"),
+            type,
+            version: "2026-07-17",
+            data,
+            metadata: {},
+            occurredAt: OCCURRED_AT,
+            idempotencyKey: `project_a:${key}`,
+          }),
+          createdAt: OCCURRED_AT + minute * 60_000,
+        });
+        const series = "c".repeat(64);
+        const events = [
+          event(CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE, {}, "record_1", 0),
+          event(CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE, {}, "record_2", 1),
+          // Three points of one series in one hour, then one in the next hour.
+          event(METRIC_DATA_POINT_RECEIVED_EVENT_TYPE, { seriesId: series }, "point_1", 2),
+          event(METRIC_DATA_POINT_RECEIVED_EVENT_TYPE, { seriesId: series }, "point_2", 3),
+          event(METRIC_DATA_POINT_RECEIVED_EVENT_TYPE, { seriesId: series }, "point_3", 4),
+          event(METRIC_DATA_POINT_RECEIVED_EVENT_TYPE, { seriesId: series }, "point_4", 61),
+        ];
+        for (const each of events) {
+          const record = projection.map(each);
+          if (record) await append.append(record);
+        }
+        const counting = UsageCountingService.create({
+          meter,
+          traceMeter: new ReadCountingTraceMeter(),
+          ...peersFor({ allowance: 4, pricingModel: PricingModel.SEAT_EVENT }),
+        });
+
+        const counted = await counting.countMonth({
+          organizationId: ORGANIZATION,
+          month: MONTH,
+          occurredAt: OCCURRED_AT,
+        });
+
+        expect(counted.billableEvents).toBe(4);
       });
     });
   });

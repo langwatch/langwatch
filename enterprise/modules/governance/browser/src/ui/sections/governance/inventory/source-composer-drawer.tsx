@@ -19,6 +19,9 @@ import { SourceTypeIconGlyph } from "../../../../features/ingestion-sources/ui/e
 import { TraceDestinationField } from "../../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
 import { EnterpriseOttlEditor as OttlEditor } from "../../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
 import type { DestinationContext } from "../ingestion-source-forms.ts";
+import { AgentListingTest } from "./agent-listing-test.tsx";
+import { agentListingTestInput, isCloudAgentSourceType } from "./cloud-agent-pull-config.ts";
+import { cloudAgentCustomControl } from "./cloud-agent-source-controls.tsx";
 import { ParserConfigFields } from "./parser-config-fields.tsx";
 import type { ComposerState } from "./source-composer-state.ts";
 
@@ -219,7 +222,15 @@ export function SourceComposerDrawer({
           onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
           invalidKeys={invalidFieldKeys}
           advancedExtras={advancedExtras}
+          renderCustomControl={cloudAgentCustomControl({ organizationId })}
         />
+
+        {isCloudAgentSourceType(composer.sourceType) && (
+          <AgentListingTest
+            organizationId={organizationId}
+            target={{ kind: "draft", input: agentListingTestInput(composer) }}
+          />
+        )}
 
         <ComposerDestinationHint composer={composer} destinationCtx={destinationCtx} />
 
