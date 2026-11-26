@@ -235,7 +235,7 @@ export function SecretModal({
     secretModalTargets(details);
 
   const claudeCodeEnvBlock =
-    isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : "";
+    isClaudeCode && details ? buildClaudeCodeEnvBlock({ secret: details.secret, otlpUrl }) : "";
 
   const testCurl = details
     ? buildTestCurl({

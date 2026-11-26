@@ -19,6 +19,13 @@ export const STALE_TOKEN = "ik-lw-stalelogin000000_oldsecret";
 export const currentClaudeVars = (): Record<string, string> =>
   buildOtelEnvBlock("claude", CURRENT_ENDPOINT, CURRENT_TOKEN);
 
+/** A claude block as a pre-#8284 CLI wrote it: raw bodies on, no assistant-responses key. */
+export function preLightClaudeVars(endpoint: string, token: string): Record<string, string> {
+  const vars = buildOtelEnvBlock("claude", endpoint, token);
+  delete vars.OTEL_LOG_ASSISTANT_RESPONSES;
+  return { ...vars, OTEL_LOG_RAW_API_BODIES: "1" };
+}
+
 export function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
   return {
     gateway_url: "https://gateway.acme.test",

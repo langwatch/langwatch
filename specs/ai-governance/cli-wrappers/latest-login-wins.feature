@@ -77,6 +77,29 @@ Feature: The latest login wins over stale persisted telemetry wiring
       # its values are langwatch-shaped (an ik-lw-/sk-lw- bearer or an
       # /api/otel endpoint).
 
+    @unit @cli-wrappers @latest-login-wins @raw-body-opt-in
+    Scenario: A raw-body opt-in added after the upgrade survives every refresh
+      # Since #8284 the wiring sets OTEL_LOG_ASSISTANT_RESPONSES instead of
+      # OTEL_LOG_RAW_API_BODIES, and strips the old flag once, from a block
+      # that still lacks the new one. A block that carries the new flag has
+      # migrated, so a raw-body flag beside it is the user's own choice.
+      Given ~/.claude/settings.json carries the current login's langwatch env block, OTEL_LOG_ASSISTANT_RESPONSES included
+      And .claude/settings.local.json carries the same block as the run's pin
+      And the user has since added OTEL_LOG_RAW_API_BODIES=1 to both files for debugging
+      When the user runs `langwatch claude` in ingestion mode
+      Then OTEL_LOG_RAW_API_BODIES=1 is still set in both files
+      And no refresh line is printed
+
+    @unit @cli-wrappers @latest-login-wins @raw-body-opt-in
+    Scenario: A raw-body-only project setting is not stripped before the pin has ever been ours
+      # A file with no langwatch key has never held the pin, so there is no
+      # old default to migrate: langwatch never wrote that raw-body flag.
+      Given the user set OTEL_LOG_RAW_API_BODIES=1 by hand in .claude/settings.local.json
+      And that file carries no langwatch telemetry key
+      When the user runs `langwatch claude` in ingestion mode
+      Then the run's pin is added to that file with the current login's endpoint
+      And OTEL_LOG_RAW_API_BODIES=1 is still set beside it
+
   Rule: the wrapped claude run cannot be rerouted by user-level settings
 
     Scenario: the wrapper pins telemetry at project level for the run

@@ -326,12 +326,8 @@ describe("resolveWrapperMode", () => {
   });
 
   describe("when claude resolves to ingestion mode", () => {
-    /**
-     * claude-code 2.x needs all 4 OTEL_LOG_* knobs or the wire is
-     * metadata-only; RAW_API_BODIES alone carries response text. Pinned
-     * against silent drift.
-     */
-    it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
+    /** Without the four light knobs the wire is metadata-only; raw bodies stay opt-in (#8284). */
+    it("sets the four light claude OTEL_LOG_* knobs, not raw bodies", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
       (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
         token: "sk-lw-claude-test-token",
@@ -353,7 +349,8 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.OTEL_LOG_USER_PROMPTS).toBe("1");
       expect(out.vars.OTEL_LOG_TOOL_DETAILS).toBe("1");
       expect(out.vars.OTEL_LOG_TOOL_CONTENT).toBe("1");
-      expect(out.vars.OTEL_LOG_RAW_API_BODIES).toBe("1");
+      expect(out.vars.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+      expect(out.vars.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
       expect(out.vars.OTEL_TRACES_EXPORTER).toBe("otlp");
       expect(out.vars.OTEL_LOGS_EXPORTER).toBe("otlp");
       expect(out.vars.OTEL_METRICS_EXPORTER).toBe("otlp");

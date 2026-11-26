@@ -498,6 +498,24 @@ describe("scanTelemetryTargets", () => {
   });
 });
 
+describe("scanTelemetryTargets, given a claude block a pre-#8284 CLI wrote", () => {
+  it("clears the raw-body flag on logout too", () => {
+    const claude = appSettingsTargetFor("claude")!;
+    installAppEnv(claude, {
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://app/api/otel",
+      CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+      OTEL_LOG_RAW_API_BODIES: "1",
+    });
+
+    for (const t of scan().filter((t) => t.present)) {
+      t.remove();
+    }
+
+    const after = JSON.parse(fs.readFileSync(claude.path, "utf8"));
+    expect(after.env?.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
+  });
+});
+
 describe("scanTelemetryTargets for pi", () => {
   describe("when `langwatch pi` persisted its telemetry env for bare pi runs", () => {
     const piBlock = buildOtelEnvBlock("pi", "http://app/api/otel", "ik-lw-pi_secret");
