@@ -418,7 +418,7 @@ describe("given a rule saved from the drawer", () => {
 });
 
 describe("given where the organization stands on the model's price", () => {
-  const priced = { kind: "model", free: false } as const;
+  const priced = { kind: "model", free: false, split: false } as const;
 
   /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
   it("needs an acceptance only on Cloud at a price, until an admin gives it", () => {
@@ -431,10 +431,12 @@ describe("given where the organization stands on the model's price", () => {
     expect(acceptanceOf(priced, true, false)).toBe("accepted");
     expect(acceptanceOf(priced, false, true)).toBe("can-accept");
     expect(acceptanceOf(priced, false, false)).toBe("awaiting-admin");
-    expect(acceptanceOf({ kind: "model", free: true }, false, true)).toBe("not-needed");
-    expect(acceptanceOf({ kind: "model", free: true, licensed: true }, false, true)).toBe(
+    expect(acceptanceOf({ kind: "model", free: true, split: false }, false, true)).toBe(
       "not-needed",
     );
+    expect(
+      acceptanceOf({ kind: "model", free: true, licensed: true, split: false }, false, true),
+    ).toBe("not-needed");
     expect(acceptanceOf({ kind: "rule-based", note: "turn-on" }, false, true)).toBe("not-needed");
     expect(acceptanceOf(null, false, true)).toBe("not-needed");
   });
