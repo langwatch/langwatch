@@ -21,7 +21,11 @@ class StubSession extends UiSession {
   currentUser() {
     return null;
   }
-  hasPermission(): boolean {
+  // A member on a project page: `organization:view` comes only from the organization floor.
+  hasPermission(permission: string): boolean {
+    return permission !== "organization:view";
+  }
+  override hasOrganizationPermission(): boolean {
     return true;
   }
   isSettled(): boolean {
@@ -110,5 +114,18 @@ describe("given a plan question that has not answered yet", () => {
     resolvePlan({ type: "ENTERPRISE" });
     await waitFor(() => expect(result.current.isEnterprise).toBe(true));
     expect(result.current.isPlanLoading).toBe(false);
+  });
+});
+
+describe("given a member who holds organization:view at the organization but not on the project", () => {
+  /** @scenario "A member without project-level organization rights sees their plan's Enterprise entries unlocked" */
+  it("still reads the plan and reports Enterprise", async () => {
+    const rpc = stubRpc(() => Promise.resolve({ type: "ENTERPRISE" }));
+
+    const { result } = renderHook(() => useUiOrganizationFacts(), {
+      wrapper: ({ children }) => wrapper({ children, rpc }),
+    });
+
+    await waitFor(() => expect(result.current.isEnterprise).toBe(true));
   });
 });

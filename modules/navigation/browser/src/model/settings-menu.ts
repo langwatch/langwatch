@@ -69,6 +69,8 @@ export interface SettingsMenuItem {
    * in Enterprise", and the page opens on its upsell.
    */
   isLocked?: boolean;
+  /** An Enterprise entry the plan includes: the sidebar shows a quiet gold open lock. */
+  isEnterpriseIncluded?: boolean;
 }
 
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
@@ -183,7 +185,11 @@ function enterpriseEntry({
   enterprisePlan: EnterprisePlanGate;
 }): SettingsMenuItem[] {
   if (enterprisePlan === "pending") return [];
-  return [enterprisePlan === "locked" ? { ...item, isLocked: true } : item];
+  return [
+    enterprisePlan === "locked"
+      ? { ...item, isLocked: true }
+      : { ...item, isEnterpriseIncluded: true },
+  ];
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { Badge, Box, chakra, HStack, Link, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Lock } from "lucide-react";
+import { Lock, LockKeyholeOpen } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 
@@ -27,9 +27,12 @@ export type SideMenuItemProps = {
   legacyLabel?: string;
   /** The plan lacks this entry: a lock and "Included in Enterprise" beside the label. */
   isLocked?: boolean;
+  /** The plan includes this Enterprise entry: a quiet gold open lock named "Enterprise". */
+  isEnterpriseIncluded?: boolean;
 };
 
 const ENTERPRISE_LOCK_MESSAGE = "Included in Enterprise";
+const ENTERPRISE_INCLUDED_MESSAGE = "Enterprise";
 
 const DEFAULT_BETA_MESSAGE = "This feature is in beta";
 const DEFAULT_LEGACY_MESSAGE =
@@ -57,6 +60,33 @@ function IconComponentNode({
   return <Icon size={size} color={color} />;
 }
 
+/** Grey lock on a plan that lacks the entry; a quiet gold open lock on one that includes it. */
+function EnterpriseMark({
+  isLocked,
+  isEnterpriseIncluded,
+}: {
+  isLocked: boolean;
+  isEnterpriseIncluded: boolean;
+}) {
+  if (!isLocked && !isEnterpriseIncluded) return null;
+  const message = isLocked ? ENTERPRISE_LOCK_MESSAGE : ENTERPRISE_INCLUDED_MESSAGE;
+  const Icon = isLocked ? Lock : LockKeyholeOpen;
+  return (
+    <Tooltip content={message} positioning={{ placement: "right" }} showArrow>
+      <Box
+        as="span"
+        display="inline-flex"
+        flexShrink={0}
+        color={isLocked ? "fg.subtle" : "nav.enterprise"}
+        // Full strength in light mode for 3:1 contrast; dark mode stays quiet.
+        opacity={isLocked ? 1 : { base: 1, _dark: 0.55 }}
+      >
+        <Icon size={14} aria-label={message} />
+      </Box>
+    </Tooltip>
+  );
+}
+
 // Renders the common visual content (icon, label, badge)
 export const SideMenuItem = ({
   icon,
@@ -70,6 +100,7 @@ export const SideMenuItem = ({
   legacy,
   legacyLabel,
   isLocked = false,
+  isEnterpriseIncluded = false,
 }: SideMenuItemProps) => {
   const betaPill = beta ? (
     <BetaPill
@@ -85,13 +116,7 @@ export const SideMenuItem = ({
       }
     />
   ) : null;
-  const lock = isLocked ? (
-    <Tooltip content={ENTERPRISE_LOCK_MESSAGE} positioning={{ placement: "right" }} showArrow>
-      <Box as="span" display="inline-flex" flexShrink={0} color="fg.subtle">
-        <Lock size={14} aria-label={ENTERPRISE_LOCK_MESSAGE} />
-      </Box>
-    </Tooltip>
-  ) : null;
+  const lock = <EnterpriseMark isLocked={isLocked} isEnterpriseIncluded={isEnterpriseIncluded} />;
   const badge =
     badgeNumber && badgeNumber > 0 ? (
       <Badge variant="solid" colorPalette="green" borderRadius="full" paddingX={1.5} fontSize="xs">
@@ -195,6 +220,7 @@ export const SideMenuLink = ({
   unavailableReason,
   tourId,
   isLocked,
+  isEnterpriseIncluded,
 }: SideMenuLinkProps) => {
   const linkRef = useRef<HTMLAnchorElement>(null);
   // A page opened by its address can have its entry below the visible
@@ -274,6 +300,7 @@ export const SideMenuLink = ({
           legacy={legacy}
           legacyLabel={legacyLabel}
           isLocked={isLocked}
+          isEnterpriseIncluded={isEnterpriseIncluded}
         />
       </NavigationLink>
     </Link>

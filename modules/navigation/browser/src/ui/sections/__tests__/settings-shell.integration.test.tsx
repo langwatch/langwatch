@@ -281,13 +281,19 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "A plan with Enterprise sees its entries as plain entries" */
-    it("draws the enterprise entries plainly on a plan that includes them", () => {
+    /** @scenario "A plan with Enterprise sees its entries unlocked in a quiet gold" */
+    it("marks the enterprise entries with an open lock on a plan that includes them", () => {
       renderSettingsSidebar();
 
-      const roles = screen.getByRole("link", { name: /^Roles/ });
-      expect(within(roles).queryByLabelText("Enterprise")).not.toBeInTheDocument();
-      expect(roles.querySelector(".lucide-lock")).toBeNull();
+      for (const name of [/^Roles/, /^Audit log/]) {
+        const link = screen.getByRole("link", { name });
+        expect(within(link).getByLabelText("Enterprise")).toBeInTheDocument();
+        expect(link.querySelector(".lucide-lock")).toBeNull();
+      }
+      for (const name of [/^Users/, /^Authentication/]) {
+        const link = screen.getByRole("link", { name });
+        expect(within(link).queryByLabelText("Enterprise")).not.toBeInTheDocument();
+      }
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
@@ -321,7 +327,7 @@ describe("the settings shell in a new navigation mode", () => {
 
       const braids = screen.getByRole("link", { name: /^Braids/ });
       expect(braids.querySelector('[data-feature="braids"]')).not.toBeNull();
-      expect(braids.querySelector(".lucide")).toBeNull();
+      expect(braids.querySelector(".lucide-waypoints")).toBeNull();
     });
 
     /** @scenario "Settings groups read in sentence case" */

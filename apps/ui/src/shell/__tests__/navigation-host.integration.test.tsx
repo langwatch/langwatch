@@ -134,6 +134,9 @@ class SignedInSession extends UiSession {
   hasPermission(_permission: string): boolean {
     return false;
   }
+  override hasOrganizationPermission(_permission: string): boolean {
+    return false;
+  }
   isSettled(): boolean {
     return true;
   }
@@ -266,6 +269,9 @@ class SignedOutSession extends UiSession {
     };
   }
   hasPermission(): boolean {
+    return false;
+  }
+  override hasOrganizationPermission(): boolean {
     return false;
   }
   isSettled(): boolean {
@@ -601,6 +607,9 @@ describe("the application chrome", () => {
     }
     class OrganizationViewerSession extends SignedInSession {
       override hasPermission(permission: string): boolean {
+        return permission === "organization:view";
+      }
+      override hasOrganizationPermission(permission: string): boolean {
         return permission === "organization:view";
       }
     }

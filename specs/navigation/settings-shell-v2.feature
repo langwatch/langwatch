@@ -83,11 +83,18 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: A plan with Enterprise sees its entries as plain entries
+  Scenario: A plan with Enterprise sees its entries unlocked in a quiet gold
     Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the Enterprise entries carry no badge and no lock, like any entry the plan includes
+    Then the Enterprise entries carry a small open lock in a very subtle gold, read as "Enterprise"
     And no entry carries the "Included in Enterprise" lock
+
+  @integration
+  Scenario: A member without project-level organization rights sees their plan's Enterprise entries unlocked
+    Given my plan includes Enterprise
+    And I hold organization:view at the organization but not on the project I am in
+    When the settings sidebar renders
+    Then the plan is still read, and the Enterprise entries are unlocked
 
   @integration
   Scenario: A plan without Enterprise sees its entries locked

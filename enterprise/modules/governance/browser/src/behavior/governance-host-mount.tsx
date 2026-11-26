@@ -133,7 +133,10 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
 
   const activePlan = governanceApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+    {
+      enabled: !!organizationId && session.hasOrganizationPermission("organization:view"),
+      retry: false,
+    },
   );
   const plan = useMemo(
     () => ({
