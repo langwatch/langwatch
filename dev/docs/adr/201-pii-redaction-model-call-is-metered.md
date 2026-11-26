@@ -144,10 +144,12 @@ list is now read when the batch is routed, and an unreadable one sends the batch
     a Strict rule. Routing reads it once a minute per organization, so an acceptance reaches the
     model within a minute. Billing counts an organization's PII spend only from the moment of the
     acceptance: none without one, none in a month that ended before it. A pending meter total (a
-    send cut off before Stripe confirmed it) is replayed under its own identifier at once and kept
-    as reported; when it is above the spend from the acceptance on, the next report sends the
-    negative difference, so the month ends at the accepted spend. Self-hosted is unchanged: the
-    licence decides and no call is priced.
+    send cut off before Stripe confirmed it) is replayed under its own identifier by the next
+    report, without waiting for the price or the spend read, and kept as reported; when it is
+    above the spend from the acceptance on, the report after sends the negative difference, so the
+    month ends at the accepted spend. Neither the replay nor the correction is bounded in time: both
+    are the shared meter reporter's, with the two limits the trade-offs state. Self-hosted is
+    unchanged: the licence decides and no call is priced.
 
 ## Rationale / Trade-offs
 
@@ -201,6 +203,21 @@ negative, for one Stripe never got. The cost: until the next report's negative d
 Stripe holds spend no admin accepted, and a held price or a tripped breaker can delay that
 correction. A pending total can sit above that spend only when it was written before this rule
 shipped or the ledger was corrected down, and decision 11 maps the meter in test mode only.
+
+Two limits are the shared meter reporter's, the same for the events, Instant Evals and PII meters,
+and this ADR leaves them as they are. First, a pending total is replayed whenever the next report
+runs, with no bound on its age. Stripe keeps an identifier for 24 hours, so a replay after that
+counts the send twice if Stripe had taken it. That needs a day with no report after the cut-off
+send, or an operator clearing a tripped breaker more than a day later: five failures in a row stop
+every report of that meter until one succeeds. Second, a negative correction is sent whenever its
+report runs, with no check on the invoice. One held back by a missing price or a tripped breaker
+past the end of the billing period lands after Stripe finalised the invoice, which keeps the
+excess. Both are accepted here because neither is new, a PII total reaches Stripe only for a
+subscription that carries the PII price (decision 10; a pending total is only written after that
+check), and decision 11 maps the meter in test mode only, so no live PII total exists yet. The
+follow-up, before the meter is mapped live: reconcile a pending total older than the window against
+Stripe's meter summaries before replaying it, and credit a correction that lands after the invoice
+was finalised.
 
 ## Consequences
 
