@@ -28,7 +28,6 @@ type StoredObjectRetentionServiceOptions = Readonly<{
   sweepTenantLimit?: number;
   sweepPageSize?: number;
   sweepBudgetMs?: number;
-  retimePageSize?: number;
 }>;
 
 export type StoredObjectSweepReport = Readonly<{
@@ -91,7 +90,7 @@ export class StoredObjectRetentionService {
     isRaise?: boolean;
   }): Promise<void> {
     const days = input.retentionDays === INDEFINITE_RETENTION_DAYS ? null : input.retentionDays;
-    const limit = this.options.retimePageSize ?? RETIME_PAGE_SIZE;
+    const limit = RETIME_PAGE_SIZE;
     const at = this.options.now();
     for (const purpose of purposesIn(input.category)) {
       let afterId: StoredObjectId | undefined;

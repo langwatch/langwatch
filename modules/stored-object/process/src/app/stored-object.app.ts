@@ -222,7 +222,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     });
   }
 
-  /** `GET /api/files/...`: one object's bytes, counted and authorized in the door's order. */
   /** The pipeline `stored_object_retention` registers: the sweep and the retention follower. */
   retentionPipeline(input: {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
@@ -233,6 +232,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     });
   }
 
+  /** `GET /api/files/...`: one object's bytes, counted and authorized in the door's order. */
   readFile(input: StoredObjectFileReadInput): Promise<StoredObjectFileBytes> {
     return this.#files.read(input);
   }

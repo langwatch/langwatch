@@ -15,22 +15,23 @@ import { MemoryStoredObjectOwnerLinkRepository } from "./memory.stored-object-ow
 
 /**
  * The same answers as the Prisma repository, over one Map keyed by tenant and id. The
- * owner links answer the conditional delete, as the Prisma statement reads their table.
+ * owner links answer the conditional delete, as the Prisma statement reads their table; with
+ * none given, no link holds any object.
  */
 export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRepository {
   static create(
     values: readonly StoredObjectRecord[] = [],
-    ownerLinks?: MemoryStoredObjectOwnerLinkRepository,
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository = MemoryStoredObjectOwnerLinkRepository.create(),
   ): MemoryStoredObjectRecordRepository {
     return new MemoryStoredObjectRecordRepository(values, ownerLinks);
   }
 
   readonly #values = new Map<string, StoredObjectRecord>();
-  readonly #ownerLinks: MemoryStoredObjectOwnerLinkRepository | undefined;
+  readonly #ownerLinks: MemoryStoredObjectOwnerLinkRepository;
 
   private constructor(
     values: readonly StoredObjectRecord[],
-    ownerLinks: MemoryStoredObjectOwnerLinkRepository | undefined,
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository,
   ) {
     for (const value of values) this.#values.set(key(value), value);
     this.#ownerLinks = ownerLinks;
@@ -103,6 +104,7 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
     purpose: string;
     sha256: string;
     mediaType: string;
+    limit: number;
   }): Promise<StoredObjectRecord[]> {
     return [...this.#values.values()]
       .filter(
@@ -113,7 +115,8 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
           value.sha256 === input.sha256 &&
           value.mediaType === input.mediaType,
       )
-      .toSorted((left, right) => left.id.localeCompare(right.id));
+      .toSorted((left, right) => left.id.localeCompare(right.id))
+      .slice(0, input.limit);
   }
 
   async findPageByPurpose(input: {
@@ -167,9 +170,6 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
     id: StoredObjectId;
     now: Instant;
   }): Promise<boolean> {
-    if (!this.#ownerLinks) {
-      throw new Error("the memory record repository was created without its owner links");
-    }
     const value = this.#values.get(key(input));
     if (value?.status !== "available") return false;
     if (
