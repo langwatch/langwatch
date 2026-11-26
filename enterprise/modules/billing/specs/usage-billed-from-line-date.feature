@@ -52,6 +52,15 @@ Feature: Instant Evals and PII redaction usage is billed only from the day its p
       And its replacement, which carries the line from the 15th
       When the line's start is read for that month
       Then it is the cancelled subscription's line, so the window never moves later after a report
+      # Only a cancellation at or after the new line's creation, within a minute's tolerance, chains.
+
+    @unit
+    Scenario: Usage while no line existed anywhere is never billed
+      Given a cancelled subscription whose line ended on the 6th
+      And a new subscription whose line was added on the 15th
+      And spend of 1 dollar on the 3rd, 4 dollars on the 10th and 2 dollars on the 20th
+      When the month is reported
+      Then the spend is read from the 15th, so the 4 dollars from the gap are never billed
 
     @unit
     Scenario: A line on a subscription that ended before the month does not set its start
@@ -61,10 +70,11 @@ Feature: Instant Evals and PII redaction usage is billed only from the day its p
       Then it is the live line's creation on the 10th
 
     @unit
-    Scenario: A line with no recorded creation reads the month as before
+    Scenario: A line with no recorded creation is refused as a failed read
       Given a subscription line with no creation time
-      When the line's start is read
-      Then no start is set and the month keeps its other bounds
+      When the month is reported
+      Then nothing is sent for that meter and the read counts as a failure toward the breaker
+      # Reading the month from its first day instead would bill usage from before the line.
 
     @unit
     Scenario: Without the line nothing is read as billed

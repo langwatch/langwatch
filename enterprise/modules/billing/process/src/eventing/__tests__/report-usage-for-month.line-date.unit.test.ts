@@ -15,9 +15,10 @@ import { describe, expect, it } from "vitest";
 
 import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
+import type { BillingSubscription } from "../../rules/billing-stripe-shapes.rules.ts";
 import { INSTANT_EVAL_USD_EVENT_NAME } from "../../rules/instant-eval-meter.rules.ts";
 import { PII_REDACTION_USD_EVENT_NAME } from "../../rules/pii-redaction-meter.rules.ts";
-import type { PriceLine } from "../../rules/price-line.rules.ts";
+import { priceLineOf, type PriceLine } from "../../rules/price-line.rules.ts";
 import { BillingErrorReporterService } from "../../services/billing-error-reporter.service.ts";
 import { InstantEvalSpendQueryService } from "../../services/instant-eval-spend-query.service.ts";
 import { PiiRedactionSpendQueryService } from "../../services/pii-redaction-spend-query.service.ts";
@@ -37,6 +38,38 @@ const ONE_DOLLAR_NANO_USD = 1_000_000_000;
 
 const NO_LINE: PriceLine = { carried: false };
 const lineSince = (addedAtMs: number): PriceLine => ({ carried: true, addedAtMs });
+/** The ids this mode maps for the two usage prices. */
+const PRICE_IDS: Partial<Record<StripePriceName, string>> = {
+  GROWTH_INSTANT_EVAL_USD: "price_instant_eval",
+  GROWTH_PII_REDACTION_USD: "price_pii_redaction",
+};
+
+/** A subscription at Stripe with an Instant Evals line created at `lineAtMs`. */
+function instantEvalSubscription({
+  lineAtMs,
+  endedAtMs,
+}: {
+  lineAtMs: number;
+  endedAtMs?: number;
+}): BillingSubscription {
+  return {
+    id: `sub_${lineAtMs}`,
+    status: endedAtMs === undefined ? "active" : "canceled",
+    canceledAt: endedAtMs === undefined ? null : endedAtMs / 1000,
+    billingThreshold: null,
+    items: [
+      {
+        id: `si_${lineAtMs}`,
+        priceId: "price_instant_eval",
+        unitAmount: null,
+        interval: "month",
+        quantity: null,
+        createdAt: lineAtMs / 1000,
+      },
+    ],
+    ...(endedAtMs === undefined ? {} : { endedAt: endedAtMs / 1000 }),
+  };
+}
 
 type LedgerRow = { requestType: string; atMs: number; nanoUsd: number };
 
@@ -64,10 +97,13 @@ function billing({
   organization = lookup(),
   ledger,
   lines,
+  stripe,
 }: {
   organization?: BillingReportOrganizationLookup;
   ledger: LedgerRow[];
   lines: Partial<Record<StripePriceName, PriceLine>>;
+  /** The customer's subscriptions at Stripe; when given, the lines are read off them. */
+  stripe?: readonly BillingSubscription[];
 }) {
   const repositories = MemoryBillingRepositories.create();
   const meterEvents: { eventName: string; value: number }[] = [];
@@ -108,7 +144,14 @@ function billing({
     isInstantEvalMeterProvisioned: () => true,
     queryPiiRedactionSpendTotal: (input) => piiRedaction.queryPiiRedactionSpendTotal(input),
     isPiiRedactionMeterProvisioned: () => true,
-    subscriptionCarriesPrice: async ({ price }) => lines[price] ?? NO_LINE,
+    subscriptionCarriesPrice: async ({ price, billingMonth }) =>
+      stripe === undefined
+        ? (lines[price] ?? NO_LINE)
+        : priceLineOf({
+            subscriptions: stripe,
+            prices: [{ priceName: price, priceId: PRICE_IDS[price] }],
+            billingMonth,
+          }),
     selfDispatch: async () => {},
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
@@ -262,6 +305,71 @@ describe("billing usage from the day its price line was added", () => {
       await report.report();
 
       expect(report.sent(PII_REDACTION_USD_EVENT_NAME)).toEqual([0.5]);
+    });
+  });
+
+  describe("given an Instant Evals line that ended on the 6th and a new one on another subscription from the 15th", () => {
+    /** @scenario "Usage while no line existed anywhere is never billed" */
+    it("never bills the 10th's spend, when no line existed anywhere", async () => {
+      const report = billing({
+        ledger: [
+          {
+            requestType: INSTANT_EVAL_REQUEST_TYPE,
+            atMs: Date.UTC(2026, 1, 3, 9),
+            nanoUsd: ONE_DOLLAR_NANO_USD,
+          },
+          {
+            requestType: INSTANT_EVAL_REQUEST_TYPE,
+            atMs: ON_THE_10TH_MS,
+            nanoUsd: 4 * ONE_DOLLAR_NANO_USD,
+          },
+          {
+            requestType: INSTANT_EVAL_REQUEST_TYPE,
+            atMs: ON_THE_20TH_MS,
+            nanoUsd: 2 * ONE_DOLLAR_NANO_USD,
+          },
+        ],
+        lines: {},
+        stripe: [
+          instantEvalSubscription({
+            lineAtMs: Date.UTC(2026, 0, 15),
+            endedAtMs: Date.UTC(2026, 1, 6, 10),
+          }),
+          instantEvalSubscription({ lineAtMs: Date.UTC(2026, 1, 15, 12) }),
+        ],
+      });
+
+      await report.report();
+
+      expect(report.sent(INSTANT_EVAL_USD_EVENT_NAME)).toEqual([2]);
+      expect(report.readsOf(INSTANT_EVAL_REQUEST_TYPE)[0]?.fromMs).toBe(Date.UTC(2026, 1, 15, 12));
+    });
+  });
+
+  describe("given an Instant Evals line Stripe answered with no creation time", () => {
+    /** @scenario "A line with no recorded creation is refused as a failed read" */
+    it("sends nothing and counts a failed read toward the breaker", async () => {
+      const live = instantEvalSubscription({ lineAtMs: ON_THE_12TH_MS });
+      const unknownCreation: BillingSubscription = {
+        ...live,
+        items: live.items.map((item) => ({ ...item, createdAt: Number.NaN })),
+      };
+      const report = billing({
+        ledger: SPEND_ON_THE_5TH_AND_20TH,
+        lines: {},
+        stripe: [unknownCreation],
+      });
+
+      await report.report();
+
+      expect(report.sent(INSTANT_EVAL_USD_EVENT_NAME)).toEqual([]);
+      expect(
+        await report.checkpoints.findCheckpoint({
+          organizationId: ORG,
+          billingMonth: BILLING_MONTH,
+          meter: INSTANT_EVAL_USD_EVENT_NAME,
+        }),
+      ).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null, consecutiveFailures: 1 });
     });
   });
 

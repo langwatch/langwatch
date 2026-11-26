@@ -57,11 +57,19 @@ function subscription({
     currency: "eur",
     customerId: "cus_1",
     items: [
-      { id: "si_seat", priceId: seatPrice, unitAmount: 2900, interval, quantity: 2 },
+      {
+        id: "si_seat",
+        priceId: seatPrice,
+        unitAmount: 2900,
+        interval,
+        quantity: 2,
+        createdAt: 1_700_000_000,
+      },
       ...(withStorage
         ? [
             {
               id: "si_storage",
+              createdAt: 1_700_000_000,
               priceId: "price_storage_eur_monthly",
               unitAmount: null,
               interval,

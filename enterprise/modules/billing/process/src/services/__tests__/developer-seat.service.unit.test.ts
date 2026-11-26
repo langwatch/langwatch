@@ -50,6 +50,7 @@ describe("DeveloperSeatService", () => {
         items: [
           {
             id: "si_seat",
+            createdAt: 1_700_000_000,
             priceId: BASE_PRICES.GROWTH_SEAT_EUR_MONTHLY,
             unitAmount: 2900,
             interval: "month",
@@ -59,6 +60,7 @@ describe("DeveloperSeatService", () => {
             ? [
                 {
                   id: "si_dev",
+                  createdAt: 1_700_000_000,
                   priceId: "price_dev_eur_monthly",
                   unitAmount: 500,
                   interval: "month",

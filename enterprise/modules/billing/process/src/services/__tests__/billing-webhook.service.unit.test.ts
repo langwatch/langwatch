@@ -193,6 +193,7 @@ const stripeSubscription = (overrides: Partial<BillingSubscription> = {}): Billi
 const itemFor = (priceId: string): BillingSubscriptionItem => ({
   id: `si_${priceId}`,
   priceId,
+  createdAt: 1_700_000_000,
   unitAmount: null,
   interval: null,
 });

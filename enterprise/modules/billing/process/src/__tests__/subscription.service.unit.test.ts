@@ -73,7 +73,12 @@ const providerSubscription = ({
   status,
   canceledAt: null,
   billingThreshold: null,
-  items: items.map((item) => ({ ...item, unitAmount: null, interval: null })),
+  items: items.map((item) => ({
+    ...item,
+    unitAmount: null,
+    interval: null,
+    createdAt: 1_700_000_000,
+  })),
 });
 
 const createMockRepository = (): {

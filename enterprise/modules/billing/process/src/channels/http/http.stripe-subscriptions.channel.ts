@@ -195,7 +195,7 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
       quantity: item.quantity ?? null,
       ...(item.price.lookup_key ? { lookupKey: item.price.lookup_key } : {}),
       ...langwatchKeyOf(item.price.metadata),
-      ...(typeof item.created === "number" ? { createdAt: item.created } : {}),
+      createdAt: item.created,
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,

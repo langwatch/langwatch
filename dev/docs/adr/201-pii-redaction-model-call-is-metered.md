@@ -118,8 +118,10 @@ added to the Stripe subscription, never from the month's first day (decision 15)
     subscription's start and the creation of the `GROWTH_PII_REDACTION_USD` line, read off the
     same subscriptions list decision 10 already makes. The first report after the line is added
     carries only usage since then, never the month from its first day, and a month the line
-    narrows never reports below what it already sent. The rule, its replacement handling and its
-    trade-offs are ADR-174 decision 26, shared by both usage meters.
+    narrows never reports below what it already sent. Usage while no line existed on any
+    subscription is never billed, and a line with no creation time is refused as a failed read.
+    The rule, its replacement handling and its trade-offs are ADR-174 decision 26, shared by
+    both usage meters.
 
 ## Rationale / Trade-offs
 

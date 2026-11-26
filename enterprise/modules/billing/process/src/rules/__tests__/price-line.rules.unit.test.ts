@@ -1,7 +1,9 @@
 /**
- * When a usage meter's price line was added, the moment its month is billed from (ADR-174
- * decision 26).
+ * Whether a customer's subscriptions price a usage meter, and the moment its month is billed
+ * from (ADR-174 decisions 18 and 26).
  * @see enterprise/modules/billing/specs/usage-billed-from-line-date.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ * @see modules/data-privacy/specs/pii-redaction-billing.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -10,7 +12,7 @@ import type {
   BillingSubscription,
   BillingSubscriptionItem,
 } from "../billing-stripe-shapes.rules.ts";
-import { meterBilledSince, priceLineOf } from "../price-line.rules.ts";
+import { meterBilledSince, priceLineOf, REPLACEMENT_TOLERANCE_MS } from "../price-line.rules.ts";
 
 const PRICE_NAME = "GROWTH_INSTANT_EVAL_USD";
 const PRICE_ID = "price_catalogue";
@@ -19,18 +21,23 @@ const BILLING_MONTH = "2026-02";
 
 const seconds = (ms: number) => Math.floor(ms / 1000);
 const BEFORE_THE_MONTH_MS = Date.UTC(2026, 0, 20);
+const ON_THE_6TH_MS = Date.UTC(2026, 1, 6, 10);
 const ON_THE_10TH_MS = Date.UTC(2026, 1, 10, 9);
 const ON_THE_15TH_MS = Date.UTC(2026, 1, 15, 12);
 const ON_THE_20TH_MS = Date.UTC(2026, 1, 20, 8);
 
-function line(createdAtMs: number | null, priceId = PRICE_ID): BillingSubscriptionItem {
+function line(
+  createdAtMs: number,
+  overrides: Partial<BillingSubscriptionItem> = {},
+): BillingSubscriptionItem {
   return {
-    id: `si_${priceId}_${createdAtMs}`,
-    priceId,
+    id: `si_${overrides.priceId ?? PRICE_ID}_${createdAtMs}`,
+    priceId: PRICE_ID,
     unitAmount: null,
     interval: "month",
     quantity: null,
-    ...(createdAtMs === null ? {} : { createdAt: seconds(createdAtMs) }),
+    createdAt: seconds(createdAtMs),
+    ...overrides,
   };
 }
 
@@ -56,23 +63,104 @@ function subscription({
 const lineOf = (subscriptions: BillingSubscription[]) =>
   priceLineOf({ subscriptions, prices: PRICES, billingMonth: BILLING_MONTH });
 
-describe("priceLineOf", () => {
-  describe("when no invoiced subscription has a line on the price", () => {
-    /** @scenario "Without the line nothing is read as billed" */
-    it("answers that the price is not carried", () => {
-      expect(lineOf([subscription({ items: [line(ON_THE_10TH_MS, "price_seat")] })])).toEqual({
-        carried: false,
-      });
-    });
+const since = (ms: number) => ({ carried: true, addedAtMs: seconds(ms) * 1000 });
 
-    /** @scenario "Without the line nothing is read as billed" */
-    it("answers not carried when only a cancelled subscription has the line", () => {
+describe("priceLineOf", () => {
+  describe("when an invoiced subscription has a line on the price", () => {
+    it.each(["active", "past_due", "trialing"] as const)("carries it for a %s one", (status) => {
       expect(
         lineOf([
           subscription({
-            status: "canceled",
-            items: [line(BEFORE_THE_MONTH_MS)],
-            endedAtMs: ON_THE_15TH_MS,
+            status,
+            items: [line(ON_THE_10TH_MS, { priceId: "price_seat" }), line(ON_THE_10TH_MS)],
+          }),
+        ]),
+      ).toEqual(since(ON_THE_10TH_MS));
+    });
+  });
+
+  describe("when no invoiced subscription has a line on the price", () => {
+    /** @scenario "Without the line nothing is read as billed" */
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("answers that the price is not carried", () => {
+      expect(
+        lineOf([
+          subscription({
+            items: [
+              line(ON_THE_10TH_MS, { priceId: "price_seat" }),
+              line(ON_THE_10TH_MS, { priceId: "price_events" }),
+            ],
+          }),
+        ]),
+      ).toEqual({ carried: false });
+    });
+
+    /** @scenario "Without the line nothing is read as billed" */
+    it.each(["canceled", "incomplete_expired", "unpaid", "paused"] as const)(
+      "answers not carried when only a %s subscription, which invoices nothing, has it",
+      (status) => {
+        expect(lineOf([subscription({ status, items: [line(BEFORE_THE_MONTH_MS)] })])).toEqual({
+          carried: false,
+        });
+      },
+    );
+
+    it("answers not carried where the mode maps no price for the name", () => {
+      expect(
+        priceLineOf({
+          subscriptions: [
+            subscription({
+              items: [line(ON_THE_10TH_MS, { priceId: "price_new", lookupKey: PRICE_NAME })],
+            }),
+          ],
+          prices: [{ priceName: PRICE_NAME, priceId: undefined }],
+          billingMonth: BILLING_MONTH,
+        }),
+      ).toEqual({ carried: false });
+    });
+  });
+
+  describe("when the line is on a newer price for the same name", () => {
+    /** @scenario "A re-priced Instant Evals line is still recognised" */
+    it("carries it when that price carries the name as its lookup key", () => {
+      expect(
+        lineOf([
+          subscription({
+            items: [line(ON_THE_10TH_MS, { priceId: "price_new", lookupKey: PRICE_NAME })],
+          }),
+        ]),
+      ).toEqual(since(ON_THE_10TH_MS));
+    });
+
+    /** @scenario "A re-priced Instant Evals line is still recognised" */
+    it("carries it when the old price kept the name in its langwatch_key metadata", () => {
+      expect(
+        lineOf([
+          subscription({
+            items: [
+              line(ON_THE_10TH_MS, {
+                priceId: "price_old",
+                lookupKey: null,
+                langwatchKey: PRICE_NAME,
+              }),
+            ],
+          }),
+        ]),
+      ).toEqual(since(ON_THE_10TH_MS));
+    });
+
+    /** @scenario "A re-priced Instant Evals line is still recognised" */
+    it("does not carry a price keyed to another name", () => {
+      expect(
+        lineOf([
+          subscription({
+            items: [
+              line(ON_THE_10TH_MS, {
+                priceId: "price_pii",
+                lookupKey: "GROWTH_PII_REDACTION_USD",
+                langwatchKey: "GROWTH_PII_REDACTION_USD",
+              }),
+            ],
           }),
         ]),
       ).toEqual({ carried: false });
@@ -82,26 +170,24 @@ describe("priceLineOf", () => {
   describe("when the live line was added mid-month", () => {
     /** @scenario "A PII redaction line added mid-month bills only from that moment" */
     it("answers the line's creation", () => {
-      expect(lineOf([subscription({ items: [line(ON_THE_10TH_MS)] })])).toEqual({
-        carried: true,
-        addedAtMs: seconds(ON_THE_10TH_MS) * 1000,
-      });
+      expect(lineOf([subscription({ items: [line(ON_THE_10TH_MS)] })])).toEqual(
+        since(ON_THE_10TH_MS),
+      );
     });
   });
 
   describe("when the line was removed and a new one added", () => {
     /** @scenario "A line removed and added again bills from the line now on the subscription" */
     it("answers the new line's creation, since Stripe lists only the line now there", () => {
-      expect(lineOf([subscription({ items: [line(ON_THE_20TH_MS)] })])).toEqual({
-        carried: true,
-        addedAtMs: seconds(ON_THE_20TH_MS) * 1000,
-      });
+      expect(lineOf([subscription({ items: [line(ON_THE_20TH_MS)] })])).toEqual(
+        since(ON_THE_20TH_MS),
+      );
     });
   });
 
   describe("when a subscription carrying the line was replaced mid-month", () => {
     /** @scenario "A subscription replaced mid-month keeps the earlier line's start" */
-    it("answers the cancelled subscription's earlier line", () => {
+    it("answers the cancelled subscription's earlier line when it ended as the new line began", () => {
       expect(
         lineOf([
           subscription({
@@ -111,7 +197,70 @@ describe("priceLineOf", () => {
           }),
           subscription({ items: [line(ON_THE_15TH_MS)] }),
         ]),
-      ).toEqual({ carried: true, addedAtMs: seconds(BEFORE_THE_MONTH_MS) * 1000 });
+      ).toEqual(since(BEFORE_THE_MONTH_MS));
+    });
+
+    /** @scenario "A subscription replaced mid-month keeps the earlier line's start" */
+    it("still chains a cancellation that landed within the tolerance before the new line", () => {
+      expect(
+        lineOf([
+          subscription({
+            status: "canceled",
+            items: [line(BEFORE_THE_MONTH_MS)],
+            endedAtMs: ON_THE_15TH_MS - REPLACEMENT_TOLERANCE_MS,
+          }),
+          subscription({ items: [line(ON_THE_15TH_MS)] }),
+        ]),
+      ).toEqual(since(BEFORE_THE_MONTH_MS));
+    });
+
+    /** @scenario "A subscription replaced mid-month keeps the earlier line's start" */
+    it("chains every replacement back to the first line", () => {
+      expect(
+        lineOf([
+          subscription({
+            status: "canceled",
+            items: [line(BEFORE_THE_MONTH_MS)],
+            endedAtMs: ON_THE_10TH_MS,
+          }),
+          subscription({
+            status: "canceled",
+            items: [line(ON_THE_10TH_MS)],
+            endedAtMs: ON_THE_15TH_MS,
+          }),
+          subscription({ items: [line(ON_THE_15TH_MS)] }),
+        ]),
+      ).toEqual(since(BEFORE_THE_MONTH_MS));
+    });
+  });
+
+  describe("when no line existed between a cancelled subscription's end and the new line", () => {
+    /** @scenario "Usage while no line existed anywhere is never billed" */
+    it("answers the new line's creation, so the gap is never billed", () => {
+      expect(
+        lineOf([
+          subscription({
+            status: "canceled",
+            items: [line(BEFORE_THE_MONTH_MS)],
+            endedAtMs: ON_THE_6TH_MS,
+          }),
+          subscription({ items: [line(ON_THE_15TH_MS)] }),
+        ]),
+      ).toEqual(since(ON_THE_15TH_MS));
+    });
+
+    /** @scenario "Usage while no line existed anywhere is never billed" */
+    it("does not chain a cancellation just past the tolerance", () => {
+      expect(
+        lineOf([
+          subscription({
+            status: "canceled",
+            items: [line(BEFORE_THE_MONTH_MS)],
+            endedAtMs: ON_THE_15TH_MS - REPLACEMENT_TOLERANCE_MS - 1_000,
+          }),
+          subscription({ items: [line(ON_THE_15TH_MS)] }),
+        ]),
+      ).toEqual(since(ON_THE_15TH_MS));
     });
   });
 
@@ -127,17 +276,16 @@ describe("priceLineOf", () => {
           }),
           subscription({ items: [line(ON_THE_10TH_MS)] }),
         ]),
-      ).toEqual({ carried: true, addedAtMs: seconds(ON_THE_10TH_MS) * 1000 });
+      ).toEqual(since(ON_THE_10TH_MS));
     });
   });
 
   describe("when the line carries no creation time", () => {
-    /** @scenario "A line with no recorded creation reads the month as before" */
-    it("answers no start", () => {
-      expect(lineOf([subscription({ items: [line(null)] })])).toEqual({
-        carried: true,
-        addedAtMs: null,
-      });
+    /** @scenario "A line with no recorded creation is refused as a failed read" */
+    it("refuses rather than read the month from before the line", () => {
+      expect(() =>
+        lineOf([subscription({ items: [line(ON_THE_10TH_MS, { createdAt: Number.NaN })] })]),
+      ).toThrow(/has no creation time/);
     });
   });
 
@@ -145,11 +293,13 @@ describe("priceLineOf", () => {
     it("answers that line's creation", () => {
       expect(
         priceLineOf({
-          subscriptions: [subscription({ items: [line(ON_THE_10TH_MS, "price_other")] })],
+          subscriptions: [
+            subscription({ items: [line(ON_THE_10TH_MS, { priceId: "price_other" })] }),
+          ],
           prices: [...PRICES, { priceName: "GROWTH_INSTANT_EVAL_OTHER", priceId: "price_other" }],
           billingMonth: BILLING_MONTH,
         }),
-      ).toEqual({ carried: true, addedAtMs: seconds(ON_THE_10TH_MS) * 1000 });
+      ).toEqual(since(ON_THE_10TH_MS));
     });
   });
 });
@@ -168,8 +318,8 @@ describe("meterBilledSince", () => {
     ).toEqual({ outcome: "since", startMs: ON_THE_15TH_MS });
   });
 
-  /** @scenario "A line with no recorded creation reads the month as before" */
-  it("keeps whichever start is known, and none when neither is", () => {
+  /** @scenario "The month starts at the later of the subscription's start and the line's" */
+  it("keeps whichever start is known, and the whole month when neither is", () => {
     expect(meterBilledSince({ usageBilledSinceMs: null, lineAddedAtMs: ON_THE_10TH_MS })).toEqual({
       outcome: "since",
       startMs: ON_THE_10TH_MS,

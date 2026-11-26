@@ -10,6 +10,7 @@ const calculator = SubscriptionItemCalculatorService.create(prices);
 const createSubscriptionItem = (id: string, priceId: string): BillingSubscriptionItem => ({
   id,
   priceId,
+  createdAt: 1_700_000_000,
   unitAmount: null,
   interval: null,
 });
