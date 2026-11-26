@@ -42,9 +42,9 @@ export interface InstantEvalJudgeApi {
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
   /**
-   * A judged query's budget hold rates: the dearest base input rate a search or LLM-judge route
-   * could reach (a scenario-only backend is left out), never below the classifier's. Best-effort,
-   * not a hard cap: a routed query re-sends text, pays output and long-context rates (ADR-190 d7).
+   * An unrouted judged query's hold rates: the dearest base input rate a search or LLM-judge route
+   * could reach (a scenario-only backend is left out), never below the classifier's (ADR-190 d7).
+   * A routed query is held at its cost ceiling instead (ADR-190 d13).
    */
   queryHoldPricing(): Promise<InstantEvalPricing>;
   /**
@@ -121,6 +121,22 @@ export interface InstantEvalClassification {
   readonly decisionModel?: InstantEvalOwnDecisionModel;
   /** Present when the call is routed; absent, the hosted classifier answers alone, as before. */
   readonly route?: InstantEvalJudgeRouteRequest;
+  /** A routed call's spend cap, shared by every call of one judged query (ADR-190 decision 13). */
+  readonly costCeiling?: InstantEvalJudgeCostCeiling;
+}
+
+/**
+ * What a routed judged query may still spend, in our cost. Each send holds its worst case first
+ * and is not sent when that would pass the ceiling, so the query never spends past it.
+ */
+export interface InstantEvalJudgeCostCeiling {
+  /**
+   * Holds a send's worst-case cost, waiting for sends in flight to settle when it fits only then;
+   * false, and nothing is held, when it cannot fit even with nothing held. Rejects on the stop.
+   */
+  hold(nanoUsd: number, signal?: AbortSignal): Promise<boolean>;
+  /** Swaps a send's hold for what it cost: what it billed, or its whole hold with no usage read. */
+  settle(input: { heldNanoUsd: number; costNanoUsd: number }): void;
 }
 
 /**
@@ -276,6 +292,8 @@ export const INSTANT_EVAL_SKIP_REASONS = [
   "classifier_key_invalid",
   // An own decision model's provider is down or answered unreadably; retry later (ADR-182).
   "classifier_provider_unavailable",
+  // A judged query's cost ceiling had no room for this send's worst case, so nothing was sent.
+  "query_cost_ceiling",
 ] as const;
 
 export type InstantEvalSkipReason = (typeof INSTANT_EVAL_SKIP_REASONS)[number];

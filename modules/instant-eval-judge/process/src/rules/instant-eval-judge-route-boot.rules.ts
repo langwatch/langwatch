@@ -46,9 +46,9 @@ export function instantEvalJudgeRouteBootIssues({
 const QUERY_HOLD_JOBS: readonly InstantEvalJudgeJob[] = ["search", "llm_judge"];
 
 /**
- * A judged query's budget hold: the dearest base input rate a search or LLM-judge route can reach
- * (a scenario route's backends are left out), never below the classifier's, at the one markup. A
- * best-effort hold: it ignores re-sends, output tokens and long-context rates (ADR-190 decision 7).
+ * An unrouted judged query's hold: the dearest base input rate a search or LLM-judge route can
+ * reach (a scenario route's backends are left out), never below the classifier's, at the one
+ * markup (ADR-190 decision 7). A routed query is held at its cost ceiling (decision 13).
  */
 export function instantEvalJudgeQueryHoldPricingOf({
   table,

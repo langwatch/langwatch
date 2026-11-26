@@ -11,6 +11,7 @@ import { type Dispatcher, fetch as undiciFetch } from "undici";
 import { prepareInstantEvalText } from "../../rules/instant-eval-classifier-text.rules.ts";
 import { decisionFailureOf } from "../../rules/instant-eval-decision-wire.rules.ts";
 import {
+  INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
   instantEvalLlmJudgeBodyOf,
   instantEvalLlmJudgePromptOf,
   readInstantEvalLlmJudgeAnswer,
@@ -34,10 +35,9 @@ const ENDPOINTS: Record<InstantEvalLlmJudgeWire, string> = {
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
-/** Content an LLM leg keeps, as langevals' judge fit does. */
-const LLM_CONTENT_BUDGET_TOKENS = 128_000;
-
 type Keys = Readonly<Partial<Record<InstantEvalLlmJudgeWire, string>>>;
+
+type SkippedAnswer = Extract<InstantEvalLlmJudgeAnswer, { outcome: "skipped" }>;
 
 export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChannel {
   private constructor(
@@ -64,12 +64,24 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   }
 
   async judge(
-    { wire, model, job, question, text, timeoutMs, reasoningEffort }: InstantEvalLlmJudgeRequest,
+    {
+      wire,
+      model,
+      job,
+      question,
+      text,
+      timeoutMs,
+      reasoningEffort,
+      maxOutputTokens,
+    }: InstantEvalLlmJudgeRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalLlmJudgeAnswer> {
     const apiKey = this.keys[wire];
     if (!apiKey || !model) return skipped("classifier_not_configured");
-    const fitted = prepareInstantEvalText({ text, budgetTokens: LLM_CONTENT_BUDGET_TOKENS });
+    const fitted = prepareInstantEvalText({
+      text,
+      budgetTokens: INSTANT_EVAL_LLM_JUDGE_CONTENT_BUDGET_TOKENS,
+    });
     const prompt = instantEvalLlmJudgePromptOf({ job, question, text: fitted.text });
     const body = JSON.stringify(
       instantEvalLlmJudgeBodyOf({
@@ -77,6 +89,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
         model,
         prompt,
         ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
       }),
     );
     let response: Awaited<ReturnType<typeof undiciFetch>>;
@@ -90,7 +103,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
       });
     } catch (error) {
       if (signal?.aborted) throw error;
-      return this.skip({ wire, reason: "classifier_provider_unavailable" });
+      return {
+        ...this.skip({ wire, reason: "classifier_provider_unavailable" }),
+        isUsageUnread: true,
+      };
     }
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => undefined);
@@ -100,6 +116,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     const parsed: unknown = await response.json().catch(() => undefined);
     const reading = readInstantEvalLlmJudgeAnswer({ wire, body: parsed, question });
     const { inputTokens, outputTokens } = reading;
+    // A body cut off mid-read (the timeout fires after the headers) carries no usage either.
+    if (parsed === undefined) {
+      return { ...this.skip({ wire, reason: "classifier_failed" }), isUsageUnread: true };
+    }
     if (reading.outcome === "none") {
       this.logger.warn(
         { wire, kind: question.kind, stoppedBy: reading.stoppedBy, reasoningEffort },
@@ -120,13 +140,13 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     wire: InstantEvalLlmJudgeWire;
     reason: InstantEvalSkipReason;
     status?: number;
-  }): InstantEvalLlmJudgeAnswer {
+  }): SkippedAnswer {
     this.logger.warn({ wire, reason, status }, "Instant Evals LLM leg did not answer");
     return skipped(reason);
   }
 }
 
-function skipped(reason: InstantEvalSkipReason): InstantEvalLlmJudgeAnswer {
+function skipped(reason: InstantEvalSkipReason): SkippedAnswer {
   return { outcome: "skipped", reason, inputTokens: 0, outputTokens: 0 };
 }
 
