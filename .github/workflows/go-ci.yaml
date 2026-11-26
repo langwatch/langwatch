@@ -25,6 +25,8 @@ on:
       - "packages/handled-error/**"
       - "modules/*/process/src/*.module.ts"
       - "enterprise/modules/*/process/src/*.module.ts"
+      - "modules/*/process/src/migrations/*.ts"
+      - "enterprise/modules/*/process/src/migrations/*.ts"
       - "*/go.mod"
       - "*/go.sum"
       - ".golangci.yml"
@@ -123,6 +125,8 @@ jobs:
             upgradelab:
               - 'modules/*/process/src/*.module.ts'
               - 'enterprise/modules/*/process/src/*.module.ts'
+              - 'modules/*/process/src/migrations/*.ts'
+              - 'enterprise/modules/*/process/src/migrations/*.ts'
             ciguards:
               - '.github/workflows/**'
               - '.github/pr-filters.yml'

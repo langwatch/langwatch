@@ -354,6 +354,11 @@
       "cells": ["C2"],
       "note": "SSO connection and SCIM state by SQL"
     },
+    "stored-object:import-clickhouse-index": {
+      "status": "seeded",
+      "seed": "traffic:otlp",
+      "note": "the step form of the stored objects clickhouse import system migration; declared in its migrations file, not the module file"
+    },
     "suite:replay-scenario-facts-for-open-runs": {
       "status": "seeded",
       "seed": "product-seeds:suite",

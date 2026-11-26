@@ -18,6 +18,8 @@ const goodGoCI = `on:
       - "**/*.go"
       - "modules/*/process/src/*.module.ts"
       - "enterprise/modules/*/process/src/*.module.ts"
+      - "modules/*/process/src/migrations/*.ts"
+      - "enterprise/modules/*/process/src/migrations/*.ts"
 jobs:
   changes:
     outputs:
@@ -33,6 +35,8 @@ jobs:
             upgradelab:
               - 'modules/*/process/src/*.module.ts'
               - 'enterprise/modules/*/process/src/*.module.ts'
+              - 'modules/*/process/src/migrations/*.ts'
+              - 'enterprise/modules/*/process/src/migrations/*.ts'
   upgradelab:
     needs: changes
     if: ${{ needs.changes.outputs.upgradelab == 'true' && !(needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true') }}
