@@ -65,6 +65,11 @@
       "cells": ["C3", "C4"],
       "note": "not in plan 3.4; needs usage traffic in the window"
     },
+    "dashboard:mark-my-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs unmarked boards named My dashboard with a creator, as the previous release made them; the report seed names its board rehearsal report"
+    },
     "data-retention:keep-control-plane-events-forever": {
       "status": "seeded",
       "seed": "heavy:product.retention",

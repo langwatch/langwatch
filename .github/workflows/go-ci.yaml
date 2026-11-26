@@ -23,6 +23,8 @@ on:
       - "sdks/go/**"
       - "infra/clickhouse-serverless/**"
       - "packages/handled-error/**"
+      - "modules/*/process/src/*.module.ts"
+      - "enterprise/modules/*/process/src/*.module.ts"
       - "*/go.mod"
       - "*/go.sum"
       - ".golangci.yml"
@@ -110,6 +112,9 @@ jobs:
               - 'sdks/go/**'
               - 'infra/clickhouse-serverless/**'
               - 'packages/handled-error/**'
+              # upgradelab's coverage test reads every module's declared steps.
+              - 'modules/*/process/src/*.module.ts'
+              - 'enterprise/modules/*/process/src/*.module.ts'
               - '*/go.mod'
               - '*/go.sum'
               - '.golangci.yml'
