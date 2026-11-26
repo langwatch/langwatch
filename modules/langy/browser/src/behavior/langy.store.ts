@@ -19,6 +19,7 @@ import {
   stopDispatched as reduceStopDispatched,
   seedLangyTurnProjection,
   type TurnPhaseState,
+  LANGY_DOCK_WIDTH_PX,
   LANGY_STORE_SLICE,
   type LangyAttachedContext,
   type LangyContextChip,
@@ -32,6 +33,7 @@ import {
   continuesAskOrigin,
   type LangyAskOrigin,
 } from "../model/langy-ask-origin.ts";
+import type { LangyPanelWidths, LangyResizablePlacement } from "../model/langy-panel-resize.ts";
 import type { LangyProgressSample } from "../model/values/langy-turn.ts";
 
 export type {
@@ -158,6 +160,12 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   panelEffect: LangyPanelEffect;
   setPanelEffect: (effect: LangyPanelEffect) => void;
 
+  /** The width the user dragged each resizable layout to, persisted; absent means the default. */
+  panelWidths: LangyPanelWidths;
+  setPanelWidth: (input: { placement: LangyResizablePlacement; width: number }) => void;
+  /** Forget a layout's chosen width, back to its default. */
+  resetPanelWidth: (placement: LangyResizablePlacement) => void;
+
   /**
    * How many mounted app shells have claimed the docked panel's placement.
    */
@@ -172,6 +180,9 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
    */
   dockShifted: boolean;
   setDockShifted: (shifted: boolean) => void;
+  /** The docked panel's resolved width, published beside `dockShifted` for the shell's room. */
+  dockWidthPx: number;
+  setDockWidthPx: (widthPx: number) => void;
 
   /**
    * The home page's ask field is in use right now.
@@ -509,6 +520,8 @@ const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "devMode",
   "dockShellClaims",
   "dockShifted",
+  "dockWidthPx",
+  "panelWidths",
 ]);
 
 /**
@@ -886,6 +899,16 @@ export const useLangyStore = defineSlice<LangyState>({
     panelEffect: "plain",
     setPanelEffect: (panelEffect) => set({ panelEffect }),
 
+    panelWidths: {},
+    setPanelWidth: ({ placement, width }) =>
+      set((state) => ({ panelWidths: { ...state.panelWidths, [placement]: Math.round(width) } })),
+    resetPanelWidth: (placement) =>
+      set((state) => {
+        const kept = { ...state.panelWidths };
+        delete kept[placement];
+        return { panelWidths: kept };
+      }),
+
     dockShellClaims: 0,
     claimDockShell: () => set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
     releaseDockShell: () =>
@@ -895,6 +918,8 @@ export const useLangyStore = defineSlice<LangyState>({
 
     dockShifted: false,
     setDockShifted: (dockShifted) => set({ dockShifted }),
+    dockWidthPx: LANGY_DOCK_WIDTH_PX,
+    setDockWidthPx: (dockWidthPx) => set({ dockWidthPx }),
 
     homeAskOpen: false,
     setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
@@ -1131,6 +1156,7 @@ export const useLangyStore = defineSlice<LangyState>({
       devMode: state.devMode,
       panelMode: state.panelMode,
       panelEffect: state.panelEffect,
+      panelWidths: state.panelWidths,
       activeConversationId: state.activeConversationId,
       activeConversationScope: state.activeConversationScope,
       askOrigin: state.askOrigin,

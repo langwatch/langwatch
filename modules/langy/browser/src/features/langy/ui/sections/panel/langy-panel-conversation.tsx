@@ -7,7 +7,6 @@ import { ArrowDown, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ComponentProps, Fragment, type ReactNode } from "react";
 
-import { SIDEBAR_PANEL_WIDTH } from "../../../../../model/langy-panel-layout.ts";
 import { EmptyState } from "../../../../../ui/sections/langy-empty-state.tsx";
 import { LangyModelProviderSetup } from "../../../../../ui/sections/model-provider-setup.tsx";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
@@ -334,7 +333,7 @@ export function LangyConversationBody({
     return (
       <EmptyState
         variant={floating ? "floating" : "sidebar"}
-        panelWidth={floating ? state.empty.panelWidth : SIDEBAR_PANEL_WIDTH}
+        panelWidth={state.empty.panelWidth}
         suggestions={state.empty.suggestions}
         onPick={state.empty.onPick}
       />

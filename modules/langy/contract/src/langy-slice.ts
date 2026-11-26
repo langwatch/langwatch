@@ -6,6 +6,7 @@
 
 import type { z } from "zod";
 
+import { LANGY_DOCK_WIDTH_PX } from "./langy-ask.ts";
 import type { LangyResourceKind } from "./langy-turn-context.ts";
 
 export const LANGY_STORE_SLICE = "langy:store";
@@ -202,6 +203,8 @@ export interface LangySliceSurface {
   detachContext: (id: string) => void;
   /** The docked panel is open and wants its room beside the app shell's content card. */
   dockShifted: boolean;
+  /** The docked panel's width right now; the user can drag it, so the shell cannot assume 392. */
+  dockWidthPx: number;
   /** An app shell is mounted: the dock starts below its header as a second content card. */
   claimDockShell: () => void;
   releaseDockShell: () => void;
@@ -212,6 +215,11 @@ export interface LangySliceSurface {
  * the docked panel's width plus the strip of page ground between the two cards.
  */
 export const LANGY_SHELL_DOCK_INSET = 392 + 12;
+
+/** The shell's reserved room for a dock of this width: the width plus the page-ground strip. */
+export function langyShellDockInset(dockWidthPx: number): number {
+  return dockWidthPx + (LANGY_SHELL_DOCK_INSET - LANGY_DOCK_WIDTH_PX);
+}
 
 /**
  * The precise context the current page declares for Langy (a dataset with its name), which the
@@ -244,6 +252,7 @@ export const LANGY_ABSENT_SURFACE: LangySliceSurface = {
   attachContext: nothing,
   detachContext: nothing,
   dockShifted: false,
+  dockWidthPx: LANGY_DOCK_WIDTH_PX,
   claimDockShell: nothing,
   releaseDockShell: nothing,
 };

@@ -150,3 +150,54 @@ Feature: Langy panel layout modes
     Then the first message is fully opaque with no fade above it
     When part of the conversation is scrolled off above
     Then the column dissolves under the header with a soft fade
+
+  # The panel's width is the user's to set. The free edge of the floating card
+  # and of the docked sidebar is a drag handle; the drawer companion keeps the
+  # dock width so the drawer beside it never has to move.
+
+  @integration
+  Scenario: Dragging the free edge resizes the panel
+    Given the Langy panel is open in sidebar mode or floating mode
+    When I drag the panel's resize handle toward the page
+    Then the panel grows by the distance I dragged
+    And the docked sidebar's page reservation follows the new width
+
+  @unit
+  Scenario: The width stays within a usable range
+    Given a viewport of a known width
+    When I drag the panel narrower than its minimum or wider than its maximum
+    Then the width stops at the minimum, which keeps the composer usable
+    And it stops at the maximum, a share of the viewport that leaves the page usable
+
+  @unit
+  Scenario: A window resize re-clamps the chosen width
+    Given I chose a wide panel on a large window
+    When the window becomes narrower than my chosen width allows
+    Then the panel shrinks to the new maximum without forgetting my choice
+
+  @integration
+  Scenario: The handle resizes from the keyboard
+    Given the resize handle has focus
+    When I press the arrow key that points toward the page
+    Then the panel grows by one step, and a larger step with Shift
+    And the arrow key pointing away shrinks it
+    And the handle reports its current, minimum and maximum width as a separator
+
+  @integration
+  Scenario: Double-clicking the handle restores the default width
+    Given I have resized the panel
+    When I double-click the resize handle
+    Then the panel returns to the default width for its layout
+    And the stored choice is forgotten
+
+  @unit
+  Scenario: Each layout remembers its own width across reloads
+    Given I resized the floating card and the docked sidebar to different widths
+    When the page reloads
+    Then each layout opens at the width I chose for it
+    And a stored value that is not a usable number is ignored
+
+  @integration
+  Scenario: The handle is absent while the panel is minimised or beside a drawer
+    Given the Langy panel is minimised to its peek, or riding beside a drawer
+    Then the panel shows no resize handle

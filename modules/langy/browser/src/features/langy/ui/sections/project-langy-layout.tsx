@@ -8,12 +8,9 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useLangyPromptLink } from "../../../../behavior/use-langy-prompt-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import {
-  LANGY_DOCK_GAP,
-  LANGY_DOCKED_OFFSET,
-  LANGY_TRANSITION,
-} from "../../../../model/langy-panel-layout.ts";
+import { LANGY_DOCK_GAP, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
 import { LangyProvider, useLangy } from "../../../tools/ui/sections/langy-page-context.tsx";
+import { useLangyDockWidthPx } from "../../behavior/panel/use-langy-panel-layout.ts";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useLangyWebPush } from "../../behavior/use-langy-web-push.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
@@ -79,6 +76,8 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
   const panelMode = useLangyStore((s) => s.panelMode);
   const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const setDockShifted = useLangyStore((s) => s.setDockShifted);
+  const setDockWidthPx = useLangyStore((s) => s.setDockWidthPx);
+  const dockWidthPx = useLangyDockWidthPx();
   // While a drawer is open the panel rides beside it as a floating companion
   // (see LangyPanel), so the dock's reservation releases and the page gets
   // its width back underneath the overlay pair.
@@ -93,15 +92,19 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
     setDockShifted(shifted);
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
+  // The user can drag the dock wider; the shell reads the width from the store to keep its room.
+  useEffect(() => {
+    setDockWidthPx(dockWidthPx);
+  }, [dockWidthPx, setDockWidthPx]);
   const reservation = dockReservation({ shifted, shellClaimed });
   // Without a claiming shell (the Studio), a drawer still opens beside the docked panel,
   // as on main.
   const yieldsToDock = showLangy && isOpen && panelMode === "sidebar" && !shellClaimed;
   useLayoutEffect(() => {
     if (!yieldsToDock) return;
-    setDrawerEndInset(LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP + 8);
+    setDrawerEndInset(dockWidthPx + LANGY_DOCK_GAP + 8);
     return () => setDrawerEndInset(0);
-  }, [yieldsToDock]);
+  }, [yieldsToDock, dockWidthPx]);
   // The box sits in the shell's page body and passes its flex height on,
   // or full-height pages (the prompt studio) collapse to their content.
   return (
@@ -113,7 +116,7 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
         display="flex"
         flexDirection="column"
         data-langy-dock={reservation}
-        paddingRight={reservation === "page" ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        paddingRight={reservation === "page" ? `${dockWidthPx}px` : 0}
         transition={`padding-right ${LANGY_TRANSITION}`}
       >
         {children}

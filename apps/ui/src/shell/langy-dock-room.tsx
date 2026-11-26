@@ -5,13 +5,14 @@
  */
 
 import { setDrawerEndInset } from "@langwatch/design-system/drawer";
-import { LANGY_SHELL_DOCK_INSET } from "@langwatch/langy-contract";
+import { langyShellDockInset } from "@langwatch/langy-contract";
 import { useLayoutEffect, type ReactNode } from "react";
 
 import { useLangyStore } from "./behavior/langy/langy.store.ts";
 
 function LangyDockRoom({ render }: { render: (inset: number) => ReactNode }) {
   const dockShifted = useLangyStore((store) => store.dockShifted);
+  const dockInset = langyShellDockInset(useLangyStore((store) => store.dockWidthPx));
   const claimDockShell = useLangyStore((store) => store.claimDockShell);
   const releaseDockShell = useLangyStore((store) => store.releaseDockShell);
   useLayoutEffect(() => {
@@ -21,10 +22,10 @@ function LangyDockRoom({ render }: { render: (inset: number) => ReactNode }) {
   const dockedOpen = useLangyStore((store) => store.isOpen && store.panelMode === "sidebar");
   // A drawer opens beside the docked panel, as on main: panel inset plus the drawer's own margin.
   useLayoutEffect(() => {
-    setDrawerEndInset(dockedOpen ? LANGY_SHELL_DOCK_INSET + 8 : 0);
+    setDrawerEndInset(dockedOpen ? dockInset + 8 : 0);
     return () => setDrawerEndInset(0);
-  }, [dockedOpen]);
-  return render(dockShifted ? LANGY_SHELL_DOCK_INSET : 0);
+  }, [dockedOpen, dockInset]);
+  return render(dockShifted ? dockInset : 0);
 }
 
 export function langyDockRoom({ render }: { render: (inset: number) => ReactNode }): ReactNode {
