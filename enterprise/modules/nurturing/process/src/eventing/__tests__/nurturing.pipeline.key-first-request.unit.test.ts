@@ -54,7 +54,11 @@ describe("a gateway key's first request in nurturing", () => {
       await facts.deliverFact(firstRequest());
 
       expect(facts.sent.slice(beforeFirstRequest)).toEqual([
-        { type: "identify", userId: "user-holder", traits: { has_app_request: true } },
+        {
+          type: "identify",
+          userId: "user-holder",
+          traits: { has_app_request: true, email: "user-holder@example.com" },
+        },
       ]);
     });
 
@@ -62,7 +66,11 @@ describe("a gateway key's first request in nurturing", () => {
       await facts.deliverFact(firstRequest());
 
       const order = facts.sent.map((call) =>
-        call.type === "track" ? call.event : Object.keys(call.traits ?? {}).join(","),
+        call.type === "track"
+          ? call.event
+          : Object.keys(call.traits ?? {})
+              .filter((key) => key !== "email")
+              .join(","),
       );
       expect(order).toEqual(["has_virtual_key", "virtual_key_created", "has_app_request"]);
       expect(JSON.stringify(facts.sent)).not.toMatch(/"has_app_request":(false|null)/);
@@ -82,7 +90,7 @@ describe("a gateway key's first request in nurturing", () => {
 
       expect(new Set(facts.sent.map(({ userId }) => userId))).toEqual(new Set(["user-creator"]));
       expect(appRequestIdentifies(facts.sent)).toEqual([
-        ["user-creator", { has_app_request: true }],
+        ["user-creator", { has_app_request: true, email: "user-creator@example.com" }],
       ]);
     });
   });
@@ -97,7 +105,7 @@ describe("a gateway key's first request in nurturing", () => {
 
       expect(facts.sent.map(({ userId }) => userId)).toEqual([ADMIN_USER_ID, ADMIN_USER_ID]);
       expect(appRequestIdentifies(facts.sent)).toEqual([
-        [ADMIN_USER_ID, { has_app_request: true }],
+        [ADMIN_USER_ID, { has_app_request: true, email: `${ADMIN_USER_ID}@example.com` }],
       ]);
     });
   });
@@ -163,7 +171,7 @@ describe("a gateway key's first request in nurturing", () => {
       await facts.deliverFact(firstRequest(), { deliveryAttempt: 2 });
 
       expect(appRequestIdentifies(facts.sent)).toEqual([
-        ["user-holder", { has_app_request: true }],
+        ["user-holder", { has_app_request: true, email: "user-holder@example.com" }],
       ]);
     });
   });
@@ -211,7 +219,7 @@ describe("a gateway key's first request in nurturing", () => {
       for (let delivery = 0; delivery < 2; delivery++) await facts.deliverFact(firstRequest());
 
       expect(appRequestIdentifies(facts.sent)).toEqual([
-        ["user-holder", { has_app_request: true }],
+        ["user-holder", { has_app_request: true, email: "user-holder@example.com" }],
       ]);
     });
   });
@@ -231,7 +239,7 @@ describe("a gateway key's first request in nurturing", () => {
       await facts.deliverFact(firstRequest());
 
       expect(appRequestIdentifies(facts.sent)).toEqual([
-        ["user-holder", { has_app_request: true }],
+        ["user-holder", { has_app_request: true, email: "user-holder@example.com" }],
       ]);
     });
   });

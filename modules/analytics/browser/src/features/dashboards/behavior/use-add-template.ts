@@ -1,7 +1,7 @@
 /**
- * Adding a template makes the member's own board from it, opens it and drafts the template's
- * report in Langy, unsent (AC140): from the templates finder, an empty board's "Or start from a
- * template" and a From LangWatch board's "Use this template" alike.
+ * Adding a template makes the member's own new board from it, opens it and drafts the template's
+ * report in Langy, unsent (AC140): from the templates finder and a From LangWatch board's "Use
+ * this template" alike. An empty board's templates fill that board instead (use-apply-template).
  */
 
 import type { DashboardProject } from "@langwatch/dashboard-contract";

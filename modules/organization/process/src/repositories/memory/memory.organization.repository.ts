@@ -523,6 +523,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }): Promise<void> {
     const organization = this.memory.organizations.get(input.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
+    if (this.memory.licensingLicenseKeys.get(input.organizationId) !== input.licenseKey) return;
     organization.license = input.licenseKey;
     organization.licenseExpiresAt = input.expiresAt;
     organization.licenseLastValidatedAt = input.validatedAt;

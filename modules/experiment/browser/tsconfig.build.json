@@ -48,6 +48,9 @@
       "path": "../../ops/contract/tsconfig.build.json"
     },
     {
+      "path": "../../organization/client/tsconfig.build.json"
+    },
+    {
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
@@ -103,6 +106,9 @@
     },
     {
       "path": "../../agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

@@ -9552,6 +9552,15 @@
           "documentation": "The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,\ndecision 8). Every board made before homes existed is llm-ops."
         },
         {
+          "name": "myDashboardOfUserId",
+          "columnName": "myDashboardOfUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member whose own My dashboard this is, whatever it is named; null on every other\nboard. Rows made before the column are filled by dashboard:mark-my-dashboards."
+        },
+        {
           "name": "excludedOrigins",
           "columnName": "excludedOrigins",
           "type": "Json",
@@ -28029,6 +28038,82 @@
           "name": "legacyFingerprint",
           "columnName": "legacyFingerprint",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StoredObjectOwner",
+      "tableName": "StoredObjectOwner",
+      "documentation": "",
+      "primaryKey": [
+        "tenantId",
+        "objectId",
+        "ownerKind",
+        "ownerId"
+      ],
+      "fields": [
+        {
+          "name": "tenantId",
+          "columnName": "tenantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "objectId",
+          "columnName": "objectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerKind",
+          "columnName": "ownerKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerId",
+          "columnName": "ownerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "retainUntil",
+          "columnName": "retainUntil",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,

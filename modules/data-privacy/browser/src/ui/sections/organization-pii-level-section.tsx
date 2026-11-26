@@ -36,6 +36,7 @@ function useOptimisticPick(stored: string | undefined) {
 export function OrganizationPiiLevelSection({
   free,
   licensed = false,
+  split = false,
   host,
   projectId,
   snapshot,
@@ -43,6 +44,8 @@ export function OrganizationPiiLevelSection({
 }: {
   free: boolean;
   licensed?: boolean;
+  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
+  split?: boolean;
   host: DataPrivacyHostApi;
   projectId: string;
   snapshot: DataPrivacySnapshot;
@@ -90,6 +93,7 @@ export function OrganizationPiiLevelSection({
         })}
         free={free}
         licensed={licensed}
+        split={split}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending}
         onPick={(level) => (confirmationFor(level) ? setAsking(level) : void save(level))}

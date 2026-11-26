@@ -1160,8 +1160,8 @@ export class BillingModule
   connectReporting(
     reportUsageForMonth: EventingCommandSender<ReportUsageForMonthCommandData>,
   ): void {
-    this.#reporting.connectSelfDispatch(async (data) => {
-      await reportUsageForMonth.send(data);
+    this.#reporting.connectSelfDispatch(async (data, options) => {
+      await reportUsageForMonth.send(data, options);
     });
   }
 

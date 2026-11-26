@@ -43,6 +43,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
@@ -74,6 +75,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",

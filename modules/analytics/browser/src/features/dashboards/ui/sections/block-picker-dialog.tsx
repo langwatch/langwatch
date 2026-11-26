@@ -131,6 +131,8 @@ export function BlockPickerDialog({
     langy.ask(boardQuestion({ question, board, period }));
     // A question the member put to Langy; the drafts seeded after an add send nothing.
     analytics.track(langyQuestionAsked({ surface: "add_widget" }));
+    // Closed here too, as on an add: the address that closes it can commit late.
+    setIsOpen(false);
     onClose();
   };
 

@@ -2,6 +2,7 @@ import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analyt
 import {
   isHandledByGlobalHandler,
   isNotFoundError as isTrpcNotFound,
+  showErrorToast,
 } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -17,9 +18,15 @@ import {
   extractPersistedState,
   type PersistedEvaluationsV3State,
 } from "../../model/experiments-v3/types/persistence.ts";
+import { isAccessRefusal } from "../../model/experiments-v3/workbench-access.ts";
 import { captureException, toError } from "../../model/posthog-error-capture.ts";
 import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
+import {
+  readWorkbenchAccess,
+  useWorkbenchAccess,
+  useWorkbenchAccessRefusal,
+} from "./use-workbench-access.ts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
@@ -114,7 +121,7 @@ const isEvaluationsV3BySlugQuery = (query: { queryKey: readonly unknown[] }): bo
   return Array.isArray(path) && path[0] === "experiments" && path[1] === "getEvaluationsV3BySlug";
 };
 
-/** The autosave status line when the reader's seat or plan refused the save. */
+/** The autosave status line when the reader's plan refused the save. */
 const AUTOSAVE_REFUSED_BY_SEAT_REASON = "Not saved: your access does not include saving here";
 
 /** An unexpected autosave failure: logged, shown in the status and toasted. */
@@ -139,13 +146,25 @@ const handleAutosaveFailure = ({
   error,
   snapshot,
   projectId,
+  visit,
 }: {
   analytics: UiAnalytics;
   error: unknown;
   snapshot: string;
   projectId: string | undefined;
+  visit: number;
 }): RefusalOutcome => {
   const state = useEvaluationsV3Store.getState();
+  if (isAccessRefusal(error)) {
+    // The role, not the edit, is refused: every later save would be too. A Lite Member
+    // refusal already opened licensing's modal with Request access, so the toast stays quiet.
+    const refusal = useWorkbenchAccessRefusal.getState();
+    if (refusal.visit !== visit) return "failed";
+    state.setAutosaveStatus("evaluation", "idle");
+    refusal.markRefused({ visit });
+    showErrorToast({ error, fallbackTitle: "Couldn't save the experiment" });
+    return "failed";
+  }
   const handled = readHandledError(error);
   if (handled?.code === "experiment_stale_workbench_state") {
     const refusal = refusedSaveStaleness({
@@ -160,7 +179,7 @@ const handleAutosaveFailure = ({
     state.setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
     return "refused";
   }
-  // A licence refusal (a Lite Member seat, a plan limit) already opened its modal: no second toast.
+  // A plan limit already opened licensing's upgrade modal: no second toast.
   if (isHandledByGlobalHandler(error)) {
     state.setAutosaveStatus("evaluation", "error", AUTOSAVE_REFUSED_BY_SEAT_REASON);
     return "refused";
@@ -250,7 +269,10 @@ const attemptSave = async ({
 }): Promise<AutosaveOutcome> => {
   const state = useEvaluationsV3Store.getState();
   if (!projectId || !state.experimentId || !state.name) return "unchanged";
+  // Read when the save starts, so a save queued behind a role refusal sends nothing.
+  if (!readWorkbenchAccess().maySave) return "failed";
   if (state.staleWorkbench) return "refused";
+  const { visit } = useWorkbenchAccessRefusal.getState();
   const persisted = buildPersistedState(state);
   const snapshot = JSON.stringify(persisted);
   if (snapshot === lastSavedRef.current) return "unchanged";
@@ -268,12 +290,25 @@ const attemptSave = async ({
     markSaved();
     return "saved";
   } catch (error) {
-    const outcome = handleAutosaveFailure({ analytics, error, snapshot, projectId });
+    const outcome = handleAutosaveFailure({
+      analytics,
+      error,
+      snapshot,
+      projectId,
+      visit,
+    });
     if (outcome !== "adopted") return outcome;
     // Retried once only: looping would spin against whoever is actually ahead.
     return isRetry
       ? standDownAfterRetry(error)
-      : attemptSave({ analytics, projectId, save, lastSavedRef, markSaved, isRetry: true });
+      : attemptSave({
+          analytics,
+          projectId,
+          save,
+          lastSavedRef,
+          markSaved,
+          isRetry: true,
+        });
   }
 };
 
@@ -304,6 +339,7 @@ const loadExperimentIntoStore = (data: {
  * out of date, or when nothing differs from the initial state or the last save.
  */
 const autosaveIsDue = ({
+  maySave,
   hasProject,
   isLoadingExisting,
   shouldLoadExisting,
@@ -313,6 +349,7 @@ const autosaveIsDue = ({
   stringifiedState,
   lastSaved,
 }: {
+  maySave: boolean;
   hasProject: boolean;
   isLoadingExisting: boolean;
   shouldLoadExisting: boolean;
@@ -322,6 +359,7 @@ const autosaveIsDue = ({
   stringifiedState: string;
   lastSaved: string | null;
 }): boolean =>
+  maySave &&
   hasProject &&
   !isLoadingExisting &&
   !shouldLoadExisting &&
@@ -417,9 +455,11 @@ const useWorkbenchLoad = ({
 
 /**
  * Manages syncing the evaluations v3 state with the database. Uses workbenchState field
- * in the Experiment model for persistence.
+ * in the Experiment model for persistence. A role that cannot change experiments
+ * (`useWorkbenchAccess`) keeps edits in the tab instead of sending saves the server refuses.
  */
 export const useAutosaveEvaluationsV3 = () => {
+  const { maySave } = useWorkbenchAccess();
   const { project } = useOrganizationTeamProject();
   const analytics = useUiAnalytics();
   const queryClient = useQueryClient();
@@ -561,6 +601,7 @@ export const useAutosaveEvaluationsV3 = () => {
       return;
     }
     const isDue = autosaveIsDue({
+      maySave,
       hasProject: !!project,
       isLoadingExisting: existingExperiment.isLoading,
       shouldLoadExisting,
@@ -588,6 +629,7 @@ export const useAutosaveEvaluationsV3 = () => {
     existingExperiment.isLoading,
     staleWorkbench,
     workbenchVersion,
+    maySave,
   ]);
 
   // Determine if experiment was truly not found

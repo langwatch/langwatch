@@ -90,6 +90,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { captureException } from "../../../model/posthog-error-capture.ts";
 import { useAutosaveEvaluationsV3 } from "../use-autosave-evaluations-v3.ts";
+import { useWorkbenchAccessRefusal } from "../use-workbench-access.ts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -240,8 +241,12 @@ describe("Autosave evaluation state", () => {
   });
 
   describe("when the licence reader already answered the refused save", () => {
+    afterEach(() => {
+      useWorkbenchAccessRefusal.getState().reset();
+    });
+
     /** @scenario "A refused workbench save on a Lite Member seat shows only the restriction modal" */
-    it("shows no second error toast and reports nothing", async () => {
+    it("shows no second error toast, reports nothing and turns the workbench view only", async () => {
       renderWithDesignSystem(
         <Wrapper>
           <TestAutosaveComponent />
@@ -250,7 +255,17 @@ describe("Autosave evaluation state", () => {
       await act(async () => {
         vi.advanceTimersByTime(50);
       });
-      const refusal = new Error("lite_member_restricted");
+      // The tRPC failure a Lite Member's save gets: the handled payload under `data.error`.
+      const refusal = Object.assign(new Error("lite_member_restricted"), {
+        data: {
+          code: "UNAUTHORIZED",
+          error: {
+            code: "lite_member_restricted",
+            httpStatus: 401,
+            meta: { resource: "experiments" },
+          },
+        },
+      });
       markHandledGlobally(refusal);
       mockMutateAsync.mockRejectedValueOnce(refusal);
 
@@ -263,7 +278,8 @@ describe("Autosave evaluation state", () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
       });
 
-      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
+      expect(useWorkbenchAccessRefusal.getState().refused).toBe(true);
+      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("idle");
       expect(toastCreate).not.toHaveBeenCalled();
       expect(captureException).not.toHaveBeenCalled();
     });

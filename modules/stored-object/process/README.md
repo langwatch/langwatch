@@ -6,7 +6,7 @@ The server half of [stored-object](../README.md). Stored objects: uploads and st
 
 ## Installation
 
-`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport).withEventing(storedObjectEventing).withMigrations(…)`, `src/stored-object.module.ts:18`.
+`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport).withEventing(storedObjectRetentionEventing).withEventing(storedObjectEventing).withMigrations(…)`, `src/stored-object.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete process capability exposed by the stored-object feature.
 
-Peers call these through the token, declared at `../contract/src/stored-object.api.ts:118`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/stored-object.api.ts:141`; nothing else in this package is public.
 
 #### `storeFromBytes`
 
@@ -76,6 +76,14 @@ getStorageUsageByProject(input: { projectId: StoredObjectProjectId; purpose?: st
 
 ```typescript
 deleteOwnedBy(input: { projectId: StoredObjectProjectId; }): Promise<DeleteProjectStoredObjectsResult>;
+```
+
+#### `linkUnownedObjects`
+
+The owner's upgrade step: links objects stored before owner links (ADR-002 Consequences).
+
+```typescript
+linkUnownedObjects(input: LinkUnownedStoredObjectsInput): Promise<LinkUnownedStoredObjectsResult>;
 ```
 
 #### `headById`
@@ -222,7 +230,7 @@ Public: an <img> fires with no credential; every address is fenced by the SSRF e
 Answers at `/api/image-proxy`.
 
 ```typescript
-// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:64
+// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:113
 interface Query {
   url?: string;
 }
@@ -437,6 +445,15 @@ Declared at `src/eventing/stored-object-maintenance.pipeline.ts:41`.
 | Kind            | Name                     | Handles                                                                            | Declared at                                             |
 | --------------- | ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | process manager | `storedObjectUploadReap` | every 15 min (`UPLOAD_REAP_INTERVAL_MS = 15 * 60 * 1000`); intents `reap` (outbox) | `src/eventing/stored-object-maintenance.pipeline.ts:46` |
+
+### Pipeline `stored_object_retention` (aggregate `global`)
+
+Declared at `src/eventing/stored-object-retention.pipeline.ts:43`.
+
+| Kind            | Name                          | Handles                                                                                                      | Declared at                                           |
+| --------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| process manager | `storedObjectRetentionSweep`  | every 1 h (`STORED_OBJECT_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000`); intents `sweep` (outbox)           | `src/eventing/stored-object-retention.pipeline.ts:48` |
+| peer subscriber | `storedObjectRetentionFollow` | `lw.data_retention.retention_applied_to_existing_data` from [data-retention](../../data-retention/README.md) | `src/eventing/stored-object-retention.pipeline.ts:65` |
 
 ## Configuration
 

@@ -107,6 +107,6 @@ export const sendBillingFixedEmail = async ({
   const { subject, html } = await renderMailTemplate(billingFixedEmailTemplate, props);
   await sendEmail({
     mailer,
-    content: { to, subject, html, template: billingFixedEmailTemplate.id },
+    content: { to, subject, html },
   });
 };

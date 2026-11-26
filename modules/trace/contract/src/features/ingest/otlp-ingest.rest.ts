@@ -35,4 +35,6 @@ export type TraceOtlpIngestApi = Readonly<{
   otlpMarkCredentialUsed(input: { apiKeyId: string }): void;
   otlpUsageLimit(input: { project: OtlpIngestProject; customerTraceIds: string[] }): Promise<void>;
   otlpTraces(input: OtlpTracesInput): Promise<OtlpTraceCollectionResult>;
+  /** The deployment's cap on one trace export, on the wire and decompressed. */
+  otlpTracesMaxBodyBytes(): number;
 }>;

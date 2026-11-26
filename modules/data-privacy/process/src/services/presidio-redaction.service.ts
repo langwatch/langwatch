@@ -1,13 +1,11 @@
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
-import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import type { PresidioChannel } from "../channels/presidio.channel.ts";
+import { canSplit, type PresidioChannel } from "../channels/presidio.channel.ts";
 import {
+  clearingOfAnswer,
   PII_ANALYSIS_TEXT_BUDGET,
   presidioEntitiesFor,
-  redactSparingNamesAndPlaces,
-  type PiiClearing,
 } from "../rules/pii-analysis.rules.ts";
 import type {
   PiiAnalysisMethod,
@@ -49,6 +47,11 @@ export class PresidioRedactionService {
   #configured: Promise<boolean> | undefined;
 
   private constructor(private readonly deps: PresidioRedactionDependencies) {}
+
+  /** Whether its channel takes split calls: the model's Lambda channel does (ADR-207). */
+  canSplit(): boolean {
+    return canSplit(this.deps.presidio);
+  }
 
   /** Asked once, with an empty batch that sends nothing; a failed answer is asked again. */
   isConfigured(): Promise<boolean> {
@@ -94,7 +97,7 @@ export class PresidioRedactionService {
       if (result.status === "error") throw new Error(result.details);
       if (result.status !== "processed") return null;
       findings += findingsIn(result.raw_response);
-      const clearing = clearingOf({
+      const clearing = clearingOfAnswer({
         input: entry.input,
         rawResponse: result.raw_response,
         spareNamesAndPlaces: input.spareNamesAndPlaces?.[i] ?? false,
@@ -104,17 +107,69 @@ export class PresidioRedactionService {
     return { cleared, findings };
   }
 
+  /**
+   * The service's raw answer per piece of a split span (ADR-207): its findings and its own masked
+   * text, sent as a split call on the one channel. Aborted by `signal` or at the time cap; any
+   * refusal, a missing result or a channel that cannot split throws.
+   */
+  async answers<Piece>(input: {
+    pieces: readonly Piece[];
+    textOf: (piece: Piece) => string;
+    piiRedactionLevel: PIIRedactionLevel;
+    entities?: readonly string[] | undefined;
+    projectId?: string | undefined;
+    signal: AbortSignal;
+  }): Promise<{ piece: Piece; findings: unknown; anonymized: unknown }[]> {
+    const channel = this.deps.presidio;
+    if (!canSplit(channel)) throw new Error("the model's channel takes no split calls");
+    this.deps.metrics.analysisCalled(this.deps.method);
+    const startedAt = performance.now();
+    const outcome = await this.#detect({
+      texts: input.pieces.map(input.textOf),
+      piiRedactionLevel: input.piiRedactionLevel,
+      entities: input.entities,
+      projectId: input.projectId,
+      signal: input.signal,
+      send: (request) => channel.detect(request, { context: "split" }),
+    });
+    this.deps.metrics.analysisObserved(performance.now() - startedAt, this.deps.method);
+    if (outcome.kind === "not_configured") throw new Error("the model is not configured");
+    return input.pieces.map((piece, i) => {
+      const result = outcome.results[i];
+      if (!result) throw new Error(`the model returned no result for split text ${i}`);
+      this.deps.metrics.analysisFinished(result.status, this.deps.method);
+      if (result.status === "error") throw new Error(result.details);
+      const response =
+        result.status === "processed" && typeof result.raw_response === "object"
+          ? (result.raw_response ?? {})
+          : {};
+      return {
+        piece,
+        // No list is not an empty one: a whole text then keeps the model's own masked text.
+        findings: "results" in response ? response.results : undefined,
+        anonymized: "anonymized" in response ? response.anonymized : null,
+      };
+    });
+  }
+
   async #detect(input: {
     texts: readonly string[];
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
+    signal?: AbortSignal | undefined;
+    send?: PresidioChannel["detect"];
   }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.deps.timeoutMs);
+    const outer = input.signal;
+    const abort = () => controller.abort();
+    if (outer?.aborted) controller.abort();
+    outer?.addEventListener("abort", abort, { once: true });
     const startedAt = performance.now();
     try {
-      return await this.deps.presidio.detect({
+      const send = input.send ?? ((request) => this.deps.presidio.detect(request));
+      return await send({
         texts: input.texts,
         entities: presidioEntitiesFor(input.piiRedactionLevel, input.entities),
         signal: controller.signal,
@@ -128,35 +183,9 @@ export class PresidioRedactionService {
       throw error;
     } finally {
       clearTimeout(timeout);
+      outer?.removeEventListener("abort", abort);
     }
   }
-}
-
-/**
- * How one analysed input was cleared. A flagged input whose findings cannot be placed keeps
- * Presidio's own full redaction rather than going unredacted.
- */
-function clearingOf({
-  input,
-  rawResponse,
-  spareNamesAndPlaces,
-}: {
-  input: string;
-  rawResponse: unknown;
-  spareNamesAndPlaces: boolean;
-}): PiiClearing {
-  const response = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
-  if (spareNamesAndPlaces) {
-    const spared = redactSparingNamesAndPlaces({
-      text: input,
-      findings: "results" in response ? response.results : undefined,
-    });
-    if (spared.kind !== "unplaceable") return spared;
-  }
-  const anonymized = "anonymized" in response ? response.anonymized : undefined;
-  return typeof anonymized === "string" && anonymized
-    ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
-    : { kind: "unchanged" };
 }
 
 /** How many findings one answer lists; their values are never read here. */

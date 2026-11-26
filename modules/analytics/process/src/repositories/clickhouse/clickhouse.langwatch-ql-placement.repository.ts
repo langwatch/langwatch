@@ -21,6 +21,12 @@ export class ClickHouseLangWatchQLPlacementRepository extends LangWatchQLPlaceme
 
   async placementOf({ tenantId }: { tenantId: string }): Promise<LangWatchQLPlacement> {
     const { target, recordedPrivate, origin } = await this.clickhouse.placementOf({ tenantId });
-    return { recordedPrivate, routedPrivately: target !== SHARED_CLICKHOUSE_TARGET, origin };
+    const routedPrivately = target !== SHARED_CLICKHOUSE_TARGET;
+    return {
+      recordedPrivate,
+      routedPrivately,
+      organizationId: routedPrivately ? target : null,
+      origin,
+    };
   }
 }

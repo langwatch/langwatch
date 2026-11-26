@@ -35,9 +35,11 @@ const UNNAMED = "member-unnamed";
 async function library({
   readable,
   dashboardsOffIn = [],
+  personalOwners,
 }: {
   readable: readonly string[];
   dashboardsOffIn?: readonly string[];
+  personalOwners?: Readonly<Record<string, string>>;
 }) {
   const repositories = MemoryDashboardRepositories.create();
   const app = createDashboardTestApp({
@@ -48,6 +50,7 @@ async function library({
       }),
       projects: createDashboardTestProjects({
         organizations: { [SHOP]: ACME, [OPS]: ACME, [PERSONAL]: ACME },
+        personalOwners,
       }),
       authz: createDashboardTestAuthz({ openProjectIds: readable }),
       users: createDashboardTestUsers({ [SOMEONE]: "Sam Rivera", [UNNAMED]: null }),
@@ -152,6 +155,18 @@ describe("the organization's Dashboards library", () => {
       const projects = await caller.storeProjects({ organizationId: ACME });
 
       expect(projects.map((project) => project.id)).toEqual([SHOP]);
+    });
+
+    /** @scenario "A board is never stored in another member's personal project" */
+    it("leaves out another member's personal project, and keeps the member's own", async () => {
+      const { caller } = await library({
+        readable: [SHOP, OPS, PERSONAL],
+        personalOwners: { [OPS]: ME, [PERSONAL]: SOMEONE },
+      });
+
+      const projects = await caller.storeProjects({ organizationId: ACME });
+
+      expect(projects.map((project) => project.id).toSorted()).toEqual([OPS, SHOP]);
     });
   });
 

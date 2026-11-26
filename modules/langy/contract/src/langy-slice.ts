@@ -177,8 +177,11 @@ export interface LangySliceSurface {
   isOpen: boolean;
   openPanel: () => void;
   pendingPrompt: string | null;
-  /** Open Langy on a fresh conversation and queue `prompt` to auto-send. */
-  askLangy: (prompt: string) => void;
+  /**
+   * Open Langy and queue `prompt` to auto-send: in a fresh conversation, or in the one an ask from
+   * the same `askedFrom` started while it is recent and still open.
+   */
+  askLangy: (prompt: string, askedFrom?: string) => void;
   /** Prefill the composer with `draft`, never sent; pair with `openPanel` to show it. */
   setDraft: (draft: string) => void;
   panelMode: LangyPanelMode;

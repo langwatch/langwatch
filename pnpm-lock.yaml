@@ -4141,6 +4141,9 @@ importers:
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../../saas/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/entitlement/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../../../modules/evaluation/contract
@@ -4232,9 +4235,6 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
-      liquidjs:
-        specifier: '>=10.27.2 <11'
-        version: 10.30.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -7407,6 +7407,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -7581,6 +7584,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/limiter':
+        specifier: workspace:*
+        version: link:../../../packages/limiter
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -8869,6 +8875,9 @@ importers:
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../ops/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
       '@langwatch/prompt-client':
         specifier: workspace:*
         version: link:../../prompt/client
@@ -8957,6 +8966,9 @@ importers:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -12134,9 +12146,6 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -12186,9 +12195,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@langwatch/mail':
-        specifier: workspace:*
-        version: link:../../../packages/mail
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -12520,6 +12526,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
@@ -15338,6 +15347,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -15384,6 +15396,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -15579,6 +15594,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract

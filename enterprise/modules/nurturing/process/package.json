@@ -27,6 +27,7 @@
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -59,7 +60,6 @@
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
-    "liquidjs": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

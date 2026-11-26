@@ -43,6 +43,7 @@ import {
   MemoryNurturingRepositories,
 } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../../services/nurturing-gateway-facts.service.ts";
 import { NurturingGovernanceFactsService } from "../../services/nurturing-governance-facts.service.ts";
@@ -306,7 +307,14 @@ export function inviteAcceptedEvent(userId: string, at: number): Event {
   } as Event;
 }
 
-/** Customer.io over a recording fetch: every request body, and each call it took. */
+/**
+ * The email-only identify NurturingService puts before a lone track, so its profile is born with
+ * an address: covered in its own tests, and left out of `sent` so a fact's calls read plainly.
+ */
+const isEmailOnlyIdentify = (call: CioBatchCall) =>
+  call.type === "identify" && Object.keys(call.traits).join() === "email";
+
+/** Customer.io over a recording fetch: every request body, and each fact call it took. */
 function recordingCustomerIo() {
   const requests: string[] = [];
   const sent: CioBatchCall[] = [];
@@ -317,10 +325,11 @@ function recordingCustomerIo() {
     requests.push(body);
     const { batch } = JSON.parse(body) as { batch: CioBatchCall[] };
     if (batch.some(({ type }) => refusing.has(type))) return new Response(null, { status: 500 });
-    sent.push(...batch);
+    sent.push(...batch.filter((call) => !isEmailOnlyIdentify(call)));
     return new Response(null, { status: 200 });
   });
   const service = NurturingService.create({
+    users: peopleWithEmails(),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn,
@@ -396,6 +405,7 @@ export async function gatewayFactsOver({
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
+    organizationMembers: async () => [],
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
