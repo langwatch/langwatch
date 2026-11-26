@@ -1,5 +1,5 @@
 import type { Named } from "@langwatch/module";
-import { studioWorkflowSchema, workflowWithVersionSchema } from "@langwatch/workflow-contract";
+import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 /**
  * What the experiment feature's tRPC transport answers, stated once: each
  * procedure declares its `withOutput` from here, so the shape a client reads
@@ -114,13 +114,25 @@ const experimentWithDslSchemaDefinition = z.object({
 export interface ExperimentWithDslSchema extends Named<typeof experimentWithDslSchemaDefinition> {}
 export const experimentWithDslSchema: ExperimentWithDslSchema = experimentWithDslSchemaDefinition;
 
-/** `getAllForEvaluationsList`: one page of the evaluations list. */
+/**
+ * `getAllForEvaluationsList`: one page of the evaluations list, carrying only what its table
+ * draws. A row never carries the saved workbench or workflow: those run to megabytes per
+ * experiment. `workbenchState` keeps only the task, and is null for an experiment with no state.
+ */
 const experimentEvaluationsListPageSchemaDefinition = z.object({
   experiments: z.array(
     z.object({
-      ...experimentSchema.shape,
-      workbenchState: z.json().nullable().optional(),
-      workflow: workflowWithVersionSchema.nullable(),
+      ...experimentSchema.pick({
+        id: true,
+        name: true,
+        type: true,
+        slug: true,
+        projectId: true,
+        workflowId: true,
+        createdAt: true,
+        archivedAt: true,
+      }).shape,
+      workbenchState: z.object({ task: z.string().optional() }).nullable(),
       runsSummary: z.object({
         count: z.number(),
         primaryMetric: z.unknown().optional(),
@@ -139,6 +151,7 @@ export interface ExperimentEvaluationsListPageSchema extends Named<
 export const experimentEvaluationsListPageSchema: ExperimentEvaluationsListPageSchema =
   experimentEvaluationsListPageSchemaDefinition;
 export type ExperimentEvaluationsListPage = z.infer<typeof experimentEvaluationsListPageSchema>;
+export type ExperimentEvaluationsListRow = ExperimentEvaluationsListPage["experiments"][number];
 
 /** `getExperimentBatchEvaluationRuns`: every run of one experiment. */
 const experimentRunListSchemaDefinition = z.object({ runs: z.array(experimentRunSchema) });

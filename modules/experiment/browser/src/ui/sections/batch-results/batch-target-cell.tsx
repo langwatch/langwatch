@@ -18,8 +18,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuListTree } from "react-icons/lu";
 
+import { useHoverReveal } from "../../../behavior/batch-evaluation-results/use-hover-reveal.ts";
 import {
   COLLAPSED_CELL_HEIGHT_PX,
+  collapsedPreviewOf,
   DEFAULT_ROW_HEIGHT,
   type RowHeight,
 } from "../../../model/batch-evaluation-results.row-height.ts";
@@ -212,8 +214,8 @@ const CollapsedOutput = ({
   rowHeight: RowHeight;
   onExpand: () => void;
 }) => {
-  const isTruncated = output.length > MAX_DISPLAY_CHARS;
-  const isLikelyOverflowing = isTextLikelyOverflowing(output);
+  const { preview, isCut } = collapsedPreviewOf({ text: output, rowHeight });
+  const isLikelyOverflowing = isCut || isTextLikelyOverflowing(output);
   return (
     <Box position="relative">
       <Box
@@ -223,7 +225,7 @@ const CollapsedOutput = ({
         cursor={isLikelyOverflowing ? "pointer" : undefined}
         onClick={isLikelyOverflowing ? onExpand : undefined}
       >
-        <OutputText text={output.slice(0, MAX_DISPLAY_CHARS)} isTruncated={isTruncated} />
+        <OutputText text={preview} isTruncated={false} />
       </Box>
       {isLikelyOverflowing && (
         <Box
@@ -413,6 +415,8 @@ const CopyButton = ({
 
 type CellBodyProps = Omit<BatchTargetCellProps, "rowHeight" | "describeFailure"> & {
   expanded: boolean;
+  /** The collapsed cell draws its action bar only once it was hovered or focused. */
+  showActions?: boolean;
   rowHeight: RowHeight;
   failure: BatchCellFailure | null;
   output: string;
@@ -428,7 +432,7 @@ const CellBody = (props: CellBodyProps) => {
   const traceId = showOutput ? targetOutput.traceId : null;
   return (
     <>
-      {(showOutput || showCostAndLatency) && (
+      {(expanded || props.showActions) && (showOutput || showCostAndLatency) && (
         <HStack
           position="absolute"
           top={-1}
@@ -497,6 +501,7 @@ export function BatchTargetCell({
   ...rest
 }: BatchTargetCellProps) {
   const { cellRef, isExpanded, position, expand, close } = useExpandedCell();
+  const { isRevealed, revealHandlers } = useHoverReveal();
   // {output: "hello"} reads "hello"; {pizza: false} reads as formatted JSON.
   const output = formatTargetOutput(targetOutput.output);
   const { hasCopied, copy } = useCopyText(output);
@@ -531,8 +536,10 @@ export function BatchTargetCell({
         align="stretch"
         gap={2}
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
+        {...revealHandlers}
+        data-testid={`target-cell-${targetOutput.targetId}`}
       >
-        <CellBody {...body} expanded={false} />
+        <CellBody {...body} expanded={false} showActions={isRevealed} />
       </VStack>
 
       {isExpanded && (
