@@ -10,21 +10,31 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDefaultModelsDraftStore } from "../../../behavior/default-models-draft.store.ts";
+import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 import "@testing-library/jest-dom/vitest";
 
-const { mockOpenDrawer, mockListDecisionModels, mockGetDefaultModels } = vi.hoisted(() => ({
+const {
+  mockOpenDrawer,
+  mockUpdateDrawerParams,
+  mockListDecisionModels,
+  mockGetDefaultModels,
+  ownModelFlag,
+} = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
+  mockUpdateDrawerParams: vi.fn(),
+  ownModelFlag: { isLoading: false },
   mockListDecisionModels: vi.fn(),
   mockGetDefaultModels: vi.fn(),
 }));
 
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: (flag: { name: string }) => ({
-    enabled: flag.name === "release_instant_evals_own_decision_model",
-    isLoading: false,
-  }),
+  useFeatureFlag: (flag: { name: string }) => {
+    const isOwnModel = flag.name === "release_instant_evals_own_decision_model";
+    const isLoading = isOwnModel && ownModelFlag.isLoading;
+    return { enabled: isOwnModel && !isLoading, isLoading };
+  },
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
@@ -37,6 +47,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
     currentDrawer: undefined,
   }),
   useDrawerParams: () => ({}),
+  updateDrawerParams: mockUpdateDrawerParams,
 }));
 
 vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
@@ -127,6 +138,8 @@ describe("<DefaultModelOverrideDrawer/> Add key on a decision model", () => {
   });
   afterEach(() => {
     mockOpenDrawer.mockReset();
+    mockUpdateDrawerParams.mockReset();
+    ownModelFlag.isLoading = false;
     useDefaultModelsDraftStore.getState().clear();
     cleanup();
   });
@@ -256,6 +269,40 @@ describe("<DefaultModelOverrideDrawer/> Add key on a decision model", () => {
         "aria-disabled",
         "true",
       );
+    });
+
+    /** @scenario "Saving the key returns to the Default models drawer with the model picked" */
+    it("waits for the own decision model flag before picking", () => {
+      ownModelFlag.isLoading = true;
+      mockListDecisionModels.mockReturnValue(loaded([INCEPTION_PICKABLE]));
+      const drawer = () => <DefaultModelOverrideDrawer editingId="cfg_1" pick={INCEPTION} />;
+      const { host, rerender } = renderWithModelProviderHost(drawer());
+      expect(instantEvalsTrigger()).toHaveTextContent("Choose a decision model");
+
+      ownModelFlag.isLoading = false;
+      rerender(<ModelProviderHostProvider value={host}>{drawer()}</ModelProviderHostProvider>);
+
+      expect(instantEvalsTrigger()).toHaveTextContent("Inception Mercury Decide");
+    });
+
+    /** @scenario "Edits made before Add key are still there when the drawer comes back" */
+    it("takes the handed-back model out of the address once it is picked", () => {
+      mockListDecisionModels.mockReturnValue(loaded([INCEPTION_PICKABLE]));
+      renderWithModelProviderHost(
+        <DefaultModelOverrideDrawer editingId="cfg_1" pick={INCEPTION} />,
+      );
+
+      expect(mockUpdateDrawerParams).toHaveBeenCalledWith({ pick: undefined }, { push: false });
+    });
+
+    /** @scenario "A picked model the new key does not reach is left unpicked" */
+    it("takes the handed-back model out of the address when it is left unpicked", () => {
+      mockListDecisionModels.mockReturnValue(loaded([]));
+      renderWithModelProviderHost(
+        <DefaultModelOverrideDrawer editingId="cfg_1" pick={INCEPTION} />,
+      );
+
+      expect(mockUpdateDrawerParams).toHaveBeenCalledWith({ pick: undefined }, { push: false });
     });
 
     it("waits for the decision models to be read again before picking", () => {

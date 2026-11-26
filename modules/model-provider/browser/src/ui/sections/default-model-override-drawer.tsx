@@ -4,7 +4,7 @@
  * keeps the outgoing model stale until remounted.
  */
 import type { WireOf } from "@langwatch/api/web";
-import { useDrawer } from "@langwatch/browser-host/drawer";
+import { updateDrawerParams, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -462,7 +462,7 @@ function useListedDecisionOptions({
     FrontendFlags.release_instant_evals_judge_router,
     { projectId: projectId ?? NOT_TARGETED, organizationId, enabled: isEnabled },
   );
-  const { enabled: isOwnModelEnabled } = useFeatureFlag(
+  const { enabled: isOwnModelEnabled, isLoading: isOwnModelLoading } = useFeatureFlag(
     FrontendFlags.release_instant_evals_own_decision_model,
     // Asked of the organization only, as the server asks it (ADR-182 decision 4).
     { projectId: NOT_TARGETED, organizationId, enabled: isEnabled },
@@ -475,12 +475,16 @@ function useListedDecisionOptions({
       isOwnModelEnabled,
       isHostedOffered,
     }),
-    isPickableLoaded: pickableDecisionModels.isSuccess && !pickableDecisionModels.isFetching,
+    isPickableLoaded:
+      pickableDecisionModels.isSuccess && !pickableDecisionModels.isFetching && !isOwnModelLoading,
     isHostedOffered,
   };
 }
 
-/** Picks the model a provider form handed back once its key reaches every scope; else leaves it. */
+/**
+ * Picks the model a provider form handed back once its key reaches every scope; else leaves it.
+ * Either way the pick leaves the address, so a later Add key's way back does not hand it in again.
+ */
 function useReturnedPick({
   pick,
   options,
@@ -503,6 +507,7 @@ function useReturnedPick({
     if (isPickableDecisionOption({ options, model: pick })) {
       setConfig((prev) => withOverride(prev, "INSTANT_EVALS", pick));
     }
+    updateDrawerParams({ pick: undefined }, { push: false });
   }, [pick, appliedPick, isPickableLoaded, options, hydratedForRef, setConfig]);
 }
 
