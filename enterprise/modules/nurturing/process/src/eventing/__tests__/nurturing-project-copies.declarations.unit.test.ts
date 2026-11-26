@@ -100,6 +100,7 @@ describe("the five subscriber lanes the personal-project and traced-project maps
   it("is no lane of nurturing's own pipeline any more", () => {
     const pipeline = buildNurturingPipeline({
       deliver: async () => undefined,
+      organizationMembers: async () => [],
       guidedTurnFailed: async () => undefined,
       usageReportReceived: async () => undefined,
       evaluationsCompleted: async () => undefined,

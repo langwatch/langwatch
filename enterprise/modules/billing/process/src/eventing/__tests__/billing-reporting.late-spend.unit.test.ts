@@ -49,8 +49,7 @@ const USAGE_BILLED: BillingReportOrganizationLookup = {
     stripeCustomerId: "cus_1",
     subscriptions: [{ id: "sub_1" }],
     contract: "cloud",
-    // Live since before the month the test reports.
-    growthSeatPeriods: [{ startMs: Date.UTC(2026, 0, 1), endMs: null }],
+    growthSeatPeriods: [],
   },
 };
 

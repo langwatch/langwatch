@@ -18,7 +18,9 @@ export class LimitExceededError extends HandledError {
   ) {
     super(
       "resource_limit_exceeded",
-      `You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`,
+      limitType === "scenarioRuns"
+        ? `Your plan includes ${max} scenario runs a month and this month's are used. Upgrade your plan to keep running scenarios: https://app.langwatch.ai/settings/subscription`
+        : `You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`,
       {
         meta: { limitType, current, max },
         httpStatus: 403,
