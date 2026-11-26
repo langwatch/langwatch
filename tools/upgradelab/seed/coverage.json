@@ -76,6 +76,11 @@
       "note": "retention rules set per heavy organization",
       "cells": ["C1", "C3"]
     },
+    "dashboard:mark-my-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs each member's My dashboard as the previous release wrote it, before the mark"
+    },
     "dataset:move-content-to-object-storage": {
       "status": "pending",
       "seed": "product-seeds:dataset",
@@ -135,6 +140,11 @@
       "seed": "tenancy-sql:unconfirmed-users",
       "cells": ["C1", "C2"],
       "note": "rows the old image changed after the copy, and accounts identity reopened, reach the new steps"
+    },
+    "trace:link-unowned-trace-media": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs trace media stored without an owner link, as the previous release wrote it"
     },
     "trace:send-month-trace-ids": {
       "status": "seeded",

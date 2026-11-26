@@ -1,7 +1,8 @@
 import { type ContractApiMap, createModuleApi } from "@langwatch/api/web";
-import type { storedObjectTrpc } from "@langwatch/stored-object-contract";
-
-import { parseStoredObjectReference } from "../../model/stored-object/parse-stored-object-reference.ts";
+import {
+  parseStoredObjectFileReference,
+  type storedObjectTrpc,
+} from "@langwatch/stored-object-contract";
 
 /** The one procedure family this kit calls, derived from its owner's contract. */
 const storedObjectApi = createModuleApi<ContractApiMap<typeof storedObjectTrpc>>();
@@ -28,7 +29,7 @@ export function useStoredObjectUrl({
   projectId?: string;
   filename?: string;
 }): StoredObjectUrl {
-  const parsed = parseStoredObjectReference(reference);
+  const parsed = parseStoredObjectFileReference(reference);
   const owner = parsed?.projectId ?? projectId;
   const mint = storedObjectApi.storedObjects.getReadUrl.useQuery(
     {

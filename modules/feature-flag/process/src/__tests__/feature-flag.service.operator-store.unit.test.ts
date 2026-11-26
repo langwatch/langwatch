@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const BLOB_OFFLOAD = "release_trace_blob_offload";
-const MEDIA_EXTRACTION = "release_trace_media_extraction";
+const DEFAULT_OFF_FLAG = "release_voice_agents_enabled";
 const PROJECT_ID = "project-abc";
 const OPTED_OUT_PROJECT_ID = "project-opted-out";
 
@@ -90,18 +90,34 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
   });
 });
 
+describe("given no operator row exists for the trace media extraction flag", () => {
+  describe("when the ingestion edge resolves the flag for a project", () => {
+    /** @scenario "Media extraction is on by default with no configuration" */
+    it("resolves to the registry default of on", async () => {
+      const { service } = buildGraph();
+
+      await expect(
+        service.isEnabled("release_trace_media_extraction", {
+          kind: "project",
+          projectId: PROJECT_ID,
+        }),
+      ).resolves.toBe(true);
+    });
+  });
+});
+
 describe("given a rule-only write for a flag whose registry default is off", () => {
   describe("when the ingestion edge resolves the flag for an unnamed project", () => {
     it("stays off, so an org-scoped enable cannot flip the flag on fleet-wide", async () => {
       const { service } = buildGraph();
       await service.setRules({
-        key: MEDIA_EXTRACTION,
+        key: DEFAULT_OFF_FLAG,
         rules: [{ match: { organizationId: "org-early-access" }, enabled: true }],
         lastEditedBy: "operator-1",
       });
 
       await expect(
-        service.isEnabled(MEDIA_EXTRACTION, { kind: "project", projectId: PROJECT_ID }),
+        service.isEnabled(DEFAULT_OFF_FLAG, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(false);
     });
   });

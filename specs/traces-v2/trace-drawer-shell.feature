@@ -1099,3 +1099,19 @@ Rule: Responsive behavior
     And the table is hidden
     And a back button returns to the table
     And the filter sidebar is a slide-over overlay
+
+Rule: Tab rows that fold into an overflow menu settle
+  A row of tabs measures which ones fit and folds the rest into a menu. The
+  measurement depends on which tabs there are, not on the array that lists them.
+
+  @integration
+  Scenario: A tab row settles when its tabs do not fit
+    Given a tab row too narrow for every tab, such as the visualisation tabs beside Langy
+    When the row renders, receiving a new list of the same tabs on every render
+    Then it folds the tabs that do not fit into the menu and stops re-rendering
+
+  @integration
+  Scenario: A tab row settles when its tabs fit
+    Given a tab row wide enough for every tab
+    When the row renders, receiving a new list of the same tabs on every render
+    Then it shows every tab and stops re-rendering

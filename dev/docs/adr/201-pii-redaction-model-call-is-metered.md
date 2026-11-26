@@ -8,6 +8,9 @@
 confirmed, there is no free monthly amount, no minimum per call (assumed, the owner may still set
 one), and the free list stays with no end date (decisions 12 to 14).
 
+**Revised 2026-11-25:** a span of 8,001 to 32,000 characters is split across model calls by the
+caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
+
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
 > `gateway_spend` as request type `pii_redaction`; billing reports the month's dollars on a
@@ -38,7 +41,8 @@ one), and the free list stays with no end date (decisions 12 to 14).
    and a new rate version.
 2. **Only an answered batch is priced.** A batch that falls back to Presidio (too long, breaker
    open, timeout, throttle, refusal, routing error) records nothing: the customer pays for the
-   model, not for the fallback.
+   model, not for the fallback. A split span (ADR-207) is answered only when every one of its
+   calls is; a span with any failed call falls back and is priced for nobody.
 3. **data-privacy records a priced fact; gateway writes the ledger row** (ADR-174 decision 13).
    data-privacy appends `lw.data_privacy.pii_redaction_spend_priced` on the organization's
    aggregate. Gateway's peer subscriber writes one confirmed `gateway_spend` row, request type
@@ -64,7 +68,9 @@ one), and the free list stays with no end date (decisions 12 to 14).
    failing a customer's ingestion.
 6. **Our cost is an estimate from the call's duration.** Lambda's arm64 rate for 7 GB times the
    measured duration, plus the per-request fee. It ignores the warmer and HTTP deployments
-   cost nothing here. It is for margin reports only and is never billed.
+   cost nothing here. It is for margin reports only and is never billed. A split span's cost is
+   the sum over its calls: each call's duration at 7 GB plus one request fee per call, so the
+   overlap and the extra request fees show in our cost, never in the price.
 7. **A free list records at price zero.** Organizations on `release_pii_redaction_model_free` get a
    priced fact with a price of zero and the cost kept. The release flag still says who may use
    the model; the free list says who pays nothing. A free list that cannot be read records
@@ -93,7 +99,9 @@ one), and the free list stays with no end date (decisions 12 to 14).
     of the month; the meter reports the month's whole total, nothing taken off. The characters
     are counted as sent, after the in-process standard detection has masked what it finds (a
     phone number is counted as its marker), so the customer pays for the text the model read. The
-    length cap (8,000 characters) is measured on that masked text too.
+    length caps (8,000 characters for one call, 32,000 for a split span, ADR-207) are measured on
+    that masked text too, and a split span is priced on its texts' characters once, as if sent in
+    one call: the 200-character overlap between pieces is never billed.
 13. **No minimum per call.** A batch is priced at its characters times the rate and never raised
     to a floor: a 50-character span is 25,000 nano-USD. This is assumed, not yet decided for good;
     a minimum would be a code change in data-privacy and a new rate version.
@@ -123,9 +131,9 @@ A free list with no end date (decision 14) keeps the promise made to the organiz
 used the model before it was priced. The cost is our model spend with no revenue for as long as
 they stay; every free row keeps our cost in its metadata, so a margin report sees it.
 
-Spans over the model's length cap go to Presidio and are priced for nobody (decision 2). The
-customer pays nothing for them but gets the rule-based detection, not the model, on its longest
-spans. Splitting a long text across model calls (tasks#1226) is not built.
+Spans over 32,000 characters go to Presidio and are priced for nobody (decision 2). Spans of
+8,001 to 32,000 characters, which fell back for free before ADR-207, are now answered and priced
+at the same rate per character: the customer on Strict pays for the model on them.
 
 The model's routing reads the flag and the level, never the subscription. A Strict project of an
 organization with the flag is priced whatever its plan, and the meter holds the usage until the

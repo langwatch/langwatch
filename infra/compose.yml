@@ -26,6 +26,9 @@ services:
     pull_policy: always
     ports:
       - "5560:5560"
+    # Audio, images and documents lifted out of traces, shared with the workers.
+    volumes:
+      - stored-objects:/var/lib/langwatch/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,6 +62,8 @@ services:
       - path: platform/app/.env
         required: false
     pull_policy: always
+    volumes:
+      - stored-objects:/var/lib/langwatch/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,3 +158,4 @@ volumes:
   db-data:
   redis-data:
   clickhouse-data:
+  stored-objects:

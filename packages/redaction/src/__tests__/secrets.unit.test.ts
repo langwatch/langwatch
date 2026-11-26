@@ -576,6 +576,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["a key field holding a record id", `{"key":"project_${BODY.slice(0, 29)}"}`],
     ["a key entry in an OTLP attribute pair", '{"key":"gen_ai.usage.input_tokens"}'],
     ["a key field in YAML holding a commit", `key: ${"9f8e7d6c5b4a3928".repeat(2)}`],
+    ["a bare stored object id", `storedobject_000000${BODY.slice(0, 21)}`],
   ];
 
   /** @scenario "A bare key field holding an identifier is left alone" */
@@ -583,6 +584,36 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     const hash = "a1b2c3d4e5f6".repeat(3);
     expect(redact(`{"key":"${hash}"}`).text).toBe(`{"key":"${hash}"}`);
     expect(redact(`key: ${hash}`).text).toBe(`key: ${hash}`);
+  });
+
+  describe("when a stored media reference is in the text", () => {
+    const storedObjectId = `storedobject_000000${BODY.slice(0, 21)}`;
+
+    /** @scenario "A stored media reference survives secret redaction" */
+    it.each([
+      ["a slug project id", "local-dev-project"],
+      ["a nanoid project id with a separator", `${BODY.slice(0, 8)}_${BODY.slice(8, 20)}`],
+      ["a prefixed project id", `project_000000${BODY.slice(0, 21)}`],
+    ])("keeps the reference whole under %s", (_label, projectId) => {
+      const reference = `{"url":"/api/files/${projectId}/${storedObjectId}"}`;
+
+      expect(redact(reference)).toEqual({ text: reference, redactedCount: 0 });
+    });
+
+    /** @scenario "A stored media reference survives secret redaction" */
+    it("still redacts a key-shaped value beside the reference", () => {
+      const key = `zyq_${BODY.slice(0, 30)}`;
+      const text = `/api/files/local-dev-project/${storedObjectId} ${key}`;
+
+      expect(redact(text).text).toBe(`/api/files/local-dev-project/${storedObjectId} [SECRET]`);
+    });
+
+    /** @scenario "A stored media reference survives secret redaction" */
+    it("still redacts a key whose body carries some other record path", () => {
+      const key = `zyq_${BODY.slice(0, 30)}/user_profile`;
+
+      expect(redact(key)).toEqual({ text: "[SECRET]", redactedCount: 1 });
+    });
   });
 
   /** @scenario "A qualified key name is still a credential" */

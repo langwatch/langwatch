@@ -20,6 +20,7 @@ import {
 
 function laneAliases() {
   return buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
