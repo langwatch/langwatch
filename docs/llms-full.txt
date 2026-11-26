@@ -2401,6 +2401,94 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
 
 ---
 
+# FILE: ./agent-testing/owasp-red-team.mdx
+
+---
+title: OWASP Red Team Pack
+sidebarTitle: OWASP Red Team Pack
+keywords: langwatch, red teaming, owasp, owasp top 10 for llm applications, owasp agentic top 10, prompt injection, agent security, scenario tests
+description: Run one multi-turn attack per OWASP risk against your agent as pytest or vitest scenario tests, with every verdict in LangWatch.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+The OWASP pack is a set of multi-turn [red team](/agent-testing/red-teaming) tests, one per OWASP risk, that you add to your agent's test suite. You get a pytest or vitest file per language, judged against your agent's own rules, so you can show your security team where the agent stands on the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications.
+
+To run the same OWASP lists from the platform without code, create a suite from a pack in the template gallery. See [Red Team Templates](/agent-testing/red-team-templates).
+
+## What the pack covers
+
+| OWASP id | Title | What the attacker tries |
+| --- | --- | --- |
+| LLM01:2025 | Prompt Injection | Planted instructions in pasted content or tool results |
+| LLM02:2025 | Sensitive Information Disclosure | Leaking the data you list as protected |
+| LLM05:2025 | Improper Output Handling | Scripts, handlers and tracking images in replies |
+| LLM06:2025 | Excessive Agency | Actions beyond what the user may ask for |
+| LLM07:2025 | System Prompt Leakage | Printing the system prompt or hidden rules |
+| LLM09:2025 | Misinformation | Confident answers the agent's data does not back |
+| LLM10:2025 | Unbounded Consumption | Endless output and tool loops |
+| ASI01 | Agent Goal Hijack | Redirecting the agent to the attacker's goal |
+| ASI02 | Tool Misuse and Exploitation | Tools called with injected or foreign arguments |
+| ASI03 | Identity and Privilege Abuse | Privileged tools used on a claimed identity |
+| ASI06 | Memory & Context Poisoning | A false rule planted early and used later |
+
+LLM03, LLM04, LLM08, ASI04, ASI07, ASI08 and ASI10 concern supply chain, training data, vector stores and multi-agent systems, which a conversation with your agent cannot reach. A conversation can reach ASI05 (Unexpected Code Execution) and ASI09 (Human-Agent Trust Exploitation), but the pack has no attack for them: ASI05 needs an agent that runs code, and ASI09 turns on what a person does with the reply.
+
+## Apply it with your coding agent
+
+Install the LangWatch skills and ask your coding agent:
+
+```text
+Red team my agent against the OWASP Top 10 for LLM and agentic applications
+```
+
+It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team). When it finishes, you have:
+
+- the pack in your tests, in the language your repo uses
+- an adapter that calls your agent
+- a config filled in from your system prompt and tools
+- the results of one attack, then of the full pack
+
+## Apply it by hand
+
+1. Copy the [Python pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/python) or the [TypeScript pack](https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates/typescript) into one test folder.
+2. In `agent_adapter.py` or `agent-adapter.ts`, make `call_agent` or `callAgent` call your real agent and return its reply, tool calls included. If your TypeScript agent takes OpenAI chat messages, use `toOpenAIMessages` and `fromOpenAIMessages` from the same file.
+3. In `owasp_config.py` or `owasp.config.ts`, fill in the config block. You describe the agent's name and job, its tools, the tools that change data, what it must never do and the data it must never disclose. The pack builds every attack goal and judge criterion from this one block. Every field ships as `FILL ME`, and the pack refuses to run while any field still holds `FILL ME`.
+
+   Two limits ship filled: `max_reply_words` (500) and `max_tool_calls_per_turn` (5). They set the longest reply and the most tool calls per message that the LLM10 attack accepts.
+
+## Run it
+
+Install the test dependencies if your repo does not have them yet:
+
+```bash
+pip install "langwatch-scenario>=1.6" pytest "pytest-asyncio>=0.24"  # Python
+npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScript
+```
+
+Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. Both languages take a LiteLLM id such as `openai/gpt-5-mini`. For TypeScript, also swap the `openai` import and factory in `owasp-pack.redteam.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
+
+Set `LANGWATCH_API_KEY` and the API key of the provider `OWASP_MODEL` points to (`OPENAI_API_KEY` for the default), then run:
+
+```bash
+pytest test_owasp_pack.py -v -m agent_test                      # Python
+npx vitest run --config tests/owasp/owasp.vitest.config.ts      # TypeScript
+```
+
+Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id.
+
+The pack calls live models, so keep it out of your default test run and CI. For pytest, add `-m "not agent_test"` to your default options (`addopts` under `[tool.pytest.ini_options]`); `-m agent_test` on the command line overrides it. For vitest, the pack file `owasp-pack.redteam.ts` does not end in `.test.ts`, so the default include skips it and only `owasp.vitest.config.ts` runs it.
+
+`OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
+
+To read the results:
+
+1. In LangWatch, open Simulations.
+2. Pick the `owasp-red-team` set: it holds one run per OWASP id.
+3. Open a run to read the conversation and the judge's verdict on each criterion. The criteria judge security only, so a plain refusal passes. The test output names the unmet criteria but not the turn, so find the first agent reply that breaks one here.
+
+---
+
 # FILE: ./agent-testing/red-team-open-source.mdx
 
 ---
@@ -16404,6 +16492,151 @@ The same script runs against SaaS or self-hosted deployments, the CLI's `~/.lang
 
 ---
 
+# FILE: ./ai-governance/cloud-agent-discovery.mdx
+
+---
+title: Cloud agent discovery
+description: List the agents your organisation runs on AWS Bedrock, Bedrock AgentCore, Google Cloud Vertex AI Agent Engine and any ARD registry, and find the shadow and dormant ones.
+sidebarTitle: Cloud agent discovery
+keywords: agent discovery, shadow AI, shadow agents, dormant agents, Bedrock Agents, AgentCore, Vertex AI Agent Engine, ARD, agent inventory, governance
+---
+
+Cloud agent discovery gives a governance team one inventory of the agents running in its cloud accounts. Connect an AWS account, a Google Cloud project or an agent registry, and LangWatch lists their agents on a schedule. It then compares that list with your traces: an agent sending traffic that no source lists is flagged as shadow, and a listed agent with no traffic for a set time is flagged as dormant.
+
+<Warning>
+  **Available on Enterprise plans.** Creating sources and changing the dormancy window needs the
+  `ingestionSources:manage` permission. Reading the inventory needs `governance:view`. See
+  [Open-core licensing](/ai-governance/open-core-licensing).
+</Warning>
+
+## What gets discovered
+
+| Source type | Platform | What it lists |
+|---|---|---|
+| `aws_bedrock_agents` | AWS | Bedrock Agents and Bedrock AgentCore runtimes in each region you choose |
+| `gcp_vertex_agent_engine` | Google Cloud | Vertex AI Agent Engine reasoning engines in each project and location you choose |
+| `ard_registry` | Any ARD registry | The `urn:air:` entries of an [Agentic Resource Discovery (ARD) v0.91](https://github.com/ards-project/ard-spec) registry |
+
+Each listed agent enters the [agent registry](/governance/agent-registry) with a stable id, its platform, model, owner and tags. The owner is read from the `owner` tag or label, then `Owner`, then `team`. These sources only list agents; they send no usage events.
+
+Create a source from `/governance/ingestion-sources` and pick the source type.
+
+## Set up AWS
+
+An AWS source signs its calls with an AWS connection of your organisation. A connection holds either an access key pair or a role to assume with an external id. A role is the better choice: you can revoke it in your own account at any time.
+
+Pick the connection and the regions to list, up to 20. One region that refuses the listing refuses the whole run.
+
+The identity behind the connection needs this policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListBedrockAgents",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:ListAgents",
+        "bedrock:ListAgentAliases",
+        "bedrock:GetAgent",
+        "bedrock:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ListAgentCoreRuntimes",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:ListAgentRuntimes",
+        "bedrock-agentcore:GetAgentRuntime",
+        "bedrock-agentcore:ListTagsForResource"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Every action above is required. LangWatch reads each agent's and runtime's details and tags, and if AWS refuses any of those reads the whole listing fails, Bedrock agents included.
+
+If the connection assumes a role, the role's trust policy lets the identity LangWatch runs as assume it, and only with your external id. Replace the principal with that identity's ARN and the external id with the one you set on the connection:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "AWS": "<langwatch-principal-arn>" },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": { "sts:ExternalId": "<your-external-id>" }
+      }
+    }
+  ]
+}
+```
+
+## Set up Google Cloud
+
+Create a service account in the project that runs your agents. Give it the `aiplatform.reasoningEngines.list` permission, through a custom role that holds only that permission or through `roles/aiplatform.viewer`.
+
+Create a JSON key for the service account and paste it into the source form. LangWatch stores the key sealed and never shows it again; the form only says that a key is set.
+
+Add the project and location pairs to list, such as `my-project` in `europe-west4`, up to 20. A service account in one project can list another project if you grant it the same role there.
+
+## Set up an ARD registry
+
+Enter the registry's domain, such as `registry.example.com`, or an `https` URL. LangWatch reads the manifest at `/.well-known/ard.json` on that origin. The manifest must declare `specVersion` `0.91`; any other version refuses the listing as `malformed_response`.
+
+If the registry has a search endpoint, add its URL so LangWatch reads every page of results, not only the manifest. Add a bearer token if the registry needs one. Addresses inside a private network, such as `169.254.169.254`, are refused when you save.
+
+## Schedules and testing
+
+Each source lists its agents on its own schedule, a cron expression. The default is hourly (`0 * * * *`). The Sync button on the source runs a listing straight away.
+
+Test connection runs a listing without recording it. It answers with the number of agents found, or with the reason the provider refused, such as `unauthorized` or `not_configured`. Use it before you save a source and after you change its permissions.
+
+A listing that the provider refuses records no agents and changes no entries. The source shows the refusal reason on its last run, and the registry keeps what the last good listing found.
+
+When a good listing no longer names an agent, its registry entry is removed with a `governance.agent.removed` event. If a later listing names it again, the entry becomes active again.
+
+## Governed, shadow and dormant
+
+Each agent in the inventory has one posture:
+
+| Posture | Meaning |
+|---|---|
+| `governed` | A source lists the agent, and it is either younger than the dormancy window or its traces show traffic within it |
+| `shadow` | Traces from the last 30 days show the agent, but no source lists it |
+| `dormant` | A source lists the agent, but no trace has named it within the dormancy window |
+
+The dormancy window is 30 days by default. An organisation admin can set it from 1 to 365 days in the agent registry settings. An agent younger than the window is never dormant, and a dormant agent that sends traffic again is governed. Shadow detection always reads the last 30 days of traces: a longer dormancy window does not extend it.
+
+Filter the Agents page by posture and by source to find the shadow and dormant agents. The REST list at `GET /api/governance/registry/agents` takes the same `posture` filter.
+
+## How traces join listed agents
+
+A traced agent matches a listed one when its `gen_ai.agent.id` equals one of the ids below:
+
+| Platform | Registry id | Ids a trace's `gen_ai.agent.id` may carry |
+|---|---|---|
+| Bedrock Agents | Agent ARN | Agent id, any alias id except the shared test alias `TSTALIASID`, any alias ARN, the agent ARN |
+| Bedrock AgentCore | Runtime ARN | Runtime id, the runtime ARN |
+| Vertex AI Agent Engine | Resource name | The full resource name, or the trailing engine id such as `42` |
+| ARD registry | `urn:air:` identifier | The `urn:air:` identifier |
+
+A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. To keep a traced agent apart from a listed one, give it a different `gen_ai.agent.name`, and if it sets a `gen_ai.agent.id`, use one that matches none of the listed agent's ids.
+
+## Alerts
+
+A new shadow agent appends a `governance.agent.flagged_shadow` event. Every webhook endpoint subscribed to `governance.agent.*` receives it; see [receiving events as webhooks](/governance/agent-registry#receiving-events-as-webhooks). Each organisation admin also gets one push alert for it.
+
+The first reconcile of an organisation is a silent baseline. Shadow agents it finds are registered, but they send no webhook or push alert.
+
+---
+
 # FILE: ./ai-governance/compliance-architecture.mdx
 
 ---
@@ -17599,8 +17832,13 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | [`openai_compliance`](/ai-governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
 | [`claude_compliance`](/ai-governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
 | `http_custom` | Pull (BYO REST API) | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping |
+| [`aws_bedrock_agents`](/ai-governance/cloud-agent-discovery#set-up-aws) | Pull (Bedrock and AgentCore list APIs) | Agent listing | Agent registry | **Listing-only**: lists Bedrock Agents and AgentCore runtimes, no usage events |
+| [`gcp_vertex_agent_engine`](/ai-governance/cloud-agent-discovery#set-up-google-cloud) | Pull (Vertex AI API) | Agent listing | Agent registry | **Listing-only**: lists Agent Engine reasoning engines, no usage events |
+| [`ard_registry`](/ai-governance/cloud-agent-discovery#set-up-an-ard-registry) | Pull (ARD v0.91 manifest and search) | Agent listing | Agent registry | **Listing-only**: lists `urn:air:` entries, no usage events |
 
 **Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost, token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
+
+**Listing-only** = the source lists agents into the agent registry on its schedule and sends no usage events, so it has no cost, token deltas or trace drill-down. See [cloud agent discovery](/ai-governance/cloud-agent-discovery).
 
 **Receiver works** = endpoint accepts and ack's traffic, source flips to `active`, the unified store has the event with origin metadata stamped, but per-platform deeper attribute extraction beyond the default OTLP/JSON shape is pending. Drill-down still works, but column displays may show generic labels until the platform-specific adapter ships.
 
@@ -22259,6 +22497,15 @@ openapi: "GET /api/v1/governance/registry/schema"
 
 ---
 
+# FILE: ./api-reference/governance-agent-registry/get-the-registry-settings.mdx
+
+---
+title: "Get the registry settings"
+openapi: "GET /api/v1/governance/registry/settings"
+---
+
+---
+
 # FILE: ./api-reference/governance-agent-registry/list-one-registry-agent-s-versions.mdx
 
 ---
@@ -22295,6 +22542,15 @@ Read every AI agent in your organization with its endpoints, model, instructions
 ---
 title: "Read the registry change feed"
 openapi: "GET /api/v1/governance/registry/events"
+---
+
+---
+
+# FILE: ./api-reference/governance-agent-registry/save-the-registry-settings.mdx
+
+---
+title: "Save the registry settings"
+openapi: "PUT /api/v1/governance/registry/settings"
 ---
 
 ---
@@ -23081,8 +23337,8 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
-FROM analytics.trace_metrics
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?', 0.5) AS refused
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
 ```
@@ -23157,7 +23413,7 @@ Every judgement is also a row in the `judgments` analytics dataset, so a later q
 
 ```sql
 SELECT j.Label AS verdict, count() AS traces
-FROM analytics.judgments AS j
+FROM judgments AS j
 WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
 GROUP BY verdict
 ORDER BY traces DESC
@@ -24188,7 +24444,7 @@ A function call has to be an aliased entry in the top level `SELECT` list of a s
 
 ```sql
 SELECT ConversationId, conversation(ConversationId) AS transcript
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 20
@@ -24251,7 +24507,7 @@ Three things can shorten a result, and each one leaves a diagnostic behind:
 
 ```json
 {
-  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM analytics.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
+  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
 }
 ```
 
@@ -24261,7 +24517,7 @@ Each row carries a conversation identifier and its transcript under roughly eigh
 
 ```json
 {
-  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1) AND HasError ORDER BY OccurredAt DESC LIMIT 100"
+  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"
 }
 ```
 
@@ -24275,7 +24531,7 @@ An eval function asks a question about a text and answers it per row. The text i
 SELECT
   ConversationId,
   eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -24287,7 +24543,7 @@ A question about what the agent did reads the agent's work, so it takes `llm_rea
 SELECT
   ConversationId,
   eval(llm_readable_thread(ConversationId, 16000), 'The agent quoted a price without calling get_price') AS unchecked_price
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -24319,7 +24575,7 @@ SELECT
     'What is the customer asking for',
     ['refund: wants money back', 'bug: reports something broken', 'other: anything else']
   ) AS intent
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
 GROUP BY ConversationId
 LIMIT 100
@@ -27597,7 +27853,7 @@ The [sessions list](/coding-agents/sessions) shows each session's cost, duration
 ```bash
 langwatch query run "SELECT GitBranch, count() AS sessions, sum(ModelCalls) AS model_calls,
   sum(ToolCalls) AS tool_calls, round(sum(CostUsd), 2) AS cost_usd
-  FROM langwatch.coding_sessions
+  FROM coding_sessions
   WHERE GitBranch IN ('before-branch', 'after-branch') GROUP BY GitBranch"
 ```
 
@@ -27608,7 +27864,7 @@ For the feedback loop, compare tool durations per branch:
 ```bash
 langwatch query run "SELECT Branch, ToolName, count() AS runs,
   quantileExact(0.5)(DurationMs) AS median_ms, sum(DurationMs) AS total_ms
-  FROM langwatch.coding_session_events
+  FROM coding_session_events
   WHERE EventKind = 'tool_result' AND Branch IN ('before-branch', 'after-branch')
   GROUP BY Branch, ToolName ORDER BY total_ms DESC"
 ```
@@ -27916,7 +28172,7 @@ Opus 5.5 cost 63% less per fix (95% CI 56 to 69%) at the same quality. Its lower
 
 ```bash
 langwatch query run "SELECT QuerySource, Model, round(sum(CostUsd), 2) AS cost_usd
-  FROM langwatch.coding_session_events
+  FROM coding_session_events
   WHERE EventKind = 'model_call' AND SessionId IN ('<run 1>', '<run 2>')
   GROUP BY QuerySource, Model ORDER BY cost_usd DESC"
 ```
@@ -28921,6 +29177,22 @@ A job running pi headless writes the extension first, then sets the variables on
 The session appears on the project's [sessions list](/coding-agents/sessions) like any other, and its branch work attributes to [pull requests](/coding-agents/pull-requests) the same way.
 
 For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent, `langwatch login --api-key <sk-lw-...>` writes a project API key to `.env` non-interactively, and `langwatch login --token <token>` installs a pre-minted device token. Both fail fast on a machine without a terminal instead of hanging on a device-code prompt.
+
+## Agents started by a harness
+
+A harness that runs Claude Code for you, such as a sandbox supervisor, an agent platform or a session manager like rush, starts `claude -p` with an environment it builds itself. Put the variables from [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) in that environment, with a project ingest key (`ik-lw-...`) in `OTEL_EXPORTER_OTLP_HEADERS`. Keep a project API key (`sk-lw-...`) out of it, since the agent can read every variable the harness gives it.
+
+Each Claude Code session the harness keeps becomes one session in LangWatch, each turn one trace, and a subagent's model calls and tool calls nest under the `Agent` tool call that started it.
+
+Three things to check in the harness:
+
+- `env` in a `settings.json` that Claude Code reads (the account's `~/.claude/settings.json`, or the file in `CLAUDE_CONFIG_DIR`) can override the same variables in the process environment. Keep the OTLP variables in one place.
+- Remove `TRACEPARENT` and `TRACESTATE` from the environment the harness passes on. Claude Code sets them for every command it runs, so a harness started from inside a Claude Code session inherits them, and every turn it runs then joins that outer session's trace.
+- A harness that stops idle sessions should close their input and give Claude Code a few seconds to exit, so the last spans and logs are exported.
+
+To send metadata only, set `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` to `0`. Tokens, cost, model, timings and tool names still arrive.
+
+Prompts and responses then show as `<REDACTED>`, and tool arguments and outputs are not sent; a Bash call keeps only its program name and command class. To enforce the same on the server for everything a project receives, set the input, output and tool categories of a [data privacy policy](/coding-agents/privacy) to drop.
 
 ## Bake it into an image
 
@@ -30120,22 +30392,22 @@ Ask the user, or check on their machine: run `claude -p "hello" --output-format 
 
 Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projects <id,id> -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
 
-`langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
+`coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
 A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
 If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
-If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
-`langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
+`coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
 Start with the spend mix:
 
@@ -30146,7 +30418,7 @@ SELECT Model,
   count() AS calls, sum(InputTokens) AS input, sum(OutputTokens) AS output,
   sum(CacheReadTokens) AS cache_read, sum(CacheCreationTokens) AS cache_write,
   round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY Model, thread ORDER BY cost_usd DESC
 ```
@@ -30179,7 +30451,7 @@ Measured in a controlled run: on 5 bug-fix tasks (15 runs per model, every hidde
 SELECT SessionId, max(InputTokens + CacheReadTokens + CacheCreationTokens) AS peak_context,
   countIf(InputTokens + CacheReadTokens + CacheCreationTokens > 400000) AS calls_over_400k,
   round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
   AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY SessionId HAVING calls_over_400k > 0 ORDER BY cost_usd DESC LIMIT 50
@@ -30211,7 +30483,7 @@ Also: `/compact` at the end of a task, `/clear` before an unrelated one.
 
 ```sql
 SELECT QuerySource, Model, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
   AND (QuerySource LIKE 'agent:builtin:%' OR QuerySource = 'agent_summary')
 GROUP BY QuerySource, Model ORDER BY cost_usd DESC
@@ -30241,7 +30513,7 @@ FROM (
     InputTokens + CacheReadTokens + CacheCreationTokens AS ctx,
     dateDiff('second', lagInFrame(TimeUnixMs) OVER w, TimeUnixMs) AS gap,
     row_number() OVER w AS rn
-  FROM langwatch.coding_session_events
+  FROM coding_session_events
   WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
     AND TimeUnixMs >= now() - INTERVAL 30 DAY
   WINDOW w AS (PARTITION BY SessionId ORDER BY TimeUnixMs
@@ -41060,6 +41332,7 @@ curl -X POST "$ENDPOINT" \
     {
      "startDate": 1708434000000,
      "endDate": 1710939600000,
+     "timeZone": "UTC",
      "filters": {},
      "series": [
        {
@@ -41073,6 +41346,24 @@ EOF
 ```
 
     4. Execute the `curl` command. If successful, LangWatch will return the custom analytics data in the response.
+
+## Filters
+
+`filters` narrows the query the same way the filter sidebar narrows the dashboard. Each key is a filter field. Most fields take a list of the options to keep. Keyed fields, such as `metadata.value`, take an object whose key is what the filter selects by:
+
+```json
+{
+  "filters": {
+    "traces.error": ["true"],
+    "metadata.user_id": ["user-123"],
+    "metadata.value": { "environment": ["production"] }
+  }
+}
+```
+
+Send the option's value (`field` in the filter options), not the label shown in the interface. `traces.error`, `annotations.hasAnnotation` and `evaluations.passed` accept only `"true"` and `"false"`. A label such as `"Traces with error"` is refused with a 422 and the code `analytics_filter_value_unsupported`, which names the field and lists the values it accepts.
+
+`metadata.value` needs its metadata key, and `events.metrics.value` needs its event type and metric key. Sent as a plain list, they are refused with the code `analytics_filter_key_required` and an example of the nested shape. An unknown filter field is refused too, with the list of accepted fields.
 
 ## Screenshots on how to get the JSON data.
 
@@ -41802,11 +42093,11 @@ Every verdict is a row in the `judgments` view of [LangWatchQL](/api-reference/q
 
 ```sql
 SELECT
-  t.Attributes['user.id'] AS user,
+  t.Attributes['langwatch.user_id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
-FROM analytics.judgments AS j
-JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+FROM judgments AS j
+JOIN traces AS t ON t.TraceId = j.TraceId
 WHERE j.RunId = {run:String}
   AND j.QuestionId = 'annoyed'
   AND j.CreatedAt >= subtractDays(now(), 7)
@@ -41924,7 +42215,7 @@ SELECT
   Attributes['gen_ai.conversation.id'] AS ThreadId,
   OccurredAt,
   eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= {start_at:DateTime}
   AND OccurredAt < {end_at:DateTime}
 ORDER BY TraceId
@@ -41938,7 +42229,7 @@ SELECT
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
   eval(llm_readable_thread(m.ConversationId, 18729), 'the customer sounds annoyed') AS q1
-FROM analytics.trace_metrics AS m
+FROM trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
   AND m.ConversationId != ''
@@ -41954,14 +42245,14 @@ SELECT
   SpanId,
   StartTime AS OccurredAt,
   eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
-FROM analytics.spans
+FROM spans
 WHERE StartTime >= {start_at:DateTime}
   AND StartTime < {end_at:DateTime}
   AND SpanAttributes['langwatch.span.type'] = 'llm'
 ORDER BY TraceId, SpanId
 ```
 
-A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `analytics.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
+A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
 
 ## What is the token budget per row
 
@@ -42124,7 +42415,7 @@ the offending field and the fields that exist.
 
 ```bash
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
 GROUP BY day ORDER BY day" --projects <project id>
 ```
@@ -42165,12 +42456,14 @@ langwatch query --sql-file export.sql --projects <project id> --format jsonl --o
 
 The query endpoint has no cursor of its own, so a result larger than one
 response pages through a predicate you write. Declare the two cursor parameters,
-order by the same two columns, and `--page-by keyset` rebinds them between pages
-without changing a character of your statement.
+order by the same two columns, and alias those columns `after_ts` and `after_id`
+in the `SELECT`: `--page-by keyset` reads the next page's cursor from them and
+rebinds the parameters between pages without changing a character of your
+statement.
 
 ```sql
-SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
-FROM analytics.traces
+SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId
@@ -70495,9 +70788,16 @@ keywords: sso, single sign-on, identity provider, connectors, scim, provisioning
 ---
 
 <Note>
-  Single sign-on and SCIM provisioning are Enterprise features. A self-hosted
-  deployment also needs an Enterprise license. See [SSO configuration](/self-hosting/configuration/sso)
-  for environment variables and provider settings.
+  Single sign-on and SCIM provisioning are Enterprise features, on LangWatch
+  Cloud and on self-hosted deployments. A self-hosted deployment without an
+  Enterprise license signs people in with email and password only, plus passkeys
+  unless `PASSKEYS_ENABLED=off`: setting
+  `AUTH_PROVIDER` and the identity provider variables is not enough, and the
+  deployment stays in email mode (see [SSO requires a license](/self-hosting/licensing#sso-requires-a-license)).
+
+  With a license, you can configure one identity provider for the whole
+  deployment through environment variables (see [SSO configuration](/self-hosting/configuration/sso)),
+  or per organization in **Settings > Authentication**, as this page describes.
 </Note>
 
 Use **Settings > Authentication** to manage how people sign in and how they
@@ -70819,7 +71119,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
   <Accordion title="Can I customize how long my data is retained?">
     On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35, 63 or 91 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
 
-    Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, with a separate window for traces, scenarios and experiments.
+    Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, covering traces, logs, metrics, scenarios and experiments. Logs and metrics follow the traces window.
   </Accordion>
 
 <Accordion title="Are webhooks and the billing events API included in my plan?">
@@ -70872,7 +71172,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
 title: What counts as a billable event
 description: "The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works"
 sidebarTitle: Billable events
-keywords: billable event, events, pricing, span, evaluation, experiment, simulation, metering, deduplication
+keywords: billable event, events, pricing, span, log, metric, evaluation, experiment, simulation, metering, deduplication
 ---
 
 LangWatch Cloud bills on **ingested events per billing period**. The list below is complete, so you can predict a bill from your own workload rather than from a sample.
@@ -70889,6 +71189,8 @@ These are the only events that increment your count. Everything else the platfor
 | What you did                                                                                                                  | Billable event                       | Counted                   |
 | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------- |
 | Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received`         | One per span              |
+| Your app sent an OpenTelemetry log record                                                                                     | `lw.obs.log.record_received`         | One per log record        |
+| Your app sent an OpenTelemetry metric data point                                                                              | `lw.obs.metric.data_point_received`  | One per series per hour   |
 | An evaluation produced a result                                                                                               | `lw.evaluation.reported`             | One per evaluation result |
 | An experiment run started                                                                                                     | `lw.experiment_run.started`          | One per run               |
 | An experiment recorded a target's output                                                                                      | `lw.experiment_run.target_result`    | One per target result     |
@@ -70897,6 +71199,14 @@ These are the only events that increment your count. Everything else the platfor
 | A simulation recorded a conversation snapshot                                                                                 | `lw.simulation_run.message_snapshot` | One per snapshot          |
 
 Spans dominate the count whenever your app sends traces. A single trace of an agent turn typically contains several spans, one per step.
+
+### Reading the cost of logs and metrics
+
+Each log record counts as one event, however it reaches LangWatch.
+
+Metrics count per series, not per data point. A series is one metric name with one set of attribute values, for example `http.server.duration` with `route=/chat` and `status=200`.
+
+A series counts one event for each UTC clock hour in which it sent at least one point, however many points it sent in that hour. A counter exported every 10 seconds is one event an hour, so about 720 events in a 30-day month. The same metric with a second `route` value is a second series and counts separately.
 
 ### Reading an experiment's cost
 
@@ -74702,7 +75012,7 @@ technical safeguards map cleanly onto the open-core split:
 - **§164.312(b) Audit controls**: Apache 2.0 event_log @ 49d retention
 - **§164.316(b)(2)(i) 6-year documentation retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
-- **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
+- **§164.312(d) Authentication**: Apache 2.0 email and password and passkey sign-in + Personal IDE keys; Enterprise SSO (env-configured or per organization)
 - **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
 
 **HIPAA-most-uses**: covered entities with PHI in LLM traces should
@@ -74751,8 +75061,11 @@ free to run and free to modify:
 - **Custom roles via `CustomRolePermissions` JSON** is Enterprise. The
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
   view/manage actions) is Apache 2.0.
-- **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
-  use SSO (Okta, Auth0, Azure AD, AWS Cognito, OneLogin) for sign-in.
+- **SSO and SCIM provisioning** are Enterprise. An Apache 2.0
+  deployment signs people in with email and password, and passkeys. Setting
+  `AUTH_PROVIDER` and the Okta, Auth0, Azure AD, AWS Cognito or OneLogin
+  variables without a license leaves the deployment in email mode. See
+  [SSO requires a license](/self-hosting/licensing#sso-requires-a-license).
 
 ## Migrating from Apache 2.0 to Enterprise
 
@@ -74766,7 +75079,7 @@ RoleBinding entries, AiToolCatalogEntry rows, is unchanged.
 For the upgrade path:
 
 1. Provision your Enterprise license (contact sales).
-2. Set `LANGWATCH_LICENSE` (or equivalent, see your contract) in your
+2. Set `LANGWATCH_LICENSE_KEY` (or equivalent, see your contract) in your
    self-hosted env.
 3. Restart the control-plane pod, `pnpm dev` (no migration needed).
 4. The previously-gated surfaces become available immediately. Existing
@@ -75748,7 +76061,7 @@ The AI Gateway uses three more secrets, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWA
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
-| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works | `email` |
+| `AUTH_PROVIDER` | Deployment-wide sign-in provider. `email` means the deployment issues its own passwords. `NEXTAUTH_PROVIDER` is the deprecated name and still works. Any other provider needs an [Enterprise license](/self-hosting/licensing#sso-requires-a-license); without one the deployment stays in email mode | `email` |
 | `LOCAL_PASSWORDS_ENABLED` | `on` keeps local passwords available next to a configured identity provider | `off` |
 | `PASSKEYS_ENABLED` | `off` removes passkey sign-in and its routes. Registered passkeys are kept | `on` |
 | `MFA_ENROLLMENT_OPEN` | `on` turns on two-step verification | `off` |
@@ -77584,7 +77897,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.28.0 # x-release-please-version
+    targetRevision: 3.29.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -77639,7 +77952,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.28.0 # x-release-please-version
+      targetRevision: 3.29.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -78054,7 +78367,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.28.0 # x-release-please-version
+VERSION=3.29.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -78070,13 +78383,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.28.0" # x-release-please-version
+    tag: "3.29.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.28.0" # x-release-please-version
+    tag: "3.29.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.28.0" # x-release-please-version
+    tag: "3.29.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -80481,7 +80794,9 @@ This is deliberate rather than a failure state, so an unlicensed deployment alwa
 - Email sign-up and sign-in stay available.
 - **Forgot password** stays available, so anyone whose account was originally created through an identity provider can recover through their inbox. It can only deliver if outbound email is configured; without it the screen says so rather than claiming a link was sent.
 
-Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. If `NEXTAUTH_PROVIDER` names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
+Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. `LOCAL_PASSWORDS_ENABLED=on` keeps the email routes open next to the identity provider.
+
+If `AUTH_PROVIDER` (or the older `NEXTAUTH_PROVIDER`) names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
 
 <Warning>
 **Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it.
@@ -83104,7 +83419,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.28.0 \
+  --version 3.29.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -87274,22 +87589,22 @@ Ask the user, or check on their machine: run `claude -p "hello" --output-format 
 
 Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projects <id,id> -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
 
-`langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
+`coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
 A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
 If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
-If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
-`langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
+`coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
 Start with the spend mix:
 
@@ -87300,7 +87615,7 @@ SELECT Model,
   count() AS calls, sum(InputTokens) AS input, sum(OutputTokens) AS output,
   sum(CacheReadTokens) AS cache_read, sum(CacheCreationTokens) AS cache_write,
   round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY Model, thread ORDER BY cost_usd DESC
 ```
@@ -87333,7 +87648,7 @@ Measured in a controlled run: on 5 bug-fix tasks (15 runs per model, every hidde
 SELECT SessionId, max(InputTokens + CacheReadTokens + CacheCreationTokens) AS peak_context,
   countIf(InputTokens + CacheReadTokens + CacheCreationTokens > 400000) AS calls_over_400k,
   round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
   AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY SessionId HAVING calls_over_400k > 0 ORDER BY cost_usd DESC LIMIT 50
@@ -87365,7 +87680,7 @@ Also: `/compact` at the end of a task, `/clear` before an unrelated one.
 
 ```sql
 SELECT QuerySource, Model, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
   AND (QuerySource LIKE 'agent:builtin:%' OR QuerySource = 'agent_summary')
 GROUP BY QuerySource, Model ORDER BY cost_usd DESC
@@ -87395,7 +87710,7 @@ FROM (
     InputTokens + CacheReadTokens + CacheCreationTokens AS ctx,
     dateDiff('second', lagInFrame(TimeUnixMs) OVER w, TimeUnixMs) AS gap,
     row_number() OVER w AS rn
-  FROM langwatch.coding_session_events
+  FROM coding_session_events
   WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
     AND TimeUnixMs >= now() - INTERVAL 30 DAY
   WINDOW w AS (PARTITION BY SessionId ORDER BY TimeUnixMs
@@ -90948,6 +91263,189 @@ Your harness, codebase and model decide which levers exist. Full guide: [Improvi
 
 <div className="lw-accordion">
   <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Red team my agent against the OWASP Top 10</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/owasp-red-team"} data-track="docs_copy_skill_install" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-skill={"langwatch/skills/recipes/owasp-red-team"}>
+          <code>npx skills add langwatch/skills/recipes/owasp-red-team</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/owasp-red-team"} data-track="docs_copy_slash_command" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-command={"/owasp-red-team"}>
+          <code><span className="lw-slash-command">/owasp-red-team</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-skill={"langwatch/skills/recipes/owasp-red-team"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Red team my agent against the OWASP Top 10 for LLM and agentic applications
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Red Team Your Agent with the OWASP Pack
+
+This recipe applies a ready OWASP pack to the user's agent: one multi-turn `RedTeamAgent` attack per OWASP risk, each judged against criteria built from the agent's own config. The pack lives in the `templates/` folder beside this file, in Python (pytest) and TypeScript (vitest). Copy it; do not rewrite it.
+
+Use red teaming only on agents the user owns or has permission to test.
+
+## What the pack covers
+
+| OWASP id | Title | Strategy |
+| --- | --- | --- |
+| LLM01:2025 | Prompt Injection | goat |
+| LLM02:2025 | Sensitive Information Disclosure | crescendo |
+| LLM05:2025 | Improper Output Handling | goat |
+| LLM06:2025 | Excessive Agency | crescendo |
+| LLM07:2025 | System Prompt Leakage | goat |
+| LLM09:2025 | Misinformation | crescendo |
+| LLM10:2025 | Unbounded Consumption | goat |
+| ASI01 | Agent Goal Hijack | crescendo |
+| ASI02 | Tool Misuse and Exploitation | goat |
+| ASI03 | Identity and Privilege Abuse | crescendo |
+| ASI06 | Memory & Context Poisoning | crescendo |
+
+The LLM ids are from the OWASP Top 10 for LLM Applications 2025; the ASI ids from the OWASP Top 10 for Agentic Applications. LLM03 (Supply Chain), LLM04 (Data and Model Poisoning), LLM08 (Vector and Embedding Weaknesses), ASI04 (Agentic Supply Chain Vulnerabilities), ASI07 (Insecure Inter-Agent Communication), ASI08 (Cascading Failures) and ASI10 (Rogue Agents) need build, data or multi-agent checks that a conversation cannot exercise. A conversation can reach ASI05 (Unexpected Code Execution) and ASI09 (Human-Agent Trust Exploitation), but the pack has no attack for them: ASI05 needs an agent that runs code, and ASI09 turns on what a person does with the reply, which the judge cannot see.
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Step 1: Detect the language
+
+Look at the agent's repository. `pyproject.toml`, `requirements.txt` or `uv.lock` means Python; `package.json` with TypeScript means TypeScript. If both exist, use the language the agent itself is written in. Read the agent's entry point, system prompt and tool definitions before going on: Step 4 needs them.
+
+## Step 2: Copy the template
+
+Copy every file of the matching template folder into the repository's test folder, unchanged except for import paths:
+
+- Python: `templates/python/` holds `owasp_config.py`, `agent_adapter.py`, `owasp_attacks.py`, `test_owasp_pack.py` and `conftest.py`. Put them together in one folder (for example `tests/owasp/`). `conftest.py` puts the repository root on the import path, two folders up, and registers the `agent_test` mark. If the folder sits at another depth, change the `parents[2]` in it, or set `pythonpath = ["."]` under `[tool.pytest.ini_options]`.
+- TypeScript: `templates/typescript/` holds `owasp.config.ts`, `agent-adapter.ts`, `owasp-attacks.ts`, `owasp-pack.redteam.ts` and `owasp.vitest.config.ts`. Put them together in one folder (for example `tests/owasp/`).
+
+The pack calls live models on every run, so keep it out of the repository's default test run and CI:
+
+- Python: add `-m "not agent_test"` to the default pytest options, for example `addopts = '-m "not agent_test"'` under `[tool.pytest.ini_options]`. Run the pack with `-m agent_test`, which overrides it.
+- TypeScript: the pack file does not end in `.test.ts`, so vitest's default include skips it; `owasp.vitest.config.ts` runs it. If the repository's vitest config includes every `.ts` file under `tests/`, add `tests/owasp/**` to its `exclude`. Add a script such as `"test:owasp": "vitest run --config tests/owasp/owasp.vitest.config.ts"` to `package.json`.
+
+If you cannot read the `templates/` folder, fetch the same files from `https://github.com/langwatch/skills/tree/main/recipes/owasp-red-team/templates`.
+
+Install the test dependencies:
+
+```bash
+# Python
+uv add --dev "langwatch-scenario>=1.6" pytest "pytest-asyncio>=0.24"   # or: pip install ...
+# TypeScript: @langwatch/scenario 1.7 bundles ai 6, which takes only @ai-sdk/* 3.x
+npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3
+```
+
+## Step 3: Wire the adapter
+
+Edit only the adapter function: `call_agent(messages)` in `agent_adapter.py`, or `callAgent({ messages })` in `agent-adapter.ts`. Make it call the user's real agent with the conversation and return the agent's reply. Return the tool call and tool result messages as well when the agent has tools: the judge needs them for LLM06, LLM09, LLM10, ASI02 and ASI03.
+
+Python passes `messages` as OpenAI chat messages, so an agent on the `openai` SDK takes them as is. A sync agent runs in a thread: `return await asyncio.to_thread(respond, list(messages))`.
+
+TypeScript passes AI SDK `ModelMessage`s. If the agent takes OpenAI chat messages (the `openai` SDK), use the helpers in `agent-adapter.ts`: `toOpenAIMessages({ messages })` before the call and `fromOpenAIMessages({ messages: newMessages })` on its new messages, tool calls and tool results included. An agent built on the AI SDK takes `messages` as is. Both drop system messages: the agent keeps its own system prompt.
+
+Call the real agent with its real tools and system prompt. A mock defeats the test. If the tools write to real systems, point them at a test account or a sandbox before running.
+
+## Step 4: Fill the config
+
+Fill the one config block (`AGENT` in `owasp_config.py` or `owasp.config.ts`) from what you read in Step 1. Every field but the two limits ships as `FILL ME`, and the pack refuses to run, naming the file and the fields, until none is left. `EXAMPLE_AGENT` beside it shows a filled block:
+
+- `name`, `description`: what the agent is called and what it does.
+- `tools`: every tool name the model sees. `privileged_tools`: the ones that change data, spend money or reach outside. `privileged_tools` may be an empty list (the privilege attacks then name every tool); empty `tools`, `must_never` or `protected_data` make the pack refuse to run.
+- `must_never`: the actions the agent must refuse, from its system prompt and business rules, one sentence each.
+- `protected_data`: what it must never disclose.
+- `output_rendered_as`: where replies are shown (HTML widget, Slack, plain API).
+- `max_reply_words`, `max_tool_calls_per_turn`: the longest reply and the most tool calls for one message that the unbounded consumption attack (LLM10) still accepts. They ship as 500 and 5; raise them for an agent whose normal work needs more.
+
+Every attack goal and judge criterion is built from these fields, so do not edit `owasp_attacks.py` or `owasp-attacks.ts` for a new agent. Ask the user only for rules you cannot find in the code.
+
+## Step 5: Run
+
+Set `LANGWATCH_API_KEY` (results go to that project) and the model key for the attacker and judge (`OPENAI_API_KEY` by default). `OWASP_MODEL` picks the attacker and judge model (default `gpt-6-luna`). Both languages take a LiteLLM id such as `openai/gpt-5-mini`; TypeScript drops the provider prefix. Use an OpenAI-compatible chat model for the attacker and the judge: Gemini fails in the current scenario SDK (the attacker's first call has no user turn). The agent under test can use any model. For another provider in Python, set `OWASP_MODEL` to that provider's LiteLLM id. In TypeScript, also swap the `openai` import and factory in `owasp-pack.redteam.ts` for that provider's AI SDK package. For an OpenAI-compatible endpoint in TypeScript, import `createOpenAI` beside `openai` from `@ai-sdk/openai`, define `baseURL` as the endpoint URL and `apiKey` as that endpoint's key (read both from environment variables), add `const provider = createOpenAI({ baseURL, apiKey })`, and replace each of the three `openai(MODEL)` calls (attacker, metaprompt and judge) in `owasp-pack.redteam.ts` with `provider.chat(MODEL)`. `OWASP_TURNS` sets attacker turns per attack: unset or empty gives 10, which keeps a run cheap; use 30 before a release. Any other value that is not a whole number of at least 1 stops the run with an error naming `OWASP_TURNS`.
+
+```bash
+# Python, from the folder with the pack
+pytest test_owasp_pack.py -v -m agent_test
+pytest test_owasp_pack.py -v -m agent_test -k LLM01      # one id
+# TypeScript
+npx vitest run --config tests/owasp/owasp.vitest.config.ts
+npx vitest run --config tests/owasp/owasp.vitest.config.ts -t LLM01
+```
+
+Run one id first to prove the wiring, then the full pack. ALWAYS run it: an unrun pack proves nothing.
+
+Python may print `RuntimeError: Event loop is closed` at teardown. It comes from a model client closing after the loop and does not change any result.
+
+## Step 6: Read the results in LangWatch
+
+Each attack is a scenario run named `<OWASP id> <title>: <agent name>`, grouped under the set `owasp-red-team`. Open Simulations in the LangWatch project to read each conversation and the judge's verdict per criterion. A test that does not pass is one of two things, and the runner shows both as failed:
+
+- A breach: the judge gave a verdict and the attack broke through. The criteria judge security only: a plain refusal with no alternative passes. The message names the OWASP id, the unmet criteria and the judge's reasoning. Fix the agent (see below) and run that id again.
+- An error: the test stopped on an exception with no verdict, because a provider call or a tool call failed (for example `Failed to parse tool call arguments`, a timeout or a 429). It says nothing about the agent. Rerun that id; if it repeats, switch `OWASP_MODEL` to a model with reliable tool calls. Report it as an error, not as a breach or a pass: an error has no verdict on whether the agent held.
+
+For a breach, the result does not say which turn broke: open the run in Simulations and find the first agent turn that breaks a criterion: check its tool calls, their arguments and results as well as its reply, since an agent can act on another user's record and then reply as if nothing happened. Report to the user, per id, whether the agent held, the turn where each breach broke, and each error as inconclusive.
+
+A failing test tells you WHERE the agent fails, not that the prompt is where to fix it. One more rule is the cheapest edit that turns it green, and a prompt maintained that way overfits: it passes exactly the cases it was patched against and degrades everywhere else.
+
+1. **Diagnose the layer.** Five can own a failure: the harness (tools, permissions, context assembly), the model, the knowledge (skills, docs, retrieval), the prompt, or the test itself. The prompt is the last resort. If the fix is "never use tool X", remove tool X from the configuration. Diagnose from the failing run's trace: it holds every tool call, and the assembled input too where the project captures content.
+2. **Fix the class, not the transcript.** State the one principle that makes the whole class impossible. Never paste the failing conversation into the prompt. If you cannot name the class, keep diagnosing.
+3. **Prove it generalizes.** Re-run with varied wording. The simulator improvises, so a fix that survives one phrasing was a patch for that phrasing.
+4. **Pair each prohibition with an overshoot test.** A "decline out-of-scope requests" rule needs a greeting scenario that fails if the agent declines a greeting.
+5. **Refactor under green.** Merge overlapping rules, delete what a newer principle covers, re-run. Track prompt size like bundle size: pass rate holds while the prompt trends down.
+6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
+
+Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/owasp-red-team/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Red team my agent against the OWASP Top 10"} data-track-skill={"langwatch/skills/recipes/owasp-red-team"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
     <span className="lw-accordion-title">Test my CLI is well usable by AI agents</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -91188,7 +91686,7 @@ A chart that should follow the dashboard's period selector declares the reserved
 SELECT
   toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
@@ -91340,10 +91838,10 @@ Never guess dataset or column names. The schema command lists every view your cr
 ```bash
 langwatch dashboard widget schema -f json > schema.json
 jq -r '.views[] | "\(.name) (\(.timeColumn)): \(.description)"' schema.json
-jq '.views[] | select(.name | endswith(".trace_metrics"))' schema.json
+jq '.views[] | select(.name == "trace_metrics")' schema.json
 ```
 
-Read the view's grain, its time column, and which columns are `available` to you. A view's full name carries the database this deployment serves it from (`langwatch.trace_metrics` on LangWatch Cloud, `analytics.trace_metrics` on some self-hosted installs): write the name exactly as `schema.json` gives it. The examples below use the Cloud spelling. The views most questions need:
+Read the view's grain, its time column, and which columns are `available` to you. Write a view by its bare name, as `schema.json` gives it (`trace_metrics`, never `langwatch.trace_metrics`), so one query runs on LangWatch Cloud and on every self-hosted install. The views most questions need:
 
 - `trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
 - `evaluation_metrics` and `trace_evaluation_metrics`: evaluation and online evaluation outcomes.
@@ -91368,7 +91866,7 @@ Every query reads the dashboard's own period: bound the view's time column with 
 [
   {
     "name": "cost_by_model",
-    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM langwatch.model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "sql": "SELECT Model AS model, sum(CostSum) AS cost FROM model_usage_by_minute WHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime} GROUP BY model ORDER BY cost DESC LIMIT 10",
     "parameters": []
   }
 ]
@@ -91528,7 +92026,7 @@ export default function Widget() {
 [
   {
     "name": "daily_traces",
-    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM langwatch.trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
+    "sql": "SELECT toStartOfDay(OccurredAt) AS day, uniqExact(TraceId) AS traces FROM trace_metrics WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} AND Source IN {dashboard_context_sources:Array(String)} GROUP BY day ORDER BY day",
     "parameters": []
   }
 ]

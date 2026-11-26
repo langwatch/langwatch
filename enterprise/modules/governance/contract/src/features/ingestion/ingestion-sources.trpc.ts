@@ -72,6 +72,37 @@ export interface CreatedIngestionSourceSchema extends Named<
 export const createdIngestionSourceSchema: CreatedIngestionSourceSchema =
   createdIngestionSourceSchemaDefinition;
 
+/** A source's configuration tried against its provider before (or after) it is saved. */
+const testAgentListingInputSchemaDefinition = z.object({
+  ...organizationScope.shape,
+  sourceType: governanceIngestionSourceTypeSchema,
+  config: z.record(z.string(), z.unknown()),
+  credentials: z.record(z.string(), z.string()).optional(),
+});
+export interface TestAgentListingInputSchema extends Named<
+  typeof testAgentListingInputSchemaDefinition
+> {}
+export const testAgentListingInputSchema: TestAgentListingInputSchema =
+  testAgentListingInputSchemaDefinition;
+export type TestAgentListingInput = z.infer<typeof testAgentListingInputSchema>;
+
+/** What the provider answered, recorded nowhere. `reason` is a listing refusal code. */
+const testAgentListingResultSchemaDefinition = z.discriminatedUnion("outcome", [
+  z.object({ outcome: z.literal("listed"), agentCount: z.number().int().nonnegative() }),
+  z.object({ outcome: z.literal("empty") }),
+  z.object({
+    outcome: z.literal("refused"),
+    reason: z.string(),
+    status: z.number().int().nullable(),
+  }),
+]);
+export interface TestAgentListingResultSchema extends Named<
+  typeof testAgentListingResultSchemaDefinition
+> {}
+export const testAgentListingResultSchema: TestAgentListingResultSchema =
+  testAgentListingResultSchemaDefinition;
+export type TestAgentListingResult = z.infer<typeof testAgentListingResultSchema>;
+
 export const ingestionSourcesTrpc = defineTrpcContract("ingestionSources")
   .query("list")
   .withInput(organizationScope)
@@ -134,4 +165,12 @@ export const ingestionSourcesTrpc = defineTrpcContract("ingestionSources")
   .query("ottlStarter")
   .withInput(z.object({ ...organizationScope.shape, sourceType: z.string() }))
   .withOutput(ottlStarterTemplateSchema)
+
+  .mutation("testAgentListing")
+  .withInput(testAgentListingInputSchema)
+  .withOutput(testAgentListingResultSchema)
+
+  .mutation("testAgentListingForSource")
+  .withInput(z.object({ ...organizationScope.shape, sourceId: z.string().min(1) }))
+  .withOutput(testAgentListingResultSchema)
   .build();
