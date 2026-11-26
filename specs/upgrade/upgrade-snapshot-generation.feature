@@ -49,12 +49,6 @@ Feature: Generating a typical upgrade snapshot from an old release
     Then coverage.json maps each one to the seed that feeds it or says why the old release cannot hold it
 
   @unit
-  Scenario: go-ci runs the coverage test when a module declares a step
-    When I read go-ci's pull request paths and its upgradelab filter
-    Then each lists every module path the coverage test reads
-    And the upgradelab job runs the upgradelab tests when that filter matches
-
-  @unit
   Scenario: an unknown shape is refused
     When I plan shape "cloud" from release "3.20.1" at volume "S" with seed 1
     Then planning fails naming the four shapes

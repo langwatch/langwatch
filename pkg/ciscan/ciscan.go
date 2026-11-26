@@ -136,6 +136,8 @@ type Job struct {
 	Name  string    `yaml:"name"`
 	Needs yaml.Node `yaml:"needs"`
 	If    string    `yaml:"if"`
+	// Outputs maps each job output to its expression, read as literal text.
+	Outputs map[string]string `yaml:"outputs"`
 	// TimeoutMinutes is a number or an expression string; nil when unset.
 	TimeoutMinutes any               `yaml:"timeout-minutes"`
 	Permissions    Permissions       `yaml:"permissions"`
@@ -147,6 +149,7 @@ type Job struct {
 // it.
 type PullRequest struct {
 	Types []string `yaml:"types"`
+	Paths []string `yaml:"paths"`
 }
 
 // On models the workflow `on:` triggers the guards read. Only pull_request is

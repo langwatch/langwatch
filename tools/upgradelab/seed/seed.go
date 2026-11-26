@@ -64,6 +64,10 @@ func (env ShapeEnv) parse(text string) {
 	}
 }
 
+// StepDeclarationGlobs are the repo paths that declare migration steps, the ones coverage.json
+// must cover. ciguard's upgradelab-trigger guard holds go-ci's filters to this same list.
+var StepDeclarationGlobs = []string{"modules/*/process/src/*.module.ts", "enterprise/modules/*/process/src/*.module.ts"}
+
 // Coverage is coverage.json.
 type Coverage struct {
 	Steps            map[string]CoverageEntry `json:"steps"`
