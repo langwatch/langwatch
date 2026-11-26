@@ -74,3 +74,10 @@ Feature: Ops agent access from the CLI
     Then it lists the functions the server answers
     When the agent runs "langwatch ops call org.snapshot --input {}"
     Then the call carries the session's ops token and the input
+
+  @integration
+  Scenario: The call suggested after an approval validates as printed
+    Given an approved ops session naming only "org.ingestion_health", whose input requires "since"
+    When the CLI prints the command to call it
+    Then the printed input holds a "since" inside the function's range and passes its input schema
+    And a function that needs no input is suggested first when one is approved

@@ -74,12 +74,15 @@ export function canApprove({
   return typedName.trim() !== "" && typedName.trim() === (view.organizationName ?? "").trim();
 }
 
-/** "9:41" from milliseconds left; never negative. */
+/** "1 h 59 min", "9 min 41 s" or "41 s" from milliseconds left; never negative. */
 export function formatCountdown(msLeft: number): string {
   const totalSeconds = Math.max(0, Math.ceil(msLeft / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  if (hours > 0) return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  if (minutes > 0) return seconds > 0 ? `${minutes} min ${seconds} s` : `${minutes} min`;
+  return `${seconds} s`;
 }
 
 /** A session an operator can still end: undecided, approved, or picked up and not yet over. */

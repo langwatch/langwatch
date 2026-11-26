@@ -13,6 +13,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 
@@ -39,6 +40,18 @@ let searchAuth: string | null = null;
 let withdrawCalls = 0;
 let functionCall: { auth: string; url: string; body: unknown } | null = null;
 const OPS_TOKEN = "lwsa_opsread01_secret";
+/** Functions the next redeem approves on an ops token instead of a key; null redeems a key. */
+let redeemFunctions: string[] | null = null;
+const isoTime = z.iso.datetime({ offset: true });
+/** org.ingestion_health's input as the staff-access contract declares it. */
+const ingestionHealthInput = z
+  .object({
+    since: isoTime,
+    until: isoTime.optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+    cursor: z.string().min(1).max(500).optional(),
+  })
+  .strict();
 
 const sessionFile = () => path.join(stateDir, "ops-session.json");
 
@@ -131,6 +144,18 @@ const staffRoutes: Record<string, (body: string) => Reply> = {
     if (derived !== codeChallenge) {
       return { status: 400, payload: { error: { code: "invalid_code_verifier" } } };
     }
+    if (redeemFunctions) {
+      return {
+        status: 200,
+        payload: {
+          opsToken: OPS_TOKEN,
+          organizationId: "org_acme",
+          scopes: ["org:metadata"],
+          functions: redeemFunctions,
+          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        },
+      };
+    }
     return {
       status: 200,
       payload: {
@@ -158,8 +183,16 @@ const staffRoutes: Record<string, (body: string) => Reply> = {
           personal: false,
           inputSchema: { type: "object" },
         },
+        {
+          name: "org.ingestion_health",
+          title: "Traces per project over a range, last trace time, plan-limit refusals",
+          scope: "org",
+          answers: "Whether traces are arriving.",
+          personal: false,
+          inputSchema: z.toJSONSchema(ingestionHealthInput, { io: "input" }),
+        },
       ],
-      total: 1,
+      total: 2,
       truncated: false,
       nextCursor: null,
     },
@@ -235,6 +268,7 @@ beforeEach(() => {
   searchAuth = null;
   withdrawCalls = 0;
   functionCall = null;
+  redeemFunctions = null;
 });
 
 afterEach(() => {
@@ -438,5 +472,42 @@ describe("langwatch ops access", () => {
       body: { input: {} },
     });
     expect(JSON.parse(called.stdout)).toMatchObject({ name: "org.snapshot", rows: 1 });
+  }, 30_000);
+  /** @scenario "The call suggested after an approval validates as printed" */
+  it("prints a first call whose input the approved function accepts", async () => {
+    await run(["ops", "setup"], {}, { input: `${REQUESTER_KEY}\n` });
+    redeemFunctions = ["org.ingestion_health"];
+
+    const result = await run([
+      "ops",
+      "access",
+      "request",
+      "--scope",
+      "org:metadata",
+      "--org",
+      "acme",
+      "--function",
+      "org.ingestion_health",
+      "--reason",
+      "ACME reports missing traces since Monday",
+      "--wait",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const line = result.stdout.split("\n").find((text) => text.includes("langwatch ops call"));
+    const match = /langwatch ops call (\S+) --input '(.*)'/.exec(line ?? "");
+    expect(match?.[1]).toBe("org.ingestion_health");
+
+    const called = await run([
+      "ops",
+      "call",
+      match?.[1] ?? "",
+      "--input",
+      match?.[2] ?? "",
+      "-o",
+      "json",
+    ]);
+    expect(called.exitCode).toBe(0);
+    const sent = (functionCall?.body as { input: unknown } | undefined)?.input;
+    expect(ingestionHealthInput.safeParse(sent).success).toBe(true);
   }, 30_000);
 });
