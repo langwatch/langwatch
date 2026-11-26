@@ -86,6 +86,7 @@ export function snapshotWith({
   rules = [],
   canWriteOrganization = true,
   accepted = true,
+  organizationId = "org-1",
 }: {
   level?: PiiLevel;
   entities?: string[];
@@ -93,11 +94,13 @@ export function snapshotWith({
   canWriteOrganization?: boolean;
   /** An organization admin accepted the PII redaction model's price. */
   accepted?: boolean;
+  /** The organization the shown project belongs to. */
+  organizationId?: string;
 } = {}): DataPrivacySnapshot {
   return {
     projectId: "proj-1",
     available: {
-      organization: canWriteOrganization ? { id: "org-1", name: "Acme" } : null,
+      organization: canWriteOrganization ? { id: organizationId, name: "Acme" } : null,
       departments: [],
       teams: [{ id: "team-1", name: "Platform" }],
       projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],

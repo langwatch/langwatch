@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import { useInFlight } from "../../behavior/use-in-flight.ts";
 import type { AcceptPiiRedactionModel } from "../../behavior/use-pii-redaction-model-acceptance.ts";
 import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
 import {
@@ -93,6 +94,8 @@ export function OrganizationPiiLevelSection({
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
   const [picked, setPicked] = useOptimisticPick(snapshot.effectiveOrganization?.pii.level);
   const [asking, setAsking] = useState<Asking | null>(null);
+  // An acceptance and the save after it run as one step: a pick made meanwhile would be lost.
+  const confirming = useInFlight();
   const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
   if (!organizationId || !snapshot.effectiveOrganization) return null;
 
@@ -139,7 +142,7 @@ export function OrganizationPiiLevelSection({
         split={split}
         awaitingAcceptance={awaitsAcceptance(acceptance)}
         canWrite={snapshot.available.organization !== null}
-        isSaving={setForScope.isPending}
+        isSaving={setForScope.isPending || confirming.inFlight}
         onPick={(level) =>
           confirmationFor(level) ? setAsking({ kind: "level", level }) : void save(level)
         }
@@ -151,7 +154,10 @@ export function OrganizationPiiLevelSection({
         open={confirmation !== null}
         onClose={() => setAsking(null)}
         onConfirm={() => {
-          if (asking) void confirmChoice({ choice: asking, acceptance, accept, save, host });
+          const choice = asking;
+          if (choice) {
+            void confirming.run(() => confirmChoice({ choice, acceptance, accept, save, host }));
+          }
           setAsking(null);
         }}
         title={confirmation?.title ?? ""}

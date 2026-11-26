@@ -25,6 +25,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import { useInFlight } from "../../behavior/use-in-flight.ts";
 import {
   type AcceptPiiRedactionModel,
   usePiiRedactionModelAcceptance,
@@ -109,6 +110,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   const invalidate = () => utils.dataPrivacy.getSnapshot.invalidate({ projectId });
   const acceptance = usePiiRedactionModelAcceptance({
     snapshot: snapshotQuery.data,
+    organizationId: available?.organization?.id ?? host.scope().organizationId ?? null,
     host,
     onAccepted: () => void invalidate(),
   });
@@ -336,6 +338,8 @@ function PrivacyRuleDrawerMount({
     if (asks) setPending({ scopes, config });
     else void save(scopes, config);
   };
+  // The drawer stays busy from the acceptance to the end of the save it leads to.
+  const accepting = useInFlight();
   const acceptThenSave = async (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
     const organization = available.organization;
     const asksAcceptance = acceptance === "can-accept" && organization !== null;
@@ -349,7 +353,7 @@ function PrivacyRuleDrawerMount({
         open={confirmation !== null}
         onClose={() => setPending(null)}
         onConfirm={() => {
-          if (pending) void acceptThenSave(pending.scopes, pending.config);
+          if (pending) void accepting.run(() => acceptThenSave(pending.scopes, pending.config));
           setPending(null);
         }}
         title={confirmation?.title ?? ""}
@@ -366,7 +370,7 @@ function PrivacyRuleDrawerMount({
         effectiveTeam={snapshot.effectiveTeam}
         effectiveOrganization={snapshot.effectiveOrganization}
         projectId={projectId}
-        isSaving={setForScope.isPending}
+        isSaving={setForScope.isPending || accepting.inFlight}
         piiRedactionModelOffer={piiRedactionModelOffer}
         piiRedactionModelAwaitsAcceptance={awaitsAcceptance(acceptance)}
         scopePicker={({ value, onChange }) => (

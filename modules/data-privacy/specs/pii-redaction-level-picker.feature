@@ -284,6 +284,28 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When an admin sets a project rule's PII redaction to Strict in the drawer, saves and confirms the price
     Then the acceptance is recorded and the rule is saved
 
+  @integration
+  Scenario: The picker waits while an acceptance is on its way
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And no organization admin accepted the model's price
+    When an admin confirms the price, by picking Strict or by the switch, and the acceptance has not come back
+    Then the level radios and the switch cannot be used
+    And they can again once the acceptance and the save it leads to are done
+
+  @integration
+  Scenario: The rule drawer waits while an acceptance is on its way
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And no organization admin accepted the model's price
+    When an admin saves a rule at Strict, confirms the price, and the acceptance has not come back
+    Then the drawer saves nothing else until the acceptance and the Strict save are done
+    And a failed acceptance frees the drawer again
+
+  @integration
+  Scenario: An acceptance given on the page holds only for its own organization
+    Given an organization admin accepted the model's price on the page for "acme"
+    When the page shows a project of another organization whose price no admin accepted
+    Then Strict there is still rule-based, with the switch to the model
+
   @unit
   Scenario: Only an organization admin can accept the price
     Then accepting the PII redaction model's price is declared at organization:manage on the organization it names

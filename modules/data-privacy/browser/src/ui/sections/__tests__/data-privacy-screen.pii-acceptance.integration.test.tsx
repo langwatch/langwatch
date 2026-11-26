@@ -48,6 +48,25 @@ const legacyStrict = (options: { canWriteOrganization?: boolean } = {}) =>
 const switchButton = () =>
   screen.getByRole("button", { name: "Switch to the PII Redaction Model" });
 
+/** An acceptance still on its way, settled by the test. */
+function acceptanceOnItsWay() {
+  const settle = { resolve: () => {}, reject: (_error: Error) => {} };
+  const promise = new Promise<undefined>((resolve, reject) => {
+    settle.resolve = () => resolve(undefined);
+    settle.reject = reject;
+  });
+  api.acceptPiiRedactionModel.mockImplementationOnce(() => promise);
+  return settle;
+}
+
+/** Sets the open rule drawer's PII redaction to a level and presses Save. */
+async function saveDrawerAt(level: RegExp) {
+  const user = userEvent.setup();
+  await user.click(await screen.findByLabelText("PII redaction"));
+  await user.click(await screen.findByRole("option", { name: level }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+}
+
 describe("given a Cloud organization on the model flag whose price no admin accepted", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -141,6 +160,104 @@ describe("given a Cloud organization on the model flag whose price no admin acce
       expect(host.failures[0]?.error).toBe(boom);
       expect(api.setForScope).not.toHaveBeenCalled();
       expect(pickedLevel()).toBe("Essential");
+    });
+  });
+
+  describe("when an admin confirms the price and the acceptance is still on its way", () => {
+    /** @scenario The picker waits while an acceptance is on its way */
+    it("keeps the levels still until the acceptance and the Strict save are done", async () => {
+      const acceptance = acceptanceOnItsWay();
+      page({ flagOn: true });
+
+      await userEvent.setup().click(levelRadio("Strict"));
+      await confirmStrict();
+      await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
+
+      expect(levelRadio("Essential")).toBeDisabled();
+      acceptance.resolve();
+      await waitFor(() => expect(api.setForScope).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(levelRadio("Essential")).toBeEnabled());
+    });
+
+    /** @scenario The picker waits while an acceptance is on its way */
+    it("keeps the switch and the levels still until the acceptance is done", async () => {
+      const acceptance = acceptanceOnItsWay();
+      api.snapshot = legacyStrict();
+      page({ flagOn: true });
+
+      await userEvent.setup().click(switchButton());
+      await confirmStrict();
+      await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
+
+      expect(switchButton()).toBeDisabled();
+      expect(levelRadio("Essential")).toBeDisabled();
+      acceptance.resolve();
+      expect(await screen.findByText(BILLED)).toBeInTheDocument();
+      expect(levelRadio("Essential")).toBeEnabled();
+    });
+
+    /** @scenario The rule drawer waits while an acceptance is on its way */
+    it("saves nothing else in the drawer until the acceptance and the Strict save are done", async () => {
+      const acceptance = acceptanceOnItsWay();
+      api.snapshot = snapshotWith({
+        rules: [projectRuleWith({ pii: { level: "essential" } })],
+        accepted: false,
+      });
+      page({ flagOn: true, query: { rule: "PROJECT:proj-1:false" } });
+
+      await saveDrawerAt(/^Strict/);
+      await confirmStrict();
+      await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
+      await saveDrawerAt(/^Off/);
+
+      expect(api.setForScope).not.toHaveBeenCalled();
+      acceptance.resolve();
+      await waitFor(() => expect(api.setForScope).toHaveBeenCalledTimes(1));
+      expect(api.setForScope).toHaveBeenCalledWith(
+        expect.objectContaining({ config: { pii: { level: "strict" } } }),
+      );
+    });
+
+    /** @scenario The rule drawer waits while an acceptance is on its way */
+    it("frees the drawer again once the acceptance fails", async () => {
+      const acceptance = acceptanceOnItsWay();
+      api.snapshot = snapshotWith({
+        rules: [projectRuleWith({ pii: { level: "essential" } })],
+        accepted: false,
+      });
+      const { host } = page({ flagOn: true, query: { rule: "PROJECT:proj-1:false" } });
+
+      await saveDrawerAt(/^Strict/);
+      await confirmStrict();
+      await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
+      acceptance.reject(new Error("nope"));
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+      await saveDrawerAt(/^Off/);
+
+      await waitFor(() =>
+        expect(api.setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({ config: { pii: { level: "disabled" } } }),
+        ),
+      );
+      expect(api.setForScope).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the page moves to a project of another organization", () => {
+    /** @scenario An acceptance given on the page holds only for its own organization */
+    it("shows Strict there as rule-based again, with the switch", async () => {
+      api.snapshot = legacyStrict();
+      const { rerender } = page({ flagOn: true });
+
+      await userEvent.setup().click(switchButton());
+      await confirmStrict();
+      expect(await screen.findByText(BILLED)).toBeInTheDocument();
+
+      api.snapshot = snapshotWith({ level: "strict", accepted: false, organizationId: "org-2" });
+      rerender();
+
+      expect(await screen.findByText("Organization on Strict (rule-based)")).toBeInTheDocument();
+      expect(switchButton()).toBeInTheDocument();
     });
   });
 
