@@ -91,6 +91,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     When an admin opens the information beside Strict's price
     Then it says a span goes to the rule-based detector (Presidio) when the model is unavailable or the span's text is over 32,000 characters in total
     And it says a span over 8,000 characters is sent to the model in several parts and billed once on its own characters, the overlap between parts free
+    And where Strict is included it says only that such a span is sent in several parts, naming no billing
 
   @unit
   Scenario: The price is derived from the rate billing charges

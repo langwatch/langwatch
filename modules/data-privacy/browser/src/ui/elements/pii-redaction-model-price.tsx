@@ -39,7 +39,7 @@ export function PiiRedactionModelPrice({
         content={
           <VStack align="start" gap={1.5}>
             <Text>{free ? strictFreeNote({ licensed }) : STRICT_BILLING_NOTE}</Text>
-            <Text>{strictFallbackNote({ split })}</Text>
+            <Text>{strictFallbackNote({ split, free })}</Text>
           </VStack>
         }
       >

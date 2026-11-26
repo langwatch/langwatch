@@ -145,6 +145,15 @@ describe("given the deployment and the PII redaction model flags", () => {
         mayManageLicence: true,
       });
       expect(cloud).toEqual({ kind: "model", free: false, split: true });
+      const selfHosted = piiRedactionModelOfferOf({
+        isSaaS: false,
+        modelFlag: true,
+        freeFlag: false,
+        splitFlag: true,
+        licence: "enterprise",
+        mayManageLicence: true,
+      });
+      expect(selfHosted).toMatchObject({ kind: "model", split: false });
     });
   });
 });
@@ -295,6 +304,15 @@ describe("given the fallback note", () => {
     );
     expect(note).toContain("billed once on its own characters");
     expect(note).toContain("the overlap between parts is free");
+  });
+
+  /** @scenario With long-span splitting on, the small print names the split limit and how a split span is billed */
+  it("names no billing for a split span where Strict is included", () => {
+    const note = strictFallbackNote({ split: true, free: true });
+    expect(note).toContain(
+      `A span over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters is sent to the model in several parts.`,
+    );
+    expect(note).not.toContain("billed");
   });
 });
 

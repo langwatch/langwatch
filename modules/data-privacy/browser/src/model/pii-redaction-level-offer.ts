@@ -58,16 +58,21 @@ export function includedFor({ licensed }: { licensed: boolean }): string {
 export function strictFreeNote({ licensed }: { licensed: boolean }): string {
   return licensed ? STRICT_LICENSED_NOTE : STRICT_FREE_NOTE;
 }
-const STRICT_SPLIT_NOTE =
-  "A span over 8,000 characters is sent to the model in several parts and billed once on its own characters; the overlap between parts is free.";
+const STRICT_SPLIT_NOTE = `A span over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters is sent to the model in several parts`;
 
-/** When a span falls back, by the limit the process routes by: the split one where it splits. */
-export function strictFallbackNote({ split }: { split: boolean }): string {
+/**
+ * When a span falls back, by the limit the process routes by: the split one where it splits, and
+ * how a split span is billed unless Strict is included.
+ */
+export function strictFallbackNote({ split, free = false }: { split: boolean; free?: boolean }) {
   const limit = split
     ? PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS
     : PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS;
   const note = `If the model is unavailable or a span's text is over ${limit.toLocaleString("en-US")} characters in total, that span is redacted by our rule-based detector (Presidio) instead. If that detector fails, the text can be sent to Google Cloud DLP.`;
-  return split ? `${note} ${STRICT_SPLIT_NOTE}` : note;
+  if (!split) return note;
+  return free
+    ? `${note} ${STRICT_SPLIT_NOTE}.`
+    : `${note} ${STRICT_SPLIT_NOTE} and billed once on its own characters; the overlap between parts is free.`;
 }
 const STRICT_RULE_BASED = "Strict here uses the rule-based detector.";
 

@@ -124,7 +124,7 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     const line = `{"log":"${"step\\n".repeat(600)}","payee":"NL91ABNA0417164300"}`;
     const text = [line, line, line].join("\n");
     const unescaped = text.replaceAll("\\n", " n");
-    const { clear, presidio, presidioCalls, splitModel, usage, fallbacks } = setup({
+    const { clear, presidio, presidioCalls, splitModel, usage, fallbacks, priced } = setup({
       planted: [{ value: "NL91ABNA0417164300", entity: "IBAN_CODE", score: 0.9 }],
     });
     expect(await clear([unescaped])).toEqual([
@@ -144,6 +144,7 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
       durationMs: 0,
       calls: planSpanCalls([text]).length,
     });
+    expect(priced).toHaveLength(1); // the unescaped run only
   });
 
   /** @scenario "A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio" */
@@ -155,7 +156,7 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     ]);
     const honest = setup({ planted });
     expect(await honest.clear([text])).toEqual([expected]);
-    const { clear, presidio, fallbacks, usage, splitModel } = setup({
+    const { clear, presidio, fallbacks, usage, splitModel, priced } = setup({
       planted,
       turns: Array<FakeTurn>(8).fill("lie"),
     });
@@ -165,8 +166,13 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     expect(splitModel.calls).toHaveLength(planSpanCalls([text]).length);
     expect(fallbacks).toEqual(["unplaceable"]);
     expect(usage).toEqual([
-      expect.objectContaining({ outcome: "unplaceable", calls: planSpanCalls([text]).length }),
+      expect.objectContaining({
+        outcome: "unplaceable",
+        calls: planSpanCalls([text]).length,
+        durationMs: expect.any(Number),
+      }),
     ]);
+    expect(priced).toEqual([]);
   });
 
   /** @scenario "A whole text in a split call keeps the model's own masked text" */
@@ -320,7 +326,7 @@ describe("PiiRedactionModelService, pricing a split span (ADR-201 rev, ADR-207)"
     await clearing;
 
     const made = durations.slice(0, splitModel.calls.length);
-    expect(priced).toHaveLength(1);
+    expect(priced).toHaveLength(1); // the unescaped run only
     expect(priced[0]).toMatchObject({ characters: 20_000, priceNanoUsd: 20_000 * 500 });
     expect(priced[0]?.costNanoUsd).toBe(
       made.reduce((total, durationMs) => total + piiRedactionCostNanoUsd({ durationMs }), 0),
@@ -340,7 +346,7 @@ describe("PiiRedactionModelService, pricing a split span (ADR-201 rev, ADR-207)"
     await vi.advanceTimersByTimeAsync(10_000);
     await clearing;
 
-    expect(priced).toHaveLength(1);
+    expect(priced).toHaveLength(1); // the unescaped run only
     expect(priced[0]?.costNanoUsd).toBe(3 * piiRedactionCostNanoUsd({ durationMs: 3_000 }));
   });
 
@@ -381,7 +387,7 @@ describe("PiiRedactionModelService, pricing a split span (ADR-201 rev, ADR-207)"
 
     expect(await clear([filler(40_000)])).toEqual([PRESIDIO_MASK]);
 
-    expect(priced).toHaveLength(1);
+    expect(priced).toHaveLength(1); // the unescaped run only
     expect(priced[0]?.characters).toBe(32_000);
     expect(splitModel.calls).toHaveLength(splitCalls);
     expect(single.calls).toHaveLength(0);

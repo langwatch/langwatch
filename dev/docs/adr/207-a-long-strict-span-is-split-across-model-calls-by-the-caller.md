@@ -5,7 +5,7 @@
 **Status:** Accepted (v3: one endpoint, call context)
 
 > One line: a Strict span batch of **8,001 to 32,000 characters** is cut by data-privacy into
-> **pieces of about 4,000** that the model answers in **parallel calls, **2 at a time per
+> **pieces of about 4,000** that the model answers in **parallel calls, 2 at a time per
 > process**; findings are placed back **only on pieces the model cannot have reshaped**, merged
 > by widest union (the model's own name rule across pieces follows, decision 7), and the span
 > is **billed once**;
