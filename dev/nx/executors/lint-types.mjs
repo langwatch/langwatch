@@ -16,6 +16,8 @@ function lint({ workspaceRoot, roots }) {
   });
   let out = "";
   let err = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
   child.stdout.on("data", (chunk) => (out += chunk));
   child.stderr.on("data", (chunk) => (err += chunk));
 

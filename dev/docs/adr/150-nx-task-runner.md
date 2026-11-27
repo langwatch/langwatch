@@ -521,6 +521,10 @@ still walks its references, but `^typecheck` has built them, so the walk only re
 their build info. `pnpm typecheck` is `nx run-many -t typecheck`; `pnpm typecheck:src`
 stays the root build without test programs, cached on the tree.
 
+Until 2026-12-28 the nightly workflow's `uncached-checks` job runs the full typecheck and
+type-aware lint on the default branch with no Nx cache; a failure there that the cached run
+did not have is a key missing an input. From that date it skips and warns it can be deleted.
+
 `lint:types` is cached per project on `default`, `^production` and `lintGlobals` (the
 plugin rules read dependency sources and the globals; the globals include `dev/nx/lint.mjs`
 and the executor). One process per project was

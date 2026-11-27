@@ -79,6 +79,12 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     And an oxlint process that could not run fails every project in the run
     And the plain lint does not wait for typecheck
 
+  Scenario: A nightly run checks the cache keys against an uncached run for a month
+    Given the nightly workflow on the default branch
+    Then it runs every typecheck and type-aware lint with no local or remote Nx cache
+    And it never runs on a pull request or a branch dispatch
+    And from 2026-12-28 it skips with a warning that it can be deleted
+
   Scenario: Build info written outside dist is a typecheck output
     Given a TypeScript config whose build info lives outside its dist directory
     Then the typecheck target declares that build info file as an output

@@ -107,6 +107,25 @@ void describe("per-project typecheck", () => {
   });
 });
 
+void describe("nightly uncached checks", () => {
+  const nightly = readFileSync(join(workspaceRoot, ".github/workflows/nightly.yml"), "utf8");
+  const job = nightly.slice(
+    nightly.indexOf("\n  uncached-checks:"),
+    nightly.indexOf("\n  dashboard:"),
+  );
+
+  /** @scenario "A nightly run checks the cache keys against an uncached run for a month" */
+  void it("runs typecheck and type-aware lint uncached, on the default branch, until its end date", () => {
+    assert.match(job, /NX_SKIP_NX_CACHE: "true"/);
+    assert.doesNotMatch(job, /uses: .*nx-remote-cache/);
+    assert.match(job, /pnpm typecheck --skip-nx-cache/);
+    assert.match(job, /pnpm lint:types/);
+    assert.match(job, /github\.ref_name == github\.event\.repository\.default_branch/);
+    assert.match(job, /UNCACHED_CHECKS_END: "2026-12-28"/);
+    assert.match(job, /::warning::/);
+  });
+});
+
 void describe("type-aware lint", () => {
   const nx = JSON.parse(readFileSync(join(workspaceRoot, "nx.json"), "utf8"));
 
