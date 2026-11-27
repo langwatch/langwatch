@@ -2,6 +2,7 @@ import {
   formatLangWatchQLDateTimeParameter,
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
+  LangWatchQLNotPermittedError,
   type LangWatchQLProtections,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
@@ -11,8 +12,13 @@ import {
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
+import {
+  findNamedSetOperands,
+  IN_TABLE_OPERAND_MESSAGE,
+} from "./langwatch-ql-set-operand.rules.ts";
 import { assertSafeIdentifier, clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
+import { DEFAULT_VIOLATION_HINTS } from "./langwatch-ql-violations.rules.ts";
 
 /**
  * The strictest protections across a readable project set: a content category or a catalogue
@@ -78,11 +84,11 @@ function collectNodes(value: unknown, type: string, found: SqlAstNode[]): SqlAst
   return found;
 }
 
-/** Every `WITH` name a parsed statement declares, in any subquery, lower-cased. */
+/** Every `WITH` name a parsed statement declares, in any subquery, exactly as written. */
 function findWithNames(statements: readonly SqlAstNode[]): ReadonlySet<string> {
   return new Set(
     collectNodes(statements, "WithElement", []).flatMap(({ name }) =>
-      typeof name === "string" ? [name.trim().toLowerCase()] : [],
+      typeof name === "string" ? [name] : [],
     ),
   );
 }
@@ -103,10 +109,29 @@ function assertNoShadowedView({
   windows: ReadonlyMap<string, string> | undefined;
 }): void {
   if (windows === undefined) return;
-  const shadowed = views
-    .map((view) => view.name.toLowerCase())
-    .filter((name) => withNames.has(name));
+  // Case-folded, unlike the reference match: a refusal here can only over-refuse.
+  const folded = new Set([...withNames].map((name) => name.trim().toLowerCase()));
+  const shadowed = views.map((view) => view.name.toLowerCase()).filter((name) => folded.has(name));
   if (shadowed.length > 0) throw new LangWatchQLShadowedViewError({ names: shadowed });
+}
+
+/**
+ * Refuses a membership test whose set holds a plain name, as the validator does before a
+ * statement gets here: a second check on the same shape, refused the same way.
+ * @throws {LangWatchQLNotPermittedError} with one `IN_TABLE_OPERAND` violation.
+ */
+function assertNoNamedSetOperands(statements: readonly SqlAstNode[]): void {
+  const functions = collectNodes(statements, "Function", []);
+  const holdsNamedSet = functions.some((node) => findNamedSetOperands(node).length > 0);
+  if (!holdsNamedSet) return;
+  throw new LangWatchQLNotPermittedError([
+    {
+      code: "IN_TABLE_OPERAND",
+      clause: "statement",
+      message: IN_TABLE_OPERAND_MESSAGE,
+      hint: DEFAULT_VIOLATION_HINTS.IN_TABLE_OPERAND,
+    },
+  ]);
 }
 
 /** The view references in a parsed statement, last first, each once; `WITH` names are not views. */
@@ -129,8 +154,8 @@ function findViewReferences({
     if (typeof name !== "string" || typeof start?.offset !== "number") continue;
     if (typeof end?.offset !== "number") continue;
     const qualifier = typeof written === "string" ? written : undefined;
-    const bareName = name.trim().toLowerCase();
-    if (!qualifier && withNames.has(bareName)) continue;
+    // Letter for letter, as the validator matches it: a case variant is a view, and narrowed.
+    if (!qualifier && withNames.has(name)) continue;
     byStart.set(start.offset, {
       qualified: qualifyTableName({ table: name, database: qualifier, defaultDatabase: database }),
       ...(typeof alias === "string" ? {} : { impliedAlias: name }),
@@ -206,14 +231,35 @@ export function assertNoUnsupportedTableModifiers({
 }): void {
   if (!/\b(final|sample)\b/i.test(sql)) return;
   const parsed = clickHouseSqlParser.parse(sql);
-  if (!parsed.ok) return;
+  if (parsed.ok)
+    assertNoUnsupportedTableModifiersInStatements({
+      statements: parsed.statements,
+      views,
+      database,
+    });
+}
+
+/**
+ * {@link assertNoUnsupportedTableModifiers} over statements already parsed: refuses `FINAL` or
+ * `SAMPLE` on a subquery or a PostgreSQL-resident view in any statement.
+ * @throws {LangWatchQLTableModifierError} naming the modifiers written.
+ */
+function assertNoUnsupportedTableModifiersInStatements({
+  statements,
+  views,
+  database,
+}: {
+  statements: readonly SqlAstNode[];
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): void {
   const references = findViewReferences({
-    statements: parsed.statements,
+    statements,
     database,
-    withNames: findWithNames(parsed.statements),
+    withNames: findWithNames(statements),
   });
   assertNoTableModifiers({
-    statements: parsed.statements,
+    statements,
     references: postgresReferences({ references, views, database }),
   });
 }
@@ -387,6 +433,9 @@ function datedPicks({
   );
 }
 
+/** A plain statement without one of these words has no set test or table modifier to check. */
+const PLAIN_CHECK_WORDS = /\b(in|notin|globalin|globalnotin|final|sample)\b/i;
+
 /**
  * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
  * a view outside `views` reading nothing (ADR-177 v4.14). It adds no origin condition: a statement
@@ -428,28 +477,63 @@ export function scopeLangWatchQL({
     memberWindows !== undefined &&
     (memberWindows.some((window) => window.from > 0) ||
       !windowsCoverProjects({ memberWindows, projectIds }));
-  if (!isWindowed) {
-    assertNoUnsupportedTableModifiers({ sql, views, database });
-    return sql;
+  if (!isWindowed || memberWindows === undefined) {
+    return checkPlainStatement({ sql, views, database });
   }
+  return scopeWindowedStatement({ sql, database, views, timeWindow, memberWindows });
+}
 
+/**
+ * `sql` unchanged once its set tests and table modifiers pass, from one parse. A statement that
+ * does not parse is left for the validator to refuse.
+ * @throws {LangWatchQLNotPermittedError} on a set test holding a plain name.
+ * @throws {LangWatchQLTableModifierError} on a modifier the statement cannot carry.
+ */
+function checkPlainStatement({
+  sql,
+  views,
+  database,
+}: {
+  sql: string;
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): string {
+  if (!PLAIN_CHECK_WORDS.test(sql)) return sql;
+  const parsed = clickHouseSqlParser.parse(sql);
+  if (!parsed.ok) return sql;
+  assertNoNamedSetOperands(parsed.statements);
+  assertNoUnsupportedTableModifiersInStatements({ statements: parsed.statements, views, database });
+  return sql;
+}
+
+/** `sql` with each view it reads replaced by that view kept to the members inside their windows. */
+function scopeWindowedStatement({
+  sql,
+  database,
+  views,
+  timeWindow,
+  memberWindows,
+}: {
+  sql: string;
+  database: string;
+  views: readonly LangWatchQLViewDefinition[];
+  timeWindow: LangWatchQLTimeWindow | undefined;
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): string {
   const parsed = clickHouseSqlParser.parse(sql);
   if (!parsed.ok) {
     throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
+  assertNoNamedSetOperands(parsed.statements);
 
-  const windows =
-    isWindowed && memberWindows
-      ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
-      : undefined;
+  const windows = buildWindowPredicates({ views, database, memberWindows, timeWindow });
   const withNames = findWithNames(parsed.statements);
   assertNoShadowedView({ withNames, views, windows });
   const references = findViewReferences({ statements: parsed.statements, database, withNames });
-  const rewrites = references.flatMap((reference) => {
-    const window =
-      windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    return window === undefined ? [] : [{ reference, predicate: window }];
-  });
+  const rewrites = references.map((reference) => ({
+    reference,
+    predicate: windows.get(reference.qualified) ?? NO_ROWS,
+  }));
   assertNoTableModifiers({
     statements: parsed.statements,
     references: [

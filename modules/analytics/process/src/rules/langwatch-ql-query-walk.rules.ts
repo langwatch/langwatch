@@ -29,8 +29,12 @@ import {
   isLangWatchQLAggregateFunction,
   LWQL_ALLOWED_FUNCTION_NAMES,
 } from "../features/app-functions/rules/langwatch-ql-functions.rules.ts";
-import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
+import { isNode, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
+import {
+  findNamedSetOperands,
+  IN_TABLE_OPERAND_MESSAGE,
+} from "./langwatch-ql-set-operand.rules.ts";
 import {
   type BlockAccumulator,
   type FieldArgs,
@@ -63,15 +67,6 @@ function addOnce(names: string[], name: string): void {
 // Small readers — every one of them treats a surprising shape as a refusal
 // rather than a crash, because the input is a tree built from hostile text.
 // ---------------------------------------------------------------------------
-
-function isNode(value: unknown): value is SqlAstNode {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { type?: unknown }).type === "string"
-  );
-}
 
 export function extractPosition(node: SqlAstNode): SqlSourcePosition | undefined {
   const start = (node as { location?: { start?: unknown } }).location?.start;
@@ -1029,7 +1024,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   const ctes = [...frame.ctes];
   for (const item of node.with) {
     if (isNode(item) && item.type === "WithElement" && typeof item.name === "string") {
-      addOnce(ctes, item.name.trim().toLowerCase());
+      addOnce(ctes, item.name);
     }
   }
   return { ...here, ctes };
@@ -1104,8 +1099,9 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   }
 
   // A `WITH` name resolves to its own subquery, which is validated on its own
-  // terms; it is not a table reference and never was.
-  const isCteName = frame.ctes.includes(reference.name.trim().toLowerCase());
+  // terms. Matched letter for letter: a name that differs only in case is a
+  // table reference, and is checked as one.
+  const isCteName = frame.ctes.includes(reference.name);
   if (database === undefined && isCteName) {
     return frame;
   }
@@ -1235,6 +1231,23 @@ function enterTableJoin({ node, frame }: NodeArgs): Frame {
 }
 
 /**
+ * Refuses a set written as a name, in operator and function form alike, or wrapped in a function.
+ * Written as a subquery, the set goes through the same checks as any other read; a `WITH` name
+ * gets no exemption: it is written `x IN (SELECT * FROM name)`.
+ */
+function refuseNamedSetOperands({ node, frame, ctx }: NodeArgs): void {
+  for (const operand of findNamedSetOperands(node)) {
+    report({
+      ctx,
+      frame,
+      code: "IN_TABLE_OPERAND",
+      message: IN_TABLE_OPERAND_MESSAGE,
+      node: isNode(operand) ? operand : node,
+    });
+  }
+}
+
+/**
  * Applies the function allowlist, and notes an aggregate for the block. Reports and keeps
  * descending rather than cutting the subtree off, so that a caller who used a refused function
  * *and* a restricted field hears about both in one round trip.
@@ -1260,6 +1273,7 @@ function visitFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     reportRefusedFunction({ name, node, frame, ctx });
     return childFrame;
   }
+  refuseNamedSetOperands({ node, frame, ctx });
   const collapsesRows = isLangWatchQLAggregateFunction(name) && !isWindowCall(node);
   if (childFrame.block && collapsesRows) {
     childFrame.block.isAggregated = true;

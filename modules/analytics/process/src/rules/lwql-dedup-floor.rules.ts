@@ -98,6 +98,7 @@ type StatementFacts = {
   readonly sql: string;
   readonly database: string;
   readonly floorable: ReadonlyMap<string, FloorableView>;
+  /** Exactly as written: ClickHouse matches a `WITH` name in its exact letter case. */
   readonly withNames: ReadonlySet<string>;
   readonly aliases: ReadonlySet<string>;
 };
@@ -234,7 +235,7 @@ function replacementsFor({
     defaultDatabase: facts.database,
   });
   const view = facts.floorable.get(qualified);
-  if (!view || (written === undefined && facts.withNames.has(table.name.toLowerCase()))) return [];
+  if (!view || (written === undefined && facts.withNames.has(table.name))) return [];
   // A database-qualified name without an alias can be referenced as `db.view.column`,
   // which no alias of the floored call would still answer to.
   if (written !== undefined && alias === undefined) return [];
@@ -317,7 +318,7 @@ export function floorLangWatchQLDedup({
     ),
     withNames: new Set(
       collectNodes(statements, (node) => node.type === "WithElement").flatMap(({ name }) =>
-        typeof name === "string" ? [name.trim().toLowerCase()] : [],
+        typeof name === "string" ? [name] : [],
       ),
     ),
     aliases: new Set(

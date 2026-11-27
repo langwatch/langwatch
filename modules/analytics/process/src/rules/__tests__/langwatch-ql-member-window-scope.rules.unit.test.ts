@@ -5,6 +5,7 @@
  */
 import {
   type LangWatchQLMemberWindow,
+  LangWatchQLNotPermittedError,
   LangWatchQLShadowedViewError,
   LangWatchQLTableModifierError,
 } from "@langwatch/analytics-contract";
@@ -44,6 +45,29 @@ if (!POSTGRES_VIEW) throw new Error("the catalogue has no un-narrowed PostgreSQL
 const B_FROM = `(TenantId = 'project_b' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${SHARED_FROM})))`;
 const MEMBERS = `(TenantId IN ('project_a') OR ${B_FROM})`;
 
+/** Sets written as a plain name, which the validator refuses first; the scope checks them again. */
+const NAMED_SETS: [string, string][] = [
+  ["a view name", "SELECT count() FROM spans WHERE TraceId IN traces"],
+  [
+    "a qualified name in function form",
+    "SELECT count() FROM spans WHERE in(TraceId, analytics.traces)",
+  ],
+  ["a name wrapped in a function", "SELECT count() FROM spans WHERE TraceId IN tuple(traces)"],
+  [
+    "a WITH subquery name",
+    "WITH t AS (SELECT TraceId FROM traces) SELECT count() FROM spans WHERE TraceId NOT IN t",
+  ],
+  [
+    "a name inside a subquery",
+    "SELECT count() FROM spans " +
+      "WHERE TraceId IN (SELECT TraceId FROM traces WHERE TraceId GLOBAL IN spans)",
+  ],
+  [
+    "an Identifier-typed query parameter",
+    "SELECT count() FROM spans WHERE TraceId IN {t:Identifier}",
+  ],
+];
+
 /** Scopes `sql`; the caller reads exactly the windows' projects unless `projectIds` says not. */
 function scope({
   sql,
@@ -75,8 +99,34 @@ function captureRefusal(run: () => unknown): unknown {
   throw new Error("expected the rewrite to refuse");
 }
 
+/** The refusal the validator gives a set written as a plain name, from the scope step. */
+function expectSetOperandRefusal(run: () => unknown): void {
+  const refusal = captureRefusal(run);
+
+  expect(refusal).toBeInstanceOf(LangWatchQLNotPermittedError);
+  expect((refusal as LangWatchQLNotPermittedError).message).toBe(
+    "The submitted SQL is not permitted by the LangWatchQL analytics policy.",
+  );
+  expect((refusal as LangWatchQLNotPermittedError).meta).toEqual({
+    violations: [
+      {
+        code: "IN_TABLE_OPERAND",
+        clause: "statement",
+        message:
+          "The set of an IN test cannot be a plain name. Write rows of a view as a subquery, x IN (SELECT ... FROM view); a list of values inline, x IN ('a', 'b'), or as a bound parameter, x IN {ids:Array(String)}; and a test of an array column as has(column, x).",
+        hint: "Write rows of a view as a subquery, x IN (SELECT ... FROM view); a list of values inline, x IN ('a', 'b'), or as a bound parameter, x IN {ids:Array(String)}; and a test of an array column as has(column, x).",
+      },
+    ],
+  });
+}
+
 describe("scopeLangWatchQL with member windows", () => {
   describe("given a member shared from a point in time", () => {
+    /** @scenario "A set membership test names its set with a subquery" */
+    it.each(NAMED_SETS)("refuses a set written as %s when scoping", (_case, sql) => {
+      expectSetOperandRefusal(() => scope({ sql, memberWindows: [WHOLE_A, DATED_B] }));
+    });
+
     /** @scenario "Every view the statement reads is narrowed to each member's window" */
     it("keeps whole-history members outright and the dated member from its start", () => {
       expect(scope({ sql: "SELECT count() FROM traces", memberWindows: [WHOLE_A, DATED_B] })).toBe(
@@ -243,6 +293,7 @@ describe("scopeLangWatchQL with member windows", () => {
     });
 
     /** @scenario "A WITH name spelt like a narrowed view is refused" */
+    /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
     it.each([
       [
         "declared in a subquery the outer view sits beside",
@@ -391,6 +442,18 @@ describe("scopeLangWatchQL with member windows", () => {
   });
 
   describe("given a plain project", () => {
+    /** @scenario "A set membership test names its set with a subquery" */
+    it.each(NAMED_SETS)("refuses a set written as %s when scoping", (_case, sql) => {
+      expectSetOperandRefusal(() => scope({ sql }));
+    });
+
+    /** @scenario "A set membership test names its set with a subquery" */
+    it("leaves a set written as a subquery as written", () => {
+      const sql = "SELECT count() FROM spans WHERE TraceId IN (SELECT TraceId FROM traces)";
+
+      expect(scope({ sql })).toBe(sql);
+    });
+
     /** @scenario "A plain project's statement is left as written" */
     it("runs the statement as written", () => {
       const sql = "SELECT count() FROM traces JOIN spans USING TraceId";
@@ -444,6 +507,16 @@ describe("scopeLangWatchQL with member windows", () => {
       const sql = `WITH ${POSTGRES_VIEW.name} AS (SELECT 1 AS n) SELECT n FROM ${POSTGRES_VIEW.name} FINAL`;
 
       expect(scope({ sql })).toBe(sql);
+    });
+
+    /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
+    it("refuses FINAL on a PostgreSQL-resident view beside a WITH name in another case", () => {
+      const withName = POSTGRES_VIEW.name.toUpperCase();
+      const sql = `WITH ${withName} AS (SELECT 1 AS n) SELECT n FROM ${POSTGRES_VIEW.name} FINAL`;
+      const refusal = captureRefusal(() => scope({ sql }));
+
+      expect(refusal).toBeInstanceOf(LangWatchQLTableModifierError);
+      expect((refusal as LangWatchQLTableModifierError).meta).toEqual({ modifiers: ["FINAL"] });
     });
 
     it("returns a statement that does not parse unchanged, for the validator to refuse", () => {

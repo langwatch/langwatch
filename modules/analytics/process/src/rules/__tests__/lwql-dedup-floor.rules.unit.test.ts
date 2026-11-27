@@ -113,6 +113,17 @@ describe("given a statement that reads evaluation_metrics", () => {
       );
     });
 
+    /** @scenario "A WITH name stands in for a view only when written in the same letter case" */
+    it("floors a read of the view beside a WITH name differing from it only in case", () => {
+      const read = `SELECT count() FROM evaluation_metrics WHERE OccurredAt >= ${START}`;
+
+      expect(send(`WITH EVALUATION_METRICS AS (SELECT 1 AS n) ${read}`)).toBe(
+        `WITH EVALUATION_METRICS AS (SELECT 1 AS n) SELECT count() FROM ` +
+          `evaluation_metrics__floor(lwql_floor = ${floorOf(START)}) AS evaluation_metrics ` +
+          `WHERE OccurredAt >= ${START}`,
+      );
+    });
+
     /** @scenario "A read bounded below on OccurredAt deduplicates only from that bound" */
     it("floors the evaluation reads of the attribution stock queries", () => {
       for (const [label, view] of [

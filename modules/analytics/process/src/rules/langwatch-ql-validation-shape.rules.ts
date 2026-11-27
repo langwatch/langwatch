@@ -171,7 +171,7 @@ export interface Frame {
   readonly isInSubquery: boolean;
   readonly subqueryDepth: number;
   readonly nodeDepth: number;
-  /** CTE names visible here, lowercased. Not checked against the table policy. */
+  /** CTE names visible here, exactly as written. Not checked against the table policy. */
   readonly ctes: readonly string[];
   /** The `SELECT` block this node sits in. Absent above the outermost one. */
   readonly block?: BlockAccumulator;
