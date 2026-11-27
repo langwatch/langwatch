@@ -1273,6 +1273,15 @@ jobs:
           export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $GITHUB_WORKSPACE/dev/nx/test-reads-hook.cjs"
           node --experimental-strip-types .github/scripts/run-package-suites.ts
 
+      # The worker's integration lane. package-suites.excluded skips the worker, and
+      # test-unit (worker) runs only its unit lane, so without this step nothing runs
+      # the worker's live Postgres/Redis/ClickHouse suites. Empty `projects` means
+      # main or an unnarrowed pull request (all suites run); otherwise only when the
+      # change reaches the worker.
+      - name: Run the worker integration suites
+        if: ${{ matrix.shard == 1 && (needs.affected.outputs.projects == '' || contains(needs.affected.outputs.projects, '"@langwatch/worker"')) }}
+        run: pnpm --filter @langwatch/worker run test:integration
+
       # The suites that walk the whole tree, uncached and on every change (ADR-150).
       - name: Run the repo-scanning suites
         if: ${{ matrix.shard == 1 }}

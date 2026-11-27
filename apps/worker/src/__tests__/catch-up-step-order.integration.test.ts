@@ -4,7 +4,11 @@
  * project-service, organization-service and annotation-service features (modules/<name>/specs)
  */
 import { migrationStepsOverMemory } from "@langwatch/process";
-import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
+import {
+  isDeclaredMigrationStep,
+  isMigrationStep,
+  type MigrationStep,
+} from "@langwatch/upgrade/step";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { processModules } from "../process-modules.generated.ts";
@@ -27,7 +31,7 @@ describe("given the worker's installed modules", () => {
   let steps: readonly MigrationStep[] = [];
 
   beforeAll(async () => {
-    steps = await migrationStepsOverMemory({
+    const declared = await migrationStepsOverMemory({
       name: "catch-up-step-order",
       modules: processModules,
       environment: {
@@ -35,8 +39,9 @@ describe("given the worker's installed modules", () => {
         BASE_HOST: "http://langwatch.invalid",
         API_KEY_PEPPER: "catch-up-step-order",
       },
-      isMigrationStep,
+      isMigrationStep: isDeclaredMigrationStep,
     });
+    steps = declared.filter(isMigrationStep);
   });
 
   describe("when they list their upgrade steps", () => {
