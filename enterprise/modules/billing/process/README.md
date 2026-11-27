@@ -94,10 +94,10 @@ notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
 
 #### `notifySalesOfSeatRequest`
 
-Tells sales that a person waits for a seat in an organization whose plan only sales can grow, on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws.
+Tells sales that a person waits for a seat in an organization whose plan only sales can grow, on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws: `sent` is false when it did not go out, so the caller can let a later ask retry it.
 
 ```typescript
-notifySalesOfSeatRequest(input: { organizationId: string; organizationName: string; plan: string; seats: number; requestedSeats: number; }): Promise<void>;
+notifySalesOfSeatRequest(input: { organizationId: string; organizationName: string; plan: string; seats: number; requestedSeats: number; }): Promise<{ sent: boolean }>;
 ```
 
 #### `getPricingModel`
