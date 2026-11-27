@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -60,12 +61,12 @@ function seeded(overrides: Partial<Dataset> = {}) {
 }
 
 describe("DatasetService", () => {
-  it("creates records through the Dataset boundary", async () => {
+  it("creates a dataset with its records in object storage", async () => {
     const { database, repository, records } = seeded();
     const service = DatasetService.create({
       repository,
       records,
-      generateId: () => "record_1",
+      content: createDatasetTestContent({ database }),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -78,8 +79,10 @@ describe("DatasetService", () => {
       datasetRecords: [{ question: "hello" }],
     });
 
-    expect(dataset.slug).toBe("new-set");
-    expect(database.records().map((record) => record.id)).toEqual(["record_1"]);
+    expect(dataset).toMatchObject({ slug: "new-set", contentLayout: "s3_jsonl", rowCount: 1 });
+    expect(database.records()).toEqual([]);
+    const page = await service.listRecords({ projectId: "project_1", slugOrId: dataset.id });
+    expect(page.data.map((record) => record.entry)).toEqual([{ question: "hello" }]);
   });
 
   it("rejects writes to a dataset that is not ready", async () => {
@@ -87,6 +90,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -107,6 +111,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -130,6 +135,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -276,6 +282,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       uploads: new Uploads(),
       queue: new Queue(),
       requestBounds: createDatasetTestRequestBounds(),

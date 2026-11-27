@@ -7,7 +7,12 @@ import type { LangWatchQLKeyReach } from "@langwatch/analytics-contract";
 import { CENSUS_CLIENTS } from "@langwatch/observability/credential-census";
 import { describe, expect, it } from "vitest";
 
-import { keyDoorOfClient, keyMaySpend, keyRunTelemetry } from "../langwatch-ql-key-caller.rules.ts";
+import {
+  keyDoorOfClient,
+  keyMaySpend,
+  keyReachProjectIds,
+  keyRunTelemetry,
+} from "../langwatch-ql-key-caller.rules.ts";
 
 const organizationKey: LangWatchQLKeyReach = {
   kind: "apiKey",
@@ -56,5 +61,18 @@ describe("keyMaySpend", () => {
   it("leaves every other key to its project's own Instant Evals switch", () => {
     expect(keyMaySpend(organizationKey)).toBe(true);
     expect(keyMaySpend({ kind: "project", projectId: "p-1" })).toBe(true);
+  });
+});
+
+describe("keyReachProjectIds", () => {
+  /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+  it("names a project key's project, or the one an api key resolved to, and none for a wider key", () => {
+    expect(keyReachProjectIds({ reach: { kind: "project", projectId: "p-1" } })).toEqual(["p-1"]);
+    expect(
+      keyReachProjectIds({
+        reach: { ...organizationKey, resolvedProject: { id: "p-2", teamId: "t-1" } },
+      }),
+    ).toEqual(["p-2"]);
+    expect(keyReachProjectIds({ reach: organizationKey })).toEqual([]);
   });
 });

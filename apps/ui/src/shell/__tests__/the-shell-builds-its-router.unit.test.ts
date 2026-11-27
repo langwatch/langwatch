@@ -11,7 +11,7 @@ import { servedConfig, uiFeatureConfigFrom } from "../../__tests__/ui-feature-co
  */
 import { browserModules } from "../../browser-modules.generated.ts";
 import { loadUiRootHostServices } from "../ui-root-host-services";
-import { uiRouteTable } from "../ui-route-table";
+import { uiMountedRouteTable } from "../ui-route-table";
 import { uiShellLayouts } from "../ui-shell-layouts";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
@@ -32,14 +32,14 @@ describe("given the route table and the modules this build installs", () => {
     /** @scenario "The router builds from the table the shell ships" */
     it("builds, because every page key the table names has a loader", () => {
       expect(() =>
-        createUiRouteObjects({ table: uiRouteTable, loaders, shellLayouts }),
+        createUiRouteObjects({ table: uiMountedRouteTable, loaders, shellLayouts }),
       ).not.toThrow();
     });
 
     /** @scenario "An unserved page key refuses by its own name" */
     it("refuses by name when a key has no loader, rather than failing on the navigation", () => {
       expect(() =>
-        createUiRouteObjects({ table: uiRouteTable, loaders: {}, shellLayouts }),
+        createUiRouteObjects({ table: uiMountedRouteTable, loaders: {}, shellLayouts }),
       ).toThrow(/pages\/auth\/signin/);
     });
   });
@@ -47,13 +47,15 @@ describe("given the route table and the modules this build installs", () => {
   describe("when the application chrome is read back off the built router", () => {
     /** @scenario "The application chrome carries no page key" */
     it("is a pathless layout with children and no page key on its handle", () => {
-      const chrome = createUiRouteObjects({ table: uiRouteTable, loaders, shellLayouts }).find(
-        (route) => route.path === void 0 && (route.children?.length ?? 0) > 0,
-      );
+      const chrome = createUiRouteObjects({
+        table: uiMountedRouteTable,
+        loaders,
+        shellLayouts,
+      }).find((route) => route.path === void 0 && (route.children?.length ?? 0) > 0);
 
       expect(chrome).toBeDefined();
       expect(chrome?.handle).toBeUndefined();
-      expect(uiRoutePageKeys(uiRouteTable)).not.toContain("chrome");
+      expect(uiRoutePageKeys(uiMountedRouteTable)).not.toContain("chrome");
     });
   });
 });

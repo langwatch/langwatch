@@ -117,10 +117,12 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
       beforeIso: input.before_iso,
     }),
   )
+  // A source's health is an activity-monitor read, like its events and the console's
+  // sourceHealthMetrics, so the plan refusal names the same feature as the permission.
   .get("/api/auth/cli/governance/ingest/sources/:sourceId/health", "readCliIngestionSourceHealth")
   .withParams(governanceCliSourceParamsSchema)
   .withPermission("activityMonitor:view")
-  .withEntitlement("enterprise", { feature: "INGESTION_SOURCES", before: "permission" })
+  .withEntitlement("enterprise", { feature: "ACTIVITY_MONITOR", before: "permission" })
   .responds(governanceCliIngestionSourceHealthAnswers)
   .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSourceHealth({

@@ -35,7 +35,6 @@ import {
 } from "./simulation-run.mapper.ts";
 
 const DEFAULT_SET_ID = "default";
-const INTERNAL_SET_PREFIX = "__internal__";
 
 export const TABLE_NAME = "simulation_runs" as const;
 
@@ -1413,36 +1412,6 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     const rows = await result.json<{ ScenarioRunId: string }>();
     const runIds = rows.map((r) => r.ScenarioRunId);
     return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
-  }
-
-  async findDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
-    const [firstProjectId] = projectIds;
-    if (!firstProjectId) {
-      return new Set();
-    }
-
-    // simulation_runs is a ReplacingMergeTree; fold each run to its latest
-    // version in one GROUP BY (light columns only) rather than the two-scan
-    // IN-tuple dedup. Folds on `argMax(ArchivedAt IS NULL, UpdatedAt)`, not
-    // `argMax(ArchivedAt, ...)`, since argMax skips NULL-first-arg rows and
-    // would otherwise miss a freshly un-archived run's true latest version.
-    const rows = await this.queryRows<{ ScenarioSetId: string }>(
-      `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
-       FROM (
-         SELECT
-           ScenarioSetId,
-           argMax(ArchivedAt IS NULL, UpdatedAt) AS latestIsActive
-         FROM ${TABLE_NAME}
-         WHERE TenantId IN ({projectIds:Array(String)})
-           AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-           ${AGENT_TEST_SET_EXCLUSION}
-         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE latestIsActive`,
-      { tenantId: firstProjectId, projectIds },
-    );
-
-    return new Set(rows.map((r) => (r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId)));
   }
 
   // ---- Export sweep ----

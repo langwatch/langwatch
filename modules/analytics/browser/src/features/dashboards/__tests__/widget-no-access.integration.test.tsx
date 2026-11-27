@@ -48,7 +48,13 @@ const WIDGET: BoardWidget = {
   placement: { graphId: "w-1", gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
 };
 const VIEWER = ["analytics:view", "traces:view"];
-const LANGY: WidgetCardLangy = { ask: vi.fn(), setUp: vi.fn(), setUpMissing: vi.fn() };
+const LANGY: WidgetCardLangy = {
+  ask: vi.fn(),
+  setUp: vi.fn(),
+  setUpMissing: vi.fn(),
+  askAbout: vi.fn(),
+  act: vi.fn(),
+};
 
 /** The server's answer to a reader without cost:view, as the query door sends it. */
 const refusedForCost: UiProcedureAnswer = ({ path }) =>
@@ -246,7 +252,7 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
             timeWindow={{ start: 1_000, end: 2_000 }}
             granularitySeconds={3600}
             periodKey="30d:auto"
-            onAskLangy={vi.fn()}
+            langy={{ ask: vi.fn(), askAbout: vi.fn(), act: vi.fn() }}
           />
         ),
         host,

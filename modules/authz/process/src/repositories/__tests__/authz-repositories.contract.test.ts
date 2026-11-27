@@ -20,6 +20,7 @@ import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission
 import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzBillingGrantRepository } from "../memory/memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "../memory/memory.authz-braid-lock.repository.ts";
+import { MemoryAuthzBraidWriteRepository } from "../memory/memory.authz-braid-write.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../memory/memory.authz-lineage-epoch.repository.ts";
@@ -73,6 +74,7 @@ const backends: readonly Backend[] = [
         migration: MemoryAuthzMigrationRepository.create({ memory }),
         ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
         braidLocks: MemoryAuthzBraidLockRepository.create(),
+        braidWrites: MemoryAuthzBraidWriteRepository.create(),
         organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
       };
     },

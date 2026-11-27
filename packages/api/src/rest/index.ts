@@ -38,6 +38,8 @@ export {
   permissionOf,
   projectRequestContext,
   type FeatureApiWitness,
+  type RestBodyLimit,
+  type RestBodyLimitResolver,
   type RestDeprecation,
   type RestDoorCredential,
   type RestLegacyKeyScopes,

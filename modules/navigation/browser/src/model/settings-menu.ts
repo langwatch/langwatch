@@ -1,6 +1,7 @@
 /** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
 import type { Hosting } from "@langwatch/browser-host/deployment";
+import type { FeatureName } from "@langwatch/design-system/feature-mark";
 import {
   Activity,
   Anvil,
@@ -13,7 +14,6 @@ import {
   Bug,
   Building2,
   Coins,
-  Combine,
   CreditCard,
   EyeOff,
   Server,
@@ -63,13 +63,13 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
+  /** A branded feature: the sidebar draws its mark in place of `icon`, as its pages do. */
+  feature?: FeatureName;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
    * in Enterprise", and the page opens on its upsell.
    */
   isLocked?: boolean;
-  /** An Enterprise entry on a plan that includes it: the sidebar marks it with the "ENT" chip. */
-  isEnterprise?: boolean;
 }
 
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
@@ -154,6 +154,10 @@ export interface SettingsMenuGates {
   isLiteMember: boolean;
   hasOpsAccess: boolean;
   isPlatformAdmin: boolean;
+  /** `release_braids` answered on; false while it is still loading, so no entry flickers. */
+  braidsEnabled: boolean;
+  /** The organisation already has braids: shown with the flag off so an admin can end them. */
+  braidsPresent?: boolean;
 }
 
 export type EnterprisePlanGate = "included" | "locked" | "pending";
@@ -180,9 +184,7 @@ function enterpriseEntry({
   enterprisePlan: EnterprisePlanGate;
 }): SettingsMenuItem[] {
   if (enterprisePlan === "pending") return [];
-  return [
-    enterprisePlan === "locked" ? { ...item, isLocked: true } : { ...item, isEnterprise: true },
-  ];
+  return [enterprisePlan === "locked" ? { ...item, isLocked: true } : item];
 }
 
 /**
@@ -217,6 +219,8 @@ function organizationGroup({
         href: "/settings",
         isExactMatch: true,
         icon: Settings2,
+        // The organisation's Braids page is organisation-wide, so it lights no Project entry.
+        alsoActiveAt: ["/settings/organization-braids"],
       },
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
@@ -261,7 +265,6 @@ function organizationGroup({
 
 function accessGroup({
   enterprisePlan,
-  isLiteMember,
   hasOrganizationPermission,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
@@ -309,13 +312,6 @@ function accessGroup({
         },
         enterprisePlan,
       }),
-      // Every braid in the organisation and who may braid; the project page is under Project.
-      ...(!isLiteMember && hasOrganizationPermission("organization:manage")
-        ? enterpriseEntry({
-            item: { label: "Braids", href: "/settings/organization-braids", icon: Combine },
-            enterprisePlan,
-          })
-        : []),
     ],
   };
 }
@@ -360,7 +356,12 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({
+  isLiteMember,
+  enterprisePlan,
+  braidsEnabled,
+  braidsPresent = false,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -381,9 +382,14 @@ function projectGroup({ isLiteMember, enterprisePlan }: SettingsMenuGates): Sett
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
-      ...(!isLiteMember
+      ...(!isLiteMember && (braidsEnabled || braidsPresent)
         ? enterpriseEntry({
-            item: { label: "Braids", href: "/settings/braids", icon: Waypoints },
+            item: {
+              label: "Braids",
+              href: "/settings/braids",
+              icon: Waypoints,
+              feature: "braids",
+            },
             enterprisePlan,
           })
         : []),
@@ -489,11 +495,12 @@ export function cloudAdminGroup(): SettingsMenuGroup {
 export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
   const groups: SettingsMenuGroup[] = [
     youGroup(),
+    // Right under You: from a project, Settings lands on its General page (ADR-098 amendment).
+    projectGroup(gates),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),
     dataControlsGroup(gates),
-    projectGroup(gates),
   ];
 
   return groups.filter((group) => group.items.length > 0);

@@ -1,15 +1,17 @@
 /**
  * Developer seats on a live Growth subscription, over memory twins of Stripe and the store.
  * @see specs/licensing/seat-buying.feature
+ * @see specs/licensing/seat-quantity-floor.feature
  */
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemorySeatEventSubscriptionRepository } from "../../repositories/memory/memory.seat-event-subscription.repository.ts";
-import { DeveloperSeatService } from "../developer-seat.service.ts";
+import { DeveloperSeatService, type DevelopersInUseCounter } from "../developer-seat.service.ts";
 
 const BASE_PRICES = {
   GROWTH_SEAT_EUR_MONTHLY: "price_seat_eur_monthly",
@@ -25,6 +27,12 @@ const WITH_DEVELOPER = {
 const NOW = Temporal.Instant.from("2026-11-06T12:00:00Z");
 const PERIOD_END_SECONDS = Temporal.Instant.from("2026-12-01T00:00:00Z").epochMilliseconds / 1000;
 const NOW_SECONDS = NOW.epochMilliseconds / 1000;
+
+/** Developers in use, as licensing counts them; each test sets its own. */
+let developersInUse = 0;
+const seatsInUse = createApiFixture<DevelopersInUseCounter>({
+  countDevelopersInUse: () => Promise.resolve(developersInUse),
+});
 
 describe("DeveloperSeatService", () => {
   let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
@@ -68,10 +76,12 @@ describe("DeveloperSeatService", () => {
       subscriptions: MemorySeatEventSubscriptionRepository.create(store),
       prices,
       unitAmountOf: (priceId) => (priceId === "price_dev_eur_monthly" ? 500 : null),
+      seatsInUse,
     });
 
   beforeEach(() => {
     vi.useFakeTimers({ now: NOW.epochMilliseconds, toFake: ["Date"] });
+    developersInUse = 0;
     store = MemoryBillingStore.create();
     store.subscriptions.push({
       id: "sub_db_1",
@@ -152,6 +162,7 @@ describe("DeveloperSeatService", () => {
 
     /** @scenario "Lowering Developer seats changes the line from the next period with no credit" */
     it("moves the line down with no proration", async () => {
+      developersInUse = 1;
       seedProvider(3);
       await service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 1 });
       expect(stripeSubscriptions.updates[0]?.change).toEqual({
@@ -160,8 +171,12 @@ describe("DeveloperSeatService", () => {
       });
     });
 
-    /** @scenario "Removing every Developer seat removes the line" */
-    it("removes the line when set to none", async () => {
+    /**
+     * @scenario "Removing every Developer seat removes the line"
+     * @scenario "Removing every Developer seat goes through when no Developer is in use"
+     */
+    it("removes the line when set to none with no Developer in use", async () => {
+      developersInUse = 0;
       seedProvider(2);
       await service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 0 });
       expect(stripeSubscriptions.updates[0]?.change.items).toEqual([
@@ -196,6 +211,44 @@ describe("DeveloperSeatService", () => {
       expect(stripeSubscriptions.previews[0]?.change.items).toEqual([
         { price: "price_dev_eur_monthly", quantity: 2 },
       ]);
+    });
+
+    describe("when 2 Developers are in use and the subscription bills 3 Developer seats", () => {
+      beforeEach(() => {
+        developersInUse = 2;
+        seedProvider(3);
+      });
+
+      /** @scenario "Lowering Developer seats to the Developers in use goes through" */
+      it("lowers the line to the Developers in use", async () => {
+        await service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 2 });
+        expect(stripeSubscriptions.updates[0]?.change).toEqual({
+          items: [{ id: "si_dev", quantity: 2 }],
+          prorationBehavior: "none",
+        });
+      });
+
+      /** @scenario "Lowering Developer seats below the Developers in use is refused" */
+      it("refuses a count below the Developers in use before calling the payment provider", async () => {
+        await expect(
+          service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 1 }),
+        ).rejects.toMatchObject({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 1, minimum: 2 },
+        });
+        expect(stripeSubscriptions.updates).toEqual([]);
+      });
+
+      /** @scenario "Removing every Developer seat is refused while Developers are in use" */
+      it("keeps the line when asked to remove every Developer seat", async () => {
+        await expect(
+          service(WITH_DEVELOPER).setDeveloperSeats({ organizationId: "org_1", quantity: 0 }),
+        ).rejects.toMatchObject({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 0, minimum: 2 },
+        });
+        expect(stripeSubscriptions.updates).toEqual([]);
+      });
     });
 
     it("refuses when the organization has no live subscription", async () => {

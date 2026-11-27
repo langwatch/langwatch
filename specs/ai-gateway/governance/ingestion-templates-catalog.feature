@@ -45,7 +45,7 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
         (claude_code / codex / cursor / gemini / opencode are never seeded)
     And a client-side **discovery card** "raw_otlp_advanced" renders alongside the
         platform-template tiles. The card is NOT an IngestionTemplate row — it deep-
-        links to /me/settings#otlp where the user grabs the personal-project OTLP
+        links to /coding-agents/configure#otlp where the user grabs the personal-project OTLP
         token. It does NOT mint an ingestion key. Its presence in the catalog
         is for discovery parity (so the no-template fallback is visible from the
         same surface as templates), not because it shares the IngestionTemplate
@@ -56,9 +56,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   # ---------------------------------------------------------------------------
 
   @bdd @ingestion-templates @catalog @user-visibility
-  Scenario: User sees only non-coding-assistant templates on /me Trace Ingest
+  Scenario: User sees only non-coding-assistant templates on /coding-agents Trace Ingest
     Given org "acme" has authored a template "Acme router"
-    When jane navigates to "/me" and scrolls to the "Trace Ingest" section
+    When jane navigates to "/coding-agents" and scrolls to the "Trace Ingest" section
     Then she sees a tile-grid with exactly these tiles:
       | tile              | label                 |
       | acme-router       | "Acme router"         |
@@ -71,15 +71,15 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   @bdd @ingestion-templates @catalog @empty-catalog
   Scenario: Trace Ingest section is hidden when the org has no templates
     Given org "acme" has not authored any templates
-    When jane navigates to "/me"
+    When jane navigates to "/coding-agents"
     Then no "Trace Ingest" section renders: no heading, no grid, and no
         raw_otlp_advanced card
-    And the personal OTLP endpoint stays reachable via /me/configure
+    And the personal OTLP endpoint stays reachable via /coding-agents/configure
 
   @bdd @ingestion-templates @catalog @coding-assistant-not-a-template
   Scenario: A platform coding assistant never appears as an ingestion template
     Given the coding assistant "opencode" is set up by `langwatch opencode`
-    When jane navigates to "/me" Trace Ingest
+    When jane navigates to "/coding-agents" Trace Ingest
     Then she does NOT see an "opencode" install tile in the Trace Ingest grid
     And opencode appears instead as a coding-assistant tile in the AiToolsPortal
         with setup command "$ langwatch opencode"
@@ -95,8 +95,21 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     But when she opens the raw_otlp_advanced card
     Then the headline reads "Bring your own OTLP — raw shape"
     And the subcopy contains "Spans land as-emitted; you control the shape. Cost/tokens/model not auto-populated unless your spans already follow gen_ai.* conventions."
-    And the /me/settings "Personal OTLP Endpoint" panel headline reads "Personal OTLP Endpoint"
+    And the /coding-agents/configure "Personal OTLP Endpoint" panel headline reads "Personal OTLP Endpoint"
     And its subcopy contains "For ad-hoc / custom telemetry. Use the catalog (Trace Ingest section above) for tool-specific auto-shape."
+
+  @integration
+  Scenario: The install drawer points at the personal project's traces page
+    Given jane's personal project slug is "personal-jane"
+    When the install drawer has issued her an ingestion key for the "acme-router" template
+    Then it says traces will land at "/personal-jane/traces" filtered by source=acme-router
+
+  @integration
+  Scenario: The install drawer points at Coding agents before the personal project resolves
+    Given jane's personal project slug has not resolved yet
+    When the install drawer has issued her an ingestion key for the "acme-router" template
+    Then it says traces will land in her personal project
+    And it tells her to open Coding agents to find them
 
   # ---------------------------------------------------------------------------
   # Platform-vs-org template scope
@@ -105,16 +118,16 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   @bdd @ingestion-templates @catalog @platform-default-global
   Scenario: Platform-published templates (organizationId IS NULL) are visible to every org
     Given org "beta-corp" has not authored any IngestionTemplate rows
-    When user "lisa@beta-corp.com" navigates to her /me Trace Ingest
+    When user "lisa@beta-corp.com" navigates to her /coding-agents Trace Ingest
     Then she sees any templates the platform has published for every org
     And since the platform currently ships none, her Trace Ingest section is hidden
 
   @bdd @ingestion-templates @catalog @cross-org-isolation
   Scenario: Org-authored templates (organizationId NOT NULL) are scoped to that org only
     Given an IngestionTemplate row exists with slug "acme-internal-router" and organizationId="acme"
-    When jane navigates to /me Trace Ingest
+    When jane navigates to /coding-agents Trace Ingest
     Then she sees "acme-internal-router" alongside the platform defaults
-    But when lisa from "beta-corp" navigates to her /me Trace Ingest
+    But when lisa from "beta-corp" navigates to her /coding-agents Trace Ingest
     Then she does NOT see "acme-internal-router"
     # Org-authoring UI deferred to v2; the organizationId-NULL-vs-NOT-NULL scope
     # column is reserved v1 so cross-org isolation is correct from day one.
@@ -170,13 +183,13 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     And no platform template rows are seeded at all
     # claude_cowork's retirement and archival on existing installs is covered
     # by default-catalog.feature. No flag, no filter constant: the coding
-    # assistants are absent from the seed input itself, so the /me grid and
+    # assistants are absent from the seed input itself, so the /coding-agents grid and
     # the admin list never have a row to drop.
 
   # No-leak invariant: persona-aware-chrome layout component branches on
   # route shape to hide IngestionTemplate catalog under /[project]. No
   # render-route test currently sweeps the catalog component's mount sites
-  # across /me and /[project]. Pin @unimplemented until that sweep test
+  # across /coding-agents and /[project]. Pin @unimplemented until that sweep test
   # lands (single Vitest assert over the mount site list is enough).
   @bdd @ingestion-templates @catalog @no-leak @regression @unimplemented
   Scenario: Trace Ingest section does NOT render under /[project] namespace
@@ -184,6 +197,6 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     When the page renders
     Then no "Trace Ingest" section is rendered in the project chrome
     And no IngestionTemplate-catalog-related component is mounted
-    # /me Trace Ingest is a personal-workspace surface; project chrome
+    # /coding-agents Trace Ingest is a personal-workspace surface; project chrome
     # scope-limits to project-trace consumers. Per persona-aware-chrome.feature
     # invariants — no governance/personal surfaces leak under /[project].

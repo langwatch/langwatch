@@ -77,7 +77,7 @@ func TestAcquire_RefusesSpawnWithoutSessionKey(t *testing.T) {
 	p := newLifecyclePool(t, nil)
 	t.Cleanup(p.Shutdown)
 
-	_, err := p.Acquire(context.Background(), "conv-no-key", domain.Credentials{
+	_, err := p.Acquire(context.Background(), "conv-no-key", "", domain.Credentials{
 		// No LangwatchAPIKey — the control plane thought a worker was alive.
 		LLMVirtualKey:     "vk",
 		GatewayBaseURL:    "http://gw",
@@ -89,6 +89,26 @@ func TestAcquire_RefusesSpawnWithoutSessionKey(t *testing.T) {
 		"a keyless spawn must ask the control plane to mint and retry, got: %v", err)
 }
 
+// A whitespace-only key is no key: spawning on it would boot a CLI that tells the
+// user to log in, so it takes the same mint-and-retry path as an absent one.
+//
+// @scenario "Langy never starts its CLI with a blank key"
+func TestAcquire_RefusesSpawnWithBlankSessionKey(t *testing.T) {
+	p := newLifecyclePool(t, nil)
+	t.Cleanup(p.Shutdown)
+
+	_, err := p.Acquire(context.Background(), "conv-blank-key", "", domain.Credentials{
+		LangwatchAPIKey:   " \t\n",
+		LLMVirtualKey:     "vk",
+		GatewayBaseURL:    "http://gw",
+		LangwatchEndpoint: "http://cp",
+	})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrCredentialsRequired,
+		"a blank-key spawn must ask the control plane to mint and retry, got: %v", err)
+}
+
 // A keyless request must not consume a worker slot it was never going to fill —
 // the refusal is checked before the capacity reservation.
 func TestAcquire_KeylessSpawnDoesNotConsumeCapacity(t *testing.T) {
@@ -96,7 +116,7 @@ func TestAcquire_KeylessSpawnDoesNotConsumeCapacity(t *testing.T) {
 	t.Cleanup(p.Shutdown)
 
 	for range 10 {
-		_, _ = p.Acquire(context.Background(), "conv-no-key", domain.Credentials{
+		_, _ = p.Acquire(context.Background(), "conv-no-key", "", domain.Credentials{
 			LLMVirtualKey: "vk", GatewayBaseURL: "http://gw", LangwatchEndpoint: "http://cp",
 		})
 	}
@@ -204,4 +224,174 @@ func TestSignatureOf_IgnoresTheSessionKey(t *testing.T) {
 
 	assert.Equal(t, sigOf(base), sigOf(rotated),
 		"a different session key must not look like a capability change")
+}
+
+// A worker past its max age is retired between turns, never under one: the
+// running turn finishes on it, a keyed turn arriving meanwhile gets the same
+// worker back, and only once the worker has gone quiet is it retired and its
+// key revoked.
+//
+// @scenario "An over-age worker finishes its running turn before it is retired"
+func TestReap_OverAgeWorkerIsNeverRetiredMidTurn(t *testing.T) {
+	rev := &recordingRevoker{}
+	p := newLifecyclePool(t, rev)
+	t.Cleanup(p.Shutdown)
+	p.workerIdle = time.Hour
+	p.workerMaxAge = time.Hour
+
+	creds := spawnableCreds()
+	w := &Worker{
+		conversationID: "conv-old", credSig: sigOf(creds),
+		apiKeyID: "key-old", langwatchEndpoint: "http://cp",
+		spawnedAt: time.Now().Add(-2 * time.Hour), lastSeen: time.Now().Add(-2 * time.Hour),
+	}
+	require.Equal(t, app.ClaimGranted, w.ClaimTurn("turn-long"))
+	p.mu.Lock()
+	p.workers["conv-old"] = w
+	p.mu.Unlock()
+
+	p.reapIdle()
+	got, err := p.Acquire(context.Background(), "conv-old", "turn-next", creds)
+	require.NoError(t, err)
+	assert.Same(t, w, got, "a keyed turn must not replace a worker whose turn is still running")
+	assert.Equal(t, 1, activeWorkers(p), "an over-age worker with a turn in flight must stay in service")
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, rev.revoked(), "the running turn's key must not be revoked under it")
+
+	w.Release()
+	assert.Equal(t, app.ClaimAlreadyHandled, w.ClaimTurn("turn-long"), "the running turn completed on its worker")
+
+	w.mu.Lock()
+	w.lastSeen = time.Now().Add(-2 * overAgeQuietPeriod)
+	w.mu.Unlock()
+	p.reapIdle()
+	assert.Zero(t, activeWorkers(p), "a quiet over-age worker is retired between turns")
+	assert.Equal(t, []string{"key-old"}, rev.eventually(t, 1), "retiring it revokes its key")
+	assert.Equal(t, app.ClaimBusy, w.ClaimTurn("turn-next"),
+		"a turn holding the retired worker is re-dispatched, never run on it")
+}
+
+// A warm that reuses a live worker never runs the key the control plane minted
+// for it, so that key is revoked rather than left valid until it expires.
+func TestAcquireWarm_RevokesItsUnusedKeyWhenItReusesAWorker(t *testing.T) {
+	creds := spawnableCreds()
+
+	t.Run("a different key id is revoked, the worker's own is not", func(t *testing.T) {
+		rev := &recordingRevoker{}
+		p := newLifecyclePool(t, rev)
+		t.Cleanup(p.Shutdown)
+		p.workerMaxAge = time.Hour
+
+		w := &Worker{
+			conversationID: "conv-warm", credSig: sigOf(creds),
+			apiKeyID: creds.LangwatchAPIKeyID, langwatchEndpoint: "http://cp",
+			spawnedAt: time.Now().Add(-2 * time.Hour), lastSeen: time.Now(),
+		}
+		p.mu.Lock()
+		p.workers["conv-warm"] = w
+		p.mu.Unlock()
+
+		warmCreds := creds
+		warmCreds.LangwatchAPIKeyID = "key-b"
+		got, err := p.AcquireWarm(context.Background(), "conv-warm", warmCreds)
+		require.NoError(t, err)
+		assert.Same(t, w, got, "a warm reuses the live worker even when it is over age")
+		assert.Equal(t, []string{"key-b"}, rev.eventually(t, 1), "the warm's unused key is revoked")
+	})
+
+	t.Run("the same key id revokes nothing", func(t *testing.T) {
+		rev := &recordingRevoker{}
+		p := newLifecyclePool(t, rev)
+		t.Cleanup(p.Shutdown)
+
+		w := &Worker{
+			conversationID: "conv-warm-same", credSig: sigOf(creds),
+			apiKeyID: creds.LangwatchAPIKeyID, langwatchEndpoint: "http://cp",
+			spawnedAt: time.Now(), lastSeen: time.Now(),
+		}
+		p.mu.Lock()
+		p.workers["conv-warm-same"] = w
+		p.mu.Unlock()
+
+		got, err := p.AcquireWarm(context.Background(), "conv-warm-same", creds)
+		require.NoError(t, err)
+		assert.Same(t, w, got)
+		time.Sleep(50 * time.Millisecond)
+		assert.Empty(t, rev.revoked(), "the worker's own key is still in use and must not be revoked")
+	})
+
+	t.Run("a warm with a different signature revokes its key and leaves the worker", func(t *testing.T) {
+		rev := &recordingRevoker{}
+		p := newLifecyclePool(t, rev)
+		t.Cleanup(p.Shutdown)
+
+		w := &Worker{
+			conversationID: "conv-warm-sig", credSig: sigOf(creds),
+			apiKeyID: creds.LangwatchAPIKeyID, langwatchEndpoint: "http://cp",
+			spawnedAt: time.Now(), lastSeen: time.Now(),
+		}
+		p.mu.Lock()
+		p.workers["conv-warm-sig"] = w
+		p.mu.Unlock()
+
+		warmCreds := creds
+		warmCreds.Model = creds.Model + "-other"
+		warmCreds.LangwatchAPIKeyID = "key-b"
+		require.NotEqual(t, sigOf(creds), sigOf(warmCreds))
+		got, err := p.AcquireWarm(context.Background(), "conv-warm-sig", warmCreds)
+		require.NoError(t, err)
+		assert.Same(t, w, got, "a mismatched warm returns the live worker untouched")
+		assert.Equal(t, []string{"key-b"}, rev.eventually(t, 1), "the warm's unused key is revoked")
+	})
+}
+
+// A keyed re-dispatch of a turn the over-age worker already completed (an
+// outbox retry after a lost answer) must reach that worker, which remembers the
+// turn. A fresh replacement would remember nothing and run the turn twice.
+//
+// @scenario "A re-sent turn the over-age worker already ran is not run again"
+func TestAcquire_OverAgeWorkerKeepsATurnItAlreadyRan(t *testing.T) {
+	rev := &recordingRevoker{}
+	p := newLifecyclePool(t, rev)
+	t.Cleanup(p.Shutdown)
+	p.workerMaxAge = time.Hour
+
+	creds := spawnableCreds()
+	w := &Worker{
+		conversationID: "conv-rerun", credSig: sigOf(creds),
+		apiKeyID: "key-old", langwatchEndpoint: "http://cp",
+		spawnedAt: time.Now().Add(-2 * time.Hour), lastSeen: time.Now(),
+	}
+	require.Equal(t, app.ClaimGranted, w.ClaimTurn("turn-done"))
+	w.Release()
+	p.mu.Lock()
+	p.workers["conv-rerun"] = w
+	p.mu.Unlock()
+
+	got, err := p.Acquire(context.Background(), "conv-rerun", "turn-done", creds)
+	require.NoError(t, err)
+	assert.Same(t, w, got, "a re-dispatch of a turn the worker ran must reach that worker")
+	assert.Equal(t, app.ClaimAlreadyHandled, got.ClaimTurn("turn-done"), "the turn must not run twice")
+	assert.Equal(t, 1, activeWorkers(p), "no replacement worker is spawned")
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, rev.revoked(), "the worker's key is not revoked")
+}
+
+// An over-age worker's key is close to expiry, so the probe answers false and
+// the control plane mints a fresh key for the next turn.
+//
+// @scenario "The probe asks for a fresh key once the worker is past its max age"
+func TestHasLiveWorker_FalseForAnOverAgeWorker(t *testing.T) {
+	p := newLifecyclePool(t, nil)
+	t.Cleanup(p.Shutdown)
+	p.workerMaxAge = time.Hour
+	sig := sigOf(spawnableCreds())
+
+	p.mu.Lock()
+	p.workers["conv-fresh"] = &Worker{conversationID: "conv-fresh", credSig: sig, spawnedAt: time.Now()}
+	p.workers["conv-aged"] = &Worker{conversationID: "conv-aged", credSig: sig, spawnedAt: time.Now().Add(-2 * time.Hour)}
+	p.mu.Unlock()
+
+	assert.True(t, p.HasLiveWorker("conv-fresh", sig), "a young worker's key is still good")
+	assert.False(t, p.HasLiveWorker("conv-aged", sig), "an over-age worker must make the control plane mint")
 }

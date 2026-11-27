@@ -149,6 +149,27 @@ export class PrismaStaffAccessRequestRepository
     return changed === 1;
   }
 
+  async withdraw({
+    id,
+    requesterId,
+    at,
+  }: {
+    id: string;
+    requesterId: string;
+    at: Instant;
+  }): Promise<boolean> {
+    const changed = await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // A platform staff access request, withdrawn by its own requester (ADR-202).
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "StaffAccessRequest"
+      SET "status" = 'revoked', "revokedAt" = ${toDate(at)}, "revokeCause" = 'withdrawn'
+      WHERE "id" = ${id} AND "requesterId" = ${requesterId} AND "status" = 'pending'
+        AND "revokedAt" IS NULL AND "expiresAt" > ${toDate(at)}`;
+    return changed === 1;
+  }
+
   async deny({ id, at }: { id: string; at: Instant }): Promise<boolean> {
     const changed = await this.database.$executeRaw`
       ${skipTenantCheck({

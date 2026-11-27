@@ -8,7 +8,7 @@ import {
   formatPercent,
 } from "./digest-parts.tsx";
 import { ActionRow, DetailTable, InlineLink, Muted } from "./email-layout.tsx";
-import { defineTemplate } from "./registry.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const digestPlanPressureProps = z.object({
   ...digestCommonFields,
@@ -136,3 +136,11 @@ export const digestPlanPressureTemplate = defineTemplate({
     },
   },
 });
+
+/** Rendered by the digest module, which owns the envelope and its one-click unsubscribe. */
+export const renderDigestPlanPressureEmail = async (
+  props: DigestPlanPressureProps,
+): Promise<{ subject: string; html: string }> => {
+  const { subject, html } = await renderMailTemplate(digestPlanPressureTemplate, props);
+  return { subject, html };
+};

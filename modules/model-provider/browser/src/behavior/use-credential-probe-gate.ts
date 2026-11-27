@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+/** Refusals the save is refused for too, so "Save anyway" would only fail again. */
+const REFUSALS_SAVE_CANNOT_PASS: ReadonlySet<string> = new Set(["provider_endpoint_refused"]);
+
 /**
  * Decides whether a credential still has to be probed before saving. A failed
  * probe cannot tell a bad key from a network restriction or provider outage,
@@ -7,15 +10,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * @param customKeys - The credentials as currently entered
  * @param model - The model the probe asks for (Azure's deployment); changing it re-arms the probe
  * @param resetKey - Resets the refusal when the form targets a new provider
+ * @param refusalCode - The last refusal's code; one the save cannot pass never arms "Save anyway"
  */
 export function useCredentialProbeGate({
   customKeys,
   model,
   resetKey,
+  refusalCode,
 }: {
   customKeys: Record<string, string>;
   model?: string;
   resetKey?: string;
+  refusalCode?: string;
 }) {
   const credentialsFingerprint = useMemo(
     () => JSON.stringify(model ? { customKeys, model } : customKeys),
@@ -34,7 +40,9 @@ export function useCredentialProbeGate({
   // not a boolean, keeps this safe while a probe is in flight: the refusal
   // records the credentials it was about, so a mid-probe edit can't inherit
   // the old verdict and slip through unprobed.
-  const wasRefused = refusedCredentials === credentialsFingerprint;
+  const wasRefused =
+    refusedCredentials === credentialsFingerprint &&
+    !(refusalCode && REFUSALS_SAVE_CANNOT_PASS.has(refusalCode));
 
   // Both callbacks keep a stable identity across renders. The save handlers
   // that consume them are `useCallback`s, and this component family also keys

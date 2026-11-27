@@ -1,4 +1,5 @@
 import type { TraceSpanSummaryRecord } from "../../../../repositories/trace-projected-read.repository.ts";
+import type { TraceSpanKey } from "../../rules/braid-held-trace.rules.ts";
 import {
   type BraidOwnerTraceCounts,
   NO_BRAID_TRACE_COUNTS,
@@ -17,6 +18,14 @@ export class MemoryNullTraceBraidReadsRepository extends TraceBraidReadsReposito
   }
 
   async findReaderTraceIds(): Promise<string[]> {
+    return [];
+  }
+
+  async findOutsideParents(): Promise<TraceSpanKey[]> {
+    return [];
+  }
+
+  async findTracesHoldingSpans(): Promise<string[]> {
     return [];
   }
 

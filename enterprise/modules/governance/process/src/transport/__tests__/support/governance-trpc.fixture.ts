@@ -9,11 +9,14 @@ export type GovernanceTrpcTestContext = { actor: { id: string; impersonatorId?: 
 export function governanceTrpcMembers({
   permits,
   asked,
+  enterprise = true,
 }: {
   permits: (permission: string, scope: { tier: string; id: string }) => boolean;
   asked: string[];
+  enterprise?: boolean;
 }): TrpcRuntimeMembers<GovernanceTrpcTestContext> {
   return {
+    entitlements: { holds: async () => enterprise },
     identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
     authorization: {
       forRequest: () => ({

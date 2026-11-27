@@ -331,3 +331,105 @@ describe("given a scope write that names no organisation", () => {
     });
   });
 });
+
+const GROWTH = { free: false, type: "GROWTH_SEAT_EUR_MONTHLY" };
+const growthApp = () => retentionApp(createDataRetentionTestEntitlement(GROWTH));
+const billed = (scope: Scope) => ({ ...write(scope), retentionDays: 371 });
+
+describe("given acme on a Growth seat plan, which bills storage above 90 days", () => {
+  const projectAdmin = (permission: string) => permission !== "subscription:manage";
+
+  describe("when a project admin without subscription:manage saves 1 year on their project", () => {
+    /** @scenario "A project admin without subscription:manage is refused a billed retention by name" */
+    it("refuses the scope write by name and writes nothing", async () => {
+      const { call, app } = door({ app: growthApp(), permitted: projectAdmin });
+
+      const failure = await call
+        .setForScope(billed({ scopeType: "PROJECT", scopeId: WEB_APP }))
+        .catch((error: unknown) => error);
+
+      expect(codeOf(failure)).toBe("data_retention_billed_through_billing");
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([]);
+    });
+
+    /** @scenario "The billed write asks subscription:manage on the organisation before data retention runs" */
+    it("refuses the billed write at the door, naming subscription:manage on acme", async () => {
+      const { call, asked, handled } = door({ app: growthApp(), permitted: projectAdmin });
+
+      const failure = await call
+        .setBilledForScope(billed({ scopeType: "PROJECT", scopeId: WEB_APP }))
+        .catch((error: unknown) => error);
+
+      expect(codeOf(failure)).toBe("permission_denied");
+      expect(asked).toEqual([
+        { permission: "subscription:manage", scope: { tier: "organization", id: ACME } },
+      ]);
+      expect(handled).not.toContain("changeBilledScopeRetention");
+    });
+  });
+
+  describe("when a project admin saves 90 days, which the plan includes", () => {
+    /** @scenario "A retention the plan includes is still set through the scope write" */
+    it("writes the override through the scope write", async () => {
+      const { call, app } = door({ app: growthApp(), permitted: projectAdmin });
+
+      await call.setForScope({
+        ...write({ scopeType: "PROJECT", scopeId: WEB_APP }),
+        retentionDays: 91,
+      });
+
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([
+        expect.objectContaining({ scopeId: WEB_APP, retentionDays: 91 }),
+      ]);
+    });
+  });
+
+  describe("when a billing administrator saves 1 year through the billed write", () => {
+    /** @scenario "A billing administrator sets a billed retention through the billed write" */
+    it("asks subscription:manage on acme and writes the override", async () => {
+      const { call, asked, app } = door({ app: growthApp() });
+
+      await call.setBilledForScope(billed({ scopeType: "PROJECT", scopeId: WEB_APP }));
+
+      expect(asked).toEqual([
+        { permission: "subscription:manage", scope: { tier: "organization", id: ACME } },
+      ]);
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([
+        expect.objectContaining({ scopeId: WEB_APP, retentionDays: 371, organizationId: ACME }),
+      ]);
+    });
+  });
+
+  describe("when a billing administrator saves 30 days through the billed write", () => {
+    /** @scenario "The billed write refuses a length the plan includes" */
+    it("refuses it as not billed and writes nothing", async () => {
+      const { call, app } = door({ app: growthApp() });
+
+      const failure = await call
+        .setBilledForScope({
+          ...write({ scopeType: "PROJECT", scopeId: WEB_APP }),
+          retentionDays: 35,
+        })
+        .catch((error: unknown) => error);
+
+      expect(codeOf(failure)).toBe("data_retention_not_billed");
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([]);
+    });
+  });
+
+  describe("when the billed write names a project of globex", () => {
+    /** @scenario "A billed write for a scope outside the named organisation is refused as not found" */
+    it("is refused as not found and writes nothing", async () => {
+      const { call, app } = door({ app: growthApp() });
+
+      const failure = await call
+        .setBilledForScope(billed({ scopeType: "PROJECT", scopeId: "project-billing" }))
+        .catch((error: unknown) => error);
+
+      expect(codeOf(failure)).toBe("data_retention_scope_target_not_found");
+      await expect(
+        app.listOrganizationRules({ organizationId: GLOBEX.organizationId }),
+      ).resolves.toEqual([]);
+    });
+  });
+});

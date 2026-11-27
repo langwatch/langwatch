@@ -11,11 +11,17 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     *,
     query: str | Unset = UNSET,
+    limit: int | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
 
     params["query"] = query
+
+    params["limit"] = limit
+
+    params["cursor"] = cursor
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -60,10 +66,14 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     query: str | Unset = UNSET,
+    limit: int | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> Response[ListStaffAccessOrganizationsResponse200]:
     """
     Args:
         query (str | Unset):
+        limit (int | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -75,6 +85,8 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         query=query,
+        limit=limit,
+        cursor=cursor,
     )
 
     response = client.get_httpx_client().request(
@@ -88,10 +100,14 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     query: str | Unset = UNSET,
+    limit: int | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> ListStaffAccessOrganizationsResponse200 | None:
     """
     Args:
         query (str | Unset):
+        limit (int | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -104,6 +120,8 @@ def sync(
     return sync_detailed(
         client=client,
         query=query,
+        limit=limit,
+        cursor=cursor,
     ).parsed
 
 
@@ -111,10 +129,14 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     query: str | Unset = UNSET,
+    limit: int | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> Response[ListStaffAccessOrganizationsResponse200]:
     """
     Args:
         query (str | Unset):
+        limit (int | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,6 +148,8 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         query=query,
+        limit=limit,
+        cursor=cursor,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -137,10 +161,14 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     query: str | Unset = UNSET,
+    limit: int | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> ListStaffAccessOrganizationsResponse200 | None:
     """
     Args:
         query (str | Unset):
+        limit (int | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,5 +182,7 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             query=query,
+            limit=limit,
+            cursor=cursor,
         )
     ).parsed

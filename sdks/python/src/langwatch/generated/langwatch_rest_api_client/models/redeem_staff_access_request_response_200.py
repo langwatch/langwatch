@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -23,6 +23,7 @@ class RedeemStaffAccessRequestResponse200:
     Attributes:
         projects (list[RedeemStaffAccessRequestResponse200ProjectsItem]):
         scopes (list[RedeemStaffAccessRequestResponse200ScopesItem]):
+        functions (list[str]):
         expires_at (str):
         api_key (str | Unset):
         ops_token (str | Unset):
@@ -31,6 +32,7 @@ class RedeemStaffAccessRequestResponse200:
 
     projects: list[RedeemStaffAccessRequestResponse200ProjectsItem]
     scopes: list[RedeemStaffAccessRequestResponse200ScopesItem]
+    functions: list[str]
     expires_at: str
     api_key: str | Unset = UNSET
     ops_token: str | Unset = UNSET
@@ -47,6 +49,8 @@ class RedeemStaffAccessRequestResponse200:
             scopes_item = scopes_item_data.value
             scopes.append(scopes_item)
 
+        functions = self.functions
+
         expires_at = self.expires_at
 
         api_key = self.api_key
@@ -61,6 +65,7 @@ class RedeemStaffAccessRequestResponse200:
             {
                 "projects": projects,
                 "scopes": scopes,
+                "functions": functions,
                 "expiresAt": expires_at,
             }
         )
@@ -94,6 +99,8 @@ class RedeemStaffAccessRequestResponse200:
 
             scopes.append(scopes_item)
 
+        functions = cast(list[str], d.pop("functions"))
+
         expires_at = d.pop("expiresAt")
 
         api_key = d.pop("apiKey", UNSET)
@@ -105,6 +112,7 @@ class RedeemStaffAccessRequestResponse200:
         redeem_staff_access_request_response_200 = cls(
             projects=projects,
             scopes=scopes,
+            functions=functions,
             expires_at=expires_at,
             api_key=api_key,
             ops_token=ops_token,

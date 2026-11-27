@@ -1,4 +1,5 @@
 import { defineSlice } from "@langwatch/browser-host/global-store";
+import { onUiStorageReaderChange } from "@langwatch/browser-host/storage";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -18,13 +19,25 @@ import {
   stopDispatched as reduceStopDispatched,
   seedLangyTurnProjection,
   type TurnPhaseState,
+  LANGY_DOCK_WIDTH_PX,
   LANGY_STORE_SLICE,
   type LangyAttachedContext,
   type LangyContextChip,
   type LangyPanelMode,
   type LangySliceSurface,
 } from "@langwatch/langy-contract";
+import { nowEpochMs } from "@langwatch/time";
 
+import {
+  boundAskOrigin,
+  continuesAskOrigin,
+  type LangyAskOrigin,
+} from "../model/langy-ask-origin.ts";
+import {
+  type LangyPanelWidths,
+  type LangyResizablePlacement,
+  parseStoredPanelWidths,
+} from "../model/langy-panel-resize.ts";
 import type { LangyProgressSample } from "../model/values/langy-turn.ts";
 
 export type {
@@ -99,12 +112,23 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   // Spec: specs/langy/langy-peek-dock.feature
   closePanel: () => void;
   togglePanel: () => void;
+  /**
+   * The saved open state while the panel is open only because a link opened it, else null.
+   * Spec: specs/langy/langy-prompt-link.feature
+   */
+  savedOpenBeforeLink: boolean | null;
+  /** Open on a fresh conversation with `prompt` typed, not sent, keeping the saved open state. */
+  openFromLink: (prompt: string) => void;
 
   // Command-bar → panel handoff: a question queued from the Cmd+K "Ask Langy"
   // activation, auto-sent by the panel once it is mounted and idle. Ephemeral
   // (never persisted) — it exists only for the hop between the bar and the panel.
   /** The panel has taken the queued prompt — clear it so it fires once. */
   consumePendingPrompt: () => void;
+  /** The queued prompt goes into the open conversation, keeping its messages. */
+  pendingPromptContinues: boolean;
+  /** Where the open conversation's first question came from, for follow-ups from there. */
+  askOrigin: LangyAskOrigin | null;
 
   /**
    * The guided onboarding handing over to Langy: the tour ended and the panel
@@ -140,6 +164,12 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   panelEffect: LangyPanelEffect;
   setPanelEffect: (effect: LangyPanelEffect) => void;
 
+  /** The width the user dragged each resizable layout to, persisted; absent means the default. */
+  panelWidths: LangyPanelWidths;
+  setPanelWidth: (input: { placement: LangyResizablePlacement; width: number }) => void;
+  /** Forget a layout's chosen width, back to its default. */
+  resetPanelWidth: (placement: LangyResizablePlacement) => void;
+
   /**
    * How many mounted app shells have claimed the docked panel's placement.
    */
@@ -154,6 +184,9 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
    */
   dockShifted: boolean;
   setDockShifted: (shifted: boolean) => void;
+  /** The docked panel's resolved width, published beside `dockShifted` for the shell's room. */
+  dockWidthPx: number;
+  setDockWidthPx: (widthPx: number) => void;
 
   /**
    * The home page's ask field is in use right now.
@@ -420,6 +453,7 @@ const emptyConversationState = () => ({
   turnPlan: null as { content: string; status: string }[] | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  pendingPromptContinues: false as boolean,
   pendingKickoff: null as LangyKickoffBrief | null,
   // A conversation change also drops the id a panel-open warm minted: the
   // pending id belongs to the fresh chat the warm was fired for, and the warm
@@ -427,16 +461,71 @@ const emptyConversationState = () => ({
   pendingConversationId: null as string | null,
 });
 
+/** An ask that starts a clean conversation, like a new chat, remembering where it came from. */
+const freshAsk = ({
+  prompt,
+  askedFrom,
+  now,
+}: {
+  prompt: string;
+  askedFrom: string | undefined;
+  now: number;
+}) => ({
+  isOpen: true,
+  savedOpenBeforeLink: null,
+  activeConversationId: null,
+  historyLoadConversationId: null,
+  draft: "",
+  // The model pick belongs to the conversation being left behind, the same as a new chat.
+  modelOverride: "",
+  isModelPickedByUser: false,
+  modelSeededForConversationId: null,
+  ...emptyConversationState(),
+  // AFTER the spread: emptyConversationState() nulls `pendingPrompt`.
+  pendingPrompt: prompt.trim() || null,
+  askOrigin: askedFrom === void 0 ? null : { from: askedFrom, conversationId: null, at: now },
+  // The reader expects to keep typing in the panel they just opened.
+  composerFocusRequested: true,
+});
+
+/** A question asked from `askedFrom`: a follow-up there goes on in the open conversation. */
+function askedLangy({
+  state,
+  prompt,
+  askedFrom,
+}: {
+  state: LangyState;
+  prompt: string;
+  askedFrom: string | undefined;
+}): Partial<LangyState> {
+  const now = nowEpochMs();
+  const { askOrigin: origin, activeConversationId } = state;
+  if (!continuesAskOrigin({ origin, askedFrom, activeConversationId, now })) {
+    return freshAsk({ prompt, askedFrom, now });
+  }
+  return {
+    isOpen: true,
+    savedOpenBeforeLink: null,
+    pendingPrompt: prompt.trim() || null,
+    pendingPromptContinues: true,
+    askOrigin: origin && { ...origin, at: now },
+    composerFocusRequested: true,
+  };
+}
+
 /**
  * The ONLY state allowed to cross a change of user, organization or project.
  */
 const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "isOpen",
+  "savedOpenBeforeLink",
   "panelMode",
   "panelEffect",
   "devMode",
   "dockShellClaims",
   "dockShifted",
+  "dockWidthPx",
+  "panelWidths",
 ]);
 
 /**
@@ -497,24 +586,30 @@ function setWithout(ids: Set<string>, id: string): Set<string> {
 }
 
 function withContextAttached(state: LangyState, item: LangyAttachedContext): Partial<LangyState> {
-  const existingIndex = state.attachedContext.findIndex((attached) => attached.id === item.id);
-  // Re-attaching an id is a refresh, not a duplicate: replace in place so
-  // a label/meta that changed (a title subscriber landed) updates without
-  // stacking a second chip or losing the item's position.
+  const matches = (attached: LangyAttachedContext) =>
+    attached.id === item.id || (item.key !== void 0 && attached.key === item.key);
+  const existingIndex = state.attachedContext.findIndex(matches);
+  // Re-attaching an id or a key is a refresh, not a duplicate: replace in place so a label,
+  // meta or text that changed (a board that gained a widget) updates without stacking a
+  // second chip or losing the item's position. Any other entry it matches goes.
   if (existingIndex >= 0) {
-    const next = [...state.attachedContext];
-    next[existingIndex] = item;
+    const next = state.attachedContext.flatMap((attached, index) => {
+      if (index === existingIndex) return [item];
+      return matches(attached) ? [] : [attached];
+    });
     return { attachedContext: next };
   }
   return { attachedContext: [...state.attachedContext, item] };
 }
 
+/** Detaches what carries this id, or this key. */
 function withContextDetached(state: LangyState, id: string): Partial<LangyState> {
-  if (!state.attachedContext.some((item) => item.id === id)) {
+  const matches = (item: LangyAttachedContext) => item.id === id || item.key === id;
+  if (!state.attachedContext.some(matches)) {
     return state;
   }
   return {
-    attachedContext: state.attachedContext.filter((item) => item.id !== id),
+    attachedContext: state.attachedContext.filter((item) => !matches(item)),
   };
 }
 
@@ -549,6 +644,7 @@ function beganTurn(
     // adopting the conversation and clearing the previous turn's live
     // signals (status / progress / reasoning / plan).
     activeConversationId: conversationId,
+    askOrigin: boundAskOrigin({ origin: s.askOrigin, conversationId }),
     // A conversation this dispatch just MINTED (the tab pointed at
     // nothing, or at another conversation) starts unconfirmed: its
     // projection may lag the accepted command, and a not-found read in
@@ -588,6 +684,14 @@ export function isTurnInPanelScope({
 }): boolean {
   if (!isSameScope(sentScope, scope)) return false;
   return !scope?.projectId || scope.projectId === projectId;
+}
+
+/**
+ * May a read keyed on this conversation run yet? A conversation this tab just minted answers
+ * "not found" until its projection folds, so its reads wait for the confirmation.
+ */
+export function selectConversationReadable(s: LangyState, id: string | null | undefined) {
+  return !!id && s.unconfirmedConversations[id] !== true;
 }
 
 /**
@@ -727,43 +831,48 @@ function resetScope(state: LangyState, scope: Partial<LangyScope>): Partial<Lang
   };
 }
 
+function openFromLink({
+  state,
+  set,
+  prompt,
+}: {
+  state: LangyState;
+  set: (patch: Partial<LangyState>) => void;
+  prompt: string;
+}): void {
+  const savedOpenBeforeLink = state.savedOpenBeforeLink ?? state.isOpen;
+  const text = prompt.trim();
+  if (!text) {
+    set({ isOpen: true, savedOpenBeforeLink });
+    return;
+  }
+  state.startNewConversation();
+  set({ isOpen: true, savedOpenBeforeLink, draft: text });
+}
+
 export const useLangyStore = defineSlice<LangyState>({
   name: LANGY_STORE_SLICE,
   create: (set, get) => ({
     isOpen: false,
-    openPanel: () => set({ isOpen: true }),
-    closePanel: () => set({ isOpen: false }),
+    openPanel: () => set({ isOpen: true, savedOpenBeforeLink: null }),
+    closePanel: () => set({ isOpen: false, savedOpenBeforeLink: null }),
 
-    togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
+    togglePanel: () => set((state) => ({ isOpen: !state.isOpen, savedOpenBeforeLink: null })),
+
+    savedOpenBeforeLink: null,
+    openFromLink: (prompt) => openFromLink({ state: get(), set, prompt }),
 
     pendingPrompt: null,
-    askLangy: (prompt) =>
-      set(() => ({
-        isOpen: true,
-        // A fresh ask starts a clean conversation like startNewConversation, but the context the
-        // user just grabbed rides along.
-        activeConversationId: null,
-        historyLoadConversationId: null,
-        draft: "",
-        // The model pick belongs to the conversation being left behind, the
-        // same as a new chat. Kept, it would steer a conversation the user
-        // never picked it for, and hold the pill off the default for good.
-        modelOverride: "",
-        isModelPickedByUser: false,
-        modelSeededForConversationId: null,
-        ...emptyConversationState(),
-        // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
-        // the queued question is written last or it would be wiped out.
-        pendingPrompt: prompt.trim() || null,
-        // The reader expects to keep typing in the panel they just opened.
-        composerFocusRequested: true,
-      })),
-    consumePendingPrompt: () => set({ pendingPrompt: null }),
+    pendingPromptContinues: false,
+    askOrigin: null,
+    askLangy: (prompt, askedFrom) => set((state) => askedLangy({ state, prompt, askedFrom })),
+    consumePendingPrompt: () => set({ pendingPrompt: null, pendingPromptContinues: false }),
 
     pendingKickoff: null,
     queueGuidedKickoff: (kickoff) =>
       set(() => ({
         isOpen: true,
+        savedOpenBeforeLink: null,
         // The kickoff lands where the caller's conversation is: the attached
         // one when there is one, a fresh one otherwise.
         activeConversationId: kickoff.conversationId ?? null,
@@ -794,6 +903,21 @@ export const useLangyStore = defineSlice<LangyState>({
     panelEffect: "plain",
     setPanelEffect: (panelEffect) => set({ panelEffect }),
 
+    panelWidths: {},
+    setPanelWidth: ({ placement, width }) =>
+      set((state) => ({
+        panelWidths: {
+          ...state.panelWidths,
+          [placement]: Math.round(width),
+        },
+      })),
+    resetPanelWidth: (placement) =>
+      set((state) => {
+        const kept = { ...state.panelWidths };
+        delete kept[placement];
+        return { panelWidths: kept };
+      }),
+
     dockShellClaims: 0,
     claimDockShell: () => set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
     releaseDockShell: () =>
@@ -803,6 +927,8 @@ export const useLangyStore = defineSlice<LangyState>({
 
     dockShifted: false,
     setDockShifted: (dockShifted) => set({ dockShifted }),
+    dockWidthPx: LANGY_DOCK_WIDTH_PX,
+    setDockWidthPx: (dockWidthPx) => set({ dockWidthPx }),
 
     homeAskOpen: false,
     setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
@@ -823,6 +949,7 @@ export const useLangyStore = defineSlice<LangyState>({
       set({
         activeConversationId: id,
         historyLoadConversationId: id,
+        askOrigin: null,
         // The pick belongs to the conversation being left behind; the one
         // being opened seeds its own from the durable record (or the
         // default) once its history lands.
@@ -833,11 +960,17 @@ export const useLangyStore = defineSlice<LangyState>({
       }),
     // The pending id is retired either way: adopted (the send used it and it
     // just became the active id) or superseded (the server minted its own).
-    adoptConversation: (id) => set({ activeConversationId: id, pendingConversationId: null }),
+    adoptConversation: (id) =>
+      set((state) => ({
+        activeConversationId: id,
+        pendingConversationId: null,
+        askOrigin: boundAskOrigin({ origin: state.askOrigin, conversationId: id }),
+      })),
     startNewConversation: () =>
       set((state) => ({
         activeConversationId: null,
         historyLoadConversationId: null,
+        askOrigin: null,
         // A new chat starts on a BLANK composer. Without this, the half-typed
         // text abandoned in the last conversation is still sitting there,
         // primed to be sent into the new one. (`resetForScope` already
@@ -851,6 +984,8 @@ export const useLangyStore = defineSlice<LangyState>({
         modelSeededForConversationId: null,
         chosenChipIds: new Set<string>(),
         dismissedChipIds: new Set<string>(),
+        // What a surface attached was for the last question too.
+        attachedContext: [],
         // The targets the user pointed at were gathered for the conversation
         // being left behind; the epoch is what tells the target store to let
         // them go (see its subscription).
@@ -1025,13 +1160,17 @@ export const useLangyStore = defineSlice<LangyState>({
   // Durable across sessions, so a refresh puts the user back where they were: the panel's
   // open state, its layout, developer mode and WHICH CONVERSATION was open.
   persist: {
+    // Stored widths are cleaned here, once, so renders can trust them.
+    revive: (saved) => ({ ...saved, panelWidths: parseStoredPanelWidths(saved.panelWidths) }),
     partialize: (state) => ({
-      isOpen: state.isOpen,
+      isOpen: state.savedOpenBeforeLink ?? state.isOpen,
       devMode: state.devMode,
       panelMode: state.panelMode,
       panelEffect: state.panelEffect,
+      panelWidths: state.panelWidths,
       activeConversationId: state.activeConversationId,
       activeConversationScope: state.activeConversationScope,
+      askOrigin: state.askOrigin,
     }),
   },
 });
@@ -1081,3 +1220,7 @@ export function attachedContextToChip(item: LangyAttachedContext): LangyContextC
     ref: item.id,
   };
 }
+
+// A link's kept preference belongs to the reader who followed it; registered after the slice's
+// own restore, so the next reader's restored `isOpen` is what gets saved.
+onUiStorageReaderChange(() => useLangyStore.setState({ savedOpenBeforeLink: null }));

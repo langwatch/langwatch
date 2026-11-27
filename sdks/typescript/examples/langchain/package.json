@@ -12,13 +12,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@langchain/core": "^0.3.80",
-    "@langchain/openai": "^0.6.3",
+    "@langchain/core": "^1.5.1",
+    "@langchain/openai": "^1.8.5",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.217.0",
     "cli-markdown": "^3.5.1",
     "dotenv-cli": "^10.0.0",
-    "langchain": "^0.3.37",
     "langwatch": "file:../../"
   },
   "devDependencies": {
@@ -29,7 +28,7 @@
     "@opentelemetry/core": ">=2.8.0 <3",
     "@opentelemetry/propagator-jaeger": ">=2.9.0 <3",
     "js-yaml": ">=4.3.2 <5",
-    "langsmith": ">=0.8.0 <0.11",
+    "langsmith": ">=0.11.0 <1",
     "linkify-it": ">=5.0.2 <6",
     "markdown-it": ">=14.3.3 <15",
     "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.6",

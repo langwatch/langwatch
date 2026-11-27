@@ -12,6 +12,11 @@ import {
 import { Square } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 
+import {
+  RED_TEAM_OUTCOME_COLORS,
+  RED_TEAM_OUTCOME_LABELS,
+  redTeamReportOf,
+} from "../../../../model/red-team-report.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { formatRunStatusLabel } from "../../../../model/suite/format-run-status-label.ts";
 import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
@@ -168,6 +173,8 @@ export function ScenarioTargetRow({
   });
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
+  const redTeamOutcome = redTeamReportOf(scenarioRun.metadata)?.outcome ?? null;
+  const labelColor = redTeamOutcome ? RED_TEAM_OUTCOME_COLORS[redTeamOutcome] : config.fgColor;
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
   const latencyMs = rowLatencyMs(scenarioRun);
@@ -214,15 +221,17 @@ export function ScenarioTargetRow({
           <Text
             fontSize="xs"
             fontWeight="semibold"
-            color={config.fgColor}
+            color={labelColor}
             minWidth="43px"
             textAlign="left"
             whiteSpace="nowrap"
           >
-            {formatRunStatusLabel({
-              status: scenarioRun.status,
-              results: scenarioRun.results ?? undefined,
-            })}
+            {redTeamOutcome
+              ? RED_TEAM_OUTCOME_LABELS[redTeamOutcome]
+              : formatRunStatusLabel({
+                  status: scenarioRun.status,
+                  results: scenarioRun.results ?? undefined,
+                })}
           </Text>
           <Text fontSize="sm" textAlign="left" truncate>
             {displayName}

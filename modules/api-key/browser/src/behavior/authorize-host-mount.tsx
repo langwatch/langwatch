@@ -7,6 +7,8 @@
 import {
   ApiKeyScopeViolationError,
   publicDocsOrigins,
+  type DocsSessionKeyAccess,
+  type DocsSessionKeyLifetimeMinutes,
   type DocsSessionKeyMinted,
 } from "@langwatch/api-key-contract";
 import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
@@ -27,6 +29,7 @@ import {
   type AuthorizeScope,
   type AuthorizeSessionStatus,
   type AuthorizeSuccessNotice,
+  type DocsSessionAvailabilityReading,
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "../model/authorize-host.ts";
@@ -58,7 +61,10 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
       mintDocsSessionKey: (input: {
         projectId: string;
         docsOrigin: string;
+        access: DocsSessionKeyAccess;
+        lifetimeMinutes: DocsSessionKeyLifetimeMinutes;
       }) => Promise<DocsSessionKeyMinted>;
+      docsSessionAvailability: DocsSessionAvailabilityReading;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
     },
@@ -130,8 +136,17 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
     return typeof window === "undefined" ? "" : window.location.origin;
   }
 
-  mintDocsSessionKey(input: { projectId: string; docsOrigin: string }) {
+  mintDocsSessionKey(input: {
+    projectId: string;
+    docsOrigin: string;
+    access: DocsSessionKeyAccess;
+    lifetimeMinutes: DocsSessionKeyLifetimeMinutes;
+  }) {
     return this.deps.mintDocsSessionKey(input);
+  }
+
+  docsSessionAvailability(): DocsSessionAvailabilityReading {
+    return this.deps.docsSessionAvailability;
   }
 
   closeWindow(): void {
@@ -154,6 +169,21 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
     if (ok) this.deps.succeeded(input.succeeded);
     return ok;
   }
+}
+
+/**
+ * Unread reads as loading, so Allow waits for the switch. A failed read leaves the choice to the
+ * mint, which asks the organization again and refuses by name.
+ */
+function availabilityReadingOf({
+  data,
+  failed,
+}: {
+  data: { enabled: boolean } | undefined;
+  failed: boolean;
+}): DocsSessionAvailabilityReading {
+  if (!data) return failed ? "enabled" : "loading";
+  return data.enabled ? "enabled" : "disabled";
 }
 
 /** The page config's docs origins; a shell without one registers none, so nothing connects. */
@@ -189,6 +219,15 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
   const { mutateAsync: mintDocsKey, reset: resetDocsMint } =
     apiKeyApi.apiKey.mintDocsSessionKey.useMutation({ gcTime: 0 });
   const Switcher = useLent(ProjectSwitcherToken);
+  // Read only on the docs consent page, for the project its picker holds.
+  const availability = apiKeyApi.apiKey.docsSessionAvailability.useQuery(
+    { projectId: activeScope.projectId ?? "" },
+    { enabled: !!activeScope.projectId && location.pathname.startsWith("/connect/docs") },
+  );
+  const docsSessionAvailability = availabilityReadingOf({
+    data: availability.data,
+    failed: availability.isError,
+  });
 
   const host = useMemo(
     () =>
@@ -234,6 +273,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
             resetDocsMint();
           }
         },
+        docsSessionAvailability,
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
       }),
@@ -251,6 +291,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
       resetMint,
       mintDocsKey,
       resetDocsMint,
+      docsSessionAvailability,
     ],
   );
 

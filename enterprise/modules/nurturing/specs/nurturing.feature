@@ -68,6 +68,29 @@ Feature: Nurturing sends the signals its owners record
     When a signal is delivered
     Then nothing is claimed and nothing is sent
 
+  # Customer.io runs on multiple identifiers: a profile born with only an id fails every email
+  # automation ("undefined variable: customer.email"). The address is read fresh, never stored.
+  @unit
+  Scenario: Every Customer.io identify carries the person's email, or is not sent
+    Given nurturing sends Customer.io identifies for one person or a batch of members
+    When the user module holds a person's email
+    Then that person's identify carries it, the batch's addresses read in one query
+    And a person with no email, or one the user module does not know, gets no identify
+
+  @unit
+  Scenario: A Customer.io track goes behind an identify that carries the person's email
+    Given a Customer.io track creates the person's profile when none exists
+    When nurturing tracks an event for a person
+    Then the same request first identifies them with their email
+    And a person with no email is tracked nothing
+
+  @unit
+  Scenario: A Customer.io track is held back when its identify is not taken
+    Given a Customer.io track for a person with an email
+    When Customer.io does not take the identify
+    Then the track is not sent
+    And an OrThrow caller is rejected with the failure, while a fire-and-forget caller resolves and reports it
+
   @unit
   Scenario: A Customer.io outage is logged and the delivery completes
     Given Customer.io answers every call with a server error
@@ -107,6 +130,30 @@ Feature: Nurturing sends the signals its owners record
     Given an unseeded organization with no evaluation counted yet
     When two of its evaluations settle and one batch counts them
     Then first_evaluation_created is sent once, against the admin
+
+  @unit
+  Scenario: A counted evaluation tells the organization's Company it has evaluation results and its count
+    Given an evaluation_completed signal naming its organization
+    When the signal is delivered
+    Then Customer.io groups the admin into that organization with has_evaluation_results true and the evaluation_count
+
+  @unit
+  Scenario: The organization's first counted evaluations set first_evaluation_at on its Company
+    Given an evaluation_completed signal naming its organization, marked first
+    When the signal is delivered
+    Then the Company is sent first_evaluation_at as well
+
+  @unit
+  Scenario: A debounced evaluation batch still updates the organization's Company
+    Given an evaluation_completed signal naming its organization was delivered, and its tenant is debounced
+    When a second signal for the same tenant is delivered within the debounce window
+    Then Customer.io receives both Company group updates and the admin's identify and track once
+
+  @unit
+  Scenario: An evaluation signal recorded before it named its organization updates no Company
+    Given an evaluation_completed signal with no organization
+    When the signal is delivered
+    Then Customer.io receives no group call for it
 
   @unit
   Scenario: A redelivered settled evaluation is counted once
@@ -154,10 +201,13 @@ Feature: Nurturing sends the signals its owners record
     When the first evaluation nurturing counts for it settles
     Then no first_evaluation_created is sent and the traits carry the count since the cutover
 
+  # Project's backfill records no creation for a project that has one: one created fact per
+  # project, keyed "<project>:created". A backfilled fact of another of its projects does seed the
+  # organization, whichever lands first (seeded is known OR new, row 5a below).
   @unit
-  Scenario: Project's backfill is idempotent for nurturing
+  Scenario: A redelivered project creation leaves a live organization unseeded
     Given nurturing learned an organization from a live project creation
-    When project's backfill records that project again, once or many times
+    When the same creation fact is delivered again, once or many times
     Then the organization stays unseeded and its first evaluation still raises the milestone
 
   # Migration plan D.1 (DATA-NURTURING-GUARD): seeded is computed at read, so it also covers
@@ -202,6 +252,24 @@ Feature: Nurturing sends the signals its owners record
     When they all settle
     Then every one succeeds and the organization has one row
 
+  # Admin map (projections build plan, row 5a): the admin and seeded flag are folded order-free
+  # from project's created facts, so a late, redelivered or replayed fact leaves the row as live
+  # delivery would. The admin is the latest-stamped one, no longer the latest delivered; seeded
+  # turns on for any backfilled fact, no longer only the first delivered.
+  @unit @integration
+  Scenario: The organization's admin is the latest-stamped one whatever order the facts land in
+    Given project's created facts for one organization naming admins at different stamps
+    And a later fact naming no admin, from project's backfill
+    When they land in one order, or in its reverse
+    Then the organization's admin is the one the latest-stamped fact naming an admin names
+    And the organization is seeded
+
+  @integration
+  Scenario: A redelivered project-created fact leaves the organization's row as it was
+    Given nurturing folded a project's created fact into its organization's row
+    When the same fact is delivered again
+    Then the row is unchanged, its update time included
+
   @unit
   Scenario: An evaluation in an organization nurturing never learned raises nothing
     Given a project its owners hold, in an organization nurturing never learned
@@ -220,7 +288,7 @@ Feature: Nurturing sends the signals its owners record
   Scenario: A minted account is identified to PostHog and Customer.io, with no signed_up
     Given user records "lw.user.created" for an account minted by any path
     When the fact is delivered, once or many times
-    Then PostHog and Customer.io each learn the person once, the address and name read fresh from UserApi
+    Then PostHog and Customer.io each learn the person once, the address, name and first name read fresh from UserApi
     And no signed_up milestone is tracked
 
   @unit
@@ -249,3 +317,15 @@ Feature: Nurturing sends the signals its owners record
     When nurturing's pipeline is built
     Then it tombstones that key for one release
     And the first-trace and trace-received signals still reach nurturing through trace's "projectMetadata" lane, queued beside it under its unchanged key
+
+  @unit
+  Scenario: A sign-up is identified with the first name when the name looks like one
+    Given a person signs up with the name "Jane Doe"
+    When the sign-up is identified to Customer.io
+    Then the person's traits carry first_name "Jane"
+
+  @unit
+  Scenario: A sign-up with an email-like or one-letter name sends no first name
+    Given a person signs up with the name "jane@acme.com", "J", "J Doe", "jdoe42", "j_doe", "jane.doe" or no name at all
+    When the sign-up is identified to Customer.io
+    Then the person's traits carry no first_name

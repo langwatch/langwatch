@@ -188,14 +188,15 @@ Declared at `src/eventing/pii-redaction-spend.pipeline.ts:35`. Events: `piiRedac
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:140`           |
-| secret | `requestIdKey`                 | `API_KEY_PEPPER`                     | `src/app/data-privacy.app.ts:142`           |
-| secret | `requestIdKeyFallback`         | `CREDENTIALS_SECRET`                 | `src/app/data-privacy.app.ts:143`           |
-| secret | `requestIdKeyLastFallback`     | `NEXTAUTH_SECRET`                    | `src/app/data-privacy.app.ts:144`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:142`           |
+| secret | `requestIdKey`                 | `API_KEY_PEPPER`                     | `src/app/data-privacy.app.ts:144`           |
+| secret | `requestIdKeyFallback`         | `CREDENTIALS_SECRET`                 | `src/app/data-privacy.app.ts:145`           |
+| secret | `requestIdKeyLastFallback`     | `NEXTAUTH_SECRET`                    | `src/app/data-privacy.app.ts:146`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |
 | config | `langevalsEndpoint`            | `LANGEVALS_ENDPOINT`                 | `../contract/src/data-privacy.config.ts:20` |
 | config | `piiRedactionModelEndpoint`    | `PII_REDACTION_MODEL_ENDPOINT`       | `../contract/src/data-privacy.config.ts:25` |
+| config | `isSaas`                       | `IS_SAAS`                            | `../contract/src/data-privacy.config.ts:27` |
 
 <!-- readme:generated:end -->

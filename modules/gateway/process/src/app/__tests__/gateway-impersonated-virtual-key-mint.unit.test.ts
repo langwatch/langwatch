@@ -1,4 +1,4 @@
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -56,7 +56,7 @@ async function gatewayApp() {
 
 describe("given an operator acting as a member", () => {
   /** @scenario "Creating a virtual key is refused while an operator acts as another member" */
-  it("refuses the create with permission_denied before any permission is asked", async () => {
+  it("refuses the create with impersonation_cannot_mint_credential before any permission is asked", async () => {
     const { app, hasPermission } = await gatewayApp();
 
     const creating = app.authorizeVirtualKeyCreate({
@@ -68,13 +68,13 @@ describe("given an operator acting as a member", () => {
       guardrailAttachments: void 0,
     });
 
-    await expect(creating).rejects.toBeInstanceOf(PermissionDeniedError);
-    await expect(creating).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(creating).rejects.toBeInstanceOf(ImpersonationCannotMintCredentialError);
+    await expect(creating).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
     expect(hasPermission).not.toHaveBeenCalled();
   });
 
   /** @scenario "Rotating a virtual key is refused while an operator acts as another member" */
-  it("refuses the rotation with permission_denied before the key is read", async () => {
+  it("refuses the rotation with impersonation_cannot_mint_credential before the key is read", async () => {
     const { app, hasPermission } = await gatewayApp();
 
     const rotating = app.authorizeVirtualKeyOperation({
@@ -85,8 +85,8 @@ describe("given an operator acting as a member", () => {
       permission: "virtualKeys:rotate",
     });
 
-    await expect(rotating).rejects.toBeInstanceOf(PermissionDeniedError);
-    await expect(rotating).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(rotating).rejects.toBeInstanceOf(ImpersonationCannotMintCredentialError);
+    await expect(rotating).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
     expect(hasPermission).not.toHaveBeenCalled();
   });
 });

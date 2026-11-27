@@ -514,7 +514,7 @@ Feature: Enterprise SCIM package boundary
     Scenario: No SCIM token is minted while an operator acts as another member
       Given an operator acting as an organization admin through impersonation
       When they mint a SCIM token for the organization
-      Then the mint is refused with permission_denied before any permission is asked
+      Then the mint is refused with impersonation_cannot_mint_credential before any permission is asked
 
   Rule: A directory grant's id is a role-binding KSUID, never a per-process counter
 

@@ -12,6 +12,7 @@ import {
   type AuthorizationConditionType,
   type AuthorizationGrant,
   BRAID_CONDITION_COMPILER_VERSION,
+  BRAID_HELD_MAX_HOPS,
   braidConditionDigest,
   type BraidConditionTerm,
   braidConditionTermsOf,
@@ -285,12 +286,15 @@ export function conditionsExpression({
     braided.push(`(${windowed.sql} AND (${predicate.sql}))`);
   });
   if (braided.length > 0) {
-    params[fenceParam("heldFrom")] = Math.min(
-      ...braids.clauses
-        .filter((clause) => clause.kind === "braid")
-        .flatMap((clause) => clause.windows.map((window) => window.from)),
-    );
-    picks.push(`(${heldTraceOf(held)} AND (${braided.join(" OR ")}))`);
+    const braidWindows = braids.clauses
+      .filter((clause) => clause.kind === "braid")
+      .flatMap((clause) => clause.windows);
+    params[fenceParam("heldFrom")] = Math.min(...braidWindows.map((window) => window.from));
+    const heldOwners = [...new Set(braidWindows.map((window) => window.projectId))].toSorted();
+    params[fenceParam("heldOwners")] = heldOwners;
+    // A chain passes through at most one hop per owner, so fewer owners need fewer hops.
+    const hops = Math.min(heldOwners.length, BRAID_HELD_MAX_HOPS);
+    picks.push(`(${heldTraceOf({ held, hops })} AND (${braided.join(" OR ")}))`);
   }
   return {
     sql: `(TenantId IN (${slot("all", "Array(String)")}) AND (${picks.join(" OR ")}))`,
@@ -299,20 +303,43 @@ export function conditionsExpression({
 }
 
 /**
- * The traces an own project holds: one semi-join on `stored_spans` from the earliest braid
- * window's start, narrowed by the read's trace id or its own lower bound so it reads no wider than
- * the outer read (ADR-201 §3). The fence binds the tenants; a statement names only its bound.
+ * A span's link ports: `down` is where its children attach, `up` where it attaches to its parent.
+ * A probe names the other end, so a probe equals a port exactly when the two spans are parent and
+ * child; `self` carries an owner's tenant so an owner held at one hop stays held at the next.
  */
-function heldTraceOf(held: HeldTraceParam | undefined): string {
+const UNSET_IDS = "('', '0000000000000000')";
+/** Spans with an empty or all-zero id link to nothing: they are left out of every select. */
+const LINKABLE = ` AND SpanId NOT IN ${UNSET_IDS}`;
+/** An unset parent takes a tag of its side's own, which no port or probe on the other side has. */
+const parentOf = (tag: "up" | "down", unset: string) =>
+  `(if(ifNull(ParentSpanId, '') IN ${UNSET_IDS}, '${unset}', '${tag}'), ifNull(ParentSpanId, ''))`;
+const PORT_UP = parentOf("up", "unparented-port");
+const PORTS = `[('down', SpanId), ${PORT_UP}]`;
+const OWNER_PORTS = `[('down', SpanId), ${PORT_UP}, ('self', TenantId)]`;
+const OWNER_PROBES = `[${parentOf("down", "unparented-probe")}, ('up', SpanId), ('self', TenantId)]`;
+
+/**
+ * The (owner, trace) pairs held for the reader (ADR-201 §3): an owner whose span is parent or
+ * child of a reader span, or of a held owner's span, up to `hops` owner hops; one set per hop,
+ * each nesting the last once, every select from the earliest window and narrowed.
+ */
+function heldTraceOf({ held, hops }: { held: HeldTraceParam | undefined; hops: number }): string {
   let narrowed = "";
   if (held?.kind === "traceId") narrowed = ` AND TraceId = {${held.param}:String}`;
   if (held?.kind === "sinceMs") {
     narrowed = ` AND StartTime >= fromUnixTimestamp64Milli({${held.param}:Int64})`;
   }
-  return (
-    `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN (${slot("own", "Array(String)")})` +
-    ` AND StartTime >= fromUnixTimestamp64Milli(${slot("heldFrom", "Int64")})${narrowed})`
-  );
+  const from = ` AND StartTime >= fromUnixTimestamp64Milli(${slot("heldFrom", "Int64")})${narrowed}${LINKABLE}`;
+  const owners = `FROM stored_spans WHERE TenantId IN (${slot("heldOwners", "Array(String)")})${from}`;
+  let ports =
+    `SELECT TraceId, arrayJoin(${PORTS})` +
+    ` FROM stored_spans WHERE TenantId IN (${slot("own", "Array(String)")})${from}`;
+  let heldPairs = "";
+  for (let hop = 1; hop <= hops; hop += 1) {
+    heldPairs = `SELECT TenantId, TraceId ${owners} AND (TraceId, arrayJoin(${OWNER_PROBES})) IN (${ports})`;
+    ports = `SELECT TraceId, arrayJoin(${OWNER_PORTS}) ${owners} AND (TenantId, TraceId) IN (${heldPairs})`;
+  }
+  return `((TenantId, TraceId) IN (${heldPairs}))`;
 }
 
 /**

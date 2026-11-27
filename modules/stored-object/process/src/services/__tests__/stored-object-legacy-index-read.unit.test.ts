@@ -11,6 +11,7 @@ import {
   RoutedStoredObjectsClickHouse,
 } from "../../repositories/clickhouse/stored-objects.repository.ts";
 import { ObjectStorageStoredObjectLegacyStorageRepository } from "../../repositories/object-storage/object-storage.stored-object-legacy-storage.repository.ts";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
 import { StoredObjectFileReadService } from "../stored-object-file-read.service.ts";
 import { StoredObjectsTelemetryService } from "../stored-objects-telemetry.service.ts";
 import { StoredObjectsService } from "../stored-objects.service.ts";
@@ -58,6 +59,40 @@ describe("given the legacy stored_objects index is read through the tenant guard
       });
 
       await expect(read).rejects.toMatchObject({ code: "stored_object_not_found" });
+    });
+  });
+});
+
+describe("given the legacy index holds a row for an object", () => {
+  describe("when its row alone is asked for", () => {
+    /** @scenario "Probing an object or minting its read URL opens none of its bytes" */
+    it("answers the purpose and owner kind without asking storage for anything", async () => {
+      const nothingStored = ObjectStorageStoredObjectLegacyStorageRepository.create(
+        createApiFixture<ObjectStorage>({}),
+      );
+      const files = StoredObjectsService.create({
+        repository: createApiFixture<StoredObjectsRepository>({
+          tryFindById: async () => ({
+            id: "so_legacy",
+            project_id: PROJECT,
+            purpose: "trace_content",
+            owner_kind: "trace",
+            owner_id: "trace-1",
+            media_type: "audio/mpeg",
+            size_bytes: 3,
+            sha256: "a".repeat(64),
+            storage_uri: "s3://bucket/project-1/so_legacy",
+            created_at: new Date("2026-01-01T00:00:00Z"),
+            inserted_at: new Date("2026-01-01T00:00:00Z"),
+          }),
+        }),
+        registry: (projectId) => nothingStored.forProject(projectId),
+        telemetry: StoredObjectsTelemetryService.create(),
+      });
+
+      await expect(
+        files.findRowById({ projectId: PROJECT, id: "so_legacy" }),
+      ).resolves.toMatchObject({ purpose: "trace_content", owner_kind: "trace" });
     });
   });
 });

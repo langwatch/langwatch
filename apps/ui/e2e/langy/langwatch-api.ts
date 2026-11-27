@@ -266,6 +266,25 @@ export async function listDashboards(): Promise<{ id: string; name?: string }[]>
   return [...reports, ...toArray<{ id: string; name?: string }>(dashboards)];
 }
 
+/** The project's Dashboards boards, through the public REST surface. */
+export async function listBoards(): Promise<{ id: string; name?: string }[]> {
+  return toArray(await lwGet("/api/v1/dashboards"));
+}
+
+/** Makes an empty board, as a user would before asking Langy for a chart on it. */
+export async function createBoard({ name }: { name: string }): Promise<{ id: string }> {
+  return lwPost({ path: "/api/v1/dashboards", body: { name } });
+}
+
+/** The widgets on one board. */
+export async function listBoardWidgets({
+  dashboardId,
+}: {
+  dashboardId: string;
+}): Promise<{ id: string; name?: string }[]> {
+  return toArray(await lwGet(`/api/v1/dashboards/${encodeURIComponent(dashboardId)}/widgets`));
+}
+
 export async function listWorkflows(): Promise<{ id: string; name?: string }[]> {
   return toArray(await lwGet("/api/workflows"));
 }

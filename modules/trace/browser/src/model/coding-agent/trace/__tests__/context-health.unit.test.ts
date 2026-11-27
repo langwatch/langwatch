@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contextHealthBand, contextWindowCeiling } from "../context-health.ts";
+import { contextHealthBand, contextHeatLabel, contextWindowCeiling } from "../context-health.ts";
 
 describe("contextWindowCeiling", () => {
   describe("given a session that only used standard-window models", () => {
@@ -38,5 +38,29 @@ describe("contextHealthBand", () => {
     const band = contextHealthBand(ratio);
     expect(band.tone).toBe(tone);
     expect(band.label).toBe(label);
+  });
+});
+
+describe("contextHeatLabel", () => {
+  /** @scenario "A context that a frontier model handles comfortably is not called large" */
+  it("calls 151K tokens growing, not large", () => {
+    expect(contextHeatLabel({ contextTokens: 151_000, model: "claude-opus-5-5" })).toBe("growing");
+  });
+
+  /** @scenario "A context is large from 300K tokens" */
+  it("calls a context large from 300K tokens, also when the model is unknown", () => {
+    expect(contextHeatLabel({ contextTokens: 300_000, model: "claude-opus-5-5" })).toBe("large");
+    expect(contextHeatLabel({ contextTokens: 300_000, model: null })).toBe("large");
+    expect(contextHeatLabel({ contextTokens: 49_999, model: null })).toBeNull();
+  });
+
+  /** @scenario "A model with a wider window is large later" */
+  it("waits for 60% of a 1M window before calling it large", () => {
+    expect(contextHeatLabel({ contextTokens: 400_000, model: "claude-opus-5-5[1m]" })).toBe(
+      "growing",
+    );
+    expect(contextHeatLabel({ contextTokens: 600_000, model: "claude-opus-5-5[1m]" })).toBe(
+      "large",
+    );
   });
 });

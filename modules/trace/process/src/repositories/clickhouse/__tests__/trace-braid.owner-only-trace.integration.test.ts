@@ -27,6 +27,7 @@ const reader = `test-braid-held-reader-${run}`;
 const owner = `test-braid-held-owner-${run}`;
 const HELD = `held-${run}`;
 const OWNER_ONLY = `owner-only-${run}`;
+const SHARED_ID = `shared-id-${run}`;
 const WEB: CompiledWhere = {
   version: 1,
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
@@ -74,17 +75,19 @@ function spanRow({
   tenantId,
   traceId,
   spanId,
+  parentSpanId = null,
 }: {
   tenantId: string;
   traceId: string;
   spanId: string;
+  parentSpanId?: string | null;
 }) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
     TraceId: traceId,
     SpanId: spanId,
-    ParentSpanId: null,
+    ParentSpanId: parentSpanId,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -125,6 +128,8 @@ beforeAll(async () => {
       summaryRow({ tenantId: reader, traceId: HELD }),
       summaryRow({ tenantId: owner, traceId: HELD }),
       summaryRow({ tenantId: owner, traceId: OWNER_ONLY }),
+      summaryRow({ tenantId: reader, traceId: SHARED_ID }),
+      summaryRow({ tenantId: owner, traceId: SHARED_ID }),
     ],
     format: "JSONEachRow",
     clickhouse_settings: settings,
@@ -133,7 +138,14 @@ beforeAll(async () => {
     table: "stored_spans",
     values: [
       spanRow({ tenantId: reader, traceId: HELD, spanId: "reader-root" }),
-      spanRow({ tenantId: owner, traceId: HELD, spanId: "owner-in-held" }),
+      spanRow({
+        tenantId: owner,
+        traceId: HELD,
+        spanId: "owner-in-held",
+        parentSpanId: "reader-root",
+      }),
+      spanRow({ tenantId: reader, traceId: SHARED_ID, spanId: "reader-shared" }),
+      spanRow({ tenantId: owner, traceId: SHARED_ID, spanId: "owner-shared" }),
       spanRow({ tenantId: owner, traceId: OWNER_ONLY, spanId: "owner-alone" }),
     ],
     format: "JSONEachRow",
@@ -196,15 +208,28 @@ describe.skipIf(!clickHouseConfigured)("a trace only a braid's owner holds", () 
   describe("when the reader lists or searches its traces", () => {
     /** @scenario "A trace only the owner holds is not listed for the reader" */
     it("is not listed, not found by search, and is answered as not found when opened", async () => {
-      expect(await listed({ authorization: proof() })).toEqual({ traceIds: [HELD], count: 1 });
+      const heldIds = [HELD, SHARED_ID].toSorted();
+      const sorted = async (input: Parameters<typeof listed>[0]) => {
+        const { traceIds, count } = await listed(input);
+        return { traceIds: traceIds.toSorted(), count };
+      };
+      expect(await sorted({ authorization: proof() })).toEqual({ traceIds: heldIds, count: 2 });
       expect(
-        await listed({ authorization: proof(), queryText: "span.attribute.orchestrator:web" }),
-      ).toEqual({ traceIds: [HELD], count: 1 });
+        await sorted({ authorization: proof(), queryText: "span.attribute.orchestrator:web" }),
+      ).toEqual({ traceIds: heldIds, count: 2 });
 
       expect(await opened(OWNER_ONLY)).toEqual({
         header: { code: "trace_not_found" },
         spanIds: [],
       });
+    });
+
+    /** @scenario "A trace only the owner holds is not listed for the reader" */
+    it("shows no owner span in a trace held by trace id alone, with no span linked", async () => {
+      const { header, spanIds } = await opened(SHARED_ID);
+
+      expect(header).toEqual({ code: "found" });
+      expect(spanIds).toEqual(["reader-shared"]);
     });
   });
 

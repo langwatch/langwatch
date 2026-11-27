@@ -15,6 +15,7 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { erasedUserHashOf } from "../../../rules/nurturing-virtual-key.rules.ts";
 import { PrismaNurturingMilestonesRepository } from "../prisma.nurturing-milestones.repository.ts";
 import { PrismaNurturingPersonalProjectRepository } from "../prisma.nurturing-personal-project.repository.ts";
 
@@ -24,6 +25,7 @@ const organizationIds = [`test-nurturing-erasure-a-${run}`, `test-nurturing-eras
 const [firstOrganization, secondOrganization] = organizationIds as [string, string];
 const erased = `test-nurturing-erasure-erased-${run}`;
 const kept = `test-nurturing-erasure-kept-${run}`;
+const nobody = `test-nurturing-erasure-nobody-${run}`;
 const projectId = (name: string) => `test-nurturing-erasure-${name}-${run}`;
 
 describe.skipIf(!databaseUrl)("given nurturing's rows naming two accounts", () => {
@@ -75,6 +77,9 @@ describe.skipIf(!databaseUrl)("given nurturing's rows naming two accounts", () =
       await connection.client.nurturingPersonalProject.deleteMany({ where: { organizationId } });
       await connection.client.nurturingOrganization.deleteMany({ where: { organizationId } });
     }
+    await connection.client.nurturingErasedUser.deleteMany({
+      where: { userIdHash: { in: [erased, nobody].map(erasedUserHashOf) } },
+    });
     await connection.closeOnce();
   });
 
@@ -103,11 +108,28 @@ describe.skipIf(!databaseUrl)("given nurturing's rows naming two accounts", () =
     });
   });
 
+  describe("when a late fact names the erased account admin again", () => {
+    /** @scenario "An erased admin a late fact names again reads as no admin" */
+    it("reads the organization as having no admin", async () => {
+      await organizations.forgetAdmin({ adminUserId: erased });
+
+      await organizations.recordOrganization({
+        organizationId: firstOrganization,
+        adminUserId: erased,
+        seeded: false,
+      });
+
+      await expect(adminOf(firstOrganization)).resolves.toEqual([null]);
+      await expect(
+        organizations.countEvaluation({ organizationId: firstOrganization, by: 1 }),
+      ).resolves.toMatchObject([{ adminUserId: null }]);
+      await expect(adminOf(secondOrganization)).resolves.toEqual([kept]);
+    });
+  });
+
   describe("when an account no row names is erased", () => {
     /** @scenario "An erasure of an account nurturing holds no row for changes nothing" */
     it("leaves the other account's rows as they were", async () => {
-      const nobody = `test-nurturing-erasure-nobody-${run}`;
-
       await personalProjects.forgetOwner({ ownerUserId: nobody });
       await organizations.forgetAdmin({ adminUserId: nobody });
 

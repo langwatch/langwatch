@@ -49,11 +49,11 @@ describe("readerMustAct", () => {
     expect(readerMustAct({ presentation: failure, toolName: "bash" })).toBe(true);
   });
 
-  /** @scenario "A failure no retry can fix keeps its card" */
-  it("is true for a final github-not-connected, whatever its case or padding", () => {
+  /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+  it("is false for a final github-not-connected, whatever its case or padding", () => {
     const failure = presentation({ code: "  Langy_GitHub_Not_Connected ", terminal: true });
 
-    expect(readerMustAct({ presentation: failure, toolName: "bash" })).toBe(true);
+    expect(readerMustAct({ presentation: failure, toolName: "bash" })).toBe(false);
   });
 
   /** @scenario "A not-found probe folds into the record" */

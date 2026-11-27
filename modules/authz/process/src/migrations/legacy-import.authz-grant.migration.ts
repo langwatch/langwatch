@@ -83,8 +83,6 @@ function sendPacing({
   };
 }
 
-const grantIdentity = AuthzGrantIdentityService.create();
-
 /** A held report names a SAMPLE, not the world: the count is the size of the
  *  problem, the sample is enough to find it. */
 const MAX_REPORTED = 50;
@@ -186,20 +184,16 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       return { status: "finalized", report: { kind: "authz_engine_already_on" } };
     }
     const inventory = await this.readInventory(organizationId);
-    const expected = assemble({
-      organizationId,
-      inventory,
-    });
 
     // The budget handover rides every pass, monotonically upward, and it PRECEDES the
     // projection read: legacy keeps counting views while the organization is held, and this
     // write raises the usage row the read below returns.
     await this.deps.store.seedResourceGrantUsage({
       organizationId,
-      seeds: expected.shareLinks.map((link) => ({
-        grantId: link.row.id,
-        projectId: link.row.projectId,
-        viewCount: link.row.viewCount,
+      seeds: sortedShareLinkRows(inventory.shareLinkRows).map((row) => ({
+        grantId: row.id,
+        projectId: row.projectId,
+        viewCount: row.viewCount,
       })),
     });
 
@@ -209,6 +203,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     // the NEXT pass sees it folded and finalizes. Holding a first pass to finalize a later one
     // is the design, not a shortcut.
     const heads = await this.readHeads(organizationId);
+    // A derived id already stored, revoked included, keeps its layout (#9575).
+    const expected = assemble({
+      organizationId,
+      inventory,
+      storedGrantIds: new Set(heads.grantRows.map((row) => row.id)),
+    });
 
     // One organization can be tens of thousands of commands: sent a page at a time, each page
     // waiting for the pass's queue room, so the proof below still runs once, after all of them.
@@ -619,8 +619,10 @@ type ExpectedFacts = {
 function assemble({
   organizationId,
   inventory,
+  storedGrantIds,
 }: {
   organizationId: string;
+  storedGrantIds: ReadonlySet<string>;
   inventory: {
     organizationCreatedAtMs: number | null;
     roleRows: LegacyRoleRow[];
@@ -661,6 +663,7 @@ function assemble({
       teamRows: inventory.teamRows,
       bindingRows: inventory.bindingRows,
       covers,
+      storedGrantIds,
     }),
     inventory.members,
   );
@@ -672,20 +675,18 @@ function assemble({
       bindingRows: inventory.bindingRows,
       covers,
       organizationCreatedAtMs: inventory.organizationCreatedAtMs,
+      storedGrantIds,
     }),
     inventory.members,
   );
   const credentialFacts = inventory.credentials
     .slice()
     .toSorted((a, b) => a.projectId.localeCompare(b.projectId))
-    .map((credential) => credentialToFact({ organizationId, credential }));
-  const shareLinks = inventory.shareLinkRows
-    .slice()
-    .toSorted((a, b) => a.id.localeCompare(b.id))
-    .map((row): ExpectedShareLink => ({
-      row,
-      fact: shareLinkToFact({ organizationId, row }),
-    }));
+    .map((credential) => credentialToFact({ organizationId, credential, storedGrantIds }));
+  const shareLinks = sortedShareLinkRows(inventory.shareLinkRows).map((row): ExpectedShareLink => ({
+    row,
+    fact: shareLinkToFact({ organizationId, row }),
+  }));
 
   const nonResourceFacts = [
     ...bindingFacts,
@@ -799,11 +800,13 @@ function teamMembershipFacts({
   teamRows,
   bindingRows,
   covers,
+  storedGrantIds,
 }: {
   organizationId: string;
   teamRows: LegacyTeamRow[];
   bindingRows: LegacyBindingRow[];
   covers: BindingCoverage;
+  storedGrantIds: ReadonlySet<string>;
 }): GrantFact[] {
   const suppressed = ({ userId, teamId }: { userId: string; teamId: string }) =>
     bindingRows.some((row) => {
@@ -822,11 +825,12 @@ function teamMembershipFacts({
       const scope = { type: "TEAM" as const, id: row.teamId };
       return [
         {
-          grantId: grantIdentity.deriveGrantId({
+          grantId: AuthzGrantIdentityService.deriveGrantId({
             organizationId,
             principal,
             scope,
             occurredAtMs: row.createdAtMs,
+            storedGrantIds,
           }),
           principal,
           roleKey: roleKeyForTeamRole(row.role),
@@ -848,6 +852,7 @@ function organizationLevelFacts({
   bindingRows,
   covers,
   organizationCreatedAtMs,
+  storedGrantIds,
 }: {
   organizationId: string;
   members: OrganizationMemberFact[];
@@ -855,6 +860,7 @@ function organizationLevelFacts({
   bindingRows: LegacyBindingRow[];
   covers: BindingCoverage;
   organizationCreatedAtMs: number | null;
+  storedGrantIds: ReadonlySet<string>;
 }): GrantFact[] {
   const scope = { type: "ORGANIZATION" as const, id: organizationId };
   const facts: GrantFact[] = [];
@@ -862,11 +868,12 @@ function organizationLevelFacts({
   if (organizationCreatedAtMs !== null) {
     const principal = { type: "organization" as const, id: organizationId };
     facts.push({
-      grantId: grantIdentity.deriveGrantId({
+      grantId: AuthzGrantIdentityService.deriveGrantId({
         organizationId,
         principal,
         scope,
         occurredAtMs: organizationCreatedAtMs,
+        storedGrantIds,
       }),
       principal,
       roleKey: "member",
@@ -883,11 +890,12 @@ function organizationLevelFacts({
     if (bindingRows.some((row) => covers({ row, userId: member.userId }))) continue;
     const principal = { type: "user" as const, id: member.userId };
     facts.push({
-      grantId: grantIdentity.deriveGrantId({
+      grantId: AuthzGrantIdentityService.deriveGrantId({
         organizationId,
         principal,
         scope,
         occurredAtMs: member.createdAtMs,
+        storedGrantIds,
       }),
       principal,
       roleKey: "legacy-admin",
@@ -902,11 +910,12 @@ function organizationLevelFacts({
     .toSorted((a, b) => a.userId.localeCompare(b.userId))) {
     const principal = { type: "user" as const, id: member.userId };
     facts.push({
-      grantId: grantIdentity.deriveGrantId({
+      grantId: AuthzGrantIdentityService.deriveGrantId({
         organizationId,
         principal,
         scope,
         occurredAtMs: member.createdAtMs,
+        storedGrantIds,
       }),
       principal,
       roleKey: "lite-member",
@@ -924,18 +933,21 @@ function organizationLevelFacts({
 function credentialToFact({
   organizationId,
   credential,
+  storedGrantIds,
 }: {
   organizationId: string;
   credential: ProjectCredentialFact;
+  storedGrantIds: ReadonlySet<string>;
 }): GrantFact {
   const principal = { type: "project" as const, id: credential.projectId };
   const scope = { type: "PROJECT" as const, id: credential.projectId };
   return {
-    grantId: grantIdentity.deriveGrantId({
+    grantId: AuthzGrantIdentityService.deriveGrantId({
       organizationId,
       principal,
       scope,
       occurredAtMs: credential.createdAtMs,
+      storedGrantIds,
     }),
     principal,
     roleKey: "admin",
@@ -943,6 +955,10 @@ function credentialToFact({
     source: "migration",
     occurredAtMs: credential.createdAtMs,
   };
+}
+
+function sortedShareLinkRows(rows: readonly ShareLinkFactRow[]): ShareLinkFactRow[] {
+  return rows.toSorted((a, b) => a.id.localeCompare(b.id));
 }
 
 /** A share link as the ledger attaches it, adopting the row's own id so the

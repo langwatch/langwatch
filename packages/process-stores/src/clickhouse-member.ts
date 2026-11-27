@@ -377,6 +377,8 @@ export function buildClickHouse(options: {
       })),
     ],
     organizationOf: (tenantId) => connection.organizationOf(tenantId),
+    routeTenantSet: ({ tenantIds }) =>
+      connection.routeTenantSet({ tenantId: tenantIds[0] ?? "", tenantIds }),
     placementOf: (tenantId) => connection.placementOf(tenantId),
   });
 

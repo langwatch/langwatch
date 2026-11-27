@@ -19,10 +19,10 @@ Feature: Using ops agent access
     Then metadata holds no trace read, content adds trace reads, and support adds the write bag
 
   @unit
-  Scenario: The support bag holds no prompt or trigger write
+  Scenario: The support bag writes prompts and triggers
     Given the staff-support permission bag
-    Then it holds no prompt write, since a prompt write can deploy to production
-    And it holds no trigger write, since a trigger sends trace content out
+    Then it holds the prompt and trigger create and update permissions
+    And it holds no delete or manage permission
     And prompt text is content, not metadata
 
   @integration
@@ -39,14 +39,14 @@ Feature: Using ops agent access
     Then it is refused
 
   @integration
-  Scenario: A metadata key cannot read trace content
-    Given a redeemed "org:metadata" key on ACME
+  Scenario: A key without org:content cannot read trace content
+    Given a redeemed "org:support" key on ACME approved without "org:content"
     When the agent searches traces
     Then it is refused
 
   @integration
-  Scenario: A metadata key cannot read run results or stored files
-    Given a redeemed "org:metadata" key on ACME
+  Scenario: A key without org:content cannot read run results or stored files
+    Given a redeemed "org:support" key on ACME approved without "org:content"
     When the agent reads an experiment run's results or a stored file
     Then it is refused 403 with "staff_content_not_approved"
 

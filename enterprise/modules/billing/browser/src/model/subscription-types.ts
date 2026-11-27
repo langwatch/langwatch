@@ -11,6 +11,8 @@ import type { Currency } from "./billing-plans.ts";
 export const isValidEmail = (value: string) => z.string().email().validate(value);
 export const countFullMembers = (list: { memberType: MemberType }[]) =>
   list.filter((u) => u.memberType === "FullMember").length;
+export const countDevelopers = (list: { memberType: MemberType }[]) =>
+  list.filter((u) => u.memberType === "Developer").length;
 export const isSupportedCurrency = (value: unknown): value is Currency =>
   Object.values(CurrencyValues).includes(value as Currency);
 

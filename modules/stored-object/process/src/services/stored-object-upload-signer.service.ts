@@ -57,18 +57,24 @@ export class StoredObjectUploadSignerService {
     mediaType: string;
     expiresAt: Instant;
   }): string {
-    if (this.publicBaseUrl === undefined) throw new DirectUploadUnavailableError();
-
+    const origin = this.publicOrigin();
     const seal = this.seals.seal(
       JSON.stringify({ ...input, expiresAt: toDate(input.expiresAt).toISOString() }),
     );
     const url = new URL(
       `/api/stored-objects/uploads/${encodeURIComponent(input.objectId)}/content`,
-      this.publicBaseUrl,
+      origin,
     );
     url.searchParams.set("sig", seal);
 
     return url.toString();
+  }
+
+  /** The origin clients send through-process uploads to; refuses where none is named. */
+  publicOrigin(): string {
+    if (this.publicBaseUrl === undefined) throw new DirectUploadUnavailableError();
+
+    return this.publicBaseUrl;
   }
 
   /** The claims, once the seal opens, names this object and has not lapsed. */

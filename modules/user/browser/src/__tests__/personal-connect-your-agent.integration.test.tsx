@@ -175,7 +175,7 @@ beforeEach(() => {
 // rendering, the second case finds two of everything.
 afterEach(cleanup);
 
-describe("the /me usage home, when opened", () => {
+describe("the /coding-agents usage home, when opened", () => {
   /** @scenario "The personal overview announces its open as a usage page" */
   it("records me_overview", () => {
     renderPage();
@@ -183,8 +183,8 @@ describe("the /me usage home, when opened", () => {
   });
 });
 
-describe("the /me usage home's Connect your agent button, given a personal project with no traces yet", () => {
-  /** @scenario the /me home hides Connect your agent before the first trace */
+describe("the /coding-agents usage home's Connect your agent button, given a personal project with no traces yet", () => {
+  /** @scenario the /coding-agents home hides Connect your agent before the first trace */
   it("stays absent while the first-traces flag is false or unresolved", () => {
     hasFirstMessageRef.current = false;
     renderPage();
@@ -192,15 +192,15 @@ describe("the /me usage home's Connect your agent button, given a personal proje
     expect(screen.getByText("My usage")).toBeDefined();
     expect(connectButton()).toBeNull();
     // The gate read the SAME first-traces signal the authorize page
-    // watches, for the personal project the /me home resolves.
+    // watches, for the personal project the /coding-agents home resolves.
     expect(hasFirstMessageInputs).toContainEqual({
       projectId: "proj-personal",
     });
   });
 });
 
-describe("the /me usage home's Connect your agent button, given a personal project with traces", () => {
-  /** @scenario the /me home shows Connect your agent once the personal project has traces */
+describe("the /coding-agents usage home's Connect your agent button, given a personal project with traces", () => {
+  /** @scenario the /coding-agents home shows Connect your agent once the personal project has traces */
   it("renders the menu button in the My usage header", () => {
     renderPage();
     expect(connectButton()).not.toBeNull();
@@ -257,7 +257,7 @@ describe("the docs guide", () => {
   });
 });
 
-describe("the /me usage home's Connect your agent button, given a reader who can ask the assistant", () => {
+describe("the /coding-agents usage home's Connect your agent button, given a reader who can ask the assistant", () => {
   /** @scenario the menu offers Langy exploration, a coding-agent prompt, and the guide */
   it("offers all three exploration routes", async () => {
     const { user, trigger } = renderMenuTrigger({ canAskAssistant: true });

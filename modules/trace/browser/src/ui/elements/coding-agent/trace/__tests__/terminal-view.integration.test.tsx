@@ -131,6 +131,47 @@ describe("TerminalView", () => {
     });
   });
 
+  describe("given either app colour mode", () => {
+    /** What a matching style rule declares; jsdom drops var() colours from computed style. */
+    const declared = (element: Element, properties: string[]): string => {
+      let found = "";
+      for (const sheet of Array.from(document.styleSheets)) {
+        for (const rule of Array.from(sheet.cssRules)) {
+          if (!(rule instanceof CSSStyleRule) || !element.matches(rule.selectorText)) continue;
+          for (const property of properties) {
+            const value = rule.style.getPropertyValue(property);
+            if (value) found = value;
+          }
+        }
+      }
+      return found;
+    };
+    const BACKGROUND = ["background", "background-color"];
+    /** The background declared at or above an element. */
+    const paintedBackground = (element: Element | null): string => {
+      for (let node = element; node; node = node.parentElement) {
+        const background = declared(node, BACKGROUND);
+        if (background) return background;
+      }
+      return "";
+    };
+
+    /** @scenario "The terminal screen stays dark in both colour modes" */
+    it("paints the screen, its text and its diff rows from the terminal palette", () => {
+      renderView();
+      const terminalScreen = screen.getByTestId("terminal-screen");
+
+      expect(declared(terminalScreen, BACKGROUND)).toBe("var(--chakra-colors-terminal-bg)");
+      expect(declared(terminalScreen, ["color"])).toBe("var(--chakra-colors-terminal-fg)");
+      expect(paintedBackground(screen.getByText("const version = 2;"))).toBe(
+        "var(--chakra-colors-terminal-diff-add-bg)",
+      );
+      expect(paintedBackground(screen.getByText("const version = 1;"))).toBe(
+        "var(--chakra-colors-terminal-diff-remove-bg)",
+      );
+    });
+  });
+
   describe("given the session's last model call is a lone tool request with no reply text", () => {
     // The bug this replaces: the client used to rebuild the transcript from
     // the LAST model call's rolling history, so a lone trailing tool call with
@@ -1357,6 +1398,313 @@ describe("the bottom bar's cost stat", () => {
 
     it("shows nothing when neither figure exists", () => {
       expect(statusLineCostLabel({ costUsd: null, sessionCostUsd: null })).toBeNull();
+    });
+  });
+});
+
+describe("TerminalView in a Claude Code Code Mode session", () => {
+  const script = [
+    "const lines = await Bash({ command: 'wc -l notes.txt' });",
+    "const date = await Bash({ command: 'sleep 25 && date' });",
+    "const hits = await Bash({ command: 'grep -n gadgets notes.txt' });",
+    "return { lines, date, hits };",
+  ].join("\n");
+  const outcomeSummary = JSON.stringify({
+    status: "completed",
+    success: true,
+    durationMs: 18,
+    decision: "accept",
+  });
+
+  function toolEntry(fields: Partial<Extract<TranscriptEntry, { kind: "tool" }>>): TranscriptEntry {
+    return {
+      kind: "tool",
+      atMs: 1_000,
+      name: "Bash",
+      mcpServer: null,
+      input: null,
+      output: null,
+      durationMs: null,
+      failed: false,
+      agentId: null,
+      spanId: "",
+      ...fields,
+    };
+  }
+
+  function scriptCall(fullCommand: string, atMs: number): TranscriptEntry {
+    return toolEntry({
+      atMs,
+      input: { bash_command: fullCommand.split(" ")[0], full_command: fullCommand },
+      inScript: true,
+    });
+  }
+
+  const codeModeEntries: TranscriptEntry[] = [
+    { kind: "user_prompt", atMs: 500, text: "Count the lines of notes.txt", chars: 28 },
+    toolEntry({
+      name: "REPL",
+      input: { code: script, description: "Count lines, sleep+date, grep gadgets" },
+      output: outcomeSummary,
+      durationMs: 20,
+      spanId: "repl-span",
+    }),
+    scriptCall("wc -l notes.txt", 1_050),
+    scriptCall("sleep 25 && date", 1_100),
+    scriptCall("grep -n gadgets notes.txt", 26_200),
+    toolEntry({
+      atMs: 2_000,
+      name: "Poll",
+      input: {},
+      output: outcomeSummary,
+      durationMs: 54_000,
+      spanId: "poll-span",
+    }),
+  ];
+
+  function renderCodeMode(entries: TranscriptEntry[]) {
+    return renderWithDesignSystem(<TerminalView entries={entries} />);
+  }
+
+  describe("when the REPL call carries its script and description", () => {
+    /** @scenario "A Code Mode script is shown as a Code row with its script collapsed" */
+    it("draws one Code row with its line count and the script collapsed until opened", async () => {
+      const user = userEvent.setup();
+      const { container } = renderCodeMode(codeModeEntries);
+
+      expect(screen.getByText("Code")).toBeInTheDocument();
+      expect(container.textContent).toContain("Code(Count lines, sleep+date, grep gadgets)");
+      expect(container.textContent).toContain("· 4 lines (click to show)");
+      expect(container.textContent).not.toContain("wc -l notes.txt' });");
+      expect(screen.queryByText("REPL")).not.toBeInTheDocument();
+      expect(container.textContent).not.toContain('"status"');
+
+      await user.click(screen.getByRole("button", { name: /Code\(Count lines/ }));
+
+      expect(container.textContent).toContain("return { lines, date, hits };");
+      expect(container.textContent).not.toContain('"status"');
+    });
+  });
+
+  describe("when the script ran Bash commands", () => {
+    /** @scenario "The calls a Code Mode script made are shown under its Code row" */
+    it("lists each call by tool name and command, with no output filler", () => {
+      const { container } = renderCodeMode(codeModeEntries);
+
+      expect(screen.getAllByText("Bash")).toHaveLength(3);
+      expect(screen.getByText("(wc -l notes.txt)")).toBeInTheDocument();
+      expect(screen.getByText("(sleep 25 && date)")).toBeInTheDocument();
+      expect(screen.getByText("(grep -n gadgets notes.txt)")).toBeInTheDocument();
+      expect(container.textContent).not.toContain("(no output)");
+    });
+  });
+
+  describe("when the session was exported without content", () => {
+    /** @scenario "A metadata-only Code Mode session still names the script's calls" */
+    it("shows a bare Code row and the tools the script called, with no status summary", () => {
+      const { container } = renderCodeMode([
+        toolEntry({ name: "REPL", output: outcomeSummary, spanId: "repl-span" }),
+        toolEntry({ atMs: 1_050, name: "Bash", inScript: true }),
+        toolEntry({ atMs: 1_100, name: "Read", inScript: true }),
+      ]);
+
+      expect(screen.getByText("Code")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Code/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Bash")).toBeInTheDocument();
+      expect(screen.getByText("Read")).toBeInTheDocument();
+      expect(container.textContent).not.toContain('"status"');
+      expect(container.textContent).not.toContain("(no output)");
+    });
+  });
+
+  describe("when the model polled a running script", () => {
+    /** @scenario "Waiting on a running script is one quiet line with its duration" */
+    it("draws one wait line with how long it waited and no status summary", () => {
+      const { container } = renderCodeMode(codeModeEntries);
+
+      expect(screen.getByText("Waited for the script · 54.0s")).toBeInTheDocument();
+      expect(screen.queryByText("Poll")).not.toBeInTheDocument();
+      expect(container.textContent).not.toContain('"status"');
+    });
+
+    /** @scenario "A poll that failed still shows its error" */
+    it("shows a failed poll as a failed call with its error", () => {
+      const { container } = renderCodeMode([
+        toolEntry({
+          atMs: 2_000,
+          name: "Poll",
+          input: {},
+          output: "Script failed: TypeError: notes is undefined",
+          failed: true,
+          spanId: "poll-span",
+        }),
+      ]);
+
+      expect(screen.getByText("Poll")).toBeInTheDocument();
+      expect(container.textContent).toContain("Script failed: TypeError: notes is undefined");
+      expect(container.textContent).not.toContain("Waited for the script");
+    });
+  });
+
+  describe("when the REPL input carries a script but no description", () => {
+    /** @scenario "A script with no description falls back to Code" */
+    it("reads Code with the script's line count", () => {
+      const { container } = renderCodeMode([
+        toolEntry({ name: "REPL", input: { code: "return 1;" }, spanId: "repl-span" }),
+      ]);
+
+      expect(container.textContent).toContain("Code · 1 line (click to show)");
+    });
+  });
+
+  describe("when a poll returned the script's settled result", () => {
+    const preamble =
+      "<system>authentic event nonces for this delivery: aB3dE5fG</system>\n" +
+      "<tools-used-before-summary>Bash</tools-used-before-summary>\n";
+
+    function pollWith(body: string): TranscriptEntry {
+      return toolEntry({
+        atMs: 2_000,
+        name: "Poll",
+        input: {},
+        output: `${preamble}<event nonce="aB3dE5fG" kind="repl-eval" eval="3" ms="1642" status="settled">\n${body}\n</event>`,
+        durationMs: 1_600,
+        spanId: "poll-span",
+      });
+    }
+
+    /** @scenario "A poll shows what the script handed back" */
+    it("shows the result under the wait line without the harness markup", () => {
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: { code: script, description: "Count lines" },
+          output: "(dispatched #3)",
+          spanId: "repl-span",
+        }),
+        pollWith("<result>4 notes.txt\nacme.example.com</result>"),
+      ]);
+
+      expect(screen.getByText("Waited for the script · 1.6s")).toBeInTheDocument();
+      expect(container.textContent).toContain("4 notes.txt");
+      expect(container.textContent).toContain("acme.example.com");
+      expect(container.textContent).not.toContain("nonce");
+      expect(container.textContent).not.toContain("<result>");
+      expect(container.textContent).not.toContain("tools-used-before-summary");
+    });
+
+    /** @scenario "A script that failed shows its error under the poll" */
+    it("shows the script's error under the wait line", () => {
+      const { container } = renderCodeMode([
+        pollWith("<error>The script did not run: it failed to parse.</error>"),
+      ]);
+
+      expect(screen.getByText("Waited for the script · 1.6s")).toBeInTheDocument();
+      expect(container.textContent).toContain("The script did not run: it failed to parse.");
+      expect(container.textContent).not.toContain("<error>");
+    });
+  });
+
+  describe("when the REPL call answered with a dispatch receipt", () => {
+    /** @scenario "A dispatched script does not show its receipt as a result" */
+    it("shows no receipt on the Code row, even once opened", async () => {
+      const user = userEvent.setup();
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: { code: script, description: "Count lines" },
+          output: "(dispatched #3)",
+          spanId: "repl-span",
+        }),
+      ]);
+
+      await user.click(screen.getByRole("button", { name: /Code\(Count lines\)/ }));
+      expect(container.textContent).not.toContain("(dispatched #3)");
+    });
+  });
+
+  describe("when Claude Code's telemetry cut the script short", () => {
+    /** @scenario "A script Claude Code cut short says how long it was" */
+    it("shows the start of the script and says how long the whole script was", async () => {
+      const user = userEvent.setup();
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: {
+            code: "const notes = await file('notes.txt').text();\nconst\u2026[746 chars]",
+            description: "Read notes",
+          },
+          output: outcomeSummary,
+          spanId: "repl-span",
+        }),
+      ]);
+
+      expect(container.textContent).toContain("Code(Read notes) · 746 characters (click to show)");
+      await user.click(screen.getByRole("button", { name: /Code\(Read notes\)/ }));
+      expect(container.textContent).toContain("await file('notes.txt')");
+      expect(container.textContent).not.toContain("[746 chars]");
+      expect(container.textContent).toContain(
+        "Claude Code recorded only the start of this 746-character script",
+      );
+    });
+  });
+
+  describe("when the session was exported without content", () => {
+    /** @scenario "A session exported without content says so once" */
+    it("says once that the agent sends metadata only and keeps each Code row bare", () => {
+      const { container } = renderCodeMode([
+        { kind: "user_prompt", atMs: 500, text: null, chars: 0 },
+        toolEntry({ name: "REPL", output: outcomeSummary, durationMs: 8, spanId: "repl-span" }),
+        toolEntry({ atMs: 1_500, name: "REPL", output: outcomeSummary, spanId: "repl-span-2" }),
+        toolEntry({
+          atMs: 2_000,
+          name: "Poll",
+          input: {},
+          output: outcomeSummary,
+          durationMs: 3,
+          spanId: "poll-span",
+        }),
+      ]);
+
+      const reason =
+        "This agent sends metadata only, so its prompts, scripts and output are not recorded";
+      expect(screen.getAllByText(reason)).toHaveLength(1);
+      expect(container.textContent).not.toContain("script not recorded");
+      expect(screen.getAllByText("Code")).toHaveLength(2);
+      expect(screen.queryByRole("button", { name: /Code/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Waited for the script · 3ms")).toBeInTheDocument();
+      expect(container.textContent).not.toContain('"status"');
+    });
+  });
+
+  describe("when one script of a recorded session was not recorded", () => {
+    /** @scenario "A Code call with no script recorded says so" */
+    it("says on that row that the script was not recorded", () => {
+      const { container } = renderCodeMode([
+        { kind: "user_prompt", atMs: 500, text: "tidy the notes", chars: 14 },
+        toolEntry({ name: "REPL", output: outcomeSummary, durationMs: 8, spanId: "repl-span" }),
+      ]);
+
+      expect(container.textContent).toContain("Code · script not recorded");
+      expect(container.textContent).not.toContain("sends metadata only");
+    });
+  });
+
+  describe("when the script's result text was recorded", () => {
+    it("shows it with the script once opened", async () => {
+      const user = userEvent.setup();
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: { code: script, description: "Count lines" },
+          output: "4 notes.txt",
+          spanId: "repl-span",
+        }),
+      ]);
+
+      expect(container.textContent).not.toContain("4 notes.txt");
+      await user.click(screen.getByRole("button", { name: /Code\(Count lines\)/ }));
+      expect(container.textContent).toContain("4 notes.txt");
     });
   });
 });

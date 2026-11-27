@@ -44,8 +44,14 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_agent_testing_v2_enabled",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
+  // With release_dashboards, the sidebar's Dashboards section in Gateway and Coding agents too.
+  "release_dashboards_in_every_product",
+  // With release_dashboards, the organization-wide area: the /dashboards library and its pages.
+  "release_dashboards_organization_area",
   // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
   "release_insights",
+  // The Braids pages and their settings entry; braids already made still apply.
+  "release_braids",
   // LangWatchQL; with release_dashboards, the reports page's widget drawer.
   "release_lwql_workbench",
   // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
@@ -54,8 +60,17 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_instant_evals",
   // The own decision models in the Instant Evals column of Default models (ADR-182).
   "release_instant_evals_own_decision_model",
-  // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).
+  // The judge picker names the hosted model LangWatch Evals (preview), the LangWatch Judge router
+  // (ADR-190).
   "release_instant_evals_judge_router",
+  // The Data Privacy page's Essential or Strict organization picker, Strict's
+  // price and its example (modules/data-privacy/specs/pii-redaction-level-picker.feature).
+  "release_pii_redaction_model_enabled",
+  // On the free list: the picker shows Strict as included, with no price and no price confirmation.
+  "release_pii_redaction_model_free",
+  // Long Strict spans go to the model in parts: the picker's small print names the split limit
+  // (ADR-207, pii-redaction-level-picker.feature).
+  "release_pii_redaction_model_split_enabled",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

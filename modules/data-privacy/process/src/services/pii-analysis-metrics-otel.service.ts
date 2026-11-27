@@ -35,7 +35,10 @@ export type PiiRedactionModelFallbackReason =
   | "throttled"
   | "error"
   | "breaker_open"
-  | "routing_error";
+  | "routing_error"
+  | "not_licensed"
+  | "busy"
+  | "unplaceable";
 
 /** External PII analysis counts and durations, pushed over OTLP. */
 export class PiiAnalysisMetricsOtelService {
@@ -60,36 +63,28 @@ export class PiiAnalysisMetricsOtelService {
     });
   }
 
-  private readonly checks: CounterHandle;
-  private readonly duration: HistogramHandle;
-  private readonly status: CounterHandle;
-  private readonly modelFallbacks: CounterHandle;
-
-  private constructor(series: {
-    checks: CounterHandle;
-    duration: HistogramHandle;
-    status: CounterHandle;
-    modelFallbacks: CounterHandle;
-  }) {
-    this.checks = series.checks;
-    this.duration = series.duration;
-    this.status = series.status;
-    this.modelFallbacks = series.modelFallbacks;
-  }
+  private constructor(
+    private readonly series: {
+      checks: CounterHandle;
+      duration: HistogramHandle;
+      status: CounterHandle;
+      modelFallbacks: CounterHandle;
+    },
+  ) {}
 
   analysisCalled(method: string): void {
-    this.checks.inc({ method });
+    this.series.checks.inc({ method });
   }
 
   analysisObserved(durationMs: number, method: PiiAnalysisMethod): void {
-    this.duration.observe(durationMs, { evaluator_type: EVALUATOR_TYPE_BY_METHOD[method] });
+    this.series.duration.observe(durationMs, { evaluator_type: EVALUATOR_TYPE_BY_METHOD[method] });
   }
 
   analysisFinished(outcome: PiiAnalysisOutcome, method: PiiAnalysisMethod): void {
-    this.status.inc({ evaluator_type: EVALUATOR_TYPE_BY_METHOD[method], status: outcome });
+    this.series.status.inc({ evaluator_type: EVALUATOR_TYPE_BY_METHOD[method], status: outcome });
   }
 
   modelFellBack(reason: PiiRedactionModelFallbackReason): void {
-    this.modelFallbacks.inc({ reason });
+    this.series.modelFallbacks.inc({ reason });
   }
 }

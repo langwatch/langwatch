@@ -113,3 +113,17 @@ Feature: Writing canonical spans to storage from a background process
     When it composes the span-storage write path
     Then storing a projected span reaches ClickHouse as a stored span row
     And the row carries the retention the process was configured with
+
+  # #9575: stored_spans dedups on (TenantId, TraceId, SpanId), never on the id,
+  # so a span's deterministic id is minted in the corrected KSUID layout.
+  @unit
+  Scenario: A span record id is minted in the corrected layout
+    Given a span decoded from an OTLP request
+    When its deterministic record id is derived
+    Then the id carries its timestamp big-endian, in the "v2" layout
+
+  @unit
+  Scenario: A span row records the layout its id was minted in
+    Given a span-storage write path over a ClickHouse client
+    When a process stores a span
+    Then the row records the layout "v2" in IdLayout

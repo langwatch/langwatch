@@ -13,7 +13,7 @@ import {
   externalIdSchema,
   resourceMetadataSchema,
 } from "./gateway.resource-metadata.ts";
-import { virtualKeyConfigSchema } from "./virtual-key-config.ts";
+import { virtualKeyConfigPatchSchema } from "./virtual-key-config.ts";
 
 export const gatewayVkScopeTypeSchema = z.enum(["organization", "team", "project"]);
 
@@ -297,7 +297,7 @@ const gatewayCreateVirtualKeySchemaDefinition = z.object({
   routing_mode: gatewayRoutingModeWireSchema.optional(),
   expires_at: expiresAtWireSchema.optional(),
   budget: gatewayBudgetWireSchema.nullable().optional(),
-  config: virtualKeyConfigSchema.partial().optional(),
+  config: virtualKeyConfigPatchSchema.optional(),
   external_id: externalIdSchema.nullable().optional(),
   metadata: resourceMetadataSchema.optional(),
   purpose: z.literal("user").optional(),
@@ -317,7 +317,7 @@ const gatewayUpdateVirtualKeySchemaDefinition = z.object({
   routing_mode: gatewayRoutingModeWireSchema.optional(),
   expires_at: expiresAtWireSchema.nullable().optional(),
   budget: gatewayBudgetWireSchema.nullable().optional(),
-  config: virtualKeyConfigSchema.partial().optional(),
+  config: virtualKeyConfigPatchSchema.optional(),
   external_id: externalIdSchema.nullable().optional(),
   metadata: resourceMetadataSchema.optional(),
 });

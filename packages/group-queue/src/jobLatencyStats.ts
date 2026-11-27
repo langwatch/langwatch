@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
 const LATENCY_SAMPLE_SIZE = 200;
@@ -53,7 +53,7 @@ export class JobLatencyStats {
   ) {}
 
   record(durationMs: number): void {
-    const completedAtMs = this.params.now?.() ?? nowInstant().epochMilliseconds;
+    const completedAtMs = this.params.now?.() ?? nowEpochMs();
     const field = latencyBucketField(durationMs);
     const { queueName } = this.params;
 

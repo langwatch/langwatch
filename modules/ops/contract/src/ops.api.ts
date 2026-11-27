@@ -119,12 +119,18 @@ import type {
   OpsQueueReapedStrandedGroups,
   OpsQueueReconcileOutcome,
 } from "./features/queue/ops-queue.ts";
+import type { TenantQueueCount, TenantQueueCountInput } from "./features/queue/ops-tenant-queue.ts";
 import type {
   BugReport,
   BugReportListing,
   ListBugReportsInput,
   SubmitBugReport,
 } from "./ops-bug-report.ts";
+import type {
+  OpsFeatureFlagTarget,
+  OpsFindFeatureFlagTargetsInput,
+  OpsSearchFeatureFlagTargetsInput,
+} from "./ops-feature-flag.ts";
 import type { OpsPlatformOperator } from "./ops-operators.ts";
 import type {
   ListInsightSchedulesInput,
@@ -505,6 +511,11 @@ export interface OpsApi {
   reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome>;
   readQueuePendingDrift(input: ReadQueuePendingDriftInput): Promise<number>;
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage>;
+  /**
+   * Per queue, how many groups of these tenants wait, are blocked, active, parked or dead
+   * lettered (ADR-202 ops functions): counts and one time, never a key, payload or error text.
+   */
+  countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]>;
   /** Whether this identity holds `ops:view` at the platform: the platform-operator grant. */
   isAdmin(identity: AdminIdentity): Promise<boolean>;
   assertDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
@@ -630,6 +641,12 @@ export interface OpsApi {
   /** Revokes one holder; authz refuses the last holder. */
   revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null }): Promise<void>;
   featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
+  /** Targets a rule may name, by name, slug, id or email; at most ten. */
+  searchFeatureFlagTargets(
+    input: OpsSearchFeatureFlagTargetsInput,
+  ): Promise<OpsFeatureFlagTarget[]>;
+  /** The targets stored rules name by id; an id nothing answers for is left out. */
+  findFeatureFlagTargets(input: OpsFindFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]>;
   /** The last seat sharing check, empty before the first; not found without Cloud admin. */
   findSeatSharingChecks(): Promise<SeatSharingCheck[]>;
   /** Runs the seat sharing check over every organization on a paid plan and keeps the result. */

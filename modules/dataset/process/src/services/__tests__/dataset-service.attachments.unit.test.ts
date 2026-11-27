@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
   createDatasetTestRequestBoundsWith,
@@ -58,6 +59,10 @@ async function datasetWith(
   const service = DatasetService.create({
     repository: repositories.datasets,
     records: repositories.records,
+    content: createDatasetTestContent({
+      datasets: repositories.content,
+      storage: repositories.chunks,
+    }),
     requestBounds,
     attachments: createDatasetTestAttachments(storedObjects),
     inlineAttachments: createDatasetTestInlineAttachments(storedObjects, requestBounds),
@@ -73,8 +78,10 @@ async function datasetWith(
   });
   const saveRow = (entry: Record<string, unknown>) =>
     service.batchCreateRecords({ projectId, slugOrId: dataset.id, entries: [entry] });
-  const rows = () =>
-    repositories.records.listAll({ datasetId: dataset.id, projectId, page: 1, limit: 10 });
+  const rows = async () => {
+    const page = await service.listRecords({ projectId, slugOrId: dataset.id });
+    return { records: page.data, total: page.pagination.total };
+  };
 
   return { service, dataset, getMetadata, storeFromBytes, saveRow, rows };
 }

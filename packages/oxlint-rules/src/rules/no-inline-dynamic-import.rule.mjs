@@ -28,6 +28,9 @@ const UI_APPLICATION = /^apps\/ui\/src\//;
 const DEV_RUNTIME_ENTRY = /^tools\/dev-runtime\/src\/app\.entrypoint\.ts$/;
 // The tasks entry loads every module only for a module task, so migrations stay fast.
 const TASKS_ENTRY = /^apps\/tasks\/src\/main\.ts$/;
+// A docs island loads a heavy part after its first click, under the size budgets in
+// apps/docs/scripts/interaction-sizes.mjs (Alex, 2026-11-13: docs islands only).
+const DOCS_ISLAND = /^apps\/docs\/src\/features\/[^/]+\/browser\//;
 
 function isExempt(workspacePath) {
   return (
@@ -40,7 +43,8 @@ function isExempt(workspacePath) {
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
     UI_APPLICATION.test(workspacePath) ||
     DEV_RUNTIME_ENTRY.test(workspacePath) ||
-    TASKS_ENTRY.test(workspacePath)
+    TASKS_ENTRY.test(workspacePath) ||
+    DOCS_ISLAND.test(workspacePath)
   );
 }
 

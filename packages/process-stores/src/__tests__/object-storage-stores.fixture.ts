@@ -12,6 +12,7 @@ export type ObjectStorageSettings = StoresConfig["objectStorage"];
 
 export const noObjectStorage: ObjectStorageSettings = {
   backend: undefined,
+  uploads: undefined,
   localRoot: undefined,
   s3: { bucket: undefined, endpoint: undefined, region: undefined },
   azure: {

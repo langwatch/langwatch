@@ -119,6 +119,8 @@ export interface OrganizationMemberSummary {
   createdAt: OrganizationUser["createdAt"];
   updatedAt: OrganizationUser["updatedAt"];
   user: { id: string; name: string | null; email: string | null };
+  /** A Billing-only member (ADR-205): no team, no seat. */
+  billingOnly?: boolean;
 }
 
 /**
@@ -212,6 +214,8 @@ export interface MemberSeatStanding {
   seatPendingSince: Instant | null;
   email: string | null;
   name: string | null;
+  /** A Billing-only member holds no seat (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** A person admission left waiting for a seat. */

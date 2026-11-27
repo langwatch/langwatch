@@ -19,12 +19,17 @@ export function flooredViewName(view: string): string {
   return `${view}${FLOOR_SUFFIX}`;
 }
 
-/** The view a floored twin is cut from (whose columns it carries), else `relation` itself. */
-export function baseViewName(relation: string): string {
-  return relation.endsWith(FLOOR_SUFFIX) ? relation.slice(0, -FLOOR_SUFFIX.length) : relation;
+/** Whether `relation`, bare or database-qualified, names a floored twin. */
+export function isFlooredViewName(relation: string): boolean {
+  return relation.endsWith(FLOOR_SUFFIX);
 }
 
-/** The views whose twin is provisioned: in-tuple or settled ones that declare a floor column. */
+/** The view a floored twin is cut from (whose columns it carries), else `relation` itself. */
+export function baseViewName(relation: string): string {
+  return isFlooredViewName(relation) ? relation.slice(0, -FLOOR_SUFFIX.length) : relation;
+}
+
+/** The views whose twin is provisioned: those of a floored strategy that declare a floor column. */
 function floorableViews(
   views: readonly LangWatchQLViewDefinition[],
 ): { name: string; floorColumn: string }[] {
@@ -72,6 +77,8 @@ const QUERY_CONSTANT_FUNCTIONS: ReadonlySet<string> = new Set([
   "multiply",
   "intdiv",
   "datediff",
+  "least",
+  "greatest",
   "fromunixtimestamp",
   "fromunixtimestamp64milli",
   ...["second", "minute", "hour", "day", "week", "month", "quarter", "year"].flatMap((unit) => [
@@ -96,7 +103,7 @@ type StatementFacts = {
 };
 
 /** `value` as a tree node, in a list of none or one. */
-function nodesOf(value: unknown): SqlAstNode[] {
+export function nodesOf(value: unknown): SqlAstNode[] {
   return typeof value === "object" &&
     value !== null &&
     typeof (value as SqlAstNode).type === "string"
@@ -105,7 +112,7 @@ function nodesOf(value: unknown): SqlAstNode[] {
 }
 
 /** Where a node sits in the statement; every node the parser returns carries it. */
-function getSpan(node: SqlAstNode): Span {
+export function getSpan(node: SqlAstNode): Span {
   const { start, end } =
     (node.location as { start?: { offset?: unknown }; end?: { offset?: unknown } } | undefined) ??
     {};
@@ -115,15 +122,24 @@ function getSpan(node: SqlAstNode): Span {
   return { start: start.offset, end: end.offset };
 }
 
-/** Every node under `value` that `keep` accepts, skipping the fields that say nothing. */
-function collectNodes(value: unknown, keep: (node: SqlAstNode) => boolean): SqlAstNode[] {
-  if (Array.isArray(value)) return value.flatMap((item) => collectNodes(item, keep));
-  return nodesOf(value).flatMap((node) => [
-    ...(keep(node) ? [node] : []),
-    ...Object.entries(node)
-      .filter(([field]) => !METADATA_FIELDS.includes(field))
-      .flatMap(([, child]) => collectNodes(child, keep)),
-  ]);
+/**
+ * Every node under `value` that `keep` accepts, skipping the fields that say nothing. A node
+ * `enter` refuses is neither kept nor descended into.
+ */
+export function collectNodes(
+  value: unknown,
+  keep: (node: SqlAstNode) => boolean,
+  enter: (node: SqlAstNode) => boolean = () => true,
+): SqlAstNode[] {
+  if (Array.isArray(value)) return value.flatMap((item) => collectNodes(item, keep, enter));
+  return nodesOf(value)
+    .filter(enter)
+    .flatMap((node) => [
+      ...(keep(node) ? [node] : []),
+      ...Object.entries(node)
+        .filter(([field]) => !METADATA_FIELDS.includes(field))
+        .flatMap(([, child]) => collectNodes(child, keep, enter)),
+    ]);
 }
 
 function conjuncts(value: unknown): SqlAstNode[] {

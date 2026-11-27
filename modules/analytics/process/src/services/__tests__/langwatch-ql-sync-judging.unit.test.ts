@@ -12,7 +12,7 @@ import {
   type InstantEvalQueryJudging,
 } from "@langwatch/instant-eval-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { Trace } from "@langwatch/trace-contract";
+import type { ThreadTraceIds, Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -62,6 +62,7 @@ const JUDGE_LIMITS: ReturnType<InstantEvalApi["getJudgeLimits"]> = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 50,
 };
 
 /** The fit the annoyed question leaves under {@link JUDGE_LIMITS}. */
@@ -130,6 +131,16 @@ class CountingTraceSource implements LangWatchQLTraceSource {
     this.reads += 1;
 
     return threadKeys.map((key) => trace({ id: `trace-${key}`, threadId: key }));
+  }
+
+  async readThreadTraceIds({
+    threadKeys,
+  }: {
+    threadKeys: readonly string[];
+  }): Promise<readonly ThreadTraceIds[]> {
+    this.reads += 1;
+
+    return threadKeys.map((key) => ({ threadId: key, traceIds: [`trace-${key}`] }));
   }
 }
 

@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -97,6 +98,7 @@ jobs:
           docker logs ch-backup 2>&1 | tail -100 || true
 
   clickhouse-serverless-complete:
+    timeout-minutes: 5
     needs: [changes, test, e2e]
     if: always()
     runs-on: ubuntu-latest

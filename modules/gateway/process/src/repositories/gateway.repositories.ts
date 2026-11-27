@@ -1,3 +1,4 @@
+import type { GatewayA2aTargetRepository } from "./gateway-a2a-target.repository.ts";
 import type { GatewayAgentCacheEntryRepository } from "./gateway-agent-cache.repository.ts";
 import type { GatewayAuditRepository } from "./gateway-audit.repository.ts";
 import type { GatewayBudgetChangeDedupeRepository } from "./gateway-budget-change-dedupe.repository.ts";
@@ -55,6 +56,8 @@ export interface GatewayRepositories {
   /** The key ids behind the external ids a spend filter names. */
   readonly spendScope: GatewaySpendScopeRepository;
   readonly connectUpstream: GatewayConnectUpstreamRepository;
+  /** A2A targets; the live tier seals upstream headers at rest. */
+  readonly a2aTargets: GatewayA2aTargetRepository;
   readonly realtimeSessions: GatewayRealtimeSessionRepository;
   readonly internalStore: GatewayInternalStoreRepository;
   readonly traceExportKeys: GatewayTraceExportKeyRepository;

@@ -11,7 +11,8 @@ import {
   type NurturingCountedTrace,
   type NurturingTraceDay,
   traceCountsOf,
-  traceDayIncrementsOf,
+  traceDayKeyOf,
+  traceDayOfKey,
 } from "../nurturing-trace-day.rules.ts";
 
 const AT = Date.UTC(2026, 10, 19, 12);
@@ -62,29 +63,13 @@ describe("addCountedTrace()", () => {
   });
 });
 
-describe("traceDayIncrementsOf()", () => {
-  /** @scenario "Root spans of one project and day are written as one increment" */
-  it("sums a batch's traces and failures into one increment per project and day", () => {
-    const increments = traceDayIncrementsOf([
-      span(),
-      span({ at: AT + 1000 }),
-      failure({ at: AT + 500 }),
-      span({ day: "2026-11-20", at: AT + 86_400_000 }),
-      span({ projectId: "project-2" }),
-    ]);
+describe("traceDayKeyOf()", () => {
+  /** @scenario "The spans and failures folds keep their own rows of a day, which the read sums" */
+  it("keys a project's day, and reads the key back", () => {
+    const key = traceDayKeyOf({ projectId: "project-1", day: "2026-11-19" });
 
-    expect(increments).toEqual([
-      {
-        projectId: "project-1",
-        day: "2026-11-19",
-        traceCount: 2,
-        errorCount: 1,
-        lastTraceAt: AT + 1000,
-        lastFailedTraceAt: AT + 500,
-      },
-      expect.objectContaining({ projectId: "project-1", day: "2026-11-20", traceCount: 1 }),
-      expect.objectContaining({ projectId: "project-2", day: "2026-11-19", traceCount: 1 }),
-    ]);
+    expect(traceDayOfKey(key)).toEqual({ projectId: "project-1", day: "2026-11-19" });
+    expect(() => traceDayOfKey(JSON.stringify(["project-1"]))).toThrow(/not a trace-day key/);
   });
 });
 
@@ -139,6 +124,26 @@ describe("traceCountsOf()", () => {
       errorCount: 1,
       lastFailedTraceAt: AT,
       activeDays: ["2026-11-18", "2026-11-19"],
+    });
+  });
+
+  /** @scenario "The spans and failures folds keep their own rows of a day, which the read sums" */
+  it("sums a day's spans row and failures row, counting the day active once", () => {
+    const spans = day({ day: "2026-11-19", traceCount: 3, lastTraceAt: AT });
+    const failures = day({
+      day: "2026-11-19",
+      traceCount: 0,
+      lastTraceAt: null,
+      errorCount: 2,
+      lastFailedTraceAt: AT + 1,
+    });
+
+    expect(traceCountsOf({ windowStartDay: "2026-10-20", days: [spans, failures] })).toEqual({
+      traceCount: 3,
+      errorCount: 2,
+      lastTraceAt: AT,
+      lastFailedTraceAt: AT + 1,
+      activeDays: ["2026-11-19"],
     });
   });
 

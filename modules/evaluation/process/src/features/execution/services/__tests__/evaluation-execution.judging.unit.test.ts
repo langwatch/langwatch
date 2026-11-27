@@ -10,7 +10,11 @@ import {
   type InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
 } from "@langwatch/instant-eval-judge-contract";
-import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  LANGWATCH_EVALS_MODEL_ID,
+  type DecisionModelResolution,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -472,17 +476,20 @@ describe("EvaluationExecutionService with a judge on an own decision model", () 
 });
 
 describe("EvaluationExecutionService with the judge router", () => {
-  const runBooleanJudge = (service: EvaluationExecutionService) =>
+  const runBooleanJudge = (
+    service: EvaluationExecutionService,
+    model: string = LANGWATCH_EVALS_MODEL_ID,
+  ) =>
     service.executeForTrace({
       projectId: PROJECT_ID,
       traceId: "trace-1",
       evaluatorType: "langevals/llm_boolean",
-      settings: BOOLEAN_SETTINGS,
+      settings: { ...BOOLEAN_SETTINGS, model },
       mappings: null,
     });
 
-  describe("given the router flag is on and the project runs on LangWatch Evals Preview", () => {
-    /** @scenario "An LLM judge on LangWatch Evals Preview is routed when the flag is on" */
+  describe("given the router flag is on and the judge runs on LangWatch Evals (preview)", () => {
+    /** @scenario "An LLM judge on LangWatch Evals (preview) is routed when the flag is on" */
     it("sends the llm_judge route with the judge call", async () => {
       const { service, calls, isRouted } = buildService({ isRouted: true });
 
@@ -491,6 +498,29 @@ describe("EvaluationExecutionService with the judge router", () => {
       expect(isRouted).toHaveBeenCalledWith({ projectId: PROJECT_ID });
       expect(calls[0]?.route).toEqual({ job: "llm_judge" });
       expect(calls[0]?.decisionModel).toBeUndefined();
+    });
+  });
+
+  describe("given the router flag is on and the judge runs on LangWatch Instant (preview)", () => {
+    /** @scenario "An LLM judge on LangWatch Instant (preview) is never routed" */
+    it("sends no route and never reads the flag", async () => {
+      const { service, calls, isRouted } = buildService({ isRouted: true });
+
+      await runBooleanJudge(service, "langwatch/instant-preview");
+
+      expect(isRouted).not.toHaveBeenCalled();
+      expect(calls[0]).not.toHaveProperty("route");
+    });
+  });
+
+  describe("given the router flag is on and the judge was saved as langwatch/instant-evals", () => {
+    /** @scenario "A judge saved on langwatch/instant-evals, the id the picker writes, is routed" */
+    it("sends the llm_judge route", async () => {
+      const { service, calls } = buildService({ isRouted: true });
+
+      await runBooleanJudge(service, "langwatch/instant-evals");
+
+      expect(calls[0]?.route).toEqual({ job: "llm_judge" });
     });
   });
 
@@ -531,8 +561,8 @@ describe("EvaluationExecutionService with the judge router", () => {
 });
 
 describe("EvaluationExecutionService for an organization LangWatch switched its hosted model off for", () => {
-  describe("given a judge on Instant Evals in a project whose column is Evals Preview", () => {
-    /** @scenario "An LLM judge on Evals Preview is an error for an organization with hosted switched off" */
+  describe("given a judge on Instant Evals in a project whose column is LangWatch Instant (preview)", () => {
+    /** @scenario "An LLM judge on LangWatch Instant (preview) is an error for an organization with hosted switched off" */
     it("is an error saying no decision model is set up, and the judge is never called", async () => {
       const { service, judge, isRouted, isHostedOff } = buildService({
         isHostedOff: true,

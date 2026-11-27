@@ -56,7 +56,39 @@ export interface Protections {
    * (paid/licensed plans, internal reads).
    */
   visibilityCutoffMs?: number | null;
+  /**
+   * Over-plan withholding (specs/billing/over-plan-trace-withholding.feature): traces started
+   * at or after this epoch-ms cutoff are stored but not listed or opened. `null` = nothing held.
+   */
+  withheldFromMs?: number | null;
+  /** The member counts behind `withheldFromMs`, for the traces page line. */
+  overPlan?: { members: number; maxMembers: number } | null;
 }
+
+/** What the viewer's plan withholds: nothing, or every trace started at or after `fromMs`. */
+export type TraceWithholding =
+  | { kind: "none" }
+  | { kind: "over_plan"; fromMs: number; members: number; maxMembers: number };
+
+export const traceWithholdingOf = (protections: Protections): TraceWithholding =>
+  protections.withheldFromMs === null || protections.withheldFromMs === undefined
+    ? { kind: "none" }
+    : {
+        kind: "over_plan",
+        fromMs: protections.withheldFromMs,
+        members: protections.overPlan?.members ?? 0,
+        maxMembers: protections.overPlan?.maxMembers ?? 0,
+      };
+
+/** Whether a trace that started at `startedAtMs` is withheld by an over-plan cutoff. */
+export const isTraceWithheld = ({
+  startedAtMs,
+  withheldFromMs,
+}: {
+  startedAtMs: number;
+  withheldFromMs: number | null | undefined;
+}): boolean =>
+  withheldFromMs !== null && withheldFromMs !== undefined && startedAtMs >= withheldFromMs;
 
 /**
  * Whether this viewer may read text the model wrote from the conversation, rather than a fact

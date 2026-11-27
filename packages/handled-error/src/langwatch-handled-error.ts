@@ -322,11 +322,11 @@ const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
 
 /**
  * True when retrying is pointless — see {@link TERMINAL_STATUSES}. Only ever said of a failure
- * the platform NAMED. An members failure is ours and transient by default, and a status
- * we read off a proxy's error page is not a verdict the platform reached.
+ * the platform NAMED and did not mark retryable: a trace that is still being stored answers 404
+ * and `retryable`, and waiting is the fix.
  */
 export const isTerminalFailure = (error: LangWatchHandledErrorShape): boolean =>
-  error.isHandled && TERMINAL_STATUSES.has(error.httpStatus);
+  error.isHandled && !error.retryable && TERMINAL_STATUSES.has(error.httpStatus);
 
 /**
  * The constructors raised for a fault in the PROGRAM, not a request that did

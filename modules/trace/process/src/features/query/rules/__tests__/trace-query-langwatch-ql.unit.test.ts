@@ -2,6 +2,7 @@
  * The filter language against the LangWatchQL trace view: what it compiles,
  * what it names as out of reach, and whether it still agrees with the facets.
  * @see modules/instant-eval/specs/instant-eval-shorthand.feature
+ * @see specs/traces-v2/search.feature
  */
 
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
@@ -97,6 +98,18 @@ describe("given a filter compiled against the LangWatchQL trace view", () => {
       expect(sql).toContain(" OR ");
       expect(sql).toContain(" AND ");
       expect(sql).toContain("NOT (");
+    });
+
+    /** @scenario "NOT over a bracketed group negates the whole group" */
+    it.each([
+      ["NOT (service:checkout AND topic:greeting)", "OR"],
+      ["NOT (service:checkout OR topic:greeting)", "AND"],
+    ])("negates each term of %s and joins them with %s", (filter, joiner) => {
+      const strip = (sql: string) => sql.replace(/_\d+/g, "");
+      const left = strip(compiled("NOT service:checkout").sql);
+      const right = strip(compiled("NOT topic:greeting").sql);
+
+      expect(strip(compiled(filter).sql)).toContain(`(${left} ${joiner} ${right})`);
     });
   });
 

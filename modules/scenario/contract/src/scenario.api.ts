@@ -227,6 +227,9 @@ export interface QueueSimulationRunInput {
   /** The models the suite's plan was configured with; each is recorded only when set. */
   simulatorModel?: string | null | undefined;
   judgeModel?: string | null | undefined;
+  /** The plan's judge trace wait in ms; recorded only when set, winning over the scenario's. */
+  traceQuietPeriodMs?: number | null | undefined;
+  traceWaitTimeoutMs?: number | null | undefined;
   /** A suite run's evaluators, its test suite's and its plan's, pinned as the suite queues it. */
   evaluators?: RunEvaluators | undefined;
   /** "Rerun and keep data": skip the agent's teardown for this one run (ADR-180). */
@@ -291,6 +294,7 @@ export interface ScenarioApi {
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
   findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  /** With a `templateId`, refused with `LimitExceededError` once the Free suite cap is reached. */
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   getTestSuiteRunDefinition(
@@ -309,9 +313,14 @@ export interface ScenarioApi {
   getById(input: ScenarioIdInput): Promise<Scenario>;
   /** The same read, archived rows included; a miss is `found: false`, not a refusal. */
   readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
+  /**
+   * `sourceTemplateId` marks a scenario a suite template apply creates: the Free scenario cap
+   * skips the check and never counts it. Every other create, a copy included, counts.
+   */
   create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options?: { sourceTemplateId?: string },
   ): Promise<Scenario>;
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById">,
@@ -346,6 +355,11 @@ export interface ScenarioApi {
   prefetchExecution(
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult>;
+  /**
+   * Asks the plan's run cap once, so a caller about to queue a batch is refused before any run.
+   * @throws LimitExceededError (`scenarioRuns`) when the organization is past its run cap.
+   */
+  assertSimulationRunAllowed(input: { projectId: string }): Promise<void>;
   queueSimulationRun(input: QueueSimulationRunInput): Promise<void>;
   /** Queues a settled simulation trace's run metrics onto simulation_processing. */
   computeRunMetrics(input: ComputeRunMetricsCommandData): Promise<void>;

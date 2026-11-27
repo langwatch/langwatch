@@ -28,7 +28,13 @@ function isViewOnlyCustomRole(permissions: string[]): boolean {
 export function classifyMemberType(
   role: OrganizationUserRole,
   permissions: string[] | undefined,
+  { billingOnly = false }: { billingOnly?: boolean } = {},
 ): MemberType {
+  // Billing only (ADR-205) holds no seat.
+  if (billingOnly && role === OrganizationUserRole.EXTERNAL && !permissions?.length) {
+    return "BillingOnly";
+  }
+
   // ADMIN or MEMBER roles are always FullMember
   if (role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER) {
     return "FullMember";

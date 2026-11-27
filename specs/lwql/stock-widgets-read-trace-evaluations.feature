@@ -123,6 +123,12 @@ Feature: The stock evaluation widgets read the evaluations the trace fold writes
       Then each returns the rows the query returned before the move
 
     @integration
+    Scenario: A moved trace reads the same rows through the floored trace_metrics twin as through the view
+      Given a trace moved later inside the period and a trace moved into it from before it
+      When each moved query that reads trace_metrics' floored twin runs as sent and as written
+      Then both return the same rows under the application list and under the langy list
+
+    @integration
     Scenario: A moved pre-freeze trace counts once, at its latest time, on the real views
       Given a trace dated in the previous period with one passed check and one outcome
       When its anchor moves into the period and ck-kpis reads the real views

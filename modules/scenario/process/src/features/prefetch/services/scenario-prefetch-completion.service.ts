@@ -2,8 +2,9 @@ import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { resolveRunModels } from "@langwatch/scenario-contract";
+import { resolveRunModels, resolveRunTraceWait } from "@langwatch/scenario-contract";
 import type {
+  ResolvedRunTraceWait,
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   TargetAdapterData,
@@ -154,12 +155,12 @@ export class ScenarioPrefetchCompletionService {
       return modelFailure;
     }
 
-    const traceWaitTimeoutMs =
-      input.target.type === "http"
-        ? await this.options.traces.resolveIngestWaitTimeout({
-            projectId: input.context.projectId,
-          })
-        : void 0;
+    const traceWait = await this.resolveTraceWait({
+      context: input.context,
+      target: input.target,
+      scenario: validated.scenario,
+      plan: input.plan,
+    });
 
     logger.debug(
       {
@@ -176,8 +177,35 @@ export class ScenarioPrefetchCompletionService {
       validated,
       models,
       prepared,
-      traceWaitTimeoutMs,
+      traceWait,
       runKey,
+    });
+  }
+
+  /** Only targets whose judge fetches remote traces wait; plan, then scenario, then project. */
+  private async resolveTraceWait(input: {
+    context: ScenarioExecutionPrefetchInput["context"];
+    target: TargetConfig;
+    scenario: Extract<ValidatedLookups, { success: true }>["scenario"];
+    plan: ScenarioExecutionPrefetchInput["plan"];
+  }): Promise<ResolvedRunTraceWait | undefined> {
+    if (input.target.type !== "http" && input.target.type !== "connected") return void 0;
+    const project = await this.options.traces.resolveTraceSettleSettings({
+      projectId: input.context.projectId,
+    });
+    return resolveRunTraceWait({
+      plan: {
+        traceQuietPeriodMs: input.plan?.traceQuietPeriodMs,
+        traceWaitTimeoutMs: input.plan?.traceWaitTimeoutMs,
+      },
+      scenario: {
+        traceQuietPeriodMs: input.scenario.traceQuietPeriodMs,
+        traceWaitTimeoutMs: input.scenario.traceWaitTimeoutMs,
+      },
+      project: {
+        traceQuietPeriodMs: project.quietPeriodMs,
+        traceWaitTimeoutMs: project.waitTimeoutMs,
+      },
     });
   }
 
@@ -429,10 +457,10 @@ export class ScenarioPrefetchCompletionService {
     validated: Extract<ValidatedLookups, { success: true }>;
     models: Extract<ResolvedModels, { success: true }>;
     prepared: PreparedModels;
-    traceWaitTimeoutMs: number | undefined;
+    traceWait: ResolvedRunTraceWait | undefined;
     runKey: string;
   }): ScenarioExecutionPrefetchResult {
-    const { context, target, validated, models, prepared, traceWaitTimeoutMs, runKey } = input;
+    const { context, target, validated, models, prepared, traceWait, runKey } = input;
     const modelParams = prepared.adapter?.success ? prepared.adapter.params : void 0;
     if (!prepared.simulator.success || !prepared.judge.success) {
       throw new Error("Prepared model results were not validated");
@@ -457,7 +485,7 @@ export class ScenarioPrefetchCompletionService {
         }),
         target,
         ...(target.type === "voice" ? { callerVoice: validated.scenario.callerVoice } : {}),
-        ...(traceWaitTimeoutMs !== void 0 ? { traceWaitTimeoutMs } : {}),
+        ...traceWait,
       },
       telemetry: {
         endpoint: this.options.config.langwatchEndpoint,

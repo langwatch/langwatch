@@ -1,0 +1,14 @@
+{
+  "release": "3.27.0",
+  "previous": "3.26.0",
+  "cutAt": "2026-11-23T13:31:51+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261122120000_retention_apply_status",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "data-retention",
+      "description": "Postgres schema: retention apply status"
+    }
+  ]
+}

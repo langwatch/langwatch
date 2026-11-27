@@ -1,6 +1,6 @@
 // Gemini has two Google doors (AI Studio vs Agent Platform); the credential
 // shape decides which is asked, so these tests pin which request goes out.
-import { RedirectRefusedError } from "@langwatch/egress";
+import { egressRefusalReason, RedirectRefusedError } from "@langwatch/egress";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
@@ -22,6 +22,7 @@ const mockFetch = vi.fn();
 const egress: ModelProviderEgress = {
   fetch: (...args: unknown[]) => mockFetch(...args),
   isRedirectRefusal: (error: unknown) => error instanceof RedirectRefusedError,
+  endpointRefusal: (error: unknown) => egressRefusalReason(error) ?? "not_refused",
   assertDestination: async () => {},
 };
 

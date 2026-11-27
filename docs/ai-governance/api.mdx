@@ -51,7 +51,7 @@ Anomaly rules are not in the table: they have no REST surface and no authoring p
 | Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
 | Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
 | AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
-| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
+| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/coding-agents/configure?tab=devices`) |
 | Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
 
 `audit-log` is intentionally read-only (no create, update, delete), audit rows are emitted by other state-changing routes and are immutable by design.
@@ -64,7 +64,7 @@ The first surface to ship is `ingestion-templates` (Lane B-1 commit). The verb s
 | --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------- |
 | `list`                | `GET /api/v1/governance/ingestion-templates`                  | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view`   |
 | `admin-list`          | `GET /api/v1/governance/ingestion-templates/admin`            | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`)    | `aiTools:manage` |
-| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:view`   |
+| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }` (includes `ottl_rules`)     | `aiTools:manage` |
 | `create`              | `POST /api/v1/governance/ingestion-templates`                 | `{ ingestion_template: IngestionTemplateDto }` (201)                       | `aiTools:manage` |
 | `update-ottl-rules`   | `PATCH /api/v1/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
 | `archive`             | `DELETE /api/v1/governance/ingestion-templates/:id`           | `{ archived: true }` (soft-archive)                                        | `aiTools:manage` |

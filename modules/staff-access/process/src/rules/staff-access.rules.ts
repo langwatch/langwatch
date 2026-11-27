@@ -20,7 +20,7 @@ import { type Instant, Temporal } from "@langwatch/time";
 
 import type { StaffAccessRequestRow } from "../repositories/staff-access.repository.ts";
 
-export const STAFF_ACCESS_REQUEST_TTL_MS = 10 * 60 * 1000;
+export const STAFF_ACCESS_REQUEST_TTL_MS = 2 * 60 * 60 * 1000;
 export const STAFF_ACCESS_SESSION_TTL_MS = 60 * 60 * 1000;
 export const STAFF_ACCESS_REQUESTER_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 export const STAFF_ACCESS_CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -38,14 +38,28 @@ export const STAFF_ACCESS_USAGE_CLASSIFICATION =
   "still call. membersSignedIn counts members holding a live browser session, which is UI use. " +
   "An organization with API figures and no signed-in members uses LangWatch through the API only.";
 
-/** The scopes that mint an `lwsa_` ops token, answered by the staff access door. */
-export function mintsOpsToken(scopes: readonly StaffAccessScope[]): boolean {
-  return scopes.includes("ops:read") || isCopySide(scopes);
-}
-
 /** Whether the request is one side of an organization copy. */
 export function isCopySide(scopes: readonly StaffAccessScope[]): boolean {
   return scopes.some((scope) => STAFF_ACCESS_COPY_SCOPES.includes(scope));
+}
+
+/**
+ * Whether the session gets an organization key: content and support drive the public API as
+ * the customer would. `org:metadata` alone reaches the organization only through functions.
+ */
+export function mintsOrganizationKey(scopes: readonly StaffAccessScope[]): boolean {
+  return scopes.includes("org:content") || scopes.includes("org:support");
+}
+
+/** Whether the session gets an ops token: `ops:read`, any approved function, or a copy side. */
+export function mintsOpsToken({
+  scopes,
+  functions,
+}: {
+  scopes: readonly StaffAccessScope[];
+  functions: readonly string[];
+}): boolean {
+  return scopes.includes("ops:read") || functions.length > 0 || isCopySide(scopes);
 }
 
 /** Support writes as "LangWatch Support"; anything else reads as "LangWatch Staff Read". */
@@ -77,6 +91,7 @@ export function organizationNameMatches({
 export type StaffAccessApprovalFields = Readonly<{
   requestId: string;
   scopes: readonly string[];
+  functions: readonly string[];
   organizationId: string | null;
   organizationName: string | null;
   /** A copy side's other organization; left out of the hash when there is none. */
@@ -92,7 +107,7 @@ export type StaffAccessApprovalFields = Readonly<{
   expiresAt: string;
 }>;
 
-/** base64url(SHA-256(canonical JSON)): keys sorted, scopes sorted, nothing else. */
+/** base64url(SHA-256(canonical JSON)): keys sorted, scopes and functions sorted, nothing else. */
 export function approvalChallengeOf(fields: StaffAccessApprovalFields): string {
   const canonical = {
     codeChallenge: fields.codeChallenge,
@@ -104,6 +119,7 @@ export function approvalChallengeOf(fields: StaffAccessApprovalFields): string {
           counterpartOrganizationName: fields.counterpartOrganizationName,
         }),
     expiresAt: fields.expiresAt,
+    functions: fields.functions.toSorted(),
     machine: fields.machine,
     organizationId: fields.organizationId,
     organizationName: fields.organizationName,
@@ -214,7 +230,7 @@ type DecisionRow = Readonly<{
   redeemedAt: Instant | null;
 }>;
 
-/** @throws when the request is no longer pending or its ten minutes passed */
+/** @throws when the request is no longer pending or its two hours passed */
 export function assertPending({ row, at }: { row: DecisionRow; at: Instant }): void {
   if (row.status !== "pending") throw new StaffAccessRequestNotPendingError();
   if (hasPassed({ moment: row.expiresAt, at })) throw new StaffAccessRequestExpiredError();
@@ -239,6 +255,7 @@ export function pendingRequestRow({
   requesterId,
   ownerUserId,
   body,
+  functions,
   organization,
   counterpart,
   ipAddress,
@@ -253,6 +270,7 @@ export function pendingRequestRow({
     codeChallenge: string;
     machine: string;
   }>;
+  functions: readonly string[];
   organization: NamedOrganization;
   counterpart: NamedOrganization;
   ipAddress: string | null;
@@ -263,6 +281,7 @@ export function pendingRequestRow({
     requesterId,
     ownerUserId,
     scopes: [...body.scopes],
+    functions: [...functions],
     organizationId: organization?.id ?? null,
     organizationName: organization?.name ?? null,
     counterpartOrganizationId: counterpart?.id ?? null,
@@ -304,6 +323,7 @@ export function approvalFieldsOf({
   return {
     requestId: row.id,
     scopes: row.scopes,
+    functions: row.functions,
     organizationId: row.organizationId,
     organizationName: row.organizationName,
     counterpartOrganizationId: row.counterpartOrganizationId,

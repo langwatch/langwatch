@@ -6,6 +6,7 @@
 
 import type { AgentType } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
 
@@ -15,6 +16,12 @@ export type NavigationHomeResolution = {
   intentPinned: boolean;
   governanceUiEnabled: boolean;
 };
+
+/**
+ * The dashboard contract's `homeProduct`, spelled out: importing it from the analytics client
+ * would pull that package into every procedure map's type graph (ADR-130).
+ */
+type BoardHomeProduct = "llm-ops" | "me" | "gateway" | "governance";
 
 export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   organization: {
@@ -97,6 +104,10 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
             type?: string;
             free: boolean;
             maxMessagesPerMonth: number;
+            /** A failed payment's banner outranks the seat banner while this is true. */
+            paymentFailed?: boolean;
+            /** Set while the organization is over its plan and new traces are withheld. */
+            overPlan?: { sinceMs: number; members: number; maxMembers: number } | null;
           };
           currentMonthMessagesCount: number | null;
           currentMonthCost: number;
@@ -121,7 +132,7 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     /**
      * Which library entries the reader unlocked in their personal workspace. Default-empty
      * rather than default-on: an existing reader sees Traces alone until the bundle is turned
-     * on in `/me/configure`.
+     * on in `/coding-agents/configure`.
      */
     get: {
       query: {
@@ -150,6 +161,13 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     };
   };
 
+  authz: {
+    /** The reader's own permissions in a named project, as the server resolves them. */
+    effectivePermissions: {
+      query: { input: AuthzOwnStandingInput; output: AuthzOwnStanding };
+    };
+  };
+
   user: {
     /** Whether the reader still owes their organization an SSO link. */
     getSsoStatus: {
@@ -172,6 +190,24 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   workflow: {
     getAll: {
       query: { input: { projectId: string }; output: { id: string; name: string }[] };
+    };
+  };
+
+  boards: {
+    /**
+     * The board a Dashboards address opens, by the library's rule (ADR-002): the shell draws its
+     * home product's chrome, and a project pick keeps it open unless its project owns its view.
+     */
+    resolve: {
+      query: {
+        input: { organizationId: string; dashboardId: string };
+        output: {
+          homeProduct: BoardHomeProduct;
+          scope: string;
+          /** The owning project, named only where the reader may read it. */
+          project: { id: string; slug: string } | null;
+        };
+      };
     };
   };
 

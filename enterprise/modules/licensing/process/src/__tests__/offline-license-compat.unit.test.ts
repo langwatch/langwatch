@@ -49,6 +49,10 @@ class OfflineLicenseStorage implements LicenseStorage {
     throw new Error("an offline install stored a license it only had to read");
   }
 
+  async replaceLicense(): Promise<boolean> {
+    throw new Error("an offline install stored a license it only had to read");
+  }
+
   async removeLicense(): Promise<void> {
     throw new Error("an offline install removed a license it only had to read");
   }
@@ -58,6 +62,10 @@ class OfflineLicenseStorage implements LicenseStorage {
   }
 
   async getMembersLiteCount(): Promise<number> {
+    return 0;
+  }
+
+  async getMembersDeveloperCount(): Promise<number> {
     return 0;
   }
 }

@@ -19,6 +19,14 @@ type MemoryDiscoveredAgent = {
   lastSeenAt: Instant;
 };
 
+type MemoryDiscoveredAgentListing = {
+  organizationId: string;
+  ingestionSourceId: string;
+  discoveredAgentId: string;
+  lastListedAt: Instant;
+  goneAt: Instant | null;
+};
+
 type MemoryGovernanceTenant = {
   organizationId: string;
   tenantId: string;
@@ -30,6 +38,7 @@ type MemoryGovernanceTenant = {
 export class MemoryDiscoveredPeopleStore {
   readonly people: DiscoveredPersonRow[] = [];
   readonly agents: MemoryDiscoveredAgent[] = [];
+  readonly agentListings: MemoryDiscoveredAgentListing[] = [];
   readonly matches: IdentityMatchRow[] = [];
   readonly suggestions: IdentityMatchSuggestionRow[] = [];
   readonly suppressions: ErasedIdentifierSuppressionRow[] = [];

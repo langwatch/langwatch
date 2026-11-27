@@ -389,3 +389,106 @@ describe("enrichSingleSpanWithClaudeLogContent", () => {
     });
   });
 });
+
+describe("enrichManyCodingAgentSpansFromLogs", () => {
+  const OTHER_TRACE_ID = "b4d7767de544f08650a765145cf03066";
+  const OTHER_REQUEST_ID = "req_022DdvHCg2bCdEfGhIjKlMnO";
+
+  function batchStore(
+    getLogsByTraceIds: LogRecordStorageService["getLogsByTraceIds"],
+  ): LogRecordStorageService {
+    const store = logStore(vi.fn().mockRejectedValue(new Error("single read not expected")));
+    vi.spyOn(store, "getLogsByTraceIds").mockImplementation(getLogsByTraceIds);
+    return store;
+  }
+
+  function enrichMany({
+    logRecords,
+    traces,
+  }: {
+    logRecords: LogRecordStorageService;
+    traces: { traceId: string; spans: Span[] }[];
+  }) {
+    return ClaudeCodeLogEnrichmentService.create({
+      logRecords,
+      traceCanonicalisation,
+    }).enrichManyCodingAgentSpansFromLogs({ tenantId: PROJECT_ID, traces });
+  }
+
+  function replyFor({
+    traceId,
+    requestId,
+    reply,
+  }: {
+    traceId: string;
+    requestId: string;
+    reply: string;
+  }) {
+    return [
+      {
+        ...logRow({ "event.name": "user_prompt", prompt: `ask ${reply}`, query_source: REPL }),
+        traceId,
+      },
+      {
+        ...logRow({ "event.name": "api_request", request_id: requestId, query_source: REPL }),
+        traceId,
+      },
+      {
+        ...logRow({
+          "event.name": "assistant_response",
+          request_id: requestId,
+          query_source: REPL,
+          response: reply,
+        }),
+        traceId,
+      },
+    ];
+  }
+
+  describe("given two traces holding different log rows", () => {
+    /** @scenario "A batch of coding-agent traces joins each trace to its own logs" */
+    it("joins each trace's spans to its own rows from one batch read", async () => {
+      const getLogsByTraceIds = vi.fn().mockResolvedValue(
+        new Map([
+          [TRACE_ID, replyFor({ traceId: TRACE_ID, requestId: REQUEST_ID, reply: "first" })],
+          [
+            OTHER_TRACE_ID,
+            replyFor({ traceId: OTHER_TRACE_ID, requestId: OTHER_REQUEST_ID, reply: "second" }),
+          ],
+        ]),
+      );
+
+      const [first, second] = await enrichMany({
+        logRecords: batchStore(getLogsByTraceIds),
+        traces: [
+          { traceId: TRACE_ID, spans: [span({ request_id: REQUEST_ID, query_source: REPL })] },
+          {
+            traceId: OTHER_TRACE_ID,
+            spans: [span({ request_id: OTHER_REQUEST_ID, query_source: REPL })],
+          },
+        ],
+      });
+
+      expect(getLogsByTraceIds).toHaveBeenCalledTimes(1);
+      expect(first?.[0]?.output).toEqual({ type: "text", value: "first" });
+      expect(second?.[0]?.output).toEqual({ type: "text", value: "second" });
+    });
+  });
+
+  describe("when the batch read fails", () => {
+    /** @scenario "A failed batch log read keeps the traces' attribute-only inputs" */
+    it("keeps each trace's attribute-only inputs", async () => {
+      const [interaction, plain] = await enrichMany({
+        logRecords: batchStore(vi.fn().mockRejectedValue(new Error("clickhouse down"))),
+        traces: [
+          { traceId: TRACE_ID, spans: [interactionSpan()] },
+          { traceId: OTHER_TRACE_ID, spans: [span(null)] },
+        ],
+      });
+
+      expect(interaction?.[0]?.input).toEqual({ type: "text", value: "hello claudinho" });
+      expect(interaction?.[0]?.output).toBeNull();
+      expect(plain?.[0]?.input ?? null).toBeNull();
+    });
+  });
+});

@@ -10,9 +10,12 @@ import type { BraidsPlanState } from "../../../model/braids/braids.ts";
 export function BraidsSigningKeys({
   projectId,
   planState,
+  canIssue,
 }: {
   projectId: string;
   planState: BraidsPlanState;
+  /** False while Braids is off: keys are listed and revoked, never issued. */
+  canIssue: boolean;
 }) {
   if (planState !== "enterprise") {
     return (
@@ -21,5 +24,5 @@ export function BraidsSigningKeys({
       </Text>
     );
   }
-  return <Lent of={SigningKeysPanelToken} props={{ projectId }} />;
+  return <Lent of={SigningKeysPanelToken} props={{ projectId, canIssue }} />;
 }

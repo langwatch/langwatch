@@ -262,6 +262,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
           role: input.role,
           status: "PENDING",
           requestedBy: input.requestedBy ?? null,
+          billingOnly: input.billingOnly ?? false,
         },
       });
       await this.outbox.seatChanges.newInvitation({
@@ -615,6 +616,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
+    billingOnly?: boolean;
   }): Promise<void> {
     if (!this.root) return this.admit({ client: this.prisma, ...input });
     await this.root.$transaction((client) => this.admit({ client, ...input }));
@@ -627,12 +629,14 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId,
     role,
     admission,
+    billingOnly = false,
   }: {
     client: Prisma.TransactionClient;
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
+    billingOnly?: boolean;
   }): Promise<void> {
     const { count } = await this.outbox.seatChanges.movingMember({
       transaction: client,
@@ -642,7 +646,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
       actorUserId: admission?.actorUserId ?? null,
       write: () =>
         client.organizationUser.createMany({
-          data: [{ userId, organizationId, role }],
+          data: [{ userId, organizationId, role, billingOnly }],
           skipDuplicates: true,
         }),
     });

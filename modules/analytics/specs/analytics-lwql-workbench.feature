@@ -272,3 +272,9 @@ Feature: LangWatchQL queries on the dashboard
       Given a project whose policy shows captured content to members only
       When the query surface resolves what an api key may see
       Then captured content is hidden, because an api key reads the public cut
+
+    @unit
+    Scenario: A project-bound access token reads captured content as its person
+      Given a project whose policy shows captured content to admins only
+      When the query surface resolves what an admin's project-bound access token may see
+      Then captured content is visible, as it is to that admin in the workbench

@@ -31,6 +31,7 @@ import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credentia
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { MemoryApiKeyChannels } from "../../channels/memory/memory.api-key.channels.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemorySigningKeyUsageRepository } from "../../repositories/memory/memory.signing-key-usage.repository.ts";
 import { MemorySigningKeyRepository } from "../../repositories/memory/memory.signing-key.repository.ts";
@@ -140,6 +141,7 @@ describe.skipIf(!DB_URL)("staff access keys on Postgres", () => {
         }),
       },
       secrets: resolver.scopeTo("api-key", Object.values(ApiKeyModule.secrets)),
+      channels: MemoryApiKeyChannels.create(),
       config: { docsOrigins: void 0, isSaas: true, publicBaseUrl: "https://app.langwatch.ai" },
     });
   });

@@ -62,3 +62,13 @@ export const RUM_MAX_BODY_BYTES = 1_000_000;
  * still carry thousands. More than this in one batch is malfunctioning or malicious.
  */
 export const RUM_MAX_SPANS = 2_000;
+
+/**
+ * Where the session id and its last activity live in `sessionStorage`. The boot report
+ * (apps/ui/vite/boot-report.ts) runs before any module and joins the same session.
+ */
+export const RUM_SESSION_ID_KEY = "langwatch.rum.session.id";
+export const RUM_SESSION_LAST_SEEN_KEY = "langwatch.rum.session.lastSeen";
+
+/** A gap longer than this ends the session; the next span starts a new one. */
+export const SESSION_INACTIVITY_MS = 30 * 60 * 1000;

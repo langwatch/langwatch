@@ -103,7 +103,7 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
     context: { tenantId },
     aggregateType: TIME_LOCAL,
     upToEvent,
-    after: { timestamp: 500, eventId: "event-0" },
+    after: { idempotencyKey: "key-0", timestamp: 500, eventId: "event-0" },
     limit: 100,
   };
 

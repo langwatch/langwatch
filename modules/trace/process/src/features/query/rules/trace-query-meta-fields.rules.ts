@@ -1,9 +1,11 @@
 import {
+  deriveTraceConversationId,
   FilterParseError,
   type TagToken,
   type FieldDef,
   type InMemoryTrace,
   type TranslationContext,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
   UNSUPPORTED,
   type Unsupported,
 } from "@langwatch/trace-contract";
@@ -319,7 +321,7 @@ function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationCon
       return wrap("length(AnnotationIds) > 0", negated);
 
     case "conversation":
-      return wrap("Attributes['gen_ai.conversation.id'] != ''", negated);
+      return wrap(`${TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION} != ''`, negated);
 
     case "user":
       return wrap("Attributes['langwatch.user_id'] != ''", negated);
@@ -380,7 +382,7 @@ const EXISTENCE_PROBES: ReadonlyMap<string, (trace: InMemoryTrace) => boolean | 
     ["annotation", (trace: InMemoryTrace) => trace.summary.annotationIds.length > 0],
     [
       "conversation",
-      (trace: InMemoryTrace) => (trace.summary.attributes["gen_ai.conversation.id"] ?? "") !== "",
+      (trace: InMemoryTrace) => deriveTraceConversationId(trace.summary.attributes) !== "",
     ],
     [
       "user",

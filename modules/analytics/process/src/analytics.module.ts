@@ -1,5 +1,5 @@
 import { type AnalyticsApi, type AnalyticsServerConfig } from "@langwatch/analytics-contract";
-import { keyCredentialOfRequest } from "@langwatch/api/rest";
+import { keyDoorPrincipalOfRequest } from "@langwatch/api/rest";
 import { censusClientOf } from "@langwatch/observability/credential-census";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
@@ -32,9 +32,10 @@ export const analyticsProcessModule: PublishedProcessModule<
     analyticsTrpcTransport,
     analyticsLwqlTrpcTransport,
   )
-  // The query door fans the key it authenticated out to the projects it may read.
+  // The query door fans the key it authenticated out to the projects it may read; an access
+  // token is its person on its bound project.
   .provideMiddlewareContext({
-    langWatchQLKeyReach: (request) => keyCredentialOfRequest(request),
+    langWatchQLKeyReach: (request) => keyDoorPrincipalOfRequest(request),
     // Its client, by the identity headers the CLI and MCP servers send: a metric label only.
     langWatchQLKeyDoor: (request) =>
       keyDoorOfClient({ client: censusClientOf((name) => request.headers.get(name)).client }),

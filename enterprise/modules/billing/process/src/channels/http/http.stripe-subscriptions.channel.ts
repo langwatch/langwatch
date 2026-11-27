@@ -185,16 +185,27 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
           resetBillingCycleAnchor: threshold.reset_billing_cycle_anchor,
         }
       : null,
+    // The first page of lines only, ten at most; a Growth subscription holds about six today.
     items: (subscription.items?.data ?? []).map((item) => ({
       id: item.id,
       priceId: item.price.id,
       unitAmount: item.price.unit_amount ?? null,
       interval: item.price.recurring?.interval ?? null,
       quantity: item.quantity ?? null,
+      ...(item.price.lookup_key ? { lookupKey: item.price.lookup_key } : {}),
+      ...langwatchKeyOf(item.price.metadata),
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,
+    ...customerOf(subscription),
   };
+}
+
+/** The billed customer, when the provider's answer names one. */
+function customerOf(subscription: Stripe.Subscription): { customerId?: string } {
+  const customer: Stripe.Subscription["customer"] | undefined = subscription.customer;
+  if (!customer) return {};
+  return { customerId: typeof customer === "string" ? customer : customer.id };
 }
 
 function previewDetailsOf(
@@ -225,4 +236,10 @@ function updateParamsOf(change: BillingSubscriptionChange): Stripe.SubscriptionU
     };
   }
   return params;
+}
+
+/** Both metadata spellings the price sync accepts (stripe-prices-sync.task.ts). */
+function langwatchKeyOf(metadata: Stripe.Metadata | null | undefined): { langwatchKey?: string } {
+  const key = metadata?.langwatch_key ?? metadata?.langwatchKey;
+  return key ? { langwatchKey: key } : {};
 }

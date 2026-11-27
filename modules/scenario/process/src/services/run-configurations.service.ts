@@ -281,6 +281,9 @@ function toEntry({
     // before the models were stamped reads as. Both mean the project default.
     simulatorModel: row.SimulatorModel === "" ? null : row.SimulatorModel,
     judgeModel: row.JudgeModel === "" ? null : row.JudgeModel,
+    // The raw JSON number the plan stamped; '' when it set none.
+    traceQuietPeriodMs: row.TraceQuietPeriodMs === "" ? null : Number(row.TraceQuietPeriodMs),
+    traceWaitTimeoutMs: row.TraceWaitTimeoutMs === "" ? null : Number(row.TraceWaitTimeoutMs),
   };
 
   return {
@@ -291,6 +294,8 @@ function toEntry({
         repeatCount: configuration.repeatCount,
         simulatorModel: configuration.simulatorModel,
         judgeModel: configuration.judgeModel,
+        traceQuietPeriodMs: configuration.traceQuietPeriodMs,
+        traceWaitTimeoutMs: configuration.traceWaitTimeoutMs,
       },
       scenarioIds: pickScenarioIds(scope),
       parameters: runParameters,

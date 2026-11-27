@@ -8,6 +8,12 @@ import {
 import type { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
+import {
+  EMPTY_JUDGE_TRACE_WAIT_INPUT,
+  quietPeriodSecondsError,
+  waitTimeoutSecondsError,
+} from "../judge-trace-wait.ts";
+
 export const MAX_REPEAT_COUNT = 5;
 
 export const suiteFormSchema = z.object({
@@ -29,6 +35,17 @@ export const suiteFormSchema = z.object({
     .max(MAX_REPEAT_COUNT, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`),
   simulatorModel: z.string().nullable(),
   judgeModel: z.string().nullable(),
+  /** The judge's trace wait in seconds as typed; blank leaves it to the scenario or project. */
+  traceWait: z.object({
+    quietPeriodSeconds: z.string().superRefine((raw, ctx) => {
+      const message = quietPeriodSecondsError(raw);
+      if (message) ctx.addIssue({ code: "custom", message });
+    }),
+    waitTimeoutSeconds: z.string().superRefine((raw, ctx) => {
+      const message = waitTimeoutSecondsError(raw);
+      if (message) ctx.addIssue({ code: "custom", message });
+    }),
+  }),
 });
 
 export type SuiteFormData = z.infer<typeof suiteFormSchema>;
@@ -109,6 +126,8 @@ export interface SuiteFormSuite {
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
+  traceQuietPeriodMs?: number | null;
+  traceWaitTimeoutMs?: number | null;
   /** Test-suite-only configuration retained while the shared editor ignores it. */
   fields?: unknown;
   evaluators?: unknown;
@@ -137,4 +156,5 @@ export const suiteFormDefaultValues: SuiteFormData = {
   repeatCount: 1,
   simulatorModel: null,
   judgeModel: null,
+  traceWait: EMPTY_JUDGE_TRACE_WAIT_INPUT,
 };

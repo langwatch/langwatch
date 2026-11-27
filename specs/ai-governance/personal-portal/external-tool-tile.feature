@@ -1,6 +1,6 @@
 Feature: AI Tools Portal — External-tool tile markdown render
   As an end user discovering an internal AI tool admin has linked into
-  my /me portal
+  my /coding-agents portal
   I want to expand the tile and read the admin-authored markdown
   description plus open the external link in a new tab
   So that I can find the right entrypoint to a third-party platform
@@ -12,7 +12,7 @@ Feature: AI Tools Portal — External-tool tile markdown render
     at `~/components/Markdown` so admin input cannot inject script tags.
 
   Background:
-    Given user "jane@acme.com" is on /me with the AI Tools Portal visible
+    Given user "jane@acme.com" is on /coding-agents with the AI Tools Portal visible
     And the org-scoped catalog has an external-tool entry "Copilot Studio" with:
       | field                | value                                                |
       | descriptionMarkdown  | Microsoft's low-code agent builder...\n\n# Getting started\n- Request access in #copilot-studio-onboarding |
@@ -34,7 +34,7 @@ Feature: AI Tools Portal — External-tool tile markdown render
     When user "jane@acme.com" clicks the "Open Copilot Studio" button
     Then the browser opens "https://copilotstudio.microsoft.com" in a new tab
     And the link includes `target="_blank"` and `rel="noopener noreferrer"`
-    And the user is NOT navigated away from /me
+    And the user is NOT navigated away from /coding-agents
 
   Scenario: tile without ctaLabel uses default "Open <displayName>"
     Given the org-scoped catalog has Workato entry with no `ctaLabel` field

@@ -17,14 +17,14 @@ import {
   type StaffAccessQueueSummary,
   type StaffAccessUsage,
 } from "@langwatch/staff-access-contract";
-import { fromDate, type Instant, Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { StaffAccessEventRepository } from "../repositories/staff-access.repository.ts";
+import { pageOf } from "../rules/staff-access-function.rules.ts";
 import { isoText, STAFF_ACCESS_USAGE_CLASSIFICATION } from "../rules/staff-access.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const ORGANIZATIONS_LISTED = 50;
 
 type OpsReadDeps = Readonly<{
   events: StaffAccessEventRepository;
@@ -37,7 +37,7 @@ type OpsReadDeps = Readonly<{
   codingAgents: Pick<CodingAgentApi, "countUsage">;
   gateway: Pick<GatewayApi, "countUsage">;
   traces: Pick<TraceApi, "countUsage">;
-  apiKeys: Pick<ApiKeyApi, "listAll">;
+  apiKeys: Pick<ApiKeyApi, "findKeyFactsForOrganization">;
   auth: Pick<AuthApi, "countUsageForMembers">;
   now: () => Instant;
 }>;
@@ -55,12 +55,17 @@ export class StaffAccessOpsReadService {
     return new StaffAccessOpsReadService(deps);
   }
 
+  /** A page by id; `truncated` and `nextCursor` say when more match, never a silent cut. */
   listOrganizations({
     session,
     query,
+    limit,
+    cursor,
   }: {
     session: StaffAccessDoorSession;
     query?: string;
+    limit?: number;
+    cursor?: string;
   }): Promise<StaffAccessOrganizationList> {
     return this.traced({
       session,
@@ -69,7 +74,7 @@ export class StaffAccessOpsReadService {
       read: async () => {
         const needle = query?.trim().toLowerCase() ?? "";
         const all = await this.deps.organizations.listProvisioningSummaries();
-        const organizations = all
+        const matching = all
           .filter(
             (summary) =>
               needle === "" ||
@@ -77,9 +82,14 @@ export class StaffAccessOpsReadService {
               summary.slug.toLowerCase().includes(needle) ||
               summary.name.toLowerCase().includes(needle),
           )
-          .slice(0, ORGANIZATIONS_LISTED)
           .map(({ id, slug, name }) => ({ id, slug, name }));
-        return { organizations };
+        return pageOf({
+          rows: matching,
+          keyOf: (row) => row.id,
+          name: "staffAccess.listOrganizations",
+          ...(limit === undefined ? {} : { limit }),
+          ...(cursor === undefined ? {} : { cursor }),
+        });
       },
     });
   }
@@ -104,7 +114,7 @@ export class StaffAccessOpsReadService {
         const [projectIds, members, keys] = await Promise.all([
           this.deps.projects.listIdsByOrganization({ organizationId: found.id }),
           this.deps.organizations.getAllMembers({ organizationId: found.id }),
-          this.deps.apiKeys.listAll({ organizationId: found.id }),
+          this.deps.apiKeys.findKeyFactsForOrganization({ organizationId: found.id }),
         ]);
         const [agents7, agents30, gateway, traces, signedIn] = await Promise.all([
           this.deps.codingAgents.countUsage({ projectIds, since: since7 }),
@@ -133,8 +143,11 @@ export class StaffAccessOpsReadService {
             .filter((key) => key.revokedAt === null)
             .map((key) => ({
               id: key.id,
-              name: key.name,
-              lastUsedAt: key.lastUsedAt ? isoText(fromDate(key.lastUsedAt)) : null,
+              kind: key.kind,
+              lastUsedAt:
+                key.lastUsedAt === null
+                  ? null
+                  : isoText(Temporal.Instant.fromEpochMilliseconds(key.lastUsedAt)),
             })),
           membersSignedIn: signedIn.signedInUsers,
           classification: STAFF_ACCESS_USAGE_CLASSIFICATION,
@@ -196,6 +209,9 @@ export class StaffAccessOpsReadService {
         method: "GET",
         path,
         operation,
+        functionName: null,
+        functionInput: null,
+        rowCount: null,
         permissions: ["opsRead:view"],
         organizationId: summary?.id ?? null,
         projectId: null,

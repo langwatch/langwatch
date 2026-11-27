@@ -32,7 +32,7 @@ export class PiiAnalysisService {
   }
 
   /**
-   * The model first for an allowlisted organization whose resolved policy is strict; Presidio
+   * The model first for an allowlisted organization whose effective PII level is strict; Presidio
    * for everyone else and on failure.
    */
   async clearPresidio(input: {
@@ -40,7 +40,7 @@ export class PiiAnalysisService {
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
-    resolvedPiiLevel?: PiiLevel | undefined;
+    effectivePiiLevel?: PiiLevel | undefined;
     spareNamesAndPlaces?: readonly boolean[] | undefined;
     recordKey?: string | undefined;
   }): Promise<(string | null)[]> {

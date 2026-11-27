@@ -53,6 +53,7 @@ describe("the codingAgents tRPC surface", () => {
         ["pullRequestUsage", "query"],
         ["pullRequestDetail", "query"],
         ["session", "query"],
+        ["lastTurn", "query"],
         ["transcript", "query"],
         ["sessionGroups", "query"],
       ]);
@@ -84,6 +85,7 @@ describe("the codingAgents tRPC surface", () => {
         { procedure: "codingAgents.pullRequestUsage", permission: "traces:view" },
         { procedure: "codingAgents.pullRequestDetail", permission: "traces:view" },
         { procedure: "codingAgents.session", permission: "traces:view" },
+        { procedure: "codingAgents.lastTurn", permission: "traces:view" },
         { procedure: "codingAgents.transcript", permission: "traces:view" },
         { procedure: "codingAgents.sessionGroups", permission: "traces:view" },
       ]);

@@ -19,6 +19,7 @@ runs:
     # Encoded images and videos, keyed on the media and the encoders' settings alone, so a
     # docs-only change never re-encodes; the build prunes entries it no longer uses.
     - name: Restore and save the encoded docs media
+      id: media-cache
       if: inputs.save == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -27,6 +28,7 @@ runs:
         restore-keys: |
           docs-media-${{ runner.os }}-
     - name: Restore the encoded docs media
+      id: media-restore
       if: inputs.save != 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -34,15 +36,43 @@ runs:
         key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
         restore-keys: |
           docs-media-${{ runner.os }}-
-    # The build transcodes the docs videos to AV1 and H.264 (src/site/video-variants.ts). A
-    # stalled Ubuntu mirror once held this for 30 minutes: retry stalled connections, and give
-    # up after ten minutes so a rerun can try again.
+    # Spec: specs/ci/docs-ffmpeg-cache.feature
+    # ffmpeg is installed only on a media-cache miss. Its .deb files are cached per runner image
+    # because a slow Ubuntu mirror can trickle one package for minutes, which no apt timeout
+    # catches (tasks#1215). Saved only after a good install, so a half download is never cached;
+    # PR-branch caches are not shared, so other PRs benefit once main has run it.
+    - name: Key the ffmpeg packages
+      id: ffmpeg-key
+      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: echo "key=ffmpeg-debs-${RUNNER_OS}-${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+    - name: Restore the ffmpeg packages
+      id: ffmpeg-debs
+      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ffmpeg-debs
+        key: ${{ steps.ffmpeg-key.outputs.key }}
     - name: Install ffmpeg
+      id: ffmpeg-install
+      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true'
       shell: bash
       env:
         APT_OPTS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
       run: |
-        command -v ffmpeg || timeout 600 bash -c '
+        command -v ffmpeg && exit 0
+        debs="$HOME/.cache/ffmpeg-debs"
+        sudo mkdir -p "$debs/partial"
+        timeout 600 bash -c "
           sudo apt-get $APT_OPTS update
-          sudo apt-get $APT_OPTS install -y --no-install-recommends ffmpeg
-        '
+          sudo apt-get $APT_OPTS -o Dir::Cache::Archives=$debs install -y --no-install-recommends ffmpeg
+        "
+        sudo chown -R "$(id -u):$(id -g)" "$debs"
+        rm -rf "$debs/partial" "$debs/lock"
+        ffmpeg -hide_banner -encoders | grep -E 'libsvtav1|libaom-av1|libx264'
+    - name: Save the ffmpeg packages
+      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true' && steps.ffmpeg-debs.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ffmpeg-debs
+        key: ${{ steps.ffmpeg-key.outputs.key }}

@@ -58,6 +58,10 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   pulled_usage: "traces",
   webhook_spend_delivery: "traces",
   ingestion_pull: "traces",
+  // Digest's weekly facts from spans, evaluations, scenario runs and coding-agent sessions.
+  digest_week: "traces",
+  // The send claim lives in the DigestSend row; the event only needs to outlive its week.
+  digest_send: "traces",
   experiment_run: "experiments",
   // Edit and save nudges for a dataset's history; the versions themselves live in Postgres.
   dataset_history: "experiments",
@@ -66,6 +70,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   suite_run: "scenarios",
   // Everything else: lifecycle, configuration, billing, authz, identity, governance, meters.
   agent: "indefinite",
+  agent_stop: "indefinite",
   annotation: "indefinite",
   authz_aggregate_read: "indefinite",
   authz_grant: "indefinite",
@@ -74,13 +79,18 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   billing_report: "indefinite",
   coding_assistant_billing: "indefinite",
   connected_billing: "indefinite",
+  data_retention_project: "indefinite",
   dataset: "indefinite",
+  data_retention_drift: "indefinite",
+  data_retention_extension: "indefinite",
+  data_retention_storage: "indefinite",
   entitlement_organization: "indefinite",
   evaluator: "indefinite",
   experiment_lifecycle: "indefinite",
   gateway_connect_managed_key: "indefinite",
   github_installation: "indefinite",
   global: "indefinite",
+  governance_ingestion_source: "indefinite",
   governance_subject: "indefinite",
   guided_onboarding: "indefinite",
   instant_eval_judge_spend: "indefinite",

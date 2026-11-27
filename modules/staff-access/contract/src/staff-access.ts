@@ -64,6 +64,8 @@ const staffAccessSessionViewSchemaDefinition = z.object({
   scopes: z.array(staffAccessScopeSchema),
   organizationId: z.string().nullable(),
   organizationName: z.string().nullable(),
+  /** The ops functions the approval names, with what each reads. */
+  functions: z.array(z.object({ name: z.string(), title: z.string(), scope: z.string() })),
   /** A copy side's other organization: the target of a source, the source of a target. */
   counterpartOrganizationId: z.string().nullable(),
   counterpartOrganizationName: z.string().nullable(),

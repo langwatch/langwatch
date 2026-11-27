@@ -13,6 +13,9 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export type GuidedOnboardingPath = "llmops" | "coding" | "gateway" | "governance";
 
+/** The start picked on Langy's governance opener; "call" is the choice, never a booking. */
+export type LangyStart = "coding" | "call";
+
 export interface GuidedOnboardingState {
   paths: GuidedOnboardingPath[];
   currentPath?: GuidedOnboardingPath;
@@ -24,6 +27,7 @@ export interface GuidedOnboardingState {
   providerSkippedAt?: string;
   conversationId?: string;
   tourReplays?: number;
+  langyStart?: LangyStart;
 }
 
 export class OnboardingApiError extends Error {
@@ -54,6 +58,14 @@ export class OnboardingApiService {
     return this.request<GuidedOnboardingState>(
       "completePath",
       `/api/v1/onboarding/guided/paths/${encodeURIComponent(path)}/complete`,
+      { method: "POST" },
+    );
+  }
+
+  recordLangyStart(start: LangyStart): Promise<GuidedOnboardingState> {
+    return this.request<GuidedOnboardingState>(
+      "recordLangyStart",
+      `/api/v1/onboarding/guided/start/${encodeURIComponent(start)}`,
       { method: "POST" },
     );
   }

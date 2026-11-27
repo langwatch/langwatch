@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The /me "Explore via Langy" item reads this port; the mount lends Langy's ask.
+ * The /coding-agents "Explore via Langy" item reads this port; the mount lends Langy's ask.
  * Spec: modules/user/specs/user.feature
  */
 import {
@@ -107,9 +107,9 @@ afterEach(() => {
   asked.length = 0;
 });
 
-describe("given the personal workspace host on /me", () => {
+describe("given the personal workspace host on /coding-agents", () => {
   describe("when the reader may start a Langy turn where Langy is rolled out", () => {
-    /** @scenario "A reader who may start a Langy turn is offered Explore via Langy on /me" */
+    /** @scenario "A reader who may start a Langy turn is offered Explore via Langy on /coding-agents" */
     it("offers the ask and hands the prompt to Langy", () => {
       renderWith({ permission: true, rolledOut: true });
 
@@ -120,7 +120,7 @@ describe("given the personal workspace host on /me", () => {
   });
 
   describe("when the reader lacks the grant or Langy is not rolled out", () => {
-    /** @scenario "A reader who may not start a Langy turn is not offered Explore via Langy on /me" */
+    /** @scenario "A reader who may not start a Langy turn is not offered Explore via Langy on /coding-agents" */
     it.each([
       { permission: false, rolledOut: true },
       { permission: true, rolledOut: false },

@@ -89,8 +89,8 @@ export const STAFF_READER_CONTENT_PERMISSIONS: readonly AuthzPermission[] = [
 ];
 
 /**
- * The writes a support key may make: evaluators, monitors, datasets, scenarios, dashboards. No
- * prompt (a prompt write can deploy to production) and no trigger (a trigger sends data out).
+ * The writes a support key may make: evaluators, monitors, datasets, scenarios, dashboards,
+ * prompts and triggers. Removing or switching off a record is never in it (ADR-202).
  */
 export const STAFF_SUPPORT_WRITE_PERMISSIONS: readonly AuthzPermission[] = [
   "evaluations:create",
@@ -101,6 +101,10 @@ export const STAFF_SUPPORT_WRITE_PERMISSIONS: readonly AuthzPermission[] = [
   "scenarios:update",
   "analytics:create",
   "analytics:update",
+  "prompts:create",
+  "prompts:update",
+  "triggers:create",
+  "triggers:update",
 ];
 
 /**

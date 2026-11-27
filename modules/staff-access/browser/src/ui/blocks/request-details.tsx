@@ -31,6 +31,7 @@ export function RequestDetails({
     | "counterpartOrganizationName"
     | "copyGrant"
     | "scopes"
+    | "functions"
     | "reason"
     | "machine"
     | "requestIp"
@@ -58,6 +59,18 @@ export function RequestDetails({
         <Fact label="Access">
           <ScopeList scopes={view.scopes} />
         </Fact>
+        {view.functions.length > 0 ? (
+          <Fact label="Functions">
+            <Box as="ul" listStyleType="none" data-testid="staff-access-functions">
+              {view.functions.map((fn) => (
+                <HStack as="li" key={fn.name} gap={2} wrap="wrap" paddingY={0.5}>
+                  <InlineCode variant="neutral">{fn.name}</InlineCode>
+                  <Text textStyle="bodySm">{fn.title}</Text>
+                </HStack>
+              ))}
+            </Box>
+          </Fact>
+        ) : null}
         {direction && (
           <Fact label="Copy">
             <Text fontWeight="semibold" data-testid="staff-access-copy-direction">

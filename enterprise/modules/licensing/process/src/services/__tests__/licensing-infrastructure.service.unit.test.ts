@@ -34,6 +34,7 @@ function composeWithoutMutation() {
     licenses: licenceRows().licenses,
     getMemberCount: async () => 0,
     getMembersLiteCount: async () => 0,
+    getMembersDeveloperCount: async () => 0,
   });
 }
 
@@ -88,6 +89,7 @@ function composeWithStorage(licenses: MemoryOrganizationLicenseRepository) {
     },
     getMemberCount: async () => 0,
     getMembersLiteCount: async () => 0,
+    getMembersDeveloperCount: async () => 0,
   });
   return { repository, writes };
 }
@@ -132,6 +134,7 @@ describe("licensing infrastructure composed with licence storage", () => {
       },
       getMemberCount: async () => 0,
       getMembersLiteCount: async () => 0,
+      getMembersDeveloperCount: async () => 0,
     });
     const expiresAt = Temporal.Instant.from("2027-01-01T00:00:00Z");
 
@@ -159,6 +162,7 @@ describe("licensing infrastructure composed with licence storage", () => {
       },
       getMemberCount: async () => 0,
       getMembersLiteCount: async () => 0,
+      getMembersDeveloperCount: async () => 0,
     });
     const expiresAt = Temporal.Instant.from("2027-01-01T00:00:00Z");
     await repository.storeLicense("org_acme", { licenseKey: "key", expiresAt, validatedAt: null });

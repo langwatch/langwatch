@@ -1,5 +1,8 @@
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_JUDGE_EVALUATOR_TYPES,
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,18 +13,47 @@ import {
 const OWN_DECISION_MODEL = "openai/decisions:gpt-6-luna";
 
 describe("instantEvalJudgeOf", () => {
-  describe("given a boolean judge whose model is Instant Evals", () => {
+  describe("given a boolean judge whose model is LangWatch Instant (preview)", () => {
     it("answers the judge with its prompt", () => {
       expect(
         instantEvalJudgeOf({
           evaluatorType: "langevals/llm_boolean",
-          settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "is it polite?" },
+          settings: { model: "langwatch/instant-preview", prompt: "is it polite?" },
         }),
       ).toEqual({
         kind: "instant_eval",
         judge: { evaluatorType: "langevals/llm_boolean", settings: { prompt: "is it polite?" } },
       });
     });
+  });
+
+  describe("given every evaluator the picker offers LangWatch's model to", () => {
+    /** @scenario "An evaluator Instant Evals does not answer is offered no decision model" */
+    it.each(INSTANT_EVAL_JUDGE_EVALUATOR_TYPES)("answers %s, and nothing else", (evaluatorType) => {
+      expect(
+        instantEvalJudgeOf({ evaluatorType, settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID } }),
+      ).toMatchObject({ kind: "instant_eval" });
+      expect(
+        instantEvalJudgeOf({
+          evaluatorType: "langevals/off_topic",
+          settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
+        }),
+      ).toEqual({ kind: "runs_as_today" });
+    });
+  });
+
+  describe("given a boolean judge whose model is LangWatch Evals (preview), or the id the picker writes", () => {
+    it.each(["langwatch/evals-preview", "langwatch/instant-evals"])(
+      "marks %s as one the judge router may answer",
+      (model) => {
+        expect(
+          instantEvalJudgeOf({
+            evaluatorType: "langevals/llm_boolean",
+            settings: { model, prompt: "is it polite?" },
+          }),
+        ).toMatchObject({ kind: "instant_eval", isRoutable: true });
+      },
+    );
   });
 
   describe("given a score judge with a range", () => {
@@ -33,6 +65,7 @@ describe("instantEvalJudgeOf", () => {
         }),
       ).toEqual({
         kind: "instant_eval",
+        isRoutable: true,
         judge: {
           evaluatorType: "langevals/llm_score",
           settings: { prompt: "rate it", min: 1, max: 5 },
@@ -55,6 +88,7 @@ describe("instantEvalJudgeOf", () => {
         }),
       ).toEqual({
         kind: "instant_eval",
+        isRoutable: true,
         judge: {
           evaluatorType: "langevals/llm_category",
           settings: { prompt: defaults.prompt?.default, categories: defaults.categories?.default },

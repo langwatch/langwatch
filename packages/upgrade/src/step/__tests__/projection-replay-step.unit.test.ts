@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { MigrationStepReport } from "../migration-step.ts";
 import {
   PROJECTION_REPLAY_FROM_START,
+  PROJECTION_REPLAY_PAGED,
   type LaneReplayer,
   defineProjectionReplayStep,
   projectionReplaySinceOf,
@@ -60,6 +61,30 @@ function twoTenantReplayer({ stopAfterFirst = false }: { stopAfterFirst?: boolea
     },
   };
   return { replayer, calls };
+}
+
+const PAGED_KEY = "tenant-1:directory:directory-a";
+const DEADLINE_CUT = "step_deadline_passed";
+
+/** A replayer whose lane holds one aggregate too large for a bulk read, paged and cut if told. */
+function pagingReplayer({ cut }: { cut: boolean }) {
+  const unfinishedSeen: (number | undefined)[] = [];
+  const replayer: LaneReplayer = {
+    async replayLane(input) {
+      unfinishedSeen.push(input.paging?.unfinished.get(PAGED_KEY));
+      await input.paging?.started({ key: PAGED_KEY });
+      if (cut) throw Object.assign(new Error("deadline passed"), { code: DEADLINE_CUT });
+      input.paging?.finished({ key: PAGED_KEY });
+      return {
+        lane: input.lane,
+        kind: "fold",
+        aggregatesReplayed: 1,
+        totalEvents: 1,
+        replayedThrough: CURSOR,
+      };
+    },
+  };
+  return { replayer, unfinishedSeen };
 }
 
 function runOnce({
@@ -350,6 +375,41 @@ describe("defineProjectionReplayStep", () => {
       expect(projectionReplaySinceOf(first)).toBe(PROJECTION_REPLAY_FROM_START);
       expect(projectionReplaySinceOf(second)).toBe(PROJECTION_REPLAY_FROM_START);
       expect(second).toMatchObject({ replayedThrough: CURSOR });
+    });
+  });
+
+  describe("given a lane with an aggregate its replay has to page", () => {
+    /** @scenario "A replay step keeps the aggregates it had to page across runs" */
+    it("counts each cut paged attempt in its report and hands the count to the next run", async () => {
+      let resumeFrom: MigrationStepReport | null = null;
+      const unfinishedAtStart: (number | undefined)[] = [];
+      for (let run = 1; run <= 3; run++) {
+        const { replayer, unfinishedSeen } = pagingReplayer({ cut: true });
+        const { report, saved } = runOnce({ replayer, resumeFrom });
+        await expect(report).rejects.toMatchObject({ code: DEADLINE_CUT });
+        unfinishedAtStart.push(...unfinishedSeen);
+        resumeFrom = saved.at(-1) ?? null;
+      }
+      const { replayer, unfinishedSeen } = pagingReplayer({ cut: false });
+
+      await runOnce({ replayer, resumeFrom }).report;
+
+      expect(unfinishedAtStart).toEqual([undefined, 1, 2]);
+      expect(unfinishedSeen).toEqual([3]);
+      expect(resumeFrom?.[PROJECTION_REPLAY_PAGED]).toEqual({ [PAGED_KEY]: 3 });
+    });
+
+    /** @scenario "A replay step keeps the aggregates it had to page across runs" */
+    it("keeps a finished aggregate listed with no unfinished attempt", async () => {
+      const { replayer } = pagingReplayer({ cut: false });
+
+      const { report, saved } = runOnce({ replayer, resumeFrom: null });
+
+      expect(await report).toMatchObject({ [PROJECTION_REPLAY_PAGED]: { [PAGED_KEY]: 0 } });
+      expect(saved.map((one) => one[PROJECTION_REPLAY_PAGED])).toEqual([
+        { [PAGED_KEY]: 1 },
+        { [PAGED_KEY]: 0 },
+      ]);
     });
   });
 });

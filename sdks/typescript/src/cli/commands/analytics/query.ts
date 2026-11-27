@@ -7,6 +7,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { DEFAULT_LOOKBACK, resolveTimeWindowOrExit, windowDocument } from "../../utils/timeWindow";
 import { toTimeseriesShape } from "./timeseriesShape";
 
 const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
@@ -92,6 +93,7 @@ export const queryAnalyticsCommand = async (options: {
   aggregation?: string;
   startDate?: string;
   endDate?: string;
+  since?: string;
   groupBy?: string;
   timeScale?: string;
   shouldIncludeLangy?: boolean;
@@ -124,11 +126,14 @@ export const queryAnalyticsCommand = async (options: {
     process.exit(1);
   }
 
-  const now = Date.now();
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-
-  const startDate = options.startDate ? new Date(options.startDate).getTime() : sevenDaysAgo;
-  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
+  const window = resolveTimeWindowOrExit({
+    startDate: options.startDate,
+    endDate: options.endDate,
+    since: options.since,
+    now: Date.now(),
+  });
+  const startDate = window.from;
+  const endDate = window.to;
 
   const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
 
@@ -160,6 +165,7 @@ export const queryAnalyticsCommand = async (options: {
         ...result,
         metric,
         aggregation,
+        window: windowDocument({ window, lookback: DEFAULT_LOOKBACK }),
         ...toTimeseriesShape({
           currentPeriod: result.currentPeriod,
           previousPeriod: result.previousPeriod,

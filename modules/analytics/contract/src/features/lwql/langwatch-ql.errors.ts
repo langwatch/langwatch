@@ -68,22 +68,22 @@ export class LangWatchQLResultTooLargeError extends HandledError {
 
 /**
  * Executor not provisioned or catalog missing; ACCESS_DENIED is separate
- * ({@link LangWatchQLProvisioningIncompleteError}).
+ * ({@link LangWatchQLProvisioningIncompleteError}). `message` narrows it to one
+ * organization's private ClickHouse; it never carries a URL.
  */
 export class LangWatchQLUnavailableError extends HandledError {
   declare readonly code: "lwql_unavailable";
 
-  constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "lwql_unavailable",
-      "The LangWatchQL analytics SQL API is not available on this deployment.",
-      {
-        httpStatus: 503,
-        fault: "platform",
-        ...remediation("lwql_unavailable"),
-        ...options,
-      },
-    );
+  constructor({
+    message = "The LangWatchQL analytics SQL API is not available on this deployment.",
+    ...options
+  }: { message?: string; reasons?: readonly Error[] } = {}) {
+    super("lwql_unavailable", message, {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("lwql_unavailable"),
+      ...options,
+    });
     this.name = "LangWatchQLUnavailableError";
   }
 }

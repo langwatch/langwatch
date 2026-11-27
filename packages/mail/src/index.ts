@@ -16,9 +16,14 @@ export type { DigestUpdate } from "./templates/digest-parts.tsx";
 export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
 export type { MailFixture, MailTemplate } from "./templates/registry.ts";
 export { expressive } from "./templates/email-layout.tsx";
+export type { PlatformOperatorChangeEmailProps } from "./templates/platform-operator-change-email.tsx";
 export type { UpgradeAlertEmailProps } from "./templates/upgrade-alert-email.tsx";
 export type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
 export type { StaffAccessNoticeEmailProps } from "./templates/staff-access-notice-email.tsx";
+export type { DigestPlanPressureProps } from "./templates/digest-plan-pressure.tsx";
+export type { DigestScenariosTrendProps } from "./templates/digest-scenarios-trend.tsx";
+export type { DigestCodingAgentWeekProps } from "./templates/digest-coding-agent-week.tsx";
+export type { DigestTracesWeekProps } from "./templates/digest-traces-week.tsx";
 export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter.ts";
 export {
   renderTriggerDigestEmail,
@@ -66,3 +71,7 @@ export {
   sendSsoDomainProofWaveringEmail,
 } from "./templates/sso-domain-proof-emails.tsx";
 export { sendUsageLimitEmail } from "./templates/usage-limit-email.tsx";
+export {
+  sendPaymentRecoveryEmail,
+  type PaymentRecoveryEmailProps,
+} from "./templates/payment-recovery-email.tsx";

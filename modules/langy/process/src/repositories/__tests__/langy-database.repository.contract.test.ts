@@ -38,6 +38,7 @@ function conversation(overrides: Partial<LangyConversationStateData>): LangyConv
     PendingHandoffTurnId: null,
     RunToken: null,
     ArchivedAt: null,
+    CiFollowUpsInARow: 0,
     CreatedAt: 1_000,
     UpdatedAt: 1_000,
     LastEventOccurredAt: 1_000,
@@ -120,7 +121,7 @@ describe("given the memory tier's database rows", () => {
       });
 
       expect(first.kind).toBe("claimed");
-      expect(second.kind).toBe("busy");
+      expect(second).toEqual({ kind: "busy", conversationId: "conv_a", heldTurnId: "turn_1" });
       expect(reused.kind).toBe("mismatch");
       expect(await repositories.conversations.hasAdmittedTurn(send)).toBe(true);
     });

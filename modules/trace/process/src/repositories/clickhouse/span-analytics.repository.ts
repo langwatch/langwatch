@@ -113,7 +113,13 @@ export class SpanAnalyticsClickHouseRepository extends SpanAnalyticsRepository {
         table: TABLE_NAME,
         values: rows.map((row) => toClickHouseRecord({ row, retentionDays, projectedAt })),
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        // Async deduplication off, as the pinned server profile has it: the table replaces a
+        // repeated span, and an insert with it off may share a statement (ADR-187).
+        clickhouse_settings: {
+          async_insert: 1,
+          wait_for_async_insert: 1,
+          async_insert_deduplicate: 0,
+        },
       });
     } catch (error) {
       logger.warn(

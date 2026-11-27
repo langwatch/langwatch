@@ -91,6 +91,22 @@ export const computeCost = (input: {
   const cacheWrite1h = Math.max(0, input.cacheCreation1hTokens);
   const cacheWriteTotal = Math.max(Math.max(0, input.cacheCreationTokens), cacheWrite1h);
 
+  // One billing unit per rate: a span can report tokens, characters and a duration at once,
+  // and pricing more than one of them charges the same request twice. Tokens win, then
+  // characters, then seconds.
+  const isTokenPriced =
+    !!rate.inputCostPerToken ||
+    !!rate.outputCostPerToken ||
+    !!rate.cacheReadCostPerToken ||
+    !!rate.cacheCreationCostPerToken ||
+    !!rate.cacheCreation1hCostPerToken ||
+    !!rate.inputAudioCostPerToken ||
+    !!rate.outputAudioCostPerToken ||
+    !!rate.inputImageCostPerToken ||
+    !!rate.outputImageCostPerToken;
+  const characterRate = isTokenPriced ? 0 : (rate.inputCostPerCharacter ?? 0);
+  const secondRate = isTokenPriced || characterRate ? 0 : (rate.inputCostPerSecond ?? 0);
+
   return (
     input.inputTokens * inputRate +
     input.outputTokens * outputRate +
@@ -101,8 +117,8 @@ export const computeCost = (input: {
     input.cacheReadTokens * cacheReadRate +
     cacheWrite1h * cacheCreation1hRate +
     (cacheWriteTotal - cacheWrite1h) * cacheCreationRate +
-    (input.inputCharacters ?? 0) * (rate.inputCostPerCharacter ?? 0) +
-    (input.audioSeconds ?? 0) * (rate.inputCostPerSecond ?? 0) +
+    (input.inputCharacters ?? 0) * characterRate +
+    (input.audioSeconds ?? 0) * secondRate +
     (input.webSearchRequests ?? 0) * (rate.webSearchCostPerQuery ?? 0)
   );
 };

@@ -20,6 +20,7 @@ const baseInput: PersonaResolverInput = {
   isEnterprise: false,
   hasGovernanceUi: true,
   firstProjectSlug: null,
+  planHome: null,
 };
 
 const withPersonalKey = { ...baseInput.setupState, hasPersonalVKs: true };
@@ -27,25 +28,25 @@ const withIngest = { ...baseInput.setupState, hasIngestionSources: true };
 
 describe("given the persona matrix", () => {
   describe("when a user holds a personal key and belongs to no project", () => {
-    /** @scenario "Personal-only user → /me" */
-    it("lands on /me as persona 1", () => {
+    /** @scenario "Personal-only user → /coding-agents" */
+    it("lands on /coding-agents as persona 1", () => {
       const result = personaHomes.resolve({ ...baseInput, setupState: withPersonalKey });
 
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
       expect(result.persona).toBe("personal_only");
     });
   });
 
   describe("when a user holds a personal key and belongs to a project", () => {
-    /** @scenario "User has personal VK + project membership → /me with WorkspaceSwitcher flip available" */
-    it("defaults to /me as persona 2", () => {
+    /** @scenario "User has personal VK + project membership → /coding-agents with WorkspaceSwitcher flip available" */
+    it("defaults to /coding-agents as persona 2", () => {
       const result = personaHomes.resolve({
         ...baseInput,
         setupState: withPersonalKey,
         firstProjectSlug: "alex-team-prod",
       });
 
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
       expect(result.persona).toBe("mixed");
     });
   });
@@ -94,7 +95,7 @@ describe("given the persona matrix", () => {
   });
 
   describe("when the org does not have the governance UI", () => {
-    /** @scenario "Personal-VK user in a non-governance org → project home, not /me" */
+    /** @scenario "Personal-VK user in a non-governance org → project home, not /coding-agents" */
     it("sends a personal-key user to the project home", () => {
       const result = personaHomes.resolve({
         ...baseInput,
@@ -104,7 +105,7 @@ describe("given the persona matrix", () => {
       });
 
       expect(result.destination).toBe("/jane-team-prod");
-      expect(result.destination).not.toBe("/me");
+      expect(result.destination).not.toBe("/coding-agents");
     });
 
     /** @scenario "Would-be governance admin in a non-governance org → project home, not /governance" */
@@ -122,12 +123,12 @@ describe("given the persona matrix", () => {
       expect(result.destination).not.toBe("/governance");
     });
 
-    /** @scenario "Non-governance org member with no projects → onboarding, not the gated /me" */
+    /** @scenario "Non-governance org member with no projects → onboarding, not the gated /coding-agents" */
     it("sends a member with no projects to onboarding", () => {
       const result = personaHomes.resolve({ ...baseInput, hasGovernanceUi: false });
 
       expect(result.destination).toBe("/onboarding/welcome");
-      expect(result.destination).not.toBe("/me");
+      expect(result.destination).not.toBe("/coding-agents");
     });
   });
 
@@ -155,8 +156,8 @@ describe("given the persona matrix", () => {
       expect(result.destination).toBe("/team-prod");
     });
 
-    /** @scenario "User has no project membership AND setupState fails → resolver falls back to /me" */
-    it("falls back to /me when the user belongs to no project either", () => {
+    /** @scenario "User has no project membership AND setupState fails → resolver falls back to /coding-agents" */
+    it("falls back to /coding-agents when the user belongs to no project either", () => {
       const unreadable = {
         firstProjectSlug: null,
         get setupState(): never {
@@ -166,7 +167,7 @@ describe("given the persona matrix", () => {
 
       const result = personaHomes.resolveSafe(unreadable);
 
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
     });
   });
 });

@@ -173,7 +173,7 @@ func (j *JudgeAgent) Call(ctx context.Context, in AgentInput) (*AgentReturn, err
 		in:         in,
 		criteria:   criteria,
 		transcript: buildJudgeTranscript(msgs),
-		traces:     resolveTraceSettings(in.ScenarioConfig, j.cfg.TraceFetcher),
+		traces:     resolveJudgeTraceSettings(ctx, in.ScenarioConfig, j.cfg.TraceFetcher),
 		model:      model,
 	}
 	if j.includeTimeline(hasAudio) {
@@ -340,16 +340,18 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		ThreadID: c.in.ThreadID, TraceIDs: traceIDs, Collector: collector,
 		LangWatch: c.in.ScenarioConfig.LangWatch, QuietPeriod: ts.quietPeriod,
 	}
-	allSettled := true
+	settle := SettleOutcome{AllSettled: true}
 	switch {
 	case ts.fetch && len(traceIDs) > 0:
 		target.Timeout = ts.timeout
-		allSettled = ts.fetcher.SettleWait(ctx, target)
+		settle = ts.fetcher.SettleWait(ctx, target)
 	case ts.fetch:
 		logger().Warn("Remote trace fetching is on but no message carries a trace id; nothing to fetch")
 		ts.fetcher.RecordMissingTraceIDs(c.in.ThreadID, collector)
 	}
-	waitAvailable := ts.fetch && len(traceIDs) > 0 && !allSettled && ts.extension > 0
+	// The one extra wait is offered while the traces are incomplete or
+	// settled on the quiet period alone.
+	waitAvailable := ts.fetch && len(traceIDs) > 0 && (!settle.AllSettled || settle.Unconfirmed) && ts.extension > 0
 	waitedOnce := false
 
 	for {
@@ -360,6 +362,9 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		extra := ""
 		if c.in.JudgmentRequest != nil {
 			extra = additionalContextSection(c.in.JudgmentRequest.AdditionalContext)
+		}
+		if waitAvailable && settle.Unconfirmed {
+			extra += traceStatusSection(unconfirmedTraceNote)
 		}
 		content, large := judgeContent(c.in.ScenarioState.spanDigests(), spans, j.cfg.TokenThreshold, c.transcript, extra+c.extra)
 		system := buildVerdictSystemPrompt(c.criteria, c.in.ScenarioConfig.Description, ts.fetch)
@@ -407,7 +412,7 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 		if waitAvailable && comp.called("wait_for_traces") {
 			waitAvailable, waitedOnce = false, true
 			target.Timeout = ts.extension
-			ts.fetcher.ExtendSettle(ctx, target)
+			settle = ts.fetcher.ExtendSettle(ctx, target)
 			continue
 		}
 		forcedNow := false
@@ -417,8 +422,67 @@ func (j *JudgeAgent) verdict(ctx context.Context, c judgeCall, forced, exhausted
 			}
 			forcedNow = true
 		}
+		comp = j.reaskUnanswered(ctx, c.model.LLM, params, comp, tools, c.criteria)
 		return j.parseVerdict(comp, c.criteria, terminal || forcedNow), nil
 	}
+}
+
+// reaskUnanswered asks once more, pinned to finish_test, for the criteria a
+// finish_test call left without a readable verdict, and merges the answers.
+// A failed retry keeps the first call; anything still missing fails closed.
+func (j *JudgeAgent) reaskUnanswered(ctx context.Context, llm LLM, params InferenceParams, comp judgeCompletion, tools []JudgeTool, criteria []string) judgeCompletion {
+	calls := comp.lastCalls()
+	idx := slices.IndexFunc(calls, func(tc ToolCall) bool { return tc.Name == "finish_test" })
+	if idx < 0 {
+		return comp
+	}
+	first := finishArgsObject(calls[idx].Arguments)
+	firstCriteria, _ := first.Get("criteria")
+	missing := unansweredCriteria(criteria, firstCriteria)
+	if len(missing) == 0 {
+		return comp
+	}
+	logger().Warn("finish_test left criteria without a verdict; asking once more", "missing", missing)
+	msgs := collapseDiscoveryHistory(comp.history, tools)
+	msgs = append(msgs,
+		AssistantMsg("My finish_test call: "+jsjson.Stringify(first)),
+		UserMsg(missingVerdictPrompt+"\n"+buildCriteriaList(missing)))
+	params.Messages, params.Tools, params.ToolChoice = msgs, []ToolDefinition{buildFinishTestTool(criteria)}, RequireTool("finish_test")
+	retry, err := j.loop(ctx, llm, params, nil, 1, "finish_test")
+	if err != nil {
+		logger().Warn("Re-asking the missing criteria failed", "reason", err.Error())
+		return comp
+	}
+	retryCall, ok := toolCallNamed(Message{ToolCalls: retry.lastCalls()}, "finish_test")
+	if !ok {
+		return comp
+	}
+	second := finishArgsObject(retryCall.Arguments)
+	retryCriteria, _ := second.Get("criteria")
+	merged := slices.Clone(first).Set("criteria", mergeCriteriaArgs(firstCriteria, retryCriteria))
+	if r, _ := first.Get("reasoning"); r == nil || r == "" {
+		r2, _ := second.Get("reasoning")
+		merged = merged.Set("reasoning", r2)
+	}
+	call := calls[idx]
+	call.Arguments = jsjson.Stringify(merged)
+	last := slices.Clone(calls)
+	last[idx] = call
+	comp.steps = append(slices.Clone(comp.steps[:len(comp.steps)-1]), last)
+	return comp
+}
+
+// finishArgsObject parses finish_test arguments, empty when unreadable.
+func finishArgsObject(args string) jsjson.Object {
+	v, err := jsjson.Parse(args)
+	if err != nil {
+		return jsjson.Object{}
+	}
+	obj, ok := v.(jsjson.Object)
+	if !ok {
+		return jsjson.Object{}
+	}
+	return obj
 }
 
 // forceVerdict makes one last finish_test-pinned call after discovery ran

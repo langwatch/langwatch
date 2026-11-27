@@ -1,4 +1,5 @@
 /** Spec: specs/trace/trace-evaluation-analytics.feature */
+import { ProjectNotFoundError } from "@langwatch/authorization";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import {
   EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
@@ -25,7 +26,11 @@ import {
   EvaluatedTraceNotYetStoredError,
   TraceEvaluationOutcomeService,
 } from "../trace-evaluation-outcome.service.ts";
-import { TraceEvaluationOutcomesMigrationService } from "../trace-evaluation-outcomes-migration.service.ts";
+import {
+  type EvaluationOutcomesBackfillReport,
+  evaluationOutcomesBackfillReportSchema,
+  TraceEvaluationOutcomesMigrationService,
+} from "../trace-evaluation-outcomes-migration.service.ts";
 
 const TENANT = "tenant-outcomes";
 const TRACE_ID = "trace-outcomes";
@@ -68,13 +73,16 @@ function run(over: Partial<EvaluationRunData> = {}): EvaluationRunData {
 }
 
 /** A stored trace, evaluation's runs as scripted, and every outcome the service records. */
-async function compose({ now }: { now?: () => number } = {}) {
+async function compose({
+  now,
+  storedTraceId = TRACE_ID,
+}: { now?: () => number; storedTraceId?: string } = {}) {
   const traces = MemoryTraceAnalyticsRepository.create();
   await traces.upsert({
     row: TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
       state: {
         ...projection.init(),
-        traceId: TRACE_ID,
+        traceId: storedTraceId,
         spanCount: 1,
         storageAnchorMs: TRACE_ANCHOR_MS,
         occurredAt: TRACE_ANCHOR_MS,
@@ -240,6 +248,26 @@ describe("TraceEvaluationOutcomeService", () => {
         expect(recorded).toEqual([]);
         expect(logger.warn).not.toHaveBeenCalled();
       });
+
+      /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+      it("names a minute's wait when the evaluation is fresh", async () => {
+        const { outcomes } = await compose({ now: () => EVALUATED_AT + 5_000 });
+
+        await expect(outcomes.recordReported(unstored)).rejects.toMatchObject({
+          name: "EvaluatedTraceNotYetStoredError",
+          retryable: true,
+          retryAfterMs: 60_000,
+        });
+      });
+
+      /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+      it("names a quarter hour's wait once the evaluation has waited a minute", async () => {
+        const { outcomes } = await compose({ now: () => EVALUATED_AT + 2 * 60_000 });
+
+        await expect(outcomes.recordReported(unstored)).rejects.toMatchObject({
+          retryAfterMs: 15 * 60_000,
+        });
+      });
     });
 
     describe("when it was appended longer ago than the wait", () => {
@@ -255,6 +283,70 @@ describe("TraceEvaluationOutcomeService", () => {
         expect(logger.warn).toHaveBeenCalledTimes(1);
       });
     });
+  });
+});
+
+describe("TraceEvaluationOutcomeService given an evaluation naming no trace", () => {
+  /** @scenario "An evaluation naming no trace is not retried" */
+  it("completes a report with a blank trace id at once, logging the skip", async () => {
+    const { outcomes, recorded, logger } = await compose({ now: () => EVALUATED_AT });
+
+    await outcomes.recordReported({
+      data: {
+        evaluationId: "evaluation-3",
+        evaluatorName: "Toxicity",
+        traceId: "  ",
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+      },
+      context: event("evaluation-event-6"),
+    });
+
+    expect(recorded).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("TraceEvaluationOutcomeService given an evaluation naming the all-zero trace", () => {
+  const ALL_ZERO_TRACE_ID = "00000000000000000000000000000000";
+
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it("records the outcome when a trace is stored under the all-zero id", async () => {
+    const { outcomes, recorded } = await compose({
+      now: () => EVALUATED_AT,
+      storedTraceId: ALL_ZERO_TRACE_ID,
+    });
+
+    await outcomes.recordReported({
+      data: {
+        evaluationId: "evaluation-3",
+        evaluatorName: "Toxicity",
+        traceId: ALL_ZERO_TRACE_ID,
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+      },
+      context: event("evaluation-event-6"),
+    });
+
+    expect(recorded.map((each) => each.traceId)).toEqual([ALL_ZERO_TRACE_ID]);
+  });
+
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it("completes at once and logs the skip when no such trace is stored", async () => {
+    const { outcomes, recorded, evaluations, logger } = await compose({ now: () => EVALUATED_AT });
+    evaluations.runs.set(`${TENANT}:evaluation-1`, run({ traceId: ALL_ZERO_TRACE_ID }));
+
+    await outcomes.recordCompleted({
+      data: { evaluationId: "evaluation-1", status: "processed", passed: true, label: null },
+      context: event("evaluation-event-7"),
+    });
+
+    expect(recorded).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -289,6 +381,7 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         evaluations,
         anchors,
         commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: () => {} },
         now: () => EVALUATED_AT + 60_000,
       });
 
@@ -318,6 +411,242 @@ describe("TraceEvaluationOutcomesMigrationService", () => {
         },
       ]);
       expect(report).toMatchObject({ projects: 1, outcomes: 2, skippedWithoutTrace: 0 });
+    });
+  });
+
+  describe("given a project archived since its evaluations", () => {
+    const archivedId = "p-archived";
+    const projects = {
+      listAllWithOrganization: async () => ({
+        projects: [
+          { id: archivedId, organizationId: "organization-1" },
+          { id: TENANT, organizationId: "organization-1" },
+        ],
+        orphanIds: [],
+        next: null,
+      }),
+    };
+
+    const projectGone = new ProjectNotFoundError("p-archived");
+
+    async function backfillWith({
+      failure,
+      resumeFrom = null,
+      abortWhenGone = false,
+    }: {
+      failure: Error;
+      abortWhenGone?: boolean;
+      resumeFrom?: EvaluationOutcomesBackfillReport | null;
+    }) {
+      const { evaluations, anchors } = await compose();
+      evaluations.outcomes.push({
+        tenantId: TENANT,
+        evaluationId: "evaluation-a",
+        traceId: TRACE_ID,
+        evaluatorName: "Faithfulness",
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+        occurredAt: EVALUATED_AT,
+        lastEventId: "last-evaluation-a",
+      });
+      const sent: RecordEvaluationOutcomeCommandData[] = [];
+      const saved: EvaluationOutcomesBackfillReport[] = [];
+      const controller = new AbortController();
+      const warned: unknown[] = [];
+      const backfill = TraceEvaluationOutcomesMigrationService.create({
+        projects,
+        evaluations: {
+          listEvaluationOutcomes: async (input) => {
+            if (input.tenantId === archivedId) {
+              if (abortWhenGone) controller.abort();
+              throw failure;
+            }
+            return evaluations.listEvaluationOutcomes(input);
+          },
+        },
+        anchors,
+        commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: (payload) => void warned.push(payload) },
+        now: () => EVALUATED_AT + 60_000,
+      });
+      const run = () =>
+        backfill.recordEvaluationOutcomes({
+          resumeFrom,
+          dryRun: false,
+          signal: controller.signal,
+          onPage: async (report) => void saved.push(report),
+        });
+      return { run, sent, saved, warned };
+    }
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("skips the project, counts it, and carries on with the next one", async () => {
+      const { run, sent, saved, warned } = await backfillWith({
+        failure: projectGone,
+      });
+
+      const report = await run();
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
+      expect(report).toMatchObject({
+        projects: 1,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+      expect(saved[0]).toMatchObject({
+        afterProjectId: archivedId,
+        inProject: null,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+      expect(report.afterProjectId).toBe(TENANT);
+      expect(warned).toEqual([{ projectId: archivedId }]);
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("saves the skip even when the run is aborted as the project is found gone", async () => {
+      const { run, saved } = await backfillWith({ failure: projectGone, abortWhenGone: true });
+
+      const report = await run();
+
+      expect(report).toMatchObject({
+        afterProjectId: archivedId,
+        inProject: null,
+        skippedProjects: 1,
+      });
+      expect(saved.at(-1)).toEqual(report);
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("skips a project archived after part of it was saved", async () => {
+      const { run, sent } = await backfillWith({
+        failure: projectGone,
+        resumeFrom: {
+          sinceMs: EVALUATED_AT - 1,
+          afterProjectId: null,
+          inProject: {
+            projectId: archivedId,
+            after: { occurredAt: EVALUATED_AT, evaluationId: "evaluation-0" },
+          },
+          projects: 1,
+          outcomes: 1,
+          skippedWithoutTrace: 0,
+          skippedProjects: 0,
+          skippedProjectIds: [],
+        },
+      });
+
+      const report = await run();
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-a"]);
+      // The archived project moves from `projects` to `skippedProjects`: counted once.
+      expect(report).toMatchObject({
+        projects: 1,
+        outcomes: 2,
+        skippedProjects: 1,
+        inProject: null,
+        afterProjectId: TENANT,
+      });
+    });
+
+    /** The archived project sends one page of outcomes, then is found gone. */
+    async function backfillArchivedAfterOnePage({ dryRun }: { dryRun: boolean }) {
+      const outcome = (index: number) => ({
+        evaluationId: `evaluation-${index}`,
+        traceId: TRACE_ID,
+        evaluatorName: "Faithfulness",
+        isGuardrail: false,
+        status: "processed" as const,
+        passed: true,
+        label: null,
+        occurredAt: EVALUATED_AT + index,
+        lastEventId: `last-evaluation-${index}`,
+      });
+      const anchors = { traceAnchors: async () => new Map([[TRACE_ID, EVALUATED_AT]]) };
+      let archivedCalls = 0;
+      const sent: RecordEvaluationOutcomeCommandData[] = [];
+      const backfill = TraceEvaluationOutcomesMigrationService.create({
+        projects,
+        evaluations: {
+          listEvaluationOutcomes: async ({ tenantId }) => {
+            if (tenantId !== archivedId) return { outcomes: [], next: null };
+            if (archivedCalls++ > 0) throw projectGone;
+            return {
+              outcomes: [outcome(1)],
+              next: { occurredAt: EVALUATED_AT + 1, evaluationId: "evaluation-1" },
+            };
+          },
+        },
+        anchors,
+        commands: { recordEvaluationOutcomes: async (data) => void sent.push(...data) },
+        logger: { warn: () => {} },
+        now: () => EVALUATED_AT + 60_000,
+      });
+
+      const saved: EvaluationOutcomesBackfillReport[] = [];
+      const report = await backfill.recordEvaluationOutcomes({
+        resumeFrom: null,
+        dryRun,
+        signal: new AbortController().signal,
+        onPage: async (checkpoint) => void saved.push(checkpoint),
+      });
+      return { report, sent, saved };
+    }
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("keeps the counts of pages sent before the project was archived", async () => {
+      const { report, sent, saved } = await backfillArchivedAfterOnePage({ dryRun: false });
+
+      expect(sent.map(({ evaluationId }) => evaluationId)).toEqual(["evaluation-1"]);
+      expect(report).toMatchObject({
+        projects: 0,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+      expect(saved.at(-1)).toMatchObject({ outcomes: 1, skippedProjects: 1, inProject: null });
+    });
+
+    /** @scenario "The backfill skips a project archived since its evaluations" */
+    it("reports the pages a dry run counted before the project was archived", async () => {
+      const { report, sent, saved } = await backfillArchivedAfterOnePage({ dryRun: true });
+
+      expect(sent).toEqual([]);
+      expect(saved).toEqual([]);
+      expect(report).toMatchObject({
+        projects: 0,
+        outcomes: 1,
+        skippedProjects: 1,
+        skippedProjectIds: [archivedId],
+      });
+    });
+
+    /** @scenario "The backfill still fails on any other error" */
+    it("still fails the run on any other error", async () => {
+      const failure = new Error("clickhouse down");
+      const { run } = await backfillWith({ failure });
+
+      await expect(run()).rejects.toBe(failure);
+    });
+  });
+
+  describe("given a report saved before projects could be skipped", () => {
+    /** @scenario "A checkpoint saved before projects could be skipped still resumes" */
+    it("reads it with no skipped projects", () => {
+      const report = evaluationOutcomesBackfillReportSchema.parse({
+        sinceMs: 1,
+        afterProjectId: null,
+        inProject: null,
+        projects: 3,
+        outcomes: 4,
+        skippedWithoutTrace: 2,
+      });
+
+      expect(report.skippedProjects).toBe(0);
+      expect(report.skippedProjectIds).toEqual([]);
     });
   });
 });

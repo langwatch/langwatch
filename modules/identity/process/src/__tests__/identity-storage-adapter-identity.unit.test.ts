@@ -201,6 +201,7 @@ describe("better-auth over the identity storage adapter", () => {
               createdAtMs: attachedAtMs,
             },
           ],
+          storedIdentifierIds: new Set(),
         });
 
         expect(planned.find((plan) => plan.accountId === accountId)?.identifierId).toBe(

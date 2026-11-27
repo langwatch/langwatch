@@ -4,6 +4,10 @@ export type GovernanceObjectStorageCredentials = {
   accessKeyId?: string;
   secretAccessKey?: string;
   sessionToken?: string;
+  /** A role the keys assume before the read, with its external id when the role demands one. */
+  assumeRole?: { roleArn: string; externalId?: string };
+  /** Sign only with the keys above, never with the deployment's own identity. */
+  requireStaticKeys?: boolean;
 };
 
 export interface GovernanceObjectStore {
@@ -32,4 +36,7 @@ export interface GovernanceObjectStore {
     signal?: AbortSignal;
     maxBytes: number;
   }): Promise<string>;
+
+  /** The object's bytes, for binary formats such as Parquet. */
+  readBytes(input: Parameters<GovernanceObjectStore["readText"]>[0]): Promise<Uint8Array>;
 }

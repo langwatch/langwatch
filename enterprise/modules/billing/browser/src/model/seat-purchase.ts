@@ -37,6 +37,8 @@ export type SeatPrice = {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const people = (n: number) => (n === 1 ? "1 person" : `${n} people`);
+/** "1 person uses", "2 people use": the count and its verb in agreement. */
+const peopleUse = (n: number) => `${people(n)} ${n === 1 ? "uses" : "use"}`;
 const money = (price: SeatPrice, cents: number) => formatPrice({ cents, currency: price.currency });
 /** "excl. VAT" beside a recurring price; nothing beside a free one. */
 const recurringNote = (cents: number) => (cents > 0 ? EXCLUDING_VAT : undefined);
@@ -63,6 +65,41 @@ export function billingDayOrUndefined(at: number | null | undefined): string | u
 /** The Developer row's line under its name. */
 export function developerSeatHint({ price, unitCents }: { price: SeatPrice; unitCents: number }) {
   return `Their own project only, nothing shared. ${money(price, unitCents)}${price.periodSuffix} each.`;
+}
+
+/** The Developer stepper's floor: the Developers in use, never above the seats billed now. */
+export function developerSeatMinimum({ current, inUse }: { current: number; inUse: number }) {
+  return Math.min(current, inUse);
+}
+
+type DeveloperFloor = { current: number; inUse: number };
+
+/** A pick under the floor, made before the Developers in use were counted, lifted to it. */
+export function developerTargetWithin({ target, ...floor }: DeveloperFloor & { target: number }) {
+  return Math.max(target, developerSeatMinimum(floor));
+}
+
+/** The stepper's next count, skipping the counts the server refuses: under use and not billed. */
+export function snapDeveloperTarget({
+  previous,
+  next,
+  current,
+  inUse,
+}: DeveloperFloor & { previous: number; next: number }) {
+  if (next === current || next >= inUse) return next;
+  return next > previous ? inUse : Math.min(current, previous);
+}
+
+/** Why the Developer stepper stopped where it did, once it reaches the Developers in use. */
+export function developerMinimumHint({
+  target,
+  current,
+  inUse,
+}: DeveloperFloor & { target: number }): string | undefined {
+  if (inUse === 0 || target !== inUse || target === current) return undefined;
+  return target < current
+    ? `${peopleUse(inUse)} Developer seats. Remove someone in Users to go lower.`
+    : `${peopleUse(inUse)} Developer seats, so you need at least ${inUse}.`;
 }
 
 /** "€87/mo", "excl. VAT" and "3 seats × €29", the seat dialog's live total. */
@@ -216,6 +253,8 @@ export type GrowthSeatPlan = {
   developerTaxCents?: number;
   /** When the period already paid for ends, epoch milliseconds. */
   periodEndsAt: number | undefined;
+  /** The price did not load, so the confirm names the change without one. */
+  priceFailed?: boolean;
 };
 
 /** The seats the drawer may not go under: everyone who holds or is invited to a full seat. */
@@ -239,18 +278,26 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
         : undefined,
     note: growthNote({ delta, paid, seats, quote, day }),
     summary: growthSummary({ ...plan, delta, devDelta, day, monthly }),
-    action: growthAction({ delta, devDelta, seats, invites, price, developer }),
+    action: growthAction({
+      delta,
+      devDelta,
+      seats,
+      invites,
+      price,
+      developer,
+      priceFailed: plan.priceFailed === true,
+    }),
   };
 }
 
 function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
   const lower = "Remove someone in Users to go lower.";
-  if (!("firstFreesOn" in held)) return `${people(inUse)} use full seats. ${lower}`;
+  if (!("firstFreesOn" in held)) return `${peopleUse(inUse)} full seats. ${lower}`;
   const heldPart =
     held.count === 1
       ? `1 more is held until ${held.firstFreesOn}`
       : `${held.count} more are held, the first until ${held.firstFreesOn}`;
-  return `${people(inUse - held.count)} use full seats and ${heldPart}. ${lower}`;
+  return `${peopleUse(inUse - held.count)} full seats and ${heldPart}. ${lower}`;
 }
 
 function nextPeriodDay({
@@ -430,6 +477,7 @@ function growthAction({
   invites,
   price,
   developer,
+  priceFailed,
 }: {
   delta: number;
   devDelta: number;
@@ -437,20 +485,22 @@ function growthAction({
   invites: number;
   price: SeatPrice;
   developer: DeveloperSeatPlan | undefined;
+  priceFailed: boolean;
 }): SeatAction {
-  const per = (cents: number) => `${money(price, cents)}${price.periodSuffix}`;
+  const priced = (text: string, cents: number) =>
+    priceFailed ? text : `${text} · ${money(price, cents)}${price.periodSuffix}`;
   if (delta !== 0 && devDelta !== 0) return { kind: "change", label: "Confirm seat changes" };
   if (delta > 0) {
     return {
       kind: "change",
-      label: `Add ${plural(delta, "seat")} · ${per(delta * price.seatCents)}`,
+      label: priced(`Add ${plural(delta, "seat")}`, delta * price.seatCents),
     };
   }
   if (delta < 0) return { kind: "change", label: `Lower to ${plural(seats, "seat")}` };
   if (devDelta > 0 && developer) {
     return {
       kind: "change",
-      label: `Add ${plural(devDelta, "developer seat")} · ${per(devDelta * developer.unitCents)}`,
+      label: priced(`Add ${plural(devDelta, "developer seat")}`, devDelta * developer.unitCents),
     };
   }
   if (devDelta < 0 && developer) {

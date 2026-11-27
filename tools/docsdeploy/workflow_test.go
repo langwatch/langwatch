@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// deployJob is docs-site.yml's deploy job, up to the next job.
+// deployJob is docs-site.yml's deploy job, its last job.
 func deployJob(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "docs-site.yml"))
@@ -19,12 +19,7 @@ func deployJob(t *testing.T) string {
 	if start < 0 {
 		t.Fatal("docs-site.yml has no deploy job")
 	}
-	end := strings.Index(wf[start+1:], "\n  docs-site-complete:\n")
-	if end < 0 {
-		t.Fatal("the deploy job is not followed by docs-site-complete")
-	}
-
-	return wf[start : start+1+end]
+	return wf[start:]
 }
 
 // steps returns each `- name:` step of the job with its body.
@@ -121,6 +116,13 @@ func TestDeployReadsTheLiveSitemapFirstAndPingsIndexNowLast(t *testing.T) {
 	}
 	if ping < invalidate {
 		t.Error("IndexNow must hear of the pages after the distribution serves them")
+	}
+	live := steps(job)["Read the live sitemap"]
+	if !strings.Contains(live, "https://langwatch.ai/docs/sitemap.xml") || strings.Contains(live, "s3://") {
+		t.Errorf("the live sitemap must be read from the public site; the deploy role cannot read the bucket:\n%s", live)
+	}
+	if !strings.Contains(live, "::warning::") {
+		t.Errorf("a failed read of the live sitemap must warn, since IndexNow then hears of every page:\n%s", live)
 	}
 	body := steps(job)["Tell IndexNow what changed"]
 	if !strings.Contains(body, "go run ./cmd/docsdeploy indexnow") || !strings.Contains(body, "::warning::") {

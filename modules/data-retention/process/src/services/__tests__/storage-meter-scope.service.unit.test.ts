@@ -35,6 +35,11 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return this.scopeProjects;
   }
+  async findOrganizationCreatedAt(): ReturnType<
+    DataRetentionDirectoryReader["findOrganizationCreatedAt"]
+  > {
+    return [];
+  }
 }
 
 /** `traces:view` on exactly `viewable`; every other tier answers no. */

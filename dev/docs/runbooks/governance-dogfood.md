@@ -1,7 +1,7 @@
 # Governance Dogfood Runbook
 
 Single source of truth for repeatable QA of the AI Governance Platform surfaces
-(IngestionTemplates, UserIngestionBindings, /me portal, Trace Ingest, direct
+(IngestionTemplates, UserIngestionBindings, /coding-agents portal, Trace Ingest, direct
 OTLP, cross-tenant isolation, forge-attempt rejection, admin drill-in, fresh
 user walkthrough).
 
@@ -32,15 +32,15 @@ docker exec wise-mixing-zebra-app-1 pnpm tsx scripts/dogfood/governance/<script>
 
 ## Personas
 
-| Persona            | Account              | What they see                                                                                      |
-| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------- |
-| Admin (rogerio)    | rogerio@langwatch.ai | Full /me + Governance + AI Gateway sidebar, admin drill-in, all tenant data scoped via RoleBinding |
-| Fresh user         | new sign-up          | Empty /me tile grid (no bindings yet), no governance sidebar until role granted                    |
-| Cross-tenant probe | second org           | Used to verify isolation — emit OTLP with forged tenant_id and confirm receiver clamps it back     |
+| Persona            | Account              | What they see                                                                                                 |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Admin (rogerio)    | rogerio@langwatch.ai | Full /coding-agents + Governance + AI Gateway sidebar, admin drill-in, all tenant data scoped via RoleBinding |
+| Fresh user         | new sign-up          | Empty /coding-agents tile grid (no bindings yet), no governance sidebar until role granted                    |
+| Cross-tenant probe | second org           | Used to verify isolation — emit OTLP with forged tenant_id and confirm receiver clamps it back                |
 
 ## Flows
 
-### 1. /me portal walkthrough
+### 1. /coding-agents portal walkthrough
 
 **Walker:** `apps/ui/e2e/full-uiqa-walkthrough.ts (deleted 2026-09-17, one-off script)` (19 surfaces).
 **Out dir:** `/tmp/uiqa-walkthrough/`.
@@ -48,7 +48,7 @@ docker exec wise-mixing-zebra-app-1 pnpm tsx scripts/dogfood/governance/<script>
 Gates:
 
 - Sidebar shows GOVERN section with AI Gateway (Beta blue) + Governance (Preview purple)
-- /me lands on tile grid (no auth bounce)
+- /coding-agents lands on tile grid (no auth bounce)
 - Trace Ingest section renders 3 install tiles (claude_code, cursor, claude_cowork) + raw_otlp_advanced dashed tile
 - My Usage panel shows spend, by-tool breakdown, recent activity
 - No leak of /me-only components under `/[project]` chrome (catalog no-leak invariant)
@@ -98,7 +98,7 @@ gpt-5.4, claude-haiku-4-5, gemini-2-5-pro). Legacy aliases
 
 ### 4. Direct OTLP (raw_otlp_advanced fallback)
 
-Discovery card on /me → deep links to `/me/settings#otlp`. User mints raw OTLP
+Discovery card on /coding-agents → deep links to `/coding-agents/configure#otlp`. User mints raw OTLP
 token, posts to `/api/otel/v1/traces` with `Authorization: Bearer <token>`.
 No OTTL parsing — span shape is whatever client emits.
 
@@ -164,7 +164,7 @@ unfold to single ~2128px page; `screencapture -x -o -R 0,30,1440,1050`.
 
 ### 9. Fresh-user walkthrough
 
-Manual: sign up with throwaway email, land on /me, verify:
+Manual: sign up with throwaway email, land on /coding-agents, verify:
 
 - Empty tile grid (no green-check badges)
 - No GOVERN sidebar section (no RoleBinding yet)
@@ -191,7 +191,7 @@ they're docs assets under `docs/images/ai-governance/`.
 | Install drawer returns 409 CONFLICT    | Tile already has binding                   | Drawer should auto-route to Rotate path; if not, check `hasExistingBinding` prop wiring |
 | TotalCost = NULL on trace              | Legacy model alias not in llmModels.json   | Bump payload to current-gen alias                                                       |
 | `pnpm tsx scripts/...` silently no-ops | Host `.env` DATABASE_URL points at AWS RDS | Run inside `docker exec wise-mixing-zebra-app-1`                                        |
-| /me/settings 404                       | tsx watch didn't pick up route             | Hard-kill API pid, restart `pnpm dev`                                                   |
+| /coding-agents/configure 404           | tsx watch didn't pick up route             | Hard-kill API pid, restart `pnpm dev`                                                   |
 
 ## TODO (out-of-scope for this runbook drop)
 

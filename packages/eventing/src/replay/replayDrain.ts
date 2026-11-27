@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
 import type { ReplayRedis, ReplayRedisPipeline } from "./replayRedis.ts";
@@ -234,9 +234,9 @@ export async function waitForActiveJobs({
   if (aggregates.length === 0) return;
 
   const tenantIds = new Set(aggregates.map((agg) => agg.tenantId));
-  const start = nowInstant().epochMilliseconds;
+  const start = nowEpochMs();
 
-  while (nowInstant().epochMilliseconds - start < maxWaitMs) {
+  while (nowEpochMs() - start < maxWaitMs) {
     const allDrained = await projectionDrained({
       redis,
       aggregates,
@@ -274,9 +274,9 @@ export async function waitForAllActiveJobs({
   const foldProjections = projections.filter((p) => p.kind === "fold");
   const mapProjections = projections.filter((p) => p.kind === "map");
   const tenantIds = new Set(aggregates.map((agg) => agg.tenantId));
-  const start = nowInstant().epochMilliseconds;
+  const start = nowEpochMs();
 
-  while (nowInstant().epochMilliseconds - start < maxWaitMs) {
+  while (nowEpochMs() - start < maxWaitMs) {
     const foldsDrained = await foldGroupsDrainedAcross({
       redis,
       aggregates,

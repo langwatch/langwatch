@@ -8,6 +8,7 @@ export {
   type ObjectDigest,
   type ObjectStorage,
   type ObjectStorageDestination,
+  type ObjectUploadRoute,
   type RateLimitDecision,
   type RateLimiter,
   type StoresMemberSource,

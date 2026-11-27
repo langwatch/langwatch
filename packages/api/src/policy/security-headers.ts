@@ -1,14 +1,39 @@
 import type { ContentSecurityPolicy } from "./content-security-policy.ts";
 
+/** What decides whether responses may force HTTPS on the browser. */
+export type TransportSecurityOptions = Readonly<{
+  production?: boolean;
+  /** The deployment's public address; a plain `http:` one is served without TLS. */
+  publicBaseUrl?: string | undefined;
+}>;
+
+/**
+ * Whether the browser may be told to use HTTPS only: production, unless the
+ * deployment says its public address is plain HTTP (a self-hosted install
+ * without TLS), where forcing HTTPS leaves the page blank.
+ */
+export function enforcesHttps({ production, publicBaseUrl }: TransportSecurityOptions): boolean {
+  return production === true && !servesPlainHttp(publicBaseUrl);
+}
+
+/** Whether the deployment's public address is a plain `http:` URL. */
+export function servesPlainHttp(publicBaseUrl: string | undefined): boolean {
+  return (
+    publicBaseUrl !== undefined &&
+    URL.canParse(publicBaseUrl) &&
+    new URL(publicBaseUrl).protocol === "http:"
+  );
+}
+
 /** Immutable security policy; overlays leave the shared defaults intact. */
 export class SecurityHeaders {
-  /** HSTS is production-only so localhost remains reachable over plain HTTP. */
-  static strict(options: { production?: boolean } = {}): SecurityHeaders {
+  /** HSTS only where `enforcesHttps` holds, so plain-HTTP hosts stay reachable. */
+  static strict(options: TransportSecurityOptions = {}): SecurityHeaders {
     return new SecurityHeaders([
       ["X-Content-Type-Options", "nosniff"],
       ["X-Frame-Options", "DENY"],
       ["Referrer-Policy", "no-referrer"],
-      ...(options.production === true
+      ...(enforcesHttps(options)
         ? ([["Strict-Transport-Security", "max-age=31536000; includeSubDomains"]] as const)
         : []),
     ]);

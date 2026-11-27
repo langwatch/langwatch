@@ -17,10 +17,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
+import { PrismaDatasetContentRepository } from "../../repositories/prisma/prisma.dataset-content.repository.ts";
 import { PrismaDatasetRecordRepository } from "../../repositories/prisma/prisma.dataset-record.repository.ts";
 import { PrismaDatasetRepository } from "../../repositories/prisma/prisma.dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
@@ -58,6 +60,9 @@ describe.skipIf(!DB_URL)("a column edit racing a record write", () => {
   const service = DatasetService.create({
     repository: PrismaDatasetRepository.create({ prisma }),
     records,
+    content: createDatasetTestContent({
+      datasets: PrismaDatasetContentRepository.create({ prisma }),
+    }),
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
     inlineAttachments: createDatasetTestInlineAttachments(),

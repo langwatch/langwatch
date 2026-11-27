@@ -17,6 +17,8 @@ import {
   type EvaluationExecutionResult,
   type EvaluationRunData,
   type EvaluationRunLookup,
+  type EvaluatorOutcomeCount,
+  type EvaluatorOutcomeCountQuery,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
   type ExecuteEvaluationCommand,
@@ -30,6 +32,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
 import type { EvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { EvaluatorOutcomeService } from "../features/monitors/services/evaluator-outcome.service.ts";
 import { MonitorPerformanceService } from "../features/monitors/services/monitor-performance.service.ts";
 import type {
   EvaluationRunRepository,
@@ -59,12 +62,16 @@ export class EvaluationService {
   }
 
   private readonly monitorPerformance: MonitorPerformanceService;
+  private readonly evaluatorOutcomes: EvaluatorOutcomeService;
 
   private constructor(private readonly options: EvaluationServiceOptions) {
     // The trend is composable on its own, and one process composes it that
     // way: the monitors page reads it without an executor. Delegated rather
     // than duplicated so both callers fold the same buckets the same way.
     this.monitorPerformance = MonitorPerformanceService.create({
+      repository: options.monitorPerformance,
+    });
+    this.evaluatorOutcomes = EvaluatorOutcomeService.create({
       repository: options.monitorPerformance,
     });
   }
@@ -211,5 +218,9 @@ export class EvaluationService {
 
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]> {
     return this.monitorPerformance.getMonitorPerformance(input);
+  }
+
+  countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]> {
+    return this.evaluatorOutcomes.countEvaluatorOutcomes(input);
   }
 }

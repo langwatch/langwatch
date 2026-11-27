@@ -14,6 +14,7 @@ import { LangWatchQLViewProvisioningService } from "../features/provisioning/ser
 import { LangWatchQLViewStatementsService } from "../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { flooredViewNames } from "../rules/lwql-dedup-floor.rules.ts";
+import { traceIdsViewNames } from "../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLAccessModelService,
@@ -341,7 +342,7 @@ export class LangWatchQLAccessModelDefinitionService {
       });
     }
     // Before the views, so the views stay the trailing block their catalogue test reads.
-    for (const name of flooredViewNames(views)) {
+    for (const name of [...flooredViewNames(views), ...traceIdsViewNames(views)]) {
       grants.push({ database: names.database, table: name });
     }
     for (const view of views) {

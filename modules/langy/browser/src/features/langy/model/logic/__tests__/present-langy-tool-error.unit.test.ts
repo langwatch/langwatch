@@ -3,9 +3,17 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+import { REMEDIATION_CODES, type RemediationCode, remediation } from "@langwatch/handled-error";
+import { isTipForPeople } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
-import { presentLangyToolError } from "../langy-tool-failure.ts";
+import { CLI_MISSING_KEY_LINES, presentLangyToolError } from "../langy-tool-failure.ts";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const failureDocument = (error: Record<string, unknown>) => JSON.stringify({ ok: false, error });
 
@@ -206,6 +214,11 @@ describe("presentLangyToolError", () => {
       expect(presentation.tips).toBeUndefined();
       expect(presentation.docsUrl).toBeUndefined();
     });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("keeps the CLI's own words off the card", () => {
+      expect(present(failure).raw).toBeUndefined();
+    });
   });
 
   describe("given a missing key on the developer's own machine", () => {
@@ -230,6 +243,90 @@ describe("presentLangyToolError", () => {
         expect(presentation.tips).toEqual(["Run `langwatch login` to authenticate"]);
       },
     );
+  });
+
+  describe("given the CLI's text-mode not-logged-in block and no JSON", () => {
+    // Verbatim from sdks/typescript/src/cli/utils/apiKey.ts, headline in chalk red.
+    const cliText = [
+      "\u001b[31mError: you're not logged in, and LANGWATCH_API_KEY is not set.\u001b[39m",
+      "",
+      "Sign in with your browser, interactively:",
+      "  langwatch login",
+      "",
+      "If you have an API key already, either of these works:",
+      "  langwatch login --api-key <key>",
+      "  echo 'LANGWATCH_API_KEY=<key>' >> .env",
+    ].join("\n");
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("reads a sandbox tool's text as Langy's own missing key", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: cliText,
+      });
+      const shown = [presentation.message, presentation.detail, ...(presentation.tips ?? [])].join(
+        " ",
+      );
+
+      expect(presentation.code).toBe("missing_api_key");
+      expect(presentation.message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+      expect(shown).not.toMatch(/log ?in|sign in|api key/i);
+      expect(presentation.tips).toBeUndefined();
+      expect(presentation.raw).toBeUndefined();
+    });
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("reads the org-key check's text the same way", () => {
+      // Verbatim from checkOrgApiKey in apiKey.ts.
+      const orgKeyText = [
+        "\u001b[31mError: LANGWATCH_API_KEY not found.\u001b[39m",
+        "This command needs an organization-capable API key. Create one at:",
+        "  https://app.langwatch.ai/settings/api-keys",
+        "Then add it to your .env file:",
+        "  echo 'LANGWATCH_API_KEY=<your-key>' >> .env",
+      ].join("\n");
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: orgKeyText,
+      });
+
+      expect(presentation.code).toBe("missing_api_key");
+      expect(presentation.message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+      expect(presentation.raw).toBeUndefined();
+    });
+
+    /** @scenario "A sandbox tool that only echoes the CLI's missing-key line keeps its own words" */
+    it("does not reclassify a line that only contains the CLI's words", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: "log.txt:Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.raw).toContain("log.txt:Error:");
+    });
+
+    /** @scenario "A missing key printed as plain text on the developer's own machine keeps the CLI's own words" */
+    it("keeps the CLI's own sign-in words for a local tool", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "local_bash",
+        errorText: cliText,
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.detail).toBe(
+        "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      );
+      expect(presentation.raw).toContain("langwatch login");
+    });
   });
 
   // The failure the user hit: a free-plan scenario limit, rendered as
@@ -347,8 +444,142 @@ describe("presentLangyToolError", () => {
       ]);
     });
 
+    /** @scenario "A tip written for an API caller is not shown to a person" */
+    it("drops a next step that points an API caller at a meta field", () => {
+      const withMetaTip = failureDocument({
+        code: "trace_not_found",
+        message: "That trace is no longer available",
+        httpStatus: 404,
+        meta: {},
+        isHandled: true,
+        suggestions: [
+          "meta.traceId names the trace that was asked for",
+          "Traces are removed after the retention window",
+        ],
+      });
+      expect(present(withMetaTip, "Loading trace").tips).toEqual([
+        "Traces are removed after the retention window",
+      ]);
+    });
+
     it("shows the code alongside it", () => {
       expect(present(notFound, "Loading dataset").code).toBe("dataset_not_found");
+    });
+  });
+
+  // The wire message of a handled error is its code (#5984), so once the API-caller tips are
+  // hidden the card needs the registry's sentence, or it shows a slug and nothing to do.
+  describe("given a failure whose message is only its code and whose tips name meta", () => {
+    const codesWithCallerTips = REMEDIATION_CODES.filter((code) =>
+      (remediation(code).tips ?? []).some((tip) => !isTipForPeople(tip)),
+    );
+
+    const namedByTheReview: readonly [RemediationCode, RegExp][] = [
+      ["model_not_configured", /Default Models/],
+      ["instant_eval_already_finished", /nothing left to cancel/],
+    ];
+
+    it.each(namedByTheReview)("says what to do about %s", (code, expected) => {
+      const presentation = present(
+        failureDocument({
+          code,
+          message: code,
+          httpStatus: 409,
+          meta: {},
+          isHandled: true,
+          suggestions: remediation(code).tips,
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(expected);
+    });
+
+    /** @scenario "Hiding a tip written for an API caller never leaves a person without a next step" */
+    it.each(codesWithCallerTips)("gives %s a sentence or a tip, not a bare slug", (code) => {
+      const presentation = present(
+        failureDocument({
+          code,
+          message: code,
+          httpStatus: 400,
+          meta: {},
+          isHandled: true,
+          suggestions: remediation(code).tips,
+        }),
+        "Running tool",
+      );
+      expect(presentation.message !== code || (presentation.tips ?? []).length > 0).toBe(true);
+    });
+  });
+
+  describe("given a failure whose message is only its code", () => {
+    const codeOnly = (error: Record<string, unknown>) =>
+      present(failureDocument({ meta: {}, isHandled: true, ...error }), "Running tool");
+
+    it("uses the registered description when the message is empty", () => {
+      const presentation = codeOnly({ code: "query_timeout", message: "", httpStatus: 504 });
+      expect(presentation.message).toBe("Narrow the time range or add a filter, then try again.");
+    });
+
+    it("drops a tip that repeats the description it now shows", () => {
+      const presentation = codeOnly({
+        code: "query_timeout",
+        message: "query_timeout",
+        httpStatus: 504,
+        suggestions: ["Narrow the time range", "Add filters to reduce the amount of data scanned"],
+      });
+      expect(presentation.tips).toEqual(["Add filters to reduce the amount of data scanned"]);
+    });
+
+    it("humanises a code the registry has no entry for, and still names the code", () => {
+      const presentation = codeOnly({
+        code: "made_up_failure",
+        message: "made_up_failure",
+        httpStatus: 400,
+      });
+      expect(presentation.message).toBe("Made up failure");
+      expect(presentation.code).toBe("made_up_failure");
+    });
+
+    it("does not blame the reader when the code and message are both empty", () => {
+      const presentation = codeOnly({ code: "", message: "", httpStatus: 500 });
+      expect(presentation.message).not.toBe("Check your input");
+      expect(presentation.message).not.toBe("");
+    });
+
+    it("reads the reason chain, so a refused key is not told to try again", () => {
+      const presentation = present(
+        failureDocument({
+          code: "llm_upstream_error",
+          message: "llm_upstream_error",
+          httpStatus: 502,
+          meta: {},
+          isHandled: true,
+          reasons: [
+            {
+              kind: "provider_error",
+              retryable: false,
+              reasons: [{ kind: "invalid_api_key", retryable: false }],
+            },
+          ],
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(/refused this key/);
+    });
+
+    it("falls back to the registered title when the code has no description", () => {
+      const presentation = present(
+        failureDocument({
+          code: "api_key_not_found",
+          message: "api_key_not_found",
+          httpStatus: 404,
+          meta: {},
+          isHandled: true,
+        }),
+        "Revoking key",
+      );
+      expect(presentation.message).not.toBe("api_key_not_found");
+      expect(presentation.code).toBe("api_key_not_found");
     });
   });
 
@@ -617,15 +848,18 @@ describe("presentLangyToolError", () => {
       });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
-    it("says the LangWatch GitHub App is not installed", () => {
-      expect(presentGh().title).toBe("Install the GitHub App to continue");
-      expect(presentGh().message).toContain("GitHub App");
+    it("says Langy has no GitHub access here", () => {
+      expect(presentGh().title).toBe("GitHub is not connected");
+      expect(presentGh().message).toBe(
+        "Langy has no GitHub access here, so this step could not run.",
+      );
     });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
-    it("carries the code for a missing GitHub App and points at Settings", () => {
+    it("carries the code for a missing GitHub connection and names no fix of its own", () => {
       expect(presentGh().code).toBe("langy_github_not_connected");
-      expect(presentGh().tips?.join(" ")).toContain("Integrations");
+      expect(presentGh().tips).toBeUndefined();
+      expect(presentGh().message).not.toContain("Install");
     });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
@@ -658,7 +892,7 @@ describe("presentLangyToolError", () => {
       expect(shared.message).not.toContain("GitHub App");
       expect(shared.code).toBeUndefined();
       expect(unmarked.code).toBe("langy_github_not_connected");
-      expect(unmarked.title).toBe("Install the GitHub App to continue");
+      expect(unmarked.title).toBe("GitHub is not connected");
     });
 
     /** @scenario "The developer's own gh keeps its own instruction" */
@@ -716,6 +950,20 @@ describe("presentLangyToolError", () => {
 
       expect(presentation.message).toBe("Analytics storage is temporarily unavailable.");
       expect(presentation.code).toBe("clickhouse_unavailable");
+    });
+  });
+
+  // The lines are copied from the CLI, so a reword there must fail this gate.
+  describe("given the CLI's missing-key lines", () => {
+    /** @scenario "The card's copy of the CLI's missing-key lines matches the CLI" */
+    it("matches the lines the CLI prints in its source", () => {
+      const cliSource = fs.readFileSync(
+        path.resolve(here, "../../../../../../../../../sdks/typescript/src/cli/utils/apiKey.ts"),
+        "utf8",
+      );
+      for (const line of CLI_MISSING_KEY_LINES) {
+        expect(cliSource, line).toContain(JSON.stringify(line));
+      }
     });
   });
 });

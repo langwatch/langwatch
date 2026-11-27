@@ -140,6 +140,36 @@ describe("given a person opened from the members list", () => {
       renderDrawer();
       expect(await screen.findByTestId("person-billing-badge")).toHaveTextContent("Billing");
     });
+
+    /** @scenario "Billing cannot be taken from a Billing-only member" */
+    it("shows Billing on and locked for a Billing-only member, with what to do instead", async () => {
+      state.member = { ...sam, role: "EXTERNAL", billingOnly: true };
+      state.billingHolders = [{ userId: "user-sam" }];
+      renderDrawer();
+      await screen.findByTestId("person-address-state");
+
+      const billingSwitch = screen.getByRole("checkbox", { name: /Pays for the organization/ });
+      expect(billingSwitch).toBeChecked();
+      expect(billingSwitch).toBeDisabled();
+      expect(screen.getByTestId("person-billing-locked")).toHaveTextContent(
+        /remove them from the organization, or move them to a seat/,
+      );
+    });
+
+    /** @scenario "A Billing-only member whose Billing grant is missing can be repaired" */
+    it("leaves the switch live for a Billing-only member whose grant is missing, so it can be repaired", async () => {
+      state.member = { ...sam, role: "EXTERNAL", billingOnly: true };
+      renderDrawer();
+      await screen.findByTestId("person-address-state");
+
+      const billingSwitch = screen.getByRole("checkbox", { name: /Pays for the organization/ });
+      expect(billingSwitch).not.toBeChecked();
+      expect(billingSwitch).toBeEnabled();
+      await userEvent.click(billingSwitch);
+      expect(state.setBilling).toEqual([
+        expect.objectContaining({ userId: "user-sam", holds: true }),
+      ]);
+    });
   });
 
   describe("when the drawer renders", () => {

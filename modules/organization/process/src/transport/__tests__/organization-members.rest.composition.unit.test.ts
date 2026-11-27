@@ -131,10 +131,13 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     recordPersonalWorkspaceFeaturesChanged: accepts,
     recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
     recordTraceSharingDisabled: accepts,
+    recordDocsPlaygroundSessionsDisabled: accepts,
     recordMemberDisabled: { send: async (data) => void disabledMembers.push(data) },
     recordMemberEnabled: accepts,
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
+    recordMemberRoleChanged: accepts,
+    recordMemberAdmitted: accepts,
   });
 
   const runtime = createRestRuntime({

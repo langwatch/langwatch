@@ -4,7 +4,12 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
+import {
+  listNativeSkills,
+  listPublishedSkills,
+  renderSkill,
+  targetOutput,
+} from "../_compiler/native.ts";
 import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +33,33 @@ function routingRows(): { skill: string; commands: string }[] {
     });
 }
 
+/** Every file under a skill directory, relative to it, stray caches included. */
+function skillFiles(dir: string): string[] {
+  return fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(dir, path.join(e.parentPath, e.name)))
+    .toSorted();
+}
+
+// Phrases only the excluded login and key-setup partials carry ("log in" alone also
+// matches sample data such as "i cant log in", so it is not one of them).
+const SIGN_IN_COPY = [
+  "langwatch login",
+  "sign in",
+  "signs this machine in",
+  "where you are logging in",
+  "finishes in the browser",
+  "login --api-key",
+  "writes a project's key",
+  "ask for a new key",
+];
+
+function signInCopyIn(body: string): string[] {
+  const lower = body.toLowerCase();
+  return SIGN_IN_COPY.filter((phrase) => lower.includes(phrase));
+}
+
 function expectSameSkillFile({
   slug,
   embedRoot,
@@ -37,10 +69,16 @@ function expectSameSkillFile({
   embedRoot: string;
   nativeDir: string;
 }) {
-  const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
-  expect(embedded, `${slug}: Go embed copy is stale`).toBe(
-    fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
+  const embeddedFiles = skillFiles(path.join(embedRoot, slug));
+  expect(embeddedFiles, `${slug}: Go embed file list is stale`).toEqual(
+    skillFiles(path.join(nativeDir, slug)),
   );
+  for (const rel of embeddedFiles) {
+    expect(
+      fs.readFileSync(path.join(embedRoot, slug, rel), "utf8"),
+      `${slug}/${rel}: Go embed copy is stale`,
+    ).toBe(fs.readFileSync(path.join(nativeDir, slug, rel), "utf8"));
+  }
 }
 
 // Backs specs/langy/langy-native-skills.feature. Langy loads every published
@@ -166,6 +204,36 @@ describe("native skill generation", () => {
     });
   });
 
+  // skills/_compiled/cli/ is COMMITTED too: the CLI's `langwatch skills` bundle
+  // embeds it, so a stale copy ships stale instructions inside the binary.
+  describe("given the committed _compiled/cli output", () => {
+    const { skills: cliSkills, outDir: cliDir } = targetOutput("cli");
+
+    it("carries exactly the published skill set — no extras, none missing", () => {
+      const committed = fs
+        .readdirSync(cliDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .toSorted();
+      expect(committed).toEqual(publishedSkills.map((s) => s.slug).toSorted());
+    });
+
+    it("matches the sources — regenerate with `bash skills/_compiled/generate.sh`", () => {
+      for (const skill of cliSkills) {
+        const committed = fs.readFileSync(path.join(cliDir, skill.slug, "SKILL.md"), "utf8");
+        expect(committed, `${skill.slug}: committed CLI output is stale`).toBe(
+          renderSkill(skill, "cli"),
+        );
+      }
+    });
+
+    it("keeps the sign-in steps Langy leaves out", () => {
+      const setup = cliSkills.find((skill) => skill.slug === "setup-lw");
+      expect(setup, "setup-lw is not in the CLI set").toBeDefined();
+      expect(renderSkill(setup!, "cli")).toContain("langwatch login");
+    });
+  });
+
   // A skill body reaches the customer as literal tool output, so anything
   // describing the machine WE run on is a leak (e.g. a worker-side host
   // where only the question's answer should appear). Naming a variable the
@@ -219,6 +287,18 @@ describe("native skill generation", () => {
       const body = renderSkill(setup!);
       expect(body).toContain("LANGWATCH_API_KEY");
       expect(body).toContain("LANGWATCH_ENDPOINT");
+    });
+  });
+
+  // The login and key-setup partials are excluded from Langy's render because Langy
+  // already holds a key: their copy would have it tell a signed-in user to log in
+  // or set up a key.
+  describe("given a skill Langy ships", () => {
+    /** @scenario "No skill Langy ships tells the reader to sign in or set up a key" */
+    it("carries no sign-in or key setup copy", () => {
+      for (const skill of skills) {
+        expect(signInCopyIn(renderSkill(skill)), `${skill.slug}: carries sign-in copy`).toEqual([]);
+      }
     });
   });
 

@@ -594,6 +594,39 @@ Feature: Internal feature flag system for system-level kill switches
       Then the flag resolves enabled
       And a signed-in user at another domain reads it disabled
 
+  Rule: A rollout can name signed-in users by id
+
+    # An operator turns a flag on for one person, such as a teammate who
+    # asked to try it, without switching it on for their whole organization.
+
+    @unit
+    Scenario: a user rule enables the flag for a named user
+      Given a flag that is off by default
+      And a rule naming the users "user_a" and "user_b", with enabled true
+      When the flag is read for a signed-in user "user_a"
+      Then the flag resolves enabled from the rule
+      And a read for a third user does not match
+
+    @unit
+    Scenario: a read with no signed-in user matches no user rule
+      Given a flag whose only rule names a user
+      When the flag is read from a surface with no signed-in user, such as a
+           job or an anonymous visitor
+      Then the rule does not match
+
+    @unit
+    Scenario: an operator cannot save a user rule that names no user
+      Given an operator writes a user rule from the Ops UI
+      When its list of users is empty, or an id in it is blank or padded
+      Then the write is rejected with a message naming the expected form
+
+    @unit
+    Scenario: the ops page reads and writes a user rule
+      Given a stored rule enabling the flag for two users
+      When the rule is opened in the targeting rules dialog
+      Then it shows as a "User" rule with both users
+      And saving it back stores the same two user ids
+
   Rule: Self-hosted parity
 
     Scenario: Flipping a kill switch works the same self-hosted as on a shared install

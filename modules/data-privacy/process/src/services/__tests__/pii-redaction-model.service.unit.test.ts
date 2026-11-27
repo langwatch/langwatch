@@ -5,6 +5,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { type PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   LangevalsPiiDetectionError,
   type PiiDetectionOutcome,
@@ -160,6 +161,10 @@ function setup({
   model,
   modelTimeoutMs = 60_000,
   presidioChannel,
+  selfHosted = false,
+  planType = "ENTERPRISE",
+  planSource = "license",
+  planFails = false,
 }: {
   modelConfigured?: boolean;
   allowlisted?: boolean;
@@ -167,6 +172,10 @@ function setup({
   model?: PresidioChannel;
   modelTimeoutMs?: number;
   presidioChannel?: PresidioChannel;
+  selfHosted?: boolean;
+  planType?: string;
+  planSource?: string;
+  planFails?: boolean;
 } = {}) {
   const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
   const memoryModel = MemoryPresidioChannel.create(
@@ -180,6 +189,15 @@ function setup({
       flagReads.push({ key, target });
       if (flagFails) throw new Error("flag store unreachable");
       return allowlisted;
+    },
+  });
+
+  const planReads: string[] = [];
+  const entitlements = createApiFixture<EntitlementApi>({
+    getActivePlan: async ({ organizationId }) => {
+      planReads.push(organizationId);
+      if (planFails) throw new Error("licence store unreachable");
+      return { planSource, type: planType, name: planType, free: planSource === "free" } as never;
     },
   });
 
@@ -206,6 +224,7 @@ function setup({
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
   const priced: PiiRedactionSpendPricedEventData[] = [];
   const spend = PiiRedactionSpendService.create({
+    selfHosted: false,
     requestIdKey: piiRedactionRequestIdKey("test-key-pepper"),
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     recordSpendPriced: async (fact) => {
@@ -228,11 +247,15 @@ function setup({
       }),
       featureFlags,
       scopes: DataPrivacyProjectScopeService.create({ repository }),
+      selfHosted,
+      entitlements,
       spend,
       metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
       log: {
         info: (fields, message) => usage.push({ level: "info", fields, message }),
-        warn: (fields, message) => usage.push({ level: "warn", fields, message }),
+        warn: (fields, message) => {
+          if ("outcome" in fields) usage.push({ level: "warn", fields, message });
+        },
       },
       now: () => Date.now(),
     }),
@@ -249,6 +272,7 @@ function setup({
     memoryModel,
     dlp,
     flagReads,
+    planReads,
     scopeReads,
     failNextScopeRead,
     sent,
@@ -263,7 +287,7 @@ const strictBatch = (
 ) => ({
   texts: ["call Ana"],
   piiRedactionLevel: "STRICT" as const,
-  resolvedPiiLevel: "strict" as const,
+  effectivePiiLevel: "strict" as const,
   projectId,
 });
 
@@ -303,6 +327,153 @@ function spanWith(value: string): OtlpSpan {
 }
 
 describe("PiiRedactionModelService", () => {
+  describe("given a self-hosted deployment that names the model, with its flag forced on", () => {
+    describe("when the organization's active plan is not Enterprise", () => {
+      /** @scenario "A self-hosted organization without an Enterprise licence keeps the Presidio path" */
+      it("sends the batch to Presidio, counts it not_licensed and prices nothing", async () => {
+        const { analysis, presidio, memoryModel, sent, fallbacks, priced } = setup({
+          selfHosted: true,
+          planType: "OPEN_SOURCE",
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(0);
+        expect(sent(presidio)).toHaveLength(1);
+        expect(fallbacks).toEqual(["not_licensed"]);
+        expect(priced).toEqual([]);
+      });
+
+      it("logs the organization once a minute, not once per batch", async () => {
+        vi.useFakeTimers();
+        try {
+          const { analysis, presidio, usage, fallbacks } = setup({
+            selfHosted: true,
+            planType: "OPEN_SOURCE",
+          });
+          for (let batch = 0; batch < 3; batch++) presidio.answerWith(anonymized("call <PERSON>"));
+          const outcomes = () => usage.map((line) => [line.level, line.fields.outcome]);
+
+          await analysis.clearPresidio(strictBatch());
+          await vi.advanceTimersByTimeAsync(59_999);
+          await analysis.clearPresidio(strictBatch());
+          expect(outcomes()).toEqual([["info", "not_licensed"]]);
+          expect(usage[0]?.fields).toMatchObject({
+            organizationId: ORGANIZATION_ID,
+            findings: 0,
+          });
+
+          await vi.advanceTimersByTimeAsync(1);
+          await analysis.clearPresidio(strictBatch());
+          expect(outcomes()).toEqual([
+            ["info", "not_licensed"],
+            ["info", "not_licensed"],
+          ]);
+          expect(fallbacks).toEqual(["not_licensed", "not_licensed", "not_licensed"]);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the organization's Enterprise licence has expired", () => {
+      /** @scenario "A self-hosted organization whose Enterprise licence expired keeps the Presidio path" */
+      it("sends the batch to Presidio and counts it not_licensed", async () => {
+        // Entitlement answers a lapsed licence with the free baseline plan (its
+        // "An expired license resolves the baseline plan" scenario).
+        const { analysis, presidio, memoryModel, sent, fallbacks } = setup({
+          selfHosted: true,
+          planSource: "free",
+          planType: "OPEN_SOURCE",
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(0);
+        expect(sent(presidio)).toHaveLength(1);
+        expect(fallbacks).toEqual(["not_licensed"]);
+      });
+    });
+
+    describe("when the organization's active plan is Enterprise", () => {
+      /** @scenario "A self-hosted organization with an Enterprise licence goes to the PII redaction model" */
+      it("sends the batch to the model and leaves Presidio uncalled", async () => {
+        const { analysis, presidio, memoryModel, sent, planReads } = setup({ selfHosted: true });
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(1);
+        expect(sent(presidio)).toHaveLength(0);
+        expect(planReads).toEqual([ORGANIZATION_ID]);
+      });
+    });
+
+    /** @scenario "A self-hosted organization's plan is read once a minute" */
+    it("reads the organization's plan once a minute, sharing a read in flight", async () => {
+      vi.useFakeTimers();
+      try {
+        const { analysis, memoryModel, planReads } = setup({ selfHosted: true });
+        for (let batch = 0; batch < 4; batch++) memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        await Promise.all([
+          analysis.clearPresidio(strictBatch()),
+          analysis.clearPresidio(strictBatch()),
+        ]);
+        await vi.advanceTimersByTimeAsync(59_999);
+        await analysis.clearPresidio(strictBatch());
+        expect(planReads).toEqual([ORGANIZATION_ID]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await analysis.clearPresidio(strictBatch());
+        expect(planReads).toEqual([ORGANIZATION_ID, ORGANIZATION_ID]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("sends the batch to Presidio as a routing error when the plan cannot be read", async () => {
+      const { analysis, presidio, memoryModel, sent, fallbacks } = setup({
+        selfHosted: true,
+        planFails: true,
+      });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(sent(presidio)).toHaveLength(1);
+      expect(fallbacks).toEqual(["routing_error"]);
+    });
+
+    it("never reads the plan when the flag is off for the organization", async () => {
+      const { analysis, presidio, planReads } = setup({ selfHosted: true, allowlisted: false });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(planReads).toEqual([]);
+    });
+  });
+
+  describe("given LangWatch Cloud and an allowlisted organization on a plan other than Enterprise", () => {
+    /** @scenario "LangWatch Cloud routes the model without reading the plan" */
+    it("sends the batch to the model and never reads the plan", async () => {
+      const { analysis, memoryModel, sent, planReads } = setup({ planType: "LAUNCH" });
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(planReads).toEqual([]);
+    });
+  });
+
   describe("given an organization allowlisted for the model", () => {
     /** @scenario "An allowlisted organization's strict analysis goes to the PII redaction model" */
     it("sends the batch to the model and leaves Presidio uncalled", async () => {
@@ -409,7 +580,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["call Ana at +3161234567", "nothing here"],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -422,7 +593,7 @@ describe("PiiRedactionModelService", () => {
         projectId: PROJECT_ID,
         texts: 2,
         characters: 35,
-        spansFound: 2,
+        findings: 2,
         outcome: "ok",
         durationMs: expect.any(Number),
       });
@@ -435,7 +606,9 @@ describe("PiiRedactionModelService", () => {
 
     /** @scenario "Each PII redaction model call leaves one usage log line" */
     it("logs a refusal as an error with its class name only, and counts it", async () => {
-      const { analysis, presidio, fallbacks, usage } = setup();
+      const { analysis, presidio, fallbacks, usage } = setup({
+        model: scriptedModel([{ kind: "refuse" }]).channel,
+      });
       presidio.answerWith(anonymized("call <PERSON>"));
 
       await analysis.clearPresidio(strictBatch());
@@ -445,8 +618,8 @@ describe("PiiRedactionModelService", () => {
       expect(usage[0]!.level).toBe("warn");
       expect(usage[0]!.fields).toMatchObject({
         outcome: "error",
-        errorName: "Error",
-        spansFound: 0,
+        errorName: "LangevalsPiiDetectionError",
+        findings: 0,
         texts: 1,
         characters: 8,
       });
@@ -526,7 +699,7 @@ describe("PiiRedactionModelService", () => {
       return span.attributes[0]?.value.stringValue;
     }
 
-    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
     it("sends a strict policy's batch to the model", async () => {
       const { analysis, presidio, memoryModel, sent } = setup();
       memoryModel.answerWith(anonymized("call <PERSON>"));
@@ -541,7 +714,22 @@ describe("PiiRedactionModelService", () => {
       expect(sent(presidio)).toHaveLength(0);
     });
 
-    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
+    it("sends an essential policy's batch to the model when the request says STRICT", async () => {
+      const { analysis, presidio, memoryModel, sent } = setup();
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      const redacted = await redactSpanUnder({
+        analysis,
+        resolve: async () => policyAt({ level: "essential" }),
+      });
+
+      expect(redacted).toBe("call [PERSON]");
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(sent(presidio)).toHaveLength(0);
+    });
+
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
     it("sends a custom policy's batch to Presidio, though the request says STRICT", async () => {
       const { analysis, presidio, memoryModel, flagReads, sent } = setup();
       presidio.answerWith(anonymized("call <PERSON>"));
@@ -558,7 +746,7 @@ describe("PiiRedactionModelService", () => {
       expect(flagReads).toHaveLength(0);
     });
 
-    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
     it("sends the batch to Presidio when the policy cannot be loaded", async () => {
       const { analysis, presidio, memoryModel, flagReads, sent } = setup();
       presidio.answerWith(anonymized("call <PERSON>"));
@@ -593,7 +781,7 @@ describe("PiiRedactionModelService", () => {
       const { analysis, presidio, memoryModel, flagReads, sent } = setup();
       presidio.answerWith(anonymized("call <PERSON>"));
 
-      await analysis.clearPresidio({ ...strictBatch(), resolvedPiiLevel: undefined });
+      await analysis.clearPresidio({ ...strictBatch(), effectivePiiLevel: undefined });
 
       expect(sent(memoryModel)).toHaveLength(0);
       expect(flagReads).toHaveLength(0);
@@ -821,7 +1009,7 @@ describe("PiiRedactionModelService", () => {
 
         const cleared = policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
           piiRedactionLevel: "STRICT",
-          resolvedPiiLevel: "strict",
+          effectivePiiLevel: "strict",
           mainMethod: "presidio",
           projectId: PROJECT_ID,
         });
@@ -864,7 +1052,7 @@ describe("PiiRedactionModelService", () => {
 
       const cleared = await policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         mainMethod: "presidio",
         projectId: PROJECT_ID,
       });
@@ -906,7 +1094,7 @@ describe("PiiRedactionModelService", () => {
       const cleared = await analysis.clearPresidio({
         texts: ["a".repeat(5_000), "b".repeat(3_001)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -922,7 +1110,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_000)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -938,7 +1126,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_001)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -949,7 +1137,7 @@ describe("PiiRedactionModelService", () => {
           projectId: PROJECT_ID,
           texts: 1,
           characters: 8_001,
-          spansFound: 0,
+          findings: 0,
           outcome: "too_long",
           durationMs: 0,
         },
@@ -1005,7 +1193,7 @@ describe("PiiRedactionModelService", () => {
           projectId: PROJECT_ID,
           texts: 1,
           characters: 8,
-          spansFound: 0,
+          findings: 0,
           outcome: "breaker_open",
           durationMs: 0,
         },
@@ -1165,7 +1353,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_001)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 

@@ -29,6 +29,15 @@ export type UiAnalyticsEvent = {
   attributes?: Readonly<Record<string, unknown>>;
 };
 
+/**
+ * A crash a screen caught and drew around. It should never happen, so it goes out as an
+ * exception, not a product event; `properties` say where, never a secret or any SQL.
+ */
+export type UiExceptionReport = Readonly<{
+  error: Error | string;
+  properties?: Readonly<Record<string, unknown>>;
+}>;
+
 /** The reader every later event is attributed to, as the session knows them. */
 export type UiAnalyticsReader = Readonly<{ id: string; email: string | null }>;
 
@@ -45,6 +54,8 @@ export abstract class UiAnalytics {
   /** Properties every later event carries, until {@link unregister}ed. */
   register(_properties: Readonly<Record<string, unknown>>): void {}
   unregister(_property: string): void {}
+  /** Reports a caught crash to the destinations that track exceptions; the rest drop it. */
+  captureException(_report: UiExceptionReport): void {}
   abstract identify(reader: UiAnalyticsReader): void;
   abstract group(organization: UiAnalyticsGroup): void;
   /** Forgets the reader: sign-out, or a different person signing in. */

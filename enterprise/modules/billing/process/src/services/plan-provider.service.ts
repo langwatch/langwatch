@@ -8,6 +8,7 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { BillingSubscriptionRepository } from "../repositories/subscription.repository.ts";
+import { isPlanHeldForRecovery, isPlanPausedForRecovery } from "../rules/payment-recovery.rules.ts";
 import { effectiveMaxMembers } from "../rules/seat-kept.rules.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
@@ -23,6 +24,38 @@ export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
   "maxMembersDeveloper",
   "maxMessagesPerMonth",
 ];
+
+type ActiveSubscription = NonNullable<
+  Awaited<ReturnType<BillingSubscriptionRepository["findActive"]>>
+>;
+
+function customLimitsOf(subscription: ActiveSubscription): Partial<PlanInfo> {
+  const customLimits: Partial<PlanInfo> = {};
+  for (const field of NUMERIC_OVERRIDE_FIELDS) {
+    if (subscription[field] != null) customLimits[field] = subscription[field]!;
+  }
+  // Seats lowered from the next cycle stay usable until the period paid for ends.
+  if (subscription.maxMembers != null) {
+    customLimits.maxMembers = effectiveMaxMembers({
+      ...subscription,
+      maxMembers: subscription.maxMembers,
+      now: nowInstant(),
+    });
+  }
+  return customLimits;
+}
+
+/** Before the pause, an unpaid invoice holds new members and seats on every non-Enterprise plan. */
+function recoveryHoldOf(
+  subscription: ActiveSubscription,
+): Pick<PlanInfo, "additionsHeldForPayment" | "paymentFailed"> {
+  const held = isPlanHeldForRecovery({
+    startedAt: subscription.paymentRecoveryStartedAt,
+    plan: subscription.plan,
+    now: nowInstant(),
+  });
+  return held ? { additionsHeldForPayment: true, paymentFailed: true } : {};
+}
 
 export class SaaSPlanProviderService extends BillingService {
   private constructor(
@@ -53,6 +86,8 @@ export class SaaSPlanProviderService extends BillingService {
         maxScenarios: undefined,
         maxScenarioSets: undefined,
         maxEvaluators: undefined,
+        maxScenarioRunsPerMonth: undefined,
+        scenarioRunGraceDays: undefined,
         overrideAddingLimitations,
       };
     }
@@ -61,21 +96,6 @@ export class SaaSPlanProviderService extends BillingService {
     // it can, and then which one answers decides the plan.
     const activeSubscription = await this.subscriptions.findActive(organizationId);
 
-    const customLimits: Partial<PlanInfo> = {};
-    for (const field of NUMERIC_OVERRIDE_FIELDS) {
-      if (activeSubscription?.[field] != null) {
-        customLimits[field] = activeSubscription[field]!;
-      }
-    }
-    // Seats lowered from the next cycle stay usable until the period paid for ends.
-    if (activeSubscription?.maxMembers != null) {
-      customLimits.maxMembers = effectiveMaxMembers({
-        ...activeSubscription,
-        maxMembers: activeSubscription.maxMembers,
-        now: nowInstant(),
-      });
-    }
-
     if (!activeSubscription) {
       return {
         ...getFreePlanLimits(),
@@ -83,13 +103,29 @@ export class SaaSPlanProviderService extends BillingService {
       };
     }
 
+    // Unpaid past day 21: Free limits refuse new additions; nothing is removed, deleted or
+    // hidden, so the Free visibility window does not apply to what is already stored.
+    if (
+      isPlanPausedForRecovery({
+        startedAt: activeSubscription.paymentRecoveryStartedAt,
+        plan: activeSubscription.plan,
+        now: nowInstant(),
+      })
+    ) {
+      const { visibilityDays: _freeWindow, ...freeLimits } = getFreePlanLimits();
+      return { ...freeLimits, paymentFailed: true, overrideAddingLimitations };
+    }
+
     const subscriptionPlan = activeSubscription.plan as string | undefined;
     const isKnownPlan = subscriptionPlan != null && subscriptionPlan in PLAN_LIMITS;
+    const customLimits = customLimitsOf(activeSubscription);
+    const held = recoveryHoldOf(activeSubscription);
 
     if (isKnownPlan) {
       return {
         ...PLAN_LIMITS[subscriptionPlan as PlanTypes],
         ...customLimits,
+        ...held,
         overrideAddingLimitations,
       };
     }
@@ -97,6 +133,7 @@ export class SaaSPlanProviderService extends BillingService {
     return {
       ...getFreePlanLimits(),
       ...customLimits,
+      ...held,
       overrideAddingLimitations,
     };
   }

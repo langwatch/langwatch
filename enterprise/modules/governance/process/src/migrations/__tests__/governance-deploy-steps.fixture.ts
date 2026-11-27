@@ -24,6 +24,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -127,6 +128,7 @@ export async function bootGovernanceWorker({
       log: createApiFixture<LogApi>(),
       metric: createApiFixture<MetricApi>(),
       webhook: createApiFixture<WebhookApi>(),
+      notification: createApiFixture<NotificationService>(),
     })
     .boot();
 

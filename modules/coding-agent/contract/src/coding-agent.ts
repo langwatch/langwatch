@@ -442,6 +442,17 @@ export interface CodingAgentTraceSessionLookupInputSchema extends Named<
 export const codingAgentTraceSessionLookupInputSchema: CodingAgentTraceSessionLookupInputSchema =
   codingAgentTraceSessionLookupInputSchemaDefinition;
 
+/** A session's most recent stored trace: the turn a replay opens on. */
+const codingAgentSessionLastTurnSchemaDefinition = z
+  .object({ traceId: z.string(), occurredAtMs: z.number() })
+  .strict();
+export interface CodingAgentSessionLastTurnSchema extends Named<
+  typeof codingAgentSessionLastTurnSchemaDefinition
+> {}
+export const codingAgentSessionLastTurnSchema: CodingAgentSessionLastTurnSchema =
+  codingAgentSessionLastTurnSchemaDefinition;
+export type CodingAgentSessionLastTurn = z.infer<typeof codingAgentSessionLastTurnSchema>;
+
 const codingAgentRecentSessionsInputSchemaDefinition = z
   .object({
     projectId: z.string(),

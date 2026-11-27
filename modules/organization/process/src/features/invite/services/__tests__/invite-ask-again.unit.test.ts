@@ -1,5 +1,5 @@
 import { InviteNotFoundError, InviteThrottledError } from "@langwatch/organization-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrganizationInviteMail } from "../../../../channels/organization-invite-mail.channel.ts";
 import type { OrganizationInviteRateLimitRepository } from "../../../../repositories/organization-invite-rate-limit.repository.ts";
@@ -13,6 +13,10 @@ import { InviteService } from "../invite.service.ts";
  */
 
 const sendInviteReRequestEmail = vi.fn();
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /** A fixed-window counter in memory, standing in for the real rate limiter. */
 function makeInMemoryRateLimiter(): OrganizationInviteRateLimitRepository {

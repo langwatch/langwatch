@@ -6,7 +6,7 @@ Feature: Ops agent access from the CLI
   @integration
   Scenario: The CLI requests, waits for approval and stores the key in a private session file
     Given a requester key piped into "langwatch ops setup"
-    When the agent runs "langwatch ops access request" for "org:content" on ACME with a reason
+    When the agent runs "langwatch ops access request --wait" for "org:content" on ACME with a reason
     Then it prints the approval URL and waits
     And once approved it writes the session file with mode 0600
     And no ".env" file is written
@@ -64,3 +64,19 @@ Feature: Ops agent access from the CLI
     Given a live ops session
     When the agent runs "langwatch ops access end"
     Then the server revokes the key and the session file is removed
+
+  @integration
+  Scenario: A request answers at once with its id and can be checked, resumed or withdrawn
+    Given a requester key piped into "langwatch ops setup"
+    When the agent runs "langwatch ops access request" for "org:metadata" on ACME naming "org.snapshot"
+    Then it answers at once with the request id and does not poll
+    And "langwatch ops access status <id>" answers the request's state on the server
+    And "langwatch ops access withdraw <id>" takes it back and forgets it on this machine
+
+  @integration
+  Scenario: The CLI lists the server's functions and calls an approved one on the session
+    Given a live ops session holding an ops token approved for "org.snapshot"
+    When the agent runs "langwatch ops functions"
+    Then it lists the functions the server answers
+    When the agent runs "langwatch ops call org.snapshot --input {}"
+    Then the call carries the session's ops token and the input

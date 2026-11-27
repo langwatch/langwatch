@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -23,6 +24,9 @@ const (
 	traceRequestTimeout = 30 * time.Second
 	// invalidTraceID is the all-zero trace id of a non-recording tracer.
 	invalidTraceID = "00000000000000000000000000000000"
+	// settingsRequestTimeout bounds the settle-settings request; the
+	// defaults apply after it.
+	settingsRequestTimeout = 5 * time.Second
 )
 
 // infrastructureSpanPrefixes name scenario spans, never agent evidence.
@@ -65,9 +69,41 @@ type RemoteTraceFetcherOptions struct {
 type LangWatchTraceFetcher struct {
 	client       *http.Client
 	pollInterval time.Duration
+	// now and sleep are the settle loop's clock; a nil sleep waits on a
+	// real timer. Tests swap in a fake clock.
+	now   func() time.Time
+	sleep func(ctx context.Context, d time.Duration)
 
 	mu       sync.Mutex
 	registry map[string]map[string]*traceFetchState
+	// recommendations caches the settle settings per endpoint, key and
+	// project.
+	recommendations map[string]*recommendation
+}
+
+// recommendation is one cached settle-settings request.
+type recommendation struct {
+	once     sync.Once
+	settings RecommendedTraceSettings
+	ok       bool
+}
+
+// RecommendedTraceSettings are the remote trace wait settings a LangWatch
+// project recommends, from its measured ingest lag and span arrival gaps.
+// A nil field is not recommended.
+type RecommendedTraceSettings struct {
+	WaitTimeout   *time.Duration
+	WaitExtension *time.Duration
+	QuietPeriod   *time.Duration
+}
+
+// TraceSettingsRecommender is implemented by a RemoteTraceFetcher that can
+// ask LangWatch for the project's recommended wait settings. The judge uses
+// them for whatever neither the run nor Configure sets.
+type TraceSettingsRecommender interface {
+	// RecommendedTraceSettings reports the recommendation, or false when
+	// there is none; it never fails.
+	RecommendedTraceSettings(ctx context.Context, lw LangWatchConfig) (RecommendedTraceSettings, bool)
 }
 
 // traceFetchState is the fetch state of one trace of one thread. Its fields
@@ -87,6 +123,11 @@ type traceFetchState struct {
 	candidate      []byte
 	hasCandidate   bool
 	candidateSince time.Time
+	// wrapped: every remote span whose parent is not another remote span
+	// has remote children. Ancestors export after their descendants, so such
+	// a trace is complete; a flat one settles on the quiet period alone and a
+	// later batch may still be on its way.
+	wrapped bool
 }
 
 func (st *traceFetchState) dropCandidate() {
@@ -99,9 +140,11 @@ func NewRemoteTraceFetcher(opts RemoteTraceFetcherOptions) *LangWatchTraceFetche
 		opts.PollInterval = defaultTracePollInterval
 	}
 	return &LangWatchTraceFetcher{
-		client:       opts.HTTPClient,
-		pollInterval: opts.PollInterval,
-		registry:     map[string]map[string]*traceFetchState{},
+		client:          opts.HTTPClient,
+		pollInterval:    opts.PollInterval,
+		now:             time.Now,
+		registry:        map[string]map[string]*traceFetchState{},
+		recommendations: map[string]*recommendation{},
 	}
 }
 
@@ -126,9 +169,9 @@ func (f *LangWatchTraceFetcher) httpClient() *http.Client {
 
 // SettleWait implements RemoteTraceFetcher: it polls every unsettled trace
 // in parallel under one shared deadline of target.Timeout.
-func (f *LangWatchTraceFetcher) SettleWait(ctx context.Context, target TraceSettleTarget) bool {
+func (f *LangWatchTraceFetcher) SettleWait(ctx context.Context, target TraceSettleTarget) SettleOutcome {
 	lw := resolveLangWatch(target.LangWatch)
-	deadline := time.Now().Add(target.Timeout)
+	deadline := f.now().Add(target.Timeout)
 	claimed := make([]trace.TraceID, 0, len(target.TraceIDs))
 	for _, id := range target.TraceIDs {
 		if tid, ok := parseTraceID(id); ok {
@@ -147,7 +190,7 @@ func (f *LangWatchTraceFetcher) SettleWait(ctx context.Context, target TraceSett
 			id := st.traceID.String()
 			f.recordFailure(target.ThreadID, st, target.Collector, "Cannot fetch trace "+id+": remote trace fetching is on but the LangWatch "+missing+" is not configured (set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT, or pass them in the run's langwatch config)")
 		}
-		return false
+		return SettleOutcome{}
 	}
 	quiet := target.QuietPeriod
 	if quiet < 0 {
@@ -164,17 +207,26 @@ func (f *LangWatchTraceFetcher) SettleWait(ctx context.Context, target TraceSett
 		}
 		wg.Wait()
 	}
-	return f.allSettled(target.ThreadID, target.TraceIDs)
+	return f.outcome(target.ThreadID, target.TraceIDs)
 }
 
 // ExtendSettle implements RemoteTraceFetcher: it re-arms every trace that
-// failed the first wait, retracting its error span, and waits once more.
-func (f *LangWatchTraceFetcher) ExtendSettle(ctx context.Context, target TraceSettleTarget) {
+// failed the first wait (retracting its error span) or settled on the quiet
+// period alone, and waits once more. Spans arriving meanwhile join.
+func (f *LangWatchTraceFetcher) ExtendSettle(ctx context.Context, target TraceSettleTarget) SettleOutcome {
 	f.mu.Lock()
 	states := f.registry[target.ThreadID]
 	for _, id := range target.TraceIDs {
 		st := states[id]
-		if st == nil || !st.failed {
+		if st == nil {
+			continue
+		}
+		if st.settled && !st.wrapped {
+			st.settled = false
+			st.dropCandidate()
+			continue
+		}
+		if !st.failed {
 			continue
 		}
 		st.failed = false
@@ -185,7 +237,7 @@ func (f *LangWatchTraceFetcher) ExtendSettle(ctx context.Context, target TraceSe
 		st.dropCandidate()
 	}
 	f.mu.Unlock()
-	f.SettleWait(ctx, target)
+	return f.SettleWait(ctx, target)
 }
 
 // NoneSettled implements RemoteTraceFetcher.
@@ -214,16 +266,81 @@ func (f *LangWatchTraceFetcher) ClearThread(threadID string) {
 	f.mu.Unlock()
 }
 
-func (f *LangWatchTraceFetcher) allSettled(threadID string, traceIDs []string) bool {
+func (f *LangWatchTraceFetcher) outcome(threadID string, traceIDs []string) SettleOutcome {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	states := f.registry[threadID]
+	out := SettleOutcome{AllSettled: true}
 	for _, id := range traceIDs {
-		if st := states[id]; st == nil || !st.settled {
-			return false
+		st := states[id]
+		if st == nil || !st.settled {
+			out.AllSettled = false
+			continue
+		}
+		if !st.wrapped {
+			out.Unconfirmed = true
 		}
 	}
-	return true
+	return out
+}
+
+// RecommendedTraceSettings implements TraceSettingsRecommender: it asks
+// GET {endpoint}/api/traces/settle-settings once per endpoint, key and
+// project. An unreachable endpoint, one older than the route, or any
+// unexpected answer reports none, and the caller keeps its defaults.
+func (f *LangWatchTraceFetcher) RecommendedTraceSettings(ctx context.Context, cfg LangWatchConfig) (RecommendedTraceSettings, bool) {
+	lw := resolveLangWatch(cfg)
+	if lw.Endpoint == "" || lw.APIKey == "" {
+		return RecommendedTraceSettings{}, false
+	}
+	key := lw.Endpoint + "\x00" + lw.APIKey + "\x00" + lw.ProjectID
+	f.mu.Lock()
+	rec := f.recommendations[key]
+	if rec == nil {
+		rec = &recommendation{}
+		f.recommendations[key] = rec
+	}
+	f.mu.Unlock()
+	rec.once.Do(func() { rec.settings, rec.ok = f.fetchRecommendation(ctx, lw) })
+	return rec.settings, rec.ok
+}
+
+func (f *LangWatchTraceFetcher) fetchRecommendation(ctx context.Context, lw LangWatchConfig) (RecommendedTraceSettings, bool) {
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settingsRequestTimeout)
+	defer cancel()
+	url := strings.TrimSuffix(lw.Endpoint, "/") + "/api/traces/settle-settings"
+	req, err := http.NewRequestWithContext(rctx, http.MethodGet, url, nil)
+	if err != nil {
+		return RecommendedTraceSettings{}, false
+	}
+	setAuthHeaders(req, lw)
+	resp, err := f.httpClient().Do(req)
+	if err != nil {
+		logger().Debug("Trace settle settings unavailable; using defaults", "reason", err.Error())
+		return RecommendedTraceSettings{}, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return RecommendedTraceSettings{}, false
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		logger().Debug("Trace settle settings unavailable; using defaults", "reason", err.Error())
+		return RecommendedTraceSettings{}, false
+	}
+	read := func(name string) *time.Duration {
+		v, ok := body[name].(float64)
+		if !ok || math.IsInf(v, 0) || math.IsNaN(v) || v < 0 {
+			return nil
+		}
+		d := time.Duration(v * float64(time.Millisecond))
+		return &d
+	}
+	return RecommendedTraceSettings{
+		WaitTimeout:   read("waitTimeoutMs"),
+		WaitExtension: read("waitExtensionMs"),
+		QuietPeriod:   read("quietPeriodMs"),
+	}, true
 }
 
 // pending returns the states of the traces neither settled nor failed,
@@ -317,7 +434,7 @@ func (f *LangWatchTraceFetcher) settleOne(ctx context.Context, req settleRequest
 		if settled {
 			return
 		}
-		remaining := time.Until(req.deadline)
+		remaining := req.deadline.Sub(f.now())
 		if remaining <= 0 || ctx.Err() != nil {
 			switch {
 			case candidate:
@@ -339,6 +456,10 @@ func (f *LangWatchTraceFetcher) settleOne(ctx context.Context, req settleRequest
 			return
 		}
 		wait := min(f.pollInterval, remaining)
+		if f.sleep != nil {
+			f.sleep(ctx, wait)
+			continue
+		}
 		if timer == nil {
 			timer = time.NewTimer(wait)
 		} else {
@@ -358,14 +479,15 @@ func (f *LangWatchTraceFetcher) pollOnce(ctx context.Context, req settleRequest,
 	if err != nil {
 		return 0, err
 	}
-	remote, resolved, key := f.merge(req.target, st, spans)
+	remote, resolved, key, wrapped := f.merge(req.target, st, spans)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if remote < 1 || !resolved {
 		st.dropCandidate()
 		return remote, nil
 	}
-	now := time.Now()
+	st.wrapped = wrapped
+	now := f.now()
 	if !st.hasCandidate || !bytes.Equal(st.candidate, key) {
 		st.candidate, st.hasCandidate, st.candidateSince = append(st.candidate[:0], key...), true, now
 	}
@@ -387,8 +509,9 @@ func isInfrastructureSpan(name string) bool {
 // merge skips infrastructure spans, dedupes by span id against the spans
 // already collected for the thread, tags the rest with the thread id and
 // feeds them to the collector. It returns the remote span count, whether
-// every remote span's parent resolves, and the sorted remote span id key.
-func (f *LangWatchTraceFetcher) merge(target TraceSettleTarget, st *traceFetchState, spans []langWatchAPISpan) (int, bool, []byte) {
+// every remote span's parent resolves, the sorted remote span id key, and
+// whether the remote spans are wrapped (see traceFetchState.wrapped).
+func (f *LangWatchTraceFetcher) merge(target TraceSettleTarget, st *traceFetchState, spans []langWatchAPISpan) (int, bool, []byte, bool) {
 	collector, threadID := target.Collector, target.ThreadID
 	collected := collector.SpansForThread(threadID)
 	f.mu.Lock()
@@ -412,6 +535,8 @@ func (f *LangWatchTraceFetcher) merge(target TraceSettleTarget, st *traceFetchSt
 	remote := 0
 	resolved := len(spans) > 0
 	remoteIDs := make([]trace.SpanID, 0, len(spans))
+	// remoteIdx are the indexes of the remote spans in spans.
+	remoteIdx := make([]int, 0, len(spans))
 	for i := range spans {
 		s := &spans[i]
 		if isInfrastructureSpan(s.Name) || !valid[i] {
@@ -423,6 +548,7 @@ func (f *LangWatchTraceFetcher) merge(target TraceSettleTarget, st *traceFetchSt
 		if !(seen && local) && !collector.IsProcessSpan(st.traceID, id) {
 			remote++
 			remoteIDs = append(remoteIDs, id)
+			remoteIdx = append(remoteIdx, i)
 			if parent, ok := parseSpanID(s.ParentID); ok {
 				_, inFetched := fetched[parent]
 				_, inCollected := collectedIDs[parent]
@@ -440,19 +566,49 @@ func (f *LangWatchTraceFetcher) merge(target TraceSettleTarget, st *traceFetchSt
 		f.mu.Unlock()
 		collector.Add(s.readOnlySpan(st.traceID, id, threadID))
 	}
+	wrapped := isWrapped(spans, ids, remoteIdx)
 	slices.SortFunc(remoteIDs, func(a, b trace.SpanID) int { return bytes.Compare(a[:], b[:]) })
 	key := make([]byte, 0, len(remoteIDs)*len(trace.SpanID{}))
 	for _, id := range remoteIDs {
 		key = append(key, id[:]...)
 	}
-	return remote, resolved, key
+	return remote, resolved, key, wrapped
+}
+
+// isWrapped reports whether the remote spans (indexes into spans) have entry
+// spans, those whose parent is not another remote span, and every one of
+// them has remote children.
+func isWrapped(spans []langWatchAPISpan, ids []trace.SpanID, remoteIdx []int) bool {
+	remoteSet := make(map[trace.SpanID]struct{}, len(remoteIdx))
+	for _, i := range remoteIdx {
+		remoteSet[ids[i]] = struct{}{}
+	}
+	parents := make(map[trace.SpanID]struct{}, len(remoteIdx))
+	for _, i := range remoteIdx {
+		if p, ok := parseSpanID(spans[i].ParentID); ok {
+			parents[p] = struct{}{}
+		}
+	}
+	entries := 0
+	for _, i := range remoteIdx {
+		if p, ok := parseSpanID(spans[i].ParentID); ok {
+			if _, remote := remoteSet[p]; remote {
+				continue
+			}
+		}
+		entries++
+		if _, hasChildren := parents[ids[i]]; !hasChildren {
+			return false
+		}
+	}
+	return entries > 0
 }
 
 // fetchTrace GETs the trace's spans; a 404 means not arrived yet. The
 // request is bounded by the request timeout and by what is left of the
 // shared deadline, whichever is nearer.
 func (f *LangWatchTraceFetcher) fetchTrace(ctx context.Context, req settleRequest, traceID string) ([]langWatchAPISpan, error) {
-	remaining := time.Until(req.deadline)
+	remaining := req.deadline.Sub(f.now())
 	boundedByDeadline := remaining <= traceRequestTimeout
 	bound := max(time.Millisecond, min(traceRequestTimeout, remaining))
 	rctx, cancel := context.WithTimeout(ctx, bound)
@@ -463,19 +619,23 @@ func (f *LangWatchTraceFetcher) fetchTrace(ctx context.Context, req settleReques
 	if err != nil {
 		return nil, err
 	}
-	// Dual-emit auth: /api/trace historically reads X-Auth-Token, newer
-	// deployments a Bearer token. The Bearer branch rejects an unscoped PAT
-	// or organization key, hence X-Project-Id.
-	httpReq.Header.Set("X-Auth-Token", req.lw.APIKey)
-	httpReq.Header.Set("Authorization", "Bearer "+req.lw.APIKey)
-	if req.lw.ProjectID != "" {
-		httpReq.Header.Set("X-Project-Id", req.lw.ProjectID)
-	}
+	setAuthHeaders(httpReq, req.lw)
 	spans, err := f.do(httpReq)
 	if err != nil && boundedByDeadline && errors.Is(rctx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
 		return nil, errDeadlineAbort
 	}
 	return spans, err
+}
+
+// setAuthHeaders sets the trace API auth. Dual-emit: /api/trace historically
+// reads X-Auth-Token, newer deployments a Bearer token. The Bearer branch
+// rejects an unscoped PAT or organization key, hence X-Project-Id.
+func setAuthHeaders(req *http.Request, lw LangWatchConfig) {
+	req.Header.Set("X-Auth-Token", lw.APIKey)
+	req.Header.Set("Authorization", "Bearer "+lw.APIKey)
+	if lw.ProjectID != "" {
+		req.Header.Set("X-Project-Id", lw.ProjectID)
+	}
 }
 
 func (f *LangWatchTraceFetcher) do(req *http.Request) ([]langWatchAPISpan, error) {

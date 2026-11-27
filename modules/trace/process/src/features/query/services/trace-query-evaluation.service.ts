@@ -194,8 +194,8 @@ export class TraceQueryEvaluationService {
   }
 
   /**
-   * Negation threads down unchanged and the operator stays as-is: the exact shape
-   * `translateNode` compiles, so both sides always agree.
+   * Mirrors `translateNode`: an AND chain is read once from its top, and under a NOT, AND and OR
+   * trade places (#9806).
    */
   #evaluateLogical({
     node,
@@ -208,43 +208,44 @@ export class TraceQueryEvaluationService {
     trace: InMemoryTrace;
     state: WalkState;
   }): boolean | Unsupported {
-    // An AND chain is read once from its top, binding an evaluator to its
-    // result conditions exactly as `translateNode` does.
-    const chain = negated || node.operator.operator === "OR" ? null : buildAndChain(node);
-    if (chain) return this.#evaluateAndChain({ chain, trace, state });
+    const isOr = node.operator.operator === "OR";
+    const chain = isOr ? null : buildAndChain(node);
+    if (chain) return this.#evaluateAndChain({ chain, negated, trace, state });
     const left = this.#evaluateNode({ node: node.left, negated, trace, state });
     if (left === UNSUPPORTED) return UNSUPPORTED;
     const right = this.#evaluateNode({ node: node.right, negated, trace, state });
     if (right === UNSUPPORTED) return UNSUPPORTED;
-    return node.operator.operator === "OR" ? left || right : left && right;
+    return isOr !== negated ? left || right : left && right;
   }
 
-  /** Mirrors `translateAndChain`: the bound group, ANDed with the rest. */
+  /** Mirrors `translateAndChain`: the bound group and the rest, ANDed, or ORed under a NOT. */
   #evaluateAndChain({
     chain,
+    negated,
     trace,
     state,
   }: {
     chain: AndChain;
+    negated: boolean;
     trace: InMemoryTrace;
     state: WalkState;
   }): boolean | Unsupported {
     state.nodeCount += chain.nodeCount - 1;
     if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
-    let matched = true;
+    const parts: boolean[] = [];
     if (chain.scope) {
       const bound = evaluateEvaluationScope({ scope: chain.scope, trace, fields: this.#fields });
       if (bound === UNSUPPORTED) {
         state.unsupportedFields.push("evaluator");
         return UNSUPPORTED;
       }
-      matched = bound;
+      parts.push(negated ? !bound : bound);
     }
     for (const operand of chain.rest) {
-      const result = this.#evaluateNode({ node: operand, negated: false, trace, state });
+      const result = this.#evaluateNode({ node: operand, negated, trace, state });
       if (result === UNSUPPORTED) return UNSUPPORTED;
-      matched = matched && result;
+      parts.push(result);
     }
-    return matched;
+    return negated ? parts.some(Boolean) : parts.every(Boolean);
   }
 }

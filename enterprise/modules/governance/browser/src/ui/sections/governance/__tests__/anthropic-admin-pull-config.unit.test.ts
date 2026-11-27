@@ -13,11 +13,9 @@
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  buildAnthropicAdminPullConfig,
-  buildParserConfig,
-  type ComposerState,
-} from "../governance-inventory.screen.tsx";
+import { buildAnthropicAdminPullConfig } from "../inventory/admin-api-pull-config.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { buildParserConfig } from "../inventory/source-submission.ts";
 
 function composer(parserConfig: Record<string, string>, pullSchedule = ""): ComposerState {
   return {

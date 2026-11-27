@@ -7,7 +7,6 @@ import { ArrowDown, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ComponentProps, Fragment, type ReactNode } from "react";
 
-import { SIDEBAR_PANEL_WIDTH } from "../../../../../model/langy-panel-layout.ts";
 import { EmptyState } from "../../../../../ui/sections/langy-empty-state.tsx";
 import { LangyModelProviderSetup } from "../../../../../ui/sections/model-provider-setup.tsx";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
@@ -334,7 +333,7 @@ export function LangyConversationBody({
     return (
       <EmptyState
         variant={floating ? "floating" : "sidebar"}
-        panelWidth={floating ? state.empty.panelWidth : SIDEBAR_PANEL_WIDTH}
+        panelWidth={state.empty.panelWidth}
         suggestions={state.empty.suggestions}
         onPick={state.empty.onPick}
       />
@@ -434,6 +433,7 @@ export function LangyTranscript({
   waitingCards,
   queuedPrompt,
   workingLine,
+  queuedMessages = null,
 }: {
   floating: boolean;
   messages: UIMessage[];
@@ -442,6 +442,8 @@ export function LangyTranscript({
   waitingCards: ReactNode;
   queuedPrompt: string | null;
   workingLine: ReactNode;
+  /** Messages sent while Langy works, after the running turn they wait on. */
+  queuedMessages?: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
   const gutter = panelGutter(floating);
@@ -466,6 +468,7 @@ export function LangyTranscript({
       {cardAnchorIndex === -1 ? waitingCards : null}
       {queuedPrompt ? <QueuedPrompt prompt={queuedPrompt} reduceMotion={reduceMotion} /> : null}
       {workingLine}
+      {queuedMessages}
     </VStack>
   );
 }

@@ -15,8 +15,8 @@ const DATASET_KSUID_RESOURCE = "dataset";
 
 /**
  * Born on storage (ADR-032 v13): a new dataset's rows go to chunks one chunk at a
- * time BEFORE its row exists, so a failed write leaves no dataset; whatever was
- * written is reaped, whether the write or the row insert failed.
+ * time BEFORE its row exists, so a failed write leaves no dataset. What was written
+ * is reaped, unless a failed row insert may have committed after all.
  */
 export class DatasetBirthService {
   static create(options: {
@@ -53,6 +53,7 @@ export class DatasetBirthService {
       datasetId,
     });
     const pinnedIds = new Set<string>();
+    let written: Awaited<ReturnType<StreamingChunkWriterService["finalize"]>>;
     try {
       for await (const row of rows) {
         assertStoredRowWithinLimit(row.entry);
@@ -62,8 +63,13 @@ export class DatasetBirthService {
         }
         await writer.push(stripNullBytes(row.entry), row.id === undefined ? {} : { id: row.id });
       }
-      const written = await writer.finalize();
+      written = await writer.finalize();
+    } catch (error) {
+      await this.discardChunks({ projectId, datasetId });
+      throw error;
+    }
 
+    try {
       return await this.datasets.create({
         id: datasetId,
         projectId,
@@ -78,9 +84,23 @@ export class DatasetBirthService {
         chunkOffsets: written.chunkOffsets,
       });
     } catch (error) {
-      await this.discardChunks({ projectId, datasetId });
+      await this.discardChunksUnlessSaved({ projectId, datasetId });
       throw error;
     }
+  }
+
+  /** A failed insert may still have committed: its chunks go only once the row is known absent. */
+  private async discardChunksUnlessSaved(input: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<void> {
+    const absent = await this.datasets
+      .findOne({ id: input.datasetId, projectId: input.projectId })
+      .then(
+        (row) => row === null,
+        () => false,
+      );
+    if (absent) await this.discardChunks(input);
   }
 
   /** Best-effort: a failed reap must not hide the failure that caused it. */

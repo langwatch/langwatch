@@ -439,6 +439,14 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the text is added as the last line of the file, which is created when absent
       And a replacement in a file that is not there is still refused
 
+    @unit
+    Scenario: A search pattern that is not a valid regular expression is searched as plain text
+      Given a file on the developer's machine holding the line "prompt = create_prompt(name)"
+      When Langy searches the folder for "create_prompt(" without asking for plain text
+      Then the search finds the line instead of failing on the bare parenthesis
+      And the result says the pattern was searched as plain text because it is not a valid regular expression
+      And a pattern that is a valid regular expression is still read as one
+
   Rule: The app gets its LangWatch key from the developer's login, never from Langy
 
     # The project's base key is handed out only to a person's device session

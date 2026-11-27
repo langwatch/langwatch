@@ -130,9 +130,9 @@ test_gateway_host_on_the_app_ingress() {
   else
     ok "gateway no nginx" "no ingress-nginx annotations on an envoy class"
   fi
-  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "2" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
-      && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
-    ok "gateway backend" "/v1 and /health route to the lw-gateway Service"
+  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "3" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
+      && printf '%s\n' "$doc" | grep -q 'path: /a2a$' && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
+    ok "gateway backend" "/v1, /a2a and /health route to the lw-gateway Service"
   else
     fail "gateway backend" "the gateway paths do not route to lw-gateway"
   fi
@@ -202,6 +202,11 @@ test_nginx_timeouts_on_the_app_ingress() {
     ok "nginx app timeout" "120s read timeout on the app Ingress"
   else
     fail "nginx app timeout" "the nginx app Ingress has no 120s read timeout: $(cat "$tmp/appnginx.err")"
+  fi
+  if printf '%s\n' "$app" | grep -q 'proxy-body-size: 64m'; then
+    ok "nginx app body size" "64m body size on the app Ingress"
+  else
+    fail "nginx app body size" "the nginx app Ingress keeps ingress-nginx's 1m body default"
   fi
   if printf '%s\n' "$app" | grep -q 'proxy-send-timeout: "300"'; then
     ok "nginx app override" "ingress.annotations wins over the app default"

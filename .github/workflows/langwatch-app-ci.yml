@@ -50,6 +50,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -184,6 +185,7 @@ jobs:
               # feeds. These entries cover every action this file uses
               # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
               - '.github/actions/detect-changes/**'
+              - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
@@ -214,6 +216,7 @@ jobs:
               - 'pkg/**'
               - 'services/langevals/**'
               - 'dev/scripts/**'
+              - 'dev/nx/**'
               - '.github/scripts/**'
               - '.gitattributes'
               - '.github/workflows/langwatch-app-ci.yml'
@@ -401,40 +404,34 @@ jobs:
             echo "apps=$APPS" >> "$GITHUB_OUTPUT"
           fi
 
-  # Every workspace package's own typecheck, through the root `typecheck`
-  # script: `tsc -b` over the root solution, after the api and ui closures as
-  # their own processes to bound memory (ADR-100).
-  #
-  # This used to be two jobs. One ran `pnpm run typecheck` for the three
-  # applications; the other ran its own `pnpm -r` over `packages/`,
-  # `modules/`, `enterprise/` and `apps/`, because the root script covered
-  # only the three applications and 146 packages were never typechecked by CI
-  # at all otherwise. The bespoke machinery that scoped the root script that
-  # way (dev/scripts/typecheck*.mjs, the declaration-cache action) is gone,
-  # replaced by plain `tsc -b` project references in every package, so the
-  # root script now runs across the whole workspace and one job covers what
-  # both used to.
-  #
-  # `-r` runs each package's own script, so a package opts in by declaring one
-  # and opts out by not declaring one. That is the property a named list of
-  # jobs could not have: a package added tomorrow is covered without editing
-  # this file.
-  #
-  # `install: all` because it runs every package, so every package's
-  # dependencies have to be present — the same reasoning as package-suites.
-  typecheck:
+  # One runner, one checkout and one install for the static checks: the CI
+  # script tests, workspace invariants, format, architecture, lint, feature
+  # parity, OpenAPI clients, typecheck and the CI self-test. Each check is its
+  # own step and every step runs even when an earlier one failed, so one run
+  # reports every failure. They run in sequence, not in parallel: the
+  # type-aware lint reads the packages' dist declarations, which typecheck
+  # (tsc -b) writes, so typecheck runs after lint, as when they were separate
+  # jobs. The CI self-test runs last: it stages a failing test in apps/api.
+  checks:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.relevant == 'true' || needs.changes.outputs.feature-parity == 'true'
     runs-on: ubuntu-latest
-    # Read the checkout; write only to prune this pull request's older cache copies.
+    timeout-minutes: 60
+    env:
+      # 0 turns off oxlint's local slot queue (patches/oxlint@1.85.0.patch). On a
+      # runner only this job uses, it parks the third process of `lint:types`.
+      LANGWATCH_LINT_SLOTS: "0"
+    # Read the checkout; write only to prune this pull request's older typecheck cache copies.
     permissions:
       contents: read
       actions: write
-    timeout-minutes: 30
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          fetch-depth: 0
+          persist-credentials: false
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
@@ -442,13 +439,309 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
-      # The one job that saves the pnpm store (not on the critical path).
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: all
-          save-store: "true"
+      # The CI script tests need no install, so they report first.
+      - name: Test extract-failures.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/extract-failures.test.sh
 
+      - name: Test vitest-changed-files.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/vitest-changed-files.test.sh
+
+      - name: Test start-clickhouse-with-storage-policy.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
+
+      - name: Test notify-slack-release.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      - name: Test run-package-suites.ts
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
+
+      - name: Test check-test-reads.ts
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/check-test-reads.test.ts
+
+      - name: Test check-added-images.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/check-added-images.test.sh
+
+      - name: Test nearest-ancestor-tag.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
+
+      - name: Test detect-changes-source.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/detect-changes-source.test.sh
+
+      - name: Test detect-changes-by-sha.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
+
+      - name: Test pull-request-diff-base.sh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: bash .github/scripts/__tests__/pull-request-diff-base.test.sh
+
+      - name: Test the change detector's pathspec parity with dorny's matcher
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: |
+          picomatch_dir="$(mktemp -d)"
+          npm install --prefix "$picomatch_dir" --no-save --no-audit --no-fund picomatch@^2.3.1
+          export PICOMATCH="$picomatch_dir/node_modules/picomatch"
+          bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
+
+      - name: Test guard-breaking-change-scope.ts
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
+
+      - name: Test dedupe-release-notes.ts
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: |
+          node --test --experimental-strip-types .github/scripts/dedupe-release-notes.test.ts
+          bash -n .github/scripts/dedupe-release-notes.sh
+
+      - name: Test that every generated file is marked generated
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts
+
+      - name: Test the PR impact map categories
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
+
+      # The nightly suite's reports and its workflow promises (specs/ci/nightly-suite.feature).
+      - name: Test the nightly suite's scripts
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: >-
+          node --test --experimental-strip-types
+          .github/scripts/nightly-hygiene.test.ts
+          .github/scripts/nightly-flaky.test.ts
+          .github/scripts/nightly-dashboard.test.ts
+          .github/scripts/nightly-workflows.test.ts
+
+      - name: Test when release pull requests refresh
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
+
+      # The one job that saves the pnpm store. A change that only touches
+      # feature files installs the parity checker alone and saves nothing.
+      - uses: ./.github/actions/setup-pnpm-node
+        id: setup
+        if: ${{ !cancelled() }}
+        with:
+          install: ${{ needs.changes.outputs.relevant == 'true' && 'all' || '@langwatch/architecture-enforcer...' }}
+          save-store: ${{ needs.changes.outputs.relevant == 'true' && 'true' || 'false' }}
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
+
+      # The parity scanner moved into @langwatch/architecture-enforcer with the
+      # rest of the repository-wide checks.
+      - name: Check feature-file parity
+        if: ${{ !cancelled() && needs.changes.outputs.feature-parity == 'true' && steps.setup.outcome == 'success' }}
+        run: pnpm --filter @langwatch/architecture-enforcer run check:feature-parity
+
+      # The dev scripts' own node:test suites (log renderer, supervisor watch)
+      # ran in no job until now. TZ=UTC because the
+      # log renderer prints local wall time and the fixture is pinned to UTC.
+      - name: Test dev scripts
+        if: ${{ !cancelled() && needs.changes.outputs.feature-parity == 'true' && steps.setup.outcome == 'success' }}
+        run: TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/nx/__tests__/*.unit.test.mjs
+
+      # The ADR-076 workspace invariants: one lockfile, one workspace
+      # definition, no member carrying overrides pnpm would ignore, the app and
+      # the SDK on different names. They previously ran only in
+      # npx-server-smoke, which is deliberately NOT a required check and whose
+      # path filter misses most of the manifests these assert about — so the
+      # exact drift they exist to catch (a second lockfile reappearing, a
+      # member overrides block) merged with no job running at all. This job is
+      # required via langwatch-app-complete and now triggers on the root
+      # manifests. Takes ~200ms.
+      - name: Check the workspace invariants (ADR-076)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: pnpm --filter @langwatch/server run test:invariants
+
+      # On a format failure, print the fix as a diff so it can be applied by hand.
+      - name: Oxfmt (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: |
+          if pnpm format:check; then exit 0; fi
+          format_ok=1
+          pnpm format || format_ok=0
+          git --no-pager diff --stat || true
+          git --no-pager diff | head -n 2000 || true
+          git checkout -- . || true
+          test -z "$(git status --porcelain)" || { git status --porcelain; echo "::error::could not restore the worktree after pnpm format"; exit 1; }
+          if [ "$format_ok" = 0 ]; then echo "::error::pnpm format failed, so there is no fix diff to show; run it locally"; exit 1; fi
+          echo "::error::oxfmt found unformatted files; the diff above is the fix (cut at 2000 lines)"
+          exit 1
+
+      - name: Architecture policy tests (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: |
+          pnpm --filter @langwatch/architecture-enforcer typecheck
+          pnpm --filter @langwatch/architecture-enforcer test
+
+      - name: Oxlint rule tests (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: pnpm --filter @langwatch/oxlint-rules test
+
+      - name: Lint rule reference is current (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: pnpm --filter @langwatch/architecture-enforcer docs:check
+
+      # Every tsconfig's project references match the Nx project graph, as `nx sync`
+      # (@nx/js:typescript-sync) writes them. ADR-150's 2026-10-10 amendment.
+      - name: TypeScript project references are in sync (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: NX_LOAD_DOT_ENV_FILES=false pnpm exec nx sync:check
+
+      # `pnpm lint:architecture` in CI: the architecture-enforcer policies that
+      # read zero findings on this tree, named one by one; a policy joins the
+      # list when its findings reach zero. `declarations` is left out because
+      # it reads the output of `tsc -b`.
+      - name: Architecture lint (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: >-
+          pnpm --filter @langwatch/architecture-enforcer lint --
+          --no-declarations
+          --policies application-boundaries,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations,runtime-dependencies
+
+      # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
+      # fails the job. A config error and a lint violation both surface here.
+      #
+      # It replaced a two-part step: a blocking full-tree lint plus a
+      # reviewdog pass that made the previous linter's `warn`-tier rules
+      # blocking on the lines a PR added, gated by a script that counted
+      # violations per (file, rule) on both sides of the merge base and
+      # failed only on an increase. See
+      # packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md.
+      #
+      # NONE OF THAT MACHINERY HAS AN EQUIVALENT HERE, AND NONE IS NEEDED.
+      # It existed because that ruleset carried a warn tier with a baseline
+      # in the thousands, and a rule that cannot block full-tree has to be
+      # narrowed to the diff somehow. /.oxlintrc.jsonc has no
+      # warn tier: a rule is `error` for the whole tree, and where a backlog
+      # exists the offending files are named in the debt register at the
+      # bottom of that file. The gate is full-tree and the register is the
+      # exemption, in place of a diff filter that had to guess which findings
+      # the author wrote.
+      #
+      # The register is also strictly better on the failure mode that
+      # motivated the delta gate: a formatter rewrapping a signature re-added
+      # the declaration line and handed the PR a whole function's backlog,
+      # because the rules anchored there counted lines. No carried rule
+      # counts lines, so nothing anchors that way any more.
+      #
+      # What IS lost: inline annotations on the diff. Findings now arrive as
+      # job output rather than as review comments.
+      #
+      # `pnpm lint` runs oxlint's native rules and the langwatch plugin as two
+      # parallel processes. A PR lints what it affected (dependents included, since
+      # the cross-file rules can fail in a file the PR did not touch); a push runs all.
+      # The Prisma client, the generated SDK types and the built SDK dist are
+      # imports the type-aware rules resolve; without them they read as `any`.
       - uses: ./.github/actions/prepare-generated-files
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        id: prepare
+
+      # After the generated files, so the REST cross-check can mount the api.
+      - name: Set up Go
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # After the generated files: listing the steps boots the tasks app, which imports the built SDK.
+      - name: Image code step list is current (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check
+
+      - name: Generated READMEs are current (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: pnpm check:readmes
+
+      # A PR lints what it affected; a push, or a global lint input changing, lints
+      # every project. Nx diffs the lockfile per package, but oxlint is a root tool
+      # no project reaches, so a lockfile change that moves it lints everything.
+      - name: Decide the lint scope
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        id: lint-scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
+            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/)' \
+            && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
+            echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Oxlint (blocking -- config errors included)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        env:
+          BASE: ${{ steps.lint-scope.outputs.base }}
+        run: pnpm lint ${BASE:+--base "$BASE"}
+
+      # Type-aware rules over the affected projects in one process (shared parse;
+      # ADR-150), beside the native and plugin processes its directive check needs.
+      - name: Oxlint type-aware, affected projects (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        env:
+          BASE: ${{ steps.lint-scope.outputs.base }}
+        run: pnpm lint:types ${BASE:+--base "$BASE"}
+
+      # The SDK clients and the docs site copy against the OpenAPI document the
+      # routes generate: regenerate them with `make sync-all-openapi` and fail
+      # when any committed file changes. The fix is to run the same target
+      # locally and commit the result.
+      - name: Set up Go for the SDK client
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: sdks/go/client/go.mod
+          cache: true
+          cache-dependency-path: sdks/go/client/go.sum
+
+      # The default cache glob is **/uv.lock, which walks the installed
+      # node_modules tree; name the workspace lockfile instead.
+      - name: Set up uv
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          cache-dependency-glob: uv.lock
+
+      - name: Regenerate the clients and the docs copy
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: make sync-all-openapi
+
+      - name: Check the committed clients match the routes
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: |
+          STALE=0
+          if ! git diff --exit-code --stat; then
+            STALE=1
+          fi
+          UNTRACKED=$(git ls-files --others --exclude-standard \
+            sdks/typescript/src/internal/generated/openapi \
+            sdks/python/src/langwatch/generated \
+            sdks/go/client/internal/openapi \
+            docs/api-reference)
+          if [ -n "$UNTRACKED" ]; then
+            echo "These generated files are not committed:"
+            echo "$UNTRACKED"
+            STALE=1
+          fi
+          if [ "$STALE" = "1" ]; then
+            echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
+            exit 1
+          fi
 
       # Each package writes its own .tsbuildinfo beside its output, to
       # dist/tsconfig.<stem>.tsbuildinfo, per the repo rule that every package
@@ -462,6 +755,7 @@ jobs:
       # options: a snapshot built against other dependency types is never
       # restored. Saved below, once the typecheck has run; a pull request keeps one copy.
       - name: Restore TypeScript incremental build info
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
         id: tsbuildinfo
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -483,6 +777,7 @@ jobs:
       # changed package's dist and its dependants' are dropped and built cold
       # (handoff: .claude/handoffs/ci-typecheck-stale-dist.md).
       - name: Drop restored declarations whose sources changed
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
         run: |
           manifest=node_modules/.cache/typecheck-dist/sources.txt
           current="$RUNNER_TEMP/typecheck-dist-sources.txt"
@@ -517,6 +812,7 @@ jobs:
       # migration in flight tends to break several at once. The job still fails.
       # One pass: the step above leaves no stale declaration to re-check against.
       - name: Run typecheck (every workspace package)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
         id: typecheck
         run: pnpm run typecheck
 
@@ -541,6 +837,46 @@ jobs:
         with:
           prefix: ${{ runner.os }}-pkg-dist-
 
+      # Proves the failure pipeline (vitest exit code + extract-failures.sh)
+      # still reports a failing test.
+      - name: Stage canary fixture inside vitest root
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        working-directory: apps/api
+        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./src/_ci_canary.test.ts
+
+      - name: Run intentional failure
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        id: canary
+        continue-on-error: true
+        working-directory: apps/api
+        run: |
+          pnpm exec vitest run src/_ci_canary.test.ts \
+            --reporter=default --reporter=json --outputFile=test-results.json
+
+      - name: Extract failures
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        working-directory: apps/api
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+
+      - name: Assert detection worked
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.setup.outcome == 'success' }}
+        run: |
+          if [ "${{ steps.canary.outcome }}" != "failure" ]; then
+            echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
+            exit 1
+          fi
+          if [ ! -s apps/api/test-failures.txt ]; then
+            echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
+            exit 1
+          fi
+          echo "PASS: canary failed as expected and failures were extracted"
+          cat apps/api/test-failures.txt
+
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -554,7 +890,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job typecheck
+        run: go run ./cmd/slacknotify -job checks
 
   test-unit:
     needs: [changes, affected]
@@ -710,6 +1046,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
     # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
@@ -773,6 +1110,11 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "all"
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -920,7 +1262,7 @@ jobs:
           NX_WORKSPACE_DATA_DIRECTORY: ${{ github.workspace }}/.nx/suites/data
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
-          # Each suite gets two vitest workers (patches/vitest@5.0.1.patch), so one
+          # Each suite gets two vitest workers (patches/vitest@5.0.5.patch), so one
           # at a time left half the cores idle. A heavy suite still runs alone.
           PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.
@@ -951,8 +1293,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
   package-suites-notify:
+    timeout-minutes: 5
     needs: [changes, package-suites]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.package-suites.result == 'failure' || needs.package-suites.result == 'cancelled')
     runs-on: ubuntu-latest
@@ -983,312 +1331,6 @@ jobs:
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
         run: go run ./cmd/slacknotify -job "package-suites (1/1)"
 
-  lint:
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
-    env:
-      # 0 turns off oxlint's local slot queue (patches/oxlint@1.85.0.patch). On a
-      # runner only this job uses, it parks the third process of `lint:types`.
-      LANGWATCH_LINT_SLOTS: "0"
-    # Read-only. This job used to carry `pull-requests: write` so that a
-    # reviewdog pass could post inline lint annotations through the Review
-    # API. The Oxlint gate reports through the job's exit code and writes
-    # nothing back, so the write scope went with it.
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          # `--no-renames` is not ours to set here, so keep in mind that a PR
-          # which does touch docs/ will lazily fetch just those blobs when the
-          # diff below reads them — correct, and rare.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      # Oxlint's type-aware pass resolves every governed file's imports, so it
-      # needs every workspace project installed, not only the applications'.
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "all"
-
-      # The ADR-076 workspace invariants: one lockfile, one workspace
-      # definition, no member carrying overrides pnpm would ignore, the app and
-      # the SDK on different names. They previously ran only in
-      # npx-server-smoke, which is deliberately NOT a required check and whose
-      # path filter misses most of the manifests these assert about — so the
-      # exact drift they exist to catch (a second lockfile reappearing, a
-      # member overrides block) merged with no job running at all. This job is
-      # required via langwatch-app-complete and now triggers on the root
-      # manifests. Takes ~200ms.
-      - name: Check the workspace invariants (ADR-076)
-        run: pnpm --filter @langwatch/server run test:invariants
-
-      - name: Oxfmt (blocking)
-        if: ${{ !cancelled() }}
-        run: pnpm format:check
-
-      - name: Architecture policy tests (blocking)
-        if: ${{ !cancelled() }}
-        run: |
-          pnpm --filter @langwatch/architecture-enforcer typecheck
-          pnpm --filter @langwatch/architecture-enforcer test
-
-      - name: Oxlint rule tests (blocking)
-        if: ${{ !cancelled() }}
-        run: pnpm --filter @langwatch/oxlint-rules test
-
-      - name: Lint rule reference is current (blocking)
-        if: ${{ !cancelled() }}
-        run: pnpm --filter @langwatch/architecture-enforcer docs:check
-
-      # Every tsconfig's project references match the Nx project graph, as `nx sync`
-      # (@nx/js:typescript-sync) writes them. ADR-150's 2026-10-10 amendment.
-      - name: TypeScript project references are in sync (blocking)
-        if: ${{ !cancelled() }}
-        run: NX_LOAD_DOT_ENV_FILES=false pnpm exec nx sync:check
-
-      # `pnpm lint:architecture` in CI: the architecture-enforcer policies that
-      # read zero findings on this tree, named one by one; a policy joins the
-      # list when its findings reach zero. `declarations` is left out because
-      # it reads the output of `tsc -b`.
-      - name: Architecture lint (blocking)
-        if: ${{ !cancelled() }}
-        run: >-
-          pnpm --filter @langwatch/architecture-enforcer lint --
-          --no-declarations
-          --policies application-boundaries,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations,runtime-dependencies
-
-      # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
-      # fails the job. A config error and a lint violation both surface here.
-      #
-      # It replaced a two-part step: a blocking full-tree lint plus a
-      # reviewdog pass that made the previous linter's `warn`-tier rules
-      # blocking on the lines a PR added, gated by a script that counted
-      # violations per (file, rule) on both sides of the merge base and
-      # failed only on an increase. See
-      # packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md.
-      #
-      # NONE OF THAT MACHINERY HAS AN EQUIVALENT HERE, AND NONE IS NEEDED.
-      # It existed because that ruleset carried a warn tier with a baseline
-      # in the thousands, and a rule that cannot block full-tree has to be
-      # narrowed to the diff somehow. /.oxlintrc.jsonc has no
-      # warn tier: a rule is `error` for the whole tree, and where a backlog
-      # exists the offending files are named in the debt register at the
-      # bottom of that file. The gate is full-tree and the register is the
-      # exemption, in place of a diff filter that had to guess which findings
-      # the author wrote.
-      #
-      # The register is also strictly better on the failure mode that
-      # motivated the delta gate: a formatter rewrapping a signature re-added
-      # the declaration line and handed the PR a whole function's backlog,
-      # because the rules anchored there counted lines. No carried rule
-      # counts lines, so nothing anchors that way any more.
-      #
-      # What IS lost: inline annotations on the diff. Findings now arrive as
-      # job output rather than as review comments.
-      #
-      # `pnpm lint` runs oxlint's native rules and the langwatch plugin as two
-      # parallel processes. A PR lints what it affected (dependents included, since
-      # the cross-file rules can fail in a file the PR did not touch); a push runs all.
-      # The Prisma client, the generated SDK types and the built SDK dist are
-      # imports the type-aware rules resolve; without them they read as `any`.
-      - uses: ./.github/actions/prepare-generated-files
-        if: ${{ !cancelled() }}
-
-      # After the generated files, so the REST cross-check can mount the api.
-      - name: Set up Go
-        if: ${{ !cancelled() }}
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.work
-          cache-dependency-path: "*/go.sum"
-
-      # After the generated files: listing the steps boots the tasks app, which imports the built SDK.
-      - name: Image code step list is current (blocking)
-        if: ${{ !cancelled() }}
-        run: node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check
-
-      - name: Generated READMEs are current (blocking)
-        if: ${{ !cancelled() }}
-        run: pnpm check:readmes
-
-      # A PR lints what it affected; a push, or a global lint input changing, lints
-      # every project. Nx diffs the lockfile per package, but oxlint is a root tool
-      # no project reaches, so a lockfile change that moves it lints everything.
-      - name: Decide the lint scope
-        if: ${{ !cancelled() }}
-        id: lint-scope
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig(\.[a-z]+)?\.json|dev/nx/)' \
-            && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
-            echo "base=$BASE" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Oxlint (blocking -- config errors included)
-        if: ${{ !cancelled() }}
-        env:
-          BASE: ${{ steps.lint-scope.outputs.base }}
-        run: pnpm lint ${BASE:+--base "$BASE"}
-
-      # Type-aware rules over the affected projects in one process (shared parse;
-      # ADR-150), beside the native and plugin processes its directive check needs.
-      - name: Oxlint type-aware, affected projects (blocking)
-        if: ${{ !cancelled() }}
-        env:
-          BASE: ${{ steps.lint-scope.outputs.base }}
-        run: pnpm lint:types ${BASE:+--base "$BASE"}
-
-      - name: Notify Slack on failure
-        if: failure() && github.ref == 'refs/heads/main'
-        env:
-          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
-          GH_TOKEN: ${{ github.token }}
-          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
-          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job lint
-
-  feature-parity:
-    needs: changes
-    if: needs.changes.outputs.feature-parity == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "@langwatch/architecture-enforcer..."
-
-      # The parity scanner moved into @langwatch/architecture-enforcer with the
-      # rest of the repository-wide checks.
-      - name: Check feature-file parity
-        run: pnpm --filter @langwatch/architecture-enforcer run check:feature-parity
-
-      # The dev scripts' own node:test suites (log renderer, supervisor watch)
-      # ran in no job until now. TZ=UTC because the
-      # log renderer prints local wall time and the fixture is pinned to UTC.
-      - name: Test dev scripts
-        run: TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs dev/nx/__tests__/*.unit.test.mjs
-
-      - name: Set up Go for the Slack notifier
-        if: failure() && github.ref == 'refs/heads/main'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.work
-          cache-dependency-path: "*/go.sum"
-      - name: Notify Slack on failure
-        if: failure() && github.ref == 'refs/heads/main'
-        env:
-          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
-          GH_TOKEN: ${{ github.token }}
-          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
-          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job feature-parity
-
-  # The SDK clients and the docs site copy against the OpenAPI document the
-  # routes generate.
-  #
-  # The document itself is never committed: the api builds it from the routes
-  # it mounts, and `pnpm --filter @langwatch/platform-api openapi:generate`
-  # writes the same document to specs/api-reference/openapi-document.json,
-  # which git ignores. The TypeScript, Python and Go clients and the docs copy
-  # are generated from it and committed, so this job regenerates all of them
-  # with `make sync-all-openapi` and fails when any of them changes. The fix is
-  # to run the same target locally and commit the result.
-  openapi-clients:
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "@langwatch/platform-api... @langwatch/ui... langwatch..."
-
-      - uses: ./.github/actions/prepare-generated-files
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: sdks/go/client/go.mod
-          cache: true
-          cache-dependency-path: sdks/go/client/go.sum
-
-      # The default cache glob is **/uv.lock, which walks the installed
-      # node_modules tree; name the workspace lockfile instead.
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          cache-dependency-glob: uv.lock
-
-      - name: Regenerate the clients and the docs copy
-        run: make sync-all-openapi
-
-      - name: Check the committed clients match the routes
-        run: |
-          STALE=0
-          if ! git diff --exit-code --stat; then
-            STALE=1
-          fi
-          UNTRACKED=$(git ls-files --others --exclude-standard \
-            sdks/typescript/src/internal/generated/openapi \
-            sdks/python/src/langwatch/generated \
-            sdks/go/client/internal/openapi \
-            docs/api-reference)
-          if [ -n "$UNTRACKED" ]; then
-            echo "These generated files are not committed:"
-            echo "$UNTRACKED"
-            STALE=1
-          fi
-          if [ "$STALE" = "1" ]; then
-            echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
-            exit 1
-          fi
-
-      - name: Set up Go for the Slack notifier
-        if: failure() && github.ref == 'refs/heads/main'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.work
-          cache-dependency-path: "*/go.sum"
-      - name: Notify Slack on failure
-        if: failure() && github.ref == 'refs/heads/main'
-        env:
-          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
-          GH_TOKEN: ${{ github.token }}
-          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
-          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job openapi-clients
-
   build:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
@@ -1297,6 +1339,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     env:
       # Disable telemetry and optimize build for CI
       NEXT_TELEMETRY_DISABLED: 1
@@ -1384,6 +1427,11 @@ jobs:
         with:
           suffix: build
 
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
+
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
 
@@ -1415,6 +1463,11 @@ jobs:
           # (the gate we want); the EXIT trap still stops the preview server.
           node scripts/smoke-boot.mjs
 
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -1430,136 +1483,10 @@ jobs:
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
         run: go run ./cmd/slacknotify -job build
 
-  ci-scripts-test:
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      - name: Test extract-failures.sh
-        run: bash .github/scripts/__tests__/extract-failures.test.sh
-
-      - name: Test vitest-changed-files.sh
-        run: bash .github/scripts/__tests__/vitest-changed-files.test.sh
-
-      - name: Test start-clickhouse-with-storage-policy.sh
-        run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
-
-      - name: Test notify-slack-release.sh
-        run: bash .github/scripts/__tests__/notify-slack-release.test.sh
-
-      - name: Test release-docs.sh
-        run: bash .github/scripts/__tests__/release-docs.test.sh
-
-      - name: Test run-package-suites.ts
-        run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
-
-      - name: Test check-test-reads.ts
-        run: node --test --experimental-strip-types .github/scripts/check-test-reads.test.ts
-
-      - name: Test check-added-images.sh
-        run: bash .github/scripts/__tests__/check-added-images.test.sh
-
-      - name: Test nearest-ancestor-tag.sh
-        run: bash .github/scripts/__tests__/nearest-ancestor-tag.test.sh
-
-      - name: Test detect-changes-source.sh
-        run: bash .github/scripts/__tests__/detect-changes-source.test.sh
-
-      - name: Test detect-changes-by-sha.sh
-        run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
-
-      - name: Test pull-request-diff-base.sh
-        run: bash .github/scripts/__tests__/pull-request-diff-base.test.sh
-
-      - name: Test the change detector's pathspec parity with dorny's matcher
-        run: |
-          picomatch_dir="$(mktemp -d)"
-          npm install --prefix "$picomatch_dir" --no-save --no-audit --no-fund picomatch@^2.3.1
-          export PICOMATCH="$picomatch_dir/node_modules/picomatch"
-          bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
-
-      - name: Test guard-breaking-change-scope.ts
-        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
-
-      - name: Test that every generated file is marked generated
-        run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts
-
-      - name: Test the PR impact map categories
-        run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
-
-      # The nightly suite's reports and its workflow promises (specs/ci/nightly-suite.feature).
-      - name: Test the nightly suite's scripts
-        run: >-
-          node --test --experimental-strip-types
-          .github/scripts/nightly-hygiene.test.ts
-          .github/scripts/nightly-flaky.test.ts
-          .github/scripts/nightly-dashboard.test.ts
-          .github/scripts/nightly-workflows.test.ts
-
-      - name: Test when release pull requests refresh
-        run: node --test --experimental-strip-types .github/scripts/release-please-timer.test.ts
-
-  ci-self-test:
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "@langwatch/platform-api..."
-
-      - name: Stage canary fixture inside vitest root
-        working-directory: apps/api
-        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./src/_ci_canary.test.ts
-
-      - name: Run intentional failure
-        id: canary
-        continue-on-error: true
-        working-directory: apps/api
-        run: |
-          pnpm exec vitest run src/_ci_canary.test.ts \
-            --reporter=default --reporter=json --outputFile=test-results.json
-
-      - name: Extract failures
-        if: always()
-        working-directory: apps/api
-        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
-
-      - name: Assert detection worked
-        if: always()
-        run: |
-          if [ "${{ steps.canary.outcome }}" != "failure" ]; then
-            echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
-            exit 1
-          fi
-          if [ ! -s apps/api/test-failures.txt ]; then
-            echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
-            exit 1
-          fi
-          echo "PASS: canary failed as expected and failures were extracted"
-          cat apps/api/test-failures.txt
-
   langwatch-app-complete:
+    timeout-minutes: 5
+    # Reads only its needs' results, so its token gets no scopes.
+    permissions: {}
     needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed
@@ -1568,15 +1495,10 @@ jobs:
         # also in allowed-skips because it skips when `changes` found no
         # relevant path, and then there is nothing for it to select.
         affected,
-        typecheck,
+        checks,
         test-unit,
         package-suites,
-        lint,
-        feature-parity,
-        openapi-clients,
         build,
-        ci-scripts-test,
-        ci-self-test,
       ]
     if: always()
     runs-on: ubuntu-latest
@@ -1584,4 +1506,4 @@ jobs:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: affected, typecheck, test-unit, package-suites, lint, feature-parity, openapi-clients, build, ci-scripts-test, ci-self-test
+          allowed-skips: affected, checks, test-unit, package-suites, build

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The server half of `governance.*`. The actor lookup collapses every refusal to
- * null, so a `governance:view` holder learns nothing about who exists elsewhere, as on main.
+ * The server half of `governance.*`. The actor lookup answers an undisclosed miss as main's
+ * null, so a `governance:view` holder learns nothing about who exists elsewhere.
  * The caller's own /me reads were `user.*` until the peer cut (peer-cycle-cuts §4 B4 U).
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
@@ -13,7 +13,11 @@ export const governanceTrpcTransport: TrpcRouterDeclaration<
 > = defineTrpcRouter(GovernanceRestApi, governanceTrpc)
   .procedure("resolveActorPersonalProject")
   .withPermission("governance:view")
-  .handle(({ app, input }) => app.findActorWorkspace(input))
+  .handle(async ({ app, input }) => {
+    const lookup = await app.getActorWorkspace(input);
+
+    return lookup.status === "found" ? lookup.workspace : null;
+  })
 
   .procedure("resolveHome")
   .withPermission("organization:view")

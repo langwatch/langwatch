@@ -46,10 +46,17 @@ export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser
       ctx.recordRule(`${this.id}:user.id`);
     }
 
-    const sessionId = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_SESSION_ID);
-    if (typeof sessionId === "string" && sessionId.length > 0) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
-      ctx.recordRule(`${this.id}:session.id`);
+    // A declared thread already names the conversation; the session id then stays on the span,
+    // since a coding agent's own session (Claude Code's session.id) is not the launcher's thread.
+    if (
+      ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID] === void 0 &&
+      !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_CONVERSATION_ID)
+    ) {
+      const sessionId = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_SESSION_ID);
+      if (typeof sessionId === "string" && sessionId.length > 0) {
+        ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
+        ctx.recordRule(`${this.id}:session.id`);
+      }
     }
 
     const tags = takeAttribute(attrs, ATTR_KEYS.OPENINFERENCE_TAG_TAGS);

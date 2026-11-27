@@ -4,9 +4,7 @@
  */
 
 import {
-  LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
-  LangWatchQLUnavailableError,
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
@@ -28,19 +26,19 @@ import {
   langWatchQLRowLimitedSql,
   type ValidatedLangWatchQL,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
-import { floorLangWatchQLDedup } from "../rules/lwql-dedup-floor.rules.ts";
 import type { LangWatchQLViewDefinition } from "./langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import type { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLFlooredReadService } from "./langwatch-ql-floored-read.service.ts";
 import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import type { LangWatchQLGranularityResolution } from "./langwatch-ql-time-window.service.ts";
 
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
+const flooredRead = LangWatchQLFlooredReadService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
 type LangWatchQLExecutionDependencies = {
-  readonly database: string;
   readonly views: readonly LangWatchQLViewDefinition[];
   readonly limits: LangWatchQLResultLimits;
   /** The clock the diagnostics ask "has this period finished yet" against. */
@@ -54,6 +52,8 @@ type LangWatchQLExecutionDependencies = {
 
 type LangWatchQLExecutionInput = {
   readonly executor: LangWatchQLExecutorRepository;
+  /** The database this run's route names; where unqualified views resolve. */
+  readonly database: string;
   readonly projects: readonly LangWatchQLCaller[];
   readonly protections: LangWatchQLProtections;
   readonly sql: string;
@@ -70,7 +70,7 @@ type LangWatchQLExecutionInput = {
 };
 
 export class LangWatchQLExecutionService {
-  /** Builds the runner over the deployment's database, views, limits and clocks. */
+  /** Builds the runner over views, limits, clocks and services; the database comes per run. */
   static create(deps: LangWatchQLExecutionDependencies): LangWatchQLExecutionService {
     return new LangWatchQLExecutionService(deps);
   }
@@ -88,8 +88,8 @@ export class LangWatchQLExecutionService {
     telemetry,
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
-    const { database, views } = this.deps;
-    const { validation, granularity, memberWindows } = run;
+    const { views } = this.deps;
+    const { database, validation, granularity, memberWindows } = run;
     const execution = await this.runRestricted({ ...run, projects });
     const hydrationStartedMs = this.deps.stopwatch();
     const answer = await this.deps.extraction.hydrate({
@@ -160,6 +160,7 @@ export class LangWatchQLExecutionService {
   /** The statement as the database runs it, refused when its rows outgrow `maxResultBytes`. */
   private async runRestricted({
     executor,
+    database,
     projects,
     sql,
     validation,
@@ -171,7 +172,7 @@ export class LangWatchQLExecutionService {
     LangWatchQLExecutionInput,
     "protections" | "signal" | "telemetry"
   >): Promise<LangWatchQLExecutionResult> {
-    const { database, views, limits } = this.deps;
+    const { views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
     // empty, so an unparameterised query keeps the request shape it had.
@@ -185,10 +186,10 @@ export class LangWatchQLExecutionService {
       views,
       ...(timeWindow ? { timeWindow } : {}),
       ...(memberWindows ? { memberWindows } : {}),
+      projectIds: projects.map((project) => project.id),
     });
-    // Floored after scoping: the scope reads the views by name, and the floor reads its bound.
-    const floored = floorLangWatchQLDedup({ sql: scoped, database, views });
     const request = {
+      sql: scoped,
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half: it predates the
@@ -197,19 +198,7 @@ export class LangWatchQLExecutionService {
       tenantCapability,
       projectIds: projects.map(({ id }) => id),
     };
-    const execution = await executor.execute({ ...request, sql: floored }).catch((error) => {
-      // A twin not provisioned yet (rolling deploy) answers as the whole-history view would:
-      // missing (unavailable), or created before its grant landed (provisioning incomplete).
-      const twinNotReady =
-        error instanceof LangWatchQLUnavailableError ||
-        error instanceof LangWatchQLProvisioningIncompleteError;
-      if (floored === scoped || !twinNotReady) throw error;
-      logger.warn(
-        { refusal: error.code },
-        "LangWatchQL floored view not readable yet; sent the statement as written",
-      );
-      return executor.execute({ ...request, sql: scoped });
-    });
+    const execution = await flooredRead.execute({ executor, request, database, views });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
     this.assertResultWithinByteCeiling({ rows: execution.rows });

@@ -175,8 +175,20 @@ describe("queryAnalyticsCommand()", () => {
         ...result,
         metric: "metadata.trace_id",
         aggregation: "cardinality",
+        window: expect.objectContaining({ lookback: "7d", widened: false }),
       });
       expect(console.log).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the window is a lookback", () => {
+    it("sends that long before now", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({ since: "3d" });
+
+      const body = mockTimeseries.mock.calls[0]![0] as { startDate: number; endDate: number };
+      expect(body.endDate - body.startDate).toBe(3 * 24 * 60 * 60 * 1000);
     });
   });
 

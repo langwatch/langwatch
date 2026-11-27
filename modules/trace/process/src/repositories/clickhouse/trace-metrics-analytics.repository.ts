@@ -18,9 +18,11 @@ import type {
   TraceAnalyticsRow,
   TraceEvaluationOutcome,
 } from "../../eventing/trace-derived.projection.ts";
+import { traceAnalyticsAppVersion } from "../../rules/app-version.rules.ts";
 import {
-  type TraceAnalyticsMetadataColumns,
+  type TraceAnalyticsWrittenMetadataColumns,
   traceAnalyticsMetadataColumns,
+  traceAnalyticsWrittenMetadataColumns,
 } from "../../rules/trace-widget-columns.rules.ts";
 import {
   TraceAnalyticsProjectionRepository,
@@ -52,8 +54,8 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
   input_format_skip_unknown_fields: 0,
-  // Goose 00126's metadata columns stay MATERIALIZED for older writers until the contract step;
-  // the fold writes them itself, which takes this and a named column list (analytics ADR-006).
+  // The fold no longer sends goose 00126's MATERIALIZED columns (see
+  // traceAnalyticsWrittenMetadataColumns). Kept for when it writes them again (ADR-006 step 4).
   insert_allow_materialized_columns: 1,
 } as const;
 
@@ -100,7 +102,13 @@ type ClickHouseTraceAnalyticsWriteRecord = {
   Attributes: Record<string, string>;
 
   // ── The stock widgets' metadata columns (migrations 00126, 00128) ──────
-} & TraceAnalyticsMetadataColumns & {
+} & TraceAnalyticsWrittenMetadataColumns & {
+    // ── The managed prompt version the trace last used (migration 00133) ──
+    LastUsedPromptVersionId: string;
+
+    // ── The application version the trace ran on (migration 00135) ──
+    AppVersion: string;
+
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
     SpanCount: number;
     AnnotationIds: string[];
@@ -127,7 +135,7 @@ type ClickHouseTraceAnalyticsWriteRecord = {
     _retention_days: number;
   };
 
-/** Every column the fold writes, named: ClickHouse takes a MATERIALIZED column only when listed. */
+/** Every column the fold writes, named, so a column the row lacks is never defaulted silently. */
 function writeColumns(
   records: readonly ClickHouseTraceAnalyticsWriteRecord[],
 ): [string, ...string[]] {
@@ -552,7 +560,11 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       HasAnnotation: row.hasAnnotation,
 
       Attributes: row.attributes,
-      ...(row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes)),
+      ...traceAnalyticsWrittenMetadataColumns(
+        row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes),
+      ),
+      AppVersion: traceAnalyticsAppVersion(row.attributes),
+      LastUsedPromptVersionId: row.lastUsedPromptVersionId ?? "",
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,
@@ -637,6 +649,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       metadataColumns: traceAnalyticsMetadataColumns(
         TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
       ),
+      // '' on a row an older release wrote, and on a part from before goose 00133.
+      lastUsedPromptVersionId: asString(record.LastUsedPromptVersionId),
 
       // Derived, not read — there is no HasSignal column. Mirrors
       // analytics' has-signal predicate door for door, including the version

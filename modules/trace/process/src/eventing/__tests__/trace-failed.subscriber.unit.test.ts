@@ -96,8 +96,9 @@ describe("the trace_failed subscriber's deduplication", () => {
 });
 
 describe("createTraceFailedHandler()", () => {
-  /** @scenario "A child span's error makes the trace failed and records trace_failed" */
-  it("records trace_failed with the project, trace, failing span's time and origin", async () => {
+  async function recordedFor(
+    attributes: Record<string, string>,
+  ): Promise<RecordTraceFailedCommandData[]> {
     const recorded: RecordTraceFailedCommandData[] = [];
     const handler = createTraceFailedHandler({
       milestones: {
@@ -107,19 +108,19 @@ describe("createTraceFailedHandler()", () => {
         },
       },
     });
-    const state = {
-      ...createInitState(),
-      containsErrorStatus: true,
-      attributes: { "langwatch.origin": "application" },
-    };
+    const state = { ...createInitState(), containsErrorStatus: true, attributes };
 
     await handler(createSpanReceivedEvent({ tenantId: "project-1", occurredAt: NOW }), {
       tenantId: "project-1",
       aggregateId: TRACE_ID,
       state,
     });
+    return recorded;
+  }
 
-    expect(recorded).toEqual([
+  /** @scenario "A child span's error makes the trace failed and records trace_failed" */
+  it("records trace_failed with the project, trace, failing span's time and origin", async () => {
+    expect(await recordedFor({ "langwatch.origin": "application" })).toEqual([
       {
         tenantId: "project-1",
         projectId: "project-1",
@@ -128,6 +129,18 @@ describe("createTraceFailedHandler()", () => {
         origin: "application",
       },
     ]);
+  });
+
+  /** @scenario "A failed governance-ingested trace records nothing" */
+  it("records nothing for a failed governance trace, but still does for a plain one", async () => {
+    const governance = await recordedFor({
+      "langwatch.origin": "application",
+      "langwatch.origin.kind": "ingestion_source",
+    });
+    const plain = await recordedFor({ "langwatch.origin": "application" });
+
+    expect(governance).toEqual([]);
+    expect(plain).toHaveLength(1);
   });
 });
 

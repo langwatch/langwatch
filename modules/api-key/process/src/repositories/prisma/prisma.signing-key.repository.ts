@@ -142,10 +142,10 @@ export class PrismaSigningKeyRepository implements SigningKeyRepository {
 
   async findCredentials(input: {
     organizationId: string;
-    publicId: string;
+    at: Instant;
   }): Promise<SigningKeyCredential[]> {
     const rows = await this.database.signingKey.findMany({
-      where: { publicId: input.publicId, organizationId: input.organizationId },
+      where: { organizationId: input.organizationId },
       select: {
         id: true,
         projectId: true,
@@ -155,12 +155,28 @@ export class PrismaSigningKeyRepository implements SigningKeyRepository {
         revokedAt: true,
       },
     });
-    return rows.map(({ secretCiphertext, verifiesUntil, revokedAt, ...row }) => ({
-      ...row,
-      verifiesUntil: verifiesUntil ? fromDate(verifiesUntil) : null,
-      revokedAt: revokedAt ? fromDate(revokedAt) : null,
-      secret: this.cipher.decrypt(secretCiphertext),
-    }));
+    const at = toDate(input.at).getTime();
+    return rows.map(({ secretCiphertext, verifiesUntil, revokedAt, ...row }) => {
+      const verifies =
+        revokedAt === null && (verifiesUntil === null || verifiesUntil.getTime() > at);
+      const secret = verifies ? this.#opened(secretCiphertext) : null;
+      return {
+        ...row,
+        verifiesUntil: verifiesUntil ? fromDate(verifiesUntil) : null,
+        revokedAt: revokedAt ? fromDate(revokedAt) : null,
+        secret: secret ?? null,
+        unreadable: secret === undefined,
+      };
+    });
+  }
+
+  /** One key's secret opened; undefined when it will not open, so the others still verify. */
+  #opened(ciphertext: string): string | undefined {
+    try {
+      return this.cipher.decrypt(ciphertext);
+    } catch {
+      return undefined;
+    }
   }
 
   async markUsed(input: {

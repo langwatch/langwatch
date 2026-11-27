@@ -75,6 +75,9 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository licence and first adminis
 
   afterAll(async () => {
     const organizationIds = [licensedId, staffedId, unstaffedId];
+    await prisma.organizationLicense.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    });
     await prisma.organizationUser.deleteMany({
       where: { organizationId: { in: organizationIds } },
     });
@@ -89,12 +92,46 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository licence and first adminis
       select: { license: true, licenseExpiresAt: true, licenseLastValidatedAt: true },
     });
 
+  const holdLicensingKey = (licenseKey: string) =>
+    prisma.organizationLicense.upsert({
+      where: { organizationId: licensedId },
+      create: { organizationId: licensedId, licenseKey },
+      update: { licenseKey },
+    });
+
   describe("given an organization in Postgres", () => {
+    describe("when a late fact names a key licensing's row no longer holds", () => {
+      /** @scenario "The licence mirror writes only while licensing's row still holds the key" */
+      it("keeps the column's key, and writes the key licensing's row holds", async () => {
+        const expiresAt = Temporal.Instant.from("2027-09-01T00:00:00Z");
+        await repository.clearLicense({ organizationId: licensedId });
+        await holdLicensingKey("key-c");
+
+        await repository.setLicense({
+          organizationId: licensedId,
+          licenseKey: "key-b",
+          expiresAt,
+          validatedAt: null,
+        });
+        expect((await stored()).license).toBeNull();
+
+        await holdLicensingKey("key-b");
+        await repository.setLicense({
+          organizationId: licensedId,
+          licenseKey: "key-b",
+          expiresAt,
+          validatedAt: null,
+        });
+        expect((await stored()).license).toBe("key-b");
+      });
+    });
+
     describe("when a licence is set with its expiry and the moment it was validated", () => {
       /** @scenario "A licence is stored with the moment it was validated and cleared with both its dates" */
       it("stores all three, clears all three, and refuses an unknown organization", async () => {
         const expiresAt = Temporal.Instant.from("2027-09-01T00:00:00Z");
         const validatedAt = Temporal.Instant.from("2026-10-08T12:00:00Z");
+        await holdLicensingKey("key-1");
 
         await repository.setLicense({
           organizationId: licensedId,
@@ -108,6 +145,7 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository licence and first adminis
           licenseLastValidatedAt: new Date("2026-10-08T12:00:00Z"),
         });
 
+        await holdLicensingKey("key-2");
         await repository.setLicense({
           organizationId: licensedId,
           licenseKey: "key-2",

@@ -28,6 +28,7 @@ export type {
 export {
   emailDomainsOf,
   projectIdsOf,
+  userIdsOf,
   deriveRuleOutcome,
   featureFlagRuleSchema,
   featureFlagRulesSchema,

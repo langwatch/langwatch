@@ -22,6 +22,8 @@ export interface WaterfallViewProps {
   /** Span ids that carry a managed prompt — rendered with a book icon so
    *  the operator can spot prompt-bearing spans in the tree at a glance. */
   promptSpanIds?: ReadonlySet<string>;
+  /** Span ids recognised as A2A calls, labelled in the tree. */
+  a2aSpanIds?: ReadonlySet<string>;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
   /** Projects that braided spans into the trace, in strand order; absent on a trace with none. */

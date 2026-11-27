@@ -1,10 +1,12 @@
 import {
+  API_KEY_FACTS_LIMIT,
   ApiKeyNotFoundError,
   ApiKeyPermissionDeniedError,
   type ApiKey,
   type ApiKeyBinding,
   type ApiKeyCredentialCheck,
   type ApiKeyDetail,
+  type ApiKeyFacts,
   type ApiKeyName,
   type ApiKeyProject,
   type ApiKeyRoleSummary,
@@ -15,6 +17,7 @@ import {
 import { NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { apiKeyFactsOf } from "../rules/api-key-facts.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
@@ -146,6 +149,29 @@ export class ApiKeyCatalogService {
     const rows = await this.repository.findForOrganization({ organizationId });
 
     return (await this.bindings.attach(rows)).map(publicApiKey);
+  }
+
+  /** Every key of the organization as ids, kinds, reach and times; never a name or secret. */
+  async findKeyFactsForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ApiKeyFacts[]> {
+    const rows = await this.repository.findEveryKeyInOrganization({
+      organizationId,
+      limit: API_KEY_FACTS_LIMIT,
+    });
+    const keys = await this.bindings.attach(rows);
+    const roleIds = [
+      ...new Set(keys.flatMap((key) => key.grants.flatMap((grant) => grant.customRoleId ?? []))),
+    ];
+    const roles =
+      roleIds.length === 0
+        ? []
+        : await this.options.authz.findRolePermissions({ organizationId, roleIds });
+    const customRolePermissions = new Map(roles.map((role) => [role.id, role.permissions]));
+
+    return keys.map((key) => apiKeyFactsOf({ key, customRolePermissions }));
   }
 
   async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {

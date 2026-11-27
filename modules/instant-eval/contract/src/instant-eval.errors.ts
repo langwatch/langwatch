@@ -124,6 +124,28 @@ export class InstantEvalClassifierNotConfiguredError extends HandledError {
   }
 }
 
+/**
+ * Every row of a run's page was refused for the project's own decision model's key: refused by
+ * the provider, no key, or the provider row off. Failed rather than recorded as skips, which a
+ * caller would read as nothing matching. Names no provider and no key.
+ */
+export class InstantEvalDecisionModelKeyInvalidError extends HandledError {
+  declare readonly code: "instant_eval_decision_model_key_invalid";
+
+  constructor() {
+    super(
+      "instant_eval_decision_model_key_invalid",
+      "The key for this project's Instant Evals model could not be used. Check it in Settings > Model Providers.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_decision_model_key_invalid"),
+      },
+    );
+    this.name = "InstantEvalDecisionModelKeyInvalidError";
+  }
+}
+
 /** The memory judge answers from a hash, not the text, so a production process refuses it. */
 export class InstantEvalMemoryJudgeInProductionError extends HandledError {
   declare readonly code: "instant_eval_memory_judge_in_production";
@@ -275,5 +297,48 @@ export class InstantEvalEstimateUnavailableError extends HandledError {
       { httpStatus: 503, fault: "platform", ...options },
     );
     this.name = "InstantEvalEstimateUnavailableError";
+  }
+}
+
+/** Whose budget a gateway refusal names, by the gateway's own lower-case scope. */
+const GATEWAY_BUDGET_OWNERS: Readonly<Record<string, string>> = {
+  organization: "This organization's",
+  team: "This team's",
+  project: "This project's",
+};
+
+/**
+ * A gateway budget set to block has been reached. Refused before anything is judged, and
+ * between pages of a run under way, so the budget is a ceiling as it is for gateway traffic.
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
+export class InstantEvalGatewayBudgetExceededError extends HandledError {
+  declare readonly code: "instant_eval_gateway_budget_exceeded";
+
+  constructor({
+    budgetId,
+    scope,
+    window,
+    limitUsd,
+    spentUsd,
+  }: {
+    readonly budgetId: string;
+    readonly scope: string;
+    readonly window: string;
+    readonly limitUsd: number;
+    readonly spentUsd: number;
+  }) {
+    const owner = Object.hasOwn(GATEWAY_BUDGET_OWNERS, scope) ? GATEWAY_BUDGET_OWNERS[scope] : "A";
+    super(
+      "instant_eval_gateway_budget_exceeded",
+      `${owner} gateway budget is used up. Raise or remove it under AI Gateway, Budgets to keep judging.`,
+      {
+        httpStatus: 402,
+        fault: "customer",
+        meta: { budgetId, scope, window, limitUsd, spentUsd },
+        ...remediation("instant_eval_gateway_budget_exceeded"),
+      },
+    );
+    this.name = "InstantEvalGatewayBudgetExceededError";
   }
 }

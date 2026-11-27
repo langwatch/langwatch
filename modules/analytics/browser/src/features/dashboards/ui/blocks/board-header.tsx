@@ -1,10 +1,11 @@
 /**
  * A board's header: title (badged on a From LangWatch board, with its scope on a stored one),
- * what peers lend it and one action, then the description, an Organization board's Project
- * chip and the period. Star and rename live in the sidebar.
+ * what peers lend it and one action, then the description, its data source and the period.
+ * Clicking the title renames the board where the reader may, as clicking the description edits it.
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { useLentAll } from "@langwatch/browser-host/lent";
 import { Button, Heading, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
@@ -18,6 +19,7 @@ export function BoardHeader({
   description,
   isFromLangWatch = false,
   scope,
+  onRename,
   onDescribe,
   pointer,
   action,
@@ -30,13 +32,15 @@ export function BoardHeader({
   isFromLangWatch?: boolean;
   /** A stored board's scope control, beside the title. */
   scope?: ReactNode;
+  /** Absent where the reader may not rename the board: its title is then plain text. */
+  onRename?: (name: string) => void;
   /** Absent where the reader cannot edit the board. */
   onDescribe?: (description: string) => void;
-  /** The board as the actions peers lend the header point at it. */
-  pointer: Omit<BoardHeaderActionProps, "boardName">;
+  /** The board as the actions peers lend the header point at it; none on a board not stored yet. */
+  pointer?: Omit<BoardHeaderActionProps, "boardName">;
   /** "Add a widget" on a board the reader may edit; null where there is nothing to offer. */
   action: ReactNode;
-  /** The Project chip of an Organization board: whose data it shows. */
+  /** An Organization board's read-only "Data from <project>": whose data it shows. */
   project?: ReactNode;
   periodControl: ReactNode;
 }) {
@@ -44,14 +48,12 @@ export function BoardHeader({
     <VStack align="stretch" gap={2} marginBottom={5}>
       <HStack gap={3}>
         <HStack columnGap={2.5} rowGap={1} flex={1} minWidth={0} flexWrap="wrap">
-          <Heading as="h1" lineClamp={2} textStyle="pageTitle">
-            {name}
-          </Heading>
+          <BoardTitle name={name} onRename={onRename} />
           {isFromLangWatch && <FromLangWatchBadge />}
           {scope}
         </HStack>
         <HStack flexShrink={0} gap={2}>
-          <LentBoardActions boardName={name} {...pointer} />
+          {pointer && <LentBoardActions boardName={name} {...pointer} />}
           {action}
         </HStack>
       </HStack>
@@ -65,11 +67,28 @@ export function BoardHeader({
   );
 }
 
-/** The actions peers lend the header (§10.1); nothing draws without a lender. */
+/**
+ * The actions peers lend the header (§10.1); nothing draws without a lender. One that crashes
+ * is reported as an exception naming its lender and the board.
+ */
 function LentBoardActions(props: BoardHeaderActionProps) {
   const actions = useLentAll(BoardHeaderActionToken);
+  const analytics = useUiAnalytics();
+  const board =
+    props.boardKind === "dashboard"
+      ? { dashboardId: props.boardId }
+      : { templateId: props.boardId };
   return actions.map(({ owner, Component }) => (
-    <IsolatedErrorBoundary key={owner} scope="This action failed to load">
+    <IsolatedErrorBoundary
+      key={owner}
+      scope="This action failed to load"
+      onError={(error) =>
+        analytics.captureException({
+          error,
+          properties: { surface: "board_header_action", owner, ...board },
+        })
+      }
+    >
       <Suspense fallback={null}>
         <Component {...props} />
       </Suspense>
@@ -94,6 +113,59 @@ function FromLangWatchBadge() {
       <Sparkles size={11} aria-hidden />
       From LangWatch
     </HStack>
+  );
+}
+
+function BoardTitle({ name, onRename }: { name: string; onRename?: (name: string) => void }) {
+  const [editing, setEditing] = useState(false);
+
+  if (onRename && editing) {
+    return (
+      <InlineTextField
+        value={name}
+        label="Dashboard name"
+        size="sm"
+        textStyle="pageTitle"
+        maxWidth="lg"
+        onCancel={() => setEditing(false)}
+        onCommit={(draft) => {
+          setEditing(false);
+          onRename(draft);
+        }}
+      />
+    );
+  }
+
+  if (!onRename) {
+    return (
+      <Heading as="h1" lineClamp={2} textStyle="pageTitle">
+        {name}
+      </Heading>
+    );
+  }
+
+  return (
+    <Heading as="h1" textStyle="pageTitle">
+      <Button
+        variant="plain"
+        height="auto"
+        paddingX={0}
+        fontSize="inherit"
+        fontWeight="inherit"
+        lineHeight="inherit"
+        letterSpacing="inherit"
+        color="fg"
+        cursor="text"
+        whiteSpace="normal"
+        textAlign="start"
+        title="Edit name"
+        onClick={() => setEditing(true)}
+      >
+        <Text as="span" lineClamp={2}>
+          {name}
+        </Text>
+      </Button>
+    </Heading>
   );
 }
 

@@ -96,6 +96,7 @@ export class AutomationEvaluationSubscriberService {
         traces: this.deps.traces,
         evaluationFilters: this.deps.evaluationFilters,
         triggerMatches: this.deps.triggerMatches,
+        metrics: this.deps.matchRecordMetrics,
       },
       event,
       context,

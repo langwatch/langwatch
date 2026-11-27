@@ -25,6 +25,7 @@ export type {
   ScimSyncSummaryNoticeProps,
 } from "./templates/index.ts";
 export {
+  accountPaymentFailedNotice,
   billingThresholdFailureNotice,
   licensePurchaseNotice,
   newOrganizationNotice,

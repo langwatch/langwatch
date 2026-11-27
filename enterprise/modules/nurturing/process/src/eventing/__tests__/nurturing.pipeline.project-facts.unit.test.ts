@@ -3,8 +3,14 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/project-facts-copies.feature
  */
-import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
+  createTenantId,
+  type Event,
+  type EventSubscriberDefinition,
+  type MapProjectionDefinition,
+} from "@langwatch/eventing";
+import {
+  type OrganizationApi,
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
@@ -27,15 +33,27 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
+import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/memory.nurturing-gateway-key.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
+import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
 import { MemoryNurturingPersonalProjectRepository } from "../../repositories/memory/memory.nurturing-personal-project.repository.ts";
+import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
+import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
+import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
+import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
-import { NurturingProjectFactsService } from "../../services/nurturing-project-facts.service.ts";
+import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
+import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 
 /**
@@ -49,13 +67,19 @@ function nurturingOverCopies() {
       new Response(null, { status: 200 }),
   );
   const seen = new Set<string>();
+  // One mark set for every copy and the delivery, as the app composes them.
+  const erasedUsers = MemoryNurturingErasedUserRepository.create();
+  const members = MemoryNurturingOrganizationMemberRepository.create({ erasedUsers });
   const delivery = NurturingDeliveryService.create({
+    erasedUsers,
     memberFacts: unplacedMemberFacts(),
+    members,
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),
     },
     customerIo: NurturingService.create({
+      users: peopleWithEmails(),
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
         fetchFn: customerIoFetch,
@@ -66,42 +90,84 @@ function nurturingOverCopies() {
   });
   const personalProjects = MemoryNurturingPersonalProjectRepository.create();
   const tracedProjects = MemoryNurturingTracedProjectRepository.create();
-  const organizations = MemoryNurturingMilestonesRepository.create();
+  const organizations = MemoryNurturingMilestonesRepository.create({ erasedUsers });
   const { logger, lines } = createTestLogger();
-  const projectFacts = NurturingProjectFactsService.create({
-    personalProjects,
-    tracedProjects,
-    logger,
-  });
-  const members = MemoryNurturingOrganizationMemberRepository.create();
   const userErasure = NurturingUserErasureService.create({
     personalProjects,
     organizations,
     members,
+    virtualKeys: MemoryNurturingVirtualKeyRepository.create({ erasedUsers }),
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
-    projectCreated: async () => undefined,
+    organizationMembers: async () => [],
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
-    recordPersonalOwner: (input) => projectFacts.recordPersonalOwner(input),
-    recordTracedProject: (input) => projectFacts.recordTracedProject(input),
     forgetErasedUser: (input) => userErasure.forgetUser(input),
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
+  });
+  // The copies of project facts are maps on the usage host, writing the same rows the subscribers did.
+  const usagePipeline = buildNurturingProjectUsagePipeline({
+    store: MemoryNurturingProjectUsageRepository.create(),
+    evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
+    traceDays: MemoryNurturingTraceDayRepository.create(),
+    copies: {
+      placements: MemoryNurturingProjectPlacementRepository.create(),
+      organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
+      admins: organizations,
+      members,
+      virtualKeys: MemoryNurturingVirtualKeyRepository.create({ erasedUsers }),
+      personalProjects,
+      tracedProjects,
+      lastTraces: organizations,
+    },
+    plans: {
+      store: MemoryNurturingOrganizationPlanRepository.create(),
+      deliver: async () => undefined,
+    },
+    sync: undefined,
+    logger,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
+  const maps: MapProjectionDefinition<unknown, Event>[] = [];
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
-  >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
-  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
-  /** Hands one event to every nurturing peer subscriber on its type, as the worker would. */
+  >({
+    registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
+    registerPeerFoldProjection: () => undefined,
+    registerSubscriber: () => undefined,
+    registerPeerMapProjection: (map) =>
+      void maps.push(map as MapProjectionDefinition<unknown, Event>),
+  });
+  for (const projection of [
+    ...(pipeline.globalProjections ?? []),
+    ...(usagePipeline.globalProjections ?? []),
+  ]) {
+    projection.register(registry);
+  }
+  /** Hands one event to every nurturing lane on its type, as the worker would. */
   const deliverFact = async (event: Event) => {
     for (const subscriber of subscribers.filter(({ eventTypes }) =>
       eventTypes.includes(event.type),
     )) {
       await subscriber.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
+    }
+    for (const map of maps.filter(({ eventTypes }) => eventTypes.includes(event.type))) {
+      const record = map.map(event);
+      if (record !== null) {
+        await map.store.append(record, {
+          tenantId: event.tenantId,
+          aggregateId: event.aggregateId,
+        } as never);
+      }
     }
   };
   /** Every request either sink saw, after the fire-and-forget sends settle. */
@@ -451,6 +517,36 @@ describe("nurturing's rows naming an erased account", () => {
       await expect(userIdsOf("org-1")).resolves.toEqual(["user-2"]);
       await expect(userIdsOf("org-2")).resolves.toEqual([]);
       await expect(sinkRequests()).resolves.toEqual(NO_REQUESTS);
+    });
+  });
+
+  describe("when a late fact names an erased account admin of an organization again", () => {
+    /** @scenario "An erased admin a late fact names again reads as no admin" */
+    it("reads the organization as having no admin, so no sync names them", async () => {
+      const { organizations, deliverFact } = await nurturingHoldingTwoAccounts();
+      await deliverFact(userErased({ userId: "user-1" }));
+
+      await organizations.recordOrganization({
+        organizationId: "org-1",
+        adminUserId: "user-1",
+        seeded: false,
+      });
+
+      const admins = NurturingMemberFactsService.create({
+        claims: MemoryNurturingClaimRepository.create(),
+        milestones: organizations,
+        projects: MemoryNurturingProjectDirectoryRepository.create(),
+        organizations: createApiFixture<OrganizationApi>({}),
+      });
+      await expect(adminOf(organizations, "org-1")).resolves.toEqual([null]);
+      await expect(
+        organizations.countEvaluation({ organizationId: "org-1", by: 1 }),
+      ).resolves.toMatchObject([{ adminUserId: null }]);
+      await expect(admins.adminOf({ organizationId: "org-1" })).resolves.toEqual({ kind: "none" });
+      await expect(admins.adminOf({ organizationId: "org-2" })).resolves.toEqual({
+        kind: "admin",
+        userId: "user-2",
+      });
     });
   });
 

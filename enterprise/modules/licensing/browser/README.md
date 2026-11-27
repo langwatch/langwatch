@@ -23,7 +23,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`.
+- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/organization-client`.
 - Lends: `UpgradeModalToken`, `ResourceLimitRowToken`.
 - Host APIs it requires: `LicensingHostApi`.
 

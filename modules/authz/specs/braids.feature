@@ -51,7 +51,7 @@ Feature: Braids
 
     @integration
     Scenario: Braids need the Enterprise plan
-      Given an organisation below Enterprise
+      Given an organisation below Enterprise that has Braids turned on
       When ana asks to create or change a braid
       Then each is refused with enterprise_plan_required naming the Braids feature
       And removing a braid and listing the organisation's braids are not refused
@@ -89,18 +89,63 @@ Feature: Braids
       And the other request is refused with braid_already_exists
 
     @unit
-    Scenario: Braids do not chain
+    Scenario: Repeating a create with the same command id answers the same braid
+      Given ana braided "specialists" into "orchestrator" with a command id
+      When the same request arrives again with that command id, saved or still being saved
+      Then it answers the same braid with the same id
+      And the ledger is written once
+      And the same command id on a request with other terms is refused with grant_validation_failed
+
+    @unit
+    Scenario: A braid identical to one still being saved is refused
+      Given ana's braid from "specialists" into "orchestrator" is in the ledger but not yet in the grant projection
+      When ana asks for a braid with the same projects, condition, data window and end date and no command id
+      Then the second braid is refused with braid_already_exists
+      And a change of another braid to those terms is refused the same way
+      And the braid still being saved counts toward the reader's distinct conditions
+
+    @unit
+    Scenario: A braid not confirmed in time is saved once, and its retry answers it
+      Given the grant projection does not land ana's braid within the read-your-writes window
+      When ana braids "specialists" into "orchestrator" with a command id
+      Then the request is refused with authz_grant_not_confirmed and the braid is still saved
+      And repeating the request with the same command id resends the same command and writes no second braid
+      And once the projection lands the repeat answers that braid
+
+    @unit
+    Scenario: A braid write the ledger accepted stays saved when its confirmation fails
+      Given the ledger accepts ana's braid with a command id
+      When waiting for the grant projection or moving the organisation's epoch then fails
+      Then the request fails and the braid's write stays saved, since it may still land
+      And only a braid the ledger refused is forgotten
+
+    @unit
+    Scenario: A command id answers only the actor who sent it
+      Given ana's braid with a command id is in the ledger but not yet in the grant projection
+      When tom sends a braid with the same command id and terms
+      Then nothing is resent in tom's name and no braid answers as ana's
+      And tom's braid is refused with braid_already_exists
+
+    @unit
+    Scenario: A braid still being saved counts however long ago it was sent
+      Given ana's braid is in the ledger but the grant projection has not landed it for hours
+      When ana asks for a braid with the same projects, condition, data window and end date
+      Then the second braid is refused with braid_already_exists
+
+    @unit
+    Scenario: A braid's grant does not pass on to a third project
       Given a live braid from "specialists" into "orchestrator"
       And a live braid from "orchestrator" into a third project "frontdesk"
       When a proof is minted for "frontdesk"
       Then it carries the braid from "orchestrator" and nothing braided into "orchestrator"
+      And this is about grants, not calls: a call chain through several owners is held only where each owner braids into the reader itself (braided-spans.feature)
 
   Rule: A braid's grant in a proof carries a permission of its own and its compiled condition
 
     @unit
     Scenario: The braid permission is appended right after braids:manage and is never grantable
       When the permission registry is read
-      Then spans:braided sits right after braids:manage, only later appends (opsRead:view) follow it, and no earlier index moved
+      Then spans:braided sits right after braids:manage, and no earlier index moved
       And it is declared at no scope, so nothing that grants permissions may list it
 
     @unit
@@ -198,6 +243,14 @@ Feature: Braids
       When tom's permissions are read
       Then tom holds braids:manage on "specialists"
 
+    @unit
+    Scenario: A refusal under braids kept to organisation admins names the policy
+      Given the organisation keeps braids to its admins
+      And tom is an admin of the team holding "specialists"
+      When tom asks to braid out of "specialists"
+      Then the refusal's reason says the organisation keeps braids to its admins, as the Braids page's banner does
+      And it is not a bare missing grant
+
     @integration
     Scenario: With braids kept to organisation admins, a team admin may not braid
       Given the organisation keeps braids to its admins
@@ -270,7 +323,7 @@ Feature: Braids
     Scenario: A braid with no condition braids every owner span in the reader's traces
       When ana saves a braid from "specialists" into "orchestrator" with no condition
       Then the braid is accepted
-      And every "specialists" span sharing a trace id with an "orchestrator" trace is braided
+      And every "specialists" span is braided in each trace where an "orchestrator" span and a "specialists" span are parent and child
 
     @unit
     Scenario: A compiled condition carries the compiler's version
@@ -345,6 +398,14 @@ Feature: Braids
       When ana repeats the same change
       Then the change answers the grant already attached
       And no third grant is attached
+
+    @unit
+    Scenario: A retried change whose braid was removed meanwhile is refused
+      Given ana's change of a braid is in the ledger but not yet in the grant projection
+      And the braid it replaces is removed
+      When ana repeats the change with the same command id
+      Then it is refused with braid_changed
+      And the replacement is not sent again
 
     @unit
     Scenario: A replaced braid reads nothing once its replacement is live, even before the worker revokes it
@@ -545,3 +606,55 @@ Feature: Braids
       And the braid is still listed, marked paused
       And an admin can still remove it
       And returning to Enterprise shows the braided spans again without recreating the braid
+
+  Rule: An organisation turns Braids on in settings
+    # Decided by Alex, 2026-11-18: "Braids is on by default, but has to be enabled in settings."
+    # release_braids is LangWatch's kill switch and defaults on (braids-release-flag.feature);
+    # this setting is the organisation admins' own, stored beside who may braid (ADR-201 §9).
+
+    @unit
+    Scenario: Braids is off for a new organisation
+      Given an organisation that has never turned Braids on
+      When its settings are read
+      Then Braids is off
+
+    @integration
+    Scenario: Only an organisation admin may turn Braids on or off
+      Given tom is an admin of the team holding "specialists"
+      When tom asks to turn Braids on
+      Then the change is refused as a permission denial
+      And ana's change is accepted
+
+    @integration
+    Scenario: Below Enterprise Braids cannot be turned on
+      Given an organisation below Enterprise
+      When ana asks to turn Braids on
+      Then the change is refused with enterprise_plan_required naming the Braids feature
+      And Braids stays off
+
+    @integration
+    Scenario: While Braids is turned off, management refuses and removal still works
+      Given a live braid from "specialists" into "orchestrator"
+      And ana turns Braids off
+      When ana creates or changes a braid, lists braid targets or counts who would see the spans
+      Then each call is refused with braids_turned_off
+      And the braid is still listed, and ana can still remove it
+      And the organisation's settings can still be read, so Braids can be turned on again
+
+    @unit
+    Scenario: Turning Braids off pauses braids within thirty seconds and keeps them
+      Given a live braid from "specialists" into "orchestrator"
+      When ana turns Braids off
+      Then within thirty seconds no "orchestrator" trace shows a "specialists" span
+      And the braid is still listed
+
+    @unit
+    Scenario: Turning Braids on again resumes the braids it paused
+      Given a live braid from "specialists" into "orchestrator" while Braids is turned off
+      When ana turns Braids on
+      Then "orchestrator" traces show the "specialists" spans again without recreating the braid
+
+    @unit
+    Scenario: Turning Braids on and off is in the audit log
+      When ana turns Braids on and then off
+      Then the audit log holds an entry for each, naming ana, the new value and the previous one

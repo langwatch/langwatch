@@ -21,6 +21,7 @@ import { ClickHouseExperimentRunProcessingRepository } from "../../repositories/
 import { ClickHouseExperimentSession } from "../../repositories/clickhouse/clickhouse.experiment-session.store.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import type { ExperimentRunActivityRecorder } from "../experiment-run-activity.subscriber.ts";
 import { ExecuteExperimentCellCommand } from "../experiment-run-cell.commands.ts";
 import { completeRun, executeCell, failLostCell } from "../experiment-run-execution.intent.ts";
 import { createExperimentRunFramesSubscriber } from "../experiment-run-frames.subscriber.ts";
@@ -77,6 +78,7 @@ function build() {
       }),
     },
     traceMetricsSync: async () => undefined,
+    runActivity: createApiFixture<ExperimentRunActivityRecorder>({}, "runActivity"),
     runFrames: createExperimentRunFramesSubscriber({
       stream: MemoryExperimentRunEventStreamRepository.create(),
     }),

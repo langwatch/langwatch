@@ -51,6 +51,20 @@ Feature: The trace filter language and its value discovery over the API key surf
     Then the response is 422 with code "validation_error"
     And the response names the unknown field and the fields the language knows
 
+  # A cloud replay's agent guessed "input" and "metadata.labels" and got only the
+  # list of fields back, then fell back to an unfiltered dump of every trace.
+  @unit
+  Scenario: An unknown field for the trace's text points at free-text search
+    When the caller searches with filter 'input:"Who declared the state of emergency?"'
+    Then the response is 422 with code "filter_field_unknown"
+    And the response says a quoted phrase with no field searches the trace input and output
+
+  @unit
+  Scenario: An unknown field the language has under another name names that field
+    When the caller searches with filter "metadata.labels:graphrag"
+    Then the response is 422 with code "filter_field_unknown"
+    And the response asks whether the caller meant "@label"
+
   @unit
   Scenario: An empty filter is the same request as no filter
     When the caller searches with filter ""

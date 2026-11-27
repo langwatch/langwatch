@@ -47,10 +47,18 @@ describe("the staff permission bags", () => {
     }
   });
 
-  /** @scenario "The support bag holds no prompt or trigger write" */
-  it("holds no prompt or trigger write, since one deploys a prompt and the other sends data out", () => {
+  /** @scenario "The support bag writes prompts and triggers" */
+  it("writes prompts and triggers, and never deletes or manages them", () => {
+    expect(STAFF_SUPPORT_WRITE_PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        "prompts:create",
+        "prompts:update",
+        "triggers:create",
+        "triggers:update",
+      ]),
+    );
     for (const permission of STAFF_SUPPORT_WRITE_PERMISSIONS) {
-      expect(["prompts", "triggers"], permission).not.toContain(permission.split(":")[0]);
+      expect(["create", "update"], permission).toContain(permission.split(":")[1]);
     }
   });
 

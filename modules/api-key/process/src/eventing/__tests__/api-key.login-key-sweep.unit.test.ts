@@ -12,6 +12,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiKeyModule } from "../../app/api-key.app.ts";
+import { MemoryApiKeyChannels } from "../../channels/memory/memory.api-key.channels.ts";
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
@@ -68,6 +69,7 @@ async function sweepOver(rows: ApiKeyRow[]) {
       signingKeys: MemorySigningKeyRepository.create(),
       signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     },
+    channels: MemoryApiKeyChannels.create(),
     dependencies: {
       authorization,
       organizations: createApiFixture<OrganizationApi>({}),

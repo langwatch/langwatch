@@ -231,3 +231,11 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
 
   return lines;
 }
+
+/** How long the person has to approve, said the way they would read it. */
+export function expiryPhrase(expiresInSeconds: number): string {
+  const minutes = Math.floor(expiresInSeconds / 60);
+  if (minutes >= 2) return `${minutes} minutes`;
+  if (minutes === 1) return "1 minute";
+  return `${Math.max(0, expiresInSeconds)} seconds`;
+}

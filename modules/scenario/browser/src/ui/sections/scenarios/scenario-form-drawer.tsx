@@ -39,6 +39,12 @@ import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx
 import { api, type Scenario } from "../../../behavior/scenario-api.ts";
 import { useScenario } from "../../../behavior/scenarios/use-scenario.ts";
 import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
+import {
+  EMPTY_JUDGE_TRACE_WAIT_INPUT,
+  type JudgeTraceWaitInput,
+  judgeTraceWaitInputOf,
+  judgeTraceWaitMsOf,
+} from "../../../model/judge-trace-wait.ts";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip.tsx";
 import {
@@ -95,6 +101,8 @@ export const NO_REMEMBERED_TARGET_HINT =
 type ModelOverrides = {
   simulatorModel: string | null;
   judgeModel: string | null;
+  traceQuietPeriodMs: number | null;
+  traceWaitTimeoutMs: number | null;
 };
 
 /** What a save without a run confirms. Every surface calls the record a scenario. */
@@ -205,6 +213,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     setRunSimulatorModel,
     runJudgeModel,
     setRunJudgeModel,
+    runTraceWait,
+    setRunTraceWait,
   } = useScenarioRunFlow({
     formInstance,
     projectId: project?.id,
@@ -376,6 +386,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         judgeModel={runJudgeModel}
         onSimulatorChange={setRunSimulatorModel}
         onJudgeChange={setRunJudgeModel}
+        traceWait={runTraceWait}
+        onTraceWaitChange={setRunTraceWait}
         onConfirm={confirmRunWithModels}
         isRunning={isSubmitting}
       />
@@ -986,6 +998,9 @@ function useScenarioRunFlow({
   const [pendingRunTarget, setPendingRunTarget] = useState<TargetValue>(null);
   const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(null);
   const [runJudgeModel, setRunJudgeModel] = useState<string | null>(null);
+  const [runTraceWait, setRunTraceWait] = useState<JudgeTraceWaitInput>(
+    EMPTY_JUDGE_TRACE_WAIT_INPUT,
+  );
 
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -1025,6 +1040,7 @@ function useScenarioRunFlow({
 
       setRunSimulatorModel(scenario?.simulatorModel ?? null);
       setRunJudgeModel(scenario?.judgeModel ?? null);
+      setRunTraceWait(judgeTraceWaitInputOf(scenario ?? {}));
       setPendingRunTarget(target);
       setRunModelDialogOpen(true);
     },
@@ -1048,6 +1064,7 @@ function useScenarioRunFlow({
           models: {
             simulatorModel: runSimulatorModel,
             judgeModel: runJudgeModel,
+            ...judgeTraceWaitMsOf(runTraceWait),
           },
         });
         if (!savedScenario) return;
@@ -1087,6 +1104,7 @@ function useScenarioRunFlow({
     router,
     runSimulatorModel,
     runJudgeModel,
+    runTraceWait,
     onRunStarted,
   ]);
 
@@ -1099,6 +1117,8 @@ function useScenarioRunFlow({
     setRunSimulatorModel,
     runJudgeModel,
     setRunJudgeModel,
+    runTraceWait,
+    setRunTraceWait,
   };
 }
 

@@ -26,15 +26,21 @@ async function* text(value: string): AsyncGenerator<Uint8Array> {
   yield Buffer.from(value);
 }
 
+function azureError(code: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?><Error><Code>${code}</Code></Error>`;
+}
+
 describe("given object storage on Azure Blob with an account key", () => {
   let server: Server;
   let received: Received[];
   let status: number;
+  let errorCode: string | undefined;
   let endpoint: string;
 
   beforeEach(async () => {
     received = [];
     status = 201;
+    errorCode = undefined;
     server = createServer((request, response) => {
       const chunks: Buffer[] = [];
       request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -46,7 +52,9 @@ describe("given object storage on Azure Blob with an account key", () => {
           body: Buffer.concat(chunks).toString("utf8"),
         });
         response.statusCode = status;
-        response.end();
+        if (errorCode === undefined) return void response.end();
+        response.setHeader("x-ms-error-code", errorCode);
+        response.end(request.method === "HEAD" ? undefined : azureError(errorCode));
       });
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -56,10 +64,11 @@ describe("given object storage on Azure Blob with an account key", () => {
   });
 
   afterEach(async () => {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   });
 
-  const backend = () =>
+  const backend = (input: { idleMs?: number } = {}) =>
     azureBackend({
       credentials: resolveAzureCredentials({
         accountName: "devstoreaccount1",
@@ -68,6 +77,7 @@ describe("given object storage on Azure Blob with an account key", () => {
         endpoint,
       }),
       clock,
+      ...input,
     });
 
   describe("when a module writes a body", () => {
@@ -96,12 +106,99 @@ describe("given object storage on Azure Blob with an account key", () => {
     });
   });
 
+  describe("when Azure stops answering a write", () => {
+    it("cuts the call once its socket idles, instead of holding the body forever", async () => {
+      server.removeAllListeners("request");
+      server.on("request", () => {});
+
+      await expect(
+        backend({ idleMs: 50 }).write(at, text("hello"), {
+          byteLength: 5,
+          contentType: "text/plain",
+        }),
+      ).rejects.toThrow("Azure Blob PUT idled for 50 ms");
+    });
+  });
+
   describe("when the object is absent", () => {
     /** @scenario "An Azure-routed project's dataset chunks resolve to the Azure adapter" */
     it("refuses the read with StoredObjectNotFoundError", async () => {
       status = 404;
 
       await expect(backend().read(at)).rejects.toBeInstanceOf(StoredObjectNotFoundError);
+    });
+  });
+
+  describe("when a module asks whether an object exists", () => {
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("sends one HEAD for the blob and answers true for a held one", async () => {
+      status = 200;
+
+      await expect(backend().exists(at)).resolves.toBe(true);
+      expect(received).toMatchObject([
+        { method: "HEAD", url: `/devstoreaccount1/objects/${at.key}` },
+      ]);
+    });
+
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("answers false for a blob the container does not hold", async () => {
+      status = 404;
+
+      await expect(backend().exists(at)).resolves.toBe(false);
+    });
+
+    /** @scenario "Azure and filesystem existence checks read no body" */
+    it("fails on a refusal instead of answering false", async () => {
+      status = 403;
+      errorCode = "AuthorizationPermissionMismatch";
+
+      await expect(backend().exists(at)).rejects.toMatchObject({
+        code: "storage_permission_denied",
+      });
+    });
+  });
+
+  describe("when Azure refuses the account key", () => {
+    /** @scenario "An Azure refusal of the credentials says to check them, not to grant a role" */
+    it("refuses every operation as credentials refused, never as a missing role", async () => {
+      status = 403;
+      errorCode = "AuthenticationFailed";
+      const operations = [
+        () => backend().write(at, text("hello"), { byteLength: 5, contentType: "text/plain" }),
+        () => backend().read(at),
+        () => backend().exists(at),
+        () => backend().remove(at),
+        () => backend().probe(),
+      ];
+
+      for (const operation of operations) {
+        const refusal = await operation().then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+        expect(refusal).toMatchObject({ code: "storage_credentials_refused", fault: "platform" });
+        expect(String((refusal as Error).message)).not.toContain(accountKey);
+        const tips = (refusal as { tips: readonly string[] }).tips.join("\n");
+        expect(tips).toContain("AZURE_BLOB_ACCOUNT_NAME");
+        expect(tips).toContain("AZURE_BLOB_ACCOUNT_KEY");
+        expect(tips).not.toContain("Storage Blob Data Contributor");
+      }
+    });
+  });
+
+  describe("when Azure refuses the identity's data access", () => {
+    /** @scenario "An Azure refusal for missing data permissions names the role to grant" */
+    it("refuses as permission denied for a mismatch or an authorization failure", async () => {
+      status = 403;
+      for (const code of ["AuthorizationPermissionMismatch", "AuthorizationFailure"]) {
+        errorCode = code;
+
+        await expect(backend().read(at)).rejects.toMatchObject({
+          code: "storage_permission_denied",
+          fault: "platform",
+          tips: expect.arrayContaining([expect.stringContaining("Storage Blob Data Contributor")]),
+        });
+      }
     });
   });
 

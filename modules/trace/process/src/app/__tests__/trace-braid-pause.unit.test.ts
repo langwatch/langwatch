@@ -3,24 +3,62 @@ import { fenceFor } from "@langwatch/clickhouse-client";
 import { planSchema } from "@langwatch/entitlement-contract";
 import type { PlanType } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import type * as Time from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
 
-import { braidedProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import {
+  braidedProof,
+  ownProof,
+  TEST_PROOF_LIFETIME_MS,
+} from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import { readsBraidedSpans } from "../../features/braid/rules/braided-span-owner.rules.ts";
 import type { TraceAppDependencies } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
+
+// The pause cache reads `nowInstant()`, which a native Temporal keeps off the fake `Date`:
+// pin it to `Date.now()` so `vi.setSystemTime` moves the proof and the cache together.
+vi.mock("@langwatch/time", async (importOriginal) => {
+  const time = await importOriginal<typeof Time>();
+  return { ...time, nowInstant: () => time.Temporal.Instant.fromEpochMilliseconds(Date.now()) };
+});
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 
 const BRAID_ID = "braid_web";
 
-/** The trace detail's proof as the route mints it, with the organisation on the plan named. */
-function detailApp({ planType }: { planType?: PlanType }) {
+/**
+ * The trace detail's proof as the route mints it, with the organisation on the plan named and
+ * its "Braids enabled" setting as `settings.braidsEnabled` holds it when asked.
+ */
+function detailApp({
+  planType,
+  braidsEnabled = true,
+}: {
+  planType?: PlanType;
+  braidsEnabled?: boolean;
+}) {
   const asked: string[] = [];
   const counted: Authorization[] = [];
+  const settings = { braidsEnabled, asked: 0, fails: false };
   const app = createTraceAppHarness({
+    braidSettings: createApiFixture<TraceAppDependencies["braidSettings"]>(
+      {
+        getOrganizationPolicy: async ({ organizationId }) => {
+          settings.asked++;
+          if (settings.fails) throw new Error("settings read failed");
+          return {
+            organizationId,
+            braidsOrganizationAdminsOnly: false,
+            braidsEnabled: settings.braidsEnabled,
+            updatedByUserId: null,
+            updatedAtMs: null,
+          };
+        },
+      },
+      "braidSettings",
+    ),
     ...(planType === undefined
       ? {}
       : {
@@ -48,6 +86,7 @@ function detailApp({ planType }: { planType?: PlanType }) {
       authz: createApiFixture<NonNullable<TraceAppDependencies["braidDirectory"]>["authz"]>(
         {
           recordBraidedSpansView: async () => undefined,
+          assertBraidsReleased: async () => undefined,
           listBraids: async () => ({
             intoOtherProjects: [],
             fromOtherProjects: [
@@ -88,7 +127,7 @@ function detailApp({ planType }: { planType?: PlanType }) {
     app.authorizationForTrace({ authorization, traceId: "trace-1" });
   const countActivity = () =>
     app.readBraidActivity({ projectId: READER, authorization: braided(), braidIds: [BRAID_ID] });
-  return { open, countActivity, counted, asked };
+  return { open, countActivity, counted, asked, settings };
 }
 
 /** The route's proof: braids carried, not yet honoured by the plan check. */
@@ -145,6 +184,83 @@ describe("braided spans and the organisation's plan", () => {
       await open(braided());
 
       expect(asked).toEqual(["test-organization"]);
+    });
+  });
+
+  describe("given an Enterprise organisation with Braids turned off in settings", () => {
+    /** @scenario Turning Braids off pauses braids within thirty seconds and keeps them */
+    it("asks the setting again once the proof that cached the answer has expired", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const start = Date.now();
+        const { open, settings } = detailApp({ planType: "ENTERPRISE" });
+        expect(readsBraidedSpans(await open(braided()))).toBe(true);
+
+        settings.braidsEnabled = false;
+        // The answer lives no longer than the proof that asked; this fixture's proof lasts 5 min.
+        expect(readsBraidedSpans(await open(braided()))).toBe(true);
+        expect(settings.asked).toBe(1);
+
+        vi.setSystemTime(start + TEST_PROOF_LIFETIME_MS + 1);
+        const proof = await open(braided());
+
+        expect(readsBraidedSpans(proof)).toBe(false);
+        expect(spanFenceOf(proof).braids).toBeUndefined();
+        expect(settings.asked).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("strips the braids for a proof minted after the setting was turned off", async () => {
+      const { open } = detailApp({ planType: "ENTERPRISE", braidsEnabled: false });
+
+      const proof = await open(braided());
+
+      expect(readsBraidedSpans(proof)).toBe(false);
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([READER]);
+      expect(spanFenceOf(proof).braids).toBeUndefined();
+    });
+
+    it("reads the own project without its braids while the setting can't be read", async () => {
+      const { open, settings } = detailApp({ planType: "ENTERPRISE" });
+      settings.fails = true;
+
+      const proof = await open(braided());
+
+      expect(readsBraidedSpans(proof)).toBe(false);
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([READER]);
+      settings.fails = false;
+      expect(readsBraidedSpans(await open(braided()))).toBe(true);
+      expect(settings.asked).toBe(2);
+    });
+
+    /** @scenario Turning Braids on again resumes the braids it paused */
+    it("honours the same braid again for a proof minted after Braids is turned back on", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const start = Date.now();
+        const { open, settings } = detailApp({ planType: "ENTERPRISE", braidsEnabled: false });
+        expect(readsBraidedSpans(await open(braided()))).toBe(false);
+
+        settings.braidsEnabled = true;
+        vi.setSystemTime(start + TEST_PROOF_LIFETIME_MS + 1);
+        const proof = await open(braided());
+
+        expect(spanFenceOf(proof).braids?.clauses).toHaveLength(1);
+        expect(settings.asked).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("given an organisation below Enterprise with Braids turned on", () => {
+    it("never asks the setting and honours no braid", async () => {
+      const { open, settings } = detailApp({ planType: "LAUNCH" });
+
+      expect(readsBraidedSpans(await open(braided()))).toBe(false);
+      expect(settings.asked).toBe(0);
     });
   });
 

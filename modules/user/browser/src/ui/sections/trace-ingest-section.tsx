@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { codingAgentsPath } from "@langwatch/user-contract";
 import { Bot, Check, Terminal } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -179,6 +180,7 @@ export function TraceIngestSection() {
             description: openTemplate.description,
             credentialSchema: openTemplate.credentialSchema,
           }}
+          personalProjectSlug={ctx.personalProjectSlug}
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
           // Both halves are gated on the template they belong to — a tRPC
@@ -304,7 +306,12 @@ function RawOtlpAdvancedTile() {
           <Text fontSize="xs" color="fg.muted">
             Bring your own OTLP, raw shape. Use for custom telemetry pipelines.
           </Text>
-          <Link href="/me/configure#otlp" color="orange.fg" fontSize="xs" fontWeight="medium">
+          <Link
+            href={`${codingAgentsPath({ page: "configure" })}#otlp`}
+            color="orange.fg"
+            fontSize="xs"
+            fontWeight="medium"
+          >
             Get OTLP token →
           </Link>
         </VStack>

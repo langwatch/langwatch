@@ -51,7 +51,7 @@ function harness(
   const service = LegacyApiKeyGrantService.create({
     authz: createApiFixture<AuthzApi>({ findEngineCutoverAt }),
     grants: createApiFixture<AuthzApi>({ attachBindings }),
-    deriveBindingId: () => "grant-derived",
+    resolveBindingId: async () => "grant-derived",
     diagnostics: logger,
     ...(options.now ? { now: options.now } : {}),
   });
@@ -177,16 +177,35 @@ describe("legacy API-key grant facts", () => {
     ).toBe(false);
   });
 
-  it("derives a stable identity from the fact", () => {
-    const derive = vi.fn(() => "grant-derived");
-    expect(LegacyApiKeyGrantService.findLegacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe(
-      "grant-derived",
-    );
-    expect(derive).toHaveBeenCalledWith({
+  /** @scenario "The read-through mint attaches under the grant id authz resolves" */
+  it("asks authz for the grant id the fact names and attaches under it", async () => {
+    const resolve = vi.fn(async () => "grant_stored_revoked");
+    const [binding, ...others] = await LegacyApiKeyGrantService.findLegacyGrantsForApiKey({
+      apiKey: apiKey(),
+      resolveBindingId: resolve,
+    });
+    expect(others).toEqual([]);
+    expect(binding?.bindingId).toBe("grant_stored_revoked");
+    expect(resolve).toHaveBeenCalledWith({
       organizationId: "org-1",
       principal: { type: "apiKey", id: "key-1" },
       scope: { type: "ORGANIZATION", id: "org-1" },
       occurredAtMs: CREATED_AT.getTime(),
     });
+  });
+
+  it("implies no grant for a key that holds one, and asks authz nothing", async () => {
+    const resolve = vi.fn(async () => "grant-derived");
+    const held = apiKey({
+      grants: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }] as ApiKey["grants"],
+    });
+
+    expect(
+      await LegacyApiKeyGrantService.findLegacyGrantsForApiKey({
+        apiKey: held,
+        resolveBindingId: resolve,
+      }),
+    ).toEqual([]);
+    expect(resolve).not.toHaveBeenCalled();
   });
 });

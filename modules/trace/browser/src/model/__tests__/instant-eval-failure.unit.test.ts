@@ -26,6 +26,11 @@ describe("instantEvalFailureMessage", () => {
       0.02,
       "This Instant Eval stopped before it finished. Only the rows judged were charged.",
     ],
+    [
+      "instant_eval_decision_model_key_invalid",
+      0,
+      "Your model provider refused the key for this Instant Evals model. Check it in Settings > Model Providers. Nothing was charged.",
+    ],
   ])("words %s with %s charged", (error, priceUsd, message) => {
     expect(instantEvalFailureMessage({ run: { error, priceUsd } })).toBe(message);
   });

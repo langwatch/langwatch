@@ -1,4 +1,4 @@
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
@@ -21,7 +21,7 @@ import { enterpriseGatewayProcessModule } from "../../enterprise-gateway.module.
 
 describe("given an operator acting as a member", () => {
   /** @scenario "No personal virtual key is issued while an operator acts as another member" */
-  it("refuses the issue with permission_denied before membership is read", async () => {
+  it("refuses the issue with impersonation_cannot_mint_credential before membership is read", async () => {
     const isMember = vi.fn<OrganizationApi["isMember"]>(async () => {
       throw new Error("membership must not be read");
     });
@@ -48,8 +48,8 @@ describe("given an operator acting as a member", () => {
         impersonatorId: "operator-1",
       });
 
-      await expect(issuing).rejects.toBeInstanceOf(PermissionDeniedError);
-      await expect(issuing).rejects.toMatchObject({ code: "permission_denied" });
+      await expect(issuing).rejects.toBeInstanceOf(ImpersonationCannotMintCredentialError);
+      await expect(issuing).rejects.toMatchObject({ code: "impersonation_cannot_mint_credential" });
       expect(isMember).not.toHaveBeenCalled();
     } finally {
       await runtime.stop();

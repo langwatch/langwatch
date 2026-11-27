@@ -42,21 +42,31 @@ function SeatLimitAction({
   );
 }
 
+/** Matches the app banner's line for an over-plan organization (seat-limit-banner.tsx). */
+const HELD_TRACES_LINE =
+  "New traces are saved and will show once you upgrade your plan or remove members.";
+
 /**
- * Shown on the billing page when the organization uses more seats than its
- * plan includes, which a plan shrinking under a full organization leaves
- * behind. Everyone keeps access; the callout says what is over and what to do.
+ * Shown on the billing page when the organization uses more seats than its plan includes,
+ * which a plan shrinking under a full organization leaves behind. It says what is over,
+ * what to do and, while over plan, that new traces are held.
  */
 export function SeatLimitCallout({
   seatLimitInfo,
   isUpgradePlanRequired,
   isEnterprisePlan,
   onAddSeats,
+  isOverPlan = false,
+  isPaymentRecoveryOpen = false,
 }: {
   seatLimitInfo: SeatLimitInfo | undefined;
   isUpgradePlanRequired: boolean;
   isEnterprisePlan: boolean;
   onAddSeats: () => void;
+  /** Over plan (specs/billing/over-plan-trace-withholding.feature): new traces are withheld. */
+  isOverPlan?: boolean;
+  /** An unpaid invoice: paying it, not a new upgrade, brings the plan back. */
+  isPaymentRecoveryOpen?: boolean;
 }) {
   if (seatLimitInfo?.status !== "exceeded") return null;
 
@@ -67,11 +77,16 @@ export function SeatLimitCallout({
       data-testid="seat-limit-callout"
     >
       {seatLimitInfo.message}{" "}
-      <SeatLimitAction
-        isUpgradePlanRequired={isUpgradePlanRequired}
-        isEnterprisePlan={isEnterprisePlan}
-        onAddSeats={onAddSeats}
-      />
+      {isPaymentRecoveryOpen ? (
+        "Pay the open invoice to get your plan back."
+      ) : (
+        <SeatLimitAction
+          isUpgradePlanRequired={isUpgradePlanRequired}
+          isEnterprisePlan={isEnterprisePlan}
+          onAddSeats={onAddSeats}
+        />
+      )}
+      {isOverPlan && ` ${HELD_TRACES_LINE}`}
     </Banner>
   );
 }

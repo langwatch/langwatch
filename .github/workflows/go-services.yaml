@@ -66,6 +66,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       service: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.service }}

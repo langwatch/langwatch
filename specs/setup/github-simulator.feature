@@ -42,6 +42,14 @@ Feature: githubsim, a local stand-in for GitHub
     Then a second pull request on the same head branch answers 422
     And the pull request reads back closed and merged
     And the check run lists under its commit
+    And the commit's check suite reads back completed with one check run
+
+  Scenario: A check suite on a pull request's head commit is delivered as GitHub sends it
+    Given githubsim is running with a webhook target and secret
+    And a pull request on a langy/ branch whose head commit has a failed check run
+    When the control API delivers a check_suite event for that commit
+    Then the target receives check_suite completed with the installation, the head branch, the failure and the pull request
+    And the pull request's head and base repository ids are the repository's own id
 
   Scenario: Webhooks are signed over the exact body and can be sent wrong
     Given githubsim is running with a webhook target and secret

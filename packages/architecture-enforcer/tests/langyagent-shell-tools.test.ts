@@ -45,4 +45,12 @@ describe("given the langyagent runtime image", () => {
       expect(packages).toContain("python-is-python3");
     });
   });
+
+  describe("when the harness searches the code of a cloned repository", () => {
+    /** @scenario "The worker image carries the harness's code search tools" */
+    it("carries ripgrep and fd, which the harness cannot download", () => {
+      expect(packages).toContain("ripgrep");
+      expect(packages).toContain("fd-find");
+    });
+  });
 });

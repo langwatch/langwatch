@@ -10,6 +10,7 @@ import {
   SharedDocumentationFetcher,
 } from "./documentation-fetch.ts";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
+import { runExperimentSchema } from "./schemas/run-experiment.ts";
 import {
   runParametersSchema,
   runPlanScopeSchema,
@@ -44,6 +45,22 @@ import { handleExperimentList } from "./tools/list-experiments.ts";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.ts";
 import { handleTestAgent } from "./tools/test-agent.ts";
 import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
+
+const PROMPT_INPUT_TYPES = [
+  "str",
+  "float",
+  "bool",
+  "image",
+  "file",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "chat_messages",
+] as const;
+const PROMPT_OUTPUT_TYPES = ["str", "float", "bool", "json_schema"] as const;
 
 const modelSchema = z
   .string()
@@ -529,7 +546,9 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_update_prompt",
-    "Update an existing prompt on the LangWatch platform. Every update creates a new version.",
+    "Update an existing prompt on the LangWatch platform. Every update creates a new version. " +
+      "Only the fields you pass change; everything else (inputs, outputs, parameters, model, " +
+      "temperature, max tokens, messages) is carried over from the current version.",
     {
       idOrHandle: z.string().describe("Prompt ID or handle to update"),
       messages: z
@@ -542,6 +561,38 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         .optional()
         .describe("Updated messages"),
       model: modelSchema.optional(),
+      temperature: z.number().optional().describe("Sampling temperature"),
+      maxTokens: z.number().int().positive().optional().describe("Maximum output tokens"),
+      inputs: z
+        .array(
+          z.object({
+            identifier: z.string().min(1),
+            type: z.enum(PROMPT_INPUT_TYPES),
+          }),
+        )
+        .optional()
+        .describe(
+          "Prompt variables, replacing the current list, e.g. [{ identifier: 'question', type: 'str' }]",
+        ),
+      outputs: z
+        .array(
+          z.object({
+            identifier: z.string().min(1),
+            type: z.enum(PROMPT_OUTPUT_TYPES),
+            json_schema: z
+              .object({ type: z.string().min(1, "Type cannot be empty") })
+              .passthrough()
+              .optional(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Prompt outputs, replacing the current list. Use type 'json_schema' with a json_schema for structured output",
+        ),
+      parameters: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("Runtime parameters (free-form JSON object), replacing the current ones"),
       commitMessage: z.string().describe("Commit message describing the change"),
       tags: z
         .array(z.string())
@@ -2189,19 +2240,8 @@ function registerSecretTools(server: McpServer): void {
 function registerExperimentTools(server: McpServer): void {
   server.tool(
     "platform_run_experiment",
-    "Start an experiment run by slug. Returns a run ID for polling status.",
-    {
-      slug: z.string().describe("The experiment slug to run"),
-      concurrency: z
-        .number()
-        .int()
-        .min(1)
-        .max(24)
-        .optional()
-        .describe(
-          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
-        ),
-    },
+    "Start an experiment run by slug. Returns a run ID for polling status. Models rarely answer the same way twice, so before calling a failing row a real failure, run again with `repeat` (3 or more): every dataset row then runs that many times in one run, and a row that fails only some of its runs is noise, not a regression.",
+    runExperimentSchema.shape,
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();
       return {

@@ -10,6 +10,7 @@ import {
   type LangWatchQLAvailability,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
+  type LangWatchQLManagedPromptVersionFloor,
   type LangWatchQLProtections,
   type LangWatchQLReadableProject,
   type LangWatchQLQueryResult,
@@ -52,6 +53,8 @@ export interface AnalyticsLwqlApi {
   }): Promise<LangWatchQLSchema>;
   /** Where span_metrics' history starts: the span_analytics replay's recorded since. */
   spanDataFloor(): Promise<LangWatchQLSpanDataFloor>;
+  /** Where LastUsedPromptVersionId is known from: the managed prompt version replay's state. */
+  managedPromptVersionFloor(): Promise<LangWatchQLManagedPromptVersionFloor>;
   /** The organization's live projects this member holds `analytics:view` on. */
   listReadableProjects(input: {
     projectId: string;
@@ -120,6 +123,11 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
   .procedure("spanDataFloor")
   .withPermission("analytics:view")
   .handle(({ app }) => app.spanDataFloor())
+
+  // No rollout gate, as for spanDataFloor: dashboards read it, and it names no project data.
+  .procedure("managedPromptVersionFloor")
+  .withPermission("analytics:view")
+  .handle(({ app }) => app.managedPromptVersionFloor())
 
   .procedure("readableProjects")
   .withPermission("analytics:view")

@@ -16,8 +16,20 @@ Braids copy no data. The spans stay in the project that recorded them, under tha
 </Frame>
 
 <Note>
-  Braids is an **Enterprise** feature. See [Enterprise, and leaving it](#enterprise-and-leaving-it).
+  Braids is an **Enterprise** feature, and an organisation admin turns it on in settings first. See [Turn Braids on](#turn-braids-on) and [Enterprise, and leaving it](#enterprise-and-leaving-it).
 </Note>
+
+## Turn Braids on
+
+Braids is off for each organisation until an organisation admin turns it on. Open **Braids** in the organisation settings and turn on **Enable Braids**, the first setting on the page. Only an organisation admin on Enterprise can change it, and each change is in the audit log.
+
+While Braids is off, nobody in the organisation can create or change a braid or create or rotate a signing key; those actions answer `braids_turned_off`. Each project's Braids page says Braids is off: an organisation admin gets a link to the organisation page, and anyone else is told to ask one.
+
+Turning Braids off **pauses** the organisation's braids and keeps them. Within thirty seconds no trace shows braided spans, and each braid is listed as paused. Admins can still remove a braid or revoke a signing key. Turn Braids on again and the braided spans show again, without recreating any braid.
+
+On a self-hosted install Braids needs an Enterprise licence. The `release_braids` feature flag is on by default, so an organisation admin only has to turn Braids on as above.
+
+Turning the flag off for an organisation stops braid management there, not the braids themselves: existing braids keep applying and are listed with **Remove** only, signing keys are listed with **Revoke** only, and **Enable Braids** cannot be turned on until the flag is on again. To pause the braids, turn Braids off in the organisation settings.
 
 ## When to use a braid
 
@@ -50,7 +62,7 @@ For spans to line up, both services must send their spans to LangWatch, and the 
 
 ## Create a braid
 
-Braids are managed under **Braids** in a project's settings. The page has three tabs: braids into other projects, braids from other projects, and the project's signing keys.
+Braids are managed under **Braids** in a project's settings. The page lists braids into other projects, braids from other projects, and the project's signing keys. A project with no braids yet shows a short introduction in place of the two braid lists.
 
 To create one, open Braids in the settings of the project the spans come from, and click **New braid**.
 
@@ -141,7 +153,7 @@ Signed calls close that gap. The calling project signs its tags with a signing k
 
 ### Signing keys
 
-Signing keys belong to the project that makes the calls: in the example, **Web orchestrator**. Manage them on the **Signing keys** tab of Braids in that project's settings.
+Signing keys belong to the project that makes the calls: in the example, **Web orchestrator**. Manage them in the **Signing keys** section of Braids in that project's settings.
 
 - **Create** a key and give it a name, such as "Production". Its secret, which starts with `lwsk_`, is shown once, with setup snippets for TypeScript, Python and Go. Store it where your calling service reads its secrets, for example as `LANGWATCH_SIGNING_KEY`.
 - **Rotate** a key to get a new secret. The old secret keeps verifying for 7 days, so you can roll out the new one without a gap.
@@ -346,3 +358,4 @@ If your organisation leaves Enterprise, its braids **pause** and are kept. No tr
 | `braid_not_on_project` | The braid does not touch the project you removed it from. |
 | `braid_condition_unsupported`, `braid_condition_syntax`, `braid_condition_too_large`, `braid_condition_limit_reached` | See [Conditions](#conditions). |
 | `enterprise_plan_required` | The action needs the Enterprise plan. |
+| `braids_turned_off` | Braids is off for your organisation. An organisation admin on Enterprise can turn it on; see [Turn Braids on](#turn-braids-on). |

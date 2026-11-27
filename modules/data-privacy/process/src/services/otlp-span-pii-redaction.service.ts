@@ -170,7 +170,7 @@ export class OtlpSpanPiiRedactionService {
           lambda: {
             entities: lambda.entities,
             exceptPatterns: lambda.exceptPatterns,
-            resolvedPiiLevel: native.level,
+            effectivePiiLevel: native.level,
           },
           projectId: tenantId,
         });
@@ -233,7 +233,7 @@ export class OtlpSpanPiiRedactionService {
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
-      resolvedPiiLevel?: PiiLevel;
+      effectivePiiLevel?: PiiLevel;
     };
   }): Promise<boolean> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -241,7 +241,7 @@ export class OtlpSpanPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: projectId,
-      resolvedPiiLevel: lambda?.resolvedPiiLevel,
+      effectivePiiLevel: lambda?.effectivePiiLevel,
     });
     // No options means the analysis pass was skipped (disabled, or the service
     // is not configured outside production) — report that it did not run so the

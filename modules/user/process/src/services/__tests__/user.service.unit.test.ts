@@ -62,9 +62,11 @@ class StubRepository implements UserRepository {
   replaceAddress = vi.fn(async () => "replaced" as const);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
+  searchProfiles = vi.fn(async (): Promise<UserFullProfile[]> => []);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
   findByEmailAnyCase = vi.fn(async (): Promise<UserFullProfile[]> => []);
   create = vi.fn(async () => user);
+  appendCreatedFact = vi.fn(async () => undefined);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
   createCredentialUser = vi.fn(async () => ({
@@ -638,6 +640,23 @@ describe("findByEmail()", () => {
       repository.findByEmail.mockResolvedValue([]);
 
       await expect(service.findByEmail({ email: "nobody@example.com" })).resolves.toBeNull();
+    });
+  });
+});
+
+describe("setLangyCodeAccessPreference()", () => {
+  describe("given a person who ticks the remember box on the code access card", () => {
+    /** @scenario "The person's record stores and clears the remembered choice" */
+    it("stores GitHub, then clears it, with the choice each call carried", async () => {
+      const { service, repository } = createService();
+
+      await service.setLangyCodeAccessPreference({ id: user.id, preference: "github" });
+      await service.setLangyCodeAccessPreference({ id: user.id, preference: null });
+
+      expect(repository.setLangyCodeAccessPreference.mock.calls).toEqual([
+        [user.id, "github"],
+        [user.id, null],
+      ]);
     });
   });
 });

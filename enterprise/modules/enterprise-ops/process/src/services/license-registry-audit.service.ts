@@ -8,6 +8,7 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseChain,
   IssuedLicenseFilters,
   IssuedLicensePage,
   IssuedLicenseView,
@@ -26,6 +27,7 @@ type LicenseRegistry = Pick<
   LicensingApi,
   | "listIssuedLicenses"
   | "getIssuedLicense"
+  | "getIssuedLicenseChain"
   | "issueLicense"
   | "registerLegacyLicense"
   | "revokeIssuedLicense"
@@ -73,6 +75,11 @@ export class LicenseRegistryAuditService {
     return this.registry.getIssuedLicense({ id: input.id });
   }
 
+  async getChain(input: Staff & { id: string }): Promise<IssuedLicenseChain> {
+    await this.record(input.operatorId, "getChain", { args: { id: input.id }, targetId: input.id });
+    return this.registry.getIssuedLicenseChain({ id: input.id });
+  }
+
   async issue(input: Parameters<LicenseRegistry["issueLicense"]>[0]): Promise<SignedIssuedLicense> {
     const asked = {
       planType: input.planType,
@@ -109,7 +116,14 @@ export class LicenseRegistryAuditService {
   async revoke(
     input: Parameters<LicenseRegistry["revokeIssuedLicense"]>[0],
   ): Promise<IssuedLicenseView> {
-    const entry = { args: { id: input.id, reason: input.reason }, targetId: input.id };
+    const entry = {
+      args: {
+        id: input.id,
+        reason: input.reason,
+        ...(input.unusedOnly ? { unusedOnly: true } : {}),
+      },
+      targetId: input.id,
+    };
     const license = await this.audited({
       operatorId: input.operatorId,
       action: "revoke",

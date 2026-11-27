@@ -16,6 +16,12 @@ let mockTestArrival: { data?: { testing: boolean }; isLoading: boolean } = {
   data: { testing: false },
   isLoading: false,
 };
+/** Both organization Dashboards flags answer alike; off unless a test says otherwise. */
+const ORGANIZATION_FLAGS_OFF = { data: { enabledByOrganizationId: {} }, isLoading: false };
+let mockOrganizationFlags: {
+  data?: { enabledByOrganizationId: Record<string, boolean> };
+  isLoading: boolean;
+} = ORGANIZATION_FLAGS_OFF;
 
 vi.mock("../../../../behavior/use-reachable-products.ts", () => ({
   useReachableProducts: () => ({
@@ -32,6 +38,9 @@ vi.mock("../../../../behavior/navigation-api.ts", () => ({
     identity: {
       myTestArrival: { useQuery: () => mockTestArrival },
     },
+    featureFlag: {
+      isEnabledForEachOrganization: { useQuery: () => mockOrganizationFlags },
+    },
   },
 }));
 
@@ -44,7 +53,11 @@ const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 const PROJECT = { id: "project_1", name: "Demo", slug: "demo", isPersonal: false };
 
 function renderLanding({ orgless = false }: { orgless?: boolean } = {}) {
-  return render(
+  return render(landingScreen({ orgless }));
+}
+
+function landingScreen({ orgless }: { orgless: boolean }) {
+  return (
     <WithStubNavigationHost
       readings={{
         organization: orgless ? undefined : ORGANIZATION,
@@ -55,7 +68,7 @@ function renderLanding({ orgless = false }: { orgless?: boolean } = {}) {
       actions={{ replace: replaceMock }}
     >
       <LandingScreen />
-    </WithStubNavigationHost>,
+    </WithStubNavigationHost>
   );
 }
 
@@ -63,6 +76,7 @@ beforeEach(() => {
   localStorage.clear();
   replaceMock.mockClear();
   mockTestArrival = { data: { testing: false }, isLoading: false };
+  mockOrganizationFlags = ORGANIZATION_FLAGS_OFF;
   mockResolveHome = {
     data: {
       destination: "/demo",
@@ -128,6 +142,29 @@ describe("the root landing", () => {
     });
   });
 
+  describe("when the device remembers Dashboards and the organization's library flags load", () => {
+    /** @scenario "The root address waits for the library's flags before landing on Dashboards" */
+    it("holds the redirect until the flags answer, then lands on the library", async () => {
+      writeLastVisitedProduct({ organizationId: "org_1", productId: "dashboards" });
+      mockOrganizationFlags = { data: undefined, isLoading: true };
+      const { rerender } = renderLanding();
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(replaceMock).not.toHaveBeenCalled();
+
+      mockOrganizationFlags = {
+        data: { enabledByOrganizationId: { org_1: true } },
+        isLoading: false,
+      };
+      rerender(landingScreen({ orgless: false }));
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/dashboards");
+      });
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the landing page re-renders while the navigation is in flight", () => {
     /** @scenario The landing redirect navigates once per destination */
     it("navigates once per destination", async () => {
@@ -140,19 +177,7 @@ describe("the root landing", () => {
       // Every mocked hook above returns a fresh object per call, the way
       // the real hooks behave while a lazy route is loading. A re-render
       // must not restart the same navigation.
-      rerender(
-        <WithStubNavigationHost
-          readings={{
-            organization: ORGANIZATION,
-            organizations: [ORGANIZATION],
-            project: PROJECT,
-            isLoading: false,
-          }}
-          actions={{ replace: replaceMock }}
-        >
-          <LandingScreen />
-        </WithStubNavigationHost>,
-      );
+      rerender(landingScreen({ orgless: false }));
 
       expect(replaceMock).toHaveBeenCalledTimes(1);
     });

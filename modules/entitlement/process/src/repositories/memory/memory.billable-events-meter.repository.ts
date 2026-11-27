@@ -4,6 +4,8 @@ import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
   type DayMeterCount,
+  type EventTypeFilter,
+  type EventTypeMeterCount,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
@@ -31,6 +33,47 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
       (row) => row.deduplicationKey,
     );
     return new Set(keys).size;
+  }
+
+  async countEventType(input: EventTypeFilter & MeterWindow): Promise<number> {
+    const keys = this.#inWindow({ organizationId: input.organizationId, window: input })
+      .filter((row) => row.eventType === input.eventType)
+      .map((row) => row.deduplicationKey);
+    return new Set(keys).size;
+  }
+
+  async hasDeduplicationKey(input: {
+    organizationId: string;
+    projectId: string;
+    deduplicationKey: string;
+  }): Promise<boolean> {
+    return this.rows.some(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        row.tenantId === input.projectId &&
+        row.deduplicationKey === input.deduplicationKey,
+    );
+  }
+
+  async findDeduplicationKeys(input: {
+    organizationId: string;
+    deduplicationKeys: readonly string[];
+  }): Promise<Set<string>> {
+    const wanted = new Set(input.deduplicationKeys);
+    return new Set(
+      this.rows
+        .filter((row) => row.organizationId === input.organizationId)
+        .map((row) => row.deduplicationKey)
+        .filter((key) => wanted.has(key)),
+    );
+  }
+
+  async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
+    const times = this.rows
+      .filter((row) => row.organizationId === input.organizationId)
+      .filter((row) => row.eventType === input.eventType)
+      .map((row) => row.eventTimestamp);
+    return times.length > 0 ? Math.min(...times) : null;
   }
 
   /** Exact where ClickHouse's `uniq` is approximate, so small test data stays deterministic. */
@@ -69,6 +112,24 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
     return [...keysByDay]
       .toSorted(([a], [b]) => a.localeCompare(b))
       .map(([day, keys]) => ({ day, count: keys.size }));
+  }
+
+  /** Exact per event type, as `countByDay` is exact per day. */
+  async countByType(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<EventTypeMeterCount[]> {
+    const keysByType = new Map<string, Set<string>>();
+    for (const row of this.#inWindow(input)) {
+      if (!input.projectIds.includes(row.tenantId)) continue;
+      const keys = keysByType.get(row.eventType) ?? new Set<string>();
+      keys.add(row.deduplicationKey);
+      keysByType.set(row.eventType, keys);
+    }
+    return [...keysByType]
+      .toSorted(([a], [b]) => a.localeCompare(b))
+      .map(([eventType, keys]) => ({ eventType, count: keys.size }));
   }
 
   #inWindow(input: { organizationId: string; window: MeterWindow }): BillableEventRecord[] {

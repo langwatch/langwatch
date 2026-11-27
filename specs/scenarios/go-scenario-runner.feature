@@ -34,6 +34,12 @@ Feature: The Go scenario runner honours the child execution contract
       When the runner parses it
       Then the run fails with "Failed to parse job data: " and the reason
 
+    @unit
+    Scenario: A red team job fails on the Go runner instead of passing
+      Given a simulation job whose scenario is of kind "red_team"
+      When the runner parses it
+      Then the run fails with "Failed to parse job data: " and says red team runs only on the Node child
+
   # ---------------------------------------------------------------------------
   # The line it writes
   # ---------------------------------------------------------------------------

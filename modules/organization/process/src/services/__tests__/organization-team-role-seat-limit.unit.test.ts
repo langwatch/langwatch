@@ -40,7 +40,12 @@ function serviceWhere(options: {
       holdsFullSeat: vi.fn(async () => true),
       withSeat: ({ work }) => work({ assertHeld: async () => {} }),
     },
-    seatNotices: { memberDisabled: vi.fn(), memberEnabled: vi.fn() },
+    seatNotices: {
+      memberDisabled: vi.fn(),
+      memberEnabled: vi.fn(),
+      memberRoleChanged: vi.fn(),
+      memberAdmitted: vi.fn(),
+    },
     grantCache: { invalidateOrganization: vi.fn() },
     testArrivals: { standingFor: async (): Promise<{ testing: false }> => ({ testing: false }) },
     ceiling: { assertWithinCaller: async () => {} },

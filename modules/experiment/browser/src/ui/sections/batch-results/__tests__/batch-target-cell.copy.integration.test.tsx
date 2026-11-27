@@ -36,6 +36,7 @@ describe("given a cell whose output changed after it first rendered", () => {
       );
       rerender(<BatchTargetCell targetOutput={targetOutput({ output: "second answer" })} />);
 
+      fireEvent.pointerEnter(screen.getByTestId("target-cell-target-1"));
       fireEvent.click(screen.getByTestId("copy-output-target-1"));
 
       expect(writeText).toHaveBeenCalledWith("second answer");

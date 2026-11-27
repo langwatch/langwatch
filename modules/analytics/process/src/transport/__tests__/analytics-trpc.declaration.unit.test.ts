@@ -73,7 +73,7 @@ describe("given the analytics tRPC contract", () => {
 
 describe("given the workbench tRPC contract", () => {
   describe("when its members are read", () => {
-    it("declares the availability, schema, validate, span data floor and project reads and the one run mutation", () => {
+    it("declares the availability, schema, validate, data floor and project reads and the one run mutation", () => {
       expect(
         Object.entries(analyticsLwqlTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
@@ -81,8 +81,29 @@ describe("given the workbench tRPC contract", () => {
         ["schema", "query"],
         ["validate", "query"],
         ["spanDataFloor", "query"],
+        ["managedPromptVersionFloor", "query"],
         ["readableProjects", "query"],
         ["query", "mutation"],
+      ]);
+    });
+
+    it("guards every workbench procedure with analytics:view, the managed prompt version floor as the span data floor", () => {
+      const declared = permissionsDeclaredBy(analyticsLwqlTrpcTransport);
+
+      expect(
+        Object.entries(analyticsLwqlTrpc.members).map(([name, member], index) => [
+          name,
+          member.kind,
+          declared[index],
+        ]),
+      ).toEqual([
+        ["availability", "query", "analytics:view"],
+        ["schema", "query", "analytics:view"],
+        ["validate", "query", "analytics:view"],
+        ["spanDataFloor", "query", "analytics:view"],
+        ["managedPromptVersionFloor", "query", "analytics:view"],
+        ["readableProjects", "query", "analytics:view"],
+        ["query", "mutation", "analytics:view"],
       ]);
     });
 

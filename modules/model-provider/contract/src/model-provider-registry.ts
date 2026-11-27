@@ -94,6 +94,11 @@ export type ModelProviderEditorValue = {
    * expression sources. Null or absent means the provider's registry default applies.
    */
   langySkipPermissionsModels?: string[] | null;
+  /**
+   * The bare model ids the provider's own model list answered with, or null when it was not
+   * asked or did not answer. A picker then offers only catalogue ids this list carries.
+   */
+  servedModels?: string[] | null;
   // Nullable like every other stored column on this row: the wire always
   // carries the key, and null is "no health check has recorded a verdict".
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;

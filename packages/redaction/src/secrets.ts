@@ -285,6 +285,7 @@ const RECORD_ID_PREFIXES = new Set([
   "toolu",
   "asst",
   "file",
+  "storedobject",
   "batch",
   "evt",
   "acct",
@@ -298,6 +299,12 @@ const RECORD_ID_PREFIXES = new Set([
  * over-redaction as eating a record id.
  */
 const PUBLIC_KEY_PREFIXES = new Set(["phc"]);
+
+/**
+ * The tail of a stored media reference (`<projectId>/storedobject_<id>`, ending the token) is an
+ * address, not key material, even when the project id has a key's shape. Only that exact shape.
+ */
+const STORED_OBJECT_PATH_TAIL_REGEX = /^[A-Za-z0-9_-]*\/storedobject_[A-Za-z0-9]{16,}$/;
 
 /** Every prefix that announces something other than a credential. */
 function isNonCredentialPrefix(prefix: string): boolean {
@@ -572,7 +579,10 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) => !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) =>
+      !isNonCredentialPrefix(groups[1] ?? "") &&
+      !STORED_OBJECT_PATH_TAIL_REGEX.test(groups[2] ?? "") &&
+      isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {

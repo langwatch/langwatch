@@ -19,10 +19,9 @@ vi.mock("../../../../../features/facet/behavior/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import type {
-  FacetItem,
-  FacetValueState,
-} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import type { FacetState } from "@langwatch/trace-contract";
+
+import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { FacetSection } from "../facet-section.tsx";
 
 const ITEMS: FacetItem[] = [
@@ -67,9 +66,9 @@ const Harness = ({
   withDrilldown?: boolean;
   onToggleSpy?: (field: string, value: string) => void;
 }) => {
-  const [states, setStates] = useState<ReadonlyMap<string, FacetValueState>>(() => new Map());
+  const [states, setStates] = useState<ReadonlyMap<string, FacetState>>(() => new Map());
   const getValueState = useCallback(
-    (value: string): FacetValueState => states.get(value) ?? "neutral",
+    (value: string): FacetState => states.get(value) ?? "neutral",
     [states],
   );
   const onToggle = useCallback(

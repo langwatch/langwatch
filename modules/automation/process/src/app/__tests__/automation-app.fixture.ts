@@ -185,6 +185,7 @@ export function createCanonicalAutomationApp(): {
     listEntityHistory: vi.fn(async () => []),
     hasRecordedSince: vi.fn(async () => false),
     findByTargetKind: vi.fn(async () => []),
+    findForOrganization: vi.fn(async () => []),
   };
   return {
     app: AutomationModule.fromInfrastructure({
@@ -207,6 +208,8 @@ export function createCanonicalAutomationApp(): {
           resolvePlanNextStep: vi.fn<EntitlementApiContract["resolvePlanNextStep"]>(),
           assertWithinUsageLimit: vi.fn<EntitlementApiContract["assertWithinUsageLimit"]>(),
           getUsageMonthBreakdown: vi.fn<EntitlementApiContract["getUsageMonthBreakdown"]>(),
+          getUsageLimits: vi.fn<EntitlementApiContract["getUsageLimits"]>(),
+          assertScenarioRunAllowed: vi.fn<EntitlementApiContract["assertScenarioRunAllowed"]>(),
         },
         auditLog,
         traces: createApiFixture<TraceApi>({}),

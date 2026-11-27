@@ -19,8 +19,11 @@ export const licenseSeatsShape = {
   maxMembersDeveloper: z.number().optional(),
 } as const;
 
-/** The most lite seats an operator may state: the 32-bit seat column. Unlimited is a plan's. */
-export const MAX_STATED_LITE_SEATS = 2_147_483_647;
+/** The most seats an operator may state of any kind: the 32-bit seat column. */
+export const MAX_STATED_SEATS = 2_147_483_647;
+
+/** The most lite seats an operator may state. Unlimited is a plan's, never a stated count. */
+export const MAX_STATED_LITE_SEATS = MAX_STATED_SEATS;
 
 /** Lite seats as an operator states them when issuing or reissuing; empty is the plan default. */
 export const statedLiteSeatsSchema = z
@@ -32,14 +35,21 @@ export const statedLiteSeatsSchema = z
     `Lite seats can be at most ${MAX_STATED_LITE_SEATS}; leave them empty for the plan's default`,
   );
 
+/** Developer seats as an operator states them; empty, like 0, sells none. */
+export const statedDeveloperSeatsSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(MAX_STATED_SEATS, `Developer seats can be at most ${MAX_STATED_SEATS}`);
+
 /** Whether the plan may publish. Named here so no payload restates it. */
 export const planPublishingShape = {
   canPublish: z.boolean(),
 } as const;
 
 /**
- * The seats a licence sells, stated from parts. Developer seats are left out when
- * unstated, so a licence selling none signs exactly as it did before the field existed.
+ * The seats a licence sells, stated from parts. Developer seats are left out when unstated
+ * or 0, so a licence selling none signs exactly as it did before the field existed.
  */
 export function licenseSeats({
   members,
@@ -53,7 +63,7 @@ export function licenseSeats({
   return {
     maxMembers: members,
     maxMembersLite: membersLite,
-    ...(membersDeveloper === undefined ? {} : { maxMembersDeveloper: membersDeveloper }),
+    ...(membersDeveloper ? { maxMembersDeveloper: membersDeveloper } : {}),
   };
 }
 

@@ -1,25 +1,27 @@
 /**
- * A widget's Ask Langy button on a board card: one click hands Langy a ready draft about
- * this widget, the same hand-off picking a widget gives (AC120).
+ * A widget's Ask Langy button on a board card, spelled out and shown with the card's hover
+ * controls: one click opens the widget large beside Langy, with a ready draft about it (AC120).
  */
 
-import { IconButton } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Sparkles } from "lucide-react";
+import { Button } from "@langwatch/design-system/primitives";
+import { MessageCircle } from "lucide-react";
 
 export function AskLangyButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
-    <Tooltip content="Ask Langy" showArrow positioning={{ placement: "bottom-end" }}>
-      <IconButton
-        aria-label={`Ask Langy about ${name}`}
-        variant="ghost"
-        size="xs"
-        color="fg.subtle"
-        _hover={{ color: "fg", background: "bg.muted" }}
-        onClick={onClick}
-      >
-        <Sparkles size={14} aria-hidden />
-      </IconButton>
-    </Tooltip>
+    <Button
+      aria-label={`Ask Langy about ${name}`}
+      variant="ghost"
+      size="xs"
+      height={6}
+      paddingX={1.5}
+      gap={1}
+      color="fg.muted"
+      fontWeight="normal"
+      _hover={{ color: "fg", background: "bg.muted" }}
+      onClick={onClick}
+    >
+      <MessageCircle size={13} aria-hidden />
+      Ask Langy
+    </Button>
   );
 }

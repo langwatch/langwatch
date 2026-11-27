@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
@@ -49,6 +52,12 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../metric/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../log/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"

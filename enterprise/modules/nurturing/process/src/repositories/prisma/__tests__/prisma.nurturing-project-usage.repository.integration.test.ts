@@ -21,7 +21,10 @@ import {
   foldProjectUsage,
   type NurturingProjectUsageState,
 } from "../../../rules/nurturing-project-usage.rules.ts";
-import { NURTURING_PROJECT_USAGE_PROJECTION_VERSION } from "../../nurturing-project-usage.repository.ts";
+import {
+  EVALUATION_ACTIVITY_OWNER,
+  NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
+} from "../../nurturing-project-usage.repository.ts";
 import { PrismaNurturingProjectUsageRepository } from "../prisma.nurturing-project-usage.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -156,23 +159,33 @@ describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
     });
   });
 
-  describe("when a project's evaluations are recorded", () => {
-    /** @scenario "Evaluations mark a project's day once" */
-    it("keeps each evaluation day once in the project's evaluation row", async () => {
-      const noon = Date.UTC(2026, 10, 20, 12);
-
-      await repository.recordEvaluationDay({ projectId: evaluatedProjectId, occurredAt: noon });
-      await repository.recordEvaluationDay({
+  describe("when a project holds an evaluation row the retired subscriber wrote", () => {
+    /** @scenario "The usage read leaves out the evaluation rows the retired subscriber wrote" */
+    it("reads its other owners' rows and leaves the evaluation row out, unchanged", async () => {
+      const evaluationRow = {
         projectId: evaluatedProjectId,
-        occurredAt: noon + 1000,
-      });
-      await repository.recordEvaluationDay({
-        projectId: evaluatedProjectId,
-        occurredAt: noon + 24 * 60 * 60 * 1000,
-      });
+        owner: EVALUATION_ACTIVITY_OWNER,
+        folded: { ...emptyProjectUsage(evaluatedProjectId), activeDays: ["2026-11-20"] },
+        appliedEventIds: [],
+        projectionVersion: NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
+        updatedAt: new Date(1_000),
+      };
+      await connection.client.nurturingProjectUsageView.create({ data: evaluationRow });
+      await repository
+        .forOwner("prompt")
+        .store(withPrompts(evaluatedProjectId, ["p9"]), context(evaluatedProjectId));
 
       const rows = await repository.findForProjects({ projectIds: [evaluatedProjectId] });
-      expect(rows.map((row) => row.activeDays)).toEqual([["2026-11-20", "2026-11-21"]]);
+
+      expect(rows.flatMap((row) => row.promptIds)).toEqual(["p9"]);
+      expect(rows.flatMap((row) => row.activeDays)).toEqual([]);
+      await expect(
+        connection.client.nurturingProjectUsageView.findUnique({
+          where: {
+            projectId_owner: { projectId: evaluatedProjectId, owner: EVALUATION_ACTIVITY_OWNER },
+          },
+        }),
+      ).resolves.toMatchObject({ folded: evaluationRow.folded });
     });
   });
 });

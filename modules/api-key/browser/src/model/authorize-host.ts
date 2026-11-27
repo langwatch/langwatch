@@ -1,7 +1,12 @@
 // Handoff screen port (/authorize + /mcp/authorize). Switcher is consent control; key asked via
 // port; MCP exchange is app's REST call; redirect-scheme check stays on screen.
 
-import type { DocsSessionKeyMinted, DocsSessionMessage } from "@langwatch/api-key-contract";
+import type {
+  DocsSessionKeyAccess,
+  DocsSessionKeyLifetimeMinutes,
+  DocsSessionKeyMinted,
+  DocsSessionMessage,
+} from "@langwatch/api-key-contract";
 import type { Instant } from "@langwatch/time";
 import { createContext, useContext, type ReactNode } from "react";
 
@@ -62,6 +67,9 @@ export type DocsOpener = {
   readonly post: (input: { message: DocsSessionMessage; targetOrigin: string }) => void;
 };
 
+/** The organization's docs playground switch, as the consent page reads it. */
+export type DocsSessionAvailabilityReading = "loading" | "enabled" | "disabled";
+
 export abstract class AuthorizeHostApi {
   abstract scope(): AuthorizeScope;
 
@@ -114,11 +122,16 @@ export abstract class AuthorizeHostApi {
   /** This app's own origin, the only one the consent answer is posted to. */
   abstract appOrigin(): string;
 
-  /** Mints the five-minute docs session key for the chosen project; on Allow only. */
+  /** Mints the docs session key for the chosen project, access and lifetime; on Allow only. */
   abstract mintDocsSessionKey(input: {
     projectId: string;
     docsOrigin: string;
+    access: DocsSessionKeyAccess;
+    lifetimeMinutes: DocsSessionKeyLifetimeMinutes;
   }): Promise<DocsSessionKeyMinted>;
+
+  /** Whether the chosen project's organization lets the docs connect, while it is being read. */
+  abstract docsSessionAvailability(): DocsSessionAvailabilityReading;
 
   /** Closes the consent popup once its answer is posted. */
   abstract closeWindow(): void;

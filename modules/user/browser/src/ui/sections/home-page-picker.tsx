@@ -1,5 +1,6 @@
 import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
+import { CODING_AGENTS_PATH, RETIRED_PERSONAL_PATH } from "@langwatch/user-contract";
 import { useMemo } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
@@ -63,8 +64,8 @@ export function HomePagePicker({ organizationId }: Props) {
       {
         value: "personal",
         label: "Personal home",
-        description: "Always land on /me",
-        path: "/me",
+        description: `Always land on ${CODING_AGENTS_PATH}`,
+        path: CODING_AGENTS_PATH,
       },
     ];
     if (firstProjectSlug) {
@@ -89,6 +90,8 @@ export function HomePagePicker({ organizationId }: Props) {
   const selected = useMemo<OptionValue>(() => {
     const pin = stateQuery.data?.lastHomePath;
     if (!pin) return "auto";
+    // Pins saved before the move still read as the personal option; the router forwards them.
+    if (pin === RETIRED_PERSONAL_PATH) return "personal";
     const match = options.find((o) => o.path === pin);
     if (match) return match.value;
     return "auto";

@@ -9,6 +9,8 @@ import {
 } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -32,6 +34,8 @@ import {
   type StaffAccessCopyReport,
   type StaffAccessDoorSession,
   type StaffAccessEnrolled,
+  type StaffAccessFunctionAnswer,
+  type StaffAccessFunctionList,
   type StaffAccessOperator,
   type StaffAccessOrganizationList,
   type StaffAccessOverview,
@@ -51,6 +55,8 @@ import type { StaffAccessRepositories } from "../repositories/staff-access.repos
 import { StaffAccessAvailabilityService } from "../services/staff-access-availability.service.ts";
 import { StaffAccessCopyService } from "../services/staff-access-copy.service.ts";
 import { StaffAccessDoorService } from "../services/staff-access-door.service.ts";
+import { StaffAccessFunctionReadsService } from "../services/staff-access-function-reads.service.ts";
+import { StaffAccessFunctionService } from "../services/staff-access-function.service.ts";
 import { StaffAccessGateService } from "../services/staff-access-gate.service.ts";
 import { StaffAccessNoticeService } from "../services/staff-access-notice.service.ts";
 import { StaffAccessOpsReadService } from "../services/staff-access-ops-read.service.ts";
@@ -91,7 +97,12 @@ export class StaffAccessModule implements StaffAccessApiContract {
     notifications: NotificationService,
     codingAgents: CodingAgentApi,
     gateway: GatewayApi,
+    /** Trace counts and presence for the ops functions, and usage. */
     traces: TraceApi,
+    /** The plan and its limits beside what the organization used. */
+    entitlements: EntitlementApi,
+    /** Online evaluator runs and failures by error code. */
+    evaluations: EvaluationApi,
     /** The organization copy's allowlist, each read and written through its owner. */
     evaluators: EvaluatorApi,
     monitors: MonitorApi,
@@ -104,6 +115,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
   readonly #requests: StaffAccessRequestService;
   readonly #sessions: StaffAccessSessionService;
   readonly #opsRead: StaffAccessOpsReadService;
+  readonly #functions: StaffAccessFunctionService;
   readonly #copies: StaffAccessCopyService;
   readonly #auth: Pick<AuthApi, "hasPasskey">;
   /** The `staff_access` door the REST runtime opens for this module's routes. */
@@ -164,6 +176,22 @@ export class StaffAccessModule implements StaffAccessApiContract {
       traces: dependencies.traces,
       apiKeys: dependencies.apiKeys,
       auth: dependencies.auth,
+      now,
+    });
+    this.#functions = StaffAccessFunctionService.create({
+      requests: repositories.requests,
+      events: repositories.events,
+      reads: StaffAccessFunctionReadsService.create({
+        organizations: dependencies.organizations,
+        projects: dependencies.projects,
+        featureFlags: dependencies.featureFlags,
+        entitlements: dependencies.entitlements,
+        traces: dependencies.traces,
+        evaluations: dependencies.evaluations,
+        apiKeys: dependencies.apiKeys,
+        ops: dependencies.ops,
+        auth: dependencies.auth,
+      }),
       now,
     });
     this.#copies = StaffAccessCopyService.create({
@@ -341,8 +369,26 @@ export class StaffAccessModule implements StaffAccessApiContract {
     });
   }
 
+  async withdrawRequest({
+    session,
+    requestId,
+  }: StaffAccessAgent & { requestId: string }): Promise<{ withdrawn: true }> {
+    const { requesterId } = requesterOf(session);
+    return this.#requests.withdrawRequest({ requesterId, requestId });
+  }
+
+  async listFunctions(_input: StaffAccessAgent): Promise<StaffAccessFunctionList> {
+    return this.#functions.listFunctions();
+  }
+
+  callFunction(
+    input: StaffAccessAgent & { name: string; input: unknown },
+  ): Promise<StaffAccessFunctionAnswer> {
+    return this.#functions.callFunction(input);
+  }
+
   listOrganizations(
-    input: StaffAccessAgent & { query?: string },
+    input: StaffAccessAgent & { query?: string; limit?: number; cursor?: string },
   ): Promise<StaffAccessOrganizationList> {
     return this.#opsRead.listOrganizations(input);
   }

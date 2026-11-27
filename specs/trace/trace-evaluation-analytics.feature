@@ -26,6 +26,27 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     And the delivery fails so the queue retries it
 
   @unit
+  Scenario: An evaluation of a trace not stored yet looks again a minute later, then every quarter hour
+    Given an evaluation whose trace is not stored
+    When the trace subscriber handles it within the wait
+    Then the delivery names a minute's wait while the evaluation is under a minute old
+    And a quarter hour's wait after that
+    And the trace is looked for five times within the hour
+
+  @unit
+  Scenario: An evaluation naming no trace is not retried
+    Given an evaluation whose trace id is blank
+    When the trace subscriber handles it
+    Then no outcome is recorded, the delivery completes at once and the skip is logged
+
+  @unit
+  Scenario: An evaluation naming the all-zero trace looks for it once
+    Given an evaluation whose trace id is all zeros
+    When the trace subscriber handles it
+    Then the outcome is recorded if a trace is stored under that id
+    And otherwise the delivery completes at once and the skip is logged
+
+  @unit
   Scenario: An evaluation of a trace still not stored after the wait records nothing
     Given an evaluation whose trace is not stored, appended over an hour ago
     When the trace subscriber handles it
@@ -133,3 +154,21 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     Given a project with finished evaluations of the last 62 days on stored traces
     When the record step runs
     Then each outcome is sent once, keyed by its evaluation id and stamped with its trace's OccurredAt
+
+  @unit
+  Scenario: The backfill skips a project archived since its evaluations
+    Given a project archived since its evaluations, and a live project with a recent outcome
+    When the record step runs
+    Then the archived project is skipped, counted once with its id kept, and the live project's outcome is still sent
+
+  @unit
+  Scenario: The backfill still fails on any other error
+    Given a project whose outcomes cannot be read for another reason
+    When the record step runs
+    Then the step fails
+
+  @unit
+  Scenario: A checkpoint saved before projects could be skipped still resumes
+    Given a record step checkpoint saved before skipped projects were counted
+    When the record step resumes from it
+    Then it reads it with no skipped projects

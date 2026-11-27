@@ -10,7 +10,13 @@ import {
   type AnalyticsSeries,
 } from "@langwatch/analytics-contract";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
-import { MAX_PROCESSED_SPANS } from "@langwatch/trace-contract";
+import {
+  latestTraceVersionOnly,
+  MAX_PROCESSED_SPANS,
+  type SpanAnalyticsFloor,
+  type SpanAnalyticsSource,
+  spanAnalyticsSourceOf,
+} from "@langwatch/trace-contract";
 
 import { snakeCase } from "../../rules/string-casing.rules.ts";
 import {
@@ -22,6 +28,7 @@ import {
   JOINED_SPAN_ATTRIBUTES,
   narrowMapColumnProjection,
   narrowSpanAttributesColumns,
+  spanAnalyticsJoinParams,
   spanAttributesNarrowProjection,
   TRACE_ANALYTICS_COLUMNS,
   TRACE_IDENTITY_COLUMNS,
@@ -111,6 +118,30 @@ const SPAN_TIME_FILTER_BOTH_PERIODS =
 const SPAN_TIME_FILTER_START_END =
   "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
+/** The 2-day cushion of the StartTime bounds above. */
+const SPAN_TIME_CUSHION_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** Where a span type is read for a StartTime bound opening at `boundStart`, minus the cushion. */
+function spanAnalyticsFor({
+  floor,
+  boundStart,
+}: {
+  floor: SpanAnalyticsFloor | null | undefined;
+  boundStart: Date;
+}): SpanAnalyticsSource {
+  return spanAnalyticsSourceOf({
+    floor,
+    windowStartMs: new Date(boundStart).getTime() - SPAN_TIME_CUSHION_MS,
+  });
+}
+
+/** The source a timeseries reads its span types from, for its both-periods span bound. */
+function timeseriesSpanAnalytics(input: TimeseriesQueryInput): SpanAnalyticsSource {
+  return spanAnalyticsFor({
+    floor: input.spanAnalyticsFloor,
+    boundStart: input.previousPeriodStartDate,
+  });
+}
 
 // Partition-pruning bounds for the evaluation_runs JOIN subquery (OccurredAt doesn't prune
 // there since it partitions on ScheduledAt/UpdatedAt). Lower bounds only, on both columns —
@@ -122,8 +153,8 @@ const EVAL_TIME_FILTER_BOTH_PERIODS =
   "AND evaluation_runs.UpdatedAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY";
 
 /**
- * Deduped trace_summaries FROM-clause keeping the latest version of each trace: narrow `columns`
- * use the spillable argMax collapse of {@link latestVersionSubquery}, wide rows the IN-tuple form.
+ * Deduped trace_summaries FROM-clause keeping each trace's latest version: narrow `columns` use
+ * the argMax collapse of {@link latestVersionSubquery}, wide rows {@link latestTraceVersionOnly}.
  * Both expose each column under {@link latestVersionKey}. See clickhouse-queries.md.
  */
 function dedupedTraceSummaries({
@@ -154,13 +185,7 @@ function dedupedTraceSummaries({
     SELECT ${columnList} FROM trace_summaries
     WHERE ${tenantScope("OccurredAt")}
       ${dateClause}
-      AND (TenantId, TraceId, UpdatedAt) IN (
-        SELECT TenantId, TraceId, max(UpdatedAt)
-        FROM trace_summaries
-        WHERE ${tenantScope("OccurredAt")}
-          ${dateClause}
-        GROUP BY TenantId, TraceId
-      )
+      AND ${latestTraceVersionOnly({ where: `${tenantScope("OccurredAt")} ${dateClause}` })}
   ) ${alias}`;
 }
 
@@ -437,15 +462,18 @@ function shapeSeriesExpression({
 function translateSeriesCondition({
   series,
   params,
+  spanAnalytics,
 }: {
   series: AnalyticsSeries;
   params: Record<string, unknown>;
+  spanAnalytics: SpanAnalyticsSource;
 }): string {
   const filters = series.filters;
   if (!filters || Object.keys(filters).length === 0) return "";
 
   const translation = translateAllFilters(filters, {
     spanTimePredicate: SPAN_TIME_FILTER_BOTH_PERIODS,
+    spanAnalytics,
   });
   if (translation.whereClause === "1=1") return "";
   if (translation.requiredJoins.length > 0) {
@@ -472,13 +500,15 @@ function translateSeries({
   series,
   index,
   params,
+  spanAnalytics,
 }: {
   series: AnalyticsSeries;
   index: number;
   params: Record<string, unknown>;
+  spanAnalytics: SpanAnalyticsSource;
 }): SeriesMetric {
   const translation = translateSeriesMetric({ series, index });
-  const seriesCondition = translateSeriesCondition({ series, params });
+  const seriesCondition = translateSeriesCondition({ series, params, spanAnalytics });
   if (series.asPercent && seriesCondition && translation.requiresSubquery) {
     throw new SeriesPercentageUnsupportedError();
   }
@@ -834,6 +864,8 @@ export interface TimeseriesQueryInput {
   negateFilters?: boolean;
   /** Trace origins left out of the count, ANDed after the filters, never negated. */
   excludeOrigins?: string[];
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }
 
 /**
@@ -1041,9 +1073,10 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const timeZone = input.timeZone ?? "UTC";
 
   const allJoins = new Set<CHTable>();
-  const seriesFilterParams: Record<string, unknown> = {};
+  const spanAnalytics = timeseriesSpanAnalytics(input);
+  const seriesFilterParams: Record<string, unknown> = { ...spanAnalyticsJoinParams(spanAnalytics) };
   const metricTranslations = input.series.map((series, index) =>
-    translateSeries({ series, index, params: seriesFilterParams }),
+    translateSeries({ series, index, params: seriesFilterParams, spanAnalytics }),
   );
   for (const translation of metricTranslations) {
     for (const join of translation.requiredJoins) allJoins.add(join);
@@ -1059,6 +1092,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // cold-scanning S3 (see SPAN_TIME_FILTER_BOTH_PERIODS).
   const filterTranslation = translateAllFilters(input.filters ?? {}, {
     spanTimePredicate: SPAN_TIME_FILTER_BOTH_PERIODS,
+    spanAnalytics,
   });
   for (const join of filterTranslation.requiredJoins) {
     allJoins.add(join);
@@ -1105,6 +1139,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
         requiredColumns,
         spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
         evalTimeFilter: EVAL_TIME_FILTER_BOTH_PERIODS,
+        spanAnalytics: timeseriesSpanAnalytics(input),
       });
     })
     .join("\n");
@@ -2682,6 +2717,7 @@ function buildSimpleMetricsCte({
         requiredColumns,
         spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
         evalTimeFilter: EVAL_TIME_FILTER_BOTH_PERIODS,
+        spanAnalytics: timeseriesSpanAnalytics(input),
       });
     })
     .join("\n");
@@ -3192,6 +3228,7 @@ export function buildTopDocumentsQuery({
   startDate,
   endDate,
   filters,
+  spanAnalyticsFloor,
 }: {
   startDate: Date;
   endDate: Date;
@@ -3201,6 +3238,8 @@ export function buildTopDocumentsQuery({
       string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
     >
   >;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
@@ -3208,6 +3247,7 @@ export function buildTopDocumentsQuery({
   // Translate filters
   const filterTranslation = translateAllFilters(filters ?? {}, {
     spanTimePredicate: SPAN_TIME_FILTER_START_END,
+    spanAnalytics: spanAnalyticsFor({ floor: spanAnalyticsFloor, boundStart: startDate }),
   });
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
@@ -3286,16 +3326,19 @@ function feedbackQueryParts({
   startDate,
   endDate,
   filters,
+  spanAnalyticsFloor,
 }: {
   startDate: Date;
   endDate: Date;
   filters?: FeedbackQueryFilters;
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): { fromClause: string; filterWhere: string; params: BuiltQuery["params"] } {
   const ts = tableAliases.trace_summaries;
 
   // Translate filters
   const filterTranslation = translateAllFilters(filters ?? {}, {
     spanTimePredicate: SPAN_TIME_FILTER_START_END,
+    spanAnalytics: spanAnalyticsFor({ floor: spanAnalyticsFloor, boundStart: startDate }),
   });
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
@@ -3337,10 +3380,13 @@ export function buildFeedbacksQuery({
   startDate,
   endDate,
   filters,
+  spanAnalyticsFloor,
 }: {
   startDate: Date;
   endDate: Date;
   filters?: FeedbackQueryFilters;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
@@ -3348,6 +3394,7 @@ export function buildFeedbacksQuery({
     startDate,
     endDate,
     filters,
+    spanAnalyticsFloor,
   });
 
   const sql = `
@@ -3385,12 +3432,15 @@ export function buildFeedbacksPageQuery({
   filters,
   after,
   limit,
+  spanAnalyticsFloor,
 }: {
   startDate: Date;
   endDate: Date;
   filters?: FeedbackQueryFilters;
   after?: AnalyticsFeedbackPosition;
   limit: number;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
@@ -3398,6 +3448,7 @@ export function buildFeedbacksPageQuery({
     startDate,
     endDate,
     filters,
+    spanAnalyticsFloor,
   });
 
   const afterWhere = after

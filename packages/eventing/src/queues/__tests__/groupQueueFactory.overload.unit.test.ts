@@ -22,11 +22,21 @@ class ShedStatement extends HandledError {
 const clickHouseError = (code: string, message: string) =>
   Object.assign(new Error(message), { code });
 
+/** The retry delay a failure names, read off whatever the queue was handed. */
+const retryAfterMsOf = (error: unknown): unknown =>
+  error instanceof GroupQueueError ? error.retryAfterMs : undefined;
+
+/** Work refused a statement slot waits a randomised 2 to 5 seconds. */
+const expectNoSlotWait = (error: unknown) => {
+  const wait = retryAfterMsOf(error);
+  expect(wait).toBeGreaterThanOrEqual(2_000);
+  expect(wait).toBeLessThan(5_000);
+};
+
 describe("backOffWhenOverloaded", () => {
   describe.each([
     ["241", "MEMORY_LIMIT_EXCEEDED"],
     ["241", "(total) memory limit exceeded: would use 2.50 GiB, maximum: 4.25 GiB"],
-    ["202", "Too many simultaneous queries"],
     ["159", "TIMEOUT_EXCEEDED"],
   ])("when ClickHouse answers code %s", (code, message) => {
     it("names a retry delay so the queue backs the batch off whole", async () => {
@@ -37,6 +47,30 @@ describe("backOffWhenOverloaded", () => {
       expect(error).toBeInstanceOf(GroupQueueError);
       expect(error).toMatchObject({ retryable: true, retryAfterMs: 0, cause });
       expect(error).toMatchObject({ message: expect.stringContaining(`code ${code}`) });
+    });
+  });
+
+  describe("when ClickHouse has no statement slot for the batch (code 202)", () => {
+    /** @scenario "A job refused for want of a statement slot waits a jittered 2 to 5 seconds" */
+    it("names a wait of 2 to 5 seconds, so the refused jobs do not take the slots back at once", async () => {
+      const cause = clickHouseError("202", "Too many simultaneous queries");
+
+      const error = await failed(cause);
+
+      expect(error).toBeInstanceOf(GroupQueueError);
+      expect(error).toMatchObject({ retryable: true, cause });
+      expectNoSlotWait(error);
+      expect(error).toMatchObject({ cause: { code: "202" } });
+    });
+
+    /** @scenario "A job refused for want of a statement slot waits a jittered 2 to 5 seconds" */
+    it("spreads the waits of jobs refused together", async () => {
+      const cause = clickHouseError("202", "Too many simultaneous queries");
+
+      const errors = await Promise.all(Array.from({ length: 20 }, () => failed(cause)));
+      const waits = errors.map(retryAfterMsOf);
+
+      expect(new Set(waits).size).toBeGreaterThan(1);
     });
   });
 
@@ -93,7 +127,8 @@ describe("backOffWhenOverloaded", () => {
 
       const error = await failed(shed);
 
-      expect(error).toMatchObject({ retryable: true, retryAfterMs: 0, cause: shed });
+      expect(error).toMatchObject({ retryable: true, cause: shed });
+      expectNoSlotWait(error);
     });
   });
 
@@ -108,7 +143,8 @@ describe("backOffWhenOverloaded", () => {
         run: () => Promise.reject(cause),
       }).catch((caught: unknown) => caught);
 
-      expect(error).toMatchObject({ retryable: true, retryAfterMs: 0, operation: "process" });
+      expect(error).toMatchObject({ retryable: true, operation: "process" });
+      expectNoSlotWait(error);
     });
   });
 

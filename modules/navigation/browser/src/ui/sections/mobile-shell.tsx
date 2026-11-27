@@ -8,7 +8,11 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState } from "rea
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import { isProjectScopedProduct, type ProductId } from "../../model/products.ts";
+import {
+  isOrganizationDashboardsPath,
+  isProjectScopedProduct,
+  type ProductId,
+} from "../../model/products.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
@@ -99,7 +103,10 @@ function MobileTopBar({
   onMenuButtonPress: () => void;
   menuButtonRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  const showsOwnScope = isProjectScopedProduct(activeProductId) || activeProductId === "me";
+  const pathname = useNavigationHost().pathname();
+  const showsOwnScope =
+    (isProjectScopedProduct(activeProductId) && !isOrganizationDashboardsPath(pathname)) ||
+    activeProductId === "me";
 
   return (
     <HStack

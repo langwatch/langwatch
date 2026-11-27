@@ -5,8 +5,9 @@
  * @see specs/rbac/authz-grants.feature
  * @see specs/migration/authz-grants-rollout.feature
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
+import { Instance, Ksuid } from "@langwatch/ksuid";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
@@ -225,6 +226,40 @@ describe.skipIf(!DB_URL)("given the grants projection over a real database", () 
       await expect(prisma.grant.findUnique({ where: { id: braid.id } })).resolves.toMatchObject({
         replacesGrantId: `grant-second-${suffix}`,
       });
+    });
+  });
+
+  describe("when an API key's grant is read-through minted in the v2 id layout", () => {
+    /** @scenario "A v2 read-through mint leaves a revoked row under its legacy id" */
+    it("keeps its legacy twin revoked, so a pre-v2 mint cannot restore access", async () => {
+      const seeded = await seedOrganization({ tag: "twin" });
+      const stamp = await joinOrganization(seeded);
+      const minted = new Ksuid({
+        environment: "prod",
+        resource: "grant",
+        timestamp: 1_700_003_839,
+        instance: new Instance(Instance.schemes.RANDOM, randomBytes(8)),
+        sequenceId: 7,
+      });
+      const legacyId = minted.withLayout("v1-legacy").toString();
+      const row = teamGrantRow({ id: minted.toString(), source: "read-through-mint", ...seeded });
+
+      await projection.append({ kind: "grant.upsert", row, membershipStamp: stamp });
+
+      await expect(prisma.grant.findUnique({ where: { id: row.id } })).resolves.toMatchObject({
+        revokedAt: null,
+      });
+      const twin = await prisma.grant.findUnique({ where: { id: legacyId } });
+      expect(twin).toMatchObject({ principalId: seeded.userId, token: null });
+      expect(twin?.revokedAt).not.toBeNull();
+
+      await projection.append({
+        kind: "grant.upsert",
+        row: { ...row, id: legacyId, occurredAt: Temporal.Now.instant() },
+        membershipStamp: stamp,
+      });
+      const after = await prisma.grant.findUnique({ where: { id: legacyId } });
+      expect(after?.revokedAt).not.toBeNull();
     });
   });
 

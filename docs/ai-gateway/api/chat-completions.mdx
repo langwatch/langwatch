@@ -94,10 +94,10 @@ data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"inde
 data: [DONE]
 ```
 
-Two extra frames can appear:
+Two extra lines can appear:
 
 - `event: error` with a JSON object when the stream fails after it opened. See [Errors](/ai-gateway/api/errors#streaming-errors).
-- `event: warning` with `{"warning":"provider_did_not_report_usage_on_stream"}` when the stream ended with no usage from the provider.
+- The SSE comment line `: provider_did_not_report_usage_on_stream` when the stream ended with no usage from the provider. Clients skip comment lines.
 
 Response headers are written before the first frame. Dropped parameters also land in `extra_fields.params_dropped` on the final usage-bearing chunk.
 

@@ -143,7 +143,8 @@ describe("a mutation declared as audited against the organization via its projec
 
       expect(answer.error?.data?.httpStatus).toBe(409);
 
-      // The policy's own failed-call row stays beside it (a separate defect, see the handoff).
+      // One row: the policy's generic failed-call row no longer stands beside the trail's.
+      expect(rows).toHaveLength(1);
       const declared = rows.filter((row) => row.targetKind === "organization");
       expect(declared).toHaveLength(1);
       expect(declared[0]).toMatchObject({

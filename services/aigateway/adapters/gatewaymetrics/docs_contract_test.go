@@ -118,6 +118,9 @@ var notMetrics = map[string]string{
 	// snake_case attribute, so a documented call reads as a
 	// `gateway_`-prefixed token without naming a series.
 	"gateway_budgets": "python SDK facade name",
+
+	// Enum values in REST bodies.
+	"gateway_virtual_key": "kill switch stop plan target kind",
 }
 
 // plannedMetrics are names the docs explicitly describe as not yet

@@ -11,7 +11,7 @@ import {
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
+import { assertSafeIdentifier, clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
 
 /**
@@ -276,9 +276,48 @@ function buildWindowPredicates({
       ...datedPicks({ view, key, reach }),
     ];
     const tenanted = view.columns.some((column) => column.name === TENANT_COLUMN);
-    predicates.set(key, !tenanted || picks.length === 0 ? NO_ROWS : `(${picks.join(" OR ")})`);
+    predicates.set(
+      key,
+      !tenanted || picks.length === 0
+        ? NO_ROWS
+        : windowPredicate({ view, database, picks, memberWindows }),
+    );
   }
   return predicates;
+}
+
+/**
+ * One predicate for the members' picks. A fanned-out view keeps only the lowest project's copy
+ * (tasks#1212), which alone would drop a row a sibling's window admits, so the picks run on the
+ * per-project copies, under the same row policy, and admit the row's keys. Plain `IN` list leads.
+ */
+function windowPredicate({
+  view,
+  database,
+  picks,
+  memberWindows,
+}: {
+  view: LangWatchQLViewDefinition;
+  database: string;
+  picks: readonly string[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): string {
+  const either = `(${picks.join(" OR ")})`;
+  const keys = view.postgres?.entityKeyColumns ?? [];
+  if (keys.length === 0) return either;
+  // Checked as the view DDL checks them: a catalogue name never reaches SQL unchecked.
+  const keyList = keys.map((key) => `\`${identifier(key, "entity key")}\``).join(", ");
+  const table = `${identifier(database, "database")}.${identifier(view.sourceTable, "table")}`;
+  const members = memberWindows.map((window) => clickHouseLiteral(window.projectId)).join(", ");
+  return (
+    `(${keyList}) IN (SELECT ${keyList} FROM ${table} ` +
+    `WHERE ${TENANT_COLUMN} IN (${members}) AND ${either})`
+  );
+}
+
+/** `value` when it is a plain identifier; anything else is a catalogue bug, so it throws. */
+function identifier(value: string, role: string): string {
+  return assertSafeIdentifier({ value, role });
 }
 
 /** What a view's dated-member windows are built from, the same for every view. */
@@ -358,7 +397,8 @@ export function scopeLangWatchQL({
   database,
   views,
   timeWindow,
-  memberWindows,
+  memberWindows: requestedWindows,
+  projectIds,
 }: {
   sql: string;
   /** Where unqualified view names resolve. */
@@ -366,11 +406,28 @@ export function scopeLangWatchQL({
   views: readonly LangWatchQLViewDefinition[];
   /** The period the statement is bound to; absent, the trace lookup reads all history. */
   timeWindow?: LangWatchQLTimeWindow;
-  /** The members an aggregate reads and where each window opens; absent on a plain project. */
+  /**
+   * The members an aggregate reads and where each window opens; absent on a plain project. A
+   * project without a window, so every project when the list is empty, admits no row.
+   */
   memberWindows?: readonly LangWatchQLMemberWindow[];
+  /**
+   * The projects the caller's key set reads; a window naming any other is dropped. Absent, no
+   * window is dropped and the windows are taken not to cover the projects: the read is rewritten.
+   */
+  projectIds?: readonly string[];
 }): string {
-  // Whole-history members need no rewrite: the row policy bounds them exactly.
-  const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
+  // The service drops these too; dropping them here means no caller widens the key set.
+  const memberWindows =
+    requestedWindows && projectIds
+      ? windowsNaming({ memberWindows: requestedWindows, projectIds })
+      : requestedWindows;
+  // Whole-history members need no rewrite when each project has exactly its own window: the row
+  // policy bounds them exactly. A project without a window must read nothing, so it is rewritten.
+  const isWindowed =
+    memberWindows !== undefined &&
+    (memberWindows.some((window) => window.from > 0) ||
+      !windowsCoverProjects({ memberWindows, projectIds }));
   if (!isWindowed) {
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
@@ -409,6 +466,49 @@ export function scopeLangWatchQL({
       scoped.slice(reference.end);
   }
   return scoped;
+}
+
+/** Whether each project the caller reads has exactly one window, and each window one project. */
+function windowsCoverProjects({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[];
+  projectIds: readonly string[] | undefined;
+}): boolean {
+  if (projectIds === undefined) return false;
+  const windowed = new Set(memberWindows.map((window) => window.projectId));
+  return (
+    windowed.size === memberWindows.length &&
+    windowed.size === projectIds.length &&
+    projectIds.every((projectId) => windowed.has(projectId))
+  );
+}
+
+/**
+ * The member windows naming a project the caller reads. A window never widens the key set: one
+ * for any other project is dropped before a predicate is built from it (tasks#1212).
+ */
+export function readableMemberWindows({
+  projects,
+  memberWindows,
+}: {
+  projects: readonly LangWatchQLCaller[];
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): readonly LangWatchQLMemberWindow[] {
+  return windowsNaming({ memberWindows, projectIds: projects.map((project) => project.id) });
+}
+
+/** The windows naming one of `projectIds`. */
+function windowsNaming({
+  memberWindows,
+  projectIds,
+}: {
+  memberWindows: readonly LangWatchQLMemberWindow[];
+  projectIds: readonly string[];
+}): readonly LangWatchQLMemberWindow[] {
+  const readable = new Set(projectIds);
+  return memberWindows.filter((window) => readable.has(window.projectId));
 }
 
 /**

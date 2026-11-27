@@ -1,3 +1,4 @@
+export { playgroundBodyOf } from "./model/body-value.ts";
 export { generateExample, initialBodyOf } from "./model/codegen.ts";
 export {
   EXAMPLE_LANGUAGES,

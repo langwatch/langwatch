@@ -85,6 +85,7 @@ async function registryRow(
     maxMembers: 50,
     maxMembersLite: 0,
     liteSeatsUnlimited: false,
+    maxMembersDeveloper: null,
     issuedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     expiresAt: Temporal.Instant.from(LAPSED_AT),
     source: "BACKOFFICE",
@@ -230,7 +231,10 @@ function install({ license, host }: { license: string; host?: ConnectLicenseChan
     facts: appliedConnectFacts(rows),
     seats: { getMemberCount: async () => 12, getMembersLiteCount: async () => 1 },
     licenses: {
-      validateAndStoreLicense: async ({ licenseKey }) => {
+      storeDeliveredLicense: async ({ licenseKey, replacing }) => {
+        if ((rows.get(ORGANIZATION)?.license ?? null) !== replacing) {
+          return { success: false, superseded: true };
+        }
         const result = cryptography.validateLicense({ licenseKey, publicKey: TEST_PUBLIC_KEY });
         if (!result.valid) return { success: false, error: result.error };
         rows.set(ORGANIZATION, {

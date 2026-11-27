@@ -13,6 +13,7 @@ import {
   facetValuesResultSchema,
   TraceApi,
   traceListPageSchema,
+  traceWithholdingOf,
   tracesEvaluationRunsSchema,
   tracesTrpc,
 } from "@langwatch/trace-contract";
@@ -25,7 +26,7 @@ import { gateTraceLogVisibility, redactV2Content } from "../rules/trace-read-map
 
 const evaluationsSchema = evaluationSchema.array();
 
-/** ADR-201 §9: the braid dialog's reads are Enterprise, named at the owner. */
+/** ADR-201 §9: the braid dialog's and Braids page's reads are Enterprise, named at the owner. */
 const braids = { feature: "BRAIDS" } as const;
 
 export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesTrpc> =
@@ -263,7 +264,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       // not — traces carry trace-level input/output either way. Gating
       // resolveBlobs on includeSpans silently truncated spans-less downloads.
       return app.listTraces({
-        query: { ...input, pageSize: input.pageSize ?? 10_000 },
+        query: { ...input, pageSize: input.pageSize ?? (input.includeSpans ? undefined : 10_000) },
         protections,
         options: {
           downloadMode: true,
@@ -318,6 +319,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           cursor: input.cursor,
           filterWhere,
           visibilityCutoffMs: protections.visibilityCutoffMs,
+          withholding: traceWithholdingOf(protections),
         }),
       );
 
@@ -342,15 +344,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .procedure("newCount")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor, authorization }) => {
+      const protections = await app.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+        authorization,
+      });
       const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
-        protections: await app.resolveViewerProtections({
-          projectId: input.projectId,
-          userId: actor.id,
-          authorization,
-        }),
+        protections,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -361,6 +364,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         timeRange: input.timeRange,
         since: input.since,
         filterWhere,
+        withholding: traceWithholdingOf(protections),
       });
 
       return { count };
@@ -534,6 +538,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({
+        authorization,
+        traceId: input.traceId,
+        occurredAtMs: input.occurredAtMs,
+        protections,
+      });
       const rows = await app.readTraceLogRecords({
         projectId: input.projectId,
         traceId: input.traceId,
@@ -591,25 +601,9 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("spanLangwatchSignals")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization: routeProof }) => {
-      const authorization = await app.authorizationForTrace({
-        authorization: routeProof,
-        traceId: input.traceId,
-        tenantId: input.tenantId,
-      });
-      const rows = await app.readLangwatchSignals({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-        reads: "spans",
-      });
-
-      return rows.map((r) => ({
-        spanId: r.spanId,
-        signals: r.signals,
-        ...(r.ownerProjectId === undefined ? {} : { ownerProjectId: r.ownerProjectId }),
-      }));
-    })
+    .handle(({ app, input, authorization, actor }) =>
+      app.readLangwatchSignalsForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
 
     /**
      * Full span data for every span in a trace — used by the LLM Optimized
@@ -619,6 +613,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .withPermission("traces:view")
     .handle(({ app, input, authorization, actor }) =>
       app.readSpansFullForViewer({ ...input, authorization, viewerUserId: actor.id }),
+    )
+
+    .procedure("agentCallGraph")
+    .withPermission("traces:view")
+    .handle(({ app, input, authorization, actor }) =>
+      app.readAgentCallGraphForViewer({ ...input, authorization, viewerUserId: actor.id }),
     )
 
     .procedure("spanDetail")
@@ -662,10 +662,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     )
 
     .procedure("braidAttributeKeys")
+    .withEntitlement("enterprise", braids)
     .withPermission("traces:view")
     .handle(({ app, authorization }) => app.readBraidAttributeKeys({ authorization }))
 
     .procedure("braidActivity")
+    .withEntitlement("enterprise", braids)
     .withPermission("traces:view")
     .handle(({ app, input, authorization }) =>
       app.readBraidActivity({

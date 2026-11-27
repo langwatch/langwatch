@@ -199,7 +199,7 @@ interface ScenarioAppDependencies {
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
-  /** The cloud Free caps on scenarios and simulations. */
+  /** The cloud Free caps on scenarios and scenario runs. */
   creationCaps: ScenarioCreationCapService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
@@ -323,7 +323,6 @@ export class ScenarioModule implements ScenarioApi {
       plans: setup.dependencies.plans,
       projects: setup.dependencies.projects,
       scenarios: repositories.scenarios,
-      simulations,
     });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
@@ -437,6 +436,7 @@ export class ScenarioModule implements ScenarioApi {
         peers: setup.dependencies,
         scenarios,
         simulations,
+        runCap: creationCaps,
         signingSecret,
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
@@ -650,8 +650,16 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.findTestSuite(input);
   }
 
-  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.createTestSuite(input);
+  /** A suite a template apply makes passes the Free suite cap before anything is written. */
+  async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    const cap = await this.#dependencies.creationCaps.testSuiteCreationCap({
+      projectId: input.projectId,
+      templateId: input.templateId,
+    });
+    return this.#dependencies.scenarios.createTestSuite(
+      input,
+      cap.kind === "capped" ? cap.cap : undefined,
+    );
   }
 
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
@@ -701,18 +709,23 @@ export class ScenarioModule implements ScenarioApi {
   async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options: { sourceTemplateId?: string } = {},
   ): Promise<Scenario> {
     await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
       projectId: input.projectId,
       operatorId: by.label === "user" ? by.id : undefined,
+      sourceTemplateId: options.sourceTemplateId,
     });
-    const scenario = await this.#dependencies.scenarios.create({
-      ...input,
-      // REST can name an explicit actor when its credential names no person;
-      // `by.id` alone would answer "the key" or "the project", neither a
-      // `User` row. tRPC, always a signed-in person, keeps the old behavior.
-      lastUpdatedById: input.actor ? input.actor.userId : by.id,
-    });
+    const scenario = await this.#dependencies.scenarios.create(
+      {
+        ...input,
+        // REST can name an explicit actor when its credential names no person;
+        // `by.id` alone would answer "the key" or "the project", neither a
+        // `User` row. tRPC, always a signed-in person, keeps the old behavior.
+        lastUpdatedById: input.actor ? input.actor.userId : by.id,
+      },
+      options,
+    );
 
     this.reportScenarioCreated({ scenario, projectId: input.projectId, userId: by.id });
 
@@ -758,7 +771,7 @@ export class ScenarioModule implements ScenarioApi {
 
   /**
    * Records that the project ran the set, once per project and set (the event's idempotency key),
-   * without making the run wait for it. Platform-owned sets are left out, as the plan's cap does.
+   * without making the run wait for it. Platform-owned sets are left out.
    */
   private reportSimulationSetCreated(
     input: Readonly<{ projectId: string; scenarioSetId: string }>,
@@ -923,6 +936,11 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.generateBounds.assertGenerateWithinBounds(input);
   }
 
+  /** Refuses a new run once the project's organization is past its plan's monthly run cap. */
+  assertSimulationRunAllowed(input: { projectId: string }): Promise<void> {
+    return this.#dependencies.creationCaps.assertRunAllowed({ projectId: input.projectId });
+  }
+
   /**
    * Dispatches the queued command, which is what writes QUEUED state before the execution job is
    * scheduled — the same order the suite execution port uses. The resolved parameters travel on the
@@ -950,6 +968,12 @@ export class ScenarioModule implements ScenarioApi {
         ...withActor(input.actor),
         ...(input.simulatorModel ? { simulatorModel: input.simulatorModel } : {}),
         ...(input.judgeModel ? { judgeModel: input.judgeModel } : {}),
+        ...(input.traceQuietPeriodMs != null
+          ? { traceQuietPeriodMs: input.traceQuietPeriodMs }
+          : {}),
+        ...(input.traceWaitTimeoutMs != null
+          ? { traceWaitTimeoutMs: input.traceWaitTimeoutMs }
+          : {}),
         ...withResolvedModels(input.resolvedModels),
         ...(input.keepData ? { keepData: true } : {}),
       },
@@ -957,6 +981,12 @@ export class ScenarioModule implements ScenarioApi {
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),
       ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
     };
+
+    // Admitting counts the run, so it comes last: a target that fails to resolve keeps no slot.
+    await this.#dependencies.creationCaps.assertRunAllowed({
+      projectId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+    });
 
     await this.#dependencies.simulations.queueRun({
       tenantId: input.projectId,
@@ -1259,6 +1289,8 @@ export interface ScenarioChildEnvironment {
   callerEnv?: Record<string, string>;
   /** The target declares scenario hooks, which only the Node child calls (ADR-180). */
   callsHooks?: boolean;
+  /** The scenario is a red team attack, which only the Node child plays. */
+  runsRedTeam?: boolean;
 }
 
 export interface ScenarioChildExecutionSession {

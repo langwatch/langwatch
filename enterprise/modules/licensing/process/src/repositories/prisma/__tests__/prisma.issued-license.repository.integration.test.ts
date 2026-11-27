@@ -116,6 +116,34 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(stored).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
   });
 
+  /** @scenario A replacement keeps the Developer seats of the licence it replaces */
+  it("stores the Developer seats and keeps them on a reissue", async () => {
+    const organization = await prisma.organization.create({
+      data: { name: `ACME Developers ${RUN}`, slug: `--${RUN}-${organizationIds.length}` },
+    });
+    organizationIds.push(organization.id);
+    const { license } = await registry.issue({
+      customer: { organizationId: organization.id },
+      email: "ops@acme.test",
+      planType: "ENTERPRISE",
+      maxMembers: 5,
+      maxMembersDeveloper: 4,
+      expiresAt: nowInstant().add({ hours: 24 * 365 }),
+      operatorId: "user_operator",
+    });
+    const reissued = await registry.reissue({
+      id: license.id,
+      expiresAt: nowInstant().add({ hours: 24 * 730 }),
+      operatorId: "user_operator",
+    });
+
+    const rows = await prisma.issuedLicense.findMany({
+      where: { id: { in: [license.id, reissued.license.id] } },
+      select: { maxMembersDeveloper: true },
+    });
+    expect(rows).toEqual([{ maxMembersDeveloper: 4 }, { maxMembersDeveloper: 4 }]);
+  });
+
   it("records a raised seat change in the replacement's own insert and reads it back", async () => {
     const { license } = await issue("ACME Seats");
     const changed = await registry.changeSeats({
@@ -222,6 +250,89 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     ).toBeNull();
   });
 
+  /** @scenario "The registry revokes an unbound license and refuses to bind a revoked one in single writes" */
+  it("lets one of a racing unused-key revoke and a bind win, in either order", async () => {
+    const at = nowInstant();
+    const revokeOf = (id: string) => (tx: Prisma.TransactionClient) =>
+      PrismaIssuedLicenseRepository.create(tx, SEALING).revokeUnbound({
+        id,
+        at,
+        revokedById: "user_operator",
+        revokedReason: "unused",
+      });
+    const bindOf = (id: string) => (tx: Prisma.TransactionClient) =>
+      PrismaIssuedLicenseRepository.create(tx, SEALING).bindInstance({
+        id,
+        instanceId: "instance-a",
+        at,
+      });
+
+    const revokedFirst = (await issue("ACME Revoke Then Bind")).license;
+    expect(
+      await raceOnOneRow({
+        prisma,
+        table: "IssuedLicense",
+        first: revokeOf(revokedFirst.id),
+        second: bindOf(revokedFirst.id),
+      }),
+    ).toEqual({ first: true, second: false });
+    const revokedRow = await prisma.issuedLicense.findUnique({ where: { id: revokedFirst.id } });
+    expect(revokedRow?.revokedAt).not.toBeNull();
+    expect(revokedRow?.instanceId).toBeNull();
+
+    const boundFirst = (await issue("ACME Bind Then Revoke")).license;
+    expect(
+      await raceOnOneRow({
+        prisma,
+        table: "IssuedLicense",
+        first: bindOf(boundFirst.id),
+        second: revokeOf(boundFirst.id),
+      }),
+    ).toEqual({ first: true, second: false });
+    const boundRow = await prisma.issuedLicense.findUnique({ where: { id: boundFirst.id } });
+    expect(boundRow?.instanceId).toBe("instance-a");
+    expect(boundRow?.revokedAt).toBeNull();
+  });
+
+  /** @scenario "A revoke ends a key that attached while it ran" */
+  it("revokes a license only while it still names the key the caller ended", async () => {
+    const { license } = await issue("ACME Holding Key");
+    const repository = PrismaIssuedLicenseRepository.create(prisma, SEALING);
+    const mark = (virtualKeyId: string | null) =>
+      repository.revokeHolding({
+        id: license.id,
+        virtualKeyId,
+        at: nowInstant(),
+        revokedById: "op",
+        revokedReason: "leaked",
+      });
+    await repository.update(license.id, { virtualKeyId: "vk-new" });
+
+    expect(await mark(null)).toBe(false);
+    expect((await repository.findById(license.id))?.revokedAt).toBeNull();
+    expect(await mark("vk-new")).toBe(true);
+    expect(await mark("vk-new")).toBe(false);
+  });
+
+  /** @scenario "Only a live license lets go of an ended managed key" */
+  it("lets go of an ended key on the live license naming it, never on a revoked one", async () => {
+    const live = (await issue("ACME Release Key")).license;
+    const revoked = (await issue("ACME Revoked Key")).license;
+    const repository = PrismaIssuedLicenseRepository.create(prisma, SEALING);
+    await repository.update(live.id, { virtualKeyId: "vk-ended-live" });
+    await repository.update(revoked.id, {
+      virtualKeyId: "vk-ended-revoked",
+      revokedAt: nowInstant(),
+    });
+
+    expect(await repository.releaseVirtualKey({ virtualKeyId: "vk-other" })).toBe(false);
+    expect(await repository.releaseVirtualKey({ virtualKeyId: "vk-ended-revoked" })).toBe(false);
+    expect(await repository.releaseVirtualKey({ virtualKeyId: "vk-ended-live" })).toBe(true);
+
+    expect((await repository.findById(live.id))?.virtualKeyId).toBeNull();
+    expect((await repository.findById(revoked.id))?.virtualKeyId).toBe("vk-ended-revoked");
+  });
+
   /** @scenario "Two instances racing to bind leave exactly one bound" */
   it("binds the first of two installs and refuses the one waiting on the row", async () => {
     const { license } = await issue("ACME Bind Race");
@@ -292,5 +403,37 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(ids(external)).toEqual([active.id]);
     expect(external.total).toBe(1);
     expect(await repository.countAll({ search: tag, ...internalOnes(true) })).toBe(1);
+  });
+
+  /** @scenario "The registry lists and counts a reissue chain once" */
+  it("leaves out a license an unrevoked one replaces, and keeps one whose replacement was revoked", async () => {
+    const tag = `Chains ${RUN}`;
+    const { license: extended } = await issue(`${tag} extended`);
+    const { license: kept } = await issue(`${tag} kept`);
+    const later = nowInstant().add({ hours: 24 * 400 });
+    const replacement = await registry.reissue({
+      id: extended.id,
+      expiresAt: later,
+      operatorId: "user_operator",
+    });
+    const withdrawn = await registry.reissue({
+      id: kept.id,
+      expiresAt: later,
+      operatorId: "user_operator",
+    });
+    await repository.update(withdrawn.license.id, {
+      revokedAt: nowInstant(),
+      revokedReason: "test",
+    });
+    const query = { page: 0, pageSize: 25, search: tag, chainHeadsOnly: true };
+
+    const heads = await repository.listAll(query);
+
+    expect(heads.rows.map((row) => row.id).toSorted()).toEqual(
+      [replacement.license.id, kept.id, withdrawn.license.id].toSorted(),
+    );
+    expect(heads.total).toBe(3);
+    expect(await repository.countAll({ search: tag, chainHeadsOnly: true })).toBe(3);
+    expect(await repository.countAll({ search: tag })).toBe(4);
   });
 });

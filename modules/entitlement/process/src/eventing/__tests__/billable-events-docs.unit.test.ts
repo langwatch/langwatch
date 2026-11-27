@@ -30,12 +30,14 @@ function documentedEventTypes(): Set<string> {
 }
 
 /**
- * The four families a customer recognises, and words the short answer may
+ * The families a customer recognises, and words the short answer may
  * use for each. Checking words, not event types, is the point: it may say
  * "simulation" or "scenario" for `lw.simulation_run.*`, not forced to either.
  */
 const BILLABLE_FAMILIES = [
   { family: "spans", synonyms: /\bspans?\b/i },
+  { family: "logs", synonyms: /\blogs?\b/i },
+  { family: "metrics", synonyms: /\bmetrics?\b/i },
   { family: "evaluations", synonyms: /\bevaluations?\b/i },
   { family: "experiments", synonyms: /\bexperiments?\b/i },
   { family: "simulations", synonyms: /\b(simulations?|scenarios?)\b/i },
@@ -80,19 +82,19 @@ const meteredEventTypes = BillableEventsMeterProjection.create({ append: vi.fn()
   .eventTypes;
 
 describe("Billable-event documentation", () => {
-  describe("given the meter bills spans, evaluations, experiments and simulations", () => {
+  describe("given the meter bills spans, logs, metrics, evaluations, experiments and simulations", () => {
     describe("when a customer reads only the short answer", () => {
-      /** @scenario "The Events section covers all four billable families" */
+      /** @scenario "The Events section covers every billable family" */
       it.each(BILLABLE_FAMILIES)("names $family in the pricing-page definition", ({ synonyms }) => {
         expect(pricingDefinition()).toMatch(synonyms);
       });
 
-      /** @scenario "The Events section covers all four billable families" */
+      /** @scenario "The Events section covers every billable family" */
       it("sends the reader to the full list for the counting rules", () => {
         expect(pricingEventsSection()).toContain("/pricing/billable-events");
       });
 
-      /** @scenario "The pricing FAQ answer covers all four billable families" */
+      /** @scenario "The pricing FAQ answer covers every billable family" */
       it.each(BILLABLE_FAMILIES)("names $family in the pricing FAQ answer", ({ synonyms }) => {
         expect(pricingFaqAnswer()).toMatch(synonyms);
       });
@@ -116,6 +118,17 @@ describe("Billable-event documentation", () => {
 
         expect(overclaimed).toEqual([]);
       });
+    });
+  });
+
+  describe("given logs and metrics are counted by their own rules", () => {
+    /** @scenario "The documented list explains how logs and metrics are counted" */
+    it("says a log record counts once and a metric series once per hour, and what a series is", () => {
+      const doc = readRepoFile(BILLABLE_EVENTS_DOC);
+
+      expect(doc).toMatch(/One per log record/);
+      expect(doc).toMatch(/One per series per hour/);
+      expect(doc).toMatch(/A series is one metric name with one set of attribute values/);
     });
   });
 });

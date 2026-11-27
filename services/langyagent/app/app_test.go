@@ -32,14 +32,14 @@ type fakePool struct {
 
 func (f *fakePool) HasLiveWorker(string, domain.CredentialSignature) bool { return f.liveWorker }
 
-func (f *fakePool) Acquire(_ context.Context, _ string, _ domain.Credentials) (Worker, error) {
+func (f *fakePool) Acquire(_ context.Context, _, _ string, _ domain.Credentials) (Worker, error) {
 	if f.acquireErr != nil {
 		return nil, f.acquireErr
 	}
 	return f.worker, nil
 }
 func (f *fakePool) AcquireWarm(ctx context.Context, id string, creds domain.Credentials) (Worker, error) {
-	return f.Acquire(ctx, id, creds)
+	return f.Acquire(ctx, id, "", creds)
 }
 func (f *fakePool) Status() (int, int)            { return 0, 0 }
 func (f *fakePool) KillSessionVanished(id string) { f.killed = append(f.killed, id) }
@@ -105,7 +105,7 @@ func (w *fakeWorker) SetTurnTraceContext(sc trace.SpanContext) {
 	w.turnTraceContexts = append(w.turnTraceContexts, sc)
 }
 func (w *fakeWorker) LastLLMError() (herr.E, bool) { return w.llmErr, w.llmErrOK }
-func (w *fakeWorker) PostMessage(_ context.Context, _, prompt, historySeed, resumeToken string) error {
+func (w *fakeWorker) PostMessage(_ context.Context, _, prompt, historySeed, resumeToken string, _ []domain.TurnImage) error {
 	w.posted++
 	w.gotPrompt = prompt
 	w.gotHistorySeed = historySeed
@@ -457,6 +457,9 @@ func TestApp_Turn_AgentErrorFrameCarriesTypedCauseChain(t *testing.T) {
 		if len(e.Herr.Reasons) != 1 || e.Herr.Reasons[0].Type != "no_provider_configured" {
 			t.Fatalf("frame herr reasons = %+v, want the captured gateway herr", e.Herr.Reasons)
 		}
+		if e.Herr.Retryable {
+			t.Errorf("a captured cause decides retry, want the agent_error herr not retryable")
+		}
 		if e.Herr.Reasons[0].Message != "no model provider configured" {
 			t.Errorf("gateway reason message = %q", e.Herr.Reasons[0].Message)
 		}
@@ -492,6 +495,9 @@ func TestApp_Turn_AgentErrorWithoutCapturedCauseStillEmitsTypedFrame(t *testing.
 			}
 			if len(e.Herr.Reasons) != 0 {
 				t.Errorf("no captured LLM error ⇒ no reasons on the wire, got %+v", e.Herr.Reasons)
+			}
+			if !e.Herr.Retryable {
+				t.Errorf("no captured cause ⇒ nothing says a resend fails the same way, want retryable")
 			}
 		}
 	}
@@ -720,5 +726,35 @@ func TestApp_Turn_ResumeFromHandoffEmitsPickingUpStatus(t *testing.T) {
 
 	if got := statusOf(relay.stream.emitted); got != "Picking up where it left off…" {
 		t.Errorf("resume readiness status = %q, want the picking-up line", got)
+	}
+}
+
+func TestApp_Turn_AgentErrorWithRetryableCauseIsRetryable(t *testing.T) {
+	worker := &fakeWorker{
+		claimOK:   true,
+		streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil, errors.New("raw prose")),
+		llmErr: herr.NewLight(context.Background(), "upstream_rate_limited",
+			herr.M{"message": "rate limited"}).WithRetryable(true),
+		llmErrOK: true,
+	}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	var errorFrames []herr.ErrorBody
+	for _, f := range relay.stream.emitted {
+		var e struct {
+			Type string         `json:"type"`
+			Herr herr.ErrorBody `json:"herr"`
+		}
+		_ = json.Unmarshal([]byte(f.JSON()), &e)
+		if e.Type == "error" {
+			errorFrames = append(errorFrames, e.Herr)
+		}
+	}
+	if len(errorFrames) != 1 || errorFrames[0].Type != "agent_error" {
+		t.Fatalf("want exactly one agent_error frame, got %+v", errorFrames)
+	}
+	if !errorFrames[0].Retryable {
+		t.Errorf("a retryable captured cause must make the agent_error herr retryable")
 	}
 }

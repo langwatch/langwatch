@@ -39,6 +39,19 @@ Feature: Audit logging
     Then the read is refused as invalid input before the repository is asked
 
   @unit
+  Scenario: An organisation's trail reads its own and its projects' entries oldest first after a watermark
+    Given audit entries naming the organisation, entries naming one of its projects and entries of another organisation
+    When the SIEM export reads the organisation's trail after a watermark with a limit
+    Then only the organisation's and its projects' entries after the watermark come back, oldest first
+    And entries sharing a millisecond are ordered by id, so a page boundary between them loses none
+
+  @integration
+  Scenario: A persisted organisation trail pages by its watermark and leaves other organisations out
+    Given persisted audit entries for two organisations
+    When the organisation's trail is read two entries at a time
+    Then every entry of that organisation is read once, in order, and none of the other
+
+  @unit
   Scenario: A memory process's trail lists what its own audit log recorded
     Given a process that installed the audit log over memory stores
     When operator acts are recorded through the audit log
@@ -122,6 +135,19 @@ Feature: Audit logging
       Given an audit intent keyed by an audit id minted when the producer committed
       When the outbox delivers it later
       Then the row's time is the moment in the key, not the delivery's
+
+    @unit
+    Scenario: A keyed audit entry keeps the millisecond its producer gave
+      Given an audit intent keyed by an audit id, carrying a moment in milliseconds inside the key's second
+      When the outbox delivers it
+      Then the row's time is that moment to the millisecond
+      And two entries keyed in one second list in the order of their moments
+
+    @unit
+    Scenario: An audit moment that is not inside its key's second is refused
+      When a caller records a keyed entry whose moment falls in another second than its key's
+      Or a caller records an entry with a moment but no key
+      Then nothing is written and the call fails
 
     @unit
     Scenario: An audit key that is not an audit id is refused

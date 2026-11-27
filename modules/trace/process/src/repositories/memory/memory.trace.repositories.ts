@@ -22,6 +22,7 @@ import { MemoryNullTraceListRepository } from "./memory.null-trace-list.reposito
 import { MemorySpanAnalyticsFloorRepository } from "./memory.span-analytics-floor.repository.ts";
 import { MemorySpanAnalyticsRepository } from "./memory.span-analytics.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
+import { MemoryTraceAgentTrafficRepository } from "./memory.trace-agent-traffic.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 import { MemoryTraceAnnotationScoresRepository } from "./memory.trace-annotation-scores.repository.ts";
@@ -37,6 +38,7 @@ import { MemoryTraceIndexMaterialisationRepository } from "./memory.trace-index-
 import { MemoryTraceIngestSourceBillingRepository } from "./memory.trace-ingest-source-billing.repository.ts";
 import { MemoryTraceInstantEvalRunsRepository } from "./memory.trace-instant-eval-runs.repository.ts";
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
+import { MemoryTracePlanLimitRefusalsRepository } from "./memory.trace-plan-limit-refusals.repository.ts";
 import { MemoryTraceRateLimitRepository } from "./memory.trace-rate-limit.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "./memory.trace-span-dedup.repository.ts";
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
@@ -148,12 +150,14 @@ export class MemoryTraceRepositories {
     return {
       editOverlay: MemoryTraceEditOverlayRepository.create(),
       ingestSourceBilling: MemoryTraceIngestSourceBillingRepository.create(),
+      planLimitRefusals: MemoryTracePlanLimitRefusalsRepository.create(),
       summaryProjection: MemoryTraceSummaryProjectionRepository.create(),
       analyticsProjection: MemoryTraceAnalyticsRepository.create(),
       analyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
       evaluationAnalytics: MemoryTraceEvaluationAnalyticsRepository.create(),
       spanAnalytics: MemorySpanAnalyticsRepository.create(),
       spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
+      managedPromptVersionLedger: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),
@@ -179,6 +183,7 @@ export class MemoryTraceRepositories {
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
+      agentTraffic: MemoryTraceAgentTrafficRepository.create(),
       indexMaterialisation: MemoryTraceIndexMaterialisationRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),

@@ -97,6 +97,7 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
     "`project:update` stores model-provider credentials and `project:manage` " +
     "regenerates the project's own API key",
   gatewayProviders: "stores provider credentials",
+  gatewayA2aTargets: "stores upstream credentials and opens egress to an outside agent",
   webhookEndpoints:
     "endpoints carry signing secrets and stream org-wide event families out " + "of the platform",
   // Not credentials, but the same shape of argument: an assistant that can

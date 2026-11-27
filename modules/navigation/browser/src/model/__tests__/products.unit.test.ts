@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isEntityAddressedDetourRoute,
+  isOrganizationDashboardsPath,
+  isOrganizationLibraryPath,
   PRODUCTS,
   productById,
   productFromPathname,
@@ -52,8 +54,14 @@ describe("product registry", () => {
       ]);
     });
 
+    /** @scenario The product switcher names the personal workspace Coding agents */
+    it("labels the personal product Coding agents", () => {
+      expect(productById("me").label).toBe("Coding agents");
+    });
+
+    /** @scenario The product switcher names the personal workspace Coding agents */
     it("points the org and personal products at fixed homes", () => {
-      expect(productById("me").homeHref({})).toBe("/me");
+      expect(productById("me").homeHref({})).toBe("/coding-agents");
       expect(productById("gateway").homeHref({})).toBe("/gateway/virtual-keys");
       expect(productById("governance").homeHref({})).toBe("/governance");
     });
@@ -62,8 +70,11 @@ describe("product registry", () => {
 
 describe("productFromPathname", () => {
   it("maps product pages to their product", () => {
+    expect(productFromPathname("/coding-agents")).toBe("me");
+    expect(productFromPathname("/coding-agents/configure")).toBe("me");
+    // The retired address, for the one render its redirect takes.
     expect(productFromPathname("/me")).toBe("me");
-    expect(productFromPathname("/me/configure")).toBe("me");
+    expect(productFromPathname("/me/sessions")).toBe("me");
     expect(productFromPathname("/gateway")).toBe("gateway");
     expect(productFromPathname("/gateway/virtual-keys/vk_1")).toBe("gateway");
     expect(productFromPathname("/governance")).toBe("governance");
@@ -83,7 +94,15 @@ describe("productFromPathname", () => {
     expect(productFromPathname("/my-project")).toBe("llm-ops");
     expect(productFromPathname("/my-project/analytics/dashboards")).toBe("llm-ops");
     expect(productFromPathname("/my-project/dashboards-old")).toBe("llm-ops");
-    expect(productFromPathname("/dashboards")).toBe("llm-ops");
+  });
+
+  it("maps the organization's Dashboards area to the Dashboards product", () => {
+    expect(productFromPathname("/dashboards")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/board_1")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/templates")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/curated/agent-flight-deck")).toBe("dashboards");
+    expect(productFromPathname("/dashboards-old")).toBe("llm-ops");
   });
 
   /** @scenario An ops page is never remembered as the last product */
@@ -139,6 +158,54 @@ describe("productFromPathname", () => {
           }
         }
       });
+    });
+  });
+});
+
+describe("the organization's Dashboards addresses", () => {
+  describe("given an address with trailing slashes", () => {
+    it("trims them, so the library and its area match however many there are", () => {
+      expect({
+        library: isOrganizationLibraryPath("/dashboards///"),
+        inArea: isOrganizationDashboardsPath("/dashboards///"),
+      }).toEqual({ library: true, inArea: true });
+    });
+
+    it("trims the root to nothing, which is neither the library nor in its area", () => {
+      expect({
+        library: isOrganizationLibraryPath("/"),
+        inArea: isOrganizationDashboardsPath("/"),
+      }).toEqual({ library: false, inArea: false });
+    });
+  });
+
+  describe("given a project that still holds the slug dashboards", () => {
+    /** @scenario A project still holding the dashboards slug keeps its deeper pages */
+    it("reads an address below the area's own as that project's page", () => {
+      expect({
+        inArea: isOrganizationDashboardsPath("/dashboards/messages/trace_1"),
+        product: productFromPathname("/dashboards/messages/trace_1"),
+      }).toEqual({ inArea: false, product: "llm-ops" });
+    });
+
+    /** @scenario A project still holding the dashboards slug keeps its deeper pages */
+    it("reads a board of that project as its own Dashboards area, not the organization's", () => {
+      expect({
+        inArea: isOrganizationDashboardsPath("/dashboards/dashboards/board_1"),
+        product: productFromPathname("/dashboards/dashboards/board_1"),
+      }).toEqual({ inArea: false, product: "dashboards" });
+    });
+
+    it("keeps the area's own addresses the organization's", () => {
+      const areaAddresses = [
+        "/dashboards",
+        "/dashboards/board_1",
+        "/dashboards/templates",
+        "/dashboards/curated/agent-flight-deck",
+      ];
+      expect(areaAddresses.filter((pathname) => !isOrganizationDashboardsPath(pathname))).toEqual(
+        [],
+      );
     });
   });
 });

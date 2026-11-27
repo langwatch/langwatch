@@ -25,7 +25,6 @@ function handoff(overrides: Partial<LangyTurnHandoff> = {}): LangyTurnHandoff {
       organizationId: "organization-1",
     },
     runToken: "run-token",
-    permitReserved: false,
     ...overrides,
   };
 }

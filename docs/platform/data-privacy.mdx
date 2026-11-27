@@ -69,6 +69,20 @@ PII redaction masks personal data in stored content and replaces each value with
 
 Card numbers and Brazilian CPF are checksum-validated before redaction. Attribute values over 250,000 characters are skipped. When the deep detection service cannot be reached, LangWatch applies the Essential level and marks the span with `langwatch.privacy.pii_incomplete`.
 
+### Strict with the LangWatch PII Redaction Model
+
+On LangWatch Cloud, an organization that has the model turned on sees an **Essential** or **Strict** picker on the page. Strict then runs the LangWatch PII Redaction Model, which finds names, places and other personal data that rule-based detection misses.
+
+- **Price:** $0.50 per 1M characters, excluding VAT, pay as you go. A span of 1,000 characters costs $0.0005.
+- **What is billed:** each span, log record or metric point the model answers, by the characters it was sent, even when it finds no personal data. Essential detection runs first, so a phone number is already masked and counted as its marker. A metric's attributes are sent again with every export, and each export is billed.
+- **No free amount and no minimum:** billing starts at the first character of the month, and a short span costs only its characters: 50 characters cost $0.000025.
+- **Long spans:** where long-span splitting is on for your organization, a span of 8,001 to 32,000 characters is sent to the model in several overlapping parts. It is billed once, on its own characters; the overlap between parts is free.
+- **Fallbacks are free:** a span with over 32,000 characters left after Essential detection (over 8,000 where splitting is not on), one the model cannot split safely (such as escaped JSON) or with no free slot, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged.
+- **How it is billed:** monthly, as its own line on a Growth plan paid in US dollars. Each answered record is one `pii_redaction` row on the [billing events](/ai-gateway/billing-events) ledger. A [gateway budget](/ai-gateway/budgets) does not cap it, so a spent budget never turns redaction off.
+- **Choosing it:** the page asks you to confirm the price before it turns Strict on. Cancel and the organization keeps its current level; Essential never calls the model and is never charged. An organization that has Strict included sees it as "Included for your organization", with no price.
+
+On a self-hosted deployment the model is part of the Enterprise license and is not priced; see [PII redaction model](/self-hosting/configuration/sizing-and-scaling#pii-redaction-model).
+
 **Exceptions** are regular expressions that must not be redacted, for example an internal id format like `00[0-9]{12}`. A rule holds up to 50. LangWatch refuses a pattern that would also match ordinary data such as a card number, an email or a phone number.
 
 ## Secrets redaction

@@ -78,7 +78,8 @@ function mount(answer: typeof workspace | null) {
   const asked: string[] = [];
   const calls: unknown[] = [];
   const app = createApiFixture<GovernanceRestApi>({
-    findActorWorkspace: async () => answer,
+    getActorWorkspace: async () =>
+      answer === null ? { status: "undisclosed" } : { status: "found", workspace: answer },
     governanceResolveHome: async (input, by) => {
       calls.push([input, by]);
       return home;

@@ -53,6 +53,7 @@ function createVoiceSessionInfrastructureFromServices(
     },
     recordCallTraces: vi.fn(async () => ({ turnTraceIds: [] })),
     writeCallRun: vi.fn(async () => {}),
+    assertRunAllowed: vi.fn(async () => {}),
     signSessionToken: vi.fn(() => "signed-token"),
     registry: fakeRegistry(),
     ...over,

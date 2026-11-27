@@ -353,6 +353,13 @@ Feature: Evaluation service boundary
     And an unmapped or empty contexts field is sent as no contexts rather than one empty string
 
   @unit
+  Scenario: A conversation mapping that resolves to nothing reaches langevals as no turns
+    Given a monitor whose conversation mapping resolves to an empty string
+    When the evaluator request is built for langevals
+    Then the conversation is sent as an empty list, not as one empty turn
+    And an empty turn beside real ones is dropped
+
+  @unit
   Scenario: Invalid evaluator settings are refused even when generation parameters ride along
     Given an evaluator whose settings carry a temperature
     And the evaluator's own settings fail its settings schema

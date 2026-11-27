@@ -72,6 +72,28 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
     When receiver attribution is applied
     Then those unrelated wire fields are retained
 
+  # Governance push ingestion writes billable spans, logs and metrics, so it asks the same
+  # monthly allowance as /api/otel/v1/*, through TraceApi.otlpUsageLimit.
+  @unit
+  Scenario Outline: An ingestion source of an organization past its allowance is refused
+    Given an organization whose month's count has reached its plan's allowance
+    When its ingestion source pushes <signal> to /api/ingest
+    Then the push is refused with ERR_PLAN_LIMIT and status 402, as the OTLP receivers refuse it
+    And nothing is handed to the <signal> pipeline
+    Examples:
+      | signal   |
+      | traces   |
+      | logs     |
+      | metrics  |
+      | webhooks |
+
+  @unit
+  Scenario: An ingestion source within its allowance lands its batch
+    Given an organization whose month's count is below its plan's allowance
+    When its ingestion source pushes logs to /api/ingest
+    Then the allowance is asked for the organization's governance project
+    And the batch is handed to the log pipeline
+
   # Q82 (Alex, 2026-10-06): governance records a billing fact; trace folds it and reads its own row at ingest.
   @unit
   Scenario: Governance records the billing fact when a coding-assistant config changes

@@ -122,6 +122,19 @@ describe("logoutCommand", () => {
     });
   });
 
+  describe("when the session was signed in with a pasted access token", () => {
+    /** @scenario "A session signed in with a pasted access token is revoked too" */
+    it("sends the access token to the server to be revoked, then clears the session", async () => {
+      const cfgPath = process.env.LANGWATCH_CLI_CONFIG!;
+      fs.writeFileSync(cfgPath, JSON.stringify({ access_token: "lw_at_pasted" }, null, 2));
+
+      await logoutCommand({ yes: true });
+
+      expect(serverRevokeLogout).toHaveBeenCalledWith(expect.anything(), undefined, "lw_at_pasted");
+      expect(fs.existsSync(cfgPath)).toBe(false);
+    });
+  });
+
   describe("when --keep-credentials is passed", () => {
     it("leaves a logged-in session file on disk", async () => {
       seedClaudeAndGemini();

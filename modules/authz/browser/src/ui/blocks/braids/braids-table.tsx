@@ -5,52 +5,94 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Box, Button, Stack, Text } from "@langwatch/design-system/primitives";
-import { format } from "@langwatch/time";
+import { Badge, Box, Button, Text } from "@langwatch/design-system/primitives";
 import { Pause } from "lucide-react";
 
 import {
+  type BraidActivityCounts,
   type BraidRow,
   type BraidSide,
   braidAuditHref,
-  braidFromText,
+  braidRowActionsLabel,
 } from "../../../model/braids/braids.ts";
 import { BraidCondition } from "../../elements/braid-condition.tsx";
 import { BraidProjectLabel } from "../../elements/braid-project.tsx";
+import { BRAID_WINDOW_HEADER, BraidCreated, BraidWindow } from "../../elements/braid-window.tsx";
 
 export type BraidsTableProps = {
   side: BraidSide;
+  /** The page's own project, which the audit log names beside the other one. */
+  projectName: string;
   rows: readonly BraidRow[];
   paused: boolean;
   canEdit: boolean;
   canRemove: boolean;
   /** Spans per braid over the last 24 hours; undefined while counting. */
-  activity: ReadonlyMap<string, number> | undefined;
+  activity: BraidActivityCounts;
   onEdit: (row: BraidRow) => void;
   onRemove: (row: BraidRow) => void;
 };
 
-function activityText({ paused, spans }: { paused: boolean; spans: number | undefined }): string {
-  if (paused) return "Paused";
-  if (spans === undefined) return "Counting spans";
-  return spans === 1 ? "1 span" : `${spans.toLocaleString("en-GB")} spans`;
+/** The Last 24 hours cell: the one place a paused row says so. */
+function Activity({ paused, spans }: { paused: boolean; spans: number | "failed" | undefined }) {
+  if (paused) {
+    return (
+      <Badge size="sm" colorPalette="gray" width="fit-content" data-testid="braid-paused">
+        <Pause size={12} aria-hidden />
+        Paused
+      </Badge>
+    );
+  }
+  if (spans === "failed") {
+    return (
+      <Text
+        textStyle="sm"
+        color="fg.warning"
+        data-testid="braid-activity"
+        data-failed
+        title="The span count could not be read just now. Reload the page to try again."
+      >
+        Couldn't count spans
+      </Text>
+    );
+  }
+  return (
+    <Text textStyle="sm" color="fg.muted" data-testid="braid-activity">
+      {spans === undefined ? (
+        "Counting spans"
+      ) : (
+        <>
+          <FormattedNumber value={spans} /> {spans === 1 ? "span" : "spans"}
+        </>
+      )}
+    </Text>
+  );
 }
 
-function day(ms: number): string {
-  return format(ms, "d MMM yyyy");
-}
-
-function rowName(row: BraidRow): string {
-  return row.side === "into"
-    ? `braid into ${row.otherProject.name}`
-    : `braid from ${row.otherProject.name}`;
+/** The audit log opens in the braid's owner: here for "into", the other project for "from". */
+function auditHref({ row, projectName }: { row: BraidRow; projectName: string }): string {
+  if (row.side === "into") {
+    return braidAuditHref({
+      braidId: row.braidId,
+      ownerName: projectName,
+      readerName: row.otherProject.name,
+    });
+  }
+  return braidAuditHref({
+    braidId: row.braidId,
+    ownerName: row.otherProject.name,
+    readerName: projectName,
+    ownerSlug: row.otherProject.slug,
+  });
 }
 
 export function BraidsTable({
   side,
+  projectName,
   rows,
   paused,
   canEdit,
@@ -68,7 +110,7 @@ export function BraidsTable({
             {side === "into" ? "Braided into" : "Braided from"}
           </ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Condition</ListTable.ColumnHeader>
-          <ListTable.ColumnHeader>Access</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>{BRAID_WINDOW_HEADER}</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Last 24 hours</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
         </ListTable.Row>
@@ -83,7 +125,7 @@ export function BraidsTable({
             <ListTable.Cell>
               <BraidProjectLabel
                 project={row.otherProject}
-                detail={`Since ${day(row.createdAtMs)}`}
+                detail={<BraidCreated atMs={row.createdAtMs} />}
               />
             </ListTable.Cell>
             <ListTable.Cell>
@@ -92,30 +134,17 @@ export function BraidsTable({
               </Box>
             </ListTable.Cell>
             <ListTable.Cell nowrap>
-              <Stack gap={0.5}>
-                {paused ? (
-                  <Badge
-                    size="sm"
-                    colorPalette="gray"
-                    width="fit-content"
-                    data-testid="braid-paused"
-                  >
-                    <Pause size={12} aria-hidden />
-                    Paused
-                  </Badge>
-                ) : null}
-                <Text textStyle="sm">
-                  {braidFromText({ fromMs: row.fromMs, showsTime: row.fromShowsTime })}
-                </Text>
-                <Text textStyle="xs" color="fg.muted">
-                  {row.expiresAtMs === null ? "No end date" : `Until ${day(row.expiresAtMs)}`}
-                </Text>
-              </Stack>
+              <BraidWindow
+                fromMs={row.fromMs}
+                fromShowsTime={row.fromShowsTime}
+                expiresAtMs={row.expiresAtMs}
+              />
             </ListTable.Cell>
             <ListTable.Cell nowrap>
-              <Text textStyle="sm" color="fg.muted" data-testid="braid-activity">
-                {activityText({ paused, spans: activity?.get(row.braidId) })}
-              </Text>
+              <Activity
+                paused={paused}
+                spans={activity === "failed" ? activity : activity?.get(row.braidId)}
+              />
             </ListTable.Cell>
             <ListTable.ActionCell>
               <Menu.Root>
@@ -123,7 +152,7 @@ export function BraidsTable({
                   <Button
                     size="xs"
                     variant="ghost"
-                    aria-label={`Actions for the ${rowName(row)}`}
+                    aria-label={braidRowActionsLabel(row)}
                     data-testid="braid-row-actions"
                   >
                     <MoreVerticalIcon size={14} aria-hidden />
@@ -136,7 +165,7 @@ export function BraidsTable({
                     </Menu.Item>
                   ) : null}
                   <Menu.Item value="audit" asChild data-testid="braid-audit">
-                    <Link href={braidAuditHref(row.braidId)}>View in audit log</Link>
+                    <Link href={auditHref({ row, projectName })}>View in audit log</Link>
                   </Menu.Item>
                   {canRemove ? (
                     <Menu.Item

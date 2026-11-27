@@ -23,7 +23,7 @@ async function queuedCommandFor(params: {
 }): Promise<QueueSimulationRunInput> {
   const queued: QueueSimulationRunInput[] = [];
   const service = SuiteExecutionService.create({
-    commands: { startSuiteRun: async () => {} },
+    commands: { startSuiteRun: async () => {}, completeSuiteRunItem: async () => {} },
     scenarios: createApiFixture<ScenarioApi>({
       resolveRunParametersForScenarios: async ({ scenarios }) =>
         scenarios.map((scenario) => ({
@@ -32,6 +32,7 @@ async function queuedCommandFor(params: {
           secretParameters: {},
           scenarioVersion: 1,
         })),
+      assertSimulationRunAllowed: async () => {},
       queueSimulationRun: async (input) => {
         queued.push(input);
       },

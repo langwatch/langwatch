@@ -105,6 +105,7 @@ function harness(options?: {
       providerAccountId: data.providerAccountId,
       normalizedValue,
       occurredAtMs: data.occurredAtMs,
+      storedIdentifierIds: new Set(rows.keys()),
     });
     if (!rows.has(id)) {
       rows.set(id, {
@@ -485,6 +486,7 @@ describe("the identifier backfill pass", () => {
         providerAccountId: null,
         normalizedValue,
         occurredAtMs: USER_CREATED_AT,
+        storedIdentifierIds: new Set(),
       });
       const { service } = harness({
         accounts: [],
@@ -513,6 +515,7 @@ describe("the identifier backfill pass", () => {
       providerAccountId: null,
       normalizedValue: normalizeIdentifierValue("old.address@acme.com"),
       occurredAtMs: USER_CREATED_AT,
+      storedIdentifierIds: new Set(),
     });
 
     it("holds the user with a surplus_row diff for a stale VERIFIED identifier", async () => {

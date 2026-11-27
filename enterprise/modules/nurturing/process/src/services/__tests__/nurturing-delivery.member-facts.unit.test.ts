@@ -11,12 +11,15 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../nurturing-member-facts.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
 const seconds = (ms: number) => Math.floor(ms / 1000);
@@ -48,34 +51,54 @@ class ClockedClaims implements NurturingClaimRepository {
 /** How the first joined_organization request fails: a 500 reply, or a fetch that throws. */
 type JoinedOrganizationFailure = "an HTTP 500" | "a network error";
 
+/** Each person's address, as peopleWithEmails() reads it fresh for every identify. */
+const addressOf = (userId: string) => `${userId}@example.com`;
+
+/** A fact identify as Customer.io receives it: the person's address beside its traits. */
+const addressed = (userId: string, traits: object) => ({ ...traits, email: addressOf(userId) });
+
 /**
  * Customer.io over a recording fetch: a batch's items are unpacked into one call each. A failed
- * joined_organization request is not recorded, as Customer.io never took it.
+ * joined_organization request is not recorded, as Customer.io never took it. Every track must
+ * follow an earlier request carrying its person's addressed identify; that address-only identify
+ * is checked here and left out of identifies(), which are the facts.
  */
 function customerIo({
   failFirstJoinedOrganization,
 }: { failFirstJoinedOrganization?: JoinedOrganizationFailure } = {}) {
   const calls: Call[] = [];
+  const unaddressed: Call[] = [];
   let batchRequests = 0;
+  const addressedUsers = new Set<string>();
   let failure = failFirstJoinedOrganization;
   const service = NurturingService.create({
+    users: peopleWithEmails(),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn: async (url: string | URL | Request, init?: RequestInit) => {
         const path = new URL(url instanceof Request ? url.url : url).pathname;
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
-        if (failure && path === "/v1/track" && body.event === "joined_organization") {
+        const items: Call[] =
+          path === "/v1/batch"
+            ? body.batch.map((item: Call & { type: string }) => ({
+                ...item,
+                path: `/v1/${item.type}`,
+              }))
+            : [{ path, ...body }];
+        const tracks = items.filter((item) => item.path === "/v1/track");
+        if (failure && tracks.some((item) => item.event === "joined_organization")) {
           const failed = failure;
           failure = undefined;
           if (failed === "a network error") throw new TypeError("fetch failed");
           return new Response("customer.io is down", { status: 500 });
         }
-        if (path === "/v1/batch") {
-          batchRequests += 1;
-          for (const item of body.batch) calls.push({ path: `/v1/${item.type}`, ...item });
-        } else {
-          calls.push({ path, ...body });
+        unaddressed.push(...tracks.filter((track) => !addressedUsers.has(track.userId)));
+        for (const item of items) {
+          if (item.path === "/v1/identify" && isAddressedIdentify(item))
+            addressedUsers.add(item.userId);
         }
+        if (path === "/v1/batch" && tracks.length === 0) batchRequests += 1;
+        calls.push(...items);
         return new Response(null, { status: 200 });
       },
     }),
@@ -84,9 +107,27 @@ function customerIo({
     service,
     calls,
     batchRequests: () => batchRequests,
-    identifies: () => calls.filter((call) => call.path === "/v1/identify"),
-    tracks: () => calls.filter((call) => call.path === "/v1/track"),
+    identifies: () => {
+      expect(unaddressed).toEqual([]);
+      return calls.filter(
+        (call) =>
+          call.path === "/v1/identify" && !isEqual(call.traits, { email: addressOf(call.userId) }),
+      );
+    },
+    tracks: () => {
+      expect(unaddressed).toEqual([]);
+      return calls.filter((call) => call.path === "/v1/track");
+    },
   };
+}
+
+/** Whether an identify carries its person's own address, the one a track needs before it. */
+function isAddressedIdentify(item: Call): boolean {
+  return (item.traits as { email?: string } | undefined)?.email === addressOf(item.userId);
+}
+
+function isEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 async function settle(): Promise<void> {
@@ -127,18 +168,39 @@ async function organizationWithMembers({
     projects,
     organizations: createApiFixture<OrganizationApi>({ getAllMembers, organizationIdsForMember }),
   });
+  const erasedUsers = MemoryNurturingErasedUserRepository.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers,
     claims,
     memberFacts,
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     customerIo: cio.service,
     posthog: undefined,
     users: createApiFixture<UserApi>({
-      findById: async () => ({ email: "jane@example.com", name: "Jane" }) as never,
+      findById: async () => ({ email: addressOf("joiner-1"), name: "Jane" }) as never,
     }),
   });
-  const deliver = (signal: NurturingSignal) =>
-    delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
-  return { claims, cio, deliver, milestones, projects, getAllMembers, organizationIdsForMember };
+  // The last-trace lane records every trace fact on its own, beside the signal's delivery: the
+  // time is stored before the delivery here, as when the lane's job runs first.
+  const deliver = async (signal: NurturingSignal) => {
+    if (signal.kind === "first_trace_integrated" || signal.kind === "trace_received") {
+      const organizationId = placed.get(signal.projectId);
+      if (organizationId !== undefined) {
+        await milestones.recordLastTrace({ organizationId, occurredAt: signal.occurredAt });
+      }
+    }
+    return delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
+  };
+  return {
+    claims,
+    cio,
+    deliver,
+    milestones,
+    projects,
+    getAllMembers,
+    organizationIdsForMember,
+    erasedUsers,
+  };
 }
 
 const down = new Error("the database is down");
@@ -232,8 +294,8 @@ describe("NurturingDeliveryService organization facts", () => {
 
       const traits = { has_traces: true, last_trace_at: seconds(T0) };
       expect(cio.identifies().map(({ userId }) => userId)).toEqual(["admin-1", "member-2"]);
-      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
-      expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
+      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([addressed("admin-1", traits)]);
+      expect(traitsOf(cio.identifies(), "member-2")).toEqual([addressed("member-2", traits)]);
     });
   });
 
@@ -246,18 +308,50 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(traitsOf(cio.identifies(), "member-2")).toEqual([
-        { has_traces: true, last_trace_at: seconds(T0) },
+        addressed("member-2", { has_traces: true, last_trace_at: seconds(T0) }),
       ]);
       expect(traitsOf(cio.identifies(), "admin-1")).toEqual([
-        {
+        addressed("admin-1", {
           has_traces: true,
           sdk_language: "python",
           sdk_framework: "unknown",
           first_trace_at: seconds(T0),
-        },
-        { has_traces: true, last_trace_at: seconds(T0) },
+        }),
+        addressed("admin-1", { has_traces: true, last_trace_at: seconds(T0) }),
       ]);
       expect(cio.tracks().map(({ userId }) => userId)).toEqual(["admin-1"]);
+    });
+  });
+
+  describe("when a first trace names an erased admin, in an organization with another member", () => {
+    /** @scenario "An organization's fact about an erased admin still reaches its other members" */
+    it("identifies the other member and sends the erased admin nothing", async () => {
+      const { cio, deliver, erasedUsers } = await organizationWithMembers();
+      await erasedUsers.markErased({ userId: "admin-1" });
+
+      await deliver(firstTrace);
+      await settle();
+
+      expect(cio.calls.filter(({ userId }) => userId === "admin-1")).toEqual([]);
+      expect(traitsOf(cio.identifies(), "member-2")).toEqual([
+        addressed("member-2", { has_traces: true, last_trace_at: seconds(T0) }),
+      ]);
+    });
+  });
+
+  describe("when a coding agent's first session names an erased admin", () => {
+    /** @scenario "An organization's fact about an erased admin still reaches its other members" */
+    it("tells the other member, and not the erased admin, that the organization uses one", async () => {
+      const { cio, deliver, erasedUsers } = await organizationWithMembers();
+      await erasedUsers.markErased({ userId: "admin-1" });
+
+      await deliver(firstSession);
+      await settle();
+
+      expect(cio.calls.filter(({ userId }) => userId === "admin-1")).toEqual([]);
+      expect(traitsOf(cio.identifies(), "member-2")).toContainEqual(
+        addressed("member-2", { uses_coding_agent: true }),
+      );
     });
   });
 
@@ -272,11 +366,11 @@ describe("NurturingDeliveryService organization facts", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_last_session_at: seconds(T0) },
+          traits: addressed("admin-1", { coding_last_session_at: seconds(T0) }),
         }),
         expect.objectContaining({
           userId: "member-2",
-          traits: { coding_last_session_at: seconds(T0) },
+          traits: addressed("member-2", { coding_last_session_at: seconds(T0) }),
         }),
       ]);
     });
@@ -291,8 +385,8 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       const traits = { coding_agent_types: ["claude_code", "codex"] };
-      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
-      expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
+      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([addressed("admin-1", traits)]);
+      expect(traitsOf(cio.identifies(), "member-2")).toEqual([addressed("member-2", traits)]);
     });
   });
 
@@ -324,8 +418,8 @@ describe("NurturingDeliveryService organization facts", () => {
         await deliver(signal);
         await settle();
 
-        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
-        expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
+        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([addressed("admin-1", traits)]);
+        expect(traitsOf(cio.identifies(), "member-2")).toEqual([addressed("member-2", traits)]);
       },
     );
 
@@ -350,8 +444,11 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(traitsOf(cio.identifies(), "member-2")).toEqual([
-        { coding_first_session_at: seconds(T0), coding_agent_types: ["claude_code"] },
-        { uses_coding_agent: true },
+        addressed("member-2", {
+          coding_first_session_at: seconds(T0),
+          coding_agent_types: ["claude_code"],
+        }),
+        addressed("member-2", { uses_coding_agent: true }),
       ]);
       expect(cio.tracks().map(({ userId }) => userId)).toEqual(["admin-1"]);
     });
@@ -367,7 +464,7 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(traitsOf(cio.identifies(), "joiner-1")).toEqual([
-        { has_traces: true, last_trace_at: seconds(T0) },
+        addressed("joiner-1", { has_traces: true, last_trace_at: seconds(T0) }),
       ]);
     });
 
@@ -594,8 +691,8 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(traitsOf(cio.identifies(), "member-2")).toEqual([
-        { has_traces: true, last_trace_at: seconds(T0) },
-        { has_traces: true, last_trace_at: seconds(T0 + 301_000) },
+        addressed("member-2", { has_traces: true, last_trace_at: seconds(T0) }),
+        addressed("member-2", { has_traces: true, last_trace_at: seconds(T0 + 301_000) }),
       ]);
     });
 
@@ -620,7 +717,7 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(traitsOf(cio.identifies(), "joiner-1")).toEqual([
-        { has_traces: true, last_trace_at: seconds(T0 + 100_000) },
+        addressed("joiner-1", { has_traces: true, last_trace_at: seconds(T0 + 100_000) }),
       ]);
     });
   });
@@ -643,10 +740,6 @@ describe("NurturingDeliveryService organization facts", () => {
         "getPlacement",
         ({ projects }) => vi.spyOn(projects, "getPlacement").mockRejectedValueOnce(down),
       ],
-      [
-        "recordLastTrace",
-        ({ milestones }) => vi.spyOn(milestones, "recordLastTrace").mockRejectedValueOnce(down),
-      ],
       ["getAllMembers", ({ getAllMembers }) => getAllMembers.mockRejectedValueOnce(down)],
     ];
 
@@ -666,8 +759,11 @@ describe("NurturingDeliveryService organization facts", () => {
         await settle();
 
         const fact = { has_traces: true, last_trace_at: seconds(T0) };
-        expect(traitsOf(cio.identifies(), "member-2")).toEqual([fact]);
-        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([expect.anything(), fact]);
+        expect(traitsOf(cio.identifies(), "member-2")).toEqual([addressed("member-2", fact)]);
+        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([
+          expect.anything(),
+          addressed("admin-1", fact),
+        ]);
         expect(cio.tracks().map(({ event }) => event)).toEqual(["first_trace_integrated"]);
       },
     );
@@ -701,7 +797,7 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       const [traits] = traitsOf(cio.identifies(), "joiner-1");
-      expect(traits).toMatchObject({ email: "jane@example.com", has_evaluations: false });
+      expect(traits).toMatchObject({ email: addressOf("joiner-1"), has_evaluations: false });
       expectNoTraceTraits(traits);
       expect(cio.tracks().map(({ event }) => event)).toEqual(["signed_up"]);
     });

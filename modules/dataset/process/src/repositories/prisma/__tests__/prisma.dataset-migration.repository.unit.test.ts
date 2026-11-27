@@ -31,6 +31,9 @@ class FixtureStorage implements DatasetChunkRepository {
   readChunk(): Promise<unknown[]> {
     throw new Error("unused");
   }
+  readMeasuredChunk(): Promise<{ rows: unknown[]; byteSize: number }> {
+    throw new Error("unused");
+  }
   rewriteChunk(): Promise<ChunkOffset> {
     throw new Error("unused");
   }

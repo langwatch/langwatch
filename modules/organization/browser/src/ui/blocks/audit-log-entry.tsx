@@ -34,10 +34,11 @@ import {
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import {
-  auditActionPhrase,
+  auditEntryPhrase,
   auditActor,
   auditChangeSummary,
   auditClient,
+  auditTargetLine,
   type AuditActor,
   type AuditRun,
 } from "../../model/audit-log-rows.ts";
@@ -111,6 +112,12 @@ export function AuditLogEntry({
   const log = run.entries[0];
   const count = run.entries.length;
   const actor = auditActor(log);
+  const target = auditTargetLine({
+    targetKind: log.targetKind,
+    targetId: log.targetId,
+    targetName: log.targetName,
+    projectName: log.projectId ? projectLabel(log.projectId) : null,
+  });
   const hasDiff = log.before != null || log.after != null;
   const detailId = useId();
   const toggle = () => setOpen((current) => (current === "closed" ? "detail" : "closed"));
@@ -146,7 +153,7 @@ export function AuditLogEntry({
           <Box display="flex" flexDirection="column" gap="0.5" minWidth={0}>
             <HStack gap={2} minWidth={0} height="20px">
               <Text textStyle="label" title={log.action} truncate>
-                {auditActionPhrase(log.action)}
+                {auditEntryPhrase({ action: log.action, targetKind: log.targetKind })}
               </Text>
               {log.error && (
                 <Badge size="xs" variant="subtle" colorPalette="red" flexShrink={0} height="18px">
@@ -155,9 +162,14 @@ export function AuditLogEntry({
               )}
             </HStack>
             <HStack gap={2} minWidth={0} height="18px" {...SECONDARY}>
-              {log.targetId && (
+              {target?.kind === "words" && (
+                <Text color="fg.muted" truncate minWidth={0}>
+                  {target.text}
+                </Text>
+              )}
+              {target?.kind === "id" && (
                 <InlineCode variant="neutral" truncate="middle" minWidth={0} {...KEEPS_ROW_CLOSED}>
-                  {log.targetId}
+                  {target.id}
                 </InlineCode>
               )}
               {count > 1 && (

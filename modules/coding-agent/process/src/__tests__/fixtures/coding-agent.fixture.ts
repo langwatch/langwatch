@@ -40,6 +40,7 @@ import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-attribution.service.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
+import type { CodingAgentStoredTraces } from "../../services/coding-agent-session-read.service.ts";
 import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import {
@@ -483,6 +484,13 @@ export class TestSessions extends CodingAgentSessionRepository {
   }
 }
 
+/** The stored-trace lookup, unconfigured: a test that reaches it configures it. */
+export function storedTracesFixture(
+  overrides: Partial<CodingAgentStoredTraces> = {},
+): CodingAgentStoredTraces {
+  return createApiFixture<CodingAgentStoredTraces>(overrides, "storedTraces");
+}
+
 export class TestTraceSessions extends CodingAgentTraceSessionRepository {
   mapping: CodingAgentTraceSessionRecord | null = null;
   inputs: { tenantId: string; traceId: string }[] = [];
@@ -495,6 +503,27 @@ export class TestTraceSessions extends CodingAgentTraceSessionRepository {
   }): Promise<CodingAgentTraceSessionRecord | null> {
     this.inputs.push(input);
     return this.mapping;
+  }
+
+  /** The session's mapped traces, newest first; defaults to the one `mapping`. */
+  recent: CodingAgentTraceSessionRecord[] | null = null;
+  latestInputs: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }[] = [];
+
+  async findRecentBySessionId(input: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]> {
+    this.latestInputs.push(input);
+    return (this.recent ?? (this.mapping ? [this.mapping] : [])).slice(0, input.limit);
   }
 }
 

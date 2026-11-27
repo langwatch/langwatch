@@ -4,6 +4,7 @@ import {
   CLOUD_FREE_LICENSING_PLAN,
   ENTERPRISE_TEMPLATE,
   GROWTH_TEMPLATE,
+  licenseSeats,
   OPEN_SOURCE_LICENSING_PLAN,
   PRO_TEMPLATE,
 } from "../licensing.ts";
@@ -91,6 +92,27 @@ describe("the templates a key is minted from", () => {
       canPublish: true,
       webhookEndpointsEnabled: true,
       usageUnit: "traces",
+    });
+  });
+});
+
+describe("the seats a licence states", () => {
+  /** @scenario A licence issued with no Developer seats, or 0, signs none and its row holds none */
+  it.each([{ stated: undefined }, { stated: 0 }])(
+    "leaves Developer seats out when $stated are stated",
+    ({ stated }) => {
+      const seats = licenseSeats({ members: 5, membersLite: 2, membersDeveloper: stated });
+
+      expect(seats).toEqual({ maxMembers: 5, maxMembersLite: 2 });
+      expect("maxMembersDeveloper" in seats).toBe(false);
+    },
+  );
+
+  it("states the Developer seats sold", () => {
+    expect(licenseSeats({ members: 5, membersLite: 2, membersDeveloper: 4 })).toEqual({
+      maxMembers: 5,
+      maxMembersLite: 2,
+      maxMembersDeveloper: 4,
     });
   });
 });

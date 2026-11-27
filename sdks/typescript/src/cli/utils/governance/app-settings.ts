@@ -7,6 +7,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { writeSecretFile } from "../secret-file";
+
 export interface AppSettingsTarget {
   /** Tool slug the target belongs to (e.g. "claude"). */
   tool: string;
@@ -188,7 +190,8 @@ export function writeAppSettingsFile({
   settings: Record<string, unknown>;
 }): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
+  // These files carry the telemetry env, API key included: owner-only.
+  writeSecretFile(filePath, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
 function unmergeable(filePath: string, why: string): Error {

@@ -19,9 +19,10 @@ import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
 const LATEST_VERSION = "SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
+/** The held set's reader side: the own spans' parent and child ports, narrowed to the trace. */
 const HELD_IN_TRACE =
-  "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
-  " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64}) AND TraceId = {traceId:String})";
+  "SELECT TraceId, arrayJoin([('down', SpanId), (if(ifNull(ParentSpanId, '') IN ('', '0000000000000000'), 'unparented-port', 'up'), ifNull(ParentSpanId, ''))]) FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
+  " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64}) AND TraceId = {traceId:String} AND SpanId NOT IN ('', '0000000000000000'))";
 const WEB: CompiledWhere = {
   version: 1,
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },

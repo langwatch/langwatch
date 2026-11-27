@@ -129,6 +129,40 @@ Rule: Drawer maximise and restore
     And `drawerChrome.widthPx` returns to the previously remembered width
 
 
+Rule: The drawer never covers Ask Langy
+  The dragged width is a preference. The drawer renders narrower when that width
+  would reach over the search bar's Ask Langy button, and narrows again (instead
+  of sliding left at the same width) while the docked Langy panel holds the right edge.
+
+  @unit @integration @regression
+  Scenario: A wide trace drawer leaves the Ask Langy button visible
+    Given the reader dragged the trace drawer wider than the space beside Ask Langy
+    When the drawer is open on Trace Explorer
+    Then the drawer's left edge stops a gap to the right of the Ask Langy button
+    And the button can still be clicked
+
+  @integration
+  Scenario: Narrowing the window keeps the drawer clear of Ask Langy
+    Given a wide trace drawer is open on Trace Explorer
+    When the reader makes the window narrower
+    Then the drawer narrows with it and the Ask Langy button stays uncovered
+
+  @unit
+  Scenario: With less room than the minimum width the drawer still leaves Ask Langy clear
+    Given the room right of Ask Langy is narrower than the drawer's minimum width
+    When the trace drawer is open
+    Then the drawer takes only the room there is and the button stays uncovered
+
+  @unit @integration @regression
+  Scenario: Opening Langy beside a wide trace drawer narrows the drawer
+    Given a wide trace drawer is open on Trace Explorer and the Langy panel is closed
+    When the reader clicks Ask Langy
+    Then the Langy panel opens, not the floating ask bar that would sit under the drawer
+    And with the panel docked the drawer gets narrower and sits left of it
+    And the Ask Langy button stays uncovered
+    And closing Langy brings back the width the reader dragged
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # UNIFIED DRAWER MODEL
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1065,3 +1099,19 @@ Rule: Responsive behavior
     And the table is hidden
     And a back button returns to the table
     And the filter sidebar is a slide-over overlay
+
+Rule: Tab rows that fold into an overflow menu settle
+  A row of tabs measures which ones fit and folds the rest into a menu. The
+  measurement depends on which tabs there are, not on the array that lists them.
+
+  @integration
+  Scenario: A tab row settles when its tabs do not fit
+    Given a tab row too narrow for every tab, such as the visualisation tabs beside Langy
+    When the row renders, receiving a new list of the same tabs on every render
+    Then it folds the tabs that do not fit into the menu and stops re-rendering
+
+  @integration
+  Scenario: A tab row settles when its tabs fit
+    Given a tab row wide enough for every tab
+    When the row renders, receiving a new list of the same tabs on every render
+    Then it shows every tab and stops re-rendering

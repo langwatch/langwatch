@@ -14,6 +14,7 @@ import {
   UPGRADE_CONSOLE_PATH,
   UPGRADE_RETRY_PATH,
   startHeartbeat,
+  PUBLIC_LISTENER_TIMEOUTS,
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
@@ -50,6 +51,7 @@ async function bootThread(): Promise<LivenessThread> {
   const heartbeat = startHeartbeat({ intervalMs: 5 });
   heartbeats.push(heartbeat);
   const thread = await startLivenessThread({
+    requestTimeoutMs: PUBLIC_LISTENER_TIMEOUTS.requestTimeout,
     port: 0,
     heartbeat: heartbeat.buffer,
     proxyPort: address.port,
@@ -67,7 +69,7 @@ const failedConsole = ({ tokenTtlMs = 60_000 } = {}): UpgradeConsole => ({
 });
 
 const urlOf = (thread: LivenessThread, path: string): string =>
-  `http://127.0.0.1:${thread.address.port}${path}`;
+  `http://localhost:${thread.address.port}${path}`;
 const browse = (thread: LivenessThread, cookie?: string) =>
   fetch(urlOf(thread, "/settings"), {
     headers: { Accept: "text/html", ...(cookie === undefined ? {} : { Cookie: cookie }) },
@@ -226,7 +228,7 @@ describe("the upgrade console", () => {
       it("refuses it, even the right token, and leaves the wrong-token limit untouched", async () => {
         const thread = await bootThread();
         await showConsole(thread);
-        const own = `http://127.0.0.1:${thread.address.port}`;
+        const own = `http://localhost:${thread.address.port}`;
         const fromElsewhere: Record<string, string>[] = [
           { "Sec-Fetch-Site": "cross-site", Origin: "http://drive-by.example" },
           { Origin: "http://drive-by.example" },
@@ -296,7 +298,7 @@ describe("the upgrade console", () => {
         thread = await bootThread();
         ({ retried } = await showConsole(thread));
         cookie = await openSession(thread);
-        own = `http://127.0.0.1:${thread.address.port}`;
+        own = `http://localhost:${thread.address.port}`;
       });
 
       /** @scenario "A cross-site Retry is refused even with the console session" */

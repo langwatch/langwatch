@@ -83,4 +83,38 @@ describe("liftSpanContribution", () => {
     expect(lifted.agent).toBe("claude_cowork");
     expect(lifted.sessionId).toBe("cw-sess-1");
   });
+
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("keys the span on the launcher's declared session over Claude Code's own", () => {
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "session.id": "cc-run-2", "gen_ai.conversation.id": "channel_a" },
+          resourceAttributes: { "langwatch.session.id": "agent_scout" },
+        }),
+      }),
+    );
+
+    expect(lifted.sessionId).toBe("agent_scout");
+    expect(lifted.sessionKeySource).toBe("provider");
+  });
+
+  /** @scenario a session with no declared session is keyed by the agent's own session id */
+  it("keys a plain Claude Code span on its session id over a declared thread", () => {
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "session.id": "cc-run-1", "gen_ai.conversation.id": "channel_a" },
+        }),
+      }),
+    );
+
+    expect(lifted.sessionId).toBe("cc-run-1");
+  });
 });

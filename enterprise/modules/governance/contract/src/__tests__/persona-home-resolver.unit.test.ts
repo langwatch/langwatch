@@ -28,36 +28,37 @@ const baseInput: PersonaResolverInput = {
   hasApplicationTraces: false,
   hasOrganizationManagePermission: false,
   isEnterprise: false,
-  // The persona 1/2/4 destinations (/me, /governance) only exist for orgs
+  // The persona 1/2/4 destinations (/coding-agents, /governance) only exist for orgs
   // with the governance UI flag; default the fixture to enabled so those
   // matrices read cleanly. The gate is exercised explicitly below.
   hasGovernanceUi: true,
   firstProjectSlug: null,
+  planHome: null,
 };
 
 describe("resolvePersonaHome", () => {
   describe("given a personal-only user (persona 1)", () => {
-    it("returns /me when user has personal VK and no project membership", () => {
+    it("returns /coding-agents when user has personal VK and no project membership", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         setupState: { ...baseInput.setupState, hasPersonalVKs: true },
         firstProjectSlug: null,
       });
       expect(result.persona).toBe("personal_only");
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
       expect(result.isOverride).toBe(false);
     });
   });
 
   describe("given a mixed persona with both personal VK and project membership (persona 2)", () => {
-    it("returns /me when user has both personal VK and project membership", () => {
+    it("returns /coding-agents when user has both personal VK and project membership", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         setupState: { ...baseInput.setupState, hasPersonalVKs: true },
         firstProjectSlug: "team-prod",
       });
       expect(result.persona).toBe("mixed");
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
     });
   });
 
@@ -153,14 +154,14 @@ describe("resolvePersonaHome", () => {
   });
 
   describe("when the org does not have the governance UI flag", () => {
-    it("routes a personal-VK customer to the project home instead of /me", () => {
+    it("routes a personal-VK customer to the project home instead of /coding-agents", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         hasGovernanceUi: false,
         setupState: { ...baseInput.setupState, hasPersonalVKs: true },
         firstProjectSlug: "team-prod",
       });
-      // Persona is still detected (mixed: personal VK + project), but /me is
+      // Persona is still detected (mixed: personal VK + project), but /coding-agents is
       // flag-gated and 404s, so the destination falls back to the project
       // home — this is the impersonated-customer case.
       expect(result.persona).toBe("mixed");
@@ -181,41 +182,41 @@ describe("resolvePersonaHome", () => {
       expect(result.destination).not.toBe("/governance");
     });
 
-    it("routes a member with no projects to onboarding, not the gated /me", () => {
+    it("routes a member with no projects to onboarding, not the gated /coding-agents", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         hasGovernanceUi: false,
         firstProjectSlug: null,
       });
-      // /me is flag-gated and 404s here, so there is no usable personal home;
+      // /coding-agents is flag-gated and 404s here, so there is no usable personal home;
       // send the user to the recoverable onboarding bootstrap instead.
       expect(result.destination).toBe("/onboarding/welcome");
-      expect(result.destination).not.toBe("/me");
+      expect(result.destination).not.toBe("/coding-agents");
     });
 
     it("still honors an explicit user pin even when the flag is off", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         hasGovernanceUi: false,
-        userLastHomePath: "/me",
+        userLastHomePath: "/coding-agents",
         setupState: { ...baseInput.setupState, hasPersonalVKs: true },
         firstProjectSlug: "team-prod",
       });
       // A pin can only have been set while the surface was reachable; keep it.
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
       expect(result.isOverride).toBe(true);
     });
   });
 
   describe("when the organization has a primary intent (ADR-038)", () => {
     /** @scenario "Agent-governance organization lands on the personal usage page" */
-    it("lands an AGENT_GOVERNANCE org on /me", () => {
+    it("lands an AGENT_GOVERNANCE org on /coding-agents", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         organizationIntent: "AGENT_GOVERNANCE",
         firstProjectSlug: "team-prod",
       });
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
       expect(result.intentPinned).toBe(true);
       expect(result.isOverride).toBe(false);
     });
@@ -228,7 +229,7 @@ describe("resolvePersonaHome", () => {
         setupState: { ...baseInput.setupState, hasPersonalVKs: true },
         firstProjectSlug: "team-prod",
       });
-      // Personal VK would make this persona "mixed" (/me) — intent wins.
+      // Personal VK would make this persona "mixed" (/coding-agents) — intent wins.
       expect(result.destination).toBe("/team-prod");
       expect(result.intentPinned).toBe(true);
     });
@@ -238,7 +239,7 @@ describe("resolvePersonaHome", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         organizationIntent: "LLM_OPS",
-        userLastHomePath: "/me",
+        userLastHomePath: "/coding-agents",
         firstProjectSlug: "team-prod",
       });
       expect(result.destination).toBe("/team-prod");
@@ -268,12 +269,12 @@ describe("resolvePersonaHome", () => {
         firstProjectSlug: "team-prod",
       });
       expect(result.destination).toBe("/team-prod");
-      expect(result.destination).not.toBe("/me");
+      expect(result.destination).not.toBe("/coding-agents");
       // Still intent-pinned: the client must not re-flip the kind either.
       expect(result.intentPinned).toBe(true);
     });
 
-    it("sends an LLM_OPS org with no project to settings, never the governance /me", () => {
+    it("sends an LLM_OPS org with no project to settings, never the governance /coding-agents", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         organizationIntent: "LLM_OPS",
@@ -294,14 +295,14 @@ describe("resolvePersonaHome", () => {
       });
       expect(result.destination).toBe("/settings");
       expect(result.destination).not.toBe("/onboarding/welcome");
-      expect(result.destination).not.toBe("/me");
+      expect(result.destination).not.toBe("/coding-agents");
     });
 
     it("keeps intentPinned false on every intent-less path", () => {
       const plain = resolvePersonaHome({ ...baseInput });
       const pinned = resolvePersonaHome({
         ...baseInput,
-        userLastHomePath: "/me",
+        userLastHomePath: "/coding-agents",
       });
       expect(plain.intentPinned).toBe(false);
       expect(pinned.intentPinned).toBe(false);
@@ -319,7 +320,7 @@ describe("resolvePersonaHome", () => {
         organizationIntent: "LLM_OPS",
         firstProjectSlug: "team-prod",
       });
-      expect(governanceOrg.destination).toBe("/me");
+      expect(governanceOrg.destination).toBe("/coding-agents");
       expect(llmOpsOrg.destination).toBe("/team-prod");
     });
   });
@@ -348,8 +349,8 @@ describe("resolvePersonaHome", () => {
         setupState: { ...baseInput.setupState, hasIngestionSources: true },
       });
 
-      expect(personalOnly.destination).toBe("/me");
-      expect(mixed.destination).toBe("/me");
+      expect(personalOnly.destination).toBe("/coding-agents");
+      expect(mixed.destination).toBe("/coding-agents");
       expect(projectOnly.destination).toBe("/team-prod");
       expect(governanceAdmin.destination).toBe("/governance");
       for (const result of [personalOnly, mixed, projectOnly, governanceAdmin]) {
@@ -371,13 +372,13 @@ describe("resolvePersonaHome", () => {
   });
 
   describe("given persona is project_only with no project slug", () => {
-    it("returns /me when persona is project_only but firstProjectSlug is null", () => {
+    it("returns /coding-agents when persona is project_only but firstProjectSlug is null", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         firstProjectSlug: null,
       });
       expect(result.persona).toBe("project_only");
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/coding-agents");
     });
   });
 });
@@ -395,18 +396,18 @@ describe("resolvePersonaHomeSafe", () => {
     const result = resolvePersonaHomeSafe({
       firstProjectSlug: null,
     });
-    // hasGovernanceUi defaults to false, so /me would 404 — route to the
+    // hasGovernanceUi defaults to false, so /coding-agents would 404 — route to the
     // recoverable onboarding bootstrap instead.
     expect(result.persona).toBe("project_only");
     expect(result.destination).toBe("/onboarding/welcome");
   });
 
-  it("falls back to /me when no project slug but the governance UI is enabled", () => {
+  it("falls back to /coding-agents when no project slug but the governance UI is enabled", () => {
     const result = resolvePersonaHomeSafe({
       firstProjectSlug: null,
       hasGovernanceUi: true,
     });
-    expect(result.destination).toBe("/me");
+    expect(result.destination).toBe("/coding-agents");
   });
 
   it("preserves the LLMOps majority experience on missing signals", () => {
@@ -417,7 +418,7 @@ describe("resolvePersonaHomeSafe", () => {
     });
     expect(result.destination).toBe("/team-prod");
     expect(result.destination).not.toBe("/governance");
-    expect(result.destination).not.toBe("/me");
+    expect(result.destination).not.toBe("/coding-agents");
   });
 
   /** @scenario "The resolution carries the same project slug it routed with" */
@@ -431,5 +432,42 @@ describe("resolvePersonaHomeSafe", () => {
     expect(
       resolvePersonaHome({ ...baseInput, firstProjectSlug: "team-prod" }).firstProjectSlug,
     ).toBe("team-prod");
+  });
+});
+
+describe("given a Billing-only member (planHome set, ADR-205)", () => {
+  const payer: PersonaResolverInput = { ...baseInput, planHome: "/settings/subscription" };
+
+  /** @scenario "The home page sends someone who only pays to the plan page" */
+  it("goes to the plan page whatever the coding-agents flag, intent or org-wide keys say", () => {
+    const cases: PersonaResolverInput[] = [
+      payer,
+      { ...payer, hasGovernanceUi: false },
+      { ...payer, organizationIntent: "LLM_OPS" },
+      { ...payer, organizationIntent: "AGENT_GOVERNANCE" },
+      { ...payer, setupState: { ...payer.setupState, hasPersonalVKs: true } },
+      { ...payer, planHome: "/settings/license" },
+    ];
+    expect(cases.map((input) => resolvePersonaHome(input).destination)).toEqual([
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/license",
+    ]);
+  });
+
+  it("answers as an override, so a pin or a remembered product cannot beat it", () => {
+    const pinned = resolvePersonaHome({ ...payer, userLastHomePath: "/coding-agents" });
+    expect(pinned.destination).toBe("/settings/subscription");
+    expect(pinned.isOverride).toBe(true);
+  });
+
+  it("changes nothing for a reader with no planHome", () => {
+    expect(resolvePersonaHome(baseInput).destination).toBe("/coding-agents");
+    expect(resolvePersonaHome({ ...baseInput, hasGovernanceUi: false }).destination).toBe(
+      "/onboarding/welcome",
+    );
   });
 });

@@ -44,6 +44,7 @@ class EventingTraceLogContributionAdapter implements CommandHandler<
           correlationSource: data.correlationSource,
           input: data.input,
           output: data.output,
+          ...(data.outputDeclared ? { outputDeclared: true } : {}),
           liftedAttributes: data.liftedAttributes,
           nonBillable: data.nonBillable,
           piiRedactionLevel: data.piiRedactionLevel,

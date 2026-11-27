@@ -3,6 +3,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { MODEL_ROLES } from "./catalog/model-feature-registry.ts";
+import type { ModelImportOutcome } from "./model-listing-import.ts";
 
 export const MODEL_PROVIDER_FEATURE_ID = "model-provider" as const;
 export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
@@ -70,6 +71,11 @@ const modelProviderSchemaDefinition = z
      * expression sources. Null means the provider's registry default applies (ADR-129).
      */
     langySkipPermissionsModels: z.array(z.string()).nullable().optional(),
+    /**
+     * The ids the provider's model listing carried on the last save that imported from it. An id
+     * here missing from the custom model lists was removed by the user, so no import adds it back.
+     */
+    lastListedModelIds: z.array(z.string()).nullable().optional(),
     deploymentMapping: z.record(z.string(), z.string()).nullable().optional(),
     healthStatus: z.enum(["UNKNOWN", "HEALTHY", "DEGRADED", "CIRCUIT_OPEN"]).optional(),
     circuitOpenedAt: z.date().nullable().optional(),
@@ -82,6 +88,9 @@ const modelProviderSchemaDefinition = z
 export interface ModelProviderSchema extends Named<typeof modelProviderSchemaDefinition> {}
 export const modelProviderSchema: ModelProviderSchema = modelProviderSchemaDefinition;
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
+
+/** A save's answer: the stored row, and what it imported from the provider's model listing. */
+export type ModelProviderSave = ModelProvider & { modelImport?: ModelImportOutcome };
 
 const modelProviderSummarySchemaDefinition = modelProviderSchema
   .safeExtend({

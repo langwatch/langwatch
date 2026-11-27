@@ -111,6 +111,14 @@ Feature: The transactional messages LangWatch sends
     Then the email goes to that member and names the organization and the administrator
     And it says whether a second factor is now needed to open that organization
 
+  @unit
+  Scenario: A platform operator change tells who changed whose role and links to the Operators page
+    Given someone was given or lost the platform operator role
+    When the notice is rendered
+    Then it names the person, who made the change and the installation
+    And a grant says to revoke the role on the Operators page if it was not expected
+    And it links to the Operators page
+
   # A self-hosted operator cannot fix an upgrade step; LangWatch staff on Cloud can.
   # Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
   @unit
@@ -177,3 +185,16 @@ Feature: The transactional messages LangWatch sends
     When the upgrade alert is rendered
     Then the subject counts the failed steps and names the installation
     And each step shows its id, its release, its attempt, its error and a link that opens that step
+
+  @unit
+  Scenario: Every payment recovery email before the move to Free asks to update the card
+    Given an unpaid renewal reached day 3, day 7 or day 14 of payment recovery
+    When that day's recovery email is rendered
+    Then its button reads "Update card"
+    And none of them reads "Pay now"
+
+  @unit
+  Scenario: The email after the move to Free asks to pay the open invoice
+    Given an unpaid renewal reached day 21 and the organization moved to the Free plan
+    When the paused email is rendered
+    Then its button reads "Pay now"

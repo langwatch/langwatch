@@ -7,6 +7,7 @@ import {
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
+import { judgeTraceWaitInputOf } from "../judge-trace-wait.ts";
 import type {
   SuiteFormAgent,
   SuiteFormAvailableTarget,
@@ -244,5 +245,6 @@ export function suiteFormValuesOf({
     repeatCount: suite.repeatCount,
     simulatorModel: suite.simulatorModel,
     judgeModel: suite.judgeModel,
+    traceWait: judgeTraceWaitInputOf(suite),
   };
 }

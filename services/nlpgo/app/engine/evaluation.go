@@ -391,7 +391,7 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 					Type:      "execute_flow",
 				}
 				entryRes, err := e.Execute(rowCtx, entryReq)
-				duration := time.Since(entryStart).Milliseconds()
+				duration := elapsedMS(entryStart)
 				var entryTraceID string
 				if entryRes != nil {
 					entryTraceID = entryRes.TraceID

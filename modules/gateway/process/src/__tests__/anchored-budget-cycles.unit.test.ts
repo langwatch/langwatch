@@ -250,7 +250,7 @@ describe("anchored cycle math", () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
       expect(
         GatewayWindow.nextBoundaryFor({
-          budget: { window, cycleAnchorAt: anchor },
+          budget: { window, cycleAnchorAt: anchor, timezone: null },
           now,
         }).toZonedDateTimeISO("UTC").year,
       ).toBe(9999);
@@ -259,7 +259,7 @@ describe("anchored cycle math", () => {
     expect(
       iso(
         GatewayWindow.nextBoundaryFor({
-          budget: { window: "MONTH", cycleAnchorAt: null },
+          budget: { window: "MONTH", cycleAnchorAt: null, timezone: null },
           now,
         }),
       ),
@@ -267,7 +267,7 @@ describe("anchored cycle math", () => {
     expect(
       iso(
         GatewayWindow.nextBoundaryFor({
-          budget: { window: "MONTH", cycleAnchorAt: anchor },
+          budget: { window: "MONTH", cycleAnchorAt: anchor, timezone: null },
           now,
         }),
       ),

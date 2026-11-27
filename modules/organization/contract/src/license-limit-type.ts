@@ -24,6 +24,8 @@ const limitCheckResultSchemaDefinition = z
     max: z.number(),
     /** Type of limit being checked */
     limitType: limitTypeSchema,
+    /** True when the refusal is an unpaid invoice holding new seats, not a full plan */
+    heldForPayment: z.boolean().optional(),
   })
   .strict();
 export interface LimitCheckResultSchema extends Named<typeof limitCheckResultSchemaDefinition> {}

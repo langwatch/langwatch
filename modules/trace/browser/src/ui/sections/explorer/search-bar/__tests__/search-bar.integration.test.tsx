@@ -324,6 +324,29 @@ describe("<SearchBar /> ask affordance", () => {
       });
     });
 
+    describe("when Ask Langy is clicked with the panel closed and a trace drawer open", () => {
+      beforeEach(() => {
+        window.history.replaceState(
+          null,
+          "",
+          "/demo/traces?drawer.open=traceV2Details&drawer.traceId=t1",
+        );
+      });
+      afterEach(() => {
+        window.history.replaceState(null, "", "/");
+      });
+
+      /** @scenario "Opening Langy beside a wide trace drawer narrows the drawer" */
+      it("opens the panel, since a floating ask bar would sit under the drawer", () => {
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(host.asked).toHaveLength(1);
+        expect(document.querySelector("[data-placeholder]")).toBeInTheDocument();
+      });
+    });
+
     describe("when Ask Langy is clicked with the panel already open", () => {
       beforeEach(() => {
         langyMock.panelOpen = true;

@@ -161,7 +161,7 @@ export class OtlpRecordPiiRedactionService {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
         projectId: tenantId,
-        resolvedPiiLevel: native.level,
+        effectivePiiLevel: native.level,
       });
     }
   }
@@ -179,7 +179,7 @@ export class OtlpRecordPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       projectId?: string | undefined;
-      resolvedPiiLevel?: PiiLevel | undefined;
+      effectivePiiLevel?: PiiLevel | undefined;
     },
   ): Promise<void> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -187,7 +187,7 @@ export class OtlpRecordPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: lambda?.projectId,
-      resolvedPiiLevel: lambda?.resolvedPiiLevel,
+      effectivePiiLevel: lambda?.effectivePiiLevel,
     });
     if (redaction.kind === "skip_redaction") {
       return;
@@ -259,7 +259,7 @@ export class OtlpRecordPiiRedactionService {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
         projectId: tenantId,
-        resolvedPiiLevel: native.level,
+        effectivePiiLevel: native.level,
       });
     }
   }
@@ -277,7 +277,7 @@ export class OtlpRecordPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       projectId?: string | undefined;
-      resolvedPiiLevel?: PiiLevel | undefined;
+      effectivePiiLevel?: PiiLevel | undefined;
     },
   ): Promise<void> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -285,7 +285,7 @@ export class OtlpRecordPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: lambda?.projectId,
-      resolvedPiiLevel: lambda?.resolvedPiiLevel,
+      effectivePiiLevel: lambda?.effectivePiiLevel,
     });
     if (redaction.kind === "skip_redaction") {
       return;

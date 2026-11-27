@@ -32,7 +32,7 @@ let lastSearchAuth: string | null = null;
 let lastMonitorsAuth: string | null = null;
 /** When true the device session is revoked server-side: the session-
  * authenticated endpoints AND refresh all 401, exactly as they would after a
- * /me/devices revocation dropped the Redis tokens. */
+ * Devices-tab revocation dropped the Redis tokens. */
 let sessionRevoked = false;
 
 const configPath = () => path.join(stateDir, "config.json");
@@ -288,7 +288,7 @@ describe("device session powers data commands with zero env vars", () => {
       },
     });
 
-    // The device is revoked from /me/devices: Redis tokens are gone, so the
+    // The device is revoked from the Devices tab: Redis tokens are gone, so the
     // session endpoints and refresh all 401.
     sessionRevoked = true;
 

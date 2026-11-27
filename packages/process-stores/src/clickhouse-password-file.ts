@@ -14,15 +14,24 @@ export const PASSWORD_FILE_REFRESH_MS = 1_000;
 
 const VARIABLE = "CLICKHOUSE_PASSWORD_FILE";
 
-/** The file named by `CLICKHOUSE_PASSWORD_FILE` could not give a password at boot. */
+/** The file a password variable names could not give a password at boot. */
 export class ClickHousePasswordFileError extends Error {
   readonly code = "clickhouse_password_file_unreadable";
-  readonly variable = VARIABLE;
+  readonly variable: string;
   readonly path: string;
 
-  constructor({ path, reason }: { path: string; reason: string }) {
-    super(`${VARIABLE} names "${path}", which ${reason}. Point it at a file holding one password.`);
+  constructor({
+    path,
+    reason,
+    variable = VARIABLE,
+  }: {
+    path: string;
+    reason: string;
+    variable?: string;
+  }) {
+    super(`${variable} names "${path}", which ${reason}. Point it at a file holding one password.`);
     this.name = "ClickHousePasswordFileError";
+    this.variable = variable;
     this.path = path;
   }
 }
@@ -31,6 +40,8 @@ type Credentials = { username: string; password: string };
 
 type PasswordFileOptions = {
   path: string;
+  /** The environment variable that named the file, for errors and warnings. */
+  variable?: string;
   logger?: Pick<Logger, "warn" | "info">;
   now?: () => number;
   refreshMs?: number;
@@ -56,12 +67,14 @@ export class ClickHousePasswordFile {
   private failing = false;
 
   private readonly path: string;
+  private readonly variable: string;
   private readonly logger: Pick<Logger, "warn" | "info">;
   private readonly now: () => number;
   private readonly refreshMs: number;
 
   private constructor(options: Required<PasswordFileOptions> & { initial: string }) {
     this.path = options.path;
+    this.variable = options.variable;
     this.logger = options.logger;
     this.now = options.now;
     this.refreshMs = options.refreshMs;
@@ -72,6 +85,7 @@ export class ClickHousePasswordFile {
   /** Reads the file now and throws {@link ClickHousePasswordFileError} if it gives no password. */
   static open({
     path,
+    variable = VARIABLE,
     logger = createLogger("langwatch:clickhouse:password-file"),
     now = () => globalThis.performance.now(),
     refreshMs = PASSWORD_FILE_REFRESH_MS,
@@ -80,11 +94,20 @@ export class ClickHousePasswordFile {
     try {
       content = readFileSync(path, "utf8");
     } catch (error) {
-      throw new ClickHousePasswordFileError({ path, reason: unreadable(error) });
+      throw new ClickHousePasswordFileError({ path, variable, reason: unreadable(error) });
     }
     const read = passwordIn(content);
-    if ("reason" in read) throw new ClickHousePasswordFileError({ path, reason: read.reason });
-    return new ClickHousePasswordFile({ path, logger, now, refreshMs, initial: read.password });
+    if ("reason" in read) {
+      throw new ClickHousePasswordFileError({ path, variable, reason: read.reason });
+    }
+    return new ClickHousePasswordFile({
+      path,
+      variable,
+      logger,
+      now,
+      refreshMs,
+      initial: read.password,
+    });
   }
 
   /** The current password; a file that stopped giving one keeps the last good password. */
@@ -107,7 +130,7 @@ export class ClickHousePasswordFile {
     if ("reason" in read) {
       if (!this.failing) {
         this.logger.warn(
-          { variable: VARIABLE, path: this.path, reason: read.reason },
+          { variable: this.variable, path: this.path, reason: read.reason },
           "ClickHouse password file gives no password; keeping the last good one",
         );
       }
@@ -116,7 +139,7 @@ export class ClickHousePasswordFile {
     }
     if (this.failing) {
       this.logger.info(
-        { variable: VARIABLE, path: this.path },
+        { variable: this.variable, path: this.path },
         "ClickHouse password file readable again",
       );
     }

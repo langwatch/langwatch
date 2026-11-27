@@ -91,7 +91,7 @@ func TestLiveClosedSendsTheFinalDelta(t *testing.T) {
 	assert.InDelta(t, 8.5, final.Usage.AudioSeconds, 0.001)
 	assert.Positive(t, final.DurationMS)
 	assert.Zero(t, r.vendor.hangupCount(), "a session the vendor closed needs no hangup")
-	assert.Zero(t, r.manager.Supervised())
+	assert.Eventually(t, func() bool { return r.manager.Supervised() == 0 }, 5*time.Second, 5*time.Millisecond, "an ended session leaves supervision")
 }
 
 // @scenario "A delegated response is reported once under its own model"
@@ -285,7 +285,7 @@ func TestDrainEndsCallsAndSendsFinalReports(t *testing.T) {
 	require.Len(t, reports, 2)
 	assert.True(t, reports[1].Final)
 	assert.InDelta(t, 1.0, reports[1].Usage.AudioSeconds, 0.001)
-	assert.Zero(t, r.manager.Supervised())
+	assert.Eventually(t, func() bool { return r.manager.Supervised() == 0 }, 5*time.Second, 5*time.Millisecond, "an ended session leaves supervision")
 }
 
 func TestDrainingManagerRefusesNewCalls(t *testing.T) {

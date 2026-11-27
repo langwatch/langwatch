@@ -68,3 +68,18 @@ Feature: Trace rollups and span storage fold idempotently
     Given main queued a span_received event read back from the event log, its metadata only a traceparent or absent
     When this release's worker parses it for a peer subscriber such as traceEvaluationTrigger or traceSpanMetricsSync
     Then the event parses and runs instead of being refused and blocking its trace's group
+
+  # #9575: trace_summaries ids keep the KSUID byte layout their row was stored with.
+  @unit
+  Scenario: A trace summary stored before its id layout was recorded keeps its id on the next write
+    Given a trace summary row stored without an IdLayout
+    When the summary fold reads it back and writes it again
+    Then its id is derived in the legacy layout, exactly as it was stored
+    And the row records the layout "v1-legacy"
+
+  @unit
+  Scenario: A new trace summary mints a corrected id and records its layout
+    Given a trace that was never stored
+    When its first span is folded and the summary written
+    Then its id is derived in the corrected layout
+    And the row records the layout "v2"

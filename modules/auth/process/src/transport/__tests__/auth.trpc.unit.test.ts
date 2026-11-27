@@ -58,6 +58,7 @@ const door: AuthApi = {
   startImpersonation: () => unreached("startImpersonation"),
   stopImpersonation: () => unreached("stopImpersonation"),
   hasPasskey: () => unreached("hasPasskey"),
+  findSignInFacts: () => unreached("findSignInFacts"),
   passkeyAssertionOptions: () => unreached("passkeyAssertionOptions"),
   verifyPasskeyAssertion: () => unreached("verifyPasskeyAssertion"),
   isWithinBudget,

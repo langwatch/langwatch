@@ -3,32 +3,33 @@ import type { UseFormSetValue } from "react-hook-form";
 
 import {
   type InviteFormValues,
+  seatJoinsNoTeam,
   teamRoleCorrectionsForSeat,
 } from "../model/add-members-form-model.ts";
-import type { TeamAssignment } from "../model/member-invite-form.ts";
-import { OrganizationUserRole } from "../model/prisma-types.ts";
+import type { InviteSeat, TeamAssignment } from "../model/member-invite-form.ts";
 
 /**
  * Keeps the staged team rows inside what the picked seat allows when the seat
- * changes. A Developer seat (ADR-171) joins no team, so its rows are cleared.
+ * changes. A Developer seat (ADR-171) and Billing only (ADR-205) join no team, so their rows
+ * are cleared.
  */
 export function useTeamsFollowSeat({
   orgRole,
   selectedTeams,
   setValue,
 }: {
-  orgRole: OrganizationUserRole;
+  orgRole: InviteSeat;
   selectedTeams: (TeamAssignment | undefined)[] | undefined;
   setValue: UseFormSetValue<InviteFormValues>;
 }): void {
-  const prevOrgRoleRef = useRef<OrganizationUserRole>(orgRole);
+  const prevOrgRoleRef = useRef<InviteSeat>(orgRole);
 
   useEffect(() => {
     const seatChanged = prevOrgRoleRef.current !== orgRole;
     prevOrgRoleRef.current = orgRole;
     if (!seatChanged || !selectedTeams?.length) return;
 
-    if (orgRole === OrganizationUserRole.DEVELOPER) {
+    if (seatJoinsNoTeam(orgRole)) {
       setValue("teams", []);
       return;
     }

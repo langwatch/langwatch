@@ -41,8 +41,8 @@ describe("scopeTraceFilterToTable", () => {
     it("reads the traces at their latest version", () => {
       const { sql } = scopeTraceFilterToTable({ table: "evaluation_runs", filterWhere: FILTER });
 
-      expect(sql).toContain("max(UpdatedAt)");
-      expect(sql).toContain("GROUP BY TenantId, TraceId");
+      expect(sql).toContain("HAVING min(UpdatedAt) < max(UpdatedAt)");
+      expect(sql).toContain(", max(UpdatedAt)");
     });
   });
 

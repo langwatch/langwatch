@@ -180,7 +180,7 @@ function attributesOf(seed: TraceSeed): Record<string, string> {
 
 /**
  * A `trace_analytics` row. The goose 00126 columns are MATERIALIZED from `Attributes`; the
- * goose 00128 ones are the fold's to write, so the row carries them as the fold does.
+ * goose 00128 and 00133 ones are the fold's to write, so the row carries them as the fold does.
  */
 function analyticsRow(seed: TraceSeed): Record<string, unknown> {
   const version = seed.version ?? 1;
@@ -188,6 +188,7 @@ function analyticsRow(seed: TraceSeed): Record<string, unknown> {
     MetadataOutcomeReason: seed.metadata.outcome_reason ?? "",
     MetadataPromptVersion: seed.metadata.prompt_version ?? "",
     MetadataEnvironment: "",
+    LastUsedPromptVersionId: seed.promptVersion ?? "",
     TenantId: TENANT,
     TraceId: seed.trace,
     Version: String(version),
@@ -479,12 +480,30 @@ async function provisionOneRowPerTrace({
   return database;
 }
 
-/** The SQL with every FROM or JOIN of trace_metrics pointed at the one-row-per-trace view. */
+/**
+ * The SQL with every FROM or JOIN of trace_metrics, or of its floored twin call, pointed at the
+ * one-row-per-trace view, which reads the whole history: the floor rewrite already ran.
+ */
 function readingOneRowPerTrace({ sql, database }: { sql: string; database: string }): string {
-  return sql.replace(
+  const target = `${database}.trace_metrics`;
+  const unfloored = sql.replace(
     /\b(FROM|JOIN)(\s+)(?:analytics\.)?trace_metrics\b(?!\.)/gi,
-    (_match, keyword: string, space: string) => `${keyword}${space}${database}.trace_metrics`,
+    (_match, keyword: string, space: string) => `${keyword}${space}${target}`,
   );
+  let read = "";
+  let from = 0;
+  for (const call of unfloored.matchAll(
+    /\b(FROM|JOIN)(\s+)(?:analytics\.)?trace_metrics__floor\(/gi,
+  )) {
+    let end = call.index + call[0].length;
+    for (let depth = 1; depth > 0 && end < unfloored.length; end++) {
+      if (unfloored[end] === "(") depth++;
+      if (unfloored[end] === ")") depth--;
+    }
+    read += `${unfloored.slice(from, call.index)}${call[1]}${call[2]}${target}`;
+    from = end;
+  }
+  return read + unfloored.slice(from);
 }
 
 type SpanSeed = { trace: string; span: string; parent: string | null; contexts?: number };
@@ -572,6 +591,148 @@ function annotationInserts(): string {
     `("id", "projectId", "traceId", "isThumbsUp", "comment", "email", "createdAt", "updatedAt") ` +
     `VALUES ${values.join(", ")}`
   );
+}
+
+// These write traces the earlier tests do not expect, so they run last.
+/** One judged trace's writes as the folds make them, each anchored and written on its day. */
+async function writeJudgedTrace({
+  harness,
+  trace,
+  writes,
+  evaluatedOn,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  trace: string;
+  writes: readonly { day: number; promptVersion: string; updated: number }[];
+  evaluatedOn: number;
+}): Promise<void> {
+  const facts = harness.factDatabase;
+  const id = `managed-${trace}`;
+  const seedOf = ({ day, promptVersion }: { day: number; promptVersion: string }): TraceSeed => ({
+    trace,
+    day,
+    origin: "application",
+    customer: "acme",
+    promptVersion,
+    metadata: {},
+  });
+  // The evaluation as the trace fold keeps it: each anchor move retracts the live revision.
+  const judged = (seed: TraceSeed, sign: 1 | -1, revision: number) => ({
+    TenantId: TENANT,
+    TraceId: trace,
+    EvaluationId: id,
+    OccurredAt: onDay(evaluatedOn),
+    UpdatedAt: onDay(evaluatedOn + revision * 0.01),
+    TraceOccurredAt: onDay(seed.day),
+    EvaluatorName: "Quality",
+    Status: "processed",
+    IsGuardrail: false,
+    Passed: true,
+    Label: null,
+    Origin: "application",
+    TraceOrigin: "application",
+    CustomerId: "acme",
+    TopicId: null,
+    Labels: [],
+    MetadataTopic: "",
+    MetadataDocumentType: "",
+    MetadataLanguage: "",
+    MetadataTeam: "",
+    MetadataFlow: "",
+    MetadataSegment: "",
+    MetadataPromptVersion: "",
+    Sign: sign,
+    Revision: revision,
+  });
+  const inserts: [string, Record<string, unknown>[]][] = [];
+  writes.forEach((write, index) => {
+    const seed = seedOf(write);
+    inserts.push(
+      ["trace_summaries", [{ ...summaryRow(seed), UpdatedAt: onDay(write.updated) }]],
+      ["trace_analytics", [{ ...analyticsRow(seed), UpdatedAt: onDay(write.updated) }]],
+    );
+    const previous = writes[index - 1];
+    if (previous)
+      inserts.push(["trace_evaluation_analytics", [judged(seedOf(previous), -1, index)]]);
+    inserts.push(["trace_evaluation_analytics", [judged(seed, 1, index + 1)]]);
+  });
+  inserts.push([
+    "evaluation_analytics",
+    [
+      {
+        TenantId: TENANT,
+        EvaluationId: id,
+        Version: "1",
+        OccurredAt: onDay(evaluatedOn),
+        CreatedAt: onDay(evaluatedOn),
+        UpdatedAt: onDay(evaluatedOn),
+        EvaluatorType: "llm",
+        EvaluatorName: "Quality",
+        Status: "processed",
+        IsGuardrail: false,
+        Passed: true,
+        Label: null,
+        TraceId: trace,
+        Origin: "application",
+      },
+    ],
+  ]);
+  for (const [table, values] of inserts) {
+    await harness.admin.insert({ table: `${facts}.${table}`, format: "JSONEachRow", values });
+  }
+}
+
+const MANAGED_FIXTURE_VERSIONS = ["pv-a", "pv-b", "pv-old", "pv-new"];
+
+/** att-change/units' rows for the fixtures' versions, sent floored and in main's form. */
+async function managedUnitRows({
+  client,
+  finalTwins,
+  sent,
+  list,
+}: {
+  client: ClickHouseClient;
+  finalTwins: string;
+  sent: (label: string) => string;
+  list: readonly string[];
+}): Promise<{ now: string[]; main: string[] }> {
+  const label = "att-change/units";
+  const rowsOf = async (sql: string) => {
+    const result = await client.query({
+      query: sql,
+      query_params: { ...PARAMETERS, dashboard_context_sources: list },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<Record<string, unknown>>();
+    return rows
+      .filter((row) => MANAGED_FIXTURE_VERSIONS.includes(String(row.version)))
+      .map((row) => JSON.stringify(row))
+      .toSorted();
+  };
+  return {
+    now: await rowsOf(sent(label)),
+    main: await rowsOf(readingFinalTwins({ sql: MAIN.get(label) ?? "", database: finalTwins })),
+  };
+}
+
+/** Main keeps the trace's older row under [application] only; under other lists it has none. */
+function expectMainTraceRows({
+  main,
+  list,
+}: {
+  main: readonly string[];
+  list: readonly string[];
+}): void {
+  const keepsOld = list.includes("application");
+  expect(
+    main.some((row) => row.includes("pv-old")),
+    `under ${list.join(", ")}`,
+  ).toBe(keepsOld);
+  // The newest version is only dropped where main drops the trace (not under [application]).
+  expect(
+    main.filter((row) => row.includes("pv-new") && !keepsOld),
+    `under ${list.join(", ")}`,
+  ).toEqual([]);
 }
 
 describe("given trace evaluations with unmerged retraction pairs beside main's facts", () => {
@@ -794,6 +955,26 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
     await expectMovedQueriesMatchBaseline();
   });
 
+  // Runs after both moves above: the helper they compare through reads the whole history.
+  /** @scenario "A moved trace reads the same rows through the floored trace_metrics twin as through the view" */
+  it("reads the moved traces' rows the same through trace_metrics' floored twin", async () => {
+    await expectTwoAnalyticsRows("a1");
+    await expectTwoAnalyticsRows("mv1");
+    const floored = MOVED.filter((label) => sent(label).includes("trace_metrics__floor("));
+    expect(floored.length, "queries reading trace_metrics' twin").toBeGreaterThan(0);
+    const differing: string[] = [];
+    for (const { list } of LISTS) {
+      for (const label of floored) {
+        const now = await run({ sql: sent(label), list });
+        const written = await run({ sql: STOCK.get(label) ?? "", list });
+        expect(now.error, `${label} as sent under ${list.join(", ")}`).toBeUndefined();
+        expect(written.error, `${label} as written under ${list.join(", ")}`).toBeUndefined();
+        if (now.rows !== written.rows) differing.push(`${label} under ${list.join(", ")}`);
+      }
+    }
+    expect(differing).toEqual([]);
+  });
+
   /** The query's one row under the application list; each expected key as a number. */
   async function countsOf<K extends string>(
     label: string,
@@ -835,5 +1016,55 @@ describe("given trace evaluations with unmerged retraction pairs beside main's f
       closed_prev: outcomes.closed_prev - 1,
       resolved_prev: outcomes.resolved_prev,
     });
+  });
+
+  /** @scenario "A trace whose newest trace_metrics row changed its version reads the newest version" */
+  it("reads att-change/units' managed version from the trace's newest row, as main does", async () => {
+    await writeJudgedTrace({
+      harness,
+      trace: "u",
+      writes: [
+        { day: 3, promptVersion: "pv-a", updated: 3 },
+        { day: 5, promptVersion: "pv-b", updated: 5.5 },
+      ],
+      evaluatedOn: 5.6,
+    });
+
+    const application = await managedUnitRows({ client, finalTwins, sent, list: ["application"] });
+    expect(application.now).toEqual(application.main);
+    const rows = application.now.map((row) => JSON.parse(row) as Record<string, unknown>);
+    expect(rows).toEqual([expect.objectContaining({ unit: "acme", version: "pv-b" })]);
+    expect(Number(rows[0]?.judged)).toBe(1);
+    expect(String(rows[0]?.first_seen).startsWith(onDay(5))).toBe(true);
+    const langy = await managedUnitRows({ client, finalTwins, sent, list: ["langy"] });
+    expect(langy.now).toEqual(langy.main);
+  });
+
+  /**
+   * The trace's newest revision anchors it at day -10, before the window. trace_evaluation_metrics
+   * keeps the evaluation at that newest revision (analytics ADR-007), so the judged half drops the
+   * trace. Main still counts pv-old: traces' FINAL copy keeps the older in-window row in another
+   * weekly partition, and FINAL never merges across partitions. This move does not copy that row.
+   * @scenario "A judged trace whose newest row anchored before the window drops out of att-change/units, unlike main"
+   */
+  it("drops from att-change/units a judged trace whose newest row fell before the window, a deliberate split from main", async () => {
+    await writeJudgedTrace({
+      harness,
+      trace: "t",
+      writes: [
+        { day: 6.5, promptVersion: "pv-old", updated: 6.5 },
+        { day: -10, promptVersion: "pv-new", updated: 6.6 },
+      ],
+      evaluatedOn: 6.7,
+    });
+
+    for (const { list } of LISTS) {
+      const { now, main } = await managedUnitRows({ client, finalTwins, sent, list });
+      const isTraceRow = (row: string) => row.includes("pv-old") || row.includes("pv-new");
+      expect(now.filter(isTraceRow), `under ${list.join(", ")}`).toEqual([]);
+      // Trace "t" is application-only: main keeps pv-old under [application] but
+      // drops it under [langy].
+      expectMainTraceRows({ main, list });
+    }
   });
 });

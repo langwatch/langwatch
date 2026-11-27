@@ -38,6 +38,7 @@ function spanRow(input: {
   offsetMs: number;
   updatedOffsetMs?: number;
   attributes: Record<string, string>;
+  parentSpanId?: string;
 }) {
   const start = new Date(base + input.offsetMs);
   return {
@@ -45,7 +46,7 @@ function spanRow(input: {
     TenantId: input.tenantId,
     TraceId: traceId,
     SpanId: input.spanId,
-    ParentSpanId: null,
+    ParentSpanId: input.parentSpanId ?? null,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -87,7 +88,13 @@ beforeAll(async () => {
   for (const row of [
     spanRow({ tenantId: reader, spanId: "reader-root", offsetMs: 0, attributes: MATCHING }),
     spanRow({ tenantId: reader, spanId: "shared", offsetMs: 5, attributes: MATCHING }),
-    spanRow({ tenantId: owner, spanId: "owner-web", offsetMs: 10, attributes: MATCHING }),
+    spanRow({
+      tenantId: owner,
+      spanId: "owner-web",
+      parentSpanId: "reader-root",
+      offsetMs: 10,
+      attributes: MATCHING,
+    }),
     spanRow({ tenantId: owner, spanId: "shared", offsetMs: 15, attributes: MATCHING }),
     spanRow({
       tenantId: owner,

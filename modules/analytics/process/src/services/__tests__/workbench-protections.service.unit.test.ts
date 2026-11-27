@@ -58,6 +58,45 @@ function inputRestrictedTo(groupId: string): dataPrivacyContractModule.ResolvedD
   };
 }
 
+/** Input and output both restricted to admins only. */
+function bothRestrictedToAdmins(): dataPrivacyContractModule.ResolvedDataPrivacy {
+  const adminsOnly = {
+    disposition: "restrict" as const,
+    audience: {
+      allMembers: false,
+      admins: true,
+      members: false,
+      viewers: false,
+      projectOwner: false,
+      groupIds: [],
+    },
+  };
+  return {
+    ...PLATFORM_DEFAULT_DATA_PRIVACY,
+    categories: {
+      ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+      input: adminsOnly,
+      output: adminsOnly,
+    },
+  };
+}
+
+/** Grants every check and records who and where each membership question named. */
+function tokenPermissionChecks() {
+  const permissionChecks: { userId: string; permission: string; projectId: string | undefined }[] =
+    [];
+  const { authz } = authzGranting({
+    grants: () => true,
+    overrides: {
+      hasPermission: async ({ userId, permission, projectId }) => {
+        permissionChecks.push({ userId, permission, projectId });
+        return true;
+      },
+    },
+  });
+  return { authz, permissionChecks };
+}
+
 const API_KEY_CREDENTIAL: RestCredentialPrincipal = {
   kind: "apiKey",
   apiKeyId: "key-1",
@@ -68,6 +107,14 @@ const API_KEY_CREDENTIAL: RestCredentialPrincipal = {
 };
 
 const LEGACY_PROJECT_KEY_CREDENTIAL: RestCredentialPrincipal = { kind: "legacyProjectKey" };
+
+const ACCESS_TOKEN_CREDENTIAL: RestCredentialPrincipal = {
+  kind: "cliAccessToken",
+  userId: "user-1",
+  organizationId: "org-1",
+  projectId: "project-1",
+  teamId: "team-1",
+};
 
 function dataPrivacyResolving(
   resolve: () => Promise<dataPrivacyContractModule.ResolvedDataPrivacy>,
@@ -440,6 +487,52 @@ describe("resolveApiKeyProtections", () => {
       });
 
       expect(resolved.canSeeCapturedInput).toBe(false);
+    });
+  });
+
+  describe("given an admin's project-bound access token and content restricted to admins", () => {
+    /** @scenario "A project-bound access token reads captured content as its person" */
+    it("shows the content, as the workbench shows it to that admin", async () => {
+      const asked = tokenPermissionChecks();
+      const { dataPrivacy, getResolvedForProject } = dataPrivacyResolving(async () =>
+        bothRestrictedToAdmins(),
+      );
+
+      const resolved = await serviceOver({
+        authz: asked.authz,
+        dataPrivacy,
+      }).resolveApiKeyProtections({ projectId: "project-1", credential: ACCESS_TOKEN_CREDENTIAL });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+      expect(resolved.canSeeCosts).toBe(true);
+      expect(asked.permissionChecks).toContainEqual({
+        userId: "user-1",
+        permission: "project:update",
+        projectId: "project-1",
+      });
+      expect(asked.permissionChecks.every((c) => c.userId === "user-1")).toBe(true);
+      expect(asked.permissionChecks.every((c) => c.projectId === "project-1")).toBe(true);
+      expect(getResolvedForProject).toHaveBeenCalledWith({ projectId: "project-1" });
+    });
+  });
+
+  describe("given an admin's access token and input restricted to a group they are not in", () => {
+    it("hides the input, as the workbench hides it from that admin", async () => {
+      const asked = tokenPermissionChecks();
+      const { dataPrivacy, getResolvedForProject } = dataPrivacyResolving(async () =>
+        inputRestrictedTo("group-a"),
+      );
+
+      const resolved = await serviceOver({
+        authz: asked.authz,
+        dataPrivacy,
+      }).resolveApiKeyProtections({ projectId: "project-1", credential: ACCESS_TOKEN_CREDENTIAL });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+      expect(asked.permissionChecks.every((c) => c.userId === "user-1")).toBe(true);
+      expect(getResolvedForProject).toHaveBeenCalledWith({ projectId: "project-1" });
     });
   });
 });

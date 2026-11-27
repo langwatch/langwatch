@@ -43,7 +43,7 @@ const VERIFIER = "v".repeat(43);
 const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
 const REASON = "fix ACME's broken evaluator";
 
-type Scope = "org:metadata" | "org:content" | "org:support";
+type Scope = "org:content" | "org:support";
 
 /** LangWatchQL's restricted identity for this suite: its own user, never a dev stack's. */
 const LWQL_ENVIRONMENT: Readonly<Record<string, string>> = {
@@ -442,11 +442,11 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
     });
   });
 
-  describe("when a metadata key on ACME searches traces", () => {
-    /** @scenario "A metadata key cannot read trace content" */
+  describe("when a support key without content on ACME searches traces", () => {
+    /** @scenario "A key without org:content cannot read trace content" */
     /** @scenario "Refused staff calls leave a trail row" */
     it("is refused 403, the trace never leaves, and the refusal is trailed", async () => {
-      const { apiKey, requestId } = await redeemedKey({ scopes: ["org:metadata"] });
+      const { apiKey, requestId } = await redeemedKey({ scopes: ["org:support"] });
 
       const answered = await traceSearch({ bearer: apiKey, projectId: acme.projectId });
 
@@ -462,10 +462,10 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
     });
   });
 
-  describe("when a metadata key on ACME reads run results or a stored file", () => {
-    /** @scenario "A metadata key cannot read run results or stored files" */
+  describe("when a support key without content on ACME reads run results or a stored file", () => {
+    /** @scenario "A key without org:content cannot read run results or stored files" */
     it("is refused 403 with staff_content_not_approved on both", async () => {
-      const { apiKey } = await redeemedKey({ scopes: ["org:metadata"] });
+      const { apiKey } = await redeemedKey({ scopes: ["org:support"] });
 
       const results = await call({
         path: "/api/experiments/runs/run-missing/results",

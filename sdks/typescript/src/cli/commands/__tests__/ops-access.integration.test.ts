@@ -37,6 +37,8 @@ let requestBody: Record<string, unknown> = {};
 let redeemCalls = 0;
 let endCalls = 0;
 let searchAuth: string | null = null;
+let withdrawCalls = 0;
+let functionCall: { auth: string; url: string; body: unknown } | null = null;
 const OPS_TOKEN = "lwsa_opsread01_secret";
 
 const sessionFile = () => path.join(stateDir, "ops-session.json");
@@ -147,6 +149,28 @@ const staffRoutes: Record<string, (body: string) => Reply> = {
       },
     };
   },
+  "POST /api/staff-access/requests/req_1/withdraw": () => {
+    withdrawCalls++;
+    return { status: 200, payload: { withdrawn: true } };
+  },
+  "GET /api/staff-access/functions": () => ({
+    status: 200,
+    payload: {
+      items: [
+        {
+          name: "org.snapshot",
+          title: "Plan, member and project counts, creation and flags",
+          scope: "org",
+          answers: "What the organization is set up with.",
+          personal: false,
+          inputSchema: { type: "object" },
+        },
+      ],
+      total: 1,
+      truncated: false,
+      nextCursor: null,
+    },
+  }),
   "POST /api/staff-access/requests/req_live/end": () => {
     endCalls++;
     return { status: 200, payload: { status: "revoked" } };
@@ -160,7 +184,20 @@ const route = ({ req, body }: { req: http.IncomingMessage; body: string }): Repl
     if (auth !== `Bearer ${OPS_TOKEN}`) return { status: 401, payload: { error: "unauthorized" } };
     return {
       status: 200,
-      payload: { organizations: [{ id: "org_acme", slug: "acme", name: "ACME" }] },
+      payload: {
+        items: [{ id: "org_acme", slug: "acme", name: "ACME" }],
+        total: 1,
+        truncated: false,
+        nextCursor: null,
+      },
+    };
+  }
+  if (url.startsWith("/api/staff-access/functions/")) {
+    functionCall = { auth, url, body: JSON.parse(body || "{}") as unknown };
+    if (auth !== `Bearer ${OPS_TOKEN}`) return { status: 401, payload: { error: "unauthorized" } };
+    return {
+      status: 200,
+      payload: { name: "org.snapshot", rows: 1, output: { organizationId: "org_acme" } },
     };
   }
   if (url.startsWith("/api/v1/traces/search")) {
@@ -170,7 +207,8 @@ const route = ({ req, body }: { req: http.IncomingMessage; body: string }): Repl
   const key = `${req.method} ${url}`;
   const handler = Object.hasOwn(staffRoutes, key) ? staffRoutes[key] : undefined;
   if (typeof handler !== "function") return { status: 404, payload: { error: "not_found" } };
-  if (auth !== `Bearer ${REQUESTER_KEY}`)
+  const listing = key === "GET /api/staff-access/functions" && auth === `Bearer ${OPS_TOKEN}`;
+  if (auth !== `Bearer ${REQUESTER_KEY}` && !listing)
     return { status: 401, payload: { error: "unauthorized" } };
   return handler(body);
 };
@@ -203,6 +241,8 @@ beforeEach(() => {
   redeemCalls = 0;
   endCalls = 0;
   searchAuth = null;
+  withdrawCalls = 0;
+  functionCall = null;
 });
 
 afterEach(() => {
@@ -231,6 +271,7 @@ describe("langwatch ops access", () => {
       "acme",
       "--reason",
       "ACME reports missing traces since Monday",
+      "--wait",
       "-o",
       "json",
     ]);
@@ -277,6 +318,7 @@ describe("langwatch ops access", () => {
       "acme",
       "--reason",
       "ACME reports missing traces since Monday",
+      "--wait",
       "-o",
       "json",
     ]);
@@ -372,5 +414,62 @@ describe("langwatch ops access", () => {
     expect(result.exitCode).toBe(0);
     expect(endCalls).toBe(1);
     expect(fs.existsSync(sessionFile())).toBe(false);
+  }, 30_000);
+
+  /** @scenario "A request answers at once with its id and can be checked, resumed or withdrawn" */
+  it("answers a request at once, checks its status, and withdraws it", async () => {
+    await run(["ops", "setup"], {}, { input: `${REQUESTER_KEY}\n` });
+
+    const asked = await run([
+      "ops",
+      "access",
+      "request",
+      "--scope",
+      "org:metadata",
+      "--org",
+      "acme",
+      "--function",
+      "org.snapshot",
+      "--reason",
+      "ACME reports missing traces since Monday",
+      "-o",
+      "json",
+    ]);
+    expect(asked.exitCode).toBe(0);
+    expect(statusPolls).toBe(0);
+    expect(JSON.parse(asked.stdout)).toMatchObject({ status: "pending", requestId: "req_1" });
+    expect(requestBody).toMatchObject({ scopes: ["org:metadata"], functions: ["org.snapshot"] });
+
+    const status = await run(["ops", "access", "status", "req_1", "-o", "json"]);
+    expect(status.exitCode).toBe(0);
+    expect(JSON.parse(status.stdout)).toMatchObject({ requestId: "req_1", status: "pending" });
+
+    const withdrawn = await run(["ops", "access", "withdraw", "req_1", "-o", "json"]);
+    expect(withdrawn.exitCode).toBe(0);
+    expect(withdrawCalls).toBe(1);
+    expect(fs.existsSync(path.join(stateDir, "ops-pending.json"))).toBe(false);
+  }, 30_000);
+
+  /** @scenario "The CLI lists the server's functions and calls an approved one on the session" */
+  it("lists functions from the server and calls one with the session's ops token", async () => {
+    writeSession({
+      apiKey: undefined,
+      opsToken: OPS_TOKEN,
+      scopes: ["org:metadata"],
+      functions: ["org.snapshot"],
+    });
+
+    const listed = await run(["ops", "functions"]);
+    expect(listed.exitCode).toBe(0);
+    expect(listed.stdout).toContain("org.snapshot");
+
+    const called = await run(["ops", "call", "org.snapshot", "--input", "{}", "-o", "json"]);
+    expect(called.exitCode).toBe(0);
+    expect(functionCall).toMatchObject({
+      auth: `Bearer ${OPS_TOKEN}`,
+      url: "/api/staff-access/functions/org.snapshot",
+      body: { input: {} },
+    });
+    expect(JSON.parse(called.stdout)).toMatchObject({ name: "org.snapshot", rows: 1 });
   }, 30_000);
 });

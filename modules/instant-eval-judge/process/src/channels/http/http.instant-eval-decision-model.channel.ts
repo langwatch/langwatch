@@ -175,12 +175,14 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   }
 }
 
-/** Azure takes its key in `api-key`; every other provider takes a bearer token. */
+/** Azure takes its key in `api-key`, Gemini in `x-goog-api-key`; the rest take a bearer token. */
 function authorizationHeaderOf({
   authHeader,
   apiKey,
 }: InstantEvalDecisionModelRequest["decisionModel"]): Readonly<Record<string, string>> {
-  return authHeader === "api_key" ? { "api-key": apiKey } : { authorization: `Bearer ${apiKey}` };
+  if (authHeader === "api_key") return { "api-key": apiKey };
+  if (authHeader === "goog_api_key") return { "x-goog-api-key": apiKey };
+  return { authorization: `Bearer ${apiKey}` };
 }
 
 /**

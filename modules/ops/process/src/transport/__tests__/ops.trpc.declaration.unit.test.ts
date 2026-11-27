@@ -173,6 +173,8 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   listFeatureFlags: "query",
   setFeatureFlag: "mutation",
   setFeatureFlagRules: "mutation",
+  searchFeatureFlagTargets: "query",
+  findFeatureFlagTargets: "query",
   clearFeatureFlag: "mutation",
   listBlobQueues: "query",
   getBlobStoreStats: "query",

@@ -2,23 +2,29 @@ import {
   ApiKeyScopeViolationError,
   DOCS_SESSION_API_KEY_NAME,
   DocsOriginNotRegisteredError,
+  DocsPlaygroundSessionsDisabledError,
   mintDocsSessionKeyInputSchema,
   revokeDocsSessionKeysInputSchema,
   type ApiKeyApi,
+  type DocsSessionAvailability,
   type DocsSessionKeyMinted,
   type DocsSessionRevoked,
   type MintDocsSessionKeyInput,
   type RevokeDocsSessionKeysInput,
 } from "@langwatch/api-key-contract";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import {
+  ImpersonationCannotMintCredentialError,
+  PermissionDeniedError,
+} from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { isRegisteredDocsOrigin } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { isDocsSessionAllowed } from "../rules/api-key-held-answer.rules.ts";
 import {
   docsSessionKeyExpiresAt,
   docsSessionKeyPermissions,
@@ -29,10 +35,13 @@ const logger = createLogger("langwatch:api-key:docs-session");
 
 type DocsSessionKeyServiceOptions = Readonly<{
   apiKeys: Pick<ApiKeyApi, "create">;
-  lifecycle: Pick<ApiKeyLifecycleService, "revokeSystemManaged">;
-  repository: Pick<ApiKeyRepository, "findById" | "findLiveBySessions">;
+  lifecycle: Pick<ApiKeyLifecycleService, "revokeSystemManaged" | "revokeChildren">;
+  repository: Pick<
+    ApiKeyRepository,
+    "findById" | "findLiveBySessions" | "findLiveSystemManagedByName"
+  >;
   authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
-  organizations: Pick<OrganizationApi, "getSessionPolicy">;
+  organizations: Pick<OrganizationApi, "getSessionPolicy" | "getDocsPlaygroundPolicy">;
   projects: Pick<ProjectApi, "getWithTeam">;
   /** Every origin a docs session may be handed to, this deployment's own included. */
   docsOrigins: readonly string[];
@@ -40,8 +49,9 @@ type DocsSessionKeyServiceOptions = Readonly<{
 }>;
 
 /**
- * Docs session keys (ADR-185): the member in one project, holding what they hold there, for at
- * most five minutes. Every request is also capped by the member's live grants (ADR-092 §9).
+ * Docs session keys (ADR-185): the member in one project, holding what they hold there or only
+ * its reads, for the 5 to 60 minutes they chose. Every request is also capped by the member's
+ * live grants (ADR-092 §9), and the organization may turn the whole flow off.
  */
 export class DocsSessionKeyService {
   static create(options: DocsSessionKeyServiceOptions): DocsSessionKeyService {
@@ -55,7 +65,8 @@ export class DocsSessionKeyService {
     const input = mintDocsSessionKeyInputSchema.parse(rawInput);
     const { browserSession } = input;
     // Only a browser session mints one; an operator acting as the member never does.
-    if (input.impersonatorId || !browserSession) {
+    if (input.impersonatorId) throw new ImpersonationCannotMintCredentialError();
+    if (!browserSession) {
       throw new PermissionDeniedError({
         permission: "project:view",
         scope: { type: "project", id: input.projectId },
@@ -71,12 +82,14 @@ export class DocsSessionKeyService {
     if (scope.type !== "project") {
       throw new ApiKeyScopeViolationError("A docs session key is bound to an existing project");
     }
-    const permissions = docsSessionKeyPermissions(
-      await this.options.authz.effectivePermissions({
+    await this.assertOrganizationAllows(scope.organizationId);
+    const permissions = docsSessionKeyPermissions({
+      held: await this.options.authz.effectivePermissions({
         principal: { type: "user", id: input.userId },
         scope,
       }),
-    );
+      access: input.access,
+    });
     if (permissions.length === 0) {
       throw new ApiKeyScopeViolationError("You hold no permission in this project to hand on");
     }
@@ -87,17 +100,19 @@ export class DocsSessionKeyService {
     const nowMs = (this.options.now ?? nowInstant)().epochMilliseconds;
     const expiresAt = docsSessionKeyExpiresAt({
       nowMs,
+      lifetimeMinutes: input.lifetimeMinutes,
       sessionExpiresAt: browserSession.expiresAt,
       sessionStartedAt: browserSession.startedAt,
       maxSessionDurationDays: policy.maxSessionDurationDays,
     });
 
-    const { token } = await this.options.apiKeys.create({
+    const { token, apiKey } = await this.options.apiKeys.create({
       isSystemManaged: true,
       name: DOCS_SESSION_API_KEY_NAME,
       description:
-        "Five-minute key the documentation playground holds in memory. Acts as its owner in " +
-        "one project and dies with their browser session.",
+        `${input.access === "read" ? "Read-only" : "Full-access"} key the documentation ` +
+        `playground holds in memory for up to ${input.lifetimeMinutes} minutes. Acts as its ` +
+        "owner in one project and dies with their browser session.",
       userId: input.userId,
       createdByUserId: input.userId,
       organizationId: scope.organizationId,
@@ -107,6 +122,10 @@ export class DocsSessionKeyService {
       expiresAt: toDate(expiresAt),
       createdByBrowserSessionId: browserSession.id,
     });
+    await this.retireIfTurnedOffDuringMint({
+      apiKey: { id: apiKey.id, createdAt: fromDate(apiKey.createdAt) },
+      organizationId: scope.organizationId,
+    });
 
     return {
       token,
@@ -114,6 +133,46 @@ export class DocsSessionKeyService {
       expiresIn: Math.max(1, Math.floor((expiresAt.epochMilliseconds - nowMs) / 1000)),
       project: { id: project.id, name: project.name },
     };
+  }
+
+  /** Whether the project's organization lets the playground connect; an unknown project refuses. */
+  async availability({ projectId }: { projectId: string }): Promise<DocsSessionAvailability> {
+    const scope = await this.options.authz.getScope({ projectId });
+    if (scope.type !== "project") {
+      throw new ApiKeyScopeViolationError("A docs session key is bound to an existing project");
+    }
+    const policy = await this.options.organizations.getDocsPlaygroundPolicy({
+      organizationId: scope.organizationId,
+    });
+
+    return { enabled: policy.docsPlaygroundSessionsEnabled };
+  }
+
+  /**
+   * The organisation may turn the playground off between the check above and the insert, leaving
+   * a key minted after the cut-off that a switch back on would revive; it goes before it is handed.
+   */
+  private async retireIfTurnedOffDuringMint({
+    apiKey,
+    organizationId,
+  }: {
+    apiKey: { id: string; createdAt: Instant };
+    organizationId: string;
+  }): Promise<void> {
+    const policy = await this.options.organizations.getDocsPlaygroundPolicy({ organizationId });
+    if (isDocsSessionAllowed({ since: apiKey.createdAt, policy })) return;
+    await this.options.lifecycle.revokeSystemManaged({
+      id: apiKey.id,
+      organizationId,
+      callerUserId: null,
+      cause: "session",
+    });
+    throw new DocsPlaygroundSessionsDisabledError();
+  }
+
+  private async assertOrganizationAllows(organizationId: string): Promise<void> {
+    const policy = await this.options.organizations.getDocsPlaygroundPolicy({ organizationId });
+    if (!policy.docsPlaygroundSessionsEnabled) throw new DocsPlaygroundSessionsDisabledError();
   }
 
   /** Idempotent, and silent about any key that is not a live docs session key. */
@@ -141,6 +200,44 @@ export class DocsSessionKeyService {
     if (keys.length > 0) logger.info({ count: keys.length, cause }, "revoked docs session keys");
 
     return { revoked: true };
+  }
+
+  /**
+   * The organisation turned the playground session off at `disabledAt`: every docs session key
+   * minted by then goes, with the keys minted under one, so turning it on again revives none; a
+   * key minted after a later switch back on stays (ADR-185). Idempotent.
+   */
+  async revokeForOrganization({
+    organizationId,
+    disabledAt,
+  }: {
+    organizationId: string;
+    disabledAt: Instant;
+  }): Promise<number> {
+    const keys = await this.options.repository.findLiveSystemManagedByName({
+      organizationId,
+      name: DOCS_SESSION_API_KEY_NAME,
+      createdAtOrBefore: disabledAt,
+    });
+    for (const key of keys) {
+      await this.options.lifecycle.revokeSystemManaged({
+        id: key.id,
+        organizationId,
+        callerUserId: null,
+        cause: "session",
+      });
+      await this.options.lifecycle.revokeChildren({
+        parentApiKeyId: key.id,
+        organizationId,
+        callerUserId: null,
+        cause: "session",
+      });
+    }
+    if (keys.length > 0) {
+      logger.info({ count: keys.length, organizationId }, "revoked an organisation's docs keys");
+    }
+
+    return keys.length;
   }
 
   /** The presenting key, only when it is a docs session key: no other key revokes this way. */

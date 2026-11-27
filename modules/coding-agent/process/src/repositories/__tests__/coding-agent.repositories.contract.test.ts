@@ -191,6 +191,52 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
         repositories.traceSessions.findByTraceId({ tenantId: "project-2", traceId: "trace-1" }),
       ).resolves.toBeNull();
     });
+
+    /**
+     * @scenario "The session's latest stored trace is found through its own trace map"
+     * @scenario "The repository answers a session's newest mapped traces, newest first"
+     */
+    it("answers the session's mappings inside the window, newest first, up to the limit", async () => {
+      const repositories = create();
+      const mapping = (traceId: string, sessionId: string, occurredAtMs: number) => ({
+        tenantId: "project-1",
+        traceId,
+        sessionId,
+        occurredAtMs,
+      });
+      await repositories.traceSessions.ensure(
+        [
+          mapping("trace-1", "session-1", 1_000),
+          mapping("trace-2", "session-1", 3_000),
+          mapping("trace-5", "session-1", 2_000),
+          mapping("trace-3", "session-2", 5_000),
+          mapping("trace-4", "session-1", 90_000),
+        ],
+        30,
+      );
+
+      await expect(
+        repositories.traceSessions.findRecentBySessionId({
+          tenantId: "project-1",
+          sessionId: "session-1",
+          fromMs: 0,
+          toMs: 10_000,
+          limit: 2,
+        }),
+      ).resolves.toEqual([
+        mapping("trace-2", "session-1", 3_000),
+        mapping("trace-5", "session-1", 2_000),
+      ]);
+      await expect(
+        repositories.traceSessions.findRecentBySessionId({
+          tenantId: "project-2",
+          sessionId: "session-1",
+          fromMs: 0,
+          toMs: 100_000,
+          limit: 10,
+        }),
+      ).resolves.toEqual([]);
+    });
   });
 
   describe("when a metric series is converged", () => {

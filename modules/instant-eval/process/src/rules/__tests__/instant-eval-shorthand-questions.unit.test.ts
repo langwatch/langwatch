@@ -26,7 +26,6 @@ const ask = (
 const expand = (shorthand: Partial<InstantEvalShorthandInput> = {}) =>
   expandInstantEvalShorthand({
     shorthand: { target: "traces", questions: [ask()], ...shorthand },
-    database: "analytics",
     now: NOW,
   });
 

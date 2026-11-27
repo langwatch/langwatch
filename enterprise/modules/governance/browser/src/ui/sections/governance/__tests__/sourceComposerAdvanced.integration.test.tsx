@@ -31,12 +31,10 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
-import {
-  type ComposerState,
-  SourceComposerDrawer,
-  SourceEditDrawer,
-} from "../governance-inventory.screen.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
+import { SourceComposerDrawer } from "../inventory/source-composer-drawer.tsx";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
 
 function sourceRow(overrides: Partial<Source>): Source {
   return {

@@ -20,8 +20,11 @@ import {
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "../../model/pii-entity-labels.ts";
+import { type PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
 import { PatternListField } from "../elements/pattern-list-field.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
+import { StrictRuleBasedNote } from "../elements/strict-rule-based-note.tsx";
+import { PiiRedactionLevelDetail } from "./pii-redaction-level-detail.tsx";
 
 type PiiFields = Pick<RuleFormState, "piiChoice" | "piiEntities" | "piiExceptPatterns">;
 
@@ -57,10 +60,13 @@ function HelpTip({ content }: { content: string }) {
 export function PiiRedactionFields({
   form,
   inheritedLevel,
+  piiRedactionModelOffer = null,
   onChange,
 }: {
   form: PiiFields;
   inheritedLevel: PiiLevel;
+  /** What the level runs, Strict's price and the example; null hides them. */
+  piiRedactionModelOffer?: PiiRedactionModelOffer;
   onChange: (patch: Partial<PiiFields>) => void;
 }) {
   const toggleEntity = (entity: string) =>
@@ -78,6 +84,8 @@ export function PiiRedactionFields({
         ? { piiEntities: Object.keys(ESSENTIAL_PII_ENTITY_LABELS) }
         : {}),
     });
+
+  const effectiveLevel = form.piiChoice === "inherit" ? inheritedLevel : form.piiChoice;
 
   return (
     <VStack gap={2} align="stretch">
@@ -124,6 +132,17 @@ export function PiiRedactionFields({
         <Text fontSize="xs" color="fg.muted" textAlign="end">
           {inheritedHint(PII_VALUE_LABELS[inheritedLevel])}
         </Text>
+      )}
+      {piiRedactionModelOffer?.kind === "model" && (
+        <PiiRedactionLevelDetail
+          level={effectiveLevel}
+          free={piiRedactionModelOffer.free}
+          licensed={piiRedactionModelOffer.licensed}
+          split={piiRedactionModelOffer.split}
+        />
+      )}
+      {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (
+        <StrictRuleBasedNote offer={piiRedactionModelOffer} />
       )}
       {form.piiChoice === "custom" && (
         <VStack align="stretch" gap={3} paddingLeft={6}>

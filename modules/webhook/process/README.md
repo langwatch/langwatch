@@ -453,6 +453,7 @@ type Output = {
   family: string;
   schemaVersion: "1";
   isEmitting: boolean;
+  isOptInOnly?: boolean;
   description: string;
 }[];
 

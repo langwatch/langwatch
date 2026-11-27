@@ -6,7 +6,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EVALUATED_TRACE_WAIT_MS,
+  evaluatedTraceRetryAfterMs,
   type LiveTraceEvaluationAnalyticsRow,
+  evaluatedTraceWaitOf,
   type TraceEvaluationAnalyticsRow,
   traceEvaluationRowWrites,
 } from "../trace-evaluation-analytics.rules.ts";
@@ -96,5 +99,62 @@ describe("traceEvaluationRowWrites", () => {
         { row: changed, sign: 1, revision: 2, updatedAtMs: NOW_MS, retentionDays: 30 },
       ]);
     });
+  });
+});
+
+describe("evaluatedTraceRetryAfterMs", () => {
+  describe("given an evaluation whose trace is not stored when it is first handled", () => {
+    /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+    it("looks again after a minute, as a late trace is most often one export behind", () => {
+      expect(evaluatedTraceRetryAfterMs(0)).toBe(60_000);
+      expect(evaluatedTraceRetryAfterMs(59_999)).toBe(60_000);
+    });
+
+    /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+    it("then looks every quarter hour", () => {
+      expect(evaluatedTraceRetryAfterMs(60_000)).toBe(15 * 60_000);
+      expect(evaluatedTraceRetryAfterMs(46 * 60_000)).toBe(15 * 60_000);
+    });
+
+    /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+    it("looks five times within the hour, then once more to give up", () => {
+      const looks: number[] = [];
+      let waitedMs = 0;
+      while (waitedMs <= EVALUATED_TRACE_WAIT_MS) {
+        looks.push(waitedMs / 60_000);
+        waitedMs += evaluatedTraceRetryAfterMs(waitedMs);
+      }
+
+      expect(looks).toEqual([0, 1, 16, 31, 46]);
+      expect(waitedMs).toBeGreaterThan(EVALUATED_TRACE_WAIT_MS);
+    });
+  });
+});
+
+describe("evaluatedTraceWaitOf", () => {
+  /** @scenario "An evaluation naming no trace is not retried" */
+  it.each([
+    ["a blank id", "   "],
+    ["an empty id", ""],
+    ["no id", null],
+  ])("never waits for %s", (_, traceId) => {
+    expect(evaluatedTraceWaitOf(traceId)).toBe("none");
+  });
+
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it.each([
+    ["the W3C all-zero id", "00000000000000000000000000000000"],
+    ["a nil UUID", "00000000-0000-0000-0000-000000000000"],
+    ["a single zero", "0"],
+  ])("looks once for %s", (_, traceId) => {
+    expect(evaluatedTraceWaitOf(traceId)).toBe("once");
+  });
+
+  it.each([
+    ["a W3C id", "4bf92f3577b34da6a3ce929d0e0e4736"],
+    ["an SDK's own id", "trace_7Vb2kQ"],
+    ["an id that only starts with zeros", "00000000000000000000000000000001"],
+  ])("waits on the ladder for %s", (_, traceId) => {
+    expect(evaluatedTraceWaitOf(traceId)).toBe("ladder");
   });
 });

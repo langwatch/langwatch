@@ -29,6 +29,7 @@ import {
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
 import {
+  agentCallGraphSchema,
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
   tracesForProjectResultSchema,
@@ -581,6 +582,17 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesSpanDetailsSchema)
+
+  /** Agents in the trace and the calls between them, A2A hops included. */
+  .query("agentCallGraph")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      traceId: z.string(),
+      ...spanReadHintShape,
+    }),
+  )
+  .withOutput(agentCallGraphSchema)
 
   .query("spanDetail")
   .withInput(

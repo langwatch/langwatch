@@ -4,8 +4,10 @@ import {
   dashboardStanding,
   DashboardNotFoundError,
   DashboardReadOnlyHereError,
+  DashboardScopeAuthorOnlyError,
   type DashboardPlace,
   type DashboardProject,
+  type DashboardScope,
   type DashboardStanding,
   type DashboardViewer,
 } from "@langwatch/dashboard-contract";
@@ -114,7 +116,7 @@ export class DashboardAccessService {
    */
   async getWritable(input: BoardReading & { dashboardId: string }): Promise<BoardRecord> {
     const found = await this.findReadable(input);
-    if (!found) throw new DashboardNotFoundError(input.projectId);
+    if (!found) throw new DashboardNotFoundError({ projectId: input.projectId });
     if (found.standing === "guest") throw new DashboardReadOnlyHereError(input.projectId);
     return found.board;
   }
@@ -142,16 +144,25 @@ export class DashboardAccessService {
     organizationId,
     projectIds,
     viewer,
+    permission = "analytics:view",
+    shouldSkipOthersPersonal = false,
   }: {
     organizationId: string | null;
     projectIds: string[];
     viewer?: DashboardViewer;
+    /** What the viewer must hold there; reading, unless a caller names another. */
+    permission?: "analytics:view" | "analytics:create";
+    /** Leaves out personal projects the viewer does not own, as a place to store a board. */
+    shouldSkipOthersPersonal?: boolean;
   }): Promise<DashboardProject[]> {
     if (projectIds.length === 0 || organizationId === null || !viewer) return [];
-    const projects = await this.#projects.listNamesByIds({ projectIds });
+    const named = await this.#projects.listNamesByIds({ projectIds });
+    const projects = shouldSkipOthersPersonal
+      ? named.filter(({ isPersonal, ownerUserId }) => !isPersonal || ownerUserId === viewer.userId)
+      : named;
     const decision = await this.#authz.canBatchByIds({
       principal: { type: "user", id: viewer.userId },
-      permission: "analytics:view",
+      permission,
       organizationId,
       teams: [],
       projects: projects.map(({ id, teamId }) => ({ projectId: id, teamId })),
@@ -159,6 +170,26 @@ export class DashboardAccessService {
     return projects
       .filter(({ id }) => decision.projects.get(id) === true)
       .map(({ id, name, slug }) => ({ id, name, slug }));
+  }
+
+  /**
+   * What `setScope` holds a board to, before one is made at a scope other than its default:
+   * an author (the door asked for `analytics:update`). Answers the stamp: the organization an
+   * Organization board carries, else none; refuses by name otherwise, before anything is written.
+   */
+  async getScopeStamp({
+    projectId,
+    createdById,
+    scope,
+  }: {
+    projectId: string;
+    createdById: string | undefined;
+    scope: DashboardScope;
+  }): Promise<{ organizationId: string | null }> {
+    if (createdById === undefined) throw new DashboardScopeAuthorOnlyError();
+    // Stamped as setScope stamps it: what lists the board in the organization's other projects.
+    if (scope !== "ORGANIZATION") return { organizationId: null };
+    return { organizationId: await this.#projects.getOrganizationId(projectId) };
   }
 
   /** The repository reach of a place: its organization's live projects' shared boards (AC188). */

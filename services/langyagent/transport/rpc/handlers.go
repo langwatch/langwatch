@@ -32,6 +32,9 @@ type chatRequest struct {
 	// conversation. Absent for a brand-new conversation or an older control
 	// plane.
 	HistorySeed string `json:"historySeed,omitempty"`
+	// Images are the user's pasted or attached images for this turn, checked by
+	// domain.ValidateTurnImages. Their data is never logged.
+	Images []domain.TurnImage `json:"images,omitempty"`
 	// Credentials has no tag of its own — the validator descends into it and
 	// checks its own `validate:"required"` fields (see domain.Credentials).
 	Credentials   domain.Credentials `json:"credentials"`
@@ -127,6 +130,10 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"}))
 			return
 		}
+		if msg := domain.ValidateTurnImages(req.Images); msg != "" {
+			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInvalidImages, herr.M{"message": msg}))
+			return
+		}
 
 		// Stamp the turn's identity + intent onto the context logger so every line
 		// the app, pool, worker, and agent reader emit for this turn carries it —
@@ -150,6 +157,7 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 			Prompt:         req.Prompt,
 			System:         req.System,
 			HistorySeed:    req.HistorySeed,
+			Images:         req.Images,
 			Credentials:    creds,
 			ResumeToken:    req.ResumeToken,
 			TurnID:         req.TurnID,

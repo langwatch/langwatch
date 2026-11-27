@@ -26,7 +26,7 @@ import {
   otlpProtobufRoot,
   parseOtlpTraces,
   readCorrectedPath,
-  readOtlpBody,
+  decodeOtlpBody,
   OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
 import {
@@ -34,7 +34,6 @@ import {
   otlpIngestKeyOf,
   type OtlpIngestCredential,
 } from "@langwatch/otlp/door";
-import { resolveRequestBound } from "@langwatch/plans";
 import { TraceApi, type TraceOtlpIngestApi } from "@langwatch/trace-contract";
 import { SpanKind, type Span } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
@@ -130,31 +129,23 @@ function collectDecodedTraceIds(request: IExportTraceServiceRequest, max: number
   return ids;
 }
 
-/**
- * Reconstructs a `Request` the shared `readOtlpBody` decompressor can
- * read: `.withRawBody("bytes")` already drained the framework's copy, so
- * this hands the SAME headers over a fresh body stream from bytes in hand.
- */
-function requestForDecompression(request: Request, bytes: Uint8Array): Request {
-  return new Request(request.url, {
-    method: request.method,
-    headers: request.headers,
-    // A copy: a fetch body must be backed by a plain ArrayBuffer, which a view may not be.
-    body: new Uint8Array(bytes),
-  });
-}
-
 /** One protocol answer: a JSON body at the status the receiver has always written. */
 type OtlpAnswer = Readonly<{
   status: ContentfulStatusCode;
   mediaType: typeof PRODUCES_JSON;
   body: string;
+  headers?: Readonly<Record<string, string>>;
 }>;
 
-const jsonAnswer = (body: unknown, status: ContentfulStatusCode): OtlpAnswer => ({
+const jsonAnswer = (
+  body: unknown,
+  status: ContentfulStatusCode,
+  headers?: Readonly<Record<string, string>>,
+): OtlpAnswer => ({
   status,
   mediaType: PRODUCES_JSON,
   body: JSON.stringify(body),
+  ...(headers ? { headers } : {}),
 });
 
 /** The door's credential refusals and the plan limit, each in the receiver's own body. */
@@ -186,7 +177,10 @@ async function handleTracesRequest({
   });
   span.setAttribute("langwatch.project.id", project.id);
 
-  const body = await readOtlpBody(requestForDecompression(request, rawBytes));
+  // The framework already drained the wire body under the same cap; decode those bytes in place.
+  const body = await decodeOtlpBody(rawBytes, request.headers.get("content-encoding"), {
+    maxBytes: ports.otlpTracesMaxBodyBytes(),
+  });
   const contentType = request.headers.get("content-type") ?? undefined;
 
   // ONE parse of the body, and the trace ids read off it. The rejection log
@@ -249,7 +243,7 @@ async function handleTracesRequest({
       result: { outcome: "unavailable", errorMessage: result.ingestionFailureMessage ?? "" },
       signal: "traces",
     });
-    return jsonAnswer(failure.body, failure.status);
+    return jsonAnswer(failure.body, failure.status, failure.headers);
   }
 
   return jsonAnswer(
@@ -266,9 +260,6 @@ async function handleTracesRequest({
 
 const INGEST_ACCESS = anyAuthenticated({ reason: AUTH_REASON });
 
-/** Wire-body cap; the decompressed cap is separate. */
-const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
-
 export const otlpIngestRest = defineRestRouter(TraceApi)
   .withNamespace("otel")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -280,7 +271,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withoutAudit("ingestion")
   .withCredential("otlp_ingest", { session: otlpIngestCredentialSchema })
   .withRawBody("bytes", { refuses: OTLP_REFUSED_MEDIA_TYPES })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
+  .withBodyLimit({ maxBytes: (app) => app.otlpTracesMaxBodyBytes() })
   .withAccess(INGEST_ACCESS)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,

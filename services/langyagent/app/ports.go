@@ -34,8 +34,9 @@ type WorkerPool interface {
 	// idle worker (a pre-warmed pool must never starve a real turn) and only
 	// returns herr(domain.ErrMaxWorkers) when every worker is busy. A herr with
 	// domain.ErrCredentialsRequired is returned when a spawn is needed but the
-	// credentials carry no session key — see HasLiveWorker.
-	Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (Worker, error)
+	// credentials carry no session key; see HasLiveWorker. turnID (empty from an
+	// older control plane) keeps a re-dispatch of a turn on the worker that ran it.
+	Acquire(ctx context.Context, conversationID, turnID string, creds domain.Credentials) (Worker, error)
 	// AcquireWarm is Acquire for a pre-warm: best-effort by contract, so at
 	// capacity it returns herr(domain.ErrMaxWorkers) instead of evicting.
 	AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (Worker, error)
@@ -143,8 +144,8 @@ type Worker interface {
 	// prompt has been delivered (the session's own transcript carries it from
 	// then on, and re-sending it would bloat every later message). resumeToken
 	// (ADR-048) carries an opaque prior-turn checkpoint to resume from; empty on
-	// a cold start.
-	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error
+	// a cold start. images ride the prompt to the model as image input.
+	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string, images []domain.TurnImage) error
 	// StreamEvents forwards this session's agent events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error

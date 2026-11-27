@@ -14,8 +14,6 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
-
 ## Step 2: Find Out How the User Pays
 
 The same tokens mean different things to different users, so settle this before any number goes in the report.
@@ -29,22 +27,22 @@ Ask the user, or check on their machine: run `claude -p "hello" --output-format 
 
 Every query below is LangWatchQL, run with `langwatch query run "<sql>" --projects <id,id> -o json`. Run `langwatch query schema` once to confirm the column names. Use one window everywhere, 30 days unless the user names another, and aggregate in SQL: a result is capped at 10,000 rows.
 
-`langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
+`coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
 A query names the projects it reads: pass `--projects <id,id>` (ids from `langwatch projects list`; a project key needs none). To check the scope first, run this with every project the login can reach: page through `langwatch projects list` until it has no more, since it lists 50 at a time.
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
 If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the project id is `$LANGWATCH_PROJECT_ID` when set (never run `langwatch whoami` then: it reads only the device login and reports "Not logged in" next to a working key). Without it, the user's own id is `personal_project.id` in `langwatch whoami`; if whoami reports "Not logged in" or that field is missing, ask the user which project id to use.
 
-If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
-`langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
+`coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
 Start with the spend mix:
 
@@ -55,7 +53,7 @@ SELECT Model,
   count() AS calls, sum(InputTokens) AS input, sum(OutputTokens) AS output,
   sum(CacheReadTokens) AS cache_read, sum(CacheCreationTokens) AS cache_write,
   round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY Model, thread ORDER BY cost_usd DESC
 ```
@@ -88,7 +86,7 @@ Measured in a controlled run: on 5 bug-fix tasks (15 runs per model, every hidde
 SELECT SessionId, max(InputTokens + CacheReadTokens + CacheCreationTokens) AS peak_context,
   countIf(InputTokens + CacheReadTokens + CacheCreationTokens > 400000) AS calls_over_400k,
   round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
   AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY SessionId HAVING calls_over_400k > 0 ORDER BY cost_usd DESC LIMIT 50
@@ -120,7 +118,7 @@ Also: `/compact` at the end of a task, `/clear` before an unrelated one.
 
 ```sql
 SELECT QuerySource, Model, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
-FROM langwatch.coding_session_events
+FROM coding_session_events
 WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
   AND (QuerySource LIKE 'agent:builtin:%' OR QuerySource = 'agent_summary')
 GROUP BY QuerySource, Model ORDER BY cost_usd DESC
@@ -150,7 +148,7 @@ FROM (
     InputTokens + CacheReadTokens + CacheCreationTokens AS ctx,
     dateDiff('second', lagInFrame(TimeUnixMs) OVER w, TimeUnixMs) AS gap,
     row_number() OVER w AS rn
-  FROM langwatch.coding_session_events
+  FROM coding_session_events
   WHERE EventKind = 'model_call' AND (QuerySource LIKE 'repl_main_thread%' OR QuerySource = 'sdk')
     AND TimeUnixMs >= now() - INTERVAL 30 DAY
   WINDOW w AS (PARTITION BY SessionId ORDER BY TimeUnixMs
@@ -193,7 +191,7 @@ Write a single self-contained `coding-agent-cost-report.html` in the project roo
 - The window used, the price list link with its fetch date, and the formula behind each estimate.
 - A note that savings overlap (checks 1 and 4 price the same Opus sub-agent calls; checks 2, 3 and 7 touch the same long threads), so the rows do not add up to a total.
 
-State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/me/sessions` shows peak context, compactions and cost per session.
+State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/coding-agents/sessions` shows peak context, compactions and cost per session.
 
 ## Common Mistakes
 

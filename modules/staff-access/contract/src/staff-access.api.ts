@@ -3,6 +3,8 @@ import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type {
+  StaffAccessFunctionAnswer,
+  StaffAccessFunctionList,
   StaffAccessCopyBody,
   StaffAccessCopyReport,
   StaffAccessOrganizationList,
@@ -95,9 +97,18 @@ export interface StaffAccessApi {
     input: StaffAccessAgent & { requestId: string; codeVerifier: string },
   ): Promise<StaffAccessRedeemed>;
   endSession(input: StaffAccessAgent & { requestId: string }): Promise<{ ended: true }>;
+  /** The requester takes back an undecided request; a decided one is `request_not_pending`. */
+  withdrawRequest(input: StaffAccessAgent & { requestId: string }): Promise<{ withdrawn: true }>;
+
+  /** The registry, served so the server rather than the CLI build says what exists. */
+  listFunctions(input: StaffAccessAgent): Promise<StaffAccessFunctionList>;
+  /** Runs one function the session's approval named, against the approved organization. */
+  callFunction(
+    input: StaffAccessAgent & { name: string; input: unknown },
+  ): Promise<StaffAccessFunctionAnswer>;
 
   listOrganizations(
-    input: StaffAccessAgent & { query?: string },
+    input: StaffAccessAgent & { query?: string; limit?: number; cursor?: string },
   ): Promise<StaffAccessOrganizationList>;
   getOrganizationUsage(
     input: StaffAccessAgent & { organization: string },

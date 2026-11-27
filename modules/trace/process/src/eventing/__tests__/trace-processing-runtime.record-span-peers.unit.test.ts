@@ -12,6 +12,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   COMMAND_INLINE_THRESHOLD,
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
   RECORD_SPAN_COMMAND_TYPE,
   spanReceivedEventSchema,
   type RecordSpanCommandData,
@@ -113,7 +114,11 @@ function composeBlobStore(repositories: ReturnType<typeof MemoryTraceRepositorie
   return TraceModule.composeBlobStore({
     repositories,
     channels: { legacySpool: MemoryTraceLegacySpoolChannel.create() },
-    config: { objectRetentionConfirmed: undefined, legacySpoolRetentionConfirmed: undefined },
+    config: {
+      objectRetentionConfirmed: undefined,
+      legacySpoolRetentionConfirmed: undefined,
+      otlpTracesMaxBodyBytes: DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
+    },
   });
 }
 

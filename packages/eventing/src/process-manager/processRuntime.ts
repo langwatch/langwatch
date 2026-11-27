@@ -1,5 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs, nowInstant } from "@langwatch/time";
 
 import type { Event } from "../domain/types.ts";
 import {
@@ -384,7 +384,7 @@ export class ProcessRuntime {
     try {
       return await registered.manager.handleEvent({
         envelope,
-        now: nowInstant().epochMilliseconds,
+        now: nowEpochMs(),
       });
     } catch (error) {
       if (error instanceof ProcessStateUnreadableError) {
@@ -421,7 +421,7 @@ export class ProcessRuntime {
 
     const result = await registered.manager.handleSignal({
       signal: params.signal,
-      now: params.now ?? nowInstant().epochMilliseconds,
+      now: params.now ?? nowEpochMs(),
       createIfMissing: params.createIfMissing,
     });
     const insertedIntents = result.outcome === "committed" && result.insertedMessageKeys.length > 0;

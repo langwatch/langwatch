@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 
 import {
   type ConversationTurn,
-  conversationContextInput,
   lastTurnOfSession,
   openReplayHere,
   openReplayInExplorer,
@@ -100,13 +99,11 @@ export function useTerminalReplay({ projectId, projectSlug }: TerminalReplayInpu
 
   const prefetch = useCallback(
     (row: ReplayableSession) => {
-      void utils.traces.conversationContext.prefetch(
-        conversationContextInput({
-          projectId,
-          sessionId: row.sessionId,
-          tenantId: memberTenantOf({ tenantId: row.tenantId, projectId }),
-        }),
-      );
+      const tenantId = memberTenantOf({ tenantId: row.tenantId, projectId });
+      void utils.codingAgents.lastTurn.prefetch({
+        projectId: tenantId ?? projectId,
+        sessionId: row.sessionId,
+      });
     },
     [projectId, utils],
   );

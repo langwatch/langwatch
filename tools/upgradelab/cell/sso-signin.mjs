@@ -12,11 +12,11 @@ mkdirSync(stateDir, { recursive: true });
 const emit = (record) => console.log(JSON.stringify({ phase, ...record }));
 const shown = async (page) =>
   `${new URL(page.url()).pathname}: ${(await page.innerText("body").catch(() => "")).replace(/\s+/g, " ").slice(0, 200)}`;
-// Signed in: on the member's project (the SAML one has its own), or on /me, the personal page a
-// member with no project of their own lands on.
+// Signed in: on the member's project (the SAML one has its own), or on the personal page a member
+// with no project of their own lands on: /me on releases before the move, /coding-agents after.
 const onProject = (at, member) =>
   at.origin === new URL(url).origin &&
-  [member?.project ?? project, "me"].includes(at.pathname.split("/")[1]);
+  [member?.project ?? project, "me", "coding-agents"].includes(at.pathname.split("/")[1]);
 const atAuth = (at) => at.pathname.startsWith("/auth/");
 const stateFile = (member) => join(stateDir, `${member.email.replace(/[^a-z0-9]+/gi, "-")}.json`);
 

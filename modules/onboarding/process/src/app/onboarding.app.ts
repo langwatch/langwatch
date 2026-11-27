@@ -14,6 +14,7 @@ import {
   type GuidedOnboardingStateWithInstance,
   type GuidedOnboardingStateWithVariant,
   type IntegrationsCheckStatus,
+  type LangyStart,
   type OnboardingCallerInput,
   type OnboardingInitializeOrganizationInput,
   type OnboardingSignUpCaller,
@@ -242,6 +243,17 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     const actor = { organizationId: input.organizationId, userId: input.userId ?? undefined };
 
     return this.#guided.completePath(actor, { path: input.path });
+  }
+
+  async recordLangyStart(input: {
+    organizationId: string;
+    userId: string | null;
+    start: LangyStart;
+  }): Promise<GuidedOnboardingState> {
+    await this.authorizeNamedPerson(input.userId, input.organizationId);
+    const actor = { organizationId: input.organizationId, userId: input.userId ?? undefined };
+
+    return this.#guided.recordLangyStart(actor, { start: input.start });
   }
 
   async attachConversation(

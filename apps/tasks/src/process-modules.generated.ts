@@ -17,6 +17,7 @@ import { dataPrivacyProcessModule } from "@langwatch/data-privacy-process";
 import { dataRetentionProcessModule } from "@langwatch/data-retention-process";
 import { datasetProcessModule } from "@langwatch/dataset-process";
 import { demoDataProcessModule } from "@langwatch/enterprise-demo-data-process";
+import { digestProcessModule } from "@langwatch/enterprise-digest-process";
 import { enterpriseGatewayProcessModule } from "@langwatch/enterprise-gateway-process";
 import { enterpriseOpsProcessModule } from "@langwatch/enterprise-ops-process";
 import { entitlementProcessModule } from "@langwatch/entitlement-process";
@@ -85,6 +86,7 @@ export const processModules = [
   dataRetentionProcessModule,
   datasetProcessModule,
   demoDataProcessModule,
+  digestProcessModule,
   enterpriseGatewayProcessModule,
   enterpriseOpsProcessModule,
   entitlementProcessModule,

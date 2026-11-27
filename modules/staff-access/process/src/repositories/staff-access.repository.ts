@@ -32,6 +32,8 @@ export type StaffAccessRequestRow = Readonly<{
   requesterId: string;
   ownerUserId: string;
   scopes: string[];
+  /** The ops functions the approval names, sorted. */
+  functions: string[];
   organizationId: string | null;
   organizationName: string | null;
   counterpartOrganizationId: string | null;
@@ -69,6 +71,10 @@ export type StaffAccessEventRow = Readonly<{
   method: string;
   path: string;
   operation: string;
+  /** The ops function called, its input as JSON, and how many rows it answered. */
+  functionName: string | null;
+  functionInput: string | null;
+  rowCount: number | null;
   permissions: string[];
   organizationId: string | null;
   projectId: string | null;
@@ -154,6 +160,8 @@ export interface StaffAccessRequestRepository {
   claimApproval(input: StaffAccessApproval): Promise<boolean>;
   /** approving -> approved once the customer's audit row exists; false when it was revoked. */
   confirmApproval(input: { id: string; at: Instant }): Promise<boolean>;
+  /** pending -> revoked by its own requester; false when it was not pending. */
+  withdraw(input: { id: string; requesterId: string; at: Instant }): Promise<boolean>;
   /** pending -> denied; false when it was not pending. */
   deny(input: { id: string; at: Instant }): Promise<boolean>;
   /** approved -> redeemed once, by its own requester, while unexpired. */
@@ -185,6 +193,7 @@ export interface StaffAccessEventRepository {
     status: number;
     errorCode: string | null;
     durationMs: number;
+    rowCount?: number;
   }): Promise<void>;
   findByRequest(input: { requestId: string }): Promise<StaffAccessEventRow[]>;
 }

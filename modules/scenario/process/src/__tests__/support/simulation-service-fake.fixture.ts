@@ -21,7 +21,6 @@ const servedReads = {
   findRunDataForAllSuites: "getRunDataForAllSuites",
   findLastUpdatedAt: "getLastUpdatedAt",
   findAllRunIdsForSet: "getRunIdsForSet",
-  findDistinctExternalSetIds: "getDistinctExternalSetIds",
   countRunsForExport: "countRunsForExport",
   countUsage: "countUsage",
   countOrganizationRuns: "countOrganizationRuns",
@@ -42,6 +41,7 @@ const sentWrites = [
   "recordAgentInstance",
   "recordCutAtLimit",
   "recordHooks",
+  "recordRedTeamReport",
 ] as const satisfies readonly (keyof SimulationService)[];
 
 /** The registry's simulation reads, answered by a service-shaped fake; any other read throws. */

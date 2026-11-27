@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -27,6 +27,13 @@ import { tenantIdFromGroupId } from "./storage.ts";
  * to keep collect cycle O(sample) whatever the backlog size.
  */
 const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
+
+/**
+ * Eligible groups the pending-age gauge compares per cycle, nearest-due first. The lowest
+ * ready score is the oldest event, not the longest wait, so the gauge reads how long each
+ * of these has actually waited and reports the longest. Bounded like the backlog sample.
+ */
+const OLDEST_PENDING_SAMPLE_GROUPS = 50;
 
 /**
  * Groups whose staging depth one collect cycle reads. A cap, not a sample:
@@ -83,6 +90,41 @@ for index = 2, #ARGV do
 end
 return out
 `);
+
+/**
+ * Each group's head job score and the time it was staged (the envelope header's `a`), read
+ * on Redis so the payload never crosses the wire. Either is "" when the group has no head or
+ * the job carries no staged time. KEYS[1] only routes the call to the queue's slot.
+ */
+const groupHeadAgesScript = new CachedLuaScript(`#!lua flags=no-writes,allow-oom
+local keyPrefix = ARGV[1]
+local out = {}
+for index = 2, #ARGV do
+  local groupId = ARGV[index]
+  local score, stagedAt = "", ""
+  local head = redis.call("ZRANGE", keyPrefix .. "group:" .. groupId .. ":jobs", 0, 0, "WITHSCORES")
+  if head[1] then
+    score = head[2]
+    local value = redis.call("HGET", keyPrefix .. "group:" .. groupId .. ":data", head[1])
+    if value and string.sub(value, 1, 4) == "GQ2|" then
+      local barIdx = string.find(value, "|", 5, true)
+      local headerLen = barIdx and tonumber(string.sub(value, 5, barIdx - 1))
+      if headerLen and headerLen > 0 then
+        local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
+        if ok and type(header) == "table" and type(header["a"]) == "number" then
+          stagedAt = string.format("%.0f", header["a"])
+        end
+      end
+    end
+  end
+  out[#out + 1] = score
+  out[#out + 1] = stagedAt
+end
+return out
+`);
+
+/** A group's head job: its score and staged time, each null when unknown or not a timestamp. */
+type HeadAge = { scoreMs: number | null; stagedAtMs: number | null };
 
 /**
  * Periodically collects metrics from the group queue processing and staging layers.
@@ -195,9 +237,9 @@ export class GroupQueueMetricsCollector {
   }
 
   /**
-   * Collects two age gauges: eligible-waiting (min readyKey score) and
-   * backlog-regardless-of-eligibility (nearest-deferred groups + eligible head).
-   * Replaces flawed "top-10 groups" scan; validates scores against MIN_PLAUSIBLE_EPOCH_MS.
+   * Collects the eligible-waiting and whole-backlog age gauges. A group waits from the later of
+   * its score and its head job's staged time (the score alone when none was recorded), since
+   * a score is the event's own time. Scores are checked against MIN_PLAUSIBLE_EPOCH_MS.
    */
   private async collectOldestAges({
     readyKey,
@@ -206,28 +248,49 @@ export class GroupQueueMetricsCollector {
     readyKey: string;
     keyPrefix: string;
   }): Promise<void> {
-    const nowMs = nowInstant().epochMilliseconds;
-    const oldestEligible = await this.params.redisConnection.zrangebyscore(
+    const nowMs = nowEpochMs();
+    const eligible = readyEntries(
+      await this.params.redisConnection.zrangebyscore(
+        readyKey,
+        MIN_PLAUSIBLE_EPOCH_MS,
+        nowMs,
+        "WITHSCORES",
+        "LIMIT",
+        0,
+        OLDEST_PENDING_SAMPLE_GROUPS,
+      ),
+    );
+    const deferredGroups = await this.params.redisConnection.zrangebyscore(
       readyKey,
-      MIN_PLAUSIBLE_EPOCH_MS,
-      nowMs,
-      "WITHSCORES",
+      `(${nowMs}`,
+      "+inf",
       "LIMIT",
       0,
-      1,
+      OLDEST_BACKLOG_SAMPLE_GROUPS,
     );
-    const eligibleDueMs = oldestEligible.length >= 2 ? Number(oldestEligible[1]) : null;
-    await this.publishOldestPending({
-      keyPrefix,
-      groupId: eligibleDueMs === null ? null : (oldestEligible[0] ?? null),
-      ageMs: eligibleDueMs === null ? 0 : Math.max(0, nowMs - eligibleDueMs),
-    });
-
-    const oldestDueMs = await this.foldDeferredHeads({
+    const heads = await this.readHeadAges({
       readyKey,
       keyPrefix,
+      groupIds: [...eligible.map(({ groupId }) => groupId), ...deferredGroups],
+    });
+
+    let oldestPending: { groupId: string; waitingSinceMs: number } | null = null;
+    for (const { groupId, scoreMs } of eligible) {
+      const waitingSinceMs = Math.max(scoreMs, heads.get(groupId)?.stagedAtMs ?? scoreMs);
+      if (oldestPending === null || waitingSinceMs < oldestPending.waitingSinceMs) {
+        oldestPending = { groupId, waitingSinceMs };
+      }
+    }
+    await this.publishOldestPending({
+      keyPrefix,
+      groupId: oldestPending?.groupId ?? null,
+      ageMs: oldestPending === null ? 0 : Math.max(0, nowMs - oldestPending.waitingSinceMs),
+    });
+
+    const oldestDueMs = foldDeferredHeads({
+      heads: deferredGroups.map((groupId) => heads.get(groupId)),
       nowMs,
-      seed: eligibleDueMs,
+      seed: oldestPending?.waitingSinceMs ?? null,
     });
     gqOldestBacklogAgeMilliseconds.set(
       oldestDueMs === null ? 0 : Math.max(0, nowMs - oldestDueMs),
@@ -414,37 +477,47 @@ export class GroupQueueMetricsCollector {
   }
 
   /**
-   * Samples the nearest-deferred ready groups and folds their head-job scores
-   * into the oldest due time, seeded with the eligible head so an old eligible
-   * group past the sample bound still registers.
+   * Each group's head job score and staged time, in one bounded script call (the two samples
+   * together). A failed call leaves every group unknown for this cycle, so the pending age
+   * falls back to the ready score and the backlog to the eligible groups alone.
    */
-  private async foldDeferredHeads({
+  private async readHeadAges({
     readyKey,
     keyPrefix,
-    nowMs,
-    seed,
+    groupIds,
   }: {
     readyKey: string;
     keyPrefix: string;
-    nowMs: number;
-    seed: number | null;
-  }): Promise<number | null> {
-    const deferredGroups = await this.params.redisConnection.zrangebyscore(
-      readyKey,
-      `(${nowMs}`,
-      "+inf",
-      "LIMIT",
-      0,
-      OLDEST_BACKLOG_SAMPLE_GROUPS,
-    );
-    if (deferredGroups.length === 0) return seed;
-
-    const headPipeline = this.params.redisConnection.pipeline();
-    for (const groupId of deferredGroups) {
-      headPipeline.zrange(`${keyPrefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+    groupIds: string[];
+  }): Promise<Map<string, HeadAge>> {
+    const heads = new Map<string, HeadAge>();
+    if (groupIds.length === 0) return heads;
+    try {
+      const reply = await groupHeadAgesScript.run(
+        this.params.redisConnection,
+        1,
+        readyKey,
+        keyPrefix,
+        ...groupIds,
+      );
+      const fields = Array.isArray(reply) ? reply.map(String) : [];
+      for (const [index, groupId] of groupIds.entries()) {
+        heads.set(groupId, {
+          scoreMs: plausibleTimestamp(fields[index * 2]),
+          stagedAtMs: plausibleTimestamp(fields[index * 2 + 1]),
+        });
+      }
+    } catch (error) {
+      this.params.logger.debug(
+        {
+          queueName: this.params.queueName,
+          groups: groupIds.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to read group head job ages for metrics",
+      );
     }
-    const headResults = (await headPipeline.exec()) ?? [];
-    return minDueMs(seed, headResults, nowMs);
+    return heads;
   }
 
   /**
@@ -491,7 +564,7 @@ export class GroupQueueMetricsCollector {
   private async warnOfDeepestGroup({ keyPrefix }: { keyPrefix: string }): Promise<void> {
     const groupId = this.stagingDeepestGroupId;
     if (groupId === null || this.stagingDepthMax < STAGING_DEPTH_REPORT_FLOOR) return;
-    const nowMs = nowInstant().epochMilliseconds;
+    const nowMs = nowEpochMs();
     if (nowMs - this.stagingDepthWarnedAtMs < STAGING_DEPTH_WARN_INTERVAL_MS) return;
     this.stagingDepthWarnedAtMs = nowMs;
     const isBlocked = await this.params.redisConnection
@@ -560,19 +633,41 @@ function seriesKey(labels: GroupLabels): string {
   return `${labels.pipeline_name}\u0000${labels.job_type}\u0000${labels.job_name}`;
 }
 
+/** The ready set's `WITHSCORES` reply as group and score pairs. */
+function readyEntries(reply: string[]): { groupId: string; scoreMs: number }[] {
+  const entries: { groupId: string; scoreMs: number }[] = [];
+  for (let index = 0; index + 1 < reply.length; index += 2) {
+    entries.push({ groupId: reply[index]!, scoreMs: Number(reply[index + 1]) });
+  }
+  return entries;
+}
+
+/** A reply field as epoch ms, or null when it is empty or not a plausible timestamp. */
+function plausibleTimestamp(field: string | undefined): number | null {
+  if (field === undefined || field === "") return null;
+  const value = Number(field);
+  return isPlausibleReadyScore(value) ? value : null;
+}
+
 /**
- * Extracts minimum due time from head-job scores; only counts genuinely due jobs,
- * skipping future-scheduled and invalid scores (not counted again at staging).
+ * Folds the sampled deferred groups' heads into the oldest due time, seeded with the oldest
+ * eligible wait so an old eligible group past the sample bound still registers. A head is due
+ * from the later of its score and its staged time; one scheduled in the future is no backlog.
  */
-function minDueMs(
-  seed: number | null,
-  headResults: [unknown, unknown][],
-  nowMs: number,
-): number | null {
-  return headResults
-    .map(([err, value]) => (err ? [] : (value as string[])))
-    .filter((arr) => arr.length >= 2)
-    .map((arr) => Number(arr[1]))
-    .filter((dueMs) => isPlausibleReadyScore(dueMs) && dueMs <= nowMs)
-    .reduce<number | null>((acc, dueMs) => (acc === null || dueMs < acc ? dueMs : acc), seed);
+function foldDeferredHeads({
+  heads,
+  nowMs,
+  seed,
+}: {
+  heads: (HeadAge | undefined)[];
+  nowMs: number;
+  seed: number | null;
+}): number | null {
+  let oldest = seed;
+  for (const head of heads) {
+    if (!head || head.scoreMs === null || head.scoreMs > nowMs) continue;
+    const dueMs = Math.max(head.scoreMs, head.stagedAtMs ?? head.scoreMs);
+    if (oldest === null || dueMs < oldest) oldest = dueMs;
+  }
+  return oldest;
 }

@@ -31,13 +31,16 @@ type PiiRedactionAnsweredCall = Readonly<{
   texts: readonly string[];
   /** The record's trace and span, when it has them. */
   recordKey?: string | undefined;
-  durationMs: number;
+  /** Each model call's duration (ADR-201 decision 6, ADR-207): our cost sums them. */
+  callDurationsMs: readonly number[];
 }>;
 
 /** Whether the organization pays nothing, or that the free list could not say. */
 type FreeListRead = { kind: "read"; free: boolean } | { kind: "unread" };
 
 type PiiRedactionSpendDeps = Readonly<{
+  /** A self-hosted install runs the model itself: its calls are recorded at zero, unread. */
+  selfHosted: boolean;
   /**
    * Keys the request id, so it is no hash of the text anyone can recompute. Absent only where
    * no model is named, which never answers a call; a call reaching here without it is not billed.
@@ -51,6 +54,7 @@ type PiiRedactionSpendDeps = Readonly<{
 
 export class PiiRedactionSpendService {
   static create(input: {
+    selfHosted: boolean;
     requestIdKey: Uint8Array | undefined;
     featureFlags: FeatureFlagApi;
     recordSpendPriced: (fact: PiiRedactionSpendPricedEventData) => Promise<void>;
@@ -91,7 +95,9 @@ export class PiiRedactionSpendService {
       );
       return;
     }
-    const freeList = await this.#readFreeList(call);
+    const freeList = this.deps.selfHosted
+      ? ({ kind: "read", free: true } as const)
+      : await this.#readFreeList(call);
     if (freeList.kind === "unread") return;
     const free = freeList.free;
     const fact = piiRedactionSpendFact({

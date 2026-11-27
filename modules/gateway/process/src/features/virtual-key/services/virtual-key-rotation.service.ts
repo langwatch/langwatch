@@ -127,6 +127,7 @@ export class VirtualKeyRotationService {
     await this.governanceSignals?.emitVirtualKeyLifecycle({
       virtualKey: rotated,
       action: "rotated",
+      actorUserId: input.actorUserId,
     });
 
     return { virtualKey: rotated, secret: newSecret };

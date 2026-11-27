@@ -1,5 +1,7 @@
 import {
   GOVERNANCE_INGESTION_SOURCE_TYPES,
+  SECURITY_LAKE_ADAPTER_ID,
+  SECURITY_LAKE_SOURCE_TYPE,
   GovernanceValidationError,
   isPushSourceType,
   IngestionSourceCapReachedError,
@@ -23,6 +25,8 @@ import type {
 } from "../../../repositories/ingestion-source.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../../../services/governance-policy.service.ts";
 import type { PullDestinationService } from "../../ingestion-pull/services/pull-destination.service.ts";
+import { plainUpdateFields } from "../rules/ingestion-source-update.rules.ts";
+import type { IngestionSourceFactsService } from "./ingestion-source-facts.service.ts";
 import { IngestionSourceParserConfigService } from "./ingestion-source-parser-config.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
@@ -41,6 +45,7 @@ type IngestionSourceProjects = Pick<
   ProjectApi,
   "ensureInternal" | "listActiveByScopes" | "findWithTeam"
 >;
+type IngestionSourceFacts = Pick<IngestionSourceFactsService, "created" | "wentLive">;
 
 export class IngestionSourceService {
   private readonly repository: IngestionSourceRepository;
@@ -55,6 +60,7 @@ export class IngestionSourceService {
   private readonly validation: IngestionSourceValidationService;
   private readonly parserConfigs: IngestionSourceParserConfigService;
   private readonly ottl: Pick<GovernanceOttlGateway, "validate">;
+  private readonly facts: IngestionSourceFacts;
 
   private constructor({
     repository,
@@ -69,6 +75,7 @@ export class IngestionSourceService {
     validation,
     parserConfigs,
     ottl,
+    facts,
   }: {
     repository: IngestionSourceRepository;
     projects: IngestionSourceProjects;
@@ -82,6 +89,7 @@ export class IngestionSourceService {
     validation: IngestionSourceValidationService;
     parserConfigs: IngestionSourceParserConfigService;
     ottl: Pick<GovernanceOttlGateway, "validate">;
+    facts: IngestionSourceFacts;
   }) {
     this.repository = repository;
     this.projects = projects;
@@ -95,6 +103,7 @@ export class IngestionSourceService {
     this.validation = validation;
     this.parserConfigs = parserConfigs;
     this.ottl = ottl;
+    this.facts = facts;
   }
 
   static create(options: {
@@ -107,7 +116,10 @@ export class IngestionSourceService {
     providerAccounts: ProviderAccountChannel;
     diagnostics: GovernanceDiagnosticsSink;
     ottl: Pick<GovernanceOttlGateway, "validate">;
+    facts: IngestionSourceFacts;
     now?: () => number;
+    /** A keyless S3 polling source reads as the deployment's own AWS identity (self-hosted). */
+    deploymentAwsIdentity?: boolean;
   }): IngestionSourceService {
     return new IngestionSourceService({
       repository: options.repository,
@@ -120,7 +132,11 @@ export class IngestionSourceService {
       diagnostics: options.diagnostics,
       now: options.now ?? Date.now,
       ottl: options.ottl,
-      validation: IngestionSourceValidationService.create({ projects: options.projects }),
+      facts: options.facts,
+      validation: IngestionSourceValidationService.create({
+        projects: options.projects,
+        deploymentAwsIdentity: options.deploymentAwsIdentity ?? false,
+      }),
       parserConfigs: IngestionSourceParserConfigService.create({
         repository: options.repository,
         providerAccounts: options.providerAccounts,
@@ -145,16 +161,13 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource | null> {
     const row = await this.repository.findById(id);
-
     return row?.organizationId === organizationId ? row : null;
   }
 
   async findByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null> {
     const candidateHash = this.secrets.hash(rawSecret);
     const direct = await this.repository.findByCurrentSecretHash(candidateHash);
-    if (direct) {
-      return direct;
-    }
+    if (direct) return direct;
 
     const candidates = await this.repository.findByPriorSecretHash(candidateHash);
     const now = this.now();
@@ -172,6 +185,36 @@ export class IngestionSourceService {
         );
       }) ?? null
     );
+  }
+
+  /**
+   * What the generic create and edit may touch: Security Lake has routes and checks of its own, so
+   * neither its source type nor its adapter is accepted here, sent or already stored.
+   */
+  async assertGenericallyManaged(input: {
+    organizationId: string;
+    sourceType?: string;
+    id?: string;
+    parserConfig?: Record<string, unknown> | null;
+    pullConfig?: Record<string, unknown> | null;
+  }): Promise<void> {
+    const stored =
+      input.id === undefined
+        ? undefined
+        : await this.getById({ id: input.id, organizationId: input.organizationId });
+    const sourceType = stored === undefined ? input.sourceType : stored.sourceType;
+    const adapters = [
+      stored?.parserConfig.adapter,
+      input.pullConfig?.adapter,
+      input.parserConfig?.adapter,
+    ];
+    if (sourceType === SECURITY_LAKE_SOURCE_TYPE || adapters.includes(SECURITY_LAKE_ADAPTER_ID)) {
+      throw unsupportedValue({
+        field: "sourceType",
+        value: SECURITY_LAKE_SOURCE_TYPE,
+        allowed: GOVERNANCE_INGESTION_SOURCE_TYPES.filter((t) => t !== SECURITY_LAKE_SOURCE_TYPE),
+      });
+    }
   }
 
   async createSource(
@@ -197,10 +240,9 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    // Only a push source has a secret at all: a pull-mode or pure-S3 source
-    // authenticates outbound, so a minted secret would be stored and shown
-    // without ever authenticating anything. The empty hash is the sentinel for
-    // "there is no secret here", which is what the ingest door reads.
+    // Only a push source has a secret: a pull-mode or pure-S3 source authenticates outbound, so a
+    // minted secret would be stored and shown without authenticating anything. The empty hash is
+    // the sentinel for "there is no secret here", which is what the ingest door reads.
     const ingestSecret = isPushSourceType({ sourceType: input.sourceType })
       ? this.secrets.generate()
       : null;
@@ -211,6 +253,7 @@ export class IngestionSourceService {
     this.destinations.assertAllowed(requestedParserConfig);
     this.validation.assertPullConfig(requestedParserConfig);
     this.validation.assertPullCredentials(requestedParserConfig);
+    await this.destinations.assertListingAddressesAllowed(requestedParserConfig);
     await this.assertOttlParses(requestedParserConfig);
     const { providerAccountId } = await this.parserConfigs.assertClaimsAreFree({
       organizationId: input.organizationId,
@@ -239,6 +282,7 @@ export class IngestionSourceService {
       createdById: input.actorUserId,
       providerAccountId: providerAccountId ?? null,
     });
+    this.facts.created(source);
     if (source.pullSchedule) {
       await this.syncBestEffort(source);
     }
@@ -251,7 +295,7 @@ export class IngestionSourceService {
   ): Promise<GovernanceIngestionSource> {
     const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
     this.validation.assertPullSchedule(input.pullSchedule);
-    const update: UpdateIngestionSourceRecord = this.plainUpdateFields(input);
+    const update: UpdateIngestionSourceRecord = plainUpdateFields(input);
     let cursorMustNotMove = false;
     if (input.parserConfig !== undefined) {
       const incoming = this.parserConfigs.mergedParserConfig({
@@ -267,6 +311,7 @@ export class IngestionSourceService {
       cursorMustNotMove = reportMoves || environmentMoves;
       this.destinations.assertAllowed(incoming);
       this.validation.assertPullConfig(incoming);
+      await this.destinations.assertListingAddressesAllowed(incoming);
       if (input.parserConfig.credentials !== undefined) {
         this.validation.assertPullCredentials(incoming);
       }
@@ -317,34 +362,6 @@ export class IngestionSourceService {
     if (result.status === "invalid") {
       throw new OttlStatementsInvalidError({ statements, errors: result.errors });
     }
-  }
-
-  /** The fields whose only rule is that they were supplied. */
-  private plainUpdateFields(
-    input: UpdateGovernanceIngestionSourceCommand,
-  ): UpdateIngestionSourceRecord {
-    const update: UpdateIngestionSourceRecord = {};
-    if (input.name !== undefined) {
-      update.name = input.name;
-    }
-
-    if (input.description !== undefined) {
-      update.description = input.description;
-    }
-
-    if (input.status !== undefined) {
-      update.status = input.status;
-    }
-
-    if (input.teamId !== undefined) {
-      update.teamId = input.teamId;
-    }
-
-    if (input.pullSchedule !== undefined) {
-      update.pullSchedule = input.pullSchedule;
-    }
-
-    return update;
   }
 
   private async updatePinnedToCursor({
@@ -420,11 +437,11 @@ export class IngestionSourceService {
     return source;
   }
 
-  async recordEventReceived(id: string): Promise<void> {
-    await this.repository.update(id, {
-      lastEventAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-      status: "active",
-    });
+  /** A disabled source is never stamped back to active; only its first data makes it live. */
+  async recordEventReceived(source: GovernanceIngestionSource): Promise<void> {
+    const at = Temporal.Instant.fromEpochMilliseconds(this.now());
+    const { wentLive } = await this.repository.recordEventReceived(source, at);
+    if (wentLive) this.facts.wentLive(source, at);
   }
 
   async getById({
@@ -435,9 +452,7 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource> {
     const source = await this.findById({ id, organizationId });
-    if (!source) {
-      throw new IngestionSourceNotFoundError(id);
-    }
+    if (!source) throw new IngestionSourceNotFoundError(id);
 
     return source;
   }
@@ -454,9 +469,7 @@ export class IngestionSourceService {
     const wanted = [
       ...new Set(sources.map((s) => s.traceProjectId).filter((id): id is string => !!id)),
     ];
-    if (wanted.length === 0) {
-      return new Set();
-    }
+    if (wanted.length === 0) return new Set();
 
     const { data } = await this.projects.listActiveByScopes({
       organizationId,

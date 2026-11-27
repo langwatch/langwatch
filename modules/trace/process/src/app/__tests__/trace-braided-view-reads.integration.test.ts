@@ -19,7 +19,11 @@ import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/reposi
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceAppDependencies, TracesSpanReader } from "../trace.app.ts";
-import { braidPlansOf, createTraceAppHarness } from "./support/trace-app.harness.ts";
+import {
+  braidPlansOf,
+  braidSettingsOf,
+  createTraceAppHarness,
+} from "./support/trace-app.harness.ts";
 
 const READER = "proj_orchestrator";
 const OWNER = "proj_specialists";
@@ -160,11 +164,13 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
       "protections",
     ),
     braidPlans: braidPlansOf("ENTERPRISE"),
+    braidSettings: braidSettingsOf(true),
     braidDirectory: {
       authz: createApiFixture<AuthzApi>(
         {
           recordBraidedSpansView,
           hasPermission: async () => false,
+          assertBraidsReleased: async () => undefined,
           listBraids: async () => ({
             intoOtherProjects: [],
             fromOtherProjects: [
@@ -222,14 +228,9 @@ function braidedTrace({ withOwnerSpans = true } = {}) {
     spanTree: () => app.readSpanTreeForViewer(viewer),
     spansFull: () => app.readSpansFullForViewer(viewer),
     resources: () => app.readSpanResourcesForViewer(viewer),
+    agentCallGraph: () => app.readAgentCallGraphForViewer(viewer),
     traceEvents: () => app.readTraceEventsForViewer(viewer),
-    // What the `spanLangwatchSignals` procedure calls, on the proof the trace honoured.
-    spanLangwatchSignals: async () =>
-      app.readLangwatchSignals({
-        authorization: await app.authorizationForTrace({ authorization, traceId: "trace-1" }),
-        traceId: "trace-1",
-        reads: "spans",
-      }),
+    spanLangwatchSignals: () => app.readLangwatchSignalsForViewer(viewer),
   };
   return { reads, recordBraidedSpansView, authorization };
 }
@@ -239,6 +240,7 @@ const READS = [
   "spanTree",
   "spansFull",
   "resources",
+  "agentCallGraph",
   "traceEvents",
   "spanLangwatchSignals",
 ] as const;

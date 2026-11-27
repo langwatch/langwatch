@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { Cluster } from "ioredis";
 
 import type { GroupQueueRedis } from "./dependencies-adapter.ts";
@@ -57,7 +57,7 @@ export class RedisQueueDrainAudit implements QueueDrainAudit {
   static create({
     redis,
     scanNodes,
-    now = () => nowInstant().epochMilliseconds,
+    now = () => nowEpochMs(),
   }: {
     redis: QueueDrainRedis;
     scanNodes: readonly QueueDrainRedis[];

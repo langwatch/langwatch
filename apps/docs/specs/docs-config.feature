@@ -29,8 +29,9 @@ Feature: docs.json stays the single source of truth for both documentation sites
   Scenario: Give agents the site's instructions in every Markdown export
     Given docs.json has Markdown instructions for agents
     When a page's Markdown export is generated
-    Then the instructions open the export under an "Agent Instructions" heading, before the page title
-    And without instructions the export starts with the page title
+    Then the export opens with the page title, and the page's own text comes first
+    And the instructions close the export under an "Agent Instructions" heading, after the page
+    And without instructions the export ends with the page's own text
 
   @unit
   Scenario: Show the authored announcement beside the release update

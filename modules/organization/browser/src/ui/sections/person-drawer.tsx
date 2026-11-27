@@ -101,7 +101,7 @@ function PersonDetail({
         image={person.user.image}
         badges={
           <>
-            {person.role === "EXTERNAL" ? (
+            {person.role === "EXTERNAL" && !person.billingOnly ? (
               <Badge colorPalette="gray" size="sm">
                 Lite Member
               </Badge>
@@ -175,6 +175,7 @@ function PersonDetail({
           organizationId={organizationId}
           userId={person.userId}
           memberRole={person.role}
+          memberBillingOnly={person.billingOnly === true}
           canManage={canManage}
           isCurrentUser={isSelf}
         />
@@ -184,6 +185,7 @@ function PersonDetail({
         organizationId={organizationId}
         userId={person.userId}
         holdsBilling={holdsBilling}
+        billingOnly={person.billingOnly === true}
         loading={billingMembers.isLoading}
       />
 
@@ -204,11 +206,14 @@ function BillingRoleSection({
   organizationId,
   userId,
   holdsBilling,
+  billingOnly,
   loading,
 }: {
   organizationId: string;
   userId: string;
   holdsBilling: boolean;
+  /** Billing is the whole of a Billing-only membership (ADR-205): once held, it stays. */
+  billingOnly: boolean;
   loading: boolean;
 }) {
   const showErrorToast = useShowErrorToast();
@@ -217,6 +222,8 @@ function BillingRoleSection({
     onSuccess: () => void queryClient.authz.listBillingMembers.invalidate(),
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't change Billing" }),
   });
+  // Locked only while held: a Billing-only member missing the grant must stay repairable.
+  const locked = billingOnly && holdsBilling;
 
   return (
     <SettingsSection title="Billing" icon={<CreditCard size={18} />} divided={false}>
@@ -225,7 +232,7 @@ function BillingRoleSection({
           size="sm"
           data-testid="person-billing-switch"
           checked={holdsBilling}
-          disabled={loading || setBilling.isPending}
+          disabled={locked || loading || setBilling.isPending}
           inputProps={{ "aria-label": "Billing role" }}
           onCheckedChange={(event) =>
             setBilling.mutate({ organizationId, userId, holds: event.checked === true })
@@ -233,9 +240,16 @@ function BillingRoleSection({
         >
           <Text fontSize="sm">Pays for the organization</Text>
         </Switch>
-        <Text fontSize="xs" color="fg.muted">
-          Changes the plan and seats, sees invoices, and approves seat requests.
-        </Text>
+        {locked ? (
+          <Text fontSize="xs" color="fg.muted" data-testid="person-billing-locked">
+            Billing only always pays for the organization. To stop them paying, remove them from the
+            organization, or move them to a seat first.
+          </Text>
+        ) : (
+          <Text fontSize="xs" color="fg.muted">
+            Changes the plan and seats, sees invoices, and approves seat requests.
+          </Text>
+        )}
       </VStack>
     </SettingsSection>
   );

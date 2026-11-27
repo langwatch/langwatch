@@ -42,10 +42,12 @@ export * from "./explorer/actions/index.ts";
 export * from "./features/evaluation/trace-instant-eval-chips.ts";
 export * from "./features/evaluation/trace-instant-eval.schemas.ts";
 export * from "./features/braid/trace-braid.schemas.ts";
+export * from "./features/ops/trace-ops.schemas.ts";
 export * from "./features/query/trace-langwatch-ql-filter.ts";
 export * from "./features/query/trace-query-analysis.ts";
 export * from "./features/query/trace-query-ast.ts";
 export * from "./features/query/trace-custom-metadata-conditions.ts";
+export * from "./features/query/span-analytics-source.ts";
 export * from "./features/query/trace-query-evaluator-group.ts";
 export * from "./features/query/trace-query-examples.ts";
 export * from "./features/query/trace-query-grammar.ts";
@@ -119,6 +121,7 @@ export {
   type NormalizedLink,
   type NormalizedSpan,
   type NormalizedSpanSchema,
+  type OwnedSpan,
 } from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,
@@ -187,12 +190,20 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
+  A2A_V0_METHODS,
+  A2A_V1_METHODS,
+  a2aSpanNameMatch,
+  isA2aSpanName,
+  isAgentCallSpanName,
+  type A2aSpanNameMatch,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";
 export * from "./features/edit-overlay/trace-edit-overlay-apply.ts";
 export * from "./features/content/trace-python-repr.ts";
 export * from "./features/analytics/trace-model-spend.ts";
+export * from "./features/analytics/trace-agent-traffic.ts";
+export * from "./features/analytics/trace-managed-prompt-version-floor.ts";
 export * from "./features/ingest/trace-collector-common.ts";
 export * from "./features/content/trace-rag-chunks.ts";
 export * from "./features/content/trace-rag-extraction.ts";
@@ -218,4 +229,8 @@ export * from "./explorer/origin-display.ts";
 export * from "./explorer/suggestion-items.ts";
 export * from "./trace-browser-slices.ts";
 export * from "./trace-lent-components.ts";
-export { traceConfig, type TraceServerConfig } from "./trace.config.ts";
+export {
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
+  traceConfig,
+  type TraceServerConfig,
+} from "./trace.config.ts";

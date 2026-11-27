@@ -19,9 +19,12 @@ export type CreateIngestionSourceRecord = {
   parserConfig: Record<string, unknown>;
   pullSchedule: string | null;
   status: "awaiting_first_event";
-  createdById: string;
+  createdById: string | null;
   providerAccountId: string | null;
 };
+
+/** A source as the batch that reached it read it: its status may already be stale. */
+export type ReceivingIngestionSource = Pick<GovernanceIngestionSource, "id" | "status">;
 
 export type UpdateIngestionSourceRecord = {
   name?: string;
@@ -80,6 +83,15 @@ export abstract class IngestionSourceRepository {
     id: string,
     input: UpdateIngestionSourceRecord,
   ): Promise<GovernanceIngestionSource>;
+  /**
+   * Stamps a batch: last event time, and active. Never touches a source that is off.
+   * `wentLive` is true for the one stamp that moved it off awaiting, however many race.
+   * Only a source read as awaiting tries the conditional write; a stale read is safe.
+   */
+  abstract recordEventReceived(
+    source: ReceivingIngestionSource,
+    at: Instant,
+  ): Promise<{ wentLive: boolean }>;
   abstract getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow>;
   abstract updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void>;
   /** The organisation's unarchived sources that read a window they could not price. */

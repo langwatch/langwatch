@@ -246,7 +246,7 @@ function provenance({ slug }: { slug: string }) {
   ].join("\n");
 }
 
-/** docs.json `markdown.instructions` as the quoted block Mintlify opens every export with. */
+/** docs.json `markdown.instructions` as a quoted block; it closes every export, after the page. */
 export function agentInstructions({ docsRoot }: { docsRoot: string }) {
   const text = readDocsConfig({ docsRoot }).markdown?.instructions?.trim() ?? "";
   if (!text) return "";
@@ -255,7 +255,7 @@ export function agentInstructions({ docsRoot }: { docsRoot: string }) {
     .join("\n");
 }
 
-/** A page as Markdown: agent instructions, title, description, operation, then the MDX. */
+/** A page as Markdown: title, description, operation, the MDX, then agent instructions. */
 export function pageMarkdown({
   docsRoot,
   slug,
@@ -311,12 +311,12 @@ function exportMarkdown({
   const body = absoluteLinks({ source: markdown }).trim();
   return (
     [
-      instructions,
       `# ${title}`,
       description,
       provenance({ slug }),
       operation ? operationMarkdown({ operation }) : "",
       body,
+      instructions,
     ]
       .filter(Boolean)
       .join("\n\n") + "\n"

@@ -12,6 +12,10 @@ import {
   DISPOSITION_LABELS,
   PII_LABELS,
 } from "../../model/data-privacy-labels.ts";
+import {
+  PII_REDACTION_MODEL_NAME,
+  type PiiRedactionModelOffer,
+} from "../../model/pii-redaction-level-offer.ts";
 
 /**
  * What is ACTUALLY applied once the rules above cascade down. Declared
@@ -51,22 +55,43 @@ export function pickEffectiveForScope(
   return { effective: snapshot.effective, scopeLabel: "this project" };
 }
 
+/** With the model offered, Essential and Strict also say what runs them. */
+function piiLevelLabel({
+  pii,
+  piiRedactionModelOffered,
+}: {
+  pii: ResolvedDataPrivacy["pii"];
+  piiRedactionModelOffered: boolean;
+}): string {
+  if (pii.level === "custom") {
+    return `Custom (${pii.entities.length} ${pii.entities.length === 1 ? "type" : "types"})`;
+  }
+  if (piiRedactionModelOffered && pii.level === "strict") {
+    return `Strict · ${PII_REDACTION_MODEL_NAME}`;
+  }
+  if (piiRedactionModelOffered && pii.level === "essential") {
+    return "Essential · standard detection";
+  }
+  return PII_LABELS[pii.level];
+}
+
 export function EffectiveSummary({
   snapshot,
   scopeFilter,
   currentTeamId,
+  piiRedactionModelOffer = null,
 }: {
   snapshot: DataPrivacySnapshot;
   scopeFilter: EffectiveScopeSelection;
   currentTeamId: string | null;
+  /** The Strict offer; null names levels as before. */
+  piiRedactionModelOffer?: PiiRedactionModelOffer;
 }) {
   const { effective, scopeLabel } = pickEffectiveForScope(snapshot, scopeFilter, currentTeamId);
-  const piiValue =
-    effective.pii.level === "custom"
-      ? `Custom (${effective.pii.entities.length} ${
-          effective.pii.entities.length === 1 ? "type" : "types"
-        })`
-      : PII_LABELS[effective.pii.level];
+  const piiValue = piiLevelLabel({
+    pii: effective.pii,
+    piiRedactionModelOffered: piiRedactionModelOffer?.kind === "model",
+  });
   const secretsValue = `${effective.secrets.enabled ? "On" : "Off"}${
     effective.secrets.customPatterns.length > 0
       ? ` · ${effective.secrets.customPatterns.length} custom ${

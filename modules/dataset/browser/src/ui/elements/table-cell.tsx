@@ -16,6 +16,8 @@ declare module "@tanstack/react-table" {
   interface ColumnMeta<TData extends RowData, TValue> {
     columnType?: DatasetTableColumnType;
     columnId?: string;
+    /** The name a header shows; also its hover title when the name is cut short. */
+    columnName?: string;
     dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
     /**
      * The column sits at a fixed pixel width rather than sharing the flexible
@@ -31,6 +33,11 @@ type TableCellProps<TData extends DatasetTableRowData> = {
   rowIndex: number;
   activeDatasetId: string;
   isLoading?: boolean;
+};
+
+/** Brings the selected cell into view when the keyboard moves it past the grid's edge. */
+const scrollIntoViewNearest = (node: HTMLTableCellElement | null) => {
+  node?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
 };
 
 /**
@@ -68,6 +75,8 @@ export const TableCell = <TData extends DatasetTableRowData>({
     }
   };
 
+  const selectedRef = isSelected ? scrollIntoViewNearest : undefined;
+
   const selectedStyles = {
     outline: isSelected ? "2px solid var(--chakra-colors-blue-emphasized)" : "none",
     outlineOffset: "-1px",
@@ -94,6 +103,7 @@ export const TableCell = <TData extends DatasetTableRowData>({
     return (
       <td
         key={cell.id}
+        ref={selectedRef}
         onClick={handleSelect}
         onDoubleClick={handleActivate}
         style={selectedStyles}
@@ -112,6 +122,7 @@ export const TableCell = <TData extends DatasetTableRowData>({
   return (
     <td
       key={cell.id}
+      ref={selectedRef}
       onClick={handleSelect}
       onDoubleClick={handleActivate}
       style={{

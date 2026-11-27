@@ -126,6 +126,41 @@ describe("stored-object upload", () => {
       });
     });
 
+    describe("when a direct upload to an in-cluster bucket cannot be reached", () => {
+      const inCluster = () =>
+        upload({
+          uploadUrl:
+            "http://s3.managed.svc.cluster.local:9000/langwatch/so_1?X-Amz-Signature=deadbeef&X-Amz-Credential=AKIA",
+        });
+
+      /** @scenario "The error names the bucket host and never the signed query" */
+      it("names the host the browser could not reach and leaves the signed query out", async () => {
+        mockFetch().mockRejectedValue(new TypeError("Failed to fetch"));
+
+        const err = await putFileToUploadUrl({ upload: inCluster(), file: csv() }).catch(
+          (e: unknown) => e,
+        );
+
+        expect(err).toBeInstanceOf(PresignedUploadFailedError);
+        expect((err as Error).message).toContain("s3.managed.svc.cluster.local:9000");
+        expect((err as Error).message).not.toMatch(/X-Amz|deadbeef|AKIA|\?/);
+      });
+
+      /** @scenario "The error names the bucket host and never the signed query" */
+      it("names the host on a refused status too, without the signed query", async () => {
+        mockFetch().mockResolvedValue({ ok: false, status: 403 });
+
+        const err = await putFileToUploadUrl({ upload: inCluster(), file: csv() }).catch(
+          (e: unknown) => e,
+        );
+
+        expect(err).toBeInstanceOf(PresignedUploadFailedError);
+        expect((err as Error).message).toContain("s3.managed.svc.cluster.local:9000");
+        expect((err as Error).message).toMatch(/status 403/);
+        expect((err as Error).message).not.toMatch(/X-Amz|deadbeef|AKIA|\?/);
+      });
+    });
+
     describe("when the PUT is cancelled", () => {
       it("rethrows the abort as it is", async () => {
         const abort = new Error("aborted");

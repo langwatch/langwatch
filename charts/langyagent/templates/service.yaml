@@ -11,7 +11,7 @@ metadata:
   {{- with .Values.service.annotations }}
   annotations:
     {{- range $key, $value := . }}
-    {{ $key }}: {{ $value | toString | quote }}
+    {{ $key }}: {{ include "langyagent.string" $value | quote }}
     {{- end }}
   {{- end }}
 spec:

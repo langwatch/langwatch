@@ -15,7 +15,14 @@ function setup({
   flagFails = false,
   dispatchFails = false,
   noKey = false,
-}: { free?: boolean; flagFails?: boolean; dispatchFails?: boolean; noKey?: boolean } = {}) {
+  selfHosted = false,
+}: {
+  free?: boolean;
+  flagFails?: boolean;
+  dispatchFails?: boolean;
+  noKey?: boolean;
+  selfHosted?: boolean;
+} = {}) {
   let clock = NOW;
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
   const featureFlags = createApiFixture<FeatureFlagApi>({
@@ -28,6 +35,7 @@ function setup({
   const facts: PiiRedactionSpendPricedEventData[] = [];
   const errors: { fields: Record<string, unknown>; message: string }[] = [];
   const spend = PiiRedactionSpendService.create({
+    selfHosted,
     requestIdKey: noKey ? undefined : piiRedactionRequestIdKey("test-key-pepper"),
     featureFlags,
     recordSpendPriced: async (fact) => {
@@ -48,7 +56,7 @@ const call = {
   projectId: PROJECT_ID,
   texts: ["a".repeat(1_000)],
   recordKey: "trace-1:span-1",
-  durationMs: 1_000,
+  callDurationsMs: [1_000],
 };
 
 describe("PiiRedactionSpendService", () => {
@@ -100,6 +108,19 @@ describe("PiiRedactionSpendService", () => {
           target: { kind: "organization", organizationId: ORGANIZATION_ID },
         },
       ]);
+    });
+  });
+
+  describe("given a self-hosted install", () => {
+    /** @scenario "A self-hosted install's call is recorded at a price of zero without reading the free list" */
+    it("records the call at zero and never reads the free list", async () => {
+      const { spend, facts, flagReads } = setup({ selfHosted: true, free: false, flagFails: true });
+
+      await spend.record(call);
+
+      expect(facts).toHaveLength(1);
+      expect(facts[0]).toMatchObject({ priceNanoUsd: 0, costNanoUsd: 93_534, characters: 1_000 });
+      expect(flagReads).toEqual([]);
     });
   });
 

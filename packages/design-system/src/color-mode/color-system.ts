@@ -15,14 +15,15 @@ export const colorSystem = {
     100: { value: "#f1f5f9" },
     50: { value: "#f8fafc" },
   },
-  // Used on _dark sides only; near-neutral with the smallest indigo tint.
+  // Used on _dark sides only. The ground (900, 950) keeps a faint indigo tint; raised steps
+  // (700 to 850) are near-neutral so a panel on a card reads as a lift, not navy.
   zinc: {
     500: { value: "#565664" },
     600: { value: "#3a3a44" },
-    700: { value: "#282832" },
-    750: { value: "#20202a" },
-    800: { value: "#1a1a24" },
-    850: { value: "#15151e" },
+    700: { value: "#2c2c33" },
+    750: { value: "#222228" },
+    800: { value: "#1c1c22" },
+    850: { value: "#16161c" },
     900: { value: "#10101a" },
     950: { value: "#080812" },
   },

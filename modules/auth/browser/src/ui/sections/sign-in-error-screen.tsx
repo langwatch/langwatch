@@ -53,6 +53,8 @@ const errorTitle = (error: string, idp: string | null): string => {
       return "Account already exists";
     case "DIFFERENT_EMAIL_NOT_ALLOWED":
       return "Can't link this account";
+    case "ACCOUNT_LINKED_TO_ANOTHER_USER":
+      return "Already connected to another account";
     case "SSO_PROVIDER_NOT_ALLOWED":
     case "SSO_REQUIRED_BY_ORGANIZATION":
       return "Use your organization's sign-in";
@@ -247,11 +249,26 @@ function SignInErrorDescription({
     return (
       <VStack gap={4} align="stretch">
         <Text>
-          You cannot link an account with a different email address. Please use the same email
-          address as your current account.
+          The account you picked uses a different email from your LangWatch address. Link an account
+          that has your LangWatch address as a verified email, or add that address to it first.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <Link href="/settings/authentication">Back to Settings</Link>
+          <Link href="/settings/security">Back to Settings</Link>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "ACCOUNT_LINKED_TO_ANOTHER_USER") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>
+          The account you picked is already connected to a different LangWatch account. Sign in to
+          that LangWatch account and disconnect it in Settings &gt; Security, or connect a different
+          account here.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/settings/security">Back to Settings</Link>
         </Button>
       </VStack>
     );

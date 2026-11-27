@@ -317,6 +317,7 @@ describe("the test suites rail", () => {
     const { props, view } = renderRail({ suites: [] });
 
     await user.click(screen.getByRole("button", { name: "New test suite" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Blank suite" }));
     expect(props.onNewSuite).toHaveBeenCalled();
 
     view.rerender(<SuiteRail {...props} suites={[makeSuite()]} />);

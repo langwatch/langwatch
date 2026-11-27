@@ -21,6 +21,10 @@ const spanTreeNodeSchemaDefinition = z.object({
   updatedAtMs: z.number().nullish(),
   /** Set only on a span braided in from another project (ADR-201 §5); absent: the reader's own. */
   ownerProjectId: z.string().nullish(),
+  /** The agent the span names (`gen_ai.agent.name`, else `.id`); null when it names none. */
+  agentName: z.string().nullish(),
+  /** True when the span is an A2A call, by the same classifier as the agent call graph. */
+  isA2aCall: z.boolean().nullish(),
 });
 export interface SpanTreeNodeSchema extends Named<typeof spanTreeNodeSchemaDefinition> {}
 export const spanTreeNodeSchema: SpanTreeNodeSchema = spanTreeNodeSchemaDefinition;

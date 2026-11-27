@@ -45,6 +45,17 @@ Feature: Project becomes integrated after first trace ingestion
     Then project.firstMessage stays false
     And no "first_trace_integrated" PostHog event is tracked
 
+  # Governance ingestion lands traces in the organization's hidden governance
+  # project, stamped langwatch.origin.kind = "ingestion_source". They are not
+  # the customer's own integration, so they set no flag and record no milestone.
+  @unit
+  Scenario: A governance-ingested trace is not the project's first trace
+    Given a project with firstMessage set to false
+    When a trace stamped langwatch.origin.kind "ingestion_source" is processed
+    Then project.firstMessage and project.integrated stay false
+    And no first_trace_recorded, project_traced or "first_trace_integrated" is recorded
+    And on a project that already traced, no trace_received is recorded either
+
   @unit
   Scenario: PostHog integration milestone reports unknown when SDK attributes are absent
     Given a project with firstMessage set to false

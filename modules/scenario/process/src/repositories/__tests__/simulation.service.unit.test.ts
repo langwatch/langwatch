@@ -38,6 +38,7 @@ class RecordingExecution extends SimulationExecutionRepository {
   async recordCutAtLimit(): Promise<void> {}
 
   async recordHooks(): Promise<void> {}
+  async recordRedTeamReport(): Promise<void> {}
 }
 
 describe("SimulationService", () => {
@@ -108,9 +109,6 @@ describe("SimulationService", () => {
         runIds: [],
         reachedCap: false,
       });
-      await expect(
-        service.getDistinctExternalSetIds({ projectIds: [project.projectId] }),
-      ).resolves.toEqual(new Set());
     });
   });
 });

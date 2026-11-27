@@ -4,14 +4,16 @@
  * clickhouse-queries.md's TenantId/partition/dedup rules; throws on unsupported shapes.
  */
 
-import type {
-  AnalyticsAggregation,
-  AnalyticsFilterValue,
-  BuiltAnalyticsQuery,
+import {
+  analyticsFilterRefusal,
+  type AnalyticsAggregation,
+  type AnalyticsFilterValue,
+  type BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
+import { findUnapplicableFilter } from "../../rules/analytics-filter-values.rules.ts";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
@@ -235,6 +237,9 @@ function buildSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
   params: Record<string, unknown>;
 } {
   if (!filters) return { clauses: [], params: {} };
+  // A value no case below can apply would be dropped and widen the answer.
+  const unapplicable = findUnapplicableFilter(filters);
+  if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
@@ -316,7 +321,7 @@ function appendSlimFilterClause({
       break;
     }
     case "traces.error": {
-      // ES sends "true"/"false"; map to HasError boolean.
+      // The options endpoint returns "true"/"false"; anything else was refused above.
       const vals = collectStringValues(rawValue);
       if (vals.length === 0) break;
       const wantsErrors = vals.includes("true");

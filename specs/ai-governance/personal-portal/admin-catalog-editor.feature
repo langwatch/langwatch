@@ -1,5 +1,5 @@
 Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=catalog
-  As an org admin curating which AI tools my team can see on /me
+  As an org admin curating which AI tools my team can see on /coding-agents
   I want a catalog editor with sections per tile type, drag-to-reorder,
   add/edit drawer, and per-team scoping
   So that I can publish, retire, scope, and order the tile set without
@@ -83,7 +83,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=cat
       | element           | function                                          |
       | grip-vertical    | drag handle (cursor: grab)                        |
       | display name     | non-interactive label                             |
-      | tile icon        | the same icon the /me portal renders for the tile |
+      | tile icon        | the same icon the /coding-agents portal renders for the tile |
       | type badge       | "Coding assistant", "Model provider" or "Internal tool" |
       | scope badge      | "Org-wide" or "Team: <name>"                      |
       | actions menu     | Edit / Disable-Enable / Delete                    |
@@ -164,7 +164,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=cat
     Then `api.aiTools.setEnabled` is called with `enabled=false`
     And the row dims (opacity 0.5)
     And the button label flips to "Enable"
-    And on /me the Anthropic tile is no longer visible to MEMBER users
+    And on /coding-agents the Anthropic tile is no longer visible to MEMBER users
 
   Scenario: UI-preview banner renders while backend router is unwired
     Given Sergey's `aiToolsCatalogRouter` is not yet shipped

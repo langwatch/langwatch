@@ -110,11 +110,15 @@ export class EnvelopeBlobLifecycle<Destination = unknown> {
   async encode({
     jobData,
     groupId,
+    stagedAtMs,
   }: {
     jobData: Record<string, unknown>;
     groupId: string;
+    /** When the job was first staged, kept across a re-stage so its wait is not reset. */
+    stagedAtMs?: number;
   }): Promise<string> {
     return encodeJobEnvelope({
+      stagedAtMs,
       jobData,
       tieredBlobs: this.tieredBlobs,
       projectId: this.projectIdFor(groupId),

@@ -21,16 +21,21 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const logged = vi.hoisted(() => ({ info: [] as { fields: unknown; message: string }[] }));
+const logged = vi.hoisted(() => ({
+  lines: [] as { level: "info" | "warn" | "error"; fields: unknown; message: string }[],
+}));
 
 vi.mock("@langwatch/observability", async (importActual) => {
   const actual = await importActual<typeof Observability>();
   return {
     ...actual,
     createLogger: () => ({
-      info: (fields: unknown, message: string) => logged.info.push({ fields, message }),
-      warn: () => void 0,
-      error: () => void 0,
+      info: (fields: unknown, message: string) =>
+        logged.lines.push({ level: "info", fields, message }),
+      warn: (fields: unknown, message: string) =>
+        logged.lines.push({ level: "warn", fields, message }),
+      error: (fields: unknown, message: string) =>
+        logged.lines.push({ level: "error", fields, message }),
       debug: () => void 0,
     }),
   };
@@ -38,6 +43,11 @@ vi.mock("@langwatch/observability", async (importActual) => {
 
 import { createHmac } from "node:crypto";
 
+import {
+  ClickHouseUnavailableError,
+  QueryMemoryExceededError,
+  QueryTimeoutError,
+} from "@langwatch/analytics-contract";
 import { ConfigParseError } from "@langwatch/config";
 
 import {
@@ -143,6 +153,7 @@ function analyticsApp(
         accessModelMode: void 0,
         sqlSingleNode: void 0,
         clickhouseCluster: void 0,
+        installMethod: void 0,
         aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
@@ -201,16 +212,20 @@ async function refusedAtTheDoor({
 }
 
 function lineNamed(message: string): Record<string, unknown> {
-  const line = logged.info.find((entry) => entry.message === message);
+  const line = logged.lines.find((entry) => entry.message === message);
   expect(line).toBeDefined();
   return line!.fields as Record<string, unknown>;
+}
+
+function levelOf(message: string): string | undefined {
+  return logged.lines.find((entry) => entry.message === message)?.level;
 }
 
 describe("LangWatchQL run telemetry", () => {
   let metrics: RecordingMeterProvider;
 
   beforeEach(() => {
-    logged.info.length = 0;
+    logged.lines.length = 0;
     metrics = createRecordingMeterProvider();
     metrics.install();
   });
@@ -288,6 +303,18 @@ describe("LangWatchQL run telemetry", () => {
       });
       expect(metrics.valueOf("lwql_queries_total", { caller: "workbench", outcome: code })).toBe(1);
     });
+
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("logs a widget's refused run as a warning naming the project it ran from", async () => {
+      // The run scope's 422 for a stray projects value: the caller's fault.
+      await refusedAtTheDoor({ sql: SQL, telemetry: WIDGET_RUN, projects: "al" });
+
+      expect(levelOf("LangWatchQL failed")).toBe("warn");
+      expect(lineNamed("LangWatchQL failed")).toMatchObject({
+        projectId: "project-1",
+        projectIds: ["project-1"],
+      });
+    });
   });
 
   describe("given a widget's run whose projects the run scope refuses", () => {
@@ -298,12 +325,13 @@ describe("LangWatchQL run telemetry", () => {
       expect(lineNamed("LangWatchQL failed")).toMatchObject({
         caller: "dashboard_widget",
         widgetId: "widget-1",
+        projectIds: ["project-1"],
         outcome: code,
       });
       expect(
         metrics.valueOf("lwql_queries_total", { caller: "dashboard_widget", outcome: code }),
       ).toBe(1);
-      expect(logged.info.some(({ message }) => message === "LangWatchQL executed")).toBe(false);
+      expect(logged.lines.some(({ message }) => message === "LangWatchQL executed")).toBe(false);
     });
   });
 
@@ -345,7 +373,12 @@ describe("LangWatchQL run telemetry", () => {
 
       expect(code).not.toBe("answered");
       const line = lineNamed("LangWatchQL failed");
-      expect(line).toMatchObject({ caller: "rest_api", queryHash: hashOf(SQL), outcome: code });
+      expect(line).toMatchObject({
+        caller: "rest_api",
+        projectIds: ["project-1"],
+        queryHash: hashOf(SQL),
+        outcome: code,
+      });
       expect(JSON.stringify(line)).not.toContain(LITERAL);
       expect(metrics.valueOf("lwql_queries_total", { caller: "rest_api", outcome: code })).toBe(1);
     });
@@ -363,6 +396,7 @@ describe("LangWatchQL run telemetry", () => {
       });
 
       expect(lineNamed("LangWatchQL failed")).toMatchObject({ outcome: "aborted" });
+      expect(levelOf("LangWatchQL failed")).toBe("info");
       expect(
         metrics.valueOf("lwql_queries_total", { caller: "dashboard_widget", outcome: "aborted" }),
       ).toBe(1);
@@ -377,9 +411,46 @@ describe("LangWatchQL run telemetry", () => {
       });
 
       expect(lineNamed("LangWatchQL failed")).toMatchObject({ outcome: "unhandled" });
+      expect(levelOf("LangWatchQL failed")).toBe("error");
       expect(
         metrics.valueOf("lwql_queries_total", { caller: "workbench", outcome: "unhandled" }),
       ).toBe(1);
+    });
+  });
+
+  describe("given a run that fails on the platform's side, or on the customer's", () => {
+    const telemetry = LangWatchQLRunTelemetryService.create({ queryHashKey: QUERY_HASH_KEY });
+
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("logs a timeout or an unavailable database as an error, with its projects", () => {
+      for (const error of [new QueryTimeoutError(30_000), new ClickHouseUnavailableError()]) {
+        logged.lines.length = 0;
+        telemetry.recordFailed({
+          telemetry: WIDGET_RUN,
+          sql: SQL,
+          error,
+          projectIds: ["project-1", "project-2"],
+        });
+
+        expect(levelOf("LangWatchQL failed"), error.code).toBe("error");
+        expect(lineNamed("LangWatchQL failed")).toMatchObject({
+          projectId: "project-1",
+          projectIds: ["project-1", "project-2"],
+          outcome: error.code,
+        });
+      }
+    });
+
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("logs a query over its memory limit as a warning, and never the error's message", () => {
+      const error = new QueryMemoryExceededError();
+      telemetry.recordFailed({ telemetry: WIDGET_RUN, sql: SQL, error, projectIds: ["project-1"] });
+
+      expect(levelOf("LangWatchQL failed")).toBe("warn");
+      const line = lineNamed("LangWatchQL failed");
+      expect(line).toMatchObject({ outcome: "query_memory_exceeded" });
+      expect(JSON.stringify(line)).not.toContain(error.message);
+      expect(JSON.stringify(line)).not.toContain(LITERAL);
     });
   });
 

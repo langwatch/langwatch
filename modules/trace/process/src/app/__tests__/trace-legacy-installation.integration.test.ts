@@ -81,6 +81,7 @@ function bootTraceApp(options: {
     getTracesWithSpans: unread,
     getTracesByThreadId: unread,
     getTracesWithSpansByThreadIds: unread,
+    getTraceIdsByThreadIds: unread,
     getEvaluationsMultiple: unread,
     getTopicCounts: unread,
     getCustomersAndLabels: unread,
@@ -95,9 +96,12 @@ function bootTraceApp(options: {
     traces: {
       braidReads: MemoryNullTraceBraidReadsRepository.create(),
       existence: {
+        findProjectsHoldingTrace: async () => [],
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
         findTraceCosts: async () => [],
+        countTracesByProject: async () => [],
+        findTracePresence: async () => [],
       },
       read,
       spans: {} as TracesSpanReader,

@@ -6,9 +6,12 @@ export function validateRequest({
   operation,
   state,
   key,
+  fieldErrors = {},
 }: {
   operation: Operation;
   state: RequestState;
+  /** What the typed controls found: out-of-range numbers, required body fields, broken JSON. */
+  fieldErrors?: Record<string, string>;
   /** The pasted key, or the session frame, which adds the reader's own key itself. */
   key: string | { from: "frame" };
 }) {
@@ -29,7 +32,7 @@ export function validateRequest({
       nextErrors.body = `Invalid JSON: ${error instanceof Error ? error.message : "could not parse"}`;
     }
   }
-  return nextErrors;
+  return { ...fieldErrors, ...nextErrors };
 }
 
 export function errorFieldId({ first }: { first: string }) {

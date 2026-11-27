@@ -16,7 +16,9 @@ import {
 } from "@langwatch/design-system/primitives";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
 
+import { redTeamReportOf } from "../../../../model/red-team-report.ts";
 import { runHooksViewOf, type RunHooksView } from "../../../../model/run-hooks.ts";
+import { RedTeamReportPanel } from "../../../blocks/red-team-report-panel.tsx";
 import { RunStartingSteps } from "../../../elements/agent-testing/drawers/run-starting-steps.tsx";
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
 import { nextSpeakerOf } from "../../../elements/next-speaker.ts";
@@ -243,6 +245,7 @@ function ResultsSection({ detail, isFirst }: { detail: RunDetail; isFirst: boole
   // reads "0 of 0 met", which says the judge failed every criterion rather
   // than that it has not spoken yet.
   const pendingMessage = pendingMessageFor(scenarioState);
+  const redTeamReport = redTeamReportOf(scenarioState.metadata);
 
   return (
     <Box
@@ -254,17 +257,20 @@ function ResultsSection({ detail, isFirst }: { detail: RunDetail; isFirst: boole
       {pendingMessage ? (
         <PendingVerdictLine message={pendingMessage} />
       ) : (
-        <RunVerdictPanel
-          status={scenarioState.status}
-          metCriteria={scenarioState.results?.metCriteria ?? []}
-          unmetCriteria={scenarioState.results?.unmetCriteria ?? []}
-          inconclusiveCriteria={scenarioState.results?.inconclusiveCriteria ?? []}
-          criteria={scenarioState.results?.criteria}
-          declaredCriteria={detail.scenarioData?.criteria ?? []}
-          reasoning={scenarioState.results?.reasoning}
-          error={scenarioState.results?.error}
-          evaluations={scenarioState.results?.evaluations ?? []}
-        />
+        <VStack align="stretch" gap={3}>
+          {redTeamReport ? <RedTeamReportPanel report={redTeamReport} /> : null}
+          <RunVerdictPanel
+            status={scenarioState.status}
+            metCriteria={scenarioState.results?.metCriteria ?? []}
+            unmetCriteria={scenarioState.results?.unmetCriteria ?? []}
+            inconclusiveCriteria={scenarioState.results?.inconclusiveCriteria ?? []}
+            criteria={scenarioState.results?.criteria}
+            declaredCriteria={detail.scenarioData?.criteria ?? []}
+            reasoning={scenarioState.results?.reasoning}
+            error={scenarioState.results?.error}
+            evaluations={scenarioState.results?.evaluations ?? []}
+          />
+        </VStack>
       )}
     </Box>
   );

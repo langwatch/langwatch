@@ -9,7 +9,9 @@ import {
   auditClient,
   auditDayHeading,
   auditDayLabel,
+  auditEntryPhrase,
   auditFeedDays,
+  auditTargetLine,
   groupAuditRuns,
 } from "../audit-log-rows.ts";
 
@@ -23,8 +25,99 @@ describe("given a recorded action slug", () => {
     ["gateway.budget.created", "Created budget"],
     ["gateway.virtual_key.guardrail_attached", "Attached guardrail"],
     ["routingPolicy.personalContext", "Routing policy personal context"],
+    ["governance.agent.stop_requested", "Stop requested"],
+    ["governance.agent.stop_approved", "Stop approved"],
+    ["governance.agent.stop_plan_set", "Stop plan set"],
+    ["governance.agent.restore_requested", "Restore requested"],
+    ["governance.agent.restore_failed", "Restore failed"],
+    ["governance.agent.quarantined", "Quarantined agent"],
+    ["governance.agent.restored", "Restored agent"],
   ])("reads %s as %s", (action, phrase) => {
     expect(auditActionPhrase(action)).toBe(phrase);
+  });
+});
+
+describe("given an action recorded before the kill switch", () => {
+  /** @scenario An audit row reads as a sentence, with the recorded action kept beside it */
+  it.each([
+    ["organization.setMemberDisabled", "Set member disabled"],
+    ["aiTools.setEnabled", "Set enabled"],
+    ["virtualKeys.update", "Updated virtual key"],
+    ["apiKey.create", "Created api key"],
+    ["team.archive", "Archived team"],
+    ["secrets.delete", "Deleted secret"],
+    ["project.updateEmbeddingsModel", "Updated embeddings model"],
+    ["authz.grants.revoke", "Revoked grant"],
+    ["identity.joinRequests.setJoining", "Set joining"],
+    ["license.upload", "License upload"],
+  ])("keeps reading %s as %s", (action, phrase) => {
+    expect(auditActionPhrase(action)).toBe(phrase);
+  });
+
+  /** @scenario An audit row reads as a sentence, with the recorded action kept beside it */
+  it("reads a verb used as an adjective before a participle as written", () => {
+    expect(auditActionPhrase("user.email.duplicate_address_tagged")).toBe(
+      "Duplicate address tagged",
+    );
+  });
+});
+
+describe("given a row whose target is a braid", () => {
+  /** @scenario A braid's entries read as braid changes */
+  it.each([
+    ["authz.grants.attach", "Created braid"],
+    ["authz.grants.revoke", "Removed braid"],
+  ])("reads %s as %s", (action, phrase) => {
+    expect(auditEntryPhrase({ action, targetKind: "braid" })).toBe(phrase);
+  });
+
+  /** @scenario A braid's entries read as braid changes */
+  it("keeps the generic wording for a verb a braid never records", () => {
+    expect(auditEntryPhrase({ action: "authz.grants.role_change", targetKind: "braid" })).toBe(
+      auditActionPhrase("authz.grants.role_change"),
+    );
+  });
+
+  /** @scenario A braid's entries read as braid changes */
+  it("keeps the grant wording on any other target", () => {
+    expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: "role_binding" })).toBe(
+      "Attached grant",
+    );
+    expect(auditEntryPhrase({ action: "authz.grants.attach", targetKind: null })).toBe(
+      "Attached grant",
+    );
+  });
+});
+
+describe("given the line under a row's phrase", () => {
+  /** @scenario A braid's entry row names its owner project, never its grant id */
+  it("reads a braid by its owner project, or as Braid alone", () => {
+    expect(
+      auditTargetLine({ targetKind: "braid", targetId: "rolebinding_1", projectName: "payments" }),
+    ).toEqual({ kind: "words", text: "Braid owned by payments" });
+    expect(
+      auditTargetLine({ targetKind: "braid", targetId: "rolebinding_1", projectName: null }),
+    ).toEqual({ kind: "words", text: "Braid" });
+  });
+
+  /** @scenario A braid's entry row names its owner project, never its grant id */
+  it("keeps any other target's id", () => {
+    expect(
+      auditTargetLine({ targetKind: "role_binding", targetId: "rolebinding_1", projectName: "p" }),
+    ).toEqual({ kind: "id", id: "rolebinding_1" });
+    expect(auditTargetLine({ targetKind: null, targetId: null, projectName: null })).toBeNull();
+  });
+
+  /** @scenario An entry row names its target by the name the row recorded */
+  it("reads a target by its recorded name rather than its id", () => {
+    expect(
+      auditTargetLine({
+        targetKind: "governance_agent",
+        targetId: "agentreg_1",
+        targetName: "Finance close",
+        projectName: null,
+      }),
+    ).toEqual({ kind: "words", text: "Finance close" });
   });
 });
 
@@ -225,6 +318,7 @@ const row = (id: string, overrides: Record<string, unknown> = {}) => ({
   action: "authz.grants.attach",
   targetKind: null,
   targetId: null,
+  targetName: null,
   projectId: null,
   error: null,
   source: "platform" as const,
@@ -254,6 +348,17 @@ describe("given consecutive identical events", () => {
     const runs = groupAuditRuns([row("a"), row("b", { error: "FORBIDDEN" })]);
     expect(runs).toHaveLength(2);
   });
+
+  /** @scenario A burst of identical events by one actor reads as one row */
+  it("keeps events on one target apart when the target's recorded name changed", () => {
+    const named = { targetKind: "governance_aws_connection", targetId: "awsconn_1" };
+    const runs = groupAuditRuns([
+      row("a", { ...named, targetName: "ACME production" }),
+      row("b", { ...named, targetName: "ACME production" }),
+      row("c", { ...named, targetName: "ACME staging" }),
+    ]);
+    expect(runs.map((run) => run.entries.map((entry) => entry.id))).toEqual([["a", "b"], ["c"]]);
+  });
 });
 
 describe("given entries across several days", () => {
@@ -269,8 +374,18 @@ describe("given entries across several days", () => {
 
   /** @scenario The feed reads by day */
   it("pairs a relative day with its full date and spells older days out once", () => {
-    expect(auditDayHeading({ at: new Date(2026, 9, 10, 1, 0), now })).toBe("Today · Oct 10, 2026");
-    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now })).toBe("Oct 8, 2026");
+    const at = new Date(2026, 9, 10, 1, 0);
+    expect(auditDayHeading({ at, now, locale: "en-US" })).toBe("Today · Oct 10, 2026");
+    expect(auditDayHeading({ at: new Date(2026, 9, 8, 9, 0), now, locale: "en-US" })).toBe(
+      "Oct 8, 2026",
+    );
+  });
+
+  /** @scenario The feed reads by day */
+  it("writes the date in the reader's locale", () => {
+    const at = new Date(2026, 9, 8, 9, 0);
+    expect(auditDayHeading({ at, now, locale: "en-GB" })).toBe("8 Oct 2026");
+    expect(auditDayHeading({ at, now, locale: "de-DE" })).toBe("8. Okt. 2026");
   });
 
   /** @scenario The feed reads by day */

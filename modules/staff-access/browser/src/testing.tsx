@@ -64,6 +64,13 @@ export function session(overrides: Partial<StaffAccessSessionView> = {}) {
     scopes: ["org:metadata"],
     organizationId: "org_acme",
     organizationName: "ACME",
+    functions: [
+      {
+        name: "org.snapshot",
+        title: "Plan, member and project counts, creation and flags",
+        scope: "org",
+      },
+    ],
     counterpartOrganizationId: null,
     counterpartOrganizationName: null,
     reason: "check why the ACME evaluator fails",

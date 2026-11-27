@@ -26,6 +26,8 @@ import type {
 import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import type { SuiteLastRun } from "../cases/use-test-cases-data.ts";
+import { SuiteTemplateGallery } from "../suite-template-gallery/suite-template-gallery.tsx";
+import { SuiteRailAddMenu } from "./suite-rail-add-menu.tsx";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailMenu } from "./suite-rail-menu.tsx";
 
@@ -78,6 +80,7 @@ export function SuiteRail(props: SuiteRailProps) {
   const { collapsed, canManage, isArchiving = false } = props;
   const { project } = useOrganizationTeamProject();
   const [suiteToArchive, setSuiteToArchive] = useState<TestSuiteEntry | null>(null);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   const hrefOf = (selection: AgentTestingSelection) =>
     buildAgentTestingPush({
@@ -144,9 +147,19 @@ export function SuiteRail(props: SuiteRailProps) {
       <Skeleton height="28px" />
     </VStack>
   ) : undefined;
-  const newSuite = canManage
-    ? { label: "New test suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
-    : undefined;
+  const addSuite = canManage ? (
+    <SuiteRailAddMenu
+      onBlankSuite={props.onNewSuite}
+      onFromTemplate={() => setIsGalleryOpen(true)}
+    />
+  ) : undefined;
+  const suiteExtra =
+    loadingRows || addSuite ? (
+      <>
+        {loadingRows}
+        {addSuite}
+      </>
+    ) : undefined;
 
   return (
     <Box data-testid="agent-testing-suite-rail" display="flex" flexShrink={0}>
@@ -158,8 +171,7 @@ export function SuiteRail(props: SuiteRailProps) {
           {
             label: "Test suites",
             links: suiteEntries.map((entry) => entry.link),
-            extra: loadingRows,
-            add: newSuite,
+            extra: suiteExtra,
           },
           { label: FROM_CODE_HEADING, links: externalEntries.map((entry) => entry.link) },
         ]}
@@ -171,6 +183,17 @@ export function SuiteRail(props: SuiteRailProps) {
         collapsed={collapsed}
         footer={<SuiteRailFooter {...props} />}
       />
+
+      {isGalleryOpen && (
+        <SuiteTemplateGallery
+          projectId={project?.id}
+          onClose={() => setIsGalleryOpen(false)}
+          onCreated={(applied) => {
+            setIsGalleryOpen(false);
+            props.onSelect({ kind: "suite", slug: applied.slug });
+          }}
+        />
+      )}
 
       <SuiteArchiveDialog
         open={!!suiteToArchive}

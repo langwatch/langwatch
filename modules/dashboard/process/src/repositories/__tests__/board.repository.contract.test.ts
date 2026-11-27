@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Dashboards boards, stars and widget deletes on memory and Postgres; no delete reaches Reports.
+ * Dashboards boards, stars, widget default size and deletes on memory and Postgres; no delete
+ * reaches Reports.
  * @see specs/dashboards-v2.feature
  */
 import { randomUUID } from "node:crypto";
@@ -52,6 +53,61 @@ function contractCases(backend: DashboardBackend): void {
     });
   });
 
+  describe("when boards are read across projects", () => {
+    /** @scenario "The memory and Postgres dashboard repositories answer alike" */
+    it("answers every board the named projects own and none of another project", async () => {
+      const boards = backend.boards();
+      const own = await board("Own");
+      const theirs = await board("Theirs", backend.otherProjectId());
+
+      const both = await boards.findBoardsInProjects({
+        projectIds: [backend.projectId(), backend.otherProjectId()],
+      });
+      const onlyOwn = await boards.findBoardsInProjects({ projectIds: [backend.projectId()] });
+
+      expect(both.map((found) => found.id)).toEqual(expect.arrayContaining([own.id, theirs.id]));
+      expect(onlyOwn.map((found) => found.id)).toContain(own.id);
+      expect(onlyOwn.map((found) => found.id)).not.toContain(theirs.id);
+      await expect(boards.findBoardsInProjects({ projectIds: [] })).resolves.toEqual([]);
+    });
+  });
+
+  describe("when a board is marked as a member's My dashboard", () => {
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("stores the mark, keeps it through a rename and reads it back on every read", async () => {
+      const boards = backend.boards();
+      const plain = await board("Plain");
+      const projectId = backend.projectId();
+      const mine = await boards.createBoard({
+        id: id("dash"),
+        projectId,
+        name: "My dashboard",
+        createdById: "author",
+        myDashboardOfUserId: "author",
+      });
+      const marked = await boards.updateBoard({
+        projectId,
+        dashboardId: plain.id,
+        data: { myDashboardOfUserId: "other" },
+      });
+      await boards.updateBoard({ projectId, dashboardId: mine.id, data: { name: "Team pulse" } });
+
+      const listed = await boards.findBoards({ projectId });
+      expect({
+        made: mine.myDashboardOfUserId,
+        marked: marked.myDashboardOfUserId,
+        listed: listed.map(({ name, myDashboardOfUserId }) => [name, myDashboardOfUserId]),
+      }).toEqual({
+        made: "author",
+        marked: "other",
+        listed: expect.arrayContaining([
+          ["Plain", "other"],
+          ["Team pulse", "author"],
+        ]),
+      });
+    });
+  });
+
   describe("when a widget is placed on a board the project does not own", () => {
     /** @scenario "The memory and Postgres dashboard repositories answer alike" */
     it("refuses it as a missing board", async () => {
@@ -71,6 +127,23 @@ function contractCases(backend: DashboardBackend): void {
 
       await expect(assign("dash_absent")).rejects.toThrow(DashboardNotFoundError);
       await expect(assign(foreign.id)).rejects.toThrow(DashboardNotFoundError);
+    });
+  });
+
+  describe("when a widget is created without a size", () => {
+    /** @scenario "A dashboard widget created without a size lands four columns by five board rows" */
+    it("stores it four columns by five board rows", async () => {
+      const created = await widget((await board()).id);
+
+      const stored = await backend
+        .widgets()
+        .getById({ id: created.id, projectId: backend.projectId() });
+
+      // Literal on purpose: a constant-derived expectation would follow a regression.
+      expect({ colSpan: stored.colSpan, rowSpan: stored.rowSpan }).toEqual({
+        colSpan: 4,
+        rowSpan: 5,
+      });
     });
   });
 
@@ -118,6 +191,56 @@ function contractCases(backend: DashboardBackend): void {
           dashboardIds: [created.id, "dash_absent"],
         }),
       ).resolves.toMatchObject([{ id: created.id, name: "Renamed" }]);
+    });
+
+    /** @scenario "A board made before home products is homed in LLM Ops" */
+    it("homes a board in LLM Ops unless one is named, and rehomes it on update", async () => {
+      const boards = backend.boards();
+      const plain = await board("Plain");
+      const gateway = await boards.createBoard({
+        id: id("dash"),
+        projectId: backend.projectId(),
+        name: "Spend",
+        createdById: "author",
+        scope: "ORGANIZATION",
+        homeProduct: "gateway",
+      });
+
+      const moved = await boards.updateBoard({
+        projectId: backend.projectId(),
+        dashboardId: plain.id,
+        data: { homeProduct: "governance" },
+      });
+      const listed = await boards.findBoards({ projectId: backend.projectId() });
+
+      expect([plain.homeProduct, gateway.homeProduct, moved.homeProduct]).toEqual([
+        "llm-ops",
+        "gateway",
+        "governance",
+      ]);
+      expect(new Map(listed.map((row) => [row.id, row.homeProduct]))).toEqual(
+        new Map([
+          [plain.id, "governance"],
+          [gateway.id, "gateway"],
+        ]),
+      );
+    });
+
+    /** @scenario "A board made before home products is homed in LLM Ops" */
+    it("lists a starred board without its home, as star lists always have", async () => {
+      const boards = backend.boards();
+      const starredBoard = await board("Starred");
+      await boards.addStar({
+        projectId: backend.projectId(),
+        userId: "u",
+        star: boardStar(starredBoard.id),
+      });
+
+      const rows = await boards.findStarred({ projectId: backend.projectId(), userId: "u" });
+      const dashboards = rows.flatMap((row) => (row.kind === "board" ? [row.dashboard] : []));
+
+      expect(dashboards.map(({ id: starredId }) => starredId)).toEqual([starredBoard.id]);
+      expect(dashboards.some((dashboard) => "homeProduct" in dashboard)).toBe(false);
     });
 
     it("counts the widgets placed on each board, and no unplaced one", async () => {
@@ -463,6 +586,31 @@ function contractCases(backend: DashboardBackend): void {
       });
 
       await expect(starred("u")).resolves.toEqual([a.id]);
+    });
+  });
+
+  describe("when a member orders a product sidebar", () => {
+    /** @scenario "The sidebar order is stored per member, organization and product" */
+    it("keeps one order per member, organization and product, replaced on each save", async () => {
+      const boards = backend.boards();
+      const key = {
+        userId: id("user"),
+        organizationId: id("org"),
+        homeProduct: "llm-ops" as const,
+      };
+
+      await expect(boards.findSidebarOrder(key)).resolves.toEqual([]);
+      await boards.setSidebarOrder({ ...key, dashboardIds: ["b", "a"] });
+      await boards.setSidebarOrder({ ...key, dashboardIds: ["c", "b", "a"] });
+
+      await expect(boards.findSidebarOrder(key)).resolves.toEqual(["c", "b", "a"]);
+      await expect(boards.findSidebarOrder({ ...key, homeProduct: "gateway" })).resolves.toEqual(
+        [],
+      );
+      await expect(boards.findSidebarOrder({ ...key, userId: id("user") })).resolves.toEqual([]);
+      await expect(boards.findSidebarOrder({ ...key, organizationId: id("org") })).resolves.toEqual(
+        [],
+      );
     });
   });
 

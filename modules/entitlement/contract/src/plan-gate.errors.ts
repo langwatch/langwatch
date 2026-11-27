@@ -17,6 +17,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   GROUPS: "Groups require an Enterprise plan",
   SIGN_IN_SECURITY: "Sign-in security controls require an Enterprise plan",
   BRAIDS: "Braids require an Enterprise plan",
+  AGENT_REGISTRY: "The agent registry requires an Enterprise plan",
 } as const;
 
 export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;

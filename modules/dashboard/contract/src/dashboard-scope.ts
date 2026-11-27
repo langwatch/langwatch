@@ -4,9 +4,11 @@
  * the same rules the browser offers controls with. Spec: dashboards-v2.feature AC170 to AC189.
  */
 import {
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
   DEFAULT_DASHBOARD_SCOPE,
   MY_DASHBOARD_NAME,
   type Dashboard,
+  type DashboardHomeProduct,
   type DashboardScope,
   type DashboardViewer,
 } from "./dashboard.ts";
@@ -130,4 +132,33 @@ export function dashboardScopeChangeAsksFirst({
   const loss = dashboardScopeLoss({ from, to });
   if (loss.otherProjects) return true;
   return loss.teammates && otherStars > 0;
+}
+
+/** Whether a board homed in `homeProduct` may be at `scope`: Project only in LLM Ops (ADR-002). */
+export function homeAllowsScope({
+  homeProduct,
+  scope,
+}: {
+  homeProduct: DashboardHomeProduct;
+  scope: DashboardScope;
+}): boolean {
+  return scope !== "PROJECT" || homeProduct === DEFAULT_DASHBOARD_HOME_PRODUCT;
+}
+
+/**
+ * Who sees a board once it moves to `homeProduct`, or "author-only" when this reader may not
+ * move it there. A Project board leaving LLM Ops loses its project, which only its author may
+ * settle: it becomes Only me (ADR-002, decision 8). Every other scope is kept.
+ */
+export function dashboardScopeAfterMove({
+  board,
+  viewer,
+  homeProduct,
+}: {
+  board: Pick<Dashboard, "scope" | "createdById">;
+  viewer: DashboardViewer | undefined;
+  homeProduct: DashboardHomeProduct;
+}): DashboardScope | "author-only" {
+  if (homeAllowsScope({ homeProduct, scope: board.scope })) return board.scope;
+  return isDashboardAuthor({ board, viewer }) ? "PRIVATE" : "author-only";
 }

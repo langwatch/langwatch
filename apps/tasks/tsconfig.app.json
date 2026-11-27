@@ -202,6 +202,9 @@
       "path": "../../enterprise/modules/enterprise-gateway/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/digest/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/demo-data/process/tsconfig.build.json"
     },
     {

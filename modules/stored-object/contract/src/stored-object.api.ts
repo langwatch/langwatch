@@ -40,6 +40,16 @@ export interface StoreStoredObjectFromBytesInput extends StoredObjectProvenance 
    * general in-process ceiling; never above the purpose's own ceiling.
    */
   maxBytes?: number;
+  /**
+   * How long the owner keeps its data in the purpose's retention category, 0 for indefinite.
+   * Required when the purpose declares one (ADR-002 §3): the caller asks data-retention.
+   */
+  retentionDays?: number;
+  /**
+   * When the owner's retention started, in epoch ms (a span's start time for trace media); the
+   * link runs `retentionDays` from it, never from later than now. Absent: from now.
+   */
+  retainFromMs?: number;
 }
 
 export interface StoreStoredObjectFromBytesResult {
@@ -114,6 +124,19 @@ export interface DeleteProjectStoredObjectsResult {
   status: "completed";
 }
 
+/** Objects of a retained purpose stored before owner links, to link to the owner on their row. */
+export interface LinkUnownedStoredObjectsInput {
+  projectId: StoredObjectProjectId;
+  purpose: string;
+  /** The owner's retention in the purpose's category, counted from creation; 0 for indefinite. */
+  retentionDays: number;
+}
+
+export interface LinkUnownedStoredObjectsResult {
+  scanned: number;
+  linked: number;
+}
+
 /** The complete process capability exposed by the stored-object feature. */
 export interface StoredObjectApi {
   storeFromBytes(input: StoreStoredObjectFromBytesInput): Promise<StoreStoredObjectFromBytesResult>;
@@ -138,6 +161,8 @@ export interface StoredObjectApi {
   deleteOwnedBy(input: {
     projectId: StoredObjectProjectId;
   }): Promise<DeleteProjectStoredObjectsResult>;
+  /** The owner's upgrade step: links objects stored before owner links (ADR-002 Consequences). */
+  linkUnownedObjects(input: LinkUnownedStoredObjectsInput): Promise<LinkUnownedStoredObjectsResult>;
   /**
    * Holds `by` to the permission the object's purpose names; the transport
    * admits any file viewer first.

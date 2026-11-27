@@ -10,14 +10,17 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import { incrementEsJobsProjectGone } from "../metrics.ts";
 import {
   classifyClickHouseError,
   ErrorCategory,
+  FoldStateNotVisibleError,
+  isOutOfStatementSlots,
+  isPermanentClickHouseError,
   isProjectGone,
+  isQueryMemoryLimitExceeded,
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
@@ -50,6 +53,36 @@ export async function refuseInvalidValueOnce<T>({
     if (!(error instanceof Error && "issues" in error && Array.isArray(error.issues))) throw error;
     throw new NonRetryableGroupQueueError(
       `Queue ${queueName} refused a value that fails its schema: ${error.message}`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * A shared flush hands one caller's parse error to every member (ADR-187). Before the eighth
+ * attempt a job has waited up to 16 s and then 32 s, so an innocent flush-mate has long since run
+ * in a clean sub-second flush; with jitter, attempts 1 to 3 can all land within 1.5 s.
+ */
+const REFUSED_DATA_ATTEMPTS = 8;
+
+/** A ClickHouse parse or type refusal fails the same way every time: stop retrying it soon. */
+export async function stopRetryingRefusedData<T>({
+  queueName,
+  attempt,
+  run,
+}: {
+  queueName: string;
+  attempt: number;
+  run: () => Promise<T>;
+}): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (attempt < REFUSED_DATA_ATTEMPTS) throw error;
+    if (!isPermanentClickHouseError(error)) throw error;
+    // The refusal's own message may quote the row it could not parse, so it stays in the cause.
+    throw new NonRetryableGroupQueueError(
+      `Queue ${queueName} stopped retrying a job whose data ClickHouse refused as unparseable or of the wrong type, on attempt ${attempt}`,
       { cause: error },
     );
   }
@@ -109,41 +142,6 @@ export async function completeWhenProjectGone({
   }
 }
 
-const MAX_QUERY_MEMORY_CAUSE_DEPTH = 8;
-
-/** ClickHouse's per-query memory limit, in both its older and newer wording. */
-const QUERY_MEMORY_LIMIT_FRAGMENTS = [
-  "Query memory limit exceeded",
-  "Memory limit (for query) exceeded",
-] as const;
-
-/**
- * Whether one statement outgrew its own memory limit, read through causes and handled
- * reasons. The server-wide `(total)` limit and the client's own shedding are load, not size.
- */
-function isQueryMemoryLimitExceeded(error: unknown): boolean {
-  return queryMemoryLimitAt({ error, depth: 0 });
-}
-
-function queryMemoryLimitAt({ error, depth }: { error: unknown; depth: number }): boolean {
-  if (depth > MAX_QUERY_MEMORY_CAUSE_DEPTH || error === null || typeof error !== "object")
-    return false;
-  const message = Reflect.get(error, "message");
-  if (
-    typeof message === "string" &&
-    QUERY_MEMORY_LIMIT_FRAGMENTS.some((fragment) => message.includes(fragment))
-  ) {
-    return true;
-  }
-  const reasons: unknown = HandledError.isHandled(error) ? error.reasons : undefined;
-  if (Array.isArray(reasons)) {
-    for (const reason of reasons) {
-      if (queryMemoryLimitAt({ error: reason, depth: depth + 1 })) return true;
-    }
-  }
-  return queryMemoryLimitAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
-}
-
 /** The first error in a cause chain that ClickHouse's own classification calls transient. */
 function overloadedClickHouseError(error: unknown): unknown {
   let current: unknown = error;
@@ -152,6 +150,74 @@ function overloadedClickHouseError(error: unknown): unknown {
     current = current instanceof Error ? current.cause : undefined;
   }
   return undefined;
+}
+
+/** A least wait and the random spread above it, so jobs refused together do not return together. */
+interface JitteredWait {
+  minMs: number;
+  spreadMs: number;
+}
+
+/** The least wait before work refused a statement slot runs again, and the spread above it. */
+const NO_STATEMENT_SLOT_RETRY: JitteredWait = { minMs: 2_000, spreadMs: 3_000 };
+
+/**
+ * The wait before a fold whose saved state was not visible yet runs again: long enough for a
+ * lagging replica to catch up, short enough that the aggregate's next events barely wait.
+ */
+const FOLD_STATE_NOT_VISIBLE_RETRY: JitteredWait = { minMs: 2_000, spreadMs: 3_000 };
+
+function jitteredWaitMs({ minMs, spreadMs }: JitteredWait): number {
+  return minMs + Math.floor(Math.random() * spreadMs);
+}
+
+/**
+ * The retry delay an overload names. Out of statement slots, the work waits a randomised 2 to
+ * 5 seconds, so the jobs one burst refused do not take the slots back together; any other
+ * overload leaves the wait to the queue's own backoff.
+ */
+function overloadRetryAfterMs(overloaded: unknown): number {
+  if (!isOutOfStatementSlots(overloaded)) return 0;
+  return jitteredWaitMs(NO_STATEMENT_SLOT_RETRY);
+}
+
+/** The first FoldStateNotVisibleError in a cause chain. */
+function foldStateNotVisibleIn(error: unknown): FoldStateNotVisibleError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current != null; depth += 1) {
+    if (current instanceof FoldStateNotVisibleError) return current;
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * A fold whose saved state is not visible yet names a jittered retry delay of 2 to 5 seconds, so
+ * the retry reads once the replica has most likely caught up. A batch backs off whole: splitting
+ * it would only miss the same state sooner. The fold itself bounds how often this happens.
+ */
+export async function retrySoonWhenFoldStateNotVisible<T>({
+  queueName,
+  run,
+  unit = "batch",
+}: {
+  queueName: string;
+  run: () => Promise<T>;
+  unit?: "batch" | "job";
+}): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    const notVisible = foldStateNotVisibleIn(error);
+    if (notVisible === undefined) throw error;
+    throw new GroupQueueError({
+      queueName,
+      operation: unit === "batch" ? "processBatch" : "process",
+      message: notVisible.message,
+      cause: error,
+      retryAfterMs: jitteredWaitMs(FOLD_STATE_NOT_VISIBLE_RETRY),
+    });
+  }
 }
 
 function codeOf(error: unknown): string {
@@ -212,7 +278,7 @@ function overloadFailureOf({
     operation,
     message: `ClickHouse overloaded (code ${code}); ${next}: ${detail}`,
     cause: error,
-    retryAfterMs: 0,
+    retryAfterMs: overloadRetryAfterMs(overloaded),
   });
 }
 
@@ -297,33 +363,48 @@ export function createEventingGroupQueueFactory({
       consumerDependencies: GroupQueueDependencies<Record<string, unknown>>,
     ): RunningGroupQueueConsumer<Record<string, unknown>> => {
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, consumerDependencies);
+      // Only a single job is refused for its data: a coalesced batch bisects to find the culprit.
       const one = (payload: Record<string, unknown>, context: JobDelivery | undefined) =>
-        backOffWhenOverloaded({
+        retrySoonWhenFoldStateNotVisible({
           queueName: eventingDefinition.name,
           unit: "job",
           run: () =>
-            refuse(() =>
-              completeWhenProjectGone({
-                queueName: eventingDefinition.name,
-                payloads: [payload],
-                run: () => eventingDefinition.process(payload, context),
-              }),
-            ),
+            backOffWhenOverloaded({
+              queueName: eventingDefinition.name,
+              unit: "job",
+              run: () =>
+                stopRetryingRefusedData({
+                  queueName: eventingDefinition.name,
+                  attempt: context?.attempt ?? 1,
+                  run: () =>
+                    refuse(() =>
+                      completeWhenProjectGone({
+                        queueName: eventingDefinition.name,
+                        payloads: [payload],
+                        run: () => eventingDefinition.process(payload, context),
+                      }),
+                    ),
+                }),
+            }),
         });
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
             each: one,
             batch: (payloads, context) =>
-              backOffWhenOverloaded({
+              retrySoonWhenFoldStateNotVisible({
                 queueName: eventingDefinition.name,
                 run: () =>
-                  refuse(() =>
-                    completeWhenProjectGone({
-                      queueName: eventingDefinition.name,
-                      payloads,
-                      run: () => eventingDefinition.processBatch!(payloads, context),
-                    }),
-                  ),
+                  backOffWhenOverloaded({
+                    queueName: eventingDefinition.name,
+                    run: () =>
+                      refuse(() =>
+                        completeWhenProjectGone({
+                          queueName: eventingDefinition.name,
+                          payloads,
+                          run: () => eventingDefinition.processBatch!(payloads, context),
+                        }),
+                      ),
+                  }),
               }),
           })
         : configuredConsumer.handle(one);

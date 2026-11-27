@@ -59,6 +59,8 @@ export type BrowserNavigationReading = {
   hasOrganizationPermission: (permission: string) => boolean;
   /** Tri-state at the source: `undefined` is "not answered yet". */
   featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
+  /** Braids already exist where the reader stands; the menu shows Braids with the flag off. */
+  braidsPresent: boolean;
 };
 
 /** Everything the chrome asks the shell to DO. */
@@ -143,6 +145,10 @@ export function browserNavigationHosts(port: NavigationHostClass): BrowserNaviga
     featureFlag(flag: ReleaseFlagToken): NavigationFlagReading {
       const answer = this.reading.featureFlag(flag);
       return { enabled: answer === true, isLoading: answer === void 0 };
+    }
+
+    override braidsPresent(): boolean {
+      return this.reading.braidsPresent;
     }
 
     waiting(): ReactNode {

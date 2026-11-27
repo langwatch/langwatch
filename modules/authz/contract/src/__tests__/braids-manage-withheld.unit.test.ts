@@ -112,6 +112,22 @@ describe("who holds braids:manage", () => {
       ).toBe(true);
     });
 
+    /** @scenario "A refusal under braids kept to organisation admins names the policy" */
+    it("names the policy as the reason it is withheld", () => {
+      const tom = grants({ bindings: [teamAdmin], braidsOrganizationAdminsOnly: true });
+
+      expect(
+        engine.decide({ grants: tom, permission: "braids:manage", scope: SPECIALISTS }),
+      ).toMatchObject({ allowed: false, denialReason: "braids-kept-to-organisation-admins" });
+      expect(
+        engine.decide({
+          grants: grants({ bindings: [teamAdmin] }),
+          permission: "braids:manage",
+          scope: ORCHESTRATOR,
+        }),
+      ).toMatchObject({ allowed: false, denialReason: "no-grant" });
+    });
+
     it("still confers it through an organisation-wide binding", () => {
       const ana = grants({
         bindings: [orgAdmin],

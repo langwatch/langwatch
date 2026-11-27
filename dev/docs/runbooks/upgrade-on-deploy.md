@@ -205,12 +205,47 @@ and grants the reader SELECT on an approved view that lacks it. It also replaces
 a column its catalog declares (an extra column is left alone), so a view a deploy left on an older
 definition is repaired within 5 minutes. The comparison is by column name only and a repair rewrites
 the whole view, so during a rollout an older worker can revert a newer deploy's column type,
-expression, dedup or filter change, and the newer worker does not notice. Ship those in two deploys. It never revokes and never creates the reader role, so a
-missing role or a changed column type converges only on a deploy: use Ops > Upgrades Retry. Alert
+expression, dedup or filter change, and the newer worker does not notice. Ship those in two deploys. It never revokes the shared reader and never creates the reader role, so a
+missing role or a changed column type converges only on a deploy: use Ops > Upgrades Retry. It does
+revoke `lwql_scoped_reader`, from every shared view and from any scoped copy that fails the
+scoped-view check. Alert
 on `level=error` with the message "lwql provisioning failed creating ClickHouse objects" or "lwql
 provisioning failed creating PostgreSQL objects". The check runs
 every 5 minutes and logs each failed statement at warn as "lwql reconvergence statement failed",
 which this alert filter does not match.
+
+**Scoped readers (`lwql_scoped_reader`).** Members of this NOLOGIN group read copies of the
+approved views in the schema `lwql_scoped`, under the same names, each carrying the per-reader row
+scope; they never read the shared `lwql_*` views. No older version writes `lwql_scoped`, so a
+rollback's converge leaves the copies scoped and granted. Create the group only once every pod runs
+this version; the next deploy, or within 5 minutes the check, creates the schema, the copies and the
+grants. Give each scoped login `search_path = lwql_scoped`, or have it qualify view names. In SQL
+mode there is no 5-minute PostgreSQL check, so after creating the group use Ops > Upgrades Retry.
+The app role creates `lwql_scoped` and needs CREATE on the database for it; without that the
+deploy logs a warning that the schema is absent and the group reads nothing. To pre-create it, run
+`CREATE SCHEMA lwql_scoped AUTHORIZATION <app role>` and
+`COMMENT ON SCHEMA lwql_scoped IS 'langwatch-lwql-scoped:<app schema>'`: the app writes copies
+only into a `lwql_scoped` whose comment names its own app schema, and otherwise logs a warning.
+
+**Organization roles for scoped logins.** Group membership alone reads zero rows. A copy returns a
+row only when the login reading it is a direct member of `lwql_org_<md5 of the organization id>`,
+for the organization that owns the row's project: the prefix `lwql_org_` and the lowercase hex md5
+of that organization's id as stored in `Team.organizationId`. LangWatch never creates these roles
+and never grants them: the operator creates one NOLOGIN role per organization and grants it to each
+scoped login that may read that organization. The copies look the membership up in
+`pg_auth_members` against `current_user`, so grant the role to the login itself; membership through
+another role does not count. The role carries no privileges, so the login need not inherit it; it
+must inherit `lwql_scoped_reader`, the default. Revoking the role hides that organization's rows
+from the next query on. For example, for one login reading one organization:
+
+```sql
+SELECT 'lwql_org_' || md5('<organization id>');  -- the role name, for example lwql_org_1a2b...
+CREATE ROLE lwql_org_<hash> NOLOGIN;              -- once per organization
+CREATE ROLE <login> LOGIN PASSWORD '<password>';
+GRANT lwql_scoped_reader TO <login>;
+GRANT lwql_org_<hash> TO <login>;                 -- once per organization it may read
+ALTER ROLE <login> SET search_path = lwql_scoped;
+```
 
 During a rolling deploy that adds the PostgreSQL schema to the credential digest, old and new workers may
 rebuild each other's engine tables on each check until the last old worker stops; the old form reads `public`.

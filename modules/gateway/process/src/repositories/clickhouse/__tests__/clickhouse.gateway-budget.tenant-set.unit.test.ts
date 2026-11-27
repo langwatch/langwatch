@@ -44,6 +44,7 @@ const budget: GatewayBudgetSpendRecord = {
   currentPeriodStartedAt: Temporal.Instant.from("2026-09-01T00:00:00Z"),
   lastResetAt: null,
   cycleAnchorAt: null,
+  timezone: null,
 };
 
 describe("GatewayBudgetClickHouseRepository across an organisation's projects", () => {

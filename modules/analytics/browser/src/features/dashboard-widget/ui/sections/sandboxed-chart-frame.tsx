@@ -5,6 +5,8 @@
  */
 
 import type {
+  ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -68,6 +70,10 @@ export interface SandboxedChartFrameProps {
    * omit this — frameBridge no-ops safely when it's absent.
    */
   onNavigate?: (args: { target: string; params: Readonly<Record<string, unknown>> }) => void;
+  /** `LW.askLangy(subject)` from the frame; omitted, the frame's asks are dropped. */
+  onAskLangy?: (subject: ChartAskSubject) => void;
+  /** `LW.signal(state)` from the frame: whether the widget shows its problem now. */
+  onSignal?: (signal: ChartSignal) => void;
   /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller
@@ -89,6 +95,8 @@ export function SandboxedChartFrame({
   params,
   onLog,
   onNavigate,
+  onAskLangy,
+  onSignal,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
   cover,
   onIdleChange,
@@ -129,6 +137,10 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
+  const onAskLangyRef = useRef(onAskLangy);
+  onAskLangyRef.current = onAskLangy;
+  const onSignalRef = useRef(onSignal);
+  onSignalRef.current = onSignal;
   const onIdleChangeRef = useRef(onIdleChange);
   onIdleChangeRef.current = onIdleChange;
   const dashboardContextRef = useRef(dashboardContext);
@@ -147,21 +159,30 @@ export function SandboxedChartFrame({
     const bridge = FrameBridgeSession.create({
       iframe,
       executeQuery: (args) => executeQueryRef.current(args),
-      dashboardContext: withThemeColors(dashboardContextRef.current),
+      readDashboardContext: () => withThemeColors(dashboardContextRef.current),
       params: paramsRef.current,
       source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
-      onTeardown: noteTornDown,
+      onAskLangy: (subject) => onAskLangyRef.current?.(subject),
+      onSignal: (signal) => onSignalRef.current?.(signal),
+      onTeardown: () => {
+        onSignalRef.current?.({ problem: false });
+        noteTornDown();
+      },
       onIdleChange: (idle) => onIdleChangeRef.current?.(idle),
     });
     bridgeRef.current = bridge;
+    // A new frame reports its own problem; until it does, the last frame's is gone.
+    onSignalRef.current?.({ problem: false });
     onIdleChangeRef.current?.(false);
     noteFrameMounted();
     return () => {
       bridgeRef.current = null;
       bridge.dispose();
+      // A frame taken away, say for an empty sources face, leaves no problem on the card.
+      onSignalRef.current?.({ problem: false });
     };
   }, [generation, codeGeneration, theme, noteTornDown, noteFrameMounted]);
 

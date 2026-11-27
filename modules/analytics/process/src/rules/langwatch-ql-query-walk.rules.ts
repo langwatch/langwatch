@@ -405,7 +405,7 @@ function appFunctionPositionMessage(name: string): string {
 const APP_FUNCTION_ALIAS_EVAL_ADVICE =
   "Its answer is decided after the query runs, so this clause would read the text it judges instead. " +
   "Run the statement as an Instant Eval first, then sort, group or filter the answers " +
-  "with a second query over analytics.judgments.";
+  "with a second query over judgments.";
 
 const APP_FUNCTION_ALIAS_EXTRACTION_ADVICE =
   "Its value is filled in after the query runs, so this clause would read the key it was called with instead. " +
@@ -1116,6 +1116,21 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     defaultDatabase: ctx.policy.defaultDatabase,
   });
   const isAllowedTable = ctx.policy.allowedTables.has(qualified);
+  const qualifiedHere = qualifyTableName({
+    table: reference.name,
+    defaultDatabase: ctx.policy.defaultDatabase,
+  });
+  if (!isAllowedTable && database !== undefined && ctx.policy.allowedTables.has(qualifiedHere)) {
+    report({
+      ctx,
+      frame,
+      code: "TABLE_NOT_ALLOWED",
+      message: `"${echoIdentifier(database)}" is not this deployment's database. Write the bare view name "${echoIdentifier(reference.name)}": a bare name resolves to the database each deployment serves, so the same statement runs everywhere.`,
+      node,
+      extra: { availableViews: ctx.policy.availableViews },
+    });
+    return null;
+  }
   if (!isAllowedTable) {
     const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
     report({

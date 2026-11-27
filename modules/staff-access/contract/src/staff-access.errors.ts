@@ -173,6 +173,92 @@ export class StaffAccessNotConfiguredError extends HandledError {
   }
 }
 
+/** The function name is not in the registry; `meta.names` lists every one. */
+export class StaffFunctionUnknownError extends HandledError {
+  declare readonly code: "staff_function_unknown";
+
+  constructor({ names, httpStatus = 404 }: { names: readonly string[]; httpStatus?: 404 | 422 }) {
+    super("staff_function_unknown", "There is no ops function by that name.", {
+      httpStatus,
+      fault: "customer",
+      meta: { names: [...names] },
+      ...remediation("staff_function_unknown"),
+    });
+    this.name = "StaffFunctionUnknownError";
+  }
+}
+
+/** The session's approval did not name this function. */
+export class StaffFunctionNotApprovedError extends HandledError {
+  declare readonly code: "staff_function_not_approved";
+
+  constructor() {
+    super("staff_function_not_approved", "This session was not approved for that function.", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_function_not_approved"),
+    });
+    this.name = "StaffFunctionNotApprovedError";
+  }
+}
+
+/** A requested function does not fit the requested scopes. */
+export class StaffFunctionScopeMismatchError extends HandledError {
+  declare readonly code: "staff_function_scope_mismatch";
+
+  constructor({ name }: { name: string }) {
+    super("staff_function_scope_mismatch", "A requested function does not fit the scopes.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { name },
+      ...remediation("staff_function_scope_mismatch"),
+    });
+    this.name = "StaffFunctionScopeMismatchError";
+  }
+}
+
+/** The input does not match the function's schema or its range limit. */
+export class StaffFunctionBadInputError extends HandledError {
+  declare readonly code: "staff_function_bad_input";
+
+  constructor({ issues }: { issues: readonly string[] }) {
+    super("staff_function_bad_input", "The function input is not valid.", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { issues: [...issues] },
+      ...remediation("staff_function_bad_input"),
+    });
+    this.name = "StaffFunctionBadInputError";
+  }
+}
+
+export class StaffFunctionBadCursorError extends HandledError {
+  declare readonly code: "staff_function_bad_cursor";
+
+  constructor() {
+    super("staff_function_bad_cursor", "The page cursor is not valid.", {
+      httpStatus: 422,
+      fault: "customer",
+      ...remediation("staff_function_bad_cursor"),
+    });
+    this.name = "StaffFunctionBadCursorError";
+  }
+}
+
+/** The project or record asked for is not in the approved organization. */
+export class StaffFunctionNotFoundError extends HandledError {
+  declare readonly code: "staff_function_not_found";
+
+  constructor() {
+    super("staff_function_not_found", "Not found in the approved organization.", {
+      httpStatus: 404,
+      fault: "customer",
+      ...remediation("staff_function_not_found"),
+    });
+    this.name = "StaffFunctionNotFoundError";
+  }
+}
+
 /** The source ops token of an organization copy is no session this server issued. */
 export class StaffCopySourceInvalidError extends HandledError {
   declare readonly code: "staff_copy_source_invalid";

@@ -39,7 +39,7 @@ Feature: Customer.io nurturing integration
   Scenario: Track call sends event payload to Customer.io
     Given a NurturingService created with an API key
     When trackEvent is called with a user ID, event name, and properties
-    Then an HTTP request is sent to the track endpoint with the event payload
+    Then one HTTP request to the batch endpoint sends an identify with the person's email, then the event payload
 
   @unit
   Scenario: Group call sends organization traits to Customer.io

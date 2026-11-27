@@ -31,6 +31,12 @@ import type {
 } from "./features/local-control/langy.local-control-protocol.ts";
 import type * as jsonModule from "./json.ts";
 import type {
+  LangyAttachment,
+  LangyAttachmentConfirmInput,
+  LangyAttachmentUpload,
+  LangyAttachmentUploadInput,
+} from "./langy-attachments.ts";
+import type {
   LangyConversationDetail,
   LangyConversationEventPage,
   LangyConversationListPage,
@@ -77,7 +83,7 @@ import type {
   LangyConversationMessagesDto,
   langyConversationUpdateFrameSchema,
 } from "./langy.dtos.ts";
-import type { LangyStreamEntry } from "./langy.stream-entry.ts";
+import type { LangyStreamFrame } from "./langy.stream-entry.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
 /**
@@ -434,6 +440,9 @@ export interface LangyApi {
   archiveConversation(
     input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
   ): Promise<{ success: boolean }>;
+  /** Refuses a file that is not an image Langy reads, or is too large, before it uploads. */
+  createAttachmentUpload(input: LangyAttachmentUploadInput): Promise<LangyAttachmentUpload>;
+  confirmAttachmentUpload(input: LangyAttachmentConfirmInput): Promise<LangyAttachment>;
   renameConversation(
     input: LangyPanelCall<typeof langyRenameInputSchema>,
   ): Promise<LangyConversationDetailDto>;
@@ -464,7 +473,7 @@ export interface LangyApi {
   ): AsyncIterable<z.infer<typeof langyConversationUpdateFrameSchema>>;
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncIterable<LangyStreamEntry>;
+  ): AsyncIterable<LangyStreamFrame>;
   getPanelLocalRecord(
     input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
   ): Promise<LangyLocalRecord>;

@@ -18,7 +18,11 @@ import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
+import {
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
+  TraceApi,
+  type RecordSpanCommandData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
@@ -42,8 +46,8 @@ const PROJECT = {
   ownerUserId: null,
   kind: "application",
 };
-/** Past the shared reader's 10 MiB decompressed cap. */
-const BOMB_EXPANDED_BYTES = 11 * 1024 * 1024;
+/** Past the receiver's default decompressed cap. */
+const BOMB_EXPANDED_BYTES = DEFAULT_OTLP_TRACES_MAX_BODY_BYTES + 1024 * 1024;
 
 /** Peers the receiver path never reaches: declared, never bound, so a call refuses by name. */
 function unreachablePeers() {

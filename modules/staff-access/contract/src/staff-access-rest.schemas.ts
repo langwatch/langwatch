@@ -7,6 +7,11 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  STAFF_ACCESS_FUNCTION_LIMITS,
+  staffAccessFunctionScopeSchema,
+  staffAccessPageSchema,
+} from "./staff-access-functions.ts";
+import {
   STAFF_ACCESS_MACHINE_MAX_LENGTH,
   STAFF_ACCESS_REASON_MAX_LENGTH,
   staffAccessRequestStatusSchema,
@@ -27,11 +32,31 @@ const staffAccessRequestBodySchemaDefinition = z
     codeChallenge: base64UrlSchema.length(43),
     codeChallengeMethod: z.literal("S256"),
     machine: z.string().trim().min(1).max(STAFF_ACCESS_MACHINE_MAX_LENGTH),
+    /** The ops functions the session may call; the passkey signs this list. */
+    functions: z
+      .array(z.string().trim().min(1).max(64))
+      .max(STAFF_ACCESS_FUNCTION_LIMITS.maxPerRequest)
+      .optional(),
   })
   .strict()
   .superRefine((body, context) => {
     if (new Set(body.scopes).size !== body.scopes.length) {
       context.addIssue({ code: "custom", path: ["scopes"], message: "Each scope once." });
+    }
+    const functions = body.functions ?? [];
+    if (new Set(functions).size !== functions.length) {
+      context.addIssue({ code: "custom", path: ["functions"], message: "Each function once." });
+    }
+    const metadataOnly =
+      body.scopes.includes("org:metadata") &&
+      !body.scopes.includes("org:content") &&
+      !body.scopes.includes("org:support");
+    if (metadataOnly && functions.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["functions"],
+        message: "org:metadata reaches the organization only through the functions it names.",
+      });
     }
     const organizationScoped = namesOrganization(body.scopes);
     if (organizationScoped && body.organization === undefined) {
@@ -141,11 +166,13 @@ const staffAccessProjectSchemaDefinition = z.object({
 const staffAccessRedeemedSchemaDefinition = z.object({
   /** An organization key, when an organization scope was approved. */
   apiKey: z.string().optional(),
-  /** An `lwsa_` token for the `ops:read` routes, when that scope was approved. */
+  /** An `lwsa_` token for the `ops:read` routes and the approved functions. */
   opsToken: z.string().optional(),
   organizationId: z.string().optional(),
   projects: z.array(staffAccessProjectSchemaDefinition),
   scopes: z.array(staffAccessScopeSchema),
+  /** The ops functions the ops token may call. */
+  functions: z.array(z.string()),
   expiresAt: z.string(),
 });
 export interface StaffAccessRedeemedSchema extends Named<
@@ -164,6 +191,8 @@ export const staffAccessEndedSchema: StaffAccessEndedSchema = staffAccessEndedSc
 
 const staffAccessOrganizationsQuerySchemaDefinition = z.object({
   query: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(STAFF_ACCESS_FUNCTION_LIMITS.maxPageSize).optional(),
+  cursor: z.string().min(1).max(500).optional(),
 });
 export interface StaffAccessOrganizationsQuerySchema extends Named<
   typeof staffAccessOrganizationsQuerySchemaDefinition
@@ -171,9 +200,9 @@ export interface StaffAccessOrganizationsQuerySchema extends Named<
 export const staffAccessOrganizationsQuerySchema: StaffAccessOrganizationsQuerySchema =
   staffAccessOrganizationsQuerySchemaDefinition;
 
-const staffAccessOrganizationListSchemaDefinition = z.object({
-  organizations: z.array(z.object({ id: z.string(), slug: z.string(), name: z.string() })),
-});
+const staffAccessOrganizationListSchemaDefinition = staffAccessPageSchema(
+  z.object({ id: z.string(), slug: z.string(), name: z.string() }).strict(),
+);
 export interface StaffAccessOrganizationListSchema extends Named<
   typeof staffAccessOrganizationListSchemaDefinition
 > {}
@@ -202,7 +231,7 @@ const staffAccessUsageSchemaDefinition = z.object({
   gateway: z.object({ requests30Days: z.number().int(), spendUsd30Days: z.number() }),
   traces30Days: z.number().int(),
   apiKeys: z.array(
-    z.object({ id: z.string(), name: z.string(), lastUsedAt: z.string().nullable() }),
+    z.object({ id: z.string(), kind: z.string(), lastUsedAt: z.string().nullable() }),
   ),
   /** Members holding a live browser session now: use through the UI. */
   membersSignedIn: z.number().int(),
@@ -234,6 +263,70 @@ export const staffAccessQueueSummarySchema: StaffAccessQueueSummarySchema =
   staffAccessQueueSummarySchemaDefinition;
 export type StaffAccessQueueSummary = z.infer<typeof staffAccessQueueSummarySchema>;
 
+/** One function as the registry listing shows it, with its input as JSON Schema. */
+const staffAccessFunctionViewSchemaDefinition = z.object({
+  name: z.string(),
+  title: z.string(),
+  scope: staffAccessFunctionScopeSchema,
+  answers: z.string(),
+  personal: z.boolean(),
+  inputSchema: z.record(z.string(), z.unknown()),
+});
+export interface StaffAccessFunctionViewSchema extends Named<
+  typeof staffAccessFunctionViewSchemaDefinition
+> {}
+export const staffAccessFunctionViewSchema: StaffAccessFunctionViewSchema =
+  staffAccessFunctionViewSchemaDefinition;
+export type StaffAccessFunctionView = z.infer<typeof staffAccessFunctionViewSchema>;
+
+const staffAccessFunctionListSchemaDefinition = staffAccessPageSchema(
+  staffAccessFunctionViewSchemaDefinition,
+);
+export interface StaffAccessFunctionListSchema extends Named<
+  typeof staffAccessFunctionListSchemaDefinition
+> {}
+export const staffAccessFunctionListSchema: StaffAccessFunctionListSchema =
+  staffAccessFunctionListSchemaDefinition;
+export type StaffAccessFunctionList = z.infer<typeof staffAccessFunctionListSchema>;
+
+const staffAccessFunctionParamsSchemaDefinition = z.object({
+  functionName: z.string().min(1).max(64),
+});
+export interface StaffAccessFunctionParamsSchema extends Named<
+  typeof staffAccessFunctionParamsSchemaDefinition
+> {}
+export const staffAccessFunctionParamsSchema: StaffAccessFunctionParamsSchema =
+  staffAccessFunctionParamsSchemaDefinition;
+
+/** The call's body: the input the function's own schema parses. */
+const staffAccessFunctionCallBodySchemaDefinition = z
+  .object({ input: z.unknown().optional() })
+  .strict();
+export interface StaffAccessFunctionCallBodySchema extends Named<
+  typeof staffAccessFunctionCallBodySchemaDefinition
+> {}
+export const staffAccessFunctionCallBodySchema: StaffAccessFunctionCallBodySchema =
+  staffAccessFunctionCallBodySchemaDefinition;
+
+/** The function's output, parsed by its declared schema, and how many rows it answered. */
+const staffAccessFunctionAnswerSchemaDefinition = z.object({
+  name: z.string(),
+  rows: z.number().int(),
+  output: z.unknown(),
+});
+export interface StaffAccessFunctionAnswerSchema extends Named<
+  typeof staffAccessFunctionAnswerSchemaDefinition
+> {}
+export const staffAccessFunctionAnswerSchema: StaffAccessFunctionAnswerSchema =
+  staffAccessFunctionAnswerSchemaDefinition;
+export type StaffAccessFunctionAnswer = z.infer<typeof staffAccessFunctionAnswerSchema>;
+
+const staffAccessWithdrawnSchemaDefinition = z.object({ withdrawn: z.literal(true) });
+export interface StaffAccessWithdrawnSchema extends Named<
+  typeof staffAccessWithdrawnSchemaDefinition
+> {}
+export const staffAccessWithdrawnSchema: StaffAccessWithdrawnSchema =
+  staffAccessWithdrawnSchemaDefinition;
 /** What an organization copy copies, in the order it runs: later kinds point at earlier ones. */
 export const STAFF_ACCESS_COPY_KINDS = [
   "project",

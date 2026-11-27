@@ -38,6 +38,7 @@ import type {
   UserSecureAccountOffer,
   UserPasswordRotationOutcome,
   UserProfile,
+  UserSignInAccount,
   UserProfilesInput,
   UserSsoStatus,
   UserTourPreference,
@@ -84,6 +85,7 @@ import {
 } from "../services/user-lifecycle-notice.service.ts";
 import { UserOrganizationDirectoryService } from "../services/user-organization-directory.service.ts";
 import { type UserPasswordHasher, UserPasswordService } from "../services/user-password.service.ts";
+import { UserSignInAccountService } from "../services/user-sign-in-account.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
 
@@ -213,6 +215,10 @@ export class UserModule implements UserApi {
         repository: repositories.credentials,
         passwords,
       }),
+      signInAccounts: UserSignInAccountService.create({
+        users: repositories.users,
+        credentials: repositories.credentials,
+      }),
       directory: UserOrganizationDirectoryService.create({
         directory: repositories.organizationDirectory,
       }),
@@ -231,6 +237,7 @@ export class UserModule implements UserApi {
   readonly #lifecycle: UserLifecycleNoticeService;
   readonly #createdFactBackfill: UserCreatedFactBackfillService;
   readonly #credentials: UserCredentialService;
+  readonly #signInAccounts: UserSignInAccountService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
   readonly #authReads: UserChannels["authReads"];
@@ -247,6 +254,7 @@ export class UserModule implements UserApi {
     lifecycle: UserLifecycleNoticeService;
     createdFactBackfill: UserCreatedFactBackfillService;
     credentials: UserCredentialService;
+    signInAccounts: UserSignInAccountService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
     rateLimits: UserRateLimitRepository;
@@ -261,6 +269,7 @@ export class UserModule implements UserApi {
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
     this.#credentials = input.credentials;
+    this.#signInAccounts = input.signInAccounts;
     this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
     this.#authReads = input.channels.authReads;
@@ -299,13 +308,26 @@ export class UserModule implements UserApi {
     return this.#users.getProfiles(input);
   }
 
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    return this.#users.searchForOperators(input);
+  }
+
   findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     return this.#users.findByEmail(input);
+  }
+
+  findSignInAccounts(input: Readonly<{ email: string }>): Promise<UserSignInAccount[]> {
+    return this.#signInAccounts.findByEmail(input);
   }
 
   /** The directory mint: an account row with no sign-in method attached yet. */
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.#users.create(input);
+  }
+
+  /** An account Better Auth wrote itself: its created fact joins the outbox a mint uses. */
+  recordCreated(input: UserIdInput): Promise<void> {
+    return this.#users.recordCreated(input);
   }
 
   /** Everything the account screen reads about one user. */

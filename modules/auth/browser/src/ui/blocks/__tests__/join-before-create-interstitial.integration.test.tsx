@@ -5,7 +5,8 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial.tsx";
 
@@ -77,6 +78,151 @@ describe("given an organization open to requests from the domain", () => {
       const join = await screen.findByRole("button", { name: /Join Acme/ });
       // Spelled out, not abbreviated, and no member of Acme is named.
       expect(join).toHaveTextContent("Join Acme (10+ colleagues)");
+    });
+
+    /** @scenario Sign-up offers the team before offering a workspace */
+    it("keeps the count outside the part a long name truncates", async () => {
+      const name = "Acme Engineering Platform and Developer Productivity Group Worldwide";
+      renderStep({
+        lookup: {
+          outcome: "ask",
+          organizations: [{ organizationId: "org_long", name, colleagueCount: 20 }],
+        },
+      });
+
+      const join = await screen.findByRole("button", { name: `Join ${name} (20+ colleagues)` });
+      const truncated = join.querySelector(`[title="${name}"]`);
+      expect(truncated).toHaveTextContent(`Join ${name}`);
+      expect(truncated).not.toHaveTextContent("colleagues");
+    });
+  });
+});
+
+const openToMany = (count: number): JoinLookupDecision => ({
+  outcome: "ask",
+  organizations: Array.from({ length: count }, (_, index) => ({
+    organizationId: `org_${index}`,
+    name: index === 0 ? "Acme" : `Acme team ${index}`,
+    colleagueCount: index === 0 ? 10 : 1,
+  })),
+});
+
+/** A row's accessible name: the organization and its rounded count. */
+const row = (name: string) => screen.getByRole("button", { name: `Join ${name} (1+ colleague)` });
+
+describe("given a few organizations open to requests from the domain", () => {
+  afterEach(() => cleanup());
+
+  describe("when sign-up reaches the join-before-create step", () => {
+    /** @scenario A few organizations list as rows with nothing to unfold */
+    it("lists every other organization as a row with no toggle and no filter", async () => {
+      renderStep({ lookup: openToMany(4) });
+
+      expect(
+        await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
+      expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+  });
+});
+
+describe("given many organizations open to requests from the domain", () => {
+  afterEach(() => cleanup());
+
+  describe("when sign-up reaches the join-before-create step", () => {
+    /** @scenario Many organizations stay one clear choice and a short list */
+    it("keeps one primary action and folds the rest behind a toggle", async () => {
+      renderStep({ lookup: openToMany(12) });
+
+      expect(
+        await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
+      ).toBeInTheDocument();
+      expect(row("Acme team 1")).toBeInTheDocument();
+      expect(row("Acme team 3")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Join Acme team 4 / })).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.getByRole("button", { name: "Create a new organization" })).toBeInTheDocument();
+    });
+
+    /** @scenario Many organizations stay one clear choice and a short list */
+    it("reads each row's rounded count out with its name", async () => {
+      renderStep({
+        lookup: {
+          outcome: "ask",
+          organizations: [
+            { organizationId: "org_acme", name: "Acme", colleagueCount: 20 },
+            { organizationId: "org_data", name: "Acme Data", colleagueCount: 10 },
+            { organizationId: "org_labs", name: "Acme Labs", colleagueCount: 1 },
+            { organizationId: "org_ops", name: "Acme Ops", colleagueCount: 1 },
+            { organizationId: "org_qa", name: "Acme QA", colleagueCount: 1 },
+          ],
+        },
+      });
+
+      // The count is half of what a row says, so a screen reader hears it too.
+      expect(
+        await screen.findByRole("button", { name: "Join Acme Data (10+ colleagues)" }),
+      ).toHaveTextContent("10+ colleagues");
+      expect(
+        screen.getByRole("button", { name: "Join Acme Labs (1+ colleague)" }),
+      ).toBeInTheDocument();
+    });
+
+    it("lists and filters every organization once asked to show all", async () => {
+      const user = userEvent.setup();
+      const { onJoinOrganization } = renderStep({ lookup: openToMany(12) });
+
+      await user.click(await screen.findByRole("button", { name: "Show all 11 organizations" }));
+      expect(row("Acme team 11")).toBeInTheDocument();
+
+      await user.type(screen.getByRole("textbox", { name: "Search organizations" }), "team 11");
+      expect(screen.queryByRole("button", { name: /^Join Acme team 1 / })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Join Acme team 10 / })).toBeNull();
+
+      await user.click(row("Acme team 11"));
+      expect(onJoinOrganization).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "org_11", name: "Acme team 11" }),
+      );
+    });
+  });
+
+  describe("when the name filter matches nothing", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      renderStep({ lookup: openToMany(12) });
+      await user.click(await screen.findByRole("button", { name: "Show all 11 organizations" }));
+      await user.type(screen.getByRole("textbox", { name: "Search organizations" }), "globex");
+    });
+
+    /** @scenario A name filter that matches nothing says so and folds back cleanly */
+    it("says no organization matches and offers to clear the search", async () => {
+      expect(screen.getByText('No other organization matches "globex".')).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Join Acme team/ })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Clear search" }));
+      expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveValue("");
+      expect(row("Acme team 11")).toBeInTheDocument();
+    });
+
+    it("puts the caret back in the search after clearing it", async () => {
+      await user.click(screen.getByRole("button", { name: "Clear search" }));
+
+      expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveFocus();
+    });
+
+    it("folds back to three rows and clears the query on Show fewer", async () => {
+      await user.click(screen.getByRole("button", { name: "Show fewer" }));
+
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.queryByText(/No other organization matches/)).toBeNull();
+      expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
+
+      await user.click(screen.getByRole("button", { name: "Show all 11 organizations" }));
+      expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveValue("");
     });
   });
 });

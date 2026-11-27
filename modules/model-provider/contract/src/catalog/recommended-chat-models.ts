@@ -1,8 +1,5 @@
 import { pickRecommendedChatModel } from "./latest-aliases.ts";
-import { getProviderModelOptions } from "./model-catalog.ts";
-
-/** The catalog lists a model's batch-priced tier as `<model>:batch`; no chat runs on it. */
-const BATCH_TIER_SUFFIX = ":batch";
+import { getProviderModelOptions, isPickableCatalogModel } from "./model-catalog.ts";
 
 /**
  * A provider's catalog chat models, its recommendation first.
@@ -17,7 +14,7 @@ export function findRecommendedChatModels({
 }): string[] {
   const catalog = getProviderModelOptions(provider, "chat")
     .map((option) => option.value)
-    .filter((model) => !model.endsWith(BATCH_TIER_SUFFIX));
+    .filter((model) => isPickableCatalogModel(`${provider}/${model}`));
   const recommended = pickRecommendedChatModel(provider)?.slice(provider.length + 1);
   const ordered = recommended
     ? [recommended, ...catalog.filter((model) => model !== recommended)]

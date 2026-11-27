@@ -247,6 +247,8 @@ export function buildBaseEnvironment(input: {
     LANGWATCH_API_KEY: input.telemetry.apiKey,
     LANGWATCH_ENDPOINT: input.telemetry.endpoint,
     SCENARIO_HEADLESS: "true",
+    // A red team run reports on its result line; the library writes no report files.
+    SCENARIO_REDTEAM_REPORT: "0",
     OTEL_RESOURCE_ATTRIBUTES: buildOtelResourceAttributes(input.labels),
     [SCENARIO_EGRESS_POLICY_ENV]: encodeScenarioEgressPolicy(input.config.egress),
     ...input.extra,

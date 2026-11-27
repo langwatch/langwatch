@@ -1,6 +1,7 @@
 import { useCodingAgentLinks } from "../../../behavior/use-coding-agent-links.ts";
 import { useLlmOpsProjectSlug } from "../../../behavior/use-llm-ops-project-slug.ts";
 import { usePersonalWorkspace } from "../../../behavior/use-personal-workspace.ts";
+import { useHasOrganizationLibrary } from "../../../behavior/use-product-home.ts";
 import { useReachableProducts } from "../../../behavior/use-reachable-products.ts";
 import { useVisibleSectionNavItems } from "../../../behavior/use-visible-section-nav-items.ts";
 import { gatewayNavItems, governanceNavItems } from "../../../model/section-nav-items.ts";
@@ -14,13 +15,18 @@ import { productPageCommands, switchProductCommands } from "../model/product-com
 export function useProductCommands(): Command[] {
   const { reachableProducts } = useReachableProducts();
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
+  const hasOrganizationLibrary = useHasOrganizationLibrary();
   const { personalProjectSlug, features: personalFeatures } = usePersonalWorkspace();
   const codingAgentLinks = useCodingAgentLinks();
   const gatewayItems = useVisibleSectionNavItems(gatewayNavItems);
   const governanceItems = useVisibleSectionNavItems(governanceNavItems);
 
   return [
-    ...switchProductCommands({ reachableProducts, projectSlug: llmOpsProjectSlug }),
+    ...switchProductCommands({
+      reachableProducts,
+      projectSlug: llmOpsProjectSlug,
+      hasOrganizationLibrary,
+    }),
     ...productPageCommands({
       reachableProducts,
       personalProjectSlug,

@@ -7,6 +7,7 @@ import {
   createPkcePair,
   describeMachine,
   forgetPendingRequest,
+  listPendingRequests,
   type OpsProject,
   type OpsSession,
   opsProjectSchema,
@@ -41,6 +42,7 @@ interface Redeemed {
   organizationId?: string;
   projects?: OpsProject[];
   scopes: string[];
+  functions?: string[];
   expiresAt: string;
 }
 
@@ -58,6 +60,7 @@ const describeSession = ({ session, file }: { session: OpsSession; file: string 
     sessionFile: file,
     organizationId: session.organizationId ?? null,
     scopes: session.scopes,
+    functions: session.functions ?? [],
     projects: session.projects,
     defaultProject: defaultProject?.slug ?? null,
     hasApiKey: Boolean(session.apiKey),
@@ -71,6 +74,7 @@ const sessionTable = (summary: ReturnType<typeof describeSession>): void => {
     ["Request", chalk.gray(summary.requestId)],
     ["Organization", summary.organizationId ?? chalk.gray("none")],
     ["Scopes", summary.scopes.join(", ")],
+    ["Functions", summary.functions.length > 0 ? summary.functions.join(", ") : chalk.gray("none")],
     ["Default project", summary.defaultProject ?? chalk.gray("none")],
     ["Expires", new Date(summary.expiresAt).toLocaleString()],
     ["Session file", summary.sessionFile],
@@ -111,6 +115,9 @@ const redeemInto = async ({
     ...(redeemed.organizationId ? { organizationId: redeemed.organizationId } : {}),
     projects,
     scopes: redeemed.scopes,
+    ...(redeemed.functions && redeemed.functions.length > 0
+      ? { functions: redeemed.functions }
+      : {}),
     expiresAt: redeemed.expiresAt,
     createdAt: new Date().toISOString(),
   };
@@ -128,10 +135,16 @@ const redeemInto = async ({
   return {
     data: { status: "redeemed", ...summary },
     table: () => {
-      console.log(
-        chalk.green("Access granted. Run a normal command on it with --ops-session, e.g.:"),
-      );
-      console.log(chalk.cyan("  langwatch trace search --ops-session"));
+      if (summary.hasApiKey) {
+        console.log(
+          chalk.green("Access granted. Run a normal command on it with --ops-session, e.g.:"),
+        );
+        console.log(chalk.cyan("  langwatch trace search --ops-session"));
+      } else {
+        console.log(chalk.green("Access granted. Call an approved function, e.g.:"));
+        const first = summary.functions[0] ?? "<name>";
+        console.log(chalk.cyan(`  langwatch ops call ${first} --input '{}'`));
+      }
       sessionTable(summary);
     },
   };
@@ -196,21 +209,27 @@ export const refuseUndecided = ({
   throw opsAuthError(`Request ${requestId} is ${status}; it cannot be redeemed.`);
 };
 
-/** `langwatch ops access request`. */
+/**
+ * `langwatch ops access request`: answers at once with the request id; `--wait` polls until it
+ * is decided. A request waits two hours; `ops access redeem <id>` finishes it later.
+ */
 export const opsAccessRequestCommand = async ({
   scope = [],
+  fn = [],
   org,
   reason,
   project,
-  wait = true,
+  wait = false,
 }: {
   scope?: string[];
+  fn?: string[];
   org?: string;
   reason?: string;
   project?: string;
   wait?: boolean;
 }): Promise<CommandResult> => {
   const scopes = [...new Set(scope.map((value) => value.trim()).filter(Boolean))];
+  const functions = [...new Set(fn.map((value) => value.trim()).filter(Boolean))];
   if (scopes.length === 0) throw validationError("Pass at least one --scope.");
   const why = reason?.trim();
   if (!why) throw validationError("Pass --reason with why this access is needed.");
@@ -230,6 +249,7 @@ export const opsAccessRequestCommand = async ({
       codeChallenge,
       codeChallengeMethod: "S256",
       machine: describeMachine(),
+      ...(functions.length > 0 ? { functions } : {}),
     },
     endpoint,
   });
@@ -247,6 +267,7 @@ export const opsAccessRequestCommand = async ({
   console.error(chalk.bold("Approve this request with your passkey:"));
   console.error(`  ${chalk.cyan(created.approvalUrl)}`);
   const redeemHint = `langwatch ops access redeem ${created.requestId}`;
+  const statusHint = `langwatch ops access status ${created.requestId}`;
 
   if (!wait) {
     return {
@@ -256,8 +277,11 @@ export const opsAccessRequestCommand = async ({
         approvalUrl: created.approvalUrl,
         expiresAt: created.expiresAt,
         next: redeemHint,
+        check: statusHint,
       },
       table: () => {
+        console.log(chalk.gray(`Request ${created.requestId} waits until ${created.expiresAt}.`));
+        console.log(chalk.gray(`Check it: ${statusHint}`));
         console.log(chalk.gray(`After approval, run: ${redeemHint}`));
       },
     };
@@ -282,7 +306,7 @@ export const opsAccessRequestCommand = async ({
   });
 };
 
-/** `langwatch ops access redeem <id>`: finishes a `--no-wait` request. */
+/** `langwatch ops access redeem <id>`: finishes a request once it is approved. */
 export const opsAccessRedeemCommand = async ({
   requestId,
   project,
@@ -318,13 +342,55 @@ export const opsAccessRedeemCommand = async ({
   });
 };
 
-/** `langwatch ops access status`: the local session and how long it has left. */
-export const opsAccessStatusCommand = (): CommandResult => {
+/** `langwatch ops access status <id>`: where one request stands on the server. */
+const requestStatus = async ({ requestId }: { requestId: string }): Promise<CommandResult> => {
+  const pending = takePendingRequest({ requestId });
+  const current = await staffAccessFetch<RequestStatus>({
+    method: "GET",
+    path: `/api/staff-access/requests/${encodeURIComponent(requestId)}`,
+    bearer: requireRequesterKey(),
+    ...(pending ? { endpoint: pending.endpoint } : {}),
+  });
+  const next = nextStepOf({ status: current.status, requestId, approvalUrl: pending?.approvalUrl });
+  return {
+    data: { requestId, ...current, next },
+    table: () => {
+      printFacts([
+        ["Request", chalk.gray(requestId)],
+        ["Status", current.status],
+        ["Waits until", current.expiresAt ?? chalk.gray("-")],
+        ["Next", next ?? chalk.gray("nothing; request again if still needed")],
+      ]);
+    },
+  };
+};
+
+/**
+ * `langwatch ops access status [id]`: with an id, that request on the server; without, the
+ * local session, how long it has left, and the requests still waiting on this machine.
+ */
+export const opsAccessStatusCommand = async ({
+  requestId,
+}: { requestId?: string } = {}): Promise<CommandResult> => {
+  if (requestId) return requestStatus({ requestId });
   const state = readOpsSession();
+  const waiting = Object.entries(listPendingRequests()).map(([id, entry]) => ({
+    requestId: id,
+    approvalUrl: entry.approvalUrl,
+    expiresAt: entry.expiresAt,
+  }));
+  const printWaiting = () => {
+    for (const entry of waiting) {
+      console.log(chalk.gray(`Waiting: ${entry.requestId} until ${entry.expiresAt}`));
+    }
+  };
   if (state.kind === "none") {
     return {
-      data: { status: "none" },
-      table: () => console.log(chalk.gray("No ops session on this machine.")),
+      data: { status: "none", pending: waiting },
+      table: () => {
+        console.log(chalk.gray("No ops session on this machine."));
+        printWaiting();
+      },
     };
   }
   if (state.kind === "invalid") {
@@ -340,8 +406,9 @@ export const opsAccessStatusCommand = (): CommandResult => {
     Math.floor((Date.parse(state.session.expiresAt) - Date.now()) / 1000),
   );
   return {
-    data: { status: state.kind, ...summary, expiresInSeconds: secondsLeft },
+    data: { status: state.kind, ...summary, expiresInSeconds: secondsLeft, pending: waiting },
     table: () => {
+      printWaiting();
       console.log(
         state.kind === "live"
           ? chalk.green(`Ops session live, ${Math.ceil(secondsLeft / 60)} min left.`)
@@ -385,3 +452,38 @@ export const opsAccessEndCommand = async (): Promise<CommandResult> => {
     },
   };
 };
+
+/** `langwatch ops access withdraw <id>`: takes back a request nobody decided yet. */
+export const opsAccessWithdrawCommand = async ({
+  requestId,
+}: {
+  requestId: string;
+}): Promise<CommandResult> => {
+  const pending = takePendingRequest({ requestId });
+  await staffAccessFetch<unknown>({
+    method: "POST",
+    path: `/api/staff-access/requests/${encodeURIComponent(requestId)}/withdraw`,
+    bearer: requireRequesterKey(),
+    body: {},
+    ...(pending ? { endpoint: pending.endpoint } : {}),
+  });
+  forgetPendingRequest({ requestId });
+  return {
+    data: { status: "withdrawn", requestId },
+    table: () => console.log(chalk.green(`Request ${requestId} withdrawn.`)),
+  };
+};
+
+function nextStepOf({
+  status,
+  requestId,
+  approvalUrl,
+}: {
+  status: string;
+  requestId: string;
+  approvalUrl: string | undefined;
+}): string | null {
+  if (status === "approved") return `langwatch ops access redeem ${requestId}`;
+  if (status === "pending") return `approve at ${approvalUrl ?? "the approval URL"}`;
+  return null;
+}

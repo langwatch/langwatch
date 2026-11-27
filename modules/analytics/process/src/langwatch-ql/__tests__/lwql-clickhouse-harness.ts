@@ -428,7 +428,11 @@ export async function startLangWatchQLClickHouse({
   // A reused container carries the previous run's objects. Dropping the
   // database first makes every run start from the same state, so a test that
   // creates a fixture object cannot leak into the next run's audits.
-  await applyAsAdmin([`DROP DATABASE IF EXISTS ${names.database}`]);
+  // The facts database is dropped too, or its inserts pile up across reused runs.
+  await applyAsAdmin([
+    `DROP DATABASE IF EXISTS ${names.database}`,
+    ...(facts === "migrated" ? [`DROP DATABASE IF EXISTS ${names.database}_facts`] : []),
+  ]);
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
 
   const factDatabase = facts === "migrated" ? `${names.database}_facts` : names.database;

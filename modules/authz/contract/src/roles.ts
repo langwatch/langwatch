@@ -77,6 +77,7 @@ const VIEWER: readonly AuthzPermission[] = [
   "gatewayLogs:view",
   "gatewayUsage:view",
   "gatewayCacheRules:view",
+  "gatewayA2aTargets:view",
 ];
 
 const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
@@ -137,6 +138,7 @@ const ADMIN_ADDITIONS: readonly AuthzPermission[] = [
   "gatewayCacheRules:update",
   "gatewayCacheRules:delete",
   "gatewayCacheRules:manage",
+  "gatewayA2aTargets:manage",
   "langy:manage",
   "featureFlags:manageExperiments",
   // The playground's completion route asks playground:view (Alex, 2026-10-06, Q97).

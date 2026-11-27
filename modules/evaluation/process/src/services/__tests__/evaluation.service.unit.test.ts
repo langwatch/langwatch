@@ -18,6 +18,7 @@ import {
 } from "../../repositories/evaluation.repository.ts";
 import {
   MonitorPerformanceRepository,
+  type EvaluatorOutcomeRow,
   type MonitorPerformanceBucket,
 } from "../../repositories/monitor-performance.repository.ts";
 import { EvaluationService } from "../evaluation.service.ts";
@@ -130,6 +131,10 @@ class FakeMonitorPerformanceRepository extends MonitorPerformanceRepository {
 
   async findBuckets(): Promise<MonitorPerformanceBucket[]> {
     return this.buckets;
+  }
+
+  async findOutcomeRows(): Promise<EvaluatorOutcomeRow[]> {
+    return [];
   }
 }
 
@@ -359,6 +364,7 @@ describe("EvaluationService", () => {
           scoreCount: 2,
           passSum: 0,
           passCount: 0,
+          labelCounts: {},
         },
         {
           evaluatorId: "guardrail",
@@ -368,6 +374,7 @@ describe("EvaluationService", () => {
           scoreCount: 0,
           passSum: 1,
           passCount: 2,
+          labelCounts: {},
         },
       ]),
     ).getMonitorPerformance({

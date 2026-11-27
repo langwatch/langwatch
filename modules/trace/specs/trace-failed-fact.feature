@@ -9,7 +9,9 @@ Feature: A trace that becomes failed is recorded once, by trace's own rule
   replay or resync, or one that arrives hours later, never records it again: the fact's
   idempotency key is collapsed only when the log is read, so a second append would still reach
   every peer subscriber. The fact carries
-  the trace's origin, so a peer can leave samples and Langy's turns out.
+  the trace's origin, so a peer can leave samples and Langy's turns out. A governance-ingested
+  trace (langwatch.origin.kind "ingestion_source") lands in the organization's hidden governance
+  project, not the customer's own, so trace records no trace_failed for it at all.
 
   @unit
   Scenario: A child span's error makes the trace failed and records trace_failed
@@ -17,6 +19,13 @@ Feature: A trace that becomes failed is recorded once, by trace's own rule
     When a child span with an error status is folded into its summary
     Then the trace counts as newly failed
     And trace records trace_failed with its project, trace, the failing span's time and origin
+
+  @unit
+  Scenario: A failed governance-ingested trace records nothing
+    Given a failed trace stamped langwatch.origin.kind "ingestion_source"
+    When the trace_failed subscriber handles it
+    Then trace_failed is not recorded
+    And a failed trace without that stamp still records trace_failed
 
   @unit
   Scenario: A trace without an error records nothing

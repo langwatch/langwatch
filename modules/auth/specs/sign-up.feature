@@ -31,6 +31,32 @@ Feature: Sign-up
     When the user is created
     Then the invite stays unapplied and nothing is granted
 
+  # Better Auth writes a social or single sign-on account through its own storage adapter, past
+  # user's mints, so its after-create hook asks user for the created fact that carries the address
+  # to Customer.io (langwatch/tasks#1190).
+  @unit
+  Scenario: A social sign-up records the new account's created fact
+    When an account is created by signing in with Google or GitHub
+    Then auth asks user to record that account's created fact once, under its id
+
+  @unit
+  Scenario: An unverified social sign-up still records the new account's created fact
+    Given a social sign-up whose address is not yet verified
+    When the account is created
+    Then its created fact is recorded all the same
+
+  @unit
+  Scenario: A new single sign-on user records the new account's created fact
+    When an account is created by signing in through an organization's identity provider
+    Then its created fact is recorded once, whether or not the person was auto-added
+
+  @unit
+  Scenario: A failure to record the new account does not block sign-in
+    Given recording the new account's created fact fails
+    When an account is created by a social or single sign-on sign-in
+    Then the sign-in still succeeds
+    And an error log entry names the account id
+
   # D-A1U-2: the register door moved from user to auth with its wire.
   @unit
   Scenario: The register procedure answers on auth's namespace

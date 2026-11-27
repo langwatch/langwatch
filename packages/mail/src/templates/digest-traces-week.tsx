@@ -10,7 +10,7 @@ import {
   formatUsd,
 } from "./digest-parts.tsx";
 import { ActionRow, DataTable, DetailTable, Muted } from "./email-layout.tsx";
-import { defineTemplate } from "./registry.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const digestTracesWeekProps = z.object({
   ...digestCommonFields,
@@ -23,8 +23,9 @@ export const digestTracesWeekProps = z.object({
   p50Milliseconds: z.number().nonnegative(),
   p95Milliseconds: z.number().nonnegative(),
   topModels: z
-    .array(z.object({ name: z.string().min(1), traces: z.number().int().nonnegative() }))
-    .max(3),
+    .array(z.object({ name: z.string().min(1), calls: z.number().int().nonnegative() }))
+    .max(3)
+    .describe("Spans that named the model, so a trace's several calls each count"),
   evaluations: z
     .array(z.object({ name: z.string().min(1), passRatePercent: z.number().min(0).max(100) }))
     .max(3)
@@ -69,11 +70,11 @@ export const DigestTracesWeek = (props: DigestTracesWeekProps) => {
       <DataTable
         columns={[
           { key: "model", label: "Top models", width: "70%" },
-          { key: "traces", label: "Traces", align: "right", width: "30%" },
+          { key: "calls", label: "LLM calls", align: "right", width: "30%" },
         ]}
         rows={topModels.map((model) => ({
           key: model.name,
-          cells: { model: model.name, traces: formatCount(model.traces) },
+          cells: { model: model.name, calls: formatCount(model.calls) },
         }))}
       />
       <DataTable
@@ -116,9 +117,9 @@ export const digestTracesWeekTemplate = defineTemplate({
       p50Milliseconds: 820,
       p95Milliseconds: 4_350,
       topModels: [
-        { name: "gpt-4.1", traces: 71_200 },
-        { name: "claude-sonnet-4", traces: 42_900 },
-        { name: "gpt-4.1-mini", traces: 14_330 },
+        { name: "gpt-4.1", calls: 71_200 },
+        { name: "claude-sonnet-4", calls: 42_900 },
+        { name: "gpt-4.1-mini", calls: 14_330 },
       ],
       evaluations: [
         { name: "Faithfulness", passRatePercent: 94 },
@@ -143,7 +144,7 @@ export const digestTracesWeekTemplate = defineTemplate({
       tokens: 880_000,
       p50Milliseconds: 310,
       p95Milliseconds: 900,
-      topModels: [{ name: "gpt-4.1-mini", traces: 1_120 }],
+      topModels: [{ name: "gpt-4.1-mini", calls: 1_120 }],
       evaluations: [],
       ...links,
     },
@@ -158,11 +159,19 @@ export const digestTracesWeekTemplate = defineTemplate({
       p50Milliseconds: 1_450,
       p95Milliseconds: 12_800,
       topModels: [
-        { name: "claude-sonnet-4", traces: 6_100 },
-        { name: "gpt-4.1", traces: 3_760 },
+        { name: "claude-sonnet-4", calls: 6_100 },
+        { name: "gpt-4.1", calls: 3_760 },
       ],
       evaluations: [{ name: "Faithfulness", passRatePercent: 71 }],
       ...links,
     },
   },
 });
+
+/** Rendered by the digest module, which owns the envelope and its one-click unsubscribe. */
+export const renderDigestTracesWeekEmail = async (
+  props: DigestTracesWeekProps,
+): Promise<{ subject: string; html: string }> => {
+  const { subject, html } = await renderMailTemplate(digestTracesWeekTemplate, props);
+  return { subject, html };
+};

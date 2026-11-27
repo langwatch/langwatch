@@ -5,11 +5,12 @@ import {
 } from "@langwatch/authorization";
 import {
   traceSummaryReadSchema,
+  traceWithholdingOf,
   type DerivedTraceEvent,
   type Protections,
-  type OwnedSpan,
   type Span,
   type SpanDetail,
+  type SpanLangwatchSignals,
   type SpanTreeDeltaInput,
   type SpanTreeInput,
   type SpanTreeNode,
@@ -18,35 +19,30 @@ import {
   type TraceDrawerReadInput,
   type TraceHeader,
   type TraceResourceInfoDto,
+  type AgentCallGraph,
 } from "@langwatch/trace-contract";
 
+import { buildAgentCallGraph, visibleResourcesOf } from "../../../rules/agent-call-graph.rules.ts";
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,
   mapSpanDetailsByOwner,
   mapTraceSummaryToHeader,
-  protectSpans,
   redactV2Content,
   type TraceReadMapperMembers,
 } from "../../../rules/trace-read-mappers.rules.ts";
-import {
-  gateHeaderCost,
-  gateTreeCostByOwner,
-  resourceInfoOf,
-} from "../../../rules/trace-view-gates.rules.ts";
-import {
-  protectByOwner,
-  readsBraidedSpans,
-  verifiedMarksOf,
-} from "../../braid/rules/braided-span-owner.rules.ts";
+import { gateHeaderCost, resourceInfoOf } from "../../../rules/trace-view-gates.rules.ts";
+import { readsBraidedSpans, verifiedMarksOf } from "../../braid/rules/braided-span-owner.rules.ts";
 import { braidedTraceSummaryOf } from "../../braid/rules/braided-trace-totals.rules.ts";
 import type { TraceBraidDetailService } from "./trace-braid-detail.service.ts";
 import type { TraceBraidedTotalsService } from "./trace-braided-totals.service.ts";
+import { TraceOwnerProtectionsService } from "./trace-owner-protections.service.ts";
 
 /** The trace reads a drawer view is assembled from: the module's own, under the route's proof. */
 type TraceDrawerReads = Pick<
   TraceApi,
   | "authorizationForTrace"
+  | "assertTraceNotWithheld"
   | "resolveViewerProtections"
   | "readTraceSummary"
   | "readSpansPage"
@@ -57,8 +53,13 @@ type TraceDrawerReads = Pick<
   | "readSpans"
   | "enrichSpansFromCodingAgentLogs"
   | "readSpanResources"
+  | "readSpansWithResources"
   | "readTraceEvents"
+  | "readLangwatchSignals"
 >;
+
+type StoredSpans = Awaited<ReturnType<TraceDrawerReads["readSpans"]>>;
+type StoredResources = Awaited<ReturnType<TraceDrawerReads["readSpanResources"]>>;
 
 type TraceDrawerReadDependencies = Readonly<{
   reads: TraceDrawerReads;
@@ -76,7 +77,11 @@ type OpenedTrace = Readonly<{ authorization: Authorization; protections: Protect
  * span (§8), so a view that cannot be audited fails rather than show it.
  */
 export class TraceDrawerReadService {
-  private constructor(private readonly deps: TraceDrawerReadDependencies) {}
+  readonly #owners: TraceOwnerProtectionsService;
+
+  private constructor(private readonly deps: TraceDrawerReadDependencies) {
+    this.#owners = TraceOwnerProtectionsService.create(deps);
+  }
 
   static create(deps: TraceDrawerReadDependencies): TraceDrawerReadService {
     return new TraceDrawerReadService(deps);
@@ -96,6 +101,7 @@ export class TraceDrawerReadService {
         tenantId: input.tenantId,
         occurredAtMs: input.occurredAtMs,
         visibilityCutoffMs: protections.visibilityCutoffMs,
+        withholding: traceWithholdingOf(protections),
         full: input.full,
       }),
     );
@@ -141,7 +147,7 @@ export class TraceDrawerReadService {
     });
     return {
       ...page,
-      spans: await this.#protectSpans({ ...input, spans: page.spans, reader: protections }),
+      spans: await this.#owners.protectSpans({ ...input, spans: page.spans, reader: protections }),
     };
   }
 
@@ -155,7 +161,7 @@ export class TraceDrawerReadService {
       occurredAtMs: input.occurredAtMs,
       reads: "spans",
     });
-    return this.#protectSpans({ ...input, spans, reader: protections });
+    return this.#owners.protectSpans({ ...input, spans, reader: protections });
   }
 
   async spanTreePage(
@@ -171,7 +177,11 @@ export class TraceDrawerReadService {
     });
     return {
       ...page,
-      nodes: await this.#gateTreeCost({ viewerUserId, nodes: page.nodes, reader: protections }),
+      nodes: await this.#owners.gateTreeCost({
+        viewerUserId,
+        nodes: page.nodes,
+        reader: protections,
+      }),
     };
   }
 
@@ -185,7 +195,7 @@ export class TraceDrawerReadService {
       authorization,
       canSeeCosts: true,
     });
-    return this.#gateTreeCost({ viewerUserId, nodes, reader: protections });
+    return this.#owners.gateTreeCost({ viewerUserId, nodes, reader: protections });
   }
 
   async spanTree(input: TraceDrawerReadInput): Promise<SpanTreeNode[]> {
@@ -196,7 +206,7 @@ export class TraceDrawerReadService {
       occurredAtMs: input.occurredAtMs,
       reads: "spans",
     });
-    return this.#gateTreeCost({
+    return this.#owners.gateTreeCost({
       viewerUserId: input.viewerUserId,
       nodes: rows.map(mapLegacySpanSummaryToTreeNode),
       reader: protections,
@@ -204,25 +214,52 @@ export class TraceDrawerReadService {
   }
 
   async spansFull(input: TraceDrawerReadInput): Promise<SpanDetail[]> {
-    const { reads, braids, mappers } = this.deps;
-    const { authorization, protections } = await this.#open(input);
-    const storedSpans = await reads.readSpans({
-      authorization,
+    return this.#protectedSpans({ input, joinsCodingAgentLogs: true });
+  }
+
+  /** Protected span details; the coding-agent log join only adds message bodies. */
+  async #protectedSpans({
+    input,
+    joinsCodingAgentLogs,
+  }: {
+    input: TraceDrawerReadInput;
+    joinsCodingAgentLogs: boolean;
+  }): Promise<SpanDetail[]> {
+    const opened = await this.#open(input);
+    const storedSpans = await this.deps.reads.readSpans({
+      authorization: opened.authorization,
       traceId: input.traceId,
       occurredAtMs: input.occurredAtMs,
-      visibilityCutoffMs: protections.visibilityCutoffMs,
+      visibilityCutoffMs: opened.protections.visibilityCutoffMs,
       reads: "spans",
     });
+    return this.#protectedSpanDetails({ input, opened, storedSpans, joinsCodingAgentLogs });
+  }
+
+  async #protectedSpanDetails({
+    input,
+    opened: { authorization, protections },
+    storedSpans,
+    joinsCodingAgentLogs,
+  }: {
+    input: TraceDrawerReadInput;
+    opened: OpenedTrace;
+    storedSpans: StoredSpans;
+    joinsCodingAgentLogs: boolean;
+  }): Promise<SpanDetail[]> {
+    const { reads, braids, mappers } = this.deps;
     // Coding-agent message content lives in the trace's OTLP log records; joined on BEFORE
     // protections run, so it goes through the same redaction pass.
-    const spans = await reads.enrichSpansFromCodingAgentLogs({
-      projectId: input.projectId,
-      traceId: input.traceId,
-      spans: storedSpans,
-      ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-    });
+    const spans = joinsCodingAgentLogs
+      ? await reads.enrichSpansFromCodingAgentLogs({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          spans: storedSpans,
+          ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+        })
+      : storedSpans;
     const [owners, spanBraids] = await Promise.all([
-      this.ownerProtections({
+      this.#owners.ownerProtections({
         viewerUserId: input.viewerUserId,
         ownerProjectIds: spans.map((span) => span.ownerProjectId),
       }),
@@ -245,6 +282,33 @@ export class TraceDrawerReadService {
     });
   }
 
+  /** The agent call graph over the viewer's protected spans and their resources. */
+  async agentCallGraph(input: TraceDrawerReadInput): Promise<AgentCallGraph> {
+    const opened = await this.#open(input);
+    const read = await this.deps.reads.readSpansWithResources({
+      authorization: opened.authorization,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      visibilityCutoffMs: opened.protections.visibilityCutoffMs,
+      reads: "spans",
+    });
+    const [spans, resources] = await Promise.all([
+      this.#protectedSpanDetails({
+        input,
+        opened,
+        storedSpans: read.spans,
+        joinsCodingAgentLogs: false,
+      }),
+      this.#resourceInfo({ input, protections: opened.protections, rows: read.resources }),
+    ]);
+    const kindOf = new Map(read.spans.map((stored) => [stored.span_id, stored.kind ?? null]));
+    const withKinds = spans.map((span) => ({ ...span, kind: kindOf.get(span.spanId) ?? null }));
+    return buildAgentCallGraph({
+      spans: withKinds,
+      resources: visibleResourcesOf({ resources, spans }),
+    });
+  }
+
   async resources(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto> {
     const { authorization, protections } = await this.#open(input);
     const rows = await this.deps.reads.readSpanResources({
@@ -253,7 +317,19 @@ export class TraceDrawerReadService {
       occurredAtMs: input.occurredAtMs,
       reads: "spans",
     });
-    const ownerProtections = await this.ownerProtections({
+    return this.#resourceInfo({ input, protections, rows });
+  }
+
+  async #resourceInfo({
+    input,
+    protections,
+    rows,
+  }: {
+    input: TraceDrawerReadInput;
+    protections: Protections;
+    rows: StoredResources;
+  }): Promise<TraceResourceInfoDto> {
+    const ownerProtections = await this.#owners.ownerProtections({
       viewerUserId: input.viewerUserId,
       ownerProjectIds: rows.map((row) => row.ownerProjectId),
     });
@@ -268,38 +344,30 @@ export class TraceDrawerReadService {
       occurredAtMs: input.occurredAtMs,
       reads: "spans",
     });
-    const owners = await this.ownerProtections({
+    return this.#owners.protectEvents({
       viewerUserId: input.viewerUserId,
-      ownerProjectIds: events.map((event) => event.ownerProjectId),
-    });
-    return protectByOwner({
-      items: events,
+      events,
       reader: protections,
-      owners,
-      protect: (group, groupProtections) =>
-        this.deps.mappers.spanProtection.applyDerivedTraceEventProtections(group, groupProtections),
     });
   }
 
-  /** Each braid owner's protections for this viewer: its policy, the viewer's standing there. */
-  async ownerProtections({
-    viewerUserId,
-    ownerProjectIds,
-  }: {
-    viewerUserId: string;
-    ownerProjectIds: readonly (string | null | undefined)[];
-  }): Promise<ReadonlyMap<string, Protections>> {
-    const owners = [...new Set(ownerProjectIds.filter((id): id is string => !!id))];
-    const resolved = await Promise.all(
-      owners.map(
-        async (projectId) =>
-          [
-            projectId,
-            await this.deps.reads.resolveViewerProtections({ projectId, userId: viewerUserId }),
-          ] as const,
-      ),
-    );
-    return new Map(resolved);
+  /**
+   * Each span's LangWatch signal buckets, opened as the span tree is: the trace's member, its
+   * withholding asked first. Buckets name attribute prefixes, never content, so no owner redacts.
+   */
+  async langwatchSignals(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]> {
+    const { authorization } = await this.#open(input);
+    const rows = await this.deps.reads.readLangwatchSignals({
+      authorization,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      reads: "spans",
+    });
+    return rows.map((row) => ({
+      spanId: row.spanId,
+      signals: row.signals,
+      ...(row.ownerProjectId === undefined ? {} : { ownerProjectId: row.ownerProjectId }),
+    }));
   }
 
   async #open(input: TraceDrawerReadInput): Promise<OpenedTrace> {
@@ -313,49 +381,13 @@ export class TraceDrawerReadService {
       userId: input.viewerUserId,
       authorization,
     });
+    await this.deps.reads.assertTraceNotWithheld({
+      authorization,
+      traceId: input.traceId,
+      ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+      protections,
+    });
     return { authorization, protections };
-  }
-
-  async #protectSpans({
-    viewerUserId,
-    spans,
-    reader,
-  }: {
-    viewerUserId: string;
-    spans: readonly OwnedSpan[];
-    reader: Protections;
-  }): Promise<Span[]> {
-    const owners = await this.ownerProtections({
-      viewerUserId,
-      ownerProjectIds: spans.map((span) => span.ownerProjectId),
-    });
-    return protectByOwner({
-      items: spans,
-      reader,
-      owners,
-      protect: (group, groupProtections) =>
-        protectSpans({
-          spans: group,
-          protections: groupProtections,
-          spanProtection: this.deps.mappers.spanProtection,
-        }),
-    });
-  }
-
-  async #gateTreeCost({
-    viewerUserId,
-    nodes,
-    reader,
-  }: {
-    viewerUserId: string;
-    nodes: SpanTreeNode[];
-    reader: Protections;
-  }): Promise<SpanTreeNode[]> {
-    const owners = await this.ownerProtections({
-      viewerUserId,
-      ownerProjectIds: nodes.map((node) => node.ownerProjectId),
-    });
-    return gateTreeCostByOwner({ nodes, reader, owners });
   }
 
   /**
@@ -376,7 +408,7 @@ export class TraceDrawerReadService {
     const ownerProjectIds = totals.map((owner) => owner.ownerProjectId);
     const [owners, ownerProtections] = await Promise.all([
       this.deps.braids.describeOwners({ ownerProjectIds, viewerUserId: input.viewerUserId }),
-      this.ownerProtections({ viewerUserId: input.viewerUserId, ownerProjectIds }),
+      this.#owners.ownerProtections({ viewerUserId: input.viewerUserId, ownerProjectIds }),
     ]);
     return {
       braided: braidedTraceSummaryOf({

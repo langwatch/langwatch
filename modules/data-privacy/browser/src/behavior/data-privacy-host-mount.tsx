@@ -5,6 +5,7 @@
  */
 
 import {
+  useUiDeployment,
   useUiHostServices,
   useUiScope,
   type UiFeedback,
@@ -17,13 +18,22 @@ import {
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
+  type PrivacyLicence,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../model/data-privacy-host.ts";
+import { licenceOf, mayReadPlan } from "../model/privacy-licence.ts";
+import { dataPrivacyApi } from "./data-privacy-api.ts";
 
 class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
   constructor(
-    private readonly deps: { scope: PrivacyHostScope; route: UiRoute; feedback: UiFeedback },
+    private readonly deps: {
+      scope: PrivacyHostScope;
+      route: UiRoute;
+      feedback: UiFeedback;
+      licence: PrivacyLicence;
+      mayManageLicence: boolean;
+    },
   ) {
     super();
   }
@@ -51,6 +61,14 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
   failed(failure: PrivacyFailureNotice): void {
     this.deps.feedback.failed(failure);
   }
+
+  licence(): PrivacyLicence {
+    return this.deps.licence;
+  }
+
+  mayManageLicence(): boolean {
+    return this.deps.mayManageLicence;
+  }
 }
 
 /**
@@ -59,10 +77,23 @@ class HostServiceDataPrivacyHost extends DataPrivacyHostApi {
  * is what `mounts.load` resolves.
  */
 export default function DataPrivacyHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route } = useUiHostServices();
+  const { feedback, route, session } = useUiHostServices();
+  const { isSaaS } = useUiDeployment();
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;
+  // Self-hosted only: the PII redaction model there comes with the Enterprise licence.
+  const mayRead = mayReadPlan({
+    isSaaS,
+    organizationId: organizationId ?? void 0,
+    canViewOrganization: session.hasPermission("organization:view"),
+  });
+  const plan = dataPrivacyApi.plan.getActivePlan.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: mayRead, retry: false },
+  );
+  const licence = licenceOf({ mayRead, plan });
+  const mayManageLicence = session.hasPermission("organization:manage");
 
   const host = useMemo(
     () =>
@@ -74,8 +105,10 @@ export default function DataPrivacyHostMount({ children }: { children?: ReactNod
         },
         route,
         feedback,
+        licence,
+        mayManageLicence,
       }),
-    [organizationId, teamId, projectId, route, feedback],
+    [organizationId, teamId, projectId, route, feedback, licence, mayManageLicence],
   );
   return <DataPrivacyHostProvider value={host}>{children}</DataPrivacyHostProvider>;
 }

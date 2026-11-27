@@ -9,6 +9,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationStartRun,
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
@@ -88,6 +89,9 @@ export class SimulationCommandDispatcherService extends SimulationExecutionRepos
   }
   recordHooks(input: SimulationRecordHooks): Promise<void> {
     return this.#send("recordHooks", input);
+  }
+  recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void> {
+    return this.#send("recordRedTeamReport", input);
   }
 
   computeRunMetrics(input: ComputeRunMetricsCommandData): Promise<void> {

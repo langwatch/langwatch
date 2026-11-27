@@ -39,7 +39,9 @@ describe("the evaluator model picker scrolled in a real engine", () => {
         model="openai/gpt-model-0"
         options={OPTIONS}
         onChange={() => undefined}
-        builtInModels={[{ value: "langwatch/instant-evals", label: "Instant Evals" }]}
+        builtInModels={[
+          { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" },
+        ]}
       />,
     );
     await userEvent.click(screen.getByRole("combobox"));

@@ -45,6 +45,7 @@ export {
   type RunContext,
   type RunWithResultsOptions,
   type ExperimentConcurrencyOptions,
+  type PrintSummaryOptions,
   type ExperimentRowResult,
   type ExperimentRunWithResults,
   ExperimentError,
@@ -91,6 +92,9 @@ export {
   type DeleteRecordsResponse,
   type UploadResponse,
   type DatasetRecordResponse,
+  type UpsertRecordsOptions,
+  type UpsertRecordsResult,
+  type DatasetValidationCode,
 } from "./client-sdk/services/datasets";
 
 // Evaluations API exports (Online Evaluations / Guardrails)

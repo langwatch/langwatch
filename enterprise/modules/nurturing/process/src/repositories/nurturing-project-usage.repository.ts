@@ -24,8 +24,8 @@ export interface NurturingProjectUsageReadRepository {
 }
 
 /**
- * The row of a project's evaluation days. Not a peer fold: evaluations are too many to write one
- * row per evaluation, so a throttled subscriber adds at most one day per project a day.
+ * The owner of the rows a retired subscriber kept a project's evaluation days in. The days live in
+ * `NurturingProjectEvaluationDay` now; the old rows stay in the table, and no read takes them.
  */
 export const EVALUATION_ACTIVITY_OWNER = "evaluation" as const;
 
@@ -33,6 +33,4 @@ export const EVALUATION_ACTIVITY_OWNER = "evaluation" as const;
 export interface NurturingProjectUsageRepository extends NurturingProjectUsageReadRepository {
   /** The store of one owner's fold; its rows are keyed by project and owner. */
   forOwner(owner: NurturingProjectUsageOwner): FoldProjectionStore<NurturingProjectUsageState>;
-  /** Adds the evaluation's UTC day to the project's evaluation row; a known day writes nothing. */
-  recordEvaluationDay(input: Readonly<{ projectId: string; occurredAt: number }>): Promise<void>;
 }

@@ -5,6 +5,7 @@ import { CAPABILITY_CATALOG } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  createdBoardDestination,
   LANGY_UNREFRESHED_RESOURCES,
   routersRefreshedByWrite,
   settledWriteOf,
@@ -165,6 +166,81 @@ describe("settledWriteOf", () => {
       state: "output-available",
       input: { name: "x" },
     });
-    expect(write).toEqual({ callId: "call-2", routers: ["evaluators"] });
+    expect(write).toEqual({ callId: "call-2", routers: ["evaluators"], createdBoard: null });
+  });
+});
+
+describe("the board a dashboard create made", () => {
+  const createdBy = (output: unknown, command = 'langwatch dashboard create "Usage" -f json') =>
+    settledWriteOf({
+      type: "dynamic-tool",
+      toolName: "bash",
+      toolCallId: "call-3",
+      state: "output-available",
+      input: { command },
+      output,
+    })?.createdBoard ?? null;
+
+  it("reads the board off a JSON document or its text", () => {
+    const board = { id: "dash_new", platformUrl: "https://app.test/demo/dashboards/dash_new" };
+    expect(createdBy(board)).toEqual(board);
+    expect(createdBy(JSON.stringify(board))).toEqual(board);
+    expect(createdBy(JSON.stringify({ id: "dash_new" }))).toEqual({
+      id: "dash_new",
+      platformUrl: null,
+    });
+  });
+
+  it("reads the board off the created card the Langy tool returns", () => {
+    const board = { id: "dash_new", platformUrl: "https://app.test/demo/dashboards/dash_new" };
+    const card = { kind: "card", card: "resourceCreated", payload: { ...board, name: "Usage" } };
+    expect(createdBy(JSON.stringify(card))).toEqual(board);
+    expect(createdBy(card)).toEqual(board);
+  });
+
+  it("is none for a widget added to a board", () => {
+    expect(
+      createdBy({ id: "widget_1" }, "langwatch dashboard widget add dash_42 --code-file w.tsx"),
+    ).toBeNull();
+  });
+
+  it("refreshes the boards list the board screen reads", () => {
+    expect(routersRefreshedByWrite({ resource: "dashboard", verb: "create" })).toContain("boards");
+  });
+});
+
+describe("createdBoardDestination", () => {
+  const origin = "https://app.test";
+
+  it("opens the board's own address on a dashboards page", () => {
+    expect(
+      createdBoardDestination({
+        board: { id: "dash_new", platformUrl: `${origin}/demo/dashboards/dash_new` },
+        pathname: "/demo/dashboards/dash_42",
+        origin,
+      }),
+    ).toBe("/demo/dashboards/dash_new");
+  });
+
+  it("builds the address from the id, in the area the reader is in", () => {
+    const board = { id: "dash_new", platformUrl: null };
+    expect(createdBoardDestination({ board, pathname: "/demo/dashboards", origin })).toBe(
+      "/demo/dashboards/dash_new",
+    );
+    expect(createdBoardDestination({ board, pathname: "/dashboards/dash_42", origin })).toBe(
+      "/dashboards/dash_new",
+    );
+  });
+
+  it("stays put off the dashboards pages and for another origin", () => {
+    const board = { id: "dash_new", platformUrl: `${origin}/demo/dashboards/dash_new` };
+    expect(createdBoardDestination({ board, pathname: "/demo/traces", origin })).toBeNull();
+    expect(
+      createdBoardDestination({
+        board: { id: null, platformUrl: "https://elsewhere.test/x" },
+        pathname: "/demo/dashboards/dash_42",
+        origin,
+      }),
+    ).toBeNull();
   });
 });

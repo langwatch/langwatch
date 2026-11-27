@@ -60,7 +60,7 @@ const EXPECTED_CACHED_SCRIPT_SOURCES = [
 ].toSorted((a, b) => a.localeCompare(b));
 
 /** Variable names of every `new CachedLuaScript(`...`)` built from an inline template. */
-const EXPECTED_INLINE_CACHED_SCRIPTS = ["groupRoutingLabelsScript"];
+const EXPECTED_INLINE_CACHED_SCRIPTS = ["groupHeadAgesScript", "groupRoutingLabelsScript"];
 
 /**
  * Exported `*_LUA` constants not reachable from a package entry;

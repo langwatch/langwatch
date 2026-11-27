@@ -8,6 +8,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { customModelEntrySchema } from "./custom-model.ts";
+import { modelImportOutcomeSchema } from "./model-listing-import.ts";
 import { modelProviderScopeSchema } from "./model-provider.ts";
 
 const modelProviderListEntrySchemaDefinition = z
@@ -40,6 +41,11 @@ const modelProviderListEntrySchemaDefinition = z
     rateLimitRpd: z.number().int().nonnegative().nullable().optional(),
     fallbackPriorityGlobal: z.number().int().nullable().optional(),
     providerConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    /**
+     * The bare model ids the provider's own model list answered with (cached), or null when it
+     * was not asked or did not answer: the picker then falls back to the catalogue.
+     */
+    servedModels: z.array(z.string()).nullable().optional(),
     /** See the docblock: carried by the domain, dropped by the projection. */
     isSystem: z.boolean().optional(),
   })
@@ -51,3 +57,15 @@ export const modelProviderListEntrySchema: ModelProviderListEntrySchema =
   modelProviderListEntrySchemaDefinition;
 
 export type ModelProviderListEntry = z.infer<typeof modelProviderListEntrySchema>;
+
+const modelProviderSavedEntrySchemaDefinition = modelProviderListEntrySchema
+  .safeExtend({ modelImport: modelImportOutcomeSchema.optional() })
+  .strict();
+export interface ModelProviderSavedEntrySchema extends Named<
+  typeof modelProviderSavedEntrySchemaDefinition
+> {}
+/** The row a save answers with, and what the save imported from the provider's model listing. */
+export const modelProviderSavedEntrySchema: ModelProviderSavedEntrySchema =
+  modelProviderSavedEntrySchemaDefinition;
+
+export type ModelProviderSavedEntry = z.infer<typeof modelProviderSavedEntrySchema>;

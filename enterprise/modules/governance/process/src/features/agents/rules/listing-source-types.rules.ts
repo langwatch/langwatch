@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { DATABRICKS_GENIE_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
+import {
+  ARD_REGISTRY_ADAPTER_ID,
+  AWS_BEDROCK_AGENTS_ADAPTER_ID,
+  DATABRICKS_GENIE_ADAPTER_ID,
+  GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+} from "@langwatch/enterprise-governance-contract";
 
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../microsoft/rules/dataverse-environment-service.rules.ts";
 
@@ -8,6 +13,9 @@ import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../microsoft/rules/datav
 const AGENT_LISTING_SOURCE_TYPES = [
   DATABRICKS_GENIE_ADAPTER_ID,
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+  AWS_BEDROCK_AGENTS_ADAPTER_ID,
+  GCP_VERTEX_AGENT_ENGINE_ADAPTER_ID,
+  ARD_REGISTRY_ADAPTER_ID,
 ] as const;
 
 export type AgentListingSourceType = (typeof AGENT_LISTING_SOURCE_TYPES)[number];

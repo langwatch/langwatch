@@ -2,24 +2,52 @@
   "name": "@langwatch/enterprise-digest-process",
   "version": "0.1.0",
   "private": true,
-  "description": "Weekly digest emails: folds the week's usage, picks one of five templates per person and sends it.",
+  "description": "Weekly digest emails: folds the week's usage, picks one of five templates per person and sends it through our own mailer.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
-    "./package.json": "./package.json"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/enterprise-digest-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/mail": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "staged": "dev/docs/plans/weekly-digest.md"
+  }
 }

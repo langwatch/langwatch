@@ -2,6 +2,10 @@ import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import {
+  LWQL_PROJECT_KEYS_VIEW,
+  LWQL_SCOPED_READER_GROUP,
+} from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LangWatchQLPostgresMappingService } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
@@ -13,9 +17,13 @@ import {
   LangWatchQLSelfProvisioningService,
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import type {
+  LwqlProvisioningDatabase,
+  LwqlScopedViewState,
+} from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { LWQL_COLLECTION_UNCONFIRMED } from "../../rules/langwatch-ql-collection-probe.rules.ts";
 import { flooredViewNames } from "../../rules/lwql-dedup-floor.rules.ts";
+import { traceIdsViewNames } from "../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   convergeLwqlAccessModel,
@@ -57,12 +65,76 @@ const NAMES = {
   tenantSetting: "custom_api_key_hash",
 };
 
-/** A PostgreSQL that records each statement, or refuses each as one without CREATEROLE does. */
-function postgresThat({ refuses }: { refuses: boolean }) {
+/** A PostgreSQL holding no scoped-reader group, as a deployment that never created one. */
+const NO_GROUP: LwqlScopedViewState = {
+  groupExists: false,
+  scopedSchema: "absent",
+  groupOnShared: [],
+  copies: [],
+};
+
+/** The rows the scoped-reader state read returns for `state`; no rows for any other read. */
+function scopedStateRows({
+  query,
+  views,
+  state,
+}: {
+  query: string;
+  views: unknown;
+  state: LwqlScopedViewState;
+}) {
+  if (query.includes('"groupExists"')) {
+    return [
+      {
+        groupExists: state.groupExists,
+        scopedSchemaExists: state.scopedSchema !== "absent",
+        scopedSchemaOwned: state.scopedSchema === "owned",
+      },
+    ];
+  }
+  if (!query.includes('"copyGranted"')) return [];
+  const asked = Array.isArray(views) ? views.map(String) : [];
+  return asked.map((view) => {
+    const copy = state.copies.find((candidate) => candidate.view === view);
+    // The project-keys copy is no part of what these cases vary: readable unless named.
+    if (view === LWQL_PROJECT_KEYS_VIEW && copy === undefined) {
+      return {
+        view,
+        groupOnShared: false,
+        copyExists: true,
+        copyPassesGuard: true,
+        copyGranted: true,
+      };
+    }
+    return {
+      view,
+      groupOnShared: state.groupOnShared.includes(view),
+      copyExists: copy?.exists ?? false,
+      copyPassesGuard: copy?.passesGuard ?? false,
+      copyGranted: copy?.granted ?? false,
+    };
+  });
+}
+
+/**
+ * A PostgreSQL that records each statement, or refuses each (or each matching `failing`) as one
+ * without the privilege does. Its scoped-reader read answers `scoped`, or fails.
+ */
+function postgresThat({
+  refuses,
+  failing,
+  scoped = NO_GROUP,
+  probeFails = false,
+}: {
+  refuses: boolean;
+  failing?: RegExp;
+  scoped?: LwqlScopedViewState;
+  probeFails?: boolean;
+}) {
   const ran: string[] = [];
   const database: LwqlProvisioningDatabase = {
     $executeRawUnsafe: async (statement) => {
-      if (refuses) {
+      if (refuses || failing?.test(statement)) {
         throw Object.assign(
           new Error("Raw query failed. Code: `42501`. Message: `permission denied`"),
           {
@@ -74,7 +146,10 @@ function postgresThat({ refuses }: { refuses: boolean }) {
       ran.push(statement);
       return 0;
     },
-    $queryRawUnsafe: async () => [],
+    $queryRawUnsafe: async (query, ...values) => {
+      if (probeFails) throw new Error("probe refused");
+      return scopedStateRows({ query, views: values[2], state: scoped });
+    },
     $transaction: (fn) => fn({ $executeRawUnsafe: async () => 0 }),
   };
   return { ran, database };
@@ -303,35 +378,7 @@ describe("LwqlProvisionTask", () => {
   });
 });
 
-describe("convergeLwqlAccessModel", () => {
-  describe("when PostgreSQL refuses the reader role, as a managed server without CREATEROLE does", () => {
-    /** @scenario "A PostgreSQL failure does not stop the ClickHouse objects converging" */
-    it("logs its own message, still converges ClickHouse, then fails the run", async () => {
-      const postgres = postgresThat({ refuses: true });
-      const clickHouse = clickHouseThat();
-
-      await expect(
-        convergeLwqlAccessModel({
-          database: postgres.database,
-          plan: clickHouse.plan,
-          failOnError: true,
-        }),
-      ).rejects.toMatchObject({ code: "P2010" });
-
-      expect(clickHouse.ran.some((statement) => statement.includes("ENGINE = PostgreSQL"))).toBe(
-        true,
-      );
-      expect(logCalls).toContainEqual(
-        expect.objectContaining({
-          level: "error",
-          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
-          message: "lwql provisioning failed creating PostgreSQL objects",
-        }),
-      );
-      expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
-    });
-  });
-
+function describeReconvergenceCheck() {
   describe("when the reconvergence check names only the drift it found", () => {
     const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
       clickHouse: [],
@@ -377,7 +424,7 @@ describe("convergeLwqlAccessModel", () => {
         database: postgres.database,
         plan: clickHouse.plan,
         failOnError: true,
-        only: only({ postgres: [{ view: approvedViews[0] ?? "", absent: true }] }),
+        only: only({ postgres: [{ kind: "shared", view: approvedViews[0] ?? "", absent: true }] }),
       });
 
       expect(postgres.ran.length).toBeGreaterThan(0);
@@ -385,7 +432,7 @@ describe("convergeLwqlAccessModel", () => {
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
-    it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
+    it("creates only the absent view, grants each gap and never revokes the shared reader", async () => {
       const [absent, ungranted, untouched] = approvedViews;
       if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
       const postgres = postgresThat({ refuses: false });
@@ -397,8 +444,8 @@ describe("convergeLwqlAccessModel", () => {
         failOnError: true,
         only: only({
           postgres: [
-            { view: absent, absent: true },
-            { view: ungranted, absent: false },
+            { kind: "shared", view: absent, absent: true },
+            { kind: "shared", view: ungranted, absent: false },
           ],
         }),
       });
@@ -409,8 +456,209 @@ describe("convergeLwqlAccessModel", () => {
       const grants = postgres.ran.join("\n");
       expect(grants).toContain(`GRANT SELECT ON "public"."${absent}"`);
       expect(grants).toContain(`GRANT SELECT ON "public"."${ungranted}"`);
-      expect(grants).not.toContain(`"${untouched}" TO`);
-      expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
+      expect(grants).not.toContain(`GRANT SELECT ON "public"."${untouched}" TO`);
+      expect(grants).not.toMatch(/ALTER ROLE|CREATE ROLE/);
+      expect(grants).not.toContain(`FROM "${LWQL_POSTGRES_READER_ROLE}"`);
+      const revokes = grants.match(/REVOKE[^;']*/g) ?? [];
+      expect(revokes.length).toBeGreaterThan(0);
+      for (const revoke of revokes) {
+        expect(revoke).toMatch(new RegExp(`FROM "${LWQL_SCOPED_READER_GROUP}"$`));
+      }
+    });
+
+    /** @scenario "The reconvergence check guards every scoped copy" */
+    it("revokes the group first, rebuilds only the absent and unscoped copies, then grants", async () => {
+      const [onShared, absent, unscoped, ungranted] = approvedViews;
+      if (!onShared || !absent || !unscoped || !ungranted) {
+        throw new Error("the catalog maps too few datasets");
+      }
+      const postgres = postgresThat({ refuses: false });
+      const copyCreated = (view: string) =>
+        postgres.ran.some((run) => run.includes(`CREATE OR REPLACE VIEW "lwql_scoped"."${view}"`));
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+        only: only({
+          postgres: [
+            { kind: "group-on-shared", view: onShared },
+            { kind: "scoped", view: absent, repair: "absent" },
+            { kind: "scoped", view: unscoped, repair: "unscoped" },
+            { kind: "scoped", view: ungranted, repair: "ungranted" },
+          ],
+        }),
+      });
+
+      const [first = ""] = postgres.ran;
+      expect(first).toContain(`REVOKE SELECT ON "public"."${onShared}" FROM`);
+      expect(first).toContain(`REVOKE SELECT ON "lwql_scoped"."${unscoped}" FROM`);
+      expect(first).not.toMatch(/\bGRANT\b|\bCREATE\b/);
+      expect(
+        postgres.ran.filter((run) => run.includes(`CREATE OR REPLACE VIEW "public".`)),
+      ).toEqual([]);
+      expect([onShared, absent, unscoped, ungranted].map(copyCreated)).toEqual([
+        false,
+        true,
+        true,
+        false,
+      ]);
+      const groupGrants =
+        postgres.ran.find((run) => run.includes('GRANT USAGE ON SCHEMA "lwql_scoped"')) ?? "";
+      expect(groupGrants).toContain('GRANT USAGE ON SCHEMA "lwql_scoped"');
+      for (const view of approvedViews) {
+        expect(groupGrants).toContain(`GRANT SELECT ON "lwql_scoped"."${view}" TO`);
+      }
+      // Not a gap here, so the project-keys copy is neither rebuilt nor re-granted.
+      expect(
+        postgres.ran.filter((run) => run.includes(`"lwql_scoped"."${LWQL_PROJECT_KEYS_VIEW}"`)),
+      ).toEqual([]);
+    });
+
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
+    it("warns with the copies the scoped-reader group cannot select, after a deploy and a repair", async () => {
+      const [first, second] = approvedViews;
+      if (!first || !second) throw new Error("the catalog maps too few datasets");
+      const readable = approvedViews.map((view) => ({
+        view,
+        exists: true,
+        passesGuard: true,
+        granted: true,
+      }));
+      const warned = async (failing: readonly string[], drift?: LwqlAppOwnedDrift) => {
+        logCalls.length = 0;
+        const copies = readable.map((copy) =>
+          failing.includes(copy.view) ? { ...copy, passesGuard: false, granted: false } : copy,
+        );
+        await convergeLwqlAccessModel({
+          database: postgresThat({
+            refuses: false,
+            scoped: { groupExists: true, scopedSchema: "owned", groupOnShared: [], copies },
+          }).database,
+          plan: clickHouseThat().plan,
+          ...(drift ? { only: drift } : {}),
+        });
+        return logCalls.filter(
+          (call) => call.level === "warn" && String(call.message).includes("group has no SELECT"),
+        );
+      };
+      const repair = only({ postgres: [{ kind: "scoped", view: first, repair: "unscoped" }] });
+
+      for (const drift of [undefined, repair]) {
+        expect((await warned([first, second], drift)).map((call) => call.fields)).toEqual([
+          { views: [first, second] },
+        ]);
+        expect(await warned([], drift)).toEqual([]);
+      }
+    });
+
+    it("logs and carries on when the scoped-reader read fails", async () => {
+      logCalls.length = 0;
+
+      await convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false, probeFails: true }).database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+      });
+
+      const warnings = logCalls.filter((call) => call.level === "warn");
+      expect(warnings.some((call) => String(call.message).includes("could not read"))).toBe(true);
+    });
+
+    /** @scenario "Without CREATE on the database, the scoped part fails closed" */
+    it("logs one warning naming the absent scoped schema, and converges the rest", async () => {
+      logCalls.length = 0;
+      const postgres = postgresThat({
+        refuses: false,
+        scoped: { ...NO_GROUP, groupExists: true },
+      });
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+      });
+
+      const scopedWarnings = logCalls.filter(
+        (call) => call.level === "warn" && String(call.message).includes("scoped"),
+      );
+      expect(scopedWarnings.map((call) => call.message)).toEqual([
+        expect.stringContaining("lwql_scoped is absent"),
+      ]);
+      expect(postgres.ran.some((run) => run.includes("ALTER ROLE"))).toBe(true);
+    });
+
+    /** @scenario "A scoped schema marked as another installation's is left alone" */
+    it("logs one warning when lwql_scoped is another installation's", async () => {
+      logCalls.length = 0;
+
+      await convergeLwqlAccessModel({
+        database: postgresThat({
+          refuses: false,
+          scoped: { ...NO_GROUP, groupExists: true, scopedSchema: "foreign" },
+        }).database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+      });
+
+      const scopedWarnings = logCalls.filter(
+        (call) => call.level === "warn" && String(call.message).includes("scoped"),
+      );
+      expect(scopedWarnings.map((call) => call.message)).toEqual([
+        expect.stringContaining("not marked as this installation's"),
+      ]);
+    });
+
+    /** @scenario "Without CREATE on the database, the scoped part fails closed" */
+    it("runs the group's revokes before any DDL, and the scoped batch after the shared one", async () => {
+      const postgres = postgresThat({ refuses: false });
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+      });
+
+      const at = (pattern: string) => postgres.ran.findIndex((run) => run.includes(pattern));
+      const revokeFirst = at(`REVOKE USAGE ON SCHEMA "public" FROM "${LWQL_SCOPED_READER_GROUP}"`);
+      expect(revokeFirst).toBe(0);
+      expect(at('CREATE OR REPLACE VIEW "public".')).toBeGreaterThan(revokeFirst);
+      expect(at('CREATE SCHEMA "lwql_scoped"')).toBeGreaterThan(at("ALTER ROLE"));
+      expect(at('CREATE OR REPLACE VIEW "lwql_scoped".')).toBeGreaterThan(
+        at('CREATE SCHEMA "lwql_scoped"'),
+      );
+      const groupGrant = at('GRANT USAGE ON SCHEMA "lwql_scoped"');
+      expect(groupGrant).toBeGreaterThan(at('CREATE OR REPLACE VIEW "lwql_scoped".'));
+      // The new view comes after the group's grants, so a failure in it skips none of them.
+      expect(
+        at(`CREATE OR REPLACE VIEW "lwql_scoped"."${LWQL_PROJECT_KEYS_VIEW}"`),
+      ).toBeGreaterThan(groupGrant);
+    });
+
+    /** @scenario "Without CREATE on the database, the scoped part fails closed" */
+    it("logs a failed scoped batch at warn and still resolves, the shared half converged", async () => {
+      logCalls.length = 0;
+      const postgres = postgresThat({ refuses: false, failing: /CREATE SCHEMA "lwql_scoped"/ });
+
+      await expect(
+        convergeLwqlAccessModel({
+          database: postgres.database,
+          plan: clickHouseThat().plan,
+          failOnError: true,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "warn",
+          message: expect.stringContaining("could not write the scoped-reader copies"),
+        }),
+      );
+      expect(logCalls.filter((call) => call.level === "error")).toEqual([]);
+      expect(postgres.ran.some((run) => run.includes("ALTER ROLE"))).toBe(true);
+      expect(
+        postgres.ran.some((run) => run.includes('CREATE OR REPLACE VIEW "lwql_scoped".')),
+      ).toBe(false);
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
@@ -438,7 +686,7 @@ describe("convergeLwqlAccessModel", () => {
         "lwql provisioning failed creating ClickHouse objects",
         "lwql provisioning failed creating PostgreSQL objects",
       ];
-      const gap = { view: approvedViews[0] ?? "", absent: true };
+      const gap = { kind: "shared" as const, view: approvedViews[0] ?? "", absent: true };
 
       const check = await logsOf(only({ clickHouse: [engineTable ?? ""], postgres: [gap] }), true);
       expect(check.filter((call) => call.level === "error")).toEqual([]);
@@ -456,7 +704,9 @@ describe("convergeLwqlAccessModel", () => {
       expect(errors).toEqual(expect.arrayContaining(alerts));
     });
   });
+}
 
+function describeEngineTableRebuild() {
   describe("when engine tables are to be rebuilt on the app's collection values", () => {
     const engineTables = selfProvisioning.engineTablesIn({ only: undefined });
     const [staleTable, absentTable] = engineTables;
@@ -651,6 +901,39 @@ describe("convergeLwqlAccessModel", () => {
       expect(rebuilt(clickHouse, stale)).toEqual([]);
     });
   });
+}
+
+describe("convergeLwqlAccessModel", () => {
+  describe("when PostgreSQL refuses the reader role, as a managed server without CREATEROLE does", () => {
+    /** @scenario "A PostgreSQL failure does not stop the ClickHouse objects converging" */
+    it("logs its own message, still converges ClickHouse, then fails the run", async () => {
+      const postgres = postgresThat({ refuses: true });
+      const clickHouse = clickHouseThat();
+
+      await expect(
+        convergeLwqlAccessModel({
+          database: postgres.database,
+          plan: clickHouse.plan,
+          failOnError: true,
+        }),
+      ).rejects.toMatchObject({ code: "P2010" });
+
+      expect(clickHouse.ran.some((statement) => statement.includes("ENGINE = PostgreSQL"))).toBe(
+        true,
+      );
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "error",
+          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
+          message: "lwql provisioning failed creating PostgreSQL objects",
+        }),
+      );
+      expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
+    });
+  });
+
+  describeReconvergenceCheck();
+  describeEngineTableRebuild();
 });
 
 describe("convergeLwqlAccessModel across the named collections a server holds", () => {
@@ -887,17 +1170,24 @@ describe("findLwqlAppOwnedDrift", () => {
   function presentWith({
     columns,
     postgresRead = true,
+    scopedRead = true,
     readerPassword = READER_PASSWORD,
   }: {
     columns: string[];
     postgresRead?: boolean;
+    /** False fails the scoped-reader read alone, after the shared reader's read succeeded. */
+    scopedRead?: boolean;
     readerPassword?: string;
   }) {
     const comment = commentFor(readerPassword);
     const database: LwqlProvisioningDatabase = {
       ...postgresThat({ refuses: false }).database,
-      $queryRawUnsafe: async () => {
+      $queryRawUnsafe: async (query: string) => {
         if (!postgresRead) throw Object.assign(new Error("connection refused"), { code: "P1001" });
+        if (query.includes('"groupExists"')) {
+          if (!scopedRead) throw Object.assign(new Error("connection reset"), { code: "P1017" });
+          return scopedStateRows({ query, views: [], state: NO_GROUP });
+        }
         return approvedViews.map((view) => ({ view, granted: true, columns }));
       },
     };
@@ -944,8 +1234,9 @@ describe("findLwqlAppOwnedDrift", () => {
     expect(drift.clickHouse).toEqual([
       ...lacking.flatMap((view) => (view.postgres ? [view.sourceTable] : [])),
       ...lacking.map((view) => view.name),
-      // A floored twin carries its base view's columns, so it lacks them too.
+      // A twin, floored or cut by trace, carries its base view's columns, so it lacks them too.
       ...flooredViewNames(lacking),
+      ...traceIdsViewNames(lacking),
     ]);
     expect(drift.clickHouse).toContain("trace_metrics");
   });
@@ -973,5 +1264,12 @@ describe("findLwqlAppOwnedDrift", () => {
       }),
     );
     expect(logCalls.map((call) => call.level)).not.toContain("error");
+  });
+
+  /** @scenario "The reconvergence check guards every scoped copy" */
+  it("reads PostgreSQL as unknown when only the scoped-reader read fails", async () => {
+    const drift = await presentWith({ columns: catalogColumns, scopedRead: false });
+
+    expect(drift.postgres).toBe("unknown");
   });
 });

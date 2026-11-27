@@ -12,7 +12,7 @@ import type {
  * Ordered decision steps; ORDER lives in AuthzEngine.decide() (engine.ts).
  * Legacy quirks tagged LEGACY-QUIRK(<stage>) (ADR-092 §2).
  */
-import { bindingGrants, findResourceGrant } from "./matchers.ts";
+import { BRAIDS_MANAGE_PERMISSION, bindingGrants, findResourceGrant } from "./matchers.ts";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
 import type { ScopeChainLink } from "./scope.ts";
 
@@ -177,13 +177,19 @@ export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzD
     return { ...base, allowed: false, denialReason: "membership-disabled" };
   }
   const hadAnyPath = grants.isOrgMember || chainBindings.length > 0;
-
+  const unreached = unreachedDenialReason({
+    organizationRole: grants.organizationRole,
+    hadAnyPath,
+  });
+  // Name the policy, as the Braids page's banner does, rather than a bare missing grant.
+  const keptToAdmins =
+    unreached === "no-grant" &&
+    base.permission === BRAIDS_MANAGE_PERMISSION &&
+    grants.principal.type === "user" &&
+    grants.braidsOrganizationAdminsOnly === true;
   return {
     ...base,
     allowed: false,
-    denialReason: unreachedDenialReason({
-      organizationRole: grants.organizationRole,
-      hadAnyPath,
-    }),
+    denialReason: keptToAdmins ? "braids-kept-to-organisation-admins" : unreached,
   };
 }

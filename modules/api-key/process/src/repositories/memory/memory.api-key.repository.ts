@@ -12,6 +12,7 @@ import type {
   ApiKeyRepository,
   ApiKeyRow,
   ApiKeyUpdateRecord,
+  KeyLiveness,
 } from "../api-key.repository.ts";
 import type { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 
@@ -89,6 +90,21 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
         key.revokedAt === null &&
         !isSystemApiKey(key),
     );
+  }
+
+  async findEveryKeyInOrganization(input: {
+    organizationId: string;
+    limit: number;
+  }): Promise<ApiKeyRow[]> {
+    const keys = this.#list((key) => key.organizationId === input.organizationId);
+    return [
+      ...keys.filter((key) => key.revokedAt === null),
+      ...keys
+        .filter((key) => key.revokedAt !== null)
+        .toSorted(
+          (left, right) => (right.revokedAt?.getTime() ?? 0) - (left.revokedAt?.getTime() ?? 0),
+        ),
+    ].slice(0, input.limit);
   }
 
   async update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
@@ -186,6 +202,22 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     return rows.map(({ id, organizationId }) => ({ id, organizationId }));
   }
 
+  async findLiveSystemManagedByName(input: {
+    organizationId: string;
+    name: string;
+    createdAtOrBefore: Instant;
+  }): Promise<{ id: string }[]> {
+    const createdAtOrBefore = input.createdAtOrBefore.epochMilliseconds;
+    return this.#list(
+      (key) =>
+        key.organizationId === input.organizationId &&
+        key.name === input.name &&
+        key.isSystemManaged === true &&
+        key.revokedAt === null &&
+        key.createdAt.getTime() <= createdAtOrBefore,
+    ).map(({ id }) => ({ id }));
+  }
+
   async findIngestKeysForUser(input: {
     organizationId: string;
     userId: string;
@@ -233,14 +265,16 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     ).map((key) => ({ id: key.id }));
   }
 
-  async findLivenessById(input: {
-    id: string;
-  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  async findLivenessById(input: { id: string }): Promise<KeyLiveness | null> {
     const key = this.#database.keys().find((row) => row.id === input.id);
     if (!key) return null;
     return {
       revokedAt: key.revokedAt ? fromDate(key.revokedAt) : null,
       expiresAt: key.expiresAt ? fromDate(key.expiresAt) : null,
+      createdAt: fromDate(key.createdAt),
+      name: key.name,
+      isSystemManaged: key.isSystemManaged === true,
+      parentApiKeyId: key.parentApiKeyId ?? null,
     };
   }
 

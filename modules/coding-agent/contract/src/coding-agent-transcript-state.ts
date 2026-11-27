@@ -8,6 +8,7 @@ import { pickString } from "./telemetry/coding-agent-span.ts";
 export interface TranscriptLogRecord {
   timestampMs: number;
   attributes: Record<string, unknown>;
+  resourceAttributes?: Record<string, unknown> | null;
   serviceName?: string | null;
 }
 

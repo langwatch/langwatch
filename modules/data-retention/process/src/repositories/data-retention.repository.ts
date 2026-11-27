@@ -13,6 +13,8 @@ export interface DataRetentionRepository {
   findAllInOrganization(input: { organizationId: string }): Promise<RetentionPolicy[]>;
   /** Every rule in any of the organisations, in one read. */
   findAllInOrganizations(input: { organizationIds: readonly string[] }): Promise<RetentionPolicy[]>;
+  /** Every organization holding at least one rule, each once. */
+  findOrganizationIdsWithRules(): Promise<string[]>;
   upsertForScope(input: {
     organizationId: string;
     scope: ScopeAssignment;

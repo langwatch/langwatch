@@ -54,6 +54,15 @@ vi.mock("../../../behavior/use-sign-in-security.ts", () => ({
   }),
 }));
 
+vi.mock("../../../behavior/use-docs-playground-policy.ts", () => ({
+  useDocsPlaygroundPolicy: () => ({
+    show: true,
+    sessionsEnabled: true,
+    saving: false,
+    save: vi.fn(),
+  }),
+}));
+
 afterEach(cleanup);
 
 function DeclaredCard({ organizationId, canReadMembership }: AuthenticationOverviewCardProps) {
@@ -92,6 +101,7 @@ describe("given an administrator on the Authentication page", () => {
       expect(screen.getByTestId("organization-policy")).toBeInTheDocument();
       expect(screen.getByTestId("join-policy-card")).toBeInTheDocument();
       expect(screen.getByTestId("two-step-requirement-card")).toBeInTheDocument();
+      expect(screen.getByTestId("docs-playground-card")).toBeInTheDocument();
       expect(
         screen.getByText(/also apply when your organization uses password sign-in/),
       ).toBeInTheDocument();

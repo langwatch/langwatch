@@ -1,4 +1,5 @@
 // Guarded upserts in raw SQL; one statement per event; guard in WHERE for atomicity.
+import { Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
@@ -86,9 +87,17 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
 
   async append(write: GrantProjectionWrite): Promise<void> {
     const lock = this.identityLockFor(write);
-    const result = lock
-      ? (await this.prisma.$transaction([lock, this.statementFor(write)]))[1]
-      : await this.statementFor(write);
+    const twin = this.legacyTwinFor(write);
+    const result =
+      lock || twin
+        ? (
+            await this.prisma.$transaction([
+              ...(lock ? [lock] : []),
+              this.statementFor(write),
+              ...(twin ? [twin] : []),
+            ])
+          )[lock ? 1 : 0]
+        : await this.statementFor(write);
     reportMissedRow(write, result);
     await this.writeCompatHeads([{ write, result }]);
   }
@@ -103,6 +112,8 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
       const lock = this.identityLockFor(write);
       if (lock) statements.push(lock);
       resultAt.push(statements.push(this.statementFor(write)) - 1);
+      const twin = this.legacyTwinFor(write);
+      if (twin) statements.push(twin);
     }
     const all = await this.prisma.$transaction(statements);
     const results = resultAt.map((index) => all[index]);
@@ -352,6 +363,36 @@ ${skipTenantCheck({
 SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
   }
 
+  /**
+   * A v2 read-through mint is born with a revoked twin under its legacy id (#9575): a pre-v2
+   * release re-mints that id and its upsert never clears `revokedAt`, so a revoke on any
+   * release cannot be undone by an old mint. Share links (RESOURCE rows) are never minted here.
+   */
+  private legacyTwinFor(write: GrantProjectionWrite): Prisma.PrismaPromise<number> | undefined {
+    if (write.kind !== "grant.upsert" || write.row.source !== "read-through-mint") return undefined;
+    if (write.row.scopeType === "RESOURCE") return undefined;
+    const parsed = parseGrantId(write.row.id);
+    if (parsed?.layout !== "v2") return undefined;
+    const twinId = parsed.withLayout("v1-legacy").toString();
+    if (twinId === write.row.id) return undefined;
+    return this.prisma.$executeRaw`
+      INSERT INTO "Grant" (
+        "id", "organizationId", "principalType", "principalId", "roleKey",
+        "legacyRole", "source", "scopeType", "scopeId", "token", "permission",
+        "resourceKind", "projectId", "createdByUserId", "expiresAt",
+        "maxViews", "condition", "occurredAt", "updatedAt", "revokedAt", "revokedReason"
+      ) SELECT
+        ${twinId}, "organizationId", "principalType", "principalId", "roleKey",
+        "legacyRole", "source", "scopeType", "scopeId", NULL, "permission",
+        "resourceKind", "projectId", "createdByUserId", "expiresAt",
+        "maxViews", "condition", "occurredAt", NOW(), "occurredAt", 'superseded by its v2 id'
+      FROM "Grant"
+      WHERE "id" = ${write.row.id}
+        AND "organizationId" = ${write.row.organizationId}
+      ON CONFLICT ("id") DO NOTHING
+    `;
+  }
+
   private statementFor(write: GrantProjectionWrite): Prisma.PrismaPromise<unknown> {
     switch (write.kind) {
       case "grant.upsert":
@@ -527,5 +568,14 @@ SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
         "updatedAt"      = NOW()
       WHERE "Role"."occurredAt" < EXCLUDED."occurredAt"
     `;
+  }
+}
+
+/** The grant id as a KSUID; grants minted outside `resolveGrantId` may not be one. */
+function parseGrantId(grantId: string): Ksuid | undefined {
+  try {
+    return Ksuid.parse(grantId);
+  } catch {
+    return undefined;
   }
 }

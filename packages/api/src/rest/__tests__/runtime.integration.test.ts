@@ -312,6 +312,51 @@ describe("a declared route that caps the body it accepts", () => {
   });
 });
 
+describe("a route whose body cap is its module's deployment setting", () => {
+  interface CappedApi {
+    maxBodyBytes(): number;
+    create(input: { name: string }): Promise<{ id: string }>;
+  }
+  const CappedApi = moduleApi<CappedApi>()("secret");
+  const capped = defineRestRouter(CappedApi)
+    .withNamespace("capped")
+    .withVersion(VERSION)
+    .post("/", "createCapped")
+    .keepsRecords()
+    .withInput(z.object({ name: z.string() }))
+    .withPermission("secrets:manage")
+    .withOutput(z.object({ id: z.string() }))
+    .withBodyLimit({ maxBytes: (app) => app.maxBodyBytes() })
+    .withoutAudit("test route")
+    .handle(async ({ app, input }) => app.create({ name: input.name }))
+    .build();
+
+  /** @scenario "A body cap can be the module's deployment setting" */
+  it("reads the cap from the app on each request", async () => {
+    let maxBytes = 1024;
+    const app = createRestRuntime({
+      authorization: authorizationPort,
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+      },
+    }).mount(capped.router(), {
+      app: () => ({
+        maxBodyBytes: () => maxBytes,
+        create: async ({ name }) => ({ id: name.slice(0, 4) }),
+      }),
+      credential: "project",
+      onError: createErrorHandler(),
+    });
+
+    const refused = await post(app, `/api/capped/${VERSION}`, "n".repeat(2048));
+    expect(refused.status).toBe(413);
+
+    maxBytes = 4096;
+    const served = await post(app, `/api/capped/${VERSION}`, "n".repeat(2048));
+    expect(served.status).toBe(200);
+  });
+});
+
 describe("a declared collection route", () => {
   /** @scenario "A collection route is addressed at the family root, with no trailing slash" */
   it("answers at its dated, latest and bare addresses, none of them trailing a slash", () => {

@@ -343,6 +343,24 @@ describe("validateLangWatchQL given a read of evaluation_metrics' floored twin",
       ),
     ).toEqual([]);
   });
+
+  /** @scenario "A caller cannot read a trace-ids twin directly" */
+  it.each<[string, string, LangWatchQLViolationCode]>([
+    ["by name", "SELECT 1 FROM traces__ids LIMIT 1", "TABLE_NOT_ALLOWED"],
+    ["database-qualified", "SELECT 1 FROM analytics.traces__ids LIMIT 1", "TABLE_NOT_ALLOWED"],
+    [
+      "inside a subquery",
+      "SELECT 1 FROM traces WHERE TraceId IN (SELECT TraceId FROM trace_metrics__ids) LIMIT 1",
+      "TABLE_NOT_ALLOWED",
+    ],
+    [
+      "as a table function",
+      "SELECT 1 FROM traces__ids(lwql_trace_ids = ['t1']) LIMIT 1",
+      "TABLE_FUNCTION",
+    ],
+  ])("refuses a trace-ids twin %s", (_case, sql, code) => {
+    expect(codesOf(validateLangWatchQL({ sql, ...twinPolicy }))).toContain(code);
+  });
 });
 
 describe("validateLangWatchQL given a table function", () => {
@@ -664,7 +682,7 @@ describe("validateLangWatchQL given a violation whose refusal should name what e
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const violation = result.violations.find((entry) => entry.code === "TABLE_NOT_ALLOWED");
-    expect(violation?.availableViews).toEqual(["analytics.spans", "analytics.traces"]);
+    expect(violation?.availableViews).toEqual(["spans", "traces"]);
   });
 
   /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
@@ -678,7 +696,27 @@ describe("validateLangWatchQL given a violation whose refusal should name what e
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const violation = result.violations.find((entry) => entry.code === "TABLE_NOT_ALLOWED");
-    expect(violation?.availableViews).toEqual(["analytics.spans", "analytics.traces"]);
+    expect(violation?.availableViews).toEqual(["spans", "traces"]);
+  });
+
+  /** @scenario "A view qualified with another deployment's database is refused with the bare name" */
+  it("refuses a view qualified with a database this deployment does not serve, naming the bare view", () => {
+    const result = validate("SELECT TraceId FROM langwatch.traces", {
+      allowedTables: ["analytics.traces", "analytics.spans"],
+      gatedColumns: [],
+      defaultDatabase: "analytics",
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const violation = result.violations.find((entry) => entry.code === "TABLE_NOT_ALLOWED");
+    expect(violation?.message).toContain('Write the bare view name "traces"');
+    expect(violation?.availableViews).toEqual(["spans", "traces"]);
+  });
+
+  it("accepts the bare view name and the deployment's own qualifier alike", () => {
+    expect(validate("SELECT TraceId FROM traces").ok).toBe(true);
+    expect(validate("SELECT TraceId FROM analytics.traces").ok).toBe(true);
   });
 
   /**

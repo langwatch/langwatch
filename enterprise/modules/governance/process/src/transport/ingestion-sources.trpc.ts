@@ -26,8 +26,40 @@ export const ingestionSourcesTrpcTransport: TrpcRouterDeclaration<
   .withPermission("ingestionSources:manage")
   .handle(({ app, input }) => app.ingestionSourceUpdate(input))
 
+  .procedure("securityLakeCreate")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input, actor }) =>
+    app.securityLakeSourceCreate({ ...input, actorUserId: actor.id }),
+  )
+
+  .procedure("securityLakeUpdate")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.securityLakeSourceUpdate(input))
+
+  .procedure("securityLakeGet")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.securityLakeSourceGet(input))
+
+  .procedure("securityLakeTestConnection")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.securityLakeSourceTest(input))
+
+  .procedure("securityLakeHealth")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withPermission("ingestionSources:view")
+  .handle(({ app, input }) => app.securityLakeSourceHealth(input))
+
+  .procedure("securityLakeCallersWithoutTraces")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withPermission("ingestionSources:view")
+  .handle(({ app, input }) => app.securityLakeCallersWithoutTraces(input))
+
   .procedure("rotateSecret")
-  .mintsCredential("ingestionSources:manage")
+  .mintsCredential()
   .withPermission("ingestionSources:manage")
   .handle(({ app, input, actor }) =>
     app.ingestionSourceRotateSecret({ ...input, impersonatorId: actor.impersonatorId }),
@@ -44,4 +76,12 @@ export const ingestionSourcesTrpcTransport: TrpcRouterDeclaration<
   .procedure("ottlStarter")
   .withPermission("ingestionSources:view")
   .handle(({ app, input }) => app.ingestionSourceOttlStarter(input))
+
+  .procedure("testAgentListing")
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.ingestionSourceTestAgentListing(input))
+
+  .procedure("testAgentListingForSource")
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.ingestionSourceTestAgentListingForSource(input))
   .build();

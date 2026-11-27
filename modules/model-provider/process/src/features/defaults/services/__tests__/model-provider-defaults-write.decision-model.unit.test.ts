@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestProjects } from "../../../../app/__tests__/model-provider.fixture.ts";
 import { MemoryModelProviderRepositories } from "../../../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../../../repositories/model-provider.repositories.ts";
 import { ModelProviderAuthorizationService } from "../../../../services/model-provider-authorization.service.ts";
 import { ModelProviderDecisionModelService } from "../../../../services/model-provider-decision-model.service.ts";
 import { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
@@ -82,6 +83,7 @@ function unused(member: string) {
 }
 
 async function writerOver({
+  defaults = MemoryModelProviderRepositories.create().defaults,
   stored,
   storedScopes = [SCOPE],
   isFlagOn,
@@ -92,8 +94,8 @@ async function writerOver({
   isFlagOn: boolean;
   /** The scopes whose own chain holds an enabled Inception key. */
   keyedScopes?: ModelDefaultScope[];
+  defaults?: ModelProviderRepositories["defaults"];
 }) {
-  const { defaults } = MemoryModelProviderRepositories.create();
   if (stored) {
     await defaults.save({
       id: CONFIG_ID,
@@ -163,16 +165,57 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" });
     });
 
-    it("accepts LangWatch Evals Preview", async () => {
-      const writer = await writerOver({ isFlagOn: false });
+    /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+    it.each(["langwatch/instant-preview", "langwatch/instant-evals"])(
+      "stores %s as langwatch/instant-evals",
+      async (sent) => {
+        const writer = await writerOver({ isFlagOn: false });
 
-      const saved = await writer.save({
-        config: { INSTANT_EVALS: "langwatch/instant-evals" },
-        scopes: [SCOPE],
+        const saved = await writer.save({
+          config: { INSTANT_EVALS: sent },
+          scopes: [SCOPE],
+          authorId: null,
+        });
+
+        expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      },
+    );
+
+    /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+    it("stores LangWatch Instant (preview) set as one default under the earlier id", async () => {
+      const { defaults } = MemoryModelProviderRepositories.create();
+      const writer = await writerOver({ isFlagOn: false, defaults });
+
+      await writer.set({
+        scope: SCOPE,
+        key: "INSTANT_EVALS",
+        model: "langwatch/instant-preview",
         authorId: null,
       });
 
-      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      const [stored] = await defaults.findForOrganization(ORGANIZATION);
+      expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+    });
+
+    /** @scenario "The Instant Evals column refuses LangWatch Evals (preview)" */
+    it("refuses LangWatch Evals (preview) in the column on a save and on a single set", async () => {
+      const writer = await writerOver({ isFlagOn: false });
+
+      await expect(
+        writer.save({
+          config: { INSTANT_EVALS: "langwatch/evals-preview" },
+          scopes: [SCOPE],
+          authorId: null,
+        }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      await expect(
+        writer.set({
+          scope: SCOPE,
+          key: "INSTANT_EVALS",
+          model: "langwatch/evals-preview",
+          authorId: null,
+        }),
+      ).rejects.toHaveProperty("code");
     });
   });
 

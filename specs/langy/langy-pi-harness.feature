@@ -33,11 +33,40 @@ Feature: Langy runs a conversation on the pi worker
     Then the entry asks pi for adaptive thinking
     And an older Claude pi's catalog does not list keeps the manager's config alone
 
+  # The manager marks every openai/* model as reasoning, and OpenAI answers a
+  # reasoning field on gpt-4o or gpt-4.1 with 400 "Unsupported parameter:
+  # 'reasoning.effort' is not supported with this model".
+  @unit
+  Scenario: A model that does not reason is never sent reasoning fields
+    Given the manager configures an OpenAI model pi's catalog lists as not reasoning
+    When the wrapper generates the model registry
+    Then the entry does not reason, whatever the lane's default says
+
+  # pi's catalog stops at gpt-5.6, and an unknown model gets pi's defaults: a
+  # 128k window and text-only input, a tenth of gpt-6's window.
+  @unit
+  Scenario: A GPT newer than pi's catalog gets its newest sibling's shape
+    Given the manager configures a GPT newer than every entry of its tier in pi's catalog
+    When the wrapper generates the model registry
+    Then the entry carries the newest same-tier sibling's window, input and thinking levels under its own id
+    And it carries neither the sibling's name nor its price
+    And an id with no catalog sibling of its tier keeps the manager's config alone
+
   @unit
   Scenario: A model pi's catalog does not know is written from config alone
     Given the manager configures a model id pi's catalog does not list for that API dialect
     When the wrapper generates the model registry
-    Then the entry is exactly the manager's config
+    Then the entry is exactly the manager's config, apart from the reasoning and image input defaults
+
+  # A provider prefix cannot tell a reasoning model from one that refuses the
+  # parameter outright, so the manager stays silent and pi's catalog decides.
+  @unit
+  Scenario: A model that cannot reason is never asked to
+    Given the manager configures a model without saying whether it reasons
+    When the wrapper generates the model registry
+    Then a model pi's catalog lists keeps the catalog's reasoning flag
+    And a Responses or Messages model the catalog does not list reasons by default
+    And a chat-completions model the catalog does not list does not reason
 
   # The model config passes unknown keys through so a new compat flag needs no
   # wrapper change. Routing and credential keys must not travel that path: they
@@ -215,3 +244,29 @@ Feature: Langy runs a conversation on the pi worker
     When the relay retells the call as a gen_ai span
     Then the span records which options the gateway dropped
     And the relay logs the drop once per distinct set, not once per call
+
+  # A person can paste images into a Langy message. The control plane sends
+  # their base64 bytes on the turn body, and the manager must hand them to pi
+  # as image input on the turn's first prompt, not only their names.
+  @unit
+  Scenario: A turn's images reach pi as image input
+    Given a turn body carrying a PNG image with its name, media type and base64 data
+    When the manager posts the turn to the pi worker
+    Then the wrapper's turn line carries the image under images with name, mediaType and data
+    And the wrapper hands it to pi's prompt as an image with the same data and media type
+    But a guided continuation inside the same turn carries no images
+
+  @unit
+  Scenario: A turn whose images break the limits is refused before it reaches a worker
+    Given a turn body with an unsupported media type, empty or non-base64 data, more than four images, or one over 5 MiB
+    When the manager receives it
+    Then it answers 422 with invalid_images and never posts the turn
+
+  # pi treats a model its catalog does not list as text-only, and pi-ai then
+  # replaces every image with an "image omitted" placeholder.
+  @unit
+  Scenario: A model pi's catalog does not list is told it can see images
+    Given the manager configures a model pi's catalog does not list and says nothing about its input
+    When the wrapper generates the model registry
+    Then the entry declares text and image input
+    And an input the manager's config names wins over that default

@@ -58,7 +58,7 @@ export function instantEvalTextBudget({
 
 /**
  * What one classification is expected to cost in input tokens, counting the
- * text as it will be after the cut.
+ * text as it will be after the cut and the envelope billed on every request.
  */
 export function estimateInstantEvalRequestTokens({
   text,
@@ -72,7 +72,7 @@ export function estimateInstantEvalRequestTokens({
   const questionTokens = instantEvalQuestionTokens(questions);
   const budget = limits.stateTokens - questionTokens - limits.reserveTokens;
   const textTokens = Math.min(estimateJudgedTextTokens({ text, limits }), Math.max(0, budget));
-  return textTokens + questionTokens;
+  return textTokens + questionTokens + limits.requestOverheadTokens;
 }
 
 /**

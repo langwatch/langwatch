@@ -11,7 +11,9 @@ are gone, and the fetch timeout is a plugin rule (see the last section).
 [environment boundaries](../../../specs/tooling/lint-environment-boundaries.feature),
 [a service given its config](../../../specs/tooling/lint-service-loads-its-own-config.feature),
 [plan literals](../../../specs/tooling/lint-plan-literals.feature),
+[ingestion source liveness](../../../specs/tooling/lint-ingestion-source-status-literal.feature),
 [fetch timeouts](../../../specs/tooling/lint-require-fetch-timeout.feature),
+[one S3 region rule](../../../specs/tooling/lint-s3-client-region.feature),
 [boot hooks](../../../specs/tooling/lint-no-boot-hook-outside-guard.feature),
 [inline dynamic imports](../../../specs/tooling/lint-no-inline-dynamic-import.feature),
 [the explicit-any scope](../../../specs/tooling/lint-platform-invariants.feature)
@@ -51,8 +53,10 @@ quotes a customer a different number on a different page.
 | `langwatch/service-loads-its-own-config`    | plugin | A service does not declare its own `loadConfig`/`resolveConfig`/`readConfig`; config is a named member of the argument `create` takes. See fc80f65635.                                                           |
 | `langwatch/plan-literals`                   | plugin | Two or more plan limit fields in one object outside `@langwatch/plans` is a second plan definition.                                                                                                              |
 | `langwatch/no-hand-rolled-plan-gate`        | plugin | A transport or app file does not ask the plan itself (`hasEntitlement`, `PlanRequiredError`); the route declares `withEntitlement` and the framework refuses with 402.                                           |
+| `langwatch/ingestion-source-status-literal` | plugin | In the governance module, a source `status` is never compared with `"disabled"` or `"awaiting_first_event"` outside the contract's `source-health.ts`; doors call `ingestionSourceIsLive`.                       |
 | `langwatch/span-braid-honour-owner`         | plugin | Only the trace module's braid pause imports `honourSpanBraids`, and no code outside `@langwatch/authorization` writes `braidsHonoured`, so braids show only after the Enterprise check (ADR-201 §9).             |
 | `langwatch/require-fetch-timeout`           | plugin | A `fetch` in a channel carries an abort signal, or it hangs as long as the peer holds the socket.                                                                                                                |
+| `langwatch/s3-client-region`                | plugin | A `new S3Client` outside `packages/aws-client` takes its region from `s3RegionOf`, so AWS never receives `auto`.                                                                                                 |
 | `langwatch/no-boot-hook-outside-guard`      | plugin | A process lifecycle listener is registered only by the boot guard: the `Server` for a long-running process, `bootNodeExecutable` for a one-shot.                                                                 |
 | `langwatch/no-inline-dynamic-import`        | plugin | No inline `import(…)`; a dependency is a top-level import.                                                                                                                                                       |
 | `langwatch/em-dash-in-copy`                 | plugin | No em dash in customer-facing copy.                                                                                                                                                                              |

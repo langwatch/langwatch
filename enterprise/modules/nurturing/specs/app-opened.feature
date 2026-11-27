@@ -74,7 +74,7 @@ Feature: App opens reach Customer.io on the opening user
 
   @integration
   Scenario: The personal overview announces its open as a usage page
-    When a person opens /me
+    When a person opens /coding-agents
     Then the screen records me_overview
 
   @integration

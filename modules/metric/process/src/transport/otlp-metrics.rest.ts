@@ -94,9 +94,14 @@ async function receive({
   request: Request;
   credential: OtlpIngestCredential;
 }): Promise<
-  Readonly<{ status: OtlpDoorAnswer["status"]; mediaType: typeof PRODUCES_JSON; body: string }>
+  Readonly<{
+    status: OtlpDoorAnswer["status"];
+    mediaType: typeof PRODUCES_JSON;
+    body: string;
+    headers?: OtlpDoorAnswer["headers"];
+  }>
 > {
-  const { status, body } = otlpMetricAnswer(
+  const { status, body, headers } = otlpMetricAnswer(
     await app.receiveOtlpMetrics({
       request: {
         method: request.method,
@@ -111,7 +116,12 @@ async function receive({
       credential,
     }),
   );
-  return { status, mediaType: PRODUCES_JSON, body: JSON.stringify(body) };
+  return {
+    status,
+    mediaType: PRODUCES_JSON,
+    body: JSON.stringify(body),
+    ...(headers ? { headers } : {}),
+  };
 }
 
 export const otlpMetricsRest = defineRestRouter(MetricApi)

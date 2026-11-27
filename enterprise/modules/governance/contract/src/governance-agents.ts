@@ -3,6 +3,8 @@
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { AGENT_REGISTRY_POSTURES } from "./features/registry/agent-registry.ts";
+
 export const agentsListingRefusalCauseSchema = z.enum(["access", "unreachable", "incomplete"]);
 export type AgentsListingRefusalCause = z.infer<typeof agentsListingRefusalCauseSchema>;
 
@@ -51,7 +53,15 @@ export const agentListingRequestResultSchema: AgentListingRequestResultSchema =
 export type AgentListingRequestResult = z.infer<typeof agentListingRequestResultSchema>;
 
 /** Where an agent came to us from: the chips the source filter offers. */
-export const AGENT_SOURCES = ["custom", "databricks", "copilot_studio"] as const;
+export const AGENT_SOURCES = [
+  "custom",
+  "databricks",
+  "copilot_studio",
+  "aws",
+  "gcp",
+  "ard",
+  "traffic",
+] as const;
 export type AgentSource = (typeof AGENT_SOURCES)[number];
 
 /** Stored, never derived from the clock: "erroring" cannot be read off last activity. */
@@ -71,6 +81,10 @@ const governanceAgentRowSchemaDefinition = z.object({
   lastActiveMinutesAgo: z.number().nullable(),
   health: z.enum(AGENT_HEALTH_STATES).nullable(),
   registeredDaysAgo: z.number().nullable(),
+  /** The agent registry's posture; null while the registry holds no entry for the agent. */
+  posture: z.enum(AGENT_REGISTRY_POSTURES).nullable(),
+  /** Where the agent runs at its source (`aws_bedrock`, `gcp_vertex`, ...), when it says. */
+  platform: z.string().nullable(),
 });
 export interface GovernanceAgentRowSchema extends Named<
   typeof governanceAgentRowSchemaDefinition

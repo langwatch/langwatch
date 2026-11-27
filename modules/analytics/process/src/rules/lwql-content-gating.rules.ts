@@ -33,14 +33,18 @@ export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = CONTENT_CATEGORIES.flat
   .filter((key, index, keys) => keys.indexOf(key) === index)
   .toSorted();
 
+/** `value` with every regular-expression metacharacter escaped, for an RE2 pattern. */
+function regexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
- * Key prefixes that carry the same content in exploded form. SDKs that emit indexed message
- * arrays write `gen_ai.prompt.0.content` rather than `gen_ai.prompt`, so an exact-key filter
- * alone would drop the blob and leave the pieces.
+ * A content key as one RE2 pattern: a catalog key alone, or followed by `.` (the exploded form,
+ * `gen_ai.prompt.0.content`). A lambda over the prefixes copies every key once per prefix.
  */
-const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] = CONTENT_ATTRIBUTE_KEYS.map(
-  (key) => `${key}.`,
-);
+const CONTENT_ATTRIBUTE_KEY_PATTERN = `^(?:${CONTENT_ATTRIBUTE_KEYS.map(regexLiteral).join("|")})(?:\\.|$)`;
+
+const CONTENT_ATTRIBUTE_KEY_REGEX = new RegExp(CONTENT_ATTRIBUTE_KEY_PATTERN);
 
 /** The gate governing a content category, per {@link CATEGORY_GATE}. */
 export function gateForContentCategory(category: ContentCategory): LwqlGate {
@@ -53,10 +57,7 @@ export function gateForContentCategory(category: ContentCategory): LwqlGate {
  * than trusting that the generated SQL says what this says.
  */
 export function isContentAttributeKey(key: string): boolean {
-  return (
-    CONTENT_ATTRIBUTE_KEYS.includes(key) ||
-    CONTENT_ATTRIBUTE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
-  );
+  return CONTENT_ATTRIBUTE_KEY_REGEX.test(key);
 }
 
 /**
@@ -64,14 +65,7 @@ export function isContentAttributeKey(key: string): boolean {
  * parameter.
  */
 export function contentKeyExclusionSql(keyParameter = "k"): string {
-  const keys = CONTENT_ATTRIBUTE_KEYS.map((value) => clickHouseLiteral(value)).join(", ");
-  const prefixes = CONTENT_ATTRIBUTE_KEY_PREFIXES.map((value) => clickHouseLiteral(value)).join(
-    ", ",
-  );
-  return (
-    `${keyParameter} NOT IN (${keys}) ` +
-    `AND NOT arrayExists(p -> startsWith(${keyParameter}, p), [${prefixes}])`
-  );
+  return `NOT match(${keyParameter}, ${clickHouseLiteral(CONTENT_ATTRIBUTE_KEY_PATTERN)})`;
 }
 
 /**

@@ -1,6 +1,7 @@
 import {
   type ContributeLogFactsCommandData,
   deriveConversationKey,
+  readDeclaredSessionKey,
   deriveSessionTitleFromPrompt,
   detectCodingAgent,
   extractCodingAgentLogFacts,
@@ -9,6 +10,7 @@ import {
   LOGS_REQUIRE_SESSION_KEY_AGENT_IDS,
   normalizeEventName,
   pickDeclaredCodingAgent,
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
@@ -75,7 +77,7 @@ export function liftLogContribution({
   });
   if (agent === null) return IGNORED;
   restateModelCallFigures({ agent, attributes, facts });
-  return keyContribution({ record, attributes, agent, facts });
+  return keyContribution({ record, attributes, resourceAttributes, agent, facts });
 }
 
 /**
@@ -115,15 +117,20 @@ function isDroppedEvent(eventName: unknown): boolean {
 function keyContribution({
   record,
   attributes,
+  resourceAttributes,
   agent,
   facts,
 }: {
   record: CanonicalLogRecord;
   attributes: Record<string, unknown>;
+  resourceAttributes: Record<string, unknown> | null;
   agent: string;
   facts: LogFacts;
 }): LogContribution {
-  const sessionKey = deriveConversationKey(attributes) ?? (record.providerSessionId || null);
+  const sessionKey =
+    readDeclaredSessionKey({ attributes, resourceAttributes }) ??
+    deriveConversationKey(attributes) ??
+    (record.providerSessionId || null);
   const correlated = record.correlationSource !== "none";
   const correlationTraceId =
     correlated && record.correlationTraceId ? record.correlationTraceId : null;
@@ -166,6 +173,11 @@ function stampResourceIdentity({
   const entrypoint = resourceAttributes?.["app.entrypoint"];
   if (facts["app.entrypoint"] === undefined && typeof entrypoint === "string" && entrypoint) {
     facts["app.entrypoint"] = entrypoint;
+  }
+  // A launcher names its sessions through OTEL_RESOURCE_ATTRIBUTES; the record's own name wins.
+  const sessionName = resourceAttributes?.[SESSION_NAME_FACT_KEY];
+  if (facts[SESSION_NAME_FACT_KEY] === undefined && typeof sessionName === "string") {
+    if (sessionName.trim() !== "") facts[SESSION_NAME_FACT_KEY] = sessionName;
   }
 }
 

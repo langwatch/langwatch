@@ -108,8 +108,84 @@ Feature: Topic clustering runs on langevals
     Then it answers with a 4xx carrying a stable code and fixed copy
     And the provider's own words, which can quote the key, are not in the answer
 
+  # litellm raises a missing key as a server, connection or generic API error,
+  # so a project whose provider had no key saved failed every run as ours, after
+  # one embedding call per trace. No key is checked before a call: litellm finds
+  # keys under several names and in cloud credentials, so only its own failure
+  # says the key is missing.
+  @unit
+  Scenario: A model provider with no API key is answered as the customer's to fix
+    Given a batch or incremental clustering run whose embeddings or naming model has no API key anywhere litellm looks
+    When the run reaches the first call to that model
+    Then langevals answers with a 422 carrying the model_provider_key_missing code
+    And the embeddings step makes no per-trace calls after the first one fails for its key
+    And the naming step makes no retries after its call fails for its key
+
+  @unit
+  Scenario: A run that names no topic needs no key for the naming model
+    Given an incremental run whose traces all match existing topics, or a batch run whose traces form no topic
+    And the naming model has no API key
+    When langevals answers
+    Then it answers with the assignments and makes no naming call
+
+  @unit
+  Scenario: A key that arrives in the request is used, never refused
+    Given langevals has no provider keys of its own
+    And the request carries an API key, an endpoint, or Bedrock or Vertex credentials for its models
+    When langevals answers
+    Then it runs, and each model call carries the credentials from the request
+
   @unit
   Scenario: A failure of ours is still answered as a server error
     Given a batch or incremental clustering run that fails for any other reason
     When langevals answers
     Then it answers with a 500 and logs the failure as an error
+
+  # A page of ~2,000 inputs sent as 99 sequential calls to a provider that
+  # takes ~2.5s a call ran past the gateway's 120s timeout every time.
+  @unit
+  Scenario: Embedding batches for one page are requested concurrently
+    Given a page whose inputs split into more embedding batches than one call carries
+    When langevals embeds the page
+    Then several batches are in flight at once, never more than the concurrency bound
+    And each input keeps its own embedding, in the order it was sent
+    And the provider usage of every batch is counted for the request
+
+  @unit
+  Scenario: A rate-limited embedding batch is retried in place
+    Given an embedding provider that rate limits a batch once, then answers
+    When langevals embeds a page
+    Then that batch is asked again and the page keeps every embedding
+    And no per-input fallback calls are made
+
+  @unit
+  Scenario: A batch still rate limited after its retries is raised to the caller
+    Given an embedding provider that rate limits a batch on every try
+    When langevals embeds a page
+    Then the rate limit is raised to the caller
+    And no per-input fallback calls are made
+    And the same holds when an earlier batch failed for another reason
+
+  @unit
+  Scenario: Any other failed embedding batch falls back to one call per input
+    Given an embedding provider that fails a batch call for a reason other than auth or rate limits
+    When langevals embeds a page
+    Then the page is embedded again one input per call
+    And no per-input call starts before every batch call in flight has returned
+
+  @unit
+  Scenario: Embedding a page stops at a provider auth refusal without retrying input by input
+    Given an embedding provider that refuses the configured key
+    When langevals embeds a page
+    Then the refusal is raised to the caller
+    And no per-input fallback calls are made
+
+  # litellm prices no Cloudflare model, and the unpriced cost used to throw
+  # away every topic name the model had already generated.
+  @unit
+  Scenario: Topic names from a model litellm cannot price are kept
+    Given a naming model that answers with names but has no litellm price
+    When langevals names the topics
+    Then every topic keeps the name the model gave it
+    And the naming cost counts that call as zero
+    And the same holds when pricing the call raises instead

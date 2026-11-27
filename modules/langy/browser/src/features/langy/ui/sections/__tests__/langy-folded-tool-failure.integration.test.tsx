@@ -490,25 +490,49 @@ describe("a failed step", () => {
     });
   });
 
-  describe("given a failure no retry can fix", () => {
+  describe("given a sandbox step that needs GitHub, which Langy has no access to", () => {
     const notConnected = failedStep({
       id: "gh-1",
       command: "gh pr list",
       errorText: "To get started with GitHub CLI, please run:  gh auth login",
     });
 
-    /** @scenario "A failure no retry can fix keeps its card" */
-    it("keeps the card while the turn runs", () => {
-      renderActivity({ parts: [notConnected], live: true });
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("is no card while the turn runs", () => {
+      const { container } = renderActivity({ parts: [ls, notConnected], live: true });
 
-      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(container.textContent).not.toContain("Install the GitHub App");
     });
 
-    /** @scenario "A failure no retry can fix keeps its card" */
-    it("keeps the card after the turn answered", () => {
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("folds into the record after the turn answered", () => {
       renderActivity({ parts: [notConnected, reply], live: false });
 
-      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(receiptSteps().getByText("gh pr list")).toBeTruthy();
+    });
+
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("stays folded when the turn ended on it", () => {
+      renderActivity({ parts: [ls, notConnected], live: false });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(receiptSteps().getByText("gh pr list")).toBeTruthy();
+    });
+
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("opens into what was missing, with no install tip of its own", async () => {
+      const user = userEvent.setup();
+      const { container } = renderActivity({ parts: [notConnected, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("Langy has no GitHub access here");
+      expect(container.textContent).not.toContain("Settings, under Integrations");
+      expect(container.textContent).not.toContain("Install the GitHub App");
+      expect(container.textContent).not.toContain("gh auth login");
+      expect(container.textContent).toContain("$ gh pr list");
     });
   });
 
@@ -581,6 +605,54 @@ describe("a failed step", () => {
       await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
 
       expect(screen.getByText(/on our side/)).toBeTruthy();
+    });
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("says the same when the CLI printed only its not-logged-in text", async () => {
+      const user = userEvent.setup();
+      const textOnly = failedStep({
+        id: "missing-key-text-1",
+        command: "langwatch trace list",
+        errorText: [
+          "\u001b[31mError: you're not logged in, and LANGWATCH_API_KEY is not set.\u001b[39m",
+          "",
+          "Sign in with your browser, interactively:",
+          "  langwatch login",
+        ].join("\n"),
+      });
+      const { container } = renderActivity({ parts: [textOnly, reply], live: false });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+      expect(container.textContent).toContain("$ langwatch trace list");
+      expect(container.textContent).not.toMatch(/log ?in|sign in|LANGWATCH_API_KEY/i);
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("shows Langy's copy, never the CLI's sign-in steps, once opened", async () => {
+      const user = userEvent.setup();
+      const missingKey = failedStep({
+        id: "missing-key-json-1",
+        command: "langwatch trace list",
+        errorText: JSON.stringify({
+          ok: false,
+          error: {
+            code: "missing_api_key",
+            message:
+              "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login`.",
+            httpStatus: 0,
+            isHandled: true,
+          },
+        }),
+      });
+      const { container } = renderActivity({ parts: [missingKey, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+      expect(container.textContent).not.toMatch(/log ?in|sign in|LANGWATCH_API_KEY/i);
     });
 
     /** @scenario "A failure no retry can fix keeps its card" */

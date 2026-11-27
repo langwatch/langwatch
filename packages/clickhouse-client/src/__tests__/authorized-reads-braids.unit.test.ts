@@ -5,6 +5,7 @@ import {
   BRAID_CONDITION_EVERY_SPAN,
   BRAID_CONDITION_MAX_LENGTH,
   BRAID_CONDITION_MAX_TERMS,
+  BRAID_HELD_MAX_HOPS,
   BRAID_MAX_DISTINCT_CONDITIONS,
   type BraidConditionTerm,
   type CompiledWhere,
@@ -135,10 +136,34 @@ const spanRead = (outer: string) =>
 
 const LATEST_VERSION_SUBQUERY = "(SELECT TenantId, TraceId, SpanId, max(UpdatedAt)";
 
-/** The held-trace semi-join the fence renders, narrowed as the read's marker names. */
-const held = (narrowed = "") =>
-  `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})` +
-  ` AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})${narrowed})`;
+/**
+ * The held-trace semi-join the fence renders, narrowed as named: one held set per owner hop (one
+ * per distinct owner, up to the bound), each probing the reader's or the last hop's ports.
+ */
+const held = (narrowed = "", hops = 1) => {
+  const from =
+    ` AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})${narrowed}` +
+    ` AND SpanId NOT IN ('', '0000000000000000')`;
+  const owners = `FROM stored_spans WHERE TenantId IN ({tenantScope_heldOwners:Array(String)})${from}`;
+  const parent = (unset: string, tag: string) =>
+    `(if(ifNull(ParentSpanId, '') IN ('', '0000000000000000'), '${unset}', '${tag}'),` +
+    ` ifNull(ParentSpanId, ''))`;
+  const up = parent("unparented-port", "up");
+  let ports =
+    `SELECT TraceId, arrayJoin([('down', SpanId), ${up}])` +
+    ` FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})${from}`;
+  let pairs = "";
+  for (let hop = 0; hop < hops; hop += 1) {
+    pairs =
+      `SELECT TenantId, TraceId ${owners} AND (TraceId, arrayJoin([${parent("unparented-probe", "down")}` +
+      `, ('up', SpanId), ('self', TenantId)])) IN (${ports})`;
+    ports =
+      `SELECT TraceId, arrayJoin([('down', SpanId), ${up}, ('self', TenantId)]) ${owners}` +
+      ` AND (TenantId, TraceId) IN (${pairs})`;
+  }
+  return `((TenantId, TraceId) IN (${pairs}))`;
+};
+const HELD_SEMI_JOIN = "(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM stored_spans";
 
 const expandSpanRead = (
   authorization: Authorization,
@@ -308,6 +333,7 @@ describe("the fence over a span read", () => {
           tenantScope_c1_until: [0],
           tenantScope_p1_v: ["cli_agent"],
           tenantScope_heldFrom: 0,
+          tenantScope_heldOwners: [OWNER],
         });
       });
 
@@ -440,9 +466,30 @@ describe("the fence over a span read", () => {
       it("puts every braid clause under one semi-join on the reader's own spans", () => {
         const { query, queryParams } = expandSpanRead(authorization);
 
-        expect(query.match(/TraceId IN \(SELECT TraceId FROM stored_spans/g)).toHaveLength(1);
+        expect(query.split(HELD_SEMI_JOIN)).toHaveLength(2);
         expect(query).toContain(`OR (${held()} AND ((TenantId IN ({tenantScope_c0_ids`);
-        expect(queryParams).toMatchObject({ tenantScope_own: [READER], tenantScope_heldFrom: 0 });
+        expect(queryParams).toMatchObject({
+          tenantScope_own: [READER],
+          tenantScope_heldFrom: 0,
+          tenantScope_heldOwners: [OWNER],
+        });
+      });
+
+      it("leaves empty and all-zero span ids out, and tags an unset parent apart on each side", () => {
+        const { query } = expandSpanRead(authorization);
+        const selects = query.split("FROM stored_spans WHERE TenantId IN ({tenantScope_").slice(1);
+        const linkSelects = selects.filter((part) => /^(own|heldOwners):/.test(part));
+
+        expect(linkSelects).toHaveLength(2);
+        for (const part of linkSelects) {
+          expect(part).toMatch(
+            /^(own|heldOwners):Array\(String\)\}\) AND StartTime >= fromUnixTimestamp64Milli\(\{tenantScope_heldFrom:Int64\}\) AND SpanId NOT IN \('', '0{16}'\)/,
+          );
+        }
+        expect(query).not.toContain("('up', ifNull(ParentSpanId, ''))");
+        expect(query).not.toContain("('down', ifNull(ParentSpanId, ''))");
+        expect(query).toContain("'unparented-port', 'up')");
+        expect(query).toContain("'unparented-probe', 'down')");
       });
 
       it("binds the semi-join's lower bound to the earliest braid window", () => {
@@ -457,6 +504,63 @@ describe("the fence over a span read", () => {
 
         expect(conditionsExpression({ fence, column: "StartTime" }).params).toMatchObject({
           tenantScope_heldFrom: 30,
+        });
+      });
+
+      /** @scenario "The fence shows owner spans only in traces the reader holds" */
+      it("holds a trace only through a parent and child link, never a shared trace id", () => {
+        const { query } = expandSpanRead(authorization);
+
+        expect(query).not.toContain("TraceId IN (SELECT TraceId FROM stored_spans");
+        expect(query).toContain(
+          "SELECT TraceId, arrayJoin([('down', SpanId), (if(ifNull(ParentSpanId, '') IN ('', '0000000000000000'), 'unparented-port', 'up'), ifNull(ParentSpanId, ''))]) FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})",
+        );
+        expect(query).toContain(
+          "(TraceId, arrayJoin([(if(ifNull(ParentSpanId, '') IN ('', '0000000000000000'), 'unparented-probe', 'down'), ifNull(ParentSpanId, '')), ('up', SpanId), ('self', TenantId)])) IN (SELECT TraceId, arrayJoin([('down', SpanId), (if(ifNull(ParentSpanId, '') IN ('', '0000000000000000'), 'unparented-port', 'up'), ifNull(ParentSpanId, ''))]) FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})",
+        );
+      });
+
+      /** @scenario "A chain of braided owners is held hop by hop up to the bound" */
+      it("follows the owners already held one hop at a time, up to the bound and no further", () => {
+        const owners = ["proj-a", "proj-b", "proj-c", "proj-d", "proj-e"];
+        const { query } = expandSpanRead(
+          proof([own(), ...owners.map((owner) => braid({ owner }))]),
+        );
+        const ownerPorts =
+          "SELECT TraceId, arrayJoin([('down', SpanId), (if(ifNull(ParentSpanId, '') IN ('', '0000000000000000'), 'unparented-port', 'up'), ifNull(ParentSpanId, '')), ('self', TenantId)]) FROM stored_spans WHERE TenantId IN ({tenantScope_heldOwners:Array(String)})";
+
+        expect(query.split(ownerPorts)).toHaveLength(BRAID_HELD_MAX_HOPS);
+        expect(
+          query.split("FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})"),
+        ).toHaveLength(2);
+      });
+
+      it("unrolls one hop per distinct owner, so a single owner costs one hop", () => {
+        const ownerPorts = "('self', TenantId)]) FROM stored_spans WHERE TenantId IN";
+        const hopsFor = (owners: string[]) =>
+          expandSpanRead(proof([own(), ...owners.map((owner) => braid({ owner }))])).query.split(
+            ownerPorts,
+          ).length - 1;
+
+        expect(hopsFor(["proj-a"])).toBe(0);
+        expect(hopsFor(["proj-a", "proj-b"])).toBe(1);
+        expect(hopsFor(["proj-a", "proj-b", "proj-c"])).toBe(2);
+      });
+
+      it("binds each braid owner once as a held owner, keyed per owner and trace", () => {
+        const second = "proj-search";
+        const fence = fenceFor({
+          authorization: proof([
+            own(),
+            braid({ from: 70 }),
+            braid({ compiledWhere: CLI, from: 30 }),
+            braid({ owner: second }),
+          ]),
+          reads: "spans",
+        });
+
+        expect(conditionsExpression({ fence, column: "StartTime" }).params).toMatchObject({
+          tenantScope_heldOwners: [OWNER, second].toSorted(),
         });
       });
 
@@ -498,7 +602,7 @@ describe("the fence over a span read", () => {
         });
 
         expect(sql.indexOf("{tenantScope_c1_ids:Array(String)}")).toBeLessThan(
-          sql.indexOf("TraceId IN (SELECT"),
+          sql.indexOf(HELD_SEMI_JOIN),
         );
         expect(sql).toContain(`OR (${held()} AND ((TenantId IN ({tenantScope_c0_ids`);
       });

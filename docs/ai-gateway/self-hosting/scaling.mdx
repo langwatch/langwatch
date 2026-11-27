@@ -106,6 +106,7 @@ What you can tune is how long a cached key survives without the control plane, a
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration is re-fetched in the background   |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh while the control plane is unreachable |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry                                  |
+| `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` | `0` | Off by default. Refuses a cached key not re-checked for this long while the change feed is also silent (minimum 30) |
 
 Add them to the pod yourself; the chart does not render them. See [Config](/ai-gateway/self-hosting/config#auth-cache).
 

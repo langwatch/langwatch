@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 export const repoScans = [
   "tests/browser-raw-colours.unit.test.ts",
   "tests/no-raw-error-toasts.unit.test.ts",
+  "tests/one-project-picker.unit.test.ts",
   "tests/storybook-showcase.unit.test.ts",
 ];
 

@@ -557,7 +557,7 @@ interface Body {
   experiment_name?: string;
   workflowId?: string;
 }
-// Response: experimentInitResponseSchema, ../contract/src/experiment-workbench-rest.ts:622
+// Response: experimentInitResponseSchema, ../contract/src/experiment-workbench-rest.ts:646
 interface Response {
   slug: string;
   path: string;
@@ -615,7 +615,7 @@ Answers at `/api/evaluations/v3/runs/:runId`.
 interface Params {
   runId: string;
 }
-type Response = z.infer<typeof runStatusResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:350
+type Response = z.infer<typeof runStatusResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:365
 ```
 
 #### `GET /runs/:runId/results` · `getApiEvaluationsV3RunsByRunIdResults`
@@ -630,7 +630,7 @@ type Params = z.infer<typeof runIdParamsSchema>; // ../contract/src/experiment-w
 interface Query {
   experimentSlug?: string;
 }
-type Response = z.infer<typeof runResultsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:445
+type Response = z.infer<typeof runResultsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:469
 ```
 
 #### `GET /:evaluationSlug/workbench-state` · `getApiEvaluationsV3BySlugWorkbenchState`
@@ -645,7 +645,7 @@ type Params = z.infer<typeof evaluationSlugParamsSchema>; // ../contract/src/exp
 interface Query {
   fields?: string;
 }
-// Response: workbenchStateAnswerSchema, ../contract/src/experiment-workbench-rest.ts:524
+// Response: workbenchStateAnswerSchema, ../contract/src/experiment-workbench-rest.ts:548
 interface Response {
   id: string;
   slug: string;
@@ -664,13 +664,13 @@ Answers at `/api/evaluations/v3/:evaluationSlug/workbench-state`.
 
 ```typescript
 type Params = z.infer<typeof evaluationSlugParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:51
-// Body: saveWorkbenchStateBodySchema, ../contract/src/experiment-workbench-rest.ts:541
+// Body: saveWorkbenchStateBodySchema, ../contract/src/experiment-workbench-rest.ts:565
 interface Body {
   state: Record<string, unknown>;
   expectedVersion?: number;
   commitMessage?: string;
 }
-// Response: saveWorkbenchStateResponseSchema, ../contract/src/experiment-workbench-rest.ts:550
+// Response: saveWorkbenchStateResponseSchema, ../contract/src/experiment-workbench-rest.ts:574
 interface Response {
   version: number;
 }
@@ -689,7 +689,7 @@ interface Query {
   limit?: number;
   cursor?: number;
 }
-type Response = z.infer<typeof listWorkbenchVersionsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:591
+type Response = z.infer<typeof listWorkbenchVersionsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:615
 ```
 
 #### `POST /:evaluationSlug/versions/:version/restore` · `postApiEvaluationsV3BySlugVersionsByVersionRestore`
@@ -704,9 +704,9 @@ interface Params {
   evaluationSlug: string;
   version: number;
 }
-// Body: restoreWorkbenchVersionBodySchema, ../contract/src/experiment-workbench-rest.ts:599
+// Body: restoreWorkbenchVersionBodySchema, ../contract/src/experiment-workbench-rest.ts:623
 type Body = Record<string, unknown>;
-// Response: restoreWorkbenchVersionResponseSchema, ../contract/src/experiment-workbench-rest.ts:612
+// Response: restoreWorkbenchVersionResponseSchema, ../contract/src/experiment-workbench-rest.ts:636
 interface Response {
   version: number;
 }
@@ -728,7 +728,7 @@ Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/execute`.
 
 ```typescript
-type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:221
+type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:222
 // Response: inline, src/transport/experiment-v3-legacy.rest.ts:175
 type Response = unknown;
 ```
@@ -740,12 +740,12 @@ Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/abort`.
 
 ```typescript
-// Body: abortExperimentRunRequestSchema, ../contract/src/workbench/execution/types.ts:232
+// Body: abortExperimentRunRequestSchema, ../contract/src/workbench/execution/types.ts:233
 interface Body {
   projectId: string;
   runId: string;
 }
-// Response: abortExperimentRunResponseSchema, ../contract/src/workbench/execution/types.ts:243
+// Response: abortExperimentRunResponseSchema, ../contract/src/workbench/execution/types.ts:244
 interface Response {
   success: true;
   runId: string;
@@ -803,7 +803,7 @@ Answers at `/api/experiments/runs/:runId`, `/api/v1/experiments/runs/:runId`; al
 
 ```typescript
 type Params = z.infer<typeof runIdParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:15
-type Response = z.infer<typeof runStatusResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:350
+type Response = z.infer<typeof runStatusResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:365
 ```
 
 #### `GET /runs/:runId/results` · `getApiExperimentsRunsByRunIdResults`
@@ -817,7 +817,7 @@ Answers at `/api/experiments/runs/:runId/results`, `/api/v1/experiments/runs/:ru
 ```typescript
 type Params = z.infer<typeof runIdParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:15
 type Query = z.infer<typeof runResultsQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:79
-type Response = z.infer<typeof runResultsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:445
+type Response = z.infer<typeof runResultsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:469
 ```
 
 #### `GET /:slug/workbench-state` · `getApiExperimentsBySlugWorkbenchState`
@@ -831,7 +831,7 @@ Answers at `/api/experiments/:slug/workbench-state`, `/api/v1/experiments/:slug/
 ```typescript
 type Params = z.infer<typeof slugParamsSchema>; // ../contract/src/experiment.rest.ts:62
 type Query = z.infer<typeof workbenchStateQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:91
-type Response = z.infer<typeof workbenchStateAnswerSchema>; // ../contract/src/experiment-workbench-rest.ts:524
+type Response = z.infer<typeof workbenchStateAnswerSchema>; // ../contract/src/experiment-workbench-rest.ts:548
 ```
 
 #### `PUT /:slug/workbench-state` · `putApiExperimentsBySlugWorkbenchState`
@@ -844,8 +844,8 @@ Answers at `/api/experiments/:slug/workbench-state`, `/api/v1/experiments/:slug/
 
 ```typescript
 type Params = z.infer<typeof slugParamsSchema>; // ../contract/src/experiment.rest.ts:62
-type Body = z.infer<typeof saveWorkbenchStateBodySchema>; // ../contract/src/experiment-workbench-rest.ts:541
-type Response = z.infer<typeof saveWorkbenchStateResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:550
+type Body = z.infer<typeof saveWorkbenchStateBodySchema>; // ../contract/src/experiment-workbench-rest.ts:565
+type Response = z.infer<typeof saveWorkbenchStateResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:574
 ```
 
 #### `GET /:slug/versions` · `getApiExperimentsBySlugVersions`
@@ -859,7 +859,7 @@ Answers at `/api/experiments/:slug/versions`, `/api/v1/experiments/:slug/version
 ```typescript
 type Params = z.infer<typeof slugParamsSchema>; // ../contract/src/experiment.rest.ts:62
 type Query = z.infer<typeof listVersionsQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:98
-type Response = z.infer<typeof listWorkbenchVersionsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:591
+type Response = z.infer<typeof listWorkbenchVersionsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:615
 ```
 
 #### `POST /:slug/versions/:version/restore` · `postApiExperimentsBySlugVersionsByVersionRestore`
@@ -876,8 +876,8 @@ interface Params {
   slug: string;
   version: number;
 }
-type Body = z.infer<typeof restoreWorkbenchVersionBodySchema>; // ../contract/src/experiment-workbench-rest.ts:599
-type Response = z.infer<typeof restoreWorkbenchVersionResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:612
+type Body = z.infer<typeof restoreWorkbenchVersionBodySchema>; // ../contract/src/experiment-workbench-rest.ts:623
+type Response = z.infer<typeof restoreWorkbenchVersionResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:636
 ```
 
 ### `experimentWorkbenchRunRest`
@@ -897,7 +897,7 @@ Permission `evaluations:manage`. Hidden from the OpenAPI document. Declared at `
 Answers at `/api/experiments/execute`, `/api/v1/experiments/execute`; also, undocumented, `/api/experiments/2026-08-07/execute`, `/api/v1/experiments/2026-08-07/execute`, `/api/experiments/latest/execute`, `/api/v1/experiments/latest/execute`.
 
 ```typescript
-type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:221
+type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:222
 // Response: inline, src/transport/experiment-workbench-run.rest.ts:30
 type Response = unknown;
 ```
@@ -909,8 +909,8 @@ Permission `evaluations:manage`. Hidden from the OpenAPI document. Declared at `
 Answers at `/api/experiments/abort`, `/api/v1/experiments/abort`; also, undocumented, `/api/experiments/2026-08-07/abort`, `/api/v1/experiments/2026-08-07/abort`, `/api/experiments/latest/abort`, `/api/v1/experiments/latest/abort`.
 
 ```typescript
-type Body = z.infer<typeof abortExperimentRunRequestSchema>; // ../contract/src/workbench/execution/types.ts:232
-type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract/src/workbench/execution/types.ts:243
+type Body = z.infer<typeof abortExperimentRunRequestSchema>; // ../contract/src/workbench/execution/types.ts:233
+type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract/src/workbench/execution/types.ts:244
 ```
 
 ### `experimentWorkflowEvaluationRest`
@@ -927,7 +927,7 @@ type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract
 
 Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else its current content is saved as a new version. Returns a run id and a results URL to poll or open in the browser.
 
-Permission `workflows:create or evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:36`.
+Permission `workflows:create and evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:36`.
 
 Answers at `/api/workflows/:id/evaluate`, `/api/v1/workflows/:id/evaluate`; also, undocumented, `/api/workflows/2026-08-07/:id/evaluate`, `/api/v1/workflows/2026-08-07/:id/evaluate`, `/api/workflows/latest/:id/evaluate`, `/api/v1/workflows/latest/:id/evaluate`.
 
@@ -1014,12 +1014,12 @@ Permission `experiments:create`. Declared at `src/transport/experiment.rest.ts:1
 Answers at `/api/experiments`, `/api/v1/experiments`; also, undocumented, `/api/experiments/2026-08-07`, `/api/v1/experiments/2026-08-07`, `/api/experiments/latest`, `/api/v1/experiments/latest`.
 
 ```typescript
-// Body: createExperimentBodySchema, ../contract/src/experiment-workbench-rest.ts:475
+// Body: createExperimentBodySchema, ../contract/src/experiment-workbench-rest.ts:499
 interface Body {
   name?: string;
   state?: Record<string, unknown>;
 }
-// Response: createExperimentResponseSchema, ../contract/src/experiment-workbench-rest.ts:486
+// Response: createExperimentResponseSchema, ../contract/src/experiment-workbench-rest.ts:510
 interface Response {
   id: string;
   slug: string;
@@ -1119,7 +1119,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: experimentUpdateFrameSchema, ../contract/src/experiment.responses.ts:177
+// Output: experimentUpdateFrameSchema, ../contract/src/experiment.responses.ts:190
 interface Output {
   event: unknown;
   timestamp?: number;
@@ -1195,7 +1195,7 @@ interface Input {
   pageOffset?: number;
   pageSize?: number;
 }
-type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contract/src/experiment.responses.ts:140
+type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contract/src/experiment.responses.ts:152
 
 // experiments.getLastExperiment
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
@@ -1207,7 +1207,7 @@ interface Input {
   projectId: string;
   experimentId: string;
 }
-// Output: experimentArchivedSchema, ../contract/src/experiment.responses.ts:154
+// Output: experimentArchivedSchema, ../contract/src/experiment.responses.ts:167
 interface Output {
   success: true;
 }
@@ -1220,7 +1220,7 @@ interface Input {
   sourceProjectId: string;
   copyDatasets?: boolean;
 }
-type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:165
+type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:178
 
 // experiments.getExperimentDSPyRuns
 // Input: inline, ../contract/src/experiment.trpc.ts:265
@@ -1246,7 +1246,7 @@ interface Input {
   projectId: string;
   experimentId: string;
 }
-type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:146
+type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:159
 
 // experiments.getExperimentBatchEvaluationRun
 // Input: inline, ../contract/src/experiment.trpc.ts:294
@@ -1274,31 +1274,34 @@ Declared at `src/eventing/experiment-lifecycle.pipeline.ts:30`. Events: `experim
 
 ### Pipeline `experiment_run_processing` (aggregate `experiment_run`)
 
-Declared at `src/eventing/experiment-run-processing.pipeline.ts:146`. Events: `experimentRunStartedEventSchema`, `targetResultEventSchema`, `evaluatorResultEventSchema`, `traceMetricsComputedEventSchema`, `experimentRunCompletedEventSchema`, `workflowEvaluationRequestedEventSchema`, `cellFinishedEventSchema`, `abortRequestedEventSchema`.
+Declared at `src/eventing/experiment-run-processing.pipeline.ts:152`. Events: `experimentRunStartedEventSchema`, `targetResultEventSchema`, `evaluatorResultEventSchema`, `traceMetricsComputedEventSchema`, `experimentRunCompletedEventSchema`, `workflowEvaluationRequestedEventSchema`, `cellFinishedEventSchema`, `abortRequestedEventSchema`.
 
 | Kind                       | Name                                                                                           | Handles                                                          | Declared at                                              |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
-| process manager            | `experimentRunExecution`                                                                       | intents `complete`, `failCell`, `executeCell` (outbox)           | `src/eventing/experiment-run-processing.pipeline.ts:182` |
-| subscriber                 | `workflowEvaluationRequested`                                                                  | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:178` |
-| peer subscriber            | `traceSpanMetricsSync`                                                                         | `lw.obs.trace.span_received` from [trace](../../trace/README.md) | `src/eventing/experiment-run-processing.pipeline.ts:187` |
-| ClickHouse fold projection | `≈ ExperimentRunStateFoldProjection.create({ store: deps.experimentRunStateFoldStore, })`      | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:162` |
-| ClickHouse fold projection | `≈ ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore })`         | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:167` |
-| ClickHouse fold projection | `≈ ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore })` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:170` |
-| ClickHouse map projection  | `≈ ExperimentRunResultStorageMapProjection.create({ store: deps.experimentRunItemAppendStore…` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:173` |
-| projection subscriber      | `≈ deps.runFrames.name`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:186` |
-| lane aliases               | `≈ MAIN_TRACE_METRICS_LANE_ALIASES`                                                            | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:206` |
-| retention                  | `≈ deps.retention`                                                                             | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:210` |
+| process manager            | `experimentRunExecution`                                                                       | intents `complete`, `failCell`, `executeCell` (outbox)           | `src/eventing/experiment-run-processing.pipeline.ts:192` |
+| subscriber                 | `workflowEvaluationRequested`                                                                  | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:184` |
+| subscriber                 | `experimentRunActivity`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:188` |
+| peer subscriber            | `traceSpanMetricsSync`                                                                         | `lw.obs.trace.span_received` from [trace](../../trace/README.md) | `src/eventing/experiment-run-processing.pipeline.ts:197` |
+| ClickHouse fold projection | `≈ ExperimentRunStateFoldProjection.create({ store: deps.experimentRunStateFoldStore, })`      | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:168` |
+| ClickHouse fold projection | `≈ ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore })`         | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:173` |
+| ClickHouse fold projection | `≈ ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore })` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:176` |
+| ClickHouse map projection  | `≈ ExperimentRunResultStorageMapProjection.create({ store: deps.experimentRunItemAppendStore…` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:179` |
+| projection subscriber      | `≈ deps.runFrames.name`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:196` |
+| lane aliases               | `≈ MAIN_TRACE_METRICS_LANE_ALIASES`                                                            | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:216` |
+| retention                  | `≈ deps.retention`                                                                             | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:220` |
 
 ## Configuration
 
 | Kind   | Leaf                  | Environment variable               | Declared at                               |
 | ------ | --------------------- | ---------------------------------- | ----------------------------------------- |
-| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS`           | `../contract/src/experiment.config.ts:14` |
-| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:15` |
-| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:17` |
-| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:19` |
-| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:21` |
-| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:29` |
-| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:30` |
+| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS`           | `../contract/src/experiment.config.ts:18` |
+| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:19` |
+| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:21` |
+| config | `projectCellBudget`   | `EVAL_V3_PROJECT_CELL_BUDGET`      | `../contract/src/experiment.config.ts:23` |
+| config | `globalCellBudget`    | `EVAL_V3_GLOBAL_CELL_BUDGET`       | `../contract/src/experiment.config.ts:28` |
+| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:33` |
+| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:35` |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:43` |
+| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:44` |
 
 <!-- readme:generated:end -->

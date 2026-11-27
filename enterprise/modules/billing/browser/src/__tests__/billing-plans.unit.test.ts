@@ -56,7 +56,7 @@ describe("getGrowthPlanFeatures()", () => {
     it("contains the EUR retention pricing string", () => {
       const features = getGrowthPlanFeatures(Currency.EUR);
 
-      expect(features).toContain("30 days retention (+ custom at \u20AC3/GB)");
+      expect(features).toContain("90 days retention (+ custom at \u20AC3/GB)");
     });
   });
 
@@ -70,7 +70,7 @@ describe("getGrowthPlanFeatures()", () => {
     it("contains the USD retention pricing string", () => {
       const features = getGrowthPlanFeatures(Currency.USD);
 
-      expect(features).toContain("30 days retention (+ custom at $4/GB)");
+      expect(features).toContain("90 days retention (+ custom at $4/GB)");
     });
   });
 });
@@ -109,12 +109,14 @@ describe("FREE_PLAN_FEATURES", () => {
   describe("when the Free plan card is shown", () => {
     /** @scenario The Free plan card matches the pricing page */
     it("lists the creation caps the plan enforces, as the pricing page does", () => {
-      const { maxScenarios, maxScenarioSets, maxEvaluators } = FREE_PLAN_CREATION_CAPS;
+      const { maxScenarios, maxEvaluators, maxScenarioRunsPerMonth } = FREE_PLAN_CREATION_CAPS;
 
       expect(FREE_PLAN_FEATURES).toContain(
-        `${maxScenarios} scenarios, ${maxScenarioSets} simulations, ${maxEvaluators} custom evals`,
+        `${maxScenarios} scenarios, ${maxEvaluators} custom evals, ${maxScenarioRunsPerMonth} scenario runs a month`,
       );
-      expect(FREE_PLAN_FEATURES).toContain("3 scenarios, 3 simulations, 3 custom evals");
+      expect(FREE_PLAN_FEATURES).toContain(
+        "3 scenarios, 3 custom evals, 100 scenario runs a month",
+      );
     });
   });
 });

@@ -4,6 +4,7 @@
  */
 
 import { tenantSet } from "@langwatch/clickhouse-client";
+import type { SpanAnalyticsSource } from "@langwatch/trace-contract";
 
 import { latestVersionKey } from "./clickhouse.latest-version-dedup.mapper.ts";
 
@@ -482,17 +483,21 @@ export function getTableAlias(table: CHTable): string {
  * @param requiredColumns optional column subset (defaults to all analytics columns).
  * @param spanTimeFilter `stored_spans` partition bound; omitted, it cold-scans every partition.
  * @param evalTimeFilter `evaluation_runs` partition bound; omitted, it cold-scans every partition.
+ * @param spanAnalytics where a span-type join reads from; a split one binds
+ *   {@link spanAnalyticsJoinParams}.
  */
 export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
   evalTimeFilter,
+  spanAnalytics,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
   evalTimeFilter?: string;
+  spanAnalytics?: SpanAnalyticsSource;
 }): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
@@ -502,11 +507,12 @@ export function buildJoinClause({
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
-      const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
-      const projection = Array.from(columns, (column) =>
-        column === "SpanAttributes" ? `SpanAttributes AS ${JOINED_SPAN_ATTRIBUTES}` : column,
-      );
-      return `JOIN (SELECT ${projection.join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      const subquery = spanJoinSubquery({
+        columns,
+        timeBound: spanTimeFilter ? ` ${spanTimeFilter}` : "",
+        spanAnalytics,
+      });
+      return `JOIN (${subquery}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
@@ -527,6 +533,73 @@ export function buildJoinClause({
     default:
       return "";
   }
+}
+
+/** The parameter a split span-type join binds its floor to. */
+const SPAN_ANALYTICS_JOIN_FROM_PARAM = "spanAnalyticsJoinFrom";
+
+/** The parameters {@link buildJoinClause} reads for this source; none unless it is split. */
+export function spanAnalyticsJoinParams(
+  spanAnalytics: SpanAnalyticsSource,
+): Record<string, unknown> {
+  return spanAnalytics.kind === "split"
+    ? { [SPAN_ANALYTICS_JOIN_FROM_PARAM]: spanAnalytics.fromMs }
+    : {};
+}
+
+/** The one span attribute span_analytics holds as a column. */
+const SPAN_TYPE_KEY = "langwatch.span.type";
+
+/** The stored_spans columns span_analytics carries under the same name and type. */
+const SPAN_ANALYTICS_PLAIN_COLUMNS: ReadonlySet<string> = new Set([
+  ...SPAN_IDENTITY_COLUMNS,
+  "StartTime",
+  "EndTime",
+  "DurationMs",
+  "StatusCode",
+]);
+
+/**
+ * The span_analytics projection of a stored_spans join that reads the span type and otherwise
+ * only columns span_analytics carries, under the same names; any other join keeps stored_spans.
+ */
+function lightSpanProjection(
+  projection: readonly string[],
+): { served: true; projection: string[] } | { served: false } {
+  const typeRead = spanAttributesNarrowProjection([SPAN_TYPE_KEY]);
+  const isServed = (column: string) =>
+    column === typeRead || SPAN_ANALYTICS_PLAIN_COLUMNS.has(column);
+  if (!projection.includes(typeRead) || !projection.every(isServed)) return { served: false };
+  return {
+    served: true,
+    projection: projection.map((column) =>
+      column === typeRead
+        ? `map('${SPAN_TYPE_KEY}', toString(SpanType)) AS ${JOINED_SPAN_ATTRIBUTES}`
+        : column,
+    ),
+  };
+}
+
+/** The span join's subquery: stored_spans, span_analytics, or both split at the floor. */
+function spanJoinSubquery({
+  columns,
+  timeBound,
+  spanAnalytics,
+}: {
+  columns: readonly string[];
+  timeBound: string;
+  spanAnalytics: SpanAnalyticsSource | undefined;
+}): string {
+  const projection = columns.map((column) =>
+    column === "SpanAttributes" ? `SpanAttributes AS ${JOINED_SPAN_ATTRIBUTES}` : column,
+  );
+  const stored = `SELECT ${projection.join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}`;
+  const light = lightSpanProjection(projection);
+  if (!light.served || !spanAnalytics || spanAnalytics.kind === "stored_spans") return stored;
+  const lightRead = `SELECT ${light.projection.join(", ")} FROM span_analytics WHERE ${tenantSet()}${timeBound}`;
+  if (spanAnalytics.kind === "span_analytics") return lightRead;
+  const from = `fromUnixTimestamp64Milli({${SPAN_ANALYTICS_JOIN_FROM_PARAM}:Int64})`;
+  return `${lightRead} AND StartTime >= ${from} UNION ALL ${stored} AND StartTime < ${from}`;
 }
 
 /**

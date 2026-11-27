@@ -16,6 +16,7 @@ import {
 } from "../eventing/billing-lifecycle.pipeline.ts";
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
+import { activePlanOf } from "../rules/active-plan.rules.ts";
 import { usageBilledOf } from "../rules/usage-billed.rules.ts";
 
 const logger = createLogger("langwatch:billing:lifecycle");
@@ -26,9 +27,13 @@ const USAGE_BILLING_FIRST_PAUSE_MS = 200;
 
 const pauseFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+type ActiveSubscription = { plan: string } | null;
+
 type BillingLifecycleAnnouncerDeps = Readonly<{
-  /** The webhook subscription repository, read only for whether a live subscription remains. */
-  subscriptions: { findLastNonCancelled(organizationId: string): Promise<unknown> };
+  /** The active subscription, or none; a pending checkout is not active. */
+  subscriptions: {
+    findActive(organizationId: string): Promise<ActiveSubscription>;
+  };
   /** The organization's active members' ids, through the shares (C2 B). */
   organizations: Pick<BillingAccountFactsRepository, "findActiveMemberIds">;
   /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
@@ -90,11 +95,13 @@ export class BillingLifecycleAnnouncerService {
     organizationId: string;
     subscriptionId: string;
     plan: string;
+    /** The retention the buyer picked at checkout, when the checkout offered one. */
+    retentionDays?: number;
   }): Promise<void> {
     const { organizationId } = input;
     await this.#subscriptionChanged({
       organizationId,
-      hasSubscription: () => Promise.resolve(true),
+      hasSubscription: () => true,
     });
     await this.usageBillingChanged({ organizationId });
     await this.#record(organizationId, async (commands) => {
@@ -108,12 +115,14 @@ export class BillingLifecycleAnnouncerService {
     });
   }
 
-  /** Whether the organization still holds another live subscription is read after the cancel. */
+  /**
+   * Whether another active subscription remains is read after the cancel, by the resync's rule:
+   * a pending checkout is no subscription, so the live fact and a later resync agree.
+   */
   async subscriptionCancelled(input: { organizationId: string }): Promise<void> {
     await this.#subscriptionChanged({
       ...input,
-      hasSubscription: async () =>
-        (await this.deps.subscriptions.findLastNonCancelled(input.organizationId)) != null,
+      hasSubscription: (active) => active != null,
     });
     await this.usageBillingChanged(input);
   }
@@ -260,6 +269,27 @@ export class BillingLifecycleAnnouncerService {
     });
   }
 
+  /** The organization went over its plan or came back within it (over-plan-trace-withholding.feature). */
+  async overPlanChanged(input: {
+    organizationId: string;
+    subscriptionId: string;
+    state: "started" | "ended";
+    reason: "cancelled" | "payment_recovery" | "within_plan";
+    since: Instant;
+    members: number;
+    maxMembers: number;
+  }): Promise<void> {
+    await this.#connected().recordOverPlanChanged.send({
+      ...this.#rowFact(input.organizationId),
+      subscriptionId: input.subscriptionId,
+      state: input.state,
+      reason: input.reason,
+      since: input.since.epochMilliseconds,
+      members: input.members,
+      maxMembers: input.maxMembers,
+    });
+  }
+
   /** A write's fact throws when it cannot be recorded, so its caller fails rather than loses it. */
   #connected(): EventingCommands<BillingLifecyclePipeline> {
     if (!this.#commands) {
@@ -276,20 +306,57 @@ export class BillingLifecycleAnnouncerService {
     };
   }
 
+  /** One findActive read feeds both fields, so plan and hasSubscription cannot disagree. */
   async #subscriptionChanged(input: {
     organizationId: string;
-    hasSubscription: () => Promise<boolean>;
+    hasSubscription: (active: ActiveSubscription) => boolean;
   }): Promise<void> {
     await this.#record(input.organizationId, async (commands) => {
-      const memberUserIds = await this.deps.organizations.findActiveMemberIds(input.organizationId);
+      const { organizationId } = input;
+      const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
+      const memberUserIds = await this.deps.organizations.findActiveMemberIds(organizationId);
+      const active = await this.deps.subscriptions.findActive(organizationId);
       await commands.recordSubscriptionChanged.send({
-        tenantId: input.organizationId,
-        occurredAt: nowInstant().epochMilliseconds,
-        organizationId: input.organizationId,
+        tenantId: organizationId,
+        occurredAt,
+        organizationId,
         memberUserIds,
-        hasSubscription: await input.hasSubscription(),
+        hasSubscription: input.hasSubscription(active),
+        plan: activePlanOf({ active }),
       });
     });
+  }
+
+  /**
+   * The Customer.io plan resync's fact for one organization, from billing's own reads: plan and
+   * active members. Stamped before the reads, so a re-run is a new fact. Throws, unlike the live
+   * fact, so the resync task stops where it failed. No active member, no fact; a dry run reads.
+   */
+  async customerIoPlanCaughtUp({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ members: number }> {
+    // Connected up front so a dry run fails exactly where --execute would.
+    const commands = this.#connected();
+    const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
+    const memberUserIds = await this.deps.organizations.findActiveMemberIds(organizationId);
+    const members = memberUserIds.length;
+    if (members === 0 || isDryRun) return { members };
+    // One findActive read feeds both fields, so plan and hasSubscription cannot disagree.
+    const active = await this.deps.subscriptions.findActive(organizationId);
+    await commands.recordSubscriptionChanged.send({
+      tenantId: organizationId,
+      occurredAt,
+      organizationId,
+      memberUserIds,
+      hasSubscription: active != null,
+      plan: activePlanOf({ active }),
+      fromCatchUp: true,
+    });
+    return { members };
   }
 
   async #record(

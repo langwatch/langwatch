@@ -38,7 +38,9 @@ export function useSubscriptionMembers({
         email: member.user.email ?? "",
         role: member.role,
         // Simplified classification (EXTERNAL = LiteMember); custom-role permissions unread.
-        memberType: classifyMemberType(member.role, undefined),
+        memberType: classifyMemberType(member.role, undefined, {
+          billingOnly: member.billingOnly ?? false,
+        }),
       })),
     [organizationWithMembers.data],
   );
@@ -52,7 +54,9 @@ export function useSubscriptionMembers({
         .map((inv) => ({
           id: inv.id,
           email: inv.email,
-          memberType: classifyMemberType(inv.role, undefined),
+          memberType: classifyMemberType(inv.role, undefined, {
+            billingOnly: inv.billingOnly ?? false,
+          }),
         })),
     [pendingInvites.data],
   );

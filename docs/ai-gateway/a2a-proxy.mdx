@@ -1,0 +1,95 @@
+---
+title: A2A proxy
+description: Register an agent-to-agent (A2A) target and call it through the gateway at /a2a/<name> with a virtual key.
+sidebarTitle: A2A proxy
+---
+
+The gateway proxies [A2A v1.0](https://a2a-protocol.org/latest/specification/) calls under `/a2a/{target}`. An agent calls another agent through the gateway instead of directly. The gateway checks the caller's virtual key, applies the target's allow list and block switch, scans messages and replies with the key's guardrails, and puts the hop in the caller's trace.
+
+A target is an A2A agent registered for a project. It holds the agent's upstream base URL, its Agent Card URL, the headers the gateway sends upstream, an optional allow list of virtual keys and a block switch.
+
+<Note>
+  There is no settings page for A2A targets yet. Until it ships, register targets with the
+  `gatewayA2aTargets` control plane procedures described below.
+</Note>
+
+## Register a target
+
+Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `gatewayA2aTargets:manage`; listing needs `gatewayA2aTargets:view`. Managing virtual keys does not reach targets. See [RBAC](/ai-gateway/rbac).
+
+```ts
+await trpc.gatewayA2aTargets.create.mutate({
+  organizationId: "org_123",
+  projectId: "project_456", // null for a target shared by the organization
+  name: "billing", // the path segment: /a2a/billing
+  agentName: "Billing agent",
+  cardUrl: "https://billing.acme.com/.well-known/agent-card.json",
+  upstreamUrl: "https://billing.acme.com/a2a",
+  upstreamHeaders: { Authorization: "Bearer <token for the upstream>" },
+  allowedVirtualKeyIds: null, // or a list of virtual key ids
+});
+```
+
+| Field                  | Rules                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                 | Lowercase letters, digits and hyphens, up to 63 characters, starting with a letter or digit. Unique within the project or organization.                  |
+| `agentName`            | A display name, 1 to 128 characters.                                                                                                                    |
+| `cardUrl`, `upstreamUrl` | `http` or `https` URLs. They cannot hold a user name or password: put credentials in `upstreamHeaders`.                                               |
+| `upstreamHeaders`      | At most 20 headers, values up to 4096 characters. The gateway sets `Content-Type`, `Content-Length`, `A2A-Version`, `Host`, `traceparent` and `tracestate` itself, so a target cannot set them. Values are stored sealed and never shown again: reads return header names only. |
+| `allowedVirtualKeyIds` | `null` admits every virtual key that reaches the target's scope. A list admits only the keys it names.                                                  |
+| `blocked`, `blockReason` | Optional. A blocked target refuses every caller.                                                                                                       |
+
+The other procedures are:
+
+| Procedure                                                      | Use                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `list`, `listForProject`                                       | List the targets of an organization, or of one project.                              |
+| `update`, `updateForProject`                                   | Change a target. Sending `upstreamHeaders` replaces the whole set.                   |
+| `setBlocked`, `setBlockedForProject`                           | Block or unblock a target, with a reason.                                            |
+| `archive`, `archiveForProject`                                 | Remove a target.                                                                     |
+
+Moving `upstreamUrl` to another scheme, host or port is refused unless the same call sends new `upstreamHeaders` (an empty set is fine), so saved headers never follow the upstream to a new origin. The `...ForProject` procedures check the permission on the project and only see that project's targets. Every write is recorded in the [audit log](/ai-gateway/audit) with header names and no values. A change reaches the gateway within moments.
+
+A virtual key sees the targets of every scope its own scopes reach. A key whose traces land in a project but whose scopes do not reach it does not see that project's targets.
+
+## Call a target
+
+Send the caller's [virtual key](/ai-gateway/virtual-keys#the-key-format-and-how-to-send-it) as `Authorization: Bearer`, as on the LLM routes. The key is never forwarded upstream.
+
+```bash
+curl https://gateway.acme.com/a2a/billing \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "SendMessage",
+    "params": {
+      "message": {
+        "messageId": "m1",
+        "role": "ROLE_USER",
+        "parts": [{ "text": "Which invoices are overdue?" }]
+      }
+    }
+  }'
+```
+
+The gateway forwards the body to the target's `upstreamUrl` and returns the upstream reply. Streamed replies stream through.
+
+The gateway serves both A2A bindings. The HTTP+JSON binding goes to the same prefix, for example `POST /a2a/billing/message:send`, which the gateway forwards to `message:send` under the upstream base URL.
+
+Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and points its `url` at `/a2a/billing` on the gateway. It keeps only the interfaces whose URL is the target's `upstreamUrl`, rewritten to the same gateway address, and removes the rest. It drops the card's signatures, which signed the upstream URLs it replaced and would no longer verify.
+
+Other card fields, such as `documentationUrl`, are returned as the upstream sent them and can still name the upstream host.
+
+The gateway builds those URLs only from its public base URL, never from the request's `Host` header. Without it the gateway refuses Agent Card fetches and extended-card calls with `a2a_public_url_unset` (HTTP 503, JSON-RPC `-32024`). Other A2A calls still work.
+
+Set `A2A_PUBLIC_BASE_URL` on the gateway to its public origin, for example `https://gateway.acme.com`. With the Helm chart, set `gateway.publicUrl` in the umbrella chart (`publicUrl` in the gateway chart). It is not derived from `ingress.gateway.host` for the gateway, so set it even when the chart Ingress publishes the gateway.
+
+## What can refuse a call
+
+An unknown name and a key missing from the allow list both answer `a2a_target_not_found`, so a caller cannot tell the two apart. Other refusals include a blocked target, a guardrail block, an exhausted rate limit or budget on the key, and an upstream that did not answer. A JSON-RPC call gets a JSON-RPC error and an HTTP+JSON call gets an HTTP status. See [Errors](/ai-gateway/api/errors) for every reason and code.
+
+## Self-hosting
+
+A self-hosted install must route `/a2a` to the gateway Service as well as `/v1` and `/health`. The chart Ingress does this when you set `ingress.gateway.host` with `ingress.enabled` and `gateway.chartManaged` both true. For your own routes, see [Routing](/self-hosting/deployment/routing).

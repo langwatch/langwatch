@@ -169,6 +169,7 @@ func (a *Agent) Post(ctx context.Context, _ string, turn app.Turn) error {
 		Prompt:      turn.Prompt,
 		System:      turn.System,
 		ResumeToken: turn.ResumeToken,
+		Images:      turn.Images,
 	}); err != nil {
 		r.unregister(turnID, mb)
 		return err

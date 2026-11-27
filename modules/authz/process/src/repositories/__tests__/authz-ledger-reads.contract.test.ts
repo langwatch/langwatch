@@ -21,6 +21,7 @@ import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { AuthzGrantProjection } from "../../eventing/authz-grant.projection.ts";
+import { AuthzGrantIdentityService } from "../../services/authz-grant-identity.service.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
@@ -350,6 +351,64 @@ function openPerTest(backend: (typeof backends)[number]): () => Promise<LedgerFi
 
 describe.each(backends)("given the ledger reads on the $name backend", (backend) => {
   const open = openPerTest(backend);
+
+  describe.skipIf(backend.skip)("when a writer resolves a deterministic grant id", () => {
+    const keyFact = (organizationId: string) => ({
+      organizationId,
+      principal: { type: "apiKey" as const, id: "key_legacy" },
+      scope: { type: "ORGANIZATION" as const, id: organizationId },
+      occurredAtMs: T0,
+    });
+    const keyGrant = ({ id, organizationId }: { id: string; organizationId: string }) =>
+      grantRow({
+        id,
+        organizationId,
+        principalType: "API_KEY",
+        principalId: "key_legacy",
+        roleKey: "admin",
+      });
+
+    it("answers a revoked grant's legacy id, so the re-mint folds onto it and access stays ended", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const fact = keyFact(organizationId);
+      const { legacy } = AuthzGrantIdentityService.deriveGrantIdCandidates(fact);
+      const held = keyGrant({ id: legacy, organizationId });
+      await attach(fixture, held);
+      await revoke(fixture, [legacy]);
+
+      const resolved = await AuthzGrantIdentityService.create({
+        grants: repositories.ledgerReads,
+      }).resolveGrantId(fact);
+      await attach(fixture, keyGrant({ id: resolved, organizationId }));
+
+      expect(resolved).toBe(legacy);
+      expect(
+        await repositories.ledgerReads.findLiveGrantsByIdentity({
+          organizationId,
+          identities: [identityOf(held)],
+        }),
+      ).toEqual([]);
+    });
+
+    it("answers v2 for a new grant, then the same id once it is stored", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const fact = keyFact(organizationId);
+      const grantIdentity = AuthzGrantIdentityService.create({ grants: repositories.ledgerReads });
+
+      const first = await grantIdentity.resolveGrantId(fact);
+      await attach(fixture, keyGrant({ id: first, organizationId }));
+      const second = await grantIdentity.resolveGrantId(fact);
+      await attach(fixture, keyGrant({ id: second, organizationId }));
+
+      expect(first).toBe(AuthzGrantIdentityService.deriveGrantIdCandidates(fact).v2);
+      expect(second).toBe(first);
+      expect(
+        await repositories.ledgerReads.findStoredGrantIds({ organizationId, grantIds: [first] }),
+      ).toEqual([first]);
+    });
+  });
 
   describe.skipIf(backend.skip)("when the read-your-writes hold polls the Grant head", () => {
     it("sees a landed grant by id and identity, and nothing of a revoked one", async () => {

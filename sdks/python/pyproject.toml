@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "1.4.0" # remember to also update it in src/langwatch/__version__.py
+version = "2.0.1" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.11,<3.15"
@@ -36,7 +36,7 @@ dependencies = [
   "tenacity>=8.0.0",
   "termcolor>=3.0.1",
   "deprecated>=1.2.18",
-  "python-liquid>=2.2.0",
+  "python-liquid>=2.2.1,<3", # security: floor past GHSA-vq2f-vcc9-j8mv, PYSEC-2026-3035; cap: 3.0 removed UndefinedError (specs/python-sdk/dependency-ranges.feature)
   "pydantic>=2",
   "attrs>=26.1.0",
   # The house identifier library (packages/ksuid-python in this repository,
@@ -118,7 +118,7 @@ examples = [
   "fonttools>=4.63.0", # security: CVE-2025-66034 (#328)
   "jupyterlab>=4.6.4", # security: CVE-2025-59842 (#319) and advisories covering 4.6.0-4.6.3 (#2831)
   "langsmith>=0.10.18", # security: CVE-2026-45134 (#1175)
-  "pypdf>=6.21.1", # security: pypdf advisories (#543, #2198-#2200, #2807-#2813, #3037)
+  "pypdf>=6.21.4", # security: pypdf advisories (#543, #2198-#2200, #2807-#2813, #3037, #3204-#3206, #3374-#3380)
   "strands-agents[otel]>=1.51.0,<2.0.0",
 ]
 tests = ["factory-boy>=3.3.3", "pytest-asyncio>=1.4.0", "python-dotenv==1.2.2"]

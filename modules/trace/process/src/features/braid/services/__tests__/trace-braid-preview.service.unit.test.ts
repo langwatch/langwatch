@@ -8,7 +8,7 @@ import {
   type CompiledWhere,
   ownProjectIdReadBy,
 } from "@langwatch/authorization";
-import type { AuthzBraid } from "@langwatch/authz-contract";
+import { type AuthzBraid, BraidsNotEnabledError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -47,10 +47,10 @@ function braidOf(overrides: Partial<AuthzBraid>): AuthzBraid {
 }
 
 /** An owner span as the marked read returns it, before its braided flag. */
-function ownerSpan(spanId: string, startTimeMs: number) {
+function ownerSpan(spanId: string, startTimeMs: number, parentSpanId: string | null = null) {
   return {
     spanId,
-    parentSpanId: null,
+    parentSpanId,
     name: spanId,
     type: null,
     startTimeMs,
@@ -67,10 +67,20 @@ function serviceOver({
   traceIds = [] as string[],
   braids = [] as AuthzBraid[],
   exampleTraceId = null as string | null,
+  released = true,
+  heldTraceIds = undefined as string[] | undefined,
+  readerStartMs = 1,
 } = {}) {
+  const held = heldTraceIds ?? traceIds;
   const reads: TraceBraidReadsRepository = MemoryNullTraceBraidReadsRepository.create();
   const spies = {
     findReaderTraceIds: vi.spyOn(reads, "findReaderTraceIds").mockResolvedValue(traceIds),
+    findOutsideParents: vi.spyOn(reads, "findOutsideParents").mockResolvedValue([]),
+    findTracesHoldingSpans: vi
+      .spyOn(reads, "findTracesHoldingSpans")
+      .mockImplementation(async ({ authorization }) =>
+        ownProjectIdReadBy(authorization) === READER ? held : [],
+      ),
     countOwnerSpansInTraces: vi.spyOn(reads, "countOwnerSpansInTraces").mockResolvedValue({
       shown: { every: 2, some: 1, spans: 9 },
       live: { every: 1, some: 1, spans: 5 },
@@ -91,8 +101,8 @@ function serviceOver({
       parentSpanId: null,
       name: "handle_message",
       type: null,
-      startTimeMs: 1,
-      endTimeMs: 2,
+      startTimeMs: readerStartMs,
+      endTimeMs: readerStartMs + 1,
       durationMs: 1,
       status: "ok",
       model: null,
@@ -106,6 +116,9 @@ function serviceOver({
         intoOtherProjects: braids.filter((braid) => braid.ownerProjectId === OWNER),
         fromOtherProjects: braids.filter((braid) => braid.readerProjectId === OWNER),
       }),
+      assertBraidsReleased: async () => {
+        if (!released) throw new BraidsNotEnabledError();
+      },
     },
     now: () => NOW,
   });
@@ -118,6 +131,80 @@ const proofs = {
 };
 
 describe("TraceBraidPreviewService", () => {
+  describe("when the trace store is past its memory limit", () => {
+    /** @scenario "A preview or count refused by an overloaded trace store says it is busy" */
+    it("refuses the preview and the activity as clickhouse_overloaded", async () => {
+      const { service, reads } = serviceOver({ traceIds: ["trace-1"] });
+      const overloaded = Object.assign(
+        new Error("Code: 241. DB::Exception: Memory limit exceeded"),
+        {
+          type: "MEMORY_LIMIT_EXCEEDED",
+        },
+      );
+      reads.countOwnerSpansInTraces.mockRejectedValueOnce(overloaded);
+      reads.countOwnerBraidActivity.mockRejectedValueOnce(overloaded);
+
+      await expect(service.preview({ ...proofs, where: "", fromMs: 0 })).rejects.toMatchObject({
+        code: "clickhouse_overloaded",
+        httpStatus: 503,
+      });
+      await expect(
+        service.activity({
+          projectId: OWNER,
+          authorization: proofs.ownerAuthorization,
+          braidIds: ["braid_out"],
+        }),
+      ).rejects.toMatchObject({ code: "clickhouse_overloaded" });
+    });
+
+    it("refuses the activity as clickhouse_overloaded when a count hits its time cap", async () => {
+      const { service, reads } = serviceOver({ traceIds: ["trace-1"] });
+      const timedOut = Object.assign(
+        new Error("Code: 159. DB::Exception: Timeout exceeded: elapsed 10.2 seconds"),
+        { type: "TIMEOUT_EXCEEDED" },
+      );
+      reads.countOwnerBraidActivity.mockRejectedValueOnce(timedOut);
+
+      await expect(
+        service.activity({
+          projectId: OWNER,
+          authorization: proofs.ownerAuthorization,
+          braidIds: ["braid_out"],
+        }),
+      ).rejects.toMatchObject({ code: "clickhouse_overloaded" });
+    });
+  });
+
+  describe("when release_braids is off for the organisation", () => {
+    /** @scenario "With release_braids off the braid dialog's trace reads refuse with braids_not_enabled" */
+    it("refuses the preview, test trace, attribute keys and activity and reads nothing", async () => {
+      const { service, reads, readerSpans } = serviceOver({ released: false });
+
+      const refusals = await Promise.all(
+        [
+          service.preview({ ...proofs, where: "", fromMs: 0 }),
+          service.testTrace({ ...proofs, where: "", fromMs: 0, traceId: "trace-1" }),
+          service.attributeKeys({ authorization: proofs.ownerAuthorization }),
+          service.activity({
+            projectId: OWNER,
+            authorization: proofs.ownerAuthorization,
+            braidIds: ["braid_out"],
+          }),
+        ].map((call) =>
+          call.then(
+            () => "answered",
+            (error: { code?: string }) => error.code,
+          ),
+        ),
+      );
+
+      expect(refusals).toEqual(Array.from({ length: 4 }, () => "braids_not_enabled"));
+      expect(reads.findReaderTraceIds).not.toHaveBeenCalled();
+      expect(reads.countOwnerBraidActivity).not.toHaveBeenCalled();
+      expect(readerSpans).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the condition is refused", () => {
     /** @scenario "The preview shows why a condition is refused" */
     it("answers the refusal with its message and reads nothing", async () => {
@@ -179,6 +266,68 @@ describe("TraceBraidPreviewService", () => {
       expect(spanRead).toMatchObject({ traceIds: ["t1"], live: [] });
       expect(spanRead.draft).toMatchObject({ readerProjectId: READER, fromMs: 5, untilMs: null });
       expect(preview.unsignedHidden).toBe(3);
+    });
+  });
+
+  describe("when only some reader traces are linked to an owner span", () => {
+    /** @scenario "The preview counts the reader's last 7 days of traces" */
+    it("counts the owner's spans only in the linked traces, and the rest as none", async () => {
+      const { service, reads } = serviceOver({
+        traceIds: ["t1", "t2", "t3"],
+        heldTraceIds: ["t2"],
+      });
+
+      const preview = await service.preview({ ...proofs, where: "", fromMs: 0 });
+
+      expect(reads.countOwnerSpansInTraces.mock.calls[0]?.[0].traceIds).toEqual(["t2"]);
+      expect(preview.traces).toMatchObject({ every: 2, some: 1, none: 0, total: 3 });
+    });
+
+    it("matches each side's outside parents against the other side's own spans", async () => {
+      const { service, reads } = serviceOver({ traceIds: ["t1"] });
+      const readerParent = { traceId: "t1", spanId: "owner-root" };
+      const ownerParent = { traceId: "t1", spanId: "root-t1" };
+      reads.findOutsideParents.mockImplementation(async ({ authorization }) =>
+        ownProjectIdReadBy(authorization) === READER ? [readerParent] : [ownerParent],
+      );
+
+      await service.preview({ ...proofs, where: "", fromMs: 0 });
+
+      const holding = reads.findTracesHoldingSpans.mock.calls.map(([call]) => ({
+        project: ownProjectIdReadBy(call.authorization),
+        spans: call.spans,
+      }));
+      expect(holding).toEqual(
+        expect.arrayContaining([
+          { project: READER, spans: [ownerParent] },
+          { project: OWNER, spans: [readerParent] },
+        ]),
+      );
+    });
+
+    it("counts nothing braided when no reader trace is linked", async () => {
+      const { service, reads } = serviceOver({ traceIds: ["t1"], heldTraceIds: [] });
+
+      const preview = await service.preview({ ...proofs, where: "", fromMs: 0 });
+
+      expect(reads.countOwnerSpansInTraces).not.toHaveBeenCalled();
+      expect(preview.traces).toMatchObject({ every: 0, some: 0, none: 1, total: 1 });
+    });
+  });
+
+  describe("when a tested trace shares only its id with the owner", () => {
+    /** @scenario "Testing a trace marks nothing braided when no reader span is linked to an owner span" */
+    it("returns the owner's spans with none marked braided", async () => {
+      const { service, reads } = serviceOver();
+      reads.findOwnerSpansMarked.mockResolvedValue([
+        { ...ownerSpan("o-1", 3), braided: true },
+        { ...ownerSpan("o-2", 4, "o-1"), braided: true },
+      ]);
+
+      const tested = await service.testTrace({ ...proofs, where: "", fromMs: 0, traceId: "t1" });
+
+      expect(tested.nodes.filter((node) => "braided" in node && node.braided)).toEqual([]);
+      expect(tested.nodes.map((node) => node.spanId)).toEqual(["root-t1", "o-1", "o-2"]);
     });
   });
 
@@ -253,8 +402,10 @@ describe("TraceBraidPreviewService", () => {
 
     /** @scenario Testing a trace shows it exactly as the reader will see it */
     it("marks the owner's spans by the live braids and the draft, as the count reads them", async () => {
-      const { service, reads } = serviceOver();
-      reads.findOwnerSpansMarked.mockResolvedValue([{ ...ownerSpan("o-1", 3), braided: true }]);
+      const { service, reads } = serviceOver({ readerStartMs: 200 });
+      reads.findOwnerSpansMarked.mockResolvedValue([
+        { ...ownerSpan("o-1", 300, "root-t1"), braided: true },
+      ]);
 
       const tested = await service.testTrace({
         ownerAuthorization: proofs.ownerAuthorization,
@@ -299,6 +450,40 @@ describe("TraceBraidPreviewService", () => {
     });
   });
 
+  describe("when the linked reader root starts before every braid's window", () => {
+    const readerWithBraids = braidedProof({
+      projectId: READER,
+      braids: [{ owner: "proj_elsewhere", from: NOW - 3 * DAY_MS }],
+    });
+
+    /** @scenario "Testing a trace and the preview hold a trace only through links the reader's fence holds" */
+    it("marks nothing braided in a tested trace, as the live fence holds no such link", async () => {
+      const { service, reads } = serviceOver({ readerStartMs: 50 });
+      reads.findOwnerSpansMarked.mockResolvedValue([
+        { ...ownerSpan("o-1", 150, "root-t1"), braided: true },
+      ]);
+
+      const tested = await service.testTrace({ ...proofs, where: "", fromMs: 100, traceId: "t1" });
+
+      expect(tested.nodes).toContainEqual(
+        expect.objectContaining({ spanId: "o-1", braided: false }),
+      );
+    });
+
+    /** @scenario "Testing a trace and the preview hold a trace only through links the reader's fence holds" */
+    it("reads the preview's links from the earliest braid window into the reader, any owner's", async () => {
+      const { service, reads } = serviceOver({ traceIds: ["t1"] });
+      const reader = { ...proofs, readerAuthorization: readerWithBraids };
+
+      await service.preview({ ...reader, where: "", fromMs: NOW - DAY_MS });
+      await service.preview({ ...proofs, where: "", fromMs: NOW - DAY_MS });
+
+      const floors = reads.findOutsideParents.mock.calls.map(([call]) => call.sinceMs);
+      expect(floors).toEqual([NOW - 3 * DAY_MS, NOW - 3 * DAY_MS, NOW - DAY_MS, NOW - DAY_MS]);
+      expect(reads.countOwnerSpansInTraces.mock.calls[0]?.[0].sinceMs).toBe(NOW - 7 * DAY_MS);
+    });
+  });
+
   describe("when a counted trace gets a braided span", () => {
     /** @scenario The preview counts what the reader will see as the condition changes */
     it("reads the example the count named, the owner's spans marked by the live braids and the draft", async () => {
@@ -307,8 +492,8 @@ describe("TraceBraidPreviewService", () => {
         exampleTraceId: "t2",
       });
       reads.findOwnerSpansMarked.mockResolvedValue([
-        { ...ownerSpan("o-1", 3), braided: true },
-        { ...ownerSpan("o-2", 2), braided: false },
+        { ...ownerSpan("o-1", 3, "root-t2"), braided: true },
+        { ...ownerSpan("o-2", 2, "o-1"), braided: false },
       ]);
 
       const preview = await service.preview({

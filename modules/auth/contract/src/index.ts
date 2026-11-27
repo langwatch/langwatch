@@ -11,6 +11,7 @@ export {
 } from "./auth.api.ts";
 export * from "./auth.errors.ts";
 export * from "./account-lockout.ts";
+export * from "./sign-in-facts.ts";
 export * from "./auth-cli-device-flow.schemas.ts";
 export * from "./browser-session.ts";
 export * from "./front-door.responses.ts";

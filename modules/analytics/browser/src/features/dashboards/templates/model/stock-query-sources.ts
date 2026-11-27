@@ -66,6 +66,12 @@ const CLAUSE_END = new Set([
   "FORMAT",
 ]);
 
+/** Words that open a nested select inside a bracket. */
+const SUBQUERY_START = new Set(["SELECT", "WITH"]);
+
+/** Words that end a select and start the next one of a set. */
+const SET_OPERATORS = new Set(["UNION", "INTERSECT", "EXCEPT"]);
+
 const PERIOD_START = "{dashboard_context_period_start:DateTime}";
 const PERIOD_END = "{dashboard_context_period_end:DateTime}";
 
@@ -198,7 +204,28 @@ function sourcesPredicate({
   return `(${chosen} OR ${key} IN ${included}) AND ${key} NOT IN ${excluded}`;
 }
 
-/** `sql` with every view it names that can follow sources kept to them by its select's WHERE. */
+/**
+ * Whether the select whose FROM is at `from` reads the sources parameter after it, outside any
+ * nested select: one that decides per trace from every source's rows keeps to the list itself.
+ */
+function keepsSourcesItself({ code, from }: { code: readonly string[]; from: number }): boolean {
+  const brackets: boolean[] = [];
+  for (let next = from; next < code.length; next++) {
+    const token = code[next] ?? "";
+    if (token === "(") brackets.push(SUBQUERY_START.has(code[next + 1]?.toUpperCase() ?? ""));
+    else if (token === ")" && brackets.length === 0) return false;
+    else if (token === ")") brackets.pop();
+    else if (brackets.length === 0 && SET_OPERATORS.has(token.toUpperCase())) return false;
+    else if (token === SOURCES_PLACEHOLDER && !brackets.includes(true)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * `sql` with every view it names that can follow sources kept to them by its select's WHERE,
+ * but a select that reads the parameter itself, which is left as written.
+ */
 export function readSources(sql: string): string {
   const tokens = sql.match(TOKEN) ?? [];
   const at = tokens.flatMap((token, index) => (isCode(token) ? [index] : []));
@@ -210,8 +237,10 @@ export function readSources(sql: string): string {
   code.forEach((token, position) => {
     const view = token.toUpperCase() === "FROM" ? referenceAt({ code, position, ctes }) : undefined;
     if (!view) return;
-    const predicate = sourcesPredicate({ ...view, bound });
+    // The region is read first so a direct join is refused even in a select that keeps itself.
     const { where, end } = regionOf({ code, from: position + 2 });
+    if (keepsSourcesItself({ code, from: position + 1 })) return;
+    const predicate = sourcesPredicate({ ...view, bound });
     const last = at[end - 1] ?? at[position] ?? 0;
 
     if (where === undefined) insertions.push({ after: last, text: ` WHERE ${predicate}` });

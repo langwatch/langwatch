@@ -153,6 +153,23 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when an operator searches the accounts", () => {
+    /** @scenario "an operator finds a user by email, name or id" */
+    it("matches the address, the name or the id, case aside, ordered by address", async () => {
+      const { users } = create();
+      const dana = await users.create({ name: "Dana Reyes", email: "dana@acme.test" });
+      await users.create({ name: "Kay", email: "kay@other.test" });
+      const daniel = await users.create({ name: "Daniel", email: "bdaniel@acme.test" });
+
+      const byAddress = await users.searchProfiles({ query: "DANA@", limit: 10 });
+      expect(byAddress.map(({ id }) => id)).toEqual([dana.id]);
+      const byName = await users.searchProfiles({ query: "dan", limit: 10 });
+      expect(byName.map(({ id }) => id)).toEqual([daniel.id, dana.id]);
+      await expect(users.searchProfiles({ query: dana.id, limit: 10 })).resolves.toHaveLength(1);
+      await expect(users.searchProfiles({ query: "dan", limit: 1 })).resolves.toHaveLength(1);
+    });
+  });
+
   describe("when an account was stored with capitals in its address", () => {
     /** Rows written before addresses were lower-cased: the address step rewrites them. */
     it("rewrites the address only while the row still holds the one read", async () => {

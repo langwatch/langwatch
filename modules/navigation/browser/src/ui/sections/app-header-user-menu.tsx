@@ -8,6 +8,7 @@ import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives";
 import type { NavigationUser } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
@@ -18,6 +19,7 @@ import {
 } from "../../behavior/navigation-mode.store.ts";
 import { useNavigationMode } from "../../behavior/use-navigation-mode.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
+import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
 import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
 import { OPERATIONS_CONSOLE } from "../../model/products.ts";
@@ -46,6 +48,7 @@ function userMenuLabel(user: Pick<NavigationUser, "name" | "email"> | null | und
 
 export function AppHeaderUserMenu() {
   const host = useNavigationHost();
+  const settingsHref = useSettingsEntryHref();
   const user = host.currentUser();
   const avatarSrc = useUserAvatarUrl(user?.image);
   const plan = host.plan();
@@ -95,7 +98,7 @@ export function AppHeaderUserMenu() {
                 </Menu.Item>
               )}
               <Menu.Item value="settings" asChild>
-                <NavigationLink href="/settings">Settings</NavigationLink>
+                <NavigationLink href={settingsHref}>Settings</NavigationLink>
               </Menu.Item>
               {host.opsAccess().hasAccess && (
                 <Menu.Item value="admin" asChild>
@@ -184,7 +187,7 @@ export function AppHeaderUserMenu() {
 
 /**
  * A plain link for the org-less reader, else one item per governance org.
- * Picking one writes that org into scope, then opens `/me`.
+ * Picking one writes that org into scope, then opens `/coding-agents`.
  */
 function PersonalWorkspaceEntries({
   entries,
@@ -199,7 +202,7 @@ function PersonalWorkspaceEntries({
   if (orgLess) {
     return (
       <Menu.Item value="my-workspace" asChild>
-        <NavigationLink href="/me">My Workspace</NavigationLink>
+        <NavigationLink href={CODING_AGENTS_PATH}>My Workspace</NavigationLink>
       </Menu.Item>
     );
   }
@@ -216,7 +219,7 @@ function PersonalWorkspaceEntries({
                 teamId: "",
                 projectSlug: "",
               });
-              host.navigate("/me");
+              host.navigate(CODING_AGENTS_PATH);
             }}
           >
             My Workspace

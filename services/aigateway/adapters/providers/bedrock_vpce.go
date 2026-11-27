@@ -99,7 +99,7 @@ func validateBedrockEndpoint(endpoint string, policy customerEndpointPolicy) err
 	if host == "" {
 		return fmt.Errorf("bedrock vpce: runtime endpoint %q has no host", endpoint)
 	}
-	if _, allowlisted := policy.allowedHosts[normalizeEndpointHost(host)]; allowlisted {
+	if policy.egress.Allowlisted(host) {
 		return nil
 	}
 	if !strings.HasSuffix(host, ".amazonaws.com") {

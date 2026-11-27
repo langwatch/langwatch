@@ -25,11 +25,17 @@ describe("Reasoning Config", () => {
       expect(config?.canDisable).toBe(true);
     });
 
-    it("GPT-5.2-pro only supports high", () => {
-      const config = pickReasoningConfig("openai/gpt-5.2-pro");
-      expect(config).toBeDefined();
+    it("GPT-5-pro only supports high", () => {
+      const config = pickReasoningConfig("openai/gpt-5-pro");
       expect(config?.allowedValues).toEqual(["high"]);
       expect(config?.defaultValue).toBe("high");
+      expect(config?.canDisable).toBe(false);
+    });
+
+    it("GPT-5.2-pro supports medium through xhigh, medium by default", () => {
+      const config = pickReasoningConfig("openai/gpt-5.2-pro");
+      expect(config?.allowedValues).toEqual(["medium", "high", "xhigh"]);
+      expect(config?.defaultValue).toBe("medium");
       expect(config?.canDisable).toBe(false);
     });
 
@@ -56,6 +62,40 @@ describe("Reasoning Config", () => {
       const config = pickReasoningConfig("openai/o3-mini");
       expect(config).toBeDefined();
       expect(config?.allowedValues).toEqual(["low", "medium", "high"]);
+    });
+
+    describe("when the model is GPT-5.4 or later", () => {
+      const NONE_TO_XHIGH = ["none", "low", "medium", "high", "xhigh"];
+      const NONE_TO_MAX = [...NONE_TO_XHIGH, "max"];
+
+      /** @scenario "GPT 5.4 and later models offer the reasoning efforts OpenAI documents" */
+      it.each([
+        ["openai/gpt-6-astra", ["low", "medium", "high", "xhigh", "max"], "medium"],
+        ["openai/gpt-6.1-sol:batch", ["low", "medium", "high", "xhigh", "max"], "medium"],
+        ["openai/gpt-6-sol", NONE_TO_MAX, "medium"],
+        ["openai/gpt-6-luna", NONE_TO_MAX, "medium"],
+        ["openai/gpt-5.6-terra", NONE_TO_MAX, "medium"],
+        ["openai/gpt-6.1-terra:batch", NONE_TO_MAX, "medium"],
+        ["openai/gpt-5.5", NONE_TO_XHIGH, "medium"],
+        ["openai/gpt-5.5-pro", ["medium", "high", "xhigh"], "high"],
+        ["openai/gpt-5.4-mini", NONE_TO_XHIGH, "none"],
+        ["openai/gpt-5.4-pro:batch", ["medium", "high", "xhigh"], "medium"],
+      ])("offers %s the efforts its OpenAI page lists", (id, values, defaultValue) => {
+        const config = pickReasoningConfig(id);
+        expect(config?.allowedValues).toEqual(values);
+        expect(config?.defaultValue).toBe(defaultValue);
+        expect(config?.canDisable).toBe(values.includes("none"));
+      });
+
+      /** @scenario "GPT 5.4 and later models offer the reasoning efforts OpenAI documents" */
+      it.each([
+        "openai/gpt-6-astra-pro",
+        "openai/gpt-6.1-terra-pro",
+        "openai/gpt-5.6-sol-pro",
+        "openai/gpt-5.4-image-2",
+      ])("leaves %s, which OpenAI documents no efforts for, without a configuration", (id) => {
+        expect(pickReasoningConfig(id)).toBeUndefined();
+      });
     });
 
     it("GPT-4 models don't have reasoning config", () => {
@@ -155,7 +195,7 @@ describe("Reasoning Config", () => {
 
     it("pickDefaultReasoningEffort returns default for reasoning models", () => {
       expect(pickDefaultReasoningEffort("openai/gpt-5.2")).toBe("none");
-      expect(pickDefaultReasoningEffort("openai/gpt-5.2-pro")).toBe("high");
+      expect(pickDefaultReasoningEffort("openai/gpt-5.2-pro")).toBe("medium");
     });
 
     it("pickDefaultReasoningEffort returns undefined for non-reasoning models", () => {

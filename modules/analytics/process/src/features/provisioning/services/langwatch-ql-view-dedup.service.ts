@@ -3,6 +3,7 @@
  * `WHERE` clause of the in-tuple form, the FROM relation of the engine-level forms and the
  * grouping of the settled form (analytics ADR-005, ADR-006, ADR-007).
  */
+import { LWQL_TRACE_ID_COLUMN } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
@@ -84,8 +85,9 @@ export class LangWatchQLViewDedupService {
 
     // The floor column never falls between versions, so every row at or after the bound has its
     // latest version there too (analytics ADR-005).
-    const { floorColumn } = view.dedup;
-    if (floor === undefined || floorColumn === undefined) {
+    const innerFloor = this.floorCondition({ view, floor });
+    const outerFloor = this.floorCondition({ view, floor, column: sourceColumn });
+    if (innerFloor === undefined || outerFloor === undefined) {
       return (
         `WHERE (${[...outerKeys, sourceColumn(versionColumn)].join(", ")}) IN (\n` +
         `    SELECT ${innerKeys.join(", ")}, max(${version})\n` +
@@ -96,29 +98,52 @@ export class LangWatchQLViewDedupService {
     }
     // The twin keeps only its window's versions, keyed by a 128-bit hash of the grain so the set
     // holds 16 bytes a row (analytics ADR-005).
-    const column = catalogShapes.physicalColumn(view, floorColumn);
     return (
       `WHERE (sipHash128(${outerKeys.join(", ")}), ${sourceColumn(versionColumn)}) IN (\n` +
       `    SELECT sipHash128(${innerKeys.join(", ")}) AS ${FLOOR_GRAIN_KEY}, max(${version})\n` +
       `    FROM ${relation}\n` +
-      `    WHERE ${sqlText.quotedColumn(column)} >= ${floor}\n` +
+      `    WHERE ${innerFloor}\n` +
       `    GROUP BY ${FLOOR_GRAIN_KEY}\n` +
       `  )\n` +
-      `  AND ${sourceColumn(column)} >= ${floor}`
+      `  AND ${outerFloor}`
     );
   }
 
   /**
-   * The `latest-in-order` relation (analytics ADR-006): the table read in sort-key order, newest
-   * version first within each key, keeping one row per sort key and stable column. `LIMIT 1 BY`
-   * streams over the read-in-order merge of the parts, and a filter on a key column prunes.
+   * A floored twin's bound on the view's floor column, or undefined when the view reads every
+   * version. `column` renders the physical column: bare inside a subquery, qualified outside it.
+   */
+  private floorCondition({
+    view,
+    floor,
+    column = (name) => sqlText.quotedColumn(name),
+  }: {
+    view: LangWatchQLViewDefinition;
+    floor?: string;
+    column?: (name: string) => string;
+  }): string | undefined {
+    const { floorColumn } = view.dedup;
+    if (floor === undefined || floorColumn === undefined) return undefined;
+    return `${column(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}`;
+  }
+
+  /**
+   * The `latest-in-order` relation (analytics ADR-006): sort-key order, newest version first, one
+   * row per sort key and stable column via `LIMIT 1 BY` over the read-in-order merge. A floored
+   * twin reads only versions from its bound: the caller's `WHERE` can't reach through `LIMIT 1 BY`.
    */
   private latestInOrderRelation({
     view,
     relation,
+    floor,
+    traceIds,
   }: {
     view: LangWatchQLViewDefinition;
     relation: string;
+    /** The floored twin's lower bound on the floor column; absent, every version is read. */
+    floor?: string;
+    /** The trace-ids twin's traces; absent, every trace is read. */
+    traceIds?: string;
   }): string {
     const { versionColumn, tieBreakColumns = [], stableColumns = [] } = view.dedup;
     if (!versionColumn || view.dedup.aggregating || view.join) {
@@ -142,9 +167,19 @@ export class LangWatchQLViewDedupService {
     const newestFirst = [versionColumn, ...tieBreakColumns].map(
       (column) => `${sqlText.quotedColumn(column)} DESC`,
     );
+    // The trace is a LIMIT 1 BY key, so cutting by it keeps or drops a key's versions together.
+    const traceCondition =
+      traceIds === undefined
+        ? undefined
+        : `${sqlText.quotedColumn(catalogShapes.physicalColumn(view, LWQL_TRACE_ID_COLUMN))} IN (${traceIds})`;
+    const conditions = [this.floorCondition({ view, floor }), traceCondition].filter(
+      (condition) => condition !== undefined,
+    );
+    const where = conditions.length === 0 ? "" : `  WHERE ${conditions.join(" AND ")}\n`;
     return (
       `(\n  SELECT ${columns.join(", ")}\n` +
       `  FROM ${relation}\n` +
+      where +
       `  ORDER BY ${[...keyColumns, ...newestFirst].join(", ")}\n` +
       `  LIMIT 1 BY ${keyColumns.join(", ")}\n` +
       `) AS ${LWQL_SOURCE_ALIAS}`
@@ -167,12 +202,9 @@ export class LangWatchQLViewDedupService {
     floor?: string;
   }): string {
     const signColumn = this.settledSign(view);
-    const { floorColumn } = view.dedup;
     const columns = this.settledColumns(view).map((column) => sqlText.quotedColumn(column));
-    const where =
-      floor === undefined || floorColumn === undefined
-        ? ""
-        : `\n  WHERE ${sqlText.quotedColumn(catalogShapes.physicalColumn(view, floorColumn))} >= ${floor}`;
+    const floorCondition = this.floorCondition({ view, floor });
+    const where = floorCondition === undefined ? "" : `\n  WHERE ${floorCondition}`;
     return (
       `(\n  SELECT ${[...columns, sqlText.quotedColumn(signColumn)].join(", ")}\n` +
       `  FROM ${relation}${where}\n` +
@@ -226,16 +258,34 @@ export class LangWatchQLViewDedupService {
     relation,
     strategy,
     engineDedup,
+    floor,
+    traceIds,
   }: {
     view: LangWatchQLViewDefinition;
     relation: string;
     strategy: LangWatchQLDedupStrategy;
     engineDedup: boolean;
+    /** The floored twin's lower bound, read by the strategies that take one. */
+    floor?: string;
+    /** The trace-ids twin's traces, read by `latest-in-order` alone. */
+    traceIds?: string;
   }): string {
     const aliased = `${relation} AS ${LWQL_SOURCE_ALIAS}`;
+    if (traceIds !== undefined && (!engineDedup || strategy !== "latest-in-order")) {
+      throw new Error(
+        `LangWatchQL view ${view.name} has no trace-ids twin: it is not latest-in-order`,
+      );
+    }
     if (!engineDedup) return aliased;
     if (strategy === "final") return `${aliased} FINAL`;
-    if (strategy === "latest-in-order") return this.latestInOrderRelation({ view, relation });
+    if (strategy === "latest-in-order") {
+      return this.latestInOrderRelation({
+        view,
+        relation,
+        ...(floor === undefined ? {} : { floor }),
+        ...(traceIds === undefined ? {} : { traceIds }),
+      });
+    }
     return aliased;
   }
 }

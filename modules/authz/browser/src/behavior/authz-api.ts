@@ -117,6 +117,13 @@ export type AuthzApiMap = {
         output: AuthzOrganizationPolicy;
       };
     };
+    /** Turns Braids on or off for the organisation; its admins alone, on Enterprise. */
+    setBraidsEnabled: {
+      mutation: {
+        input: OrganizationScope & { braidsEnabled: boolean };
+        output: AuthzOrganizationPolicy;
+      };
+    };
     /** Every live braid in the organisation, for its admins. */
     listOrganizationBraids: {
       query: { input: OrganizationScope; output: AuthzOrganizationBraids };

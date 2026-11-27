@@ -72,6 +72,40 @@ Feature: Product switcher navigation
     And I am sent to the same product in that organization when it is reachable there
 
   @integration
+  Scenario: The organization menu ends with a New organization entry
+    Given I belong to two organizations
+    When I open the organization menu in the top bar
+    Then the last entry is "New organization" with a plus mark before it
+
+  @integration
+  Scenario: New organization asks first whether a team would do
+    Given I belong to two organizations
+    When I pick "New organization" in the organization menu
+    Then a dialog says a new organization is a completely separate LangWatch account
+    And it offers "Proceed with New Organization" as the primary action
+    And it offers "Create New Team" beside it
+
+  @integration
+  Scenario: Create New Team opens the create-team drawer of the current organization
+    Given the New organization dialog is open
+    And I may manage the current organization
+    When I pick "Create New Team"
+    Then the dialog closes
+    And the organization's create-team drawer opens
+
+  @integration
+  Scenario: Create New Team is unavailable to someone who cannot manage the organization
+    Given the New organization dialog is open
+    And I may not manage the current organization
+    Then "Create New Team" is disabled with the reason that only organization admins create teams
+
+  @integration
+  Scenario: Proceed with New Organization opens organization creation
+    Given the New organization dialog is open
+    When I pick "Proceed with New Organization"
+    Then I am sent to the welcome screen asking for a new organization
+
+  @integration
   Scenario: The LLM Ops scope shows the project switch chip
     Given I am on an LLM Ops page in the product-switcher mode
     Then the top bar shows the current project as a chip

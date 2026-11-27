@@ -83,7 +83,8 @@
     "./dev/nx/helm-plugin.mjs",
     "./dev/nx/workspace-plugin.mjs",
     "./dev/nx/test-reads-plugin.mjs",
-    "./dev/nx/haven-plugin.mjs"
+    "./dev/nx/haven-plugin.mjs",
+    "./dev/nx/remote-cache-plugin.mjs"
   ],
   "targetDefaults": {
     "build": [
@@ -117,6 +118,9 @@
           "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
           "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
           "{workspaceRoot}/packages/redaction/src/**/*",
+          {
+            "env": "LANGWATCH_SKILLS_RENDER"
+          },
           "jsBuild"
         ],
         "outputs": [
@@ -381,6 +385,9 @@
         "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
         "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
         "{workspaceRoot}/packages/redaction/src/**/*",
+        {
+          "env": "LANGWATCH_SKILLS_RENDER"
+        },
         {
           "runtime": "node --version"
         },

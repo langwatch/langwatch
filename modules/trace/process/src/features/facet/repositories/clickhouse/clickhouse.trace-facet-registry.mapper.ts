@@ -1,7 +1,9 @@
 /** The ClickHouse side of the facet registry: each facet's table, time column and SQL. */
 import type { TenantScopeTimeColumn } from "@langwatch/clickhouse-client";
 import {
+  deriveTraceConversationId,
   deriveTraceOrigin,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
@@ -88,8 +90,8 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Conversation",
     group: "trace",
     table: "trace_summaries",
-    expression: "Attributes['gen_ai.conversation.id']",
-    read: (t) => t.summary.attributes["gen_ai.conversation.id"] ?? "",
+    expression: TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
+    read: (t) => deriveTraceConversationId(t.summary.attributes),
   },
   {
     // The same key the analytics layer aliases as `metadata.customer_id`.
@@ -404,6 +406,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "span",
     table: "stored_spans",
     expression: "SpanAttributes['langwatch.span.type']",
+    lightExpression: "SpanType",
   },
   EVENT_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,
@@ -416,4 +419,6 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
 export const CLICKHOUSE_FACET_CATALOG: FacetCatalog = {
   registry: FACET_REGISTRY,
   timeColumns: TABLE_TIME_COLUMNS,
+  // A span facet read from stored_spans decompresses the whole SpanAttributes map for one key.
+  lightTwins: { stored_spans: { table: "span_analytics", timeColumn: "StartTime" } },
 };

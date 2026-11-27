@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import { applyOtlpReceiverPolicy, parseOtlpLogs, parseOtlpTraces } from "@langwatch/otlp";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
@@ -152,6 +153,8 @@ export type GovernanceIngestReceiverMembers = Readonly<{
   logCollection: GovernanceIngestLogCollectionChannel;
   /** The metric pipeline. */
   metricCollection: GovernanceIngestMetricCollectionChannel;
+  /** The plan's monthly allowance, the one the OTLP receivers ask before they ingest. */
+  allowance: Pick<TraceApi, "otlpUsageLimit">;
   /** The spend ledger a cost event is priced into. */
   spend: GovernanceIngestSpend;
   /**
@@ -204,6 +207,9 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
     if (!OTLP_SOURCE_TYPES.has(source.sourceType)) return { outcome: "wrong-endpoint" };
 
+    // Outside the guard below, which acknowledges every throw: the plan limit must reach the caller.
+    const tenantId = await this.landing.tenantWithinAllowance(source);
+
     let bodyBytes = 0;
     let eventCount = 0;
     let rejectedSpans = 0;
@@ -223,8 +229,6 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         eventCount = countSpans(parsed.request);
 
         if (eventCount > 0) {
-          const tenantId = await this.landing.governanceTenantOf(source);
-
           stampOriginAttrs(parsed.request, source);
           applyOtlpReceiverPolicy({ request: parsed.request, signal: "traces", apiKeyId: null });
 
@@ -283,6 +287,8 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
     if (!WEBHOOK_SOURCE_TYPES.has(source.sourceType)) return { outcome: "wrong-endpoint" };
 
+    const tenantId = await this.landing.tenantWithinAllowance(source);
+
     const bodyBytes = input.body.length;
     const envelopeId = `envelope-${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 10)}`;
     let handoffOk = false;
@@ -290,7 +296,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     try {
       if (bodyBytes > 0) {
         await logCollection({
-          tenantId: await this.landing.governanceTenantOf(source),
+          tenantId,
           organizationId: source.organizationId,
           logRequest: buildWebhookLogRequest({
             rawBody: input.body,
@@ -331,6 +337,8 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
   async receiveLogs(batch: GovernanceIngestBatch): Promise<GovernanceIngestLogReceipt> {
     const { source } = batch;
 
+    const tenantId = await this.landing.tenantWithinAllowance(source);
+
     let bodyBytes = 0;
     let logRecordCount = 0;
     const landed = { costEvents: 0, ledgerRows: 0 };
@@ -349,7 +357,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         logRecordCount = countLogRecords(parsed.request);
 
         if (logRecordCount > 0) {
-          await this.landParsedLogs({ batch, body, request: parsed.request, landed });
+          await this.landParsedLogs({ batch, body, request: parsed.request, landed, tenantId });
         }
       }
     } catch (err) {
@@ -397,14 +405,15 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     body,
     request,
     landed,
+    tenantId,
   }: {
     batch: GovernanceIngestBatch;
     body: ArrayBuffer;
     request: IExportLogsServiceRequest;
     landed: { costEvents: number; ledgerRows: number };
+    tenantId: string;
   }): Promise<void> {
     const { source } = batch;
-    const tenantId = await this.landing.governanceTenantOf(source);
 
     stampLogOriginAttrs(request, source);
     applyOtlpReceiverPolicy({ request, signal: "logs", apiKeyId: null });

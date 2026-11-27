@@ -1,8 +1,11 @@
 import type { Named } from "@langwatch/module";
 /** The license registry (ADR-156). `licensing` is an enterprise module, so
  * every shape here is declared locally rather than imported from it. */
-import { statedLiteSeatsSchema } from "@langwatch/plans";
+import { statedDeveloperSeatsSchema, statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
+
+/** The Developer seats an operator may state; the console checks a typed count against it. */
+export const developerSeatsInputSchema = statedDeveloperSeatsSchema;
 
 const issuedLicenseSourceSchema = z.enum(["BACKOFFICE", "PURCHASE", "SCRIPT", "LEGACY_IMPORT"]);
 
@@ -22,6 +25,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   maxMembers: z.number(),
   maxMembersLite: z.number().nullable(),
   liteSeatsUnlimited: z.boolean(),
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: z.number().nullable(),
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
@@ -70,6 +75,17 @@ export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageS
 export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
 export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
+/** Every license one reissue chain holds, the newest first. */
+const issuedLicenseChainSchemaDefinition = z.object({
+  licenses: z.array(issuedLicenseViewSchema),
+});
+export interface IssuedLicenseChainSchema extends Named<
+  typeof issuedLicenseChainSchemaDefinition
+> {}
+export const issuedLicenseChainSchema: IssuedLicenseChainSchema =
+  issuedLicenseChainSchemaDefinition;
+export type IssuedLicenseChain = z.infer<typeof issuedLicenseChainSchema>;
+
 const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
@@ -112,6 +128,7 @@ const issueLicenseInputSchemaDefinition = z.object({
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: developerSeatsInputSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the term ends. */
   expiresAt: z.string().min(1),
@@ -133,6 +150,8 @@ export const registerLegacyLicenseInputSchema: RegisterLegacyLicenseInputSchema 
 const revokeIssuedLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   reason: z.string().min(1),
+  /** Refuses with `license_in_use` when an install has bound the license by now. */
+  unusedOnly: z.boolean().optional(),
 });
 export interface RevokeIssuedLicenseInputSchema extends Named<
   typeof revokeIssuedLicenseInputSchemaDefinition
@@ -144,6 +163,7 @@ const reissueLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
   maxMembersLite: statedLiteSeatsSchema.optional(),
+  maxMembersDeveloper: developerSeatsInputSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),

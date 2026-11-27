@@ -250,6 +250,30 @@ describe.skipIf(!databaseUrl)("virtual key disable and enable (real PG + interna
     });
   });
 
+  /** @scenario "The resolve route tells the previous secret from the current one" */
+  it("ends only the previous secret's token at the rotation grace", async () => {
+    const { virtualKey, secret: previousSecret } = await mintKey({ name: "rotated" });
+    const { secret: currentSecret } = await service.rotate({
+      id: virtualKey.id,
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+    });
+    const stored = await prisma.virtualKey.findUniqueOrThrow({
+      where: { id: virtualKey.id },
+    });
+    const graceEnd = Math.floor(stored.previousSecretValidUntil!.getTime() / 1000);
+
+    const previousRes = await app.fetch(signedResolveKey(previousSecret));
+    expect(previousRes.status).toBe(200);
+    const previous = jwtAdapter.verify(((await previousRes.json()) as { jwt: string }).jwt);
+    expect(previous.secret_valid_until).toBe(graceEnd);
+
+    const currentRes = await app.fetch(signedResolveKey(currentSecret));
+    expect(currentRes.status).toBe(200);
+    const current = jwtAdapter.verify(((await currentRes.json()) as { jwt: string }).jwt);
+    expect(current.secret_valid_until).toBeUndefined();
+  });
+
   /** @scenario "Revocation is terminal in both directions" */
   it("refuses to disable or enable a revoked key", async () => {
     const { virtualKey } = await mintKey({ name: "terminal" });

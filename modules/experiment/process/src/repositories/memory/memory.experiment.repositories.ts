@@ -8,6 +8,7 @@ import { ExperimentWorkflowVersionRepository } from "../experiment-workflow-vers
 import type { ExperimentRepositories } from "../experiment.repositories.ts";
 import { MemoryExperimentDspyRepository } from "./memory.experiment-dspy.repository.ts";
 import { MemoryExperimentIdLookupRepository } from "./memory.experiment-id-lookup.repository.ts";
+import { MemoryExperimentRunActivityRepository } from "./memory.experiment-run-activity.repository.ts";
 import { MemoryExperimentRunEventStreamRepository } from "./memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "./memory.experiment-run-fold.repository.ts";
 import { MemoryExperimentRunStateRepository } from "./memory.experiment-run-state.repository.ts";
@@ -79,6 +80,7 @@ export class MemoryExperimentRepositories {
     const folds = MemoryExperimentRunFoldRepository.create();
     const abort = MemoryExperimentRunAbortRepository.create();
     const stream = MemoryExperimentRunEventStreamRepository.create();
+    const activity = MemoryExperimentRunActivityRepository.create();
 
     return {
       experiments: MemoryExperimentRepository.create(),
@@ -91,6 +93,7 @@ export class MemoryExperimentRepositories {
         open: ({ defaultRetentionDays }) => ({
           folds,
           abort,
+          activity,
           stream,
           idLookup: MemoryExperimentIdLookupRepository.create(),
           experimentRunStateFoldStore: ExperimentRunStateStore.create({

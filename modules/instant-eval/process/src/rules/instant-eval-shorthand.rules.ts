@@ -22,6 +22,7 @@ import {
   instantEvalTranscriptRenderTokens,
 } from "@langwatch/instant-eval-judge-contract";
 import { Temporal, type Instant } from "@langwatch/time";
+import { type SpanAnalyticsFloor, spanAnalyticsSourceOf } from "@langwatch/trace-contract";
 
 import {
   clickHouseDateTime64,
@@ -232,6 +233,8 @@ interface TargetTemplate {
    * ClickHouse resolves a WHERE identifier against the SELECT aliases first.
    */
   readonly filterTraceColumn?: string;
+  /** `conditions` answered from the light span view, used when its floor covers the window. */
+  readonly lightConditions?: () => readonly string[];
 }
 
 const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
@@ -274,6 +277,13 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     timeColumn: "StartTime",
     projection: ["TraceId", "SpanId", "StartTime AS OccurredAt"],
     conditions: ["SpanAttributes['langwatch.span.type'] = 'llm'"],
+    // The type from span_metrics, a column there: reading it from SpanAttributes opens the whole
+    // attribute map, captured inputs and outputs included, for every span in the window.
+    lightConditions: () => [
+      `(TraceId, SpanId) IN (\n    SELECT TraceId, SpanId\n    FROM span_metrics\n` +
+        `    WHERE ${windowConditions("StartTime").join("\n      AND ")}\n` +
+        `      AND SpanType = 'llm'\n  )`,
+    ],
     orderBy: "TraceId, SpanId",
     text: () => "llm_messages_span(TraceId, SpanId)",
     filterPlacement: "trace-subquery",
@@ -382,11 +392,9 @@ function windowConditions(timeColumn: string): readonly string[] {
 
 /** The filter as a subquery over the trace view, time-bounded on its own. */
 function traceSubquery({
-  database,
   filterSql,
   traceColumn,
 }: {
-  readonly database: string;
   readonly filterSql: string;
   readonly traceColumn: string;
 }): string {
@@ -394,7 +402,7 @@ function traceSubquery({
   return (
     `${traceColumn} IN (\n` +
     `    SELECT TraceId\n` +
-    `    FROM ${database}.traces\n` +
+    `    FROM traces\n` +
     `    WHERE ${where}\n` +
     `  )`
   );
@@ -402,14 +410,12 @@ function traceSubquery({
 
 export function expandInstantEvalShorthand({
   shorthand,
-  database,
   now,
   filter,
   selection,
+  spanAnalyticsFloor,
 }: {
   readonly shorthand: InstantEvalShorthandInput;
-  /** The database the LangWatchQL views live in. */
-  readonly database: string;
   readonly now: Instant;
   /** The caller's filter, already compiled against the trace view. */
   readonly filter?: CompiledInstantEvalFilter | null;
@@ -419,6 +425,8 @@ export function expandInstantEvalShorthand({
    * keeps these ids and nothing else.
    */
   readonly selection?: readonly string[];
+  /** Where span_analytics is complete from; none, or a floor after the start, keeps the map. */
+  readonly spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): ExpandedInstantEvalShorthand {
   const template = TEMPLATES[shorthand.target];
   const budget = textBudgetFor(shorthand.questions);
@@ -431,7 +439,14 @@ export function expandInstantEvalShorthand({
   const { start, end } = instantEvalShorthandWindow({ shorthand, now });
   const applied = selection ? null : (filter ?? null);
 
-  const conditions = [...windowConditions(template.timeColumn), ...template.conditions];
+  const light =
+    template.lightConditions !== undefined &&
+    spanAnalyticsSourceOf({ floor: spanAnalyticsFloor, windowStartMs: start.epochMilliseconds })
+      .kind === "span_analytics";
+  const conditions = [
+    ...windowConditions(template.timeColumn),
+    ...(light && template.lightConditions ? template.lightConditions() : template.conditions),
+  ];
   if (selection) {
     conditions.push(
       `${template.filterTraceColumn ?? "TraceId"} IN ({${INSTANT_EVAL_SELECTION_PARAMETER}:Array(String)})`,
@@ -441,7 +456,6 @@ export function expandInstantEvalShorthand({
       template.filterPlacement === "inline"
         ? `(${applied.sql})`
         : traceSubquery({
-            database,
             filterSql: applied.sql,
             traceColumn: template.filterTraceColumn ?? "TraceId",
           }),
@@ -449,7 +463,7 @@ export function expandInstantEvalShorthand({
   }
 
   return {
-    sql: renderStatement({ template, columns, conditions, database }),
+    sql: renderStatement({ template, columns, conditions }),
     parameters: {
       start_at: clickHouseDateTime64(start),
       end_at: clickHouseDateTime64(end),
@@ -463,20 +477,17 @@ function renderStatement({
   template,
   columns,
   conditions,
-  database,
 }: {
   readonly template: TargetTemplate;
   readonly columns: readonly InstantEvalShorthandColumn[];
   readonly conditions: readonly string[];
-  readonly database: string;
 }): string {
   const projection = [
     ...template.projection,
     ...columns.map((column) => `${column.expression} AS ${column.id}`),
   ];
-  const from = template.alias
-    ? `${database}.${template.view} AS ${template.alias}`
-    : `${database}.${template.view}`;
+  // Unqualified on purpose: the run's route resolves it, so a private database name works.
+  const from = template.alias ? `${template.view} AS ${template.alias}` : template.view;
   return [
     `SELECT\n  ${projection.join(",\n  ")}`,
     `FROM ${from}`,

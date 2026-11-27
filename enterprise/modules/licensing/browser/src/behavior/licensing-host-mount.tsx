@@ -128,7 +128,7 @@ export default function LicensingHostMount({ children }: { children?: ReactNode 
   return (
     <LicensingHostProvider value={host}>
       {children}
-      <GlobalUpgradeModal isSaaS={deployment.isSaaS} />
+      <GlobalUpgradeModal isSaaS={deployment.isSaaS} isAdmin={mayManageOrganization} />
     </LicensingHostProvider>
   );
 }

@@ -74,9 +74,8 @@ describe("trace dedup OOM safety", () => {
         expect(body).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+      it("keeps each trace's latest version through the shared superseded-version dedup", () => {
+        expect(body).toContain("latestTraceVersionOnly(");
       });
 
       it("uses GROUP BY TraceId for page-selection subquery", () => {
@@ -243,9 +242,8 @@ describe("trace dedup OOM safety", () => {
         expect(body).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+      it("keeps each trace's latest version through the shared superseded-version dedup", () => {
+        expect(body).toContain("latestTraceVersionOnly(");
       });
     });
   });

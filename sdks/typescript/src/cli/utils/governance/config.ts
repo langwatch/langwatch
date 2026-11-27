@@ -282,6 +282,70 @@ export function saveConfig(cfg: GovernanceConfig): void {
   fs.renameSync(tmp, p);
 }
 
+/** Room the write check asks for: about what a session with keys for every tool takes. */
+const WRITE_CHECK_BYTES = 16 * 1024;
+
+/**
+ * Why the config could not be saved right now, or nothing when it can. Written the way
+ * `saveConfig` writes, so a read-only folder or a full disk is caught before the CLI asks the
+ * server for a credential it would then lose.
+ */
+export function configWriteProblem(): string | undefined {
+  const p = configPath();
+  const probe = `${p}.${process.pid}.probe`;
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(probe, Buffer.alloc(WRITE_CHECK_BYTES), { mode: 0o600 });
+    fs.unlinkSync(probe);
+    return undefined;
+  } catch (err) {
+    removeProbe(probe);
+    // Node's message already leads with the code: "ENOSPC: no space left on device, open …".
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/** Best-effort: a folder that refused the probe may refuse removing it too. */
+function removeProbe(probe: string): void {
+  try {
+    fs.rmSync(probe, { force: true });
+  } catch {
+    void 0;
+  }
+}
+
+/**
+ * The CLI cannot save its config, so it stops before asking the server for a credential: a token
+ * rotated or a key issued now would be lost the moment this run ends.
+ */
+export class ConfigNotWritableError extends Error {
+  readonly code = "config_not_writable";
+  constructor(readonly reason: string) {
+    super(
+      `LangWatch cannot save ${displayConfigPath()} (${reason}). Free some disk space or fix ` +
+        "that folder's permissions, then run this again. Nothing was changed on the server.",
+    );
+    this.name = "ConfigNotWritableError";
+  }
+}
+
+/**
+ * Says, on stderr, that a credential the server just issued could not be saved, so the person
+ * learns why the next run asks the server again instead of finding out from a pile of keys.
+ */
+export function warnUnsavedCredential(what: string, err: unknown): void {
+  const reason = err instanceof Error ? err.message : String(err);
+  process.stderr.write(
+    `langwatch: ${what} could not be saved to ${displayConfigPath()} (${reason}).\n`,
+  );
+}
+
+/** Refuses with `ConfigNotWritableError` when the config cannot be saved right now. */
+export function assertConfigWritable(check: () => string | undefined = configWriteProblem): void {
+  const problem = check();
+  if (problem) throw new ConfigNotWritableError(problem);
+}
+
 /** Delete the config file; idempotent. */
 export function clearConfig(): void {
   const p = configPath();

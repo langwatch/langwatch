@@ -29,6 +29,11 @@ import {
   type Route,
 } from "playwright";
 
+import {
+  CREDENTIAL_AUTOCOMPLETE,
+  credentialValuesOnPage,
+  redactCredentials,
+} from "./browser-credentials.ts";
 import { stampStderr } from "./browser-log.ts";
 import {
   consoleLine,
@@ -733,10 +738,7 @@ const actions: Record<string, Act> = {
     url: page.url(),
     title: await page.title(),
     snapshot: filterSnapshot({
-      text: redactSecrets({
-        text: await page.ariaSnapshot({ mode: "ai", timeout }),
-        secrets: await shownSecrets({ page, lane }),
-      }),
+      text: (await hiderFor({ page, lane }))(await page.ariaSnapshot({ mode: "ai", timeout })),
       grep: body.grep,
       depth: body.depth,
       maxChars: body.maxChars,
@@ -805,12 +807,9 @@ const actions: Record<string, Act> = {
   },
   eval: async ({ lane, page, body }) => {
     const value: unknown = await page.evaluate(body.expression ?? "undefined");
-    const secrets = await shownSecrets({ page, lane });
+    const hide = await hiderFor({ page, lane });
     const text = JSON.stringify(value);
-    return {
-      url: page.url(),
-      value: text === undefined ? value : JSON.parse(redactSecrets({ text, secrets })),
-    };
+    return { url: page.url(), value: text === undefined ? value : JSON.parse(hide(text)) };
   },
 };
 
@@ -848,6 +847,15 @@ const totpFile = ({ lane }: { lane: Lane }) =>
 function readTotp({ lane }: { lane: Lane }): Totp | undefined {
   const file = totpFile({ lane });
   return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Totp) : undefined;
+}
+
+/** Hides shown TOTP secrets and the values of the page's password and credential fields. */
+async function hiderFor({ page, lane }: { page: Page; lane?: Lane }) {
+  const secrets = await shownSecrets({ page, lane });
+  const values = await page
+    .evaluate(credentialValuesOnPage, CREDENTIAL_AUTOCOMPLETE)
+    .catch(() => [] as string[]);
+  return (text: string) => redactCredentials({ text: redactSecrets({ text, secrets }), values });
 }
 
 /** A snapshot ref (`e12`, `f1e3`) or, failing that, a CSS selector. */
@@ -1072,7 +1080,7 @@ const DIFFED = new Set([
 async function ariaText({ lane, timeout }: { lane: Lane; timeout: number }) {
   try {
     const text = await lane.page.ariaSnapshot({ mode: "ai", timeout: Math.min(timeout, 5_000) });
-    return redactSecrets({ text, secrets: await shownSecrets({ page: lane.page, lane }) });
+    return (await hiderFor({ page: lane.page, lane }))(text);
   } catch {
     return "";
   }
@@ -1547,8 +1555,8 @@ async function networkShow({ lane, id }: { lane: Lane; id: number }) {
     response && textual
       ? await response.text().catch((error: unknown) => `(body gone: ${String(error)})`)
       : "";
-  const secrets = await shownSecrets({ page: lane.page, lane });
-  const hide = (text: string) => redactSecrets({ text: redactBody({ text }), secrets });
+  const hideShown = await hiderFor({ page: lane.page, lane });
+  const hide = (text: string) => hideShown(redactBody({ text }));
   return {
     line: netLine({ entry, appHost: lane.stack.app.host }),
     url: entry.url,

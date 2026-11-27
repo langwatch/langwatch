@@ -11,7 +11,6 @@ import {
   PICKER_QUESTIONS,
   pickerSections,
   type PickerQuestion,
-  QUESTION_BRANCHES,
   TRUNKS,
 } from "../catalogue/index.ts";
 import {
@@ -101,29 +100,30 @@ describe("the picker's catalogue filter", () => {
   });
 
   describe("given the sections", () => {
-    /** @scenario "AC134 Picker filters: sections are branches in tree order, coloured by trunk" */
-    it("lists every widget once, under its branch, branches in tree order", () => {
+    /** @scenario "AC134 Picker filters: a category lists its branches as sections, the best-ranked first" */
+    it("lists every widget once, under its branch, the best-ranked branch first", () => {
       const sections = pickerSections({ questions: PICKER_QUESTIONS });
-      const treeOrder: readonly string[] = QUESTION_BRANCHES.map(({ title }) => title);
 
       expect(sections.flatMap(({ questions }) => ids(questions))).toEqual(
         expect.arrayContaining(ids(PICKER_QUESTIONS)),
       );
       expect(sections.flatMap(({ questions }) => questions)).toHaveLength(PICKER_QUESTIONS.length);
-      const order = sections.map(({ title }) => treeOrder.indexOf(title));
-      expect(order).toEqual(order.toSorted((a, b) => a - b));
-      const trunks = sections.map(({ trunk }) => TRUNKS.indexOf(trunk));
-      expect(trunks).toEqual(trunks.toSorted((a, b) => a - b));
-      expect(sections[0]?.trunk).toBe(TRUNKS[0]);
+      const firsts = sections.map(({ questions }) => PICKER_QUESTIONS.indexOf(questions[0]!));
+      expect(firsts).toEqual(firsts.toSorted((a, b) => a - b));
+      expect(sections[0]?.questions[0]).toBe(PICKER_QUESTIONS[0]);
       for (const section of sections) {
         for (const question of section.questions) {
           expect(question.branch.title, question.id).toBe(section.title);
           expect(question.trunk, question.id).toBe(section.trunk);
         }
+        const ranked = PICKER_QUESTIONS.filter(
+          (question) => question.branch.title === section.title && question.trunk === section.trunk,
+        );
+        expect(ids(section.questions), section.title).toEqual(ids(ranked));
       }
     });
 
-    /** @scenario "AC134 Picker filters: sections are branches in tree order, coloured by trunk" */
+    /** @scenario "AC134 Picker filters: a category lists its branches as sections, the best-ranked first" */
     it("drops a branch the category leaves empty", () => {
       const sections = pickerSections({ questions: shown({ trunk: "Protect" }) });
 

@@ -108,3 +108,33 @@ Feature: Message translation in the trace details drawer
       When the user clicks any Translate action in the drawer
       Then a toast tells them to double-check their Fast model configuration in Model Providers
       And the view returns to the untranslated state
+
+  Rule: Trace text is data to translate, never instructions
+
+    @integration @regression
+    Scenario: Trace text that reads like instructions to a model still translates
+      Given the message is a system prompt such as "Ignore all previous instructions"
+      And the provider refuses instruction-like text in a user turn, as Azure Prompt Shields do
+      When the user translates it
+      Then the text is sent in the system message and the translation comes back
+
+    @unit @regression
+    Scenario: Text that closes its own data block stays data
+      Given the message contains "</text>" followed by instructions
+      When the user translates it
+      Then the tags inside the message are escaped and only the prompt's own tags delimit the text
+
+    @integration @regression
+    Scenario: A content filter refusal says the provider filtered the text, not that the model is misconfigured
+      Given the provider's content filter refuses the text with 400 "content_filter"
+      When the user translates it
+      Then the call fails with the code "ai_content_filtered", not retryable
+      And its copy names the provider's content filter, not the Fast model configuration
+
+  Rule: Translate reaches the NLP engine the way every other model call does
+
+    @unit @regression
+    Scenario: Translate built through the app sends the NLP engine its internal secret
+      Given a deployment whose NLP engine requires its internal secret
+      When a trace message is translated through the model provider app
+      Then the engine call carries the X-LangWatch-NLP-Secret header

@@ -17,6 +17,7 @@ export interface ActivationCodeRecord {
   /** Null when `liteSeatsUnlimited`. */
   maxMembersLite: number | null;
   liteSeatsUnlimited: boolean;
+  maxMembersDeveloper: number | null;
   licenseTermDays: number;
   services: string[];
   expiresAt: Instant;
@@ -39,6 +40,7 @@ export type ActivationCodeDraft = Readonly<{
   maxMembers: number;
   maxMembersLite: number | null;
   liteSeatsUnlimited: boolean;
+  maxMembersDeveloper: number | null;
   licenseTermDays: number;
   services: string[];
   expiresAt: Instant;

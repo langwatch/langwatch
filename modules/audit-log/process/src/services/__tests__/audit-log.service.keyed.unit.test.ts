@@ -4,7 +4,7 @@
  * the key makes the write happen once.
  * Spec: modules/audit-log/specs/audit-log.feature (the audit outbox rule).
  */
-import { generate } from "@langwatch/ksuid";
+import { generate, getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -26,6 +26,17 @@ function keyedAuditLog() {
       limit: 10,
     });
   return { service, history, store };
+}
+
+/** An audit key minted in a given second, as a producer keying its own moment does. */
+function auditKeyAt({ second, sequenceId }: { second: number; sequenceId: number }): string {
+  return new Ksuid({
+    environment: getEnvironment(),
+    resource: "audit",
+    timestamp: second,
+    instance: new Instance(Instance.schemes.RANDOM, new Uint8Array(8)),
+    sequenceId,
+  }).toString();
 }
 
 const entry = {
@@ -75,6 +86,45 @@ describe("AuditLogService.record with an idempotency key", () => {
 
       expect(recorded.occurredAt).toBe(key.date.getTime());
       expect((await history())[0]?.createdAt.getTime()).toBe(key.date.getTime());
+    });
+  });
+
+  describe("when the keyed entry carries a moment in milliseconds inside the key's second", () => {
+    /** @scenario "A keyed audit entry keeps the millisecond its producer gave" */
+    it("dates the row at that millisecond, so two rows of one second keep their order", async () => {
+      const { service, history } = keyedAuditLog();
+      const second = 1_763_577_819;
+
+      await service.record({
+        ...entry,
+        idempotencyKey: auditKeyAt({ second, sequenceId: 1 }),
+        occurredAt: second * 1000 + 100,
+      });
+      await service.record({
+        ...entry,
+        idempotencyKey: auditKeyAt({ second, sequenceId: 2 }),
+        occurredAt: second * 1000 + 900,
+      });
+
+      expect((await history()).map((row) => row.createdAt.getTime())).toEqual([
+        second * 1000 + 900,
+        second * 1000 + 100,
+      ]);
+    });
+  });
+
+  describe("when the moment does not fall inside its key's second", () => {
+    /** @scenario "An audit moment that is not inside its key's second is refused" */
+    it("refuses a moment in another second than its key's, and one without a key", async () => {
+      const { service, history } = keyedAuditLog();
+      const second = 1_763_577_819;
+      const idempotencyKey = auditKeyAt({ second, sequenceId: 1 });
+
+      await expect(
+        service.record({ ...entry, idempotencyKey, occurredAt: (second + 1) * 1000 }),
+      ).rejects.toThrow(/second/);
+      await expect(service.record({ ...entry, occurredAt: second * 1000 })).rejects.toThrow(/key/);
+      expect(await history()).toHaveLength(0);
     });
   });
 

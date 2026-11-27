@@ -2,17 +2,22 @@
  * A widget query's sources and projects on write (dashboards-v2 AC200j, AC200o, AC207b): what a
  * new widget stores, and how an update's queries keep the lists already stored.
  */
-import { DEFAULT_WIDGET_SOURCES } from "@langwatch/analytics-contract";
+import { DEFAULT_WIDGET_SOURCES, readsSourcesParameter } from "@langwatch/analytics-contract";
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-/** A new widget's queries: an unset one stores {@link DEFAULT_WIDGET_SOURCES}. */
+/**
+ * A new widget's queries: an unset one whose SQL reads the sources parameter stores
+ * {@link DEFAULT_WIDGET_SOURCES}; one that never reads it stores none, as a list it ignores
+ * would say what is not so (AC202f).
+ */
 export function withNewQuerySources(
   queries: readonly DashboardWidgetQuery[],
 ): DashboardWidgetQuery[] {
-  return queries.map((query) => ({
-    ...query,
-    sources: query.sources ?? [...DEFAULT_WIDGET_SOURCES],
-  }));
+  return queries.map(({ sources, ...query }) => {
+    const stored =
+      sources ?? (readsSourcesParameter(query.sql) ? [...DEFAULT_WIDGET_SOURCES] : null);
+    return stored === null ? query : { ...query, sources: stored };
+  });
 }
 
 /**

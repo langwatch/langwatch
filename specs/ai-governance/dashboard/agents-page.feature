@@ -157,6 +157,19 @@ Feature: The AI Governance Agents page
     And the organization's agents read fails
     When a governance viewer opens the Agents page
     Then the page shows an alert saying the agents could not be loaded
+    And the pane shows no empty state and no register action of its own
+    And pressing Try again on the alert reads the agents again
+    # The header keeps its Register agent. What a failed read must not do is
+    # also say "no agents registered yet": that is a claim the read never made.
+
+  @integration
+  Scenario: A failed refresh keeps the agents already on screen beside the alert
+    Given the reader has turned sample data off
+    And the organization's agents were read
+    And a later agents read fails
+    When a governance viewer looks at the Agents page
+    Then the page shows an alert saying the agents could not be loaded
+    And the agents already read stay listed under it
 
   # ===========================================================================
   # Sample mode

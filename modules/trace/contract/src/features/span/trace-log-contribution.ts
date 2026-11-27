@@ -25,6 +25,8 @@ const logTraceContributionSchemaDefinition = z.object({
   correlationSource: logCorrelationSourceSchema.exclude(["none"]),
   input: z.string().nullable(),
   output: z.string().nullable(),
+  /** The record declared its output (`langwatch.output`); absent on events written before it. */
+  outputDeclared: z.boolean().optional(),
   liftedAttributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
   nonBillable: z.boolean(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),

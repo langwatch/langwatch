@@ -984,6 +984,16 @@ describe("isTerminalFailure", () => {
     it("leaves rate limiting open, since waiting is a fix", () => {
       expect(isTerminalFailure(failure({ status: 429, code: "rate_limited" }))).toBe(false);
     });
+
+    /** @scenario A fresh trace_not_found is retryable, not terminal */
+    it("leaves a 404 the platform marked retryable open, since it may still arrive", () => {
+      const parsed = parseHandledError({
+        status: 404,
+        body: { code: "trace_not_found", message: "trace_not_found", meta: {}, retryable: true },
+      });
+      expect(isTerminalFailure(parsed)).toBe(false);
+      expect(toCliErrorDocument(parsed).error).toMatchObject({ retryable: true, terminal: false });
+    });
   });
 
   describe("given a failure that is ours", () => {

@@ -148,3 +148,28 @@ export function extractAiCallFailedInfo(error: unknown): AiCallFailedExtracted |
     role,
   };
 }
+
+/** Wire-side discriminator for a provider's content filter refusing the text it was given. */
+export const AI_CONTENT_FILTERED_CAUSE = "AI_CONTENT_FILTERED" as const;
+
+export type AiContentFilteredExtracted = AiCallFailedExtracted;
+
+/** The payload of an `AI_CONTENT_FILTERED` refusal, set by the server's AiContentFilteredError. */
+export function extractAiContentFilteredInfo(error: unknown): AiContentFilteredExtracted | null {
+  const cause = causeOf(error);
+  if (cause?.code !== AI_CONTENT_FILTERED_CAUSE) return null;
+  if (!cause.featureKey) return null;
+
+  const role = readRole(cause.role);
+  if (!role) return null;
+
+  return {
+    featureKey: cause.featureKey,
+    featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
+    role,
+  };
+}
+
+export function markAsHandledByContentFilterHandler(error: Error): void {
+  markHandledGlobally(error);
+}

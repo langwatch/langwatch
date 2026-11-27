@@ -82,7 +82,7 @@ function renderFieldOn(model: string) {
     const methods = useForm({ defaultValues: { settings: { model } } });
     return (
       <FormProvider {...methods}>
-        <EvaluatorLLMConfigField prefix="settings" />
+        <EvaluatorLLMConfigField prefix="settings" evaluatorType="langevals/llm_boolean" />
       </FormProvider>
     );
   };

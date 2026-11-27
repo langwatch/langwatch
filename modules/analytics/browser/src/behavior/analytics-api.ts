@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
+import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type {
   boardTrpc,
   dashboardTrpc,
@@ -20,6 +21,7 @@ import type {
   graphListItemSchema,
   savedViewTrpc,
 } from "@langwatch/dashboard-contract";
+import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import type { z } from "zod";
 
 import type { FilterField } from "../model/analytics-filter-definition.ts";
@@ -311,6 +313,12 @@ type BorrowedProcedures = {
       query: { input: ProjectScope; output: AnalyticsMonitorSummary[] };
     };
   };
+  authz: {
+    /** The reader's own permissions at a scope, resolved by the server (custom roles too). */
+    effectivePermissions: {
+      query: { input: AuthzOwnStandingInput; output: AuthzOwnStanding };
+    };
+  };
 };
 
 export type AnalyticsApiMap = ContractApiMap<typeof analyticsTrpc> &
@@ -318,6 +326,7 @@ export type AnalyticsApiMap = ContractApiMap<typeof analyticsTrpc> &
   ContractApiMap<typeof savedViewTrpc> &
   ContractApiMap<typeof dashboardTrpc> &
   ContractApiMap<typeof boardTrpc> &
+  ContractApiMap<typeof featureFlagTrpc> &
   BorrowedProcedures;
 
 /**

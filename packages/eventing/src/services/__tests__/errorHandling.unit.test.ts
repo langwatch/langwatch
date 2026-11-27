@@ -1,3 +1,4 @@
+import { markInsertFailure } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,6 +11,8 @@ import {
   ErrorCategory,
   HandlerError,
   handleError,
+  isOutOfStatementSlots,
+  isPermanentClickHouseError,
   ProjectionError,
   QueueError,
   SecurityError,
@@ -659,6 +662,152 @@ describe("classifyClickHouseError", () => {
         reasons: [new Error("Syntax error in SQL")],
       });
       expect(classifyClickHouseError(translated)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+});
+
+describe("isOutOfStatementSlots", () => {
+  describe("when ClickHouse had no statement slot", () => {
+    it.each([
+      ["its code", Object.assign(new Error("query refused"), { code: "202" })],
+      ["its numeric code", Object.assign(new Error("query refused"), { code: 202 })],
+      ["the HTTP message", new Error("Code: 202. Too many simultaneous queries. Maximum: 100.")],
+      ["the code's name", new Error("DB::Exception: TOO_MANY_SIMULTANEOUS_QUERIES")],
+    ])("recognises it by %s", (_, error) => {
+      expect(isOutOfStatementSlots(error)).toBe(true);
+    });
+
+    it("recognises it among a handled error's reasons", () => {
+      const handled = new ClickHouseUnavailableError({
+        reasons: [Object.assign(new Error("query refused"), { code: "202" })],
+      });
+
+      expect(isOutOfStatementSlots(handled)).toBe(true);
+    });
+  });
+
+  describe("when the client shed the statement for want of a slot", () => {
+    it("recognises the shed itself, whatever its reasons say", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [new Error("Aborted while waiting for a ClickHouse concurrency slot.")],
+      });
+
+      expect(isOutOfStatementSlots(shed)).toBe(true);
+    });
+  });
+
+  describe("when the server is overloaded some other way", () => {
+    it.each([
+      ["memory", Object.assign(new Error("MEMORY_LIMIT_EXCEEDED"), { code: "241" })],
+      ["a timeout", Object.assign(new Error("TIMEOUT_EXCEEDED"), { code: "159" })],
+      ["a lost connection", new Error("socket hang up")],
+    ])("does not call %s a missing slot", (_, error) => {
+      expect(isOutOfStatementSlots(error)).toBe(false);
+    });
+  });
+});
+
+/** A ClickHouse server error as @clickhouse/client raises it: its code and its name apart. */
+const clickHouseServerError = ({
+  code,
+  type,
+  message,
+}: {
+  code: string;
+  type: string;
+  message: string;
+}) => Object.assign(new Error(message), { code, type });
+
+describe("isPermanentClickHouseError", () => {
+  describe("when ClickHouse refused the data itself", () => {
+    it.each([
+      ["27", "CANNOT_PARSE_INPUT_ASSERTION_FAILED", "Cannot parse input: expected '\"' before"],
+      ["6", "CANNOT_PARSE_TEXT", "Cannot parse string 'abc' as UInt64"],
+    ])("refuses retrying code %s (%s)", (code, type, message) => {
+      expect(isPermanentClickHouseError(clickHouseServerError({ code, type, message }))).toBe(true);
+    });
+
+    it.each([
+      ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
+      ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],
+    ])("refuses retrying code %s (%s) when an insert met it", (code, type, message) => {
+      const error = clickHouseServerError({ code, type, message });
+      markInsertFailure(error);
+
+      expect(isPermanentClickHouseError(error)).toBe(true);
+    });
+
+    it("recognises the name in a message that crossed a serialisation boundary", () => {
+      const error = new Error(
+        "Code: 27. DB::Exception: Cannot parse input: expected '\"' before: 'x': (at row 1). (CANNOT_PARSE_INPUT_ASSERTION_FAILED)",
+      );
+
+      expect(isPermanentClickHouseError(error)).toBe(true);
+    });
+
+    it("finds it under a wrapping error and among a handled error's reasons", () => {
+      const parse = clickHouseServerError({
+        code: "6",
+        type: "CANNOT_PARSE_TEXT",
+        message: "Cannot parse string",
+      });
+
+      expect(isPermanentClickHouseError(new Error("append failed", { cause: parse }))).toBe(true);
+      expect(isPermanentClickHouseError(new ClickHouseUnavailableError({ reasons: [parse] }))).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("when the failure may pass on its own", () => {
+    it("retries a missing column, which a rolling deploy may add moments later", () => {
+      const error = clickHouseServerError({
+        code: "16",
+        type: "NO_SUCH_COLUMN_IN_TABLE",
+        message: "No such column Cost in table stored_spans",
+      });
+
+      expect(isPermanentClickHouseError(error)).toBe(false);
+    });
+
+    /** @scenario "A type error on a read is never refused as bad data" */
+    it.each([
+      ["53", "TYPE_MISMATCH", "Type mismatch in IN or VALUES section"],
+      ["43", "ILLEGAL_TYPE_OF_ARGUMENT", "Illegal type String of argument of function plus"],
+    ])(
+      "retries code %s (%s) on a read, where a column may be changing type",
+      (code, type, message) => {
+        const error = clickHouseServerError({ code, type, message });
+
+        expect(isPermanentClickHouseError(error)).toBe(false);
+        expect(isPermanentClickHouseError(new Error("read failed", { cause: error }))).toBe(false);
+      },
+    );
+
+    it("retries when a network failure sits deeper beside the refusal", () => {
+      const parse = clickHouseServerError({ code: "6", type: "CANNOT_PARSE_TEXT", message: "bad" });
+      const reset = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+      const handled = new ClickHouseUnavailableError({
+        reasons: [parse, new Error("request failed", { cause: reset })],
+      });
+
+      expect(isPermanentClickHouseError(handled)).toBe(false);
+    });
+
+    it("retries an overload even when a parse error rides beside it", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [
+          clickHouseServerError({ code: "6", type: "CANNOT_PARSE_TEXT", message: "bad row" }),
+        ],
+      });
+
+      expect(isPermanentClickHouseError(shed)).toBe(false);
+    });
+
+    it("never reads another library's bare numeric code as ClickHouse's", () => {
+      const grpcAlreadyExists = Object.assign(new Error("entity already exists"), { code: 6 });
+
+      expect(isPermanentClickHouseError(grpcAlreadyExists)).toBe(false);
     });
   });
 });

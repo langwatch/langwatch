@@ -42,6 +42,13 @@ langevals:
     requests: { cpu: 1, memory: 4Gi }
     limits: { cpu: 2, memory: 8Gi }
 
+piiRedactionModel:
+  # Off by default (see the chart README); two replicas when turned on.
+  enabled: false
+  replicaCount: 2
+  podDisruptionBudget:
+    maxUnavailable: 1
+
 clickhouse:
   chartManaged: true
   replicas: 1

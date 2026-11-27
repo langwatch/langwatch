@@ -20,6 +20,8 @@ export interface IssuedLicenseRecord {
   /** Null when the license states none, or when `liteSeatsUnlimited`. */
   maxMembersLite: number | null;
   liteSeatsUnlimited: boolean;
+  /** Null when the license states none, which sells none. */
+  maxMembersDeveloper: number | null;
   issuedAt: Instant;
   expiresAt: Instant;
   source: IssuedLicenseSource;
@@ -67,6 +69,11 @@ export type IssuedLicenseQuery = {
    * `matching` false, the rest.
    */
   emailSuffixes?: { suffixes: readonly string[]; matching: boolean };
+  /**
+   * Keeps only the newest license of each reissue chain: drops every row an
+   * unrevoked row replaces, so a chain lists and counts once.
+   */
+  chainHeadsOnly?: boolean;
 };
 
 export interface IssuedLicenseRepository {
@@ -92,10 +99,37 @@ export interface IssuedLicenseRepository {
   /** Removes a row a failed flow wrote; a row already gone is not an error. */
   delete(id: string): Promise<void>;
   /**
-   * Binds the license to an install only while it has none, and answers whether
-   * this call was the one that bound it.
+   * Binds the license to an install only while it has none and is not revoked,
+   * and answers whether this call was the one that bound it.
    */
   bindInstance(params: { id: string; instanceId: string; at: Instant }): Promise<boolean>;
+  /**
+   * Revokes the license only while no install is bound and it is not revoked,
+   * in the same statement as the check, so a bind and this revoke cannot both
+   * win. Answers whether this call revoked it.
+   */
+  revokeUnbound(params: {
+    id: string;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean>;
+  /**
+   * Revokes the license only while it still names `virtualKeyId` (none included) and is not
+   * revoked, so a key that attached after the caller ended the old one refuses the mark.
+   */
+  revokeHolding(params: {
+    id: string;
+    virtualKeyId: string | null;
+    at: Instant;
+    revokedById: string;
+    revokedReason: string;
+  }): Promise<boolean>;
+  /**
+   * Lets go of an ended managed key on the live license that still names it, so its
+   * install's next sync provisions a new one. A revoked license keeps the key it names.
+   */
+  releaseVirtualKey(params: { virtualKeyId: string }): Promise<boolean>;
   /**
    * Records the managed key only while the license has none and still is the
    * active license of that customer on that install. `requires` is checked in

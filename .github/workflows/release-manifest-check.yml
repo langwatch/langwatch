@@ -10,6 +10,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
+    # Every release-please PR edits the manifest, so the release PR always
+    # runs; any other pull request only runs when it touches the gate itself.
+    paths:
+      - ".github/.release-please-manifest.json"
+      - "packages/upgrade/**"
+      - ".github/workflows/release-manifest-check.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}

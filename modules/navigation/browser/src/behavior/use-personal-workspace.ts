@@ -5,7 +5,7 @@ import { navigationApi, type NavigationApiMap } from "./navigation-api.ts";
 /**
  * The advanced features a reader turned on in their personal workspace:
  * default-empty storage means an existing reader sees Traces only, until
- * the bundle checkbox in `/me/configure` flips them on atomically.
+ * the bundle checkbox in `/coding-agents/configure` flips them on atomically.
  */
 export type PersonalWorkspaceFeatures =
   NavigationApiMap["personalWorkspaceFeatures"]["get"]["query"]["output"];

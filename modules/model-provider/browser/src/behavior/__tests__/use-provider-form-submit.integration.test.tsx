@@ -164,6 +164,37 @@ describe("useProviderFormSubmit()", () => {
     vi.clearAllMocks();
   });
 
+  describe("given the save is refused because the base URL is not allowed", () => {
+    /** @scenario "A save refused for its base URL says why in the form" */
+    it("shows why beside the credential fields instead of failing silently", async () => {
+      mockUpdateMutateAsync.mockRejectedValueOnce({
+        data: {
+          error: {
+            code: "model_provider_invalid",
+            httpStatus: 400,
+            meta: { reason: "endpoint_not_allowed", refusal: "cloud_internal_domain" },
+          },
+        },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(result.current.errors.customKeysRoot).toContain("outbound policy");
+      expect(result.current.errors.customKeysRoot).toContain("nothing was saved");
+      expect(result.current.isSaving).toBe(false);
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+
+      act(() => result.current.clearErrors());
+
+      expect(result.current.errors.customKeysRoot).toBeUndefined();
+    });
+  });
+
   describe("given useAsDefaultProvider is true and provider is azure", () => {
     describe("when projectDefaultModel belongs to a different provider (openai/gpt-5.2)", () => {
       beforeEach(async () => {
@@ -685,6 +716,90 @@ describe("useProviderFormSubmit()", () => {
       expect(payload?.langySkipPermissionsModels).toEqual(["^gpt-9$"]);
       expect(payload).not.toHaveProperty("rateLimitRpm");
       expect(payload).not.toHaveProperty("providerConfig");
+    });
+  });
+
+  describe("given a save that imported models from the provider listing", () => {
+    /** @scenario The drawer tells the user what the save imported */
+    it("toasts how many models were imported and from which provider", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "imported", added: 3, total: 3 },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({
+          name: "My Endpoint",
+          useAsDefaultProvider: false,
+        }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Imported 3 models from My Endpoint",
+          type: "success",
+        }),
+      );
+    });
+
+    it("shows a warning when the provider could not list its models", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "failed" },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Could not list models from this provider",
+          type: "warning",
+        }),
+      );
+    });
+
+    it("tells the user to save again when the import was skipped", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "skipped" },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Models were not imported this time",
+          type: "info",
+        }),
+      );
+    });
+
+    it("shows no import toast when nothing new was imported", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "imported", added: 0, total: 3 },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledTimes(1);
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Model Provider Updated" }),
+      );
     });
   });
 });

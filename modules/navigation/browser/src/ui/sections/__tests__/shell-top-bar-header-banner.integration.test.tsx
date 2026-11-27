@@ -62,6 +62,7 @@ describe("the shell top bar under an impersonation", () => {
             activeProductId: null,
             isSettingsRoute: false,
             seatRefusal: null,
+            openBoard: null,
             showDevelopmentIndicator: true,
             isCompactSidebar: false,
             isMobile: false,

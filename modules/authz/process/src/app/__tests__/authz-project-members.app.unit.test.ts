@@ -13,6 +13,7 @@ import { MemoryAuthzReadRepository } from "../../repositories/memory/memory.auth
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import { PROJECT_MEMBERS_DECIDED_LIMIT } from "../../services/authz-project-members.service.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
+import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 const ORG = "org_acme";
 const READER = "proj_orchestrator";
@@ -31,6 +32,7 @@ function composeOver(memory: AuthzMemoryStore) {
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
+    channels: memoryAuthzChannels(),
     repositories: {
       ...MemoryAuthzRepositories.create(),
       read: MemoryAuthzReadRepository.create({ memory }),

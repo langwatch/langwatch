@@ -11,7 +11,7 @@ import {
   modelSelectionFrom,
 } from "../model-selection.ts";
 
-const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
+const BUILT_IN = { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
   label: "gpt-6-luna",
@@ -28,11 +28,34 @@ describe("modelSelectionFrom", () => {
         builtInModels: [BUILT_IN],
       });
 
-      expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-evals"]);
-      expect(selectOptions[0]?.label).toBe("Instant Evals");
+      expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-preview"]);
+      expect(selectOptions[0]?.label).toBe("LangWatch Instant (preview)");
       expect(groupedByProvider).toEqual([
         { provider: BUILT_IN_MODELS_GROUP_KEY, label: "Decision models", models: selectOptions },
       ]);
+    });
+  });
+
+  describe("given a built-in model that sets its own line", () => {
+    /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
+    it("shows its own line over the catalogue's for the same id", () => {
+      const line = (description?: string) =>
+        modelSelectionFrom({
+          providers: [],
+          options: [],
+          mode: "chat",
+          featureKey: undefined,
+          builtInModels: [
+            {
+              value: "langwatch/instant-evals",
+              label: "LangWatch Evals (preview)",
+              ...(description ? { description } : {}),
+            },
+          ],
+        }).selectOptions[0]?.subtitle;
+
+      expect(line("Optimized for evals")).toBe("Optimized for evals");
+      expect(line()).toBe("Optimized for search and quick classification");
     });
   });
 

@@ -96,7 +96,7 @@ export class DashboardService {
     const parsed = dashboardRef(input);
 
     const found = await this.#repository.findDashboard({ ...parsed, viewer: input.viewer });
-    if (!found) throw new DashboardNotFoundError(parsed.projectId);
+    if (!found) throw new DashboardNotFoundError({ projectId: parsed.projectId });
 
     return found;
   }
@@ -346,7 +346,7 @@ export class DashboardService {
       viewer: ref.viewer,
       dashboardIds: [ref.dashboardId],
     });
-    if (!board) throw new DashboardNotFoundError(ref.projectId);
+    if (!board) throw new DashboardNotFoundError({ projectId: ref.projectId });
   }
 
   /**

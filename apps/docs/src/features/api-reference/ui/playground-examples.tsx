@@ -13,20 +13,33 @@ import { useEndpointState } from "./endpoint-state.tsx";
 import { Panel } from "./panel.tsx";
 
 const REQUEST_FILES = { python: "request.py", typescript: "request.ts", curl: "request.sh" };
+/** The agent prompt leads the strip; a reader with no stored choice still starts on Python. */
+const AGENT_TAB = { id: "agent", label: "Agent prompt", file: "prompt.md" } as const;
+const REQUEST_TABS = [
+  AGENT_TAB,
+  ...EXAMPLE_LANGUAGES.map((entry) => ({ ...entry, file: REQUEST_FILES[entry.id] })),
+];
 
-export function RequestExamples({ examples }: { examples: Record<string, CodeSource> }) {
+export function RequestExamples({
+  examples,
+  agent,
+  reference,
+}: {
+  examples: Record<string, CodeSource>;
+  agent: CodeSource;
+  reference: string;
+}) {
   const stored = usePreference({ key: "api-language" });
   const selected =
-    EXAMPLE_LANGUAGES.find((entry) => entry.label.toLowerCase() === stored?.toLowerCase()) ??
-    EXAMPLE_LANGUAGES[0];
+    REQUEST_TABS.find((entry) => entry.label.toLowerCase() === stored?.toLowerCase()) ??
+    REQUEST_TABS[1];
   if (!selected) return null;
-  const language = selected.id;
-  const languageLabel = selected.label;
+  const sources: Record<string, CodeSource | undefined> = { ...examples, agent };
   return (
     <Panel showHeader={false} title="Request example">
       <Tabs.Root
         data-docs-preference="api-language"
-        value={languageLabel}
+        value={selected.label}
         onValueChange={({ value }) => writePreference({ key: "api-language", value })}
         variant="line"
         colorPalette="accent"
@@ -36,9 +49,9 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
         <CodeBar>
           <FileCode size={16} aria-hidden="true" />
           <Text as="span" data-docs-code-title="" flex="1" fontFamily="mono" fontSize="13px">
-            {REQUEST_FILES[language]}
+            {selected.file}
           </Text>
-          <CopyAction code={examples[language]?.code ?? ""} />
+          <CopyAction code={sources[selected.id]?.code ?? ""} />
         </CodeBar>
         <Flex
           alignItems="center"
@@ -56,7 +69,7 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
               boxShadow: "none",
             }}
           >
-            {EXAMPLE_LANGUAGES.map((entry) => (
+            {REQUEST_TABS.map((entry) => (
               <Tabs.Trigger
                 key={entry.id}
                 value={entry.label}
@@ -68,15 +81,18 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
             ))}
           </Tabs.List>
         </Flex>
-        {EXAMPLE_LANGUAGES.map((entry) => {
-          const source = examples[entry.id];
+        {/* Panels keep the languages first; the agent prompt's panel follows them. */}
+        {[...REQUEST_TABS.slice(1), AGENT_TAB].map((entry) => {
+          const source = sources[entry.id];
           return (
             <Tabs.Content
               key={entry.id}
               value={entry.label}
               padding="0"
               data-docs-panel=""
-              data-code-title={REQUEST_FILES[entry.id]}
+              data-docs-example={entry.id}
+              data-docs-reference={entry.id === AGENT_TAB.id ? reference : void 0}
+              data-code-title={entry.file}
               bg="bg.nested"
               minWidth="0"
               maxWidth="100%"

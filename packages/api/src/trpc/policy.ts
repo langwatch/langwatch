@@ -47,6 +47,7 @@ import {
   callerTraceContext,
   deriveAuditTarget,
   isAuditLogExempt,
+  isFailureAnswered,
   isSilencedCall,
   redactAuditArgs,
   recordTrpcCall,
@@ -995,6 +996,7 @@ function failuresToAudit<TActor extends { id?: string }>({
   const auditedAsMutation = type === "mutation" && permissionChecked; // avoid duplicated logs
   if (auditedAsMutation || result.ok || !actor?.id) return [];
   const { error } = result;
+  if (isFailureAnswered(error)) return [];
   if (!(error instanceof TRPCError) || error.code === "INTERNAL_SERVER_ERROR") return [];
   return [{ error, actor: { ...actor, id: actor.id } }];
 }

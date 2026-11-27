@@ -21,10 +21,12 @@ import {
   LangWatchQLViewStatementsService,
   SHIPPED_LWQL_DEDUP,
 } from "../langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "../langwatch-ql-view-twin-statements.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
+const twinStatements = LangWatchQLViewTwinStatementsService.create();
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 /** The views plus the access model's policies and grants, as a SQL-mode boot runs them. */
@@ -508,6 +510,45 @@ describe("given the views pinned to latest-in-order", () => {
     expect(sql).toContain(`\n) AS ${LWQL_SOURCE_ALIAS}`);
   });
 
+  /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
+  it("floors trace_metrics' read of trace_analytics on OccurredAt before LIMIT 1 BY", () => {
+    const view = pickLwqlViewByName("trace_metrics");
+    if (!view) throw new Error("trace_metrics is not in the catalog");
+    const twins = twinStatements.flooredViewStatements({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+
+    expect(twins).toHaveLength(1);
+    expect(twins[0]).toMatch(/^CREATE OR REPLACE VIEW langwatch\.trace_metrics__floor\n/);
+    expect(twins[0]).toContain(
+      "  FROM langwatch.trace_analytics\n" +
+        "  WHERE `OccurredAt` >= {lwql_floor:DateTime64(3)}\n" +
+        "  ORDER BY ",
+    );
+    expect(render("trace_metrics")).not.toContain("lwql_floor");
+  });
+
+  /** @scenario "A floored twin of a latest-in-order view reads the source from its bound before LIMIT 1 BY" */
+  it.each(["traces", "evaluations", "simulations"])(
+    "provisions no twin for %s, a latest-in-order view that declares no floor column",
+    (name) => {
+      const view = pickLwqlViewByName(name);
+      if (!view) throw new Error(`${name} is not in the catalog`);
+
+      expect(
+        twinStatements.flooredViewStatements({
+          names: NAMES,
+          sourceDatabase: SOURCE_DATABASE,
+          view,
+          dedup: SHIPPED_LWQL_DEDUP,
+        }),
+      ).toEqual([]);
+    },
+  );
+
   it("orders trace_metrics by its whole sort key and breaks a version tie on Version", () => {
     const sql = render("trace_metrics");
 
@@ -553,7 +594,7 @@ describe("given the views over trace_evaluation_analytics", () => {
       dedup: SHIPPED_LWQL_DEDUP,
     });
   const twins = (view: LangWatchQLViewDefinition) =>
-    viewStatements.flooredViewStatements({
+    twinStatements.flooredViewStatements({
       names: NAMES,
       sourceDatabase: SOURCE_DATABASE,
       view,
@@ -642,5 +683,49 @@ describe("given the views over trace_evaluation_analytics", () => {
     const exposed = [metrics, checks].flatMap((view) => view.columns.map(({ name }) => name));
     expect(exposed).not.toContain("Sign");
     expect(exposed).not.toContain("Revision");
+  });
+});
+
+describe("given PostgreSQL-resident views that repeat a row per project", () => {
+  const render = (name: string) => {
+    const view = pickLwqlViewByName(name);
+    if (!view) throw new Error(`${name} is not in the catalog`);
+    return viewStatements.viewStatement({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+  };
+
+  describe("when an organization-scoped view is rendered", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("keeps one row per budget, the lowest project's, after the tenant predicate", () => {
+      const sql = render("gateway_budgets");
+
+      const tenantAt = sql.indexOf("WHERE src.`TenantId` >=");
+      expect(tenantAt).toBeGreaterThan(-1);
+      expect(tenantAt).toBeLessThan(sql.indexOf("\nORDER BY"));
+      expect(sql).toMatch(
+        /\nORDER BY src\.`GatewayBudgetId`, src\.`TenantId`\nLIMIT 1 BY src\.`GatewayBudgetId`$/,
+      );
+    });
+  });
+
+  describe("when a team-scoped view is rendered", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("keeps one row per ingestion source", () => {
+      expect(render("ingestion_sources")).toMatch(/\nLIMIT 1 BY src\.`IngestionSourceId`$/);
+    });
+  });
+
+  describe("when a project-scoped view is rendered", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("reads its rows with no collapse", () => {
+      const sql = render("topics");
+
+      expect(sql).not.toContain("LIMIT 1 BY");
+      expect(sql).not.toContain("ORDER BY");
+    });
   });
 });

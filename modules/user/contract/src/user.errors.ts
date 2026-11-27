@@ -330,3 +330,20 @@ export class UserLastPlatformOperatorError extends HandledError {
     this.name = "UserLastPlatformOperatorError";
   }
 }
+
+/**
+ * A platform operator's address is fixed while they hold the grant: on the hosted service only a
+ * verified staff address may operate, and the grant was checked against this one.
+ */
+export class UserPlatformOperatorEmailLockedError extends HandledError {
+  declare readonly code: "user_platform_operator_email_locked";
+
+  constructor(userId: string) {
+    super(
+      "user_platform_operator_email_locked",
+      "A platform operator's email address cannot be changed; revoke the operator first",
+      { httpStatus: 409, fault: "customer", meta: { userId } },
+    );
+    this.name = "UserPlatformOperatorEmailLockedError";
+  }
+}

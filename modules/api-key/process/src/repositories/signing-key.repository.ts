@@ -35,7 +35,10 @@ export type SigningKeyCredential = Readonly<{
   id: string;
   projectId: string;
   publicId: string;
-  secret: string;
+  /** Null for a revoked key or one past `verifiesUntil` at the read: never opened. */
+  secret: string | null;
+  /** The stored secret would not open: this key alone answers unavailable, the others verify. */
+  unreadable: boolean;
   verifiesUntil: Instant | null;
   revokedAt: Instant | null;
 }>;
@@ -53,10 +56,8 @@ export interface SigningKeyRepository {
   ): Promise<boolean>;
   /** Ends a key; revoking a revoked key keeps its first `revokedAt`. */
   revoke(input: ProjectKeyAddress & { revokedAt: Instant }): Promise<void>;
-  /** The only read that opens a secret; at most one key answers a public id. */
-  findCredentials(input: {
-    organizationId: string;
-    publicId: string;
-  }): Promise<SigningKeyCredential[]>;
+  /** The only read that opens a secret: every key the organisation holds, opened only while it
+   *  still verifies at `at`; a revoked or ended key keeps its public id and status. */
+  findCredentials(input: { organizationId: string; at: Instant }): Promise<SigningKeyCredential[]>;
   markUsed(input: { organizationId: string; ids: readonly string[]; at: Instant }): Promise<void>;
 }

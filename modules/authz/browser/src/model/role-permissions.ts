@@ -176,6 +176,11 @@ const RESOURCE_COPY = {
     blurb: "Which answers the gateway is allowed to reuse.",
     area: "AI gateway",
   },
+  gatewayA2aTargets: {
+    label: "A2A agents",
+    blurb: "The agents the gateway may call for your agents, and the credentials it sends them.",
+    area: "AI gateway",
+  },
   governance: {
     label: "Governance",
     blurb: "The policies your organization holds its use of models to.",

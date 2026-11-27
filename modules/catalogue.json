@@ -404,7 +404,8 @@
       "id": "digest",
       "root": "enterprise/modules/digest",
       "classification": "enterprise",
-      "subjects": ["digest"]
+      "subjects": ["digest"],
+      "restNamespaces": ["digest"]
     },
     {
       "id": "enterprise-gateway",

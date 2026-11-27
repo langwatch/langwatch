@@ -179,6 +179,24 @@ describe("liftMetricContribution", () => {
     });
   });
 
+  describe("when a launcher declares its own session on the resource", () => {
+    /** @scenario a launcher's declared session groups every harness session it runs */
+    it("keys the point on the declared session, not the run's session id", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        dataPoint({
+          metricName: "claude_code.cost.usage",
+          attributes: { "session.id": "cc-run-2" },
+          valueDouble: 0.5,
+          resourceAttributes: { "langwatch.session.id": "agent_scout" },
+        }),
+      );
+
+      expect(dispatched[0]!.sessionId).toBe("agent_scout");
+    });
+  });
+
   describe("when a cumulative coding-agent metric carries the session key", () => {
     /** @scenario a session that sent only metrics still appears */
     it("contributes the series' converged total, keyed by the series", () => {

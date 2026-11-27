@@ -10,6 +10,7 @@ import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingOwnCodingDeliveryService } from "../nurturing-own-coding-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
 const FIRST_CLAIM = "nurturing:own_coding_first_session:owner-1";
@@ -42,7 +43,7 @@ function deliveryOver() {
   const claims = MemoryNurturingClaimRepository.create();
   const delivery = NurturingOwnCodingDeliveryService.create({
     claims,
-    customerIo: NurturingService.create({ channel }),
+    customerIo: NurturingService.create({ users: peopleWithEmails(), channel }),
   });
   return { channel, claims, delivery };
 }
@@ -68,7 +69,10 @@ describe("NurturingOwnCodingDeliveryService", () => {
       expect(channel.sent).toContainEqual({
         type: "identify",
         userId: "owner-1",
-        traits: { own_coding_first_session_at: Math.floor(T0 / 1000) },
+        traits: {
+          own_coding_first_session_at: Math.floor(T0 / 1000),
+          email: "owner-1@example.com",
+        },
       });
     });
   });

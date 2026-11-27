@@ -5,7 +5,7 @@ import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts
 import { AgentActionsMenu } from "./agent-actions-menu.tsx";
 
 /**
- * "Connect your agent" on /me usage home.
+ * "Connect your agent" on /coding-agents usage home.
  * Appears only after first traces exist.
  */
 

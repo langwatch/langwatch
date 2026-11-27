@@ -41,6 +41,46 @@ Feature: Entitlement owns all counting
     And no trace or billing Api is asked to count
 
   @unit @usage
+  Scenario: Each OTel log record is one billable event
+    Given a project sent two log records
+    When the meter projection maps each log record event
+    Then each record is billed under its producer's own key
+    And a redelivered record keeps the same key, so it counts once
+
+  @unit @usage
+  Scenario: A metric series is billed once per UTC clock hour however many points it sends
+    Given a metric series sent several points within one UTC hour
+    When the meter projection maps each data point event
+    Then every point carries the key of the project, the series and that hour
+    And the month counts the series once for that hour
+
+  @unit @usage
+  Scenario: The same metric series sending in two hours is billed twice
+    Given a metric series sent one point at 14:59 UTC and one at 15:00 UTC
+    When the meter projection maps both events
+    Then the two points carry different keys
+
+  @unit @usage
+  Scenario: Two metric series in the same hour are billed separately
+    Given two metric series of one project each sent a point in the same UTC hour
+    When the meter projection maps both events
+    Then the two points carry different keys
+
+  @unit @usage
+  Scenario: A metric event without a series id falls back to the event's own key
+    Given a metric data point event whose data carries no valid series id
+    When the meter projection maps it
+    Then the mapping does not throw
+    And the event is billed under its producer's key, as any other event
+
+  @unit @usage
+  Scenario: The trace-side log contribution is not billed
+    Given the trace pipeline records a log record against its trace
+    When the meter's subscribed event types are read
+    Then neither the trace log record event nor the log contribution event is among them
+    And only the log pipeline's own record event bills a log
+
+  @unit @usage
   Scenario: Entitlement records a crossed warning threshold as its own event
     Given an organization at 90% of its monthly allowance
     When entitlement checks the organization's usage against the warning thresholds

@@ -6,6 +6,7 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseChain,
   IssuedLicenseFilters,
   IssuedLicensePage,
   IssuedLicenseView,
@@ -39,12 +40,17 @@ export interface EnterpriseOpsApi {
     } & IssuedLicenseFilters,
   ): Promise<IssuedLicensePage>;
   getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
+  getIssuedLicenseChain(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseChain>;
   issueLicense(input: {
     customer: LicenseCustomer;
     email: string;
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the term ends. */
     expiresAt: string;
@@ -59,12 +65,14 @@ export interface EnterpriseOpsApi {
   revokeIssuedLicense(input: {
     id: string;
     reason: string;
+    unusedOnly?: boolean;
     operator: OpsOperator | null;
   }): Promise<IssuedLicenseView>;
   reissueLicense(input: {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the new term ends. */
     expiresAt: string;
@@ -103,6 +111,7 @@ export interface EnterpriseOpsApi {
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     licenseTermDays: number;
     services?: string[];
     /** ISO 8601. The instant the code stops working. */

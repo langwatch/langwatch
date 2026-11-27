@@ -15,8 +15,8 @@ type StaffAccessNoticeDeps = {
 };
 
 /**
- * Tells every other platform operator what one operator just did with staff access, so no
- * enrolment or approval goes unseen. A failed send is logged and never undoes the action.
+ * Staff access emails: every other platform operator hears what one operator did, and an agent's
+ * owner hears that a request waits for them. A failed send is logged and never undoes the action.
  */
 export class StaffAccessNoticeService {
   private constructor(private readonly deps: StaffAccessNoticeDeps) {}
@@ -25,7 +25,8 @@ export class StaffAccessNoticeService {
     return new StaffAccessNoticeService(deps);
   }
 
-  async tellOtherOperators({
+  /** Every platform operator except the one who acted. */
+  tellOtherOperators({
     actingUserId,
     subject,
     lines,
@@ -36,20 +37,61 @@ export class StaffAccessNoticeService {
     lines: readonly NoticeLine[];
     idempotencyKey: string;
   }): Promise<void> {
+    return this.send({
+      actingUserId,
+      subject,
+      lines,
+      idempotencyKey,
+      recipients: (operator) => operator.userId !== actingUserId,
+    });
+  }
+
+  /** The operator who owns the agent: a request is waiting for their passkey. */
+  tellOwner({
+    ownerUserId,
+    subject,
+    lines,
+    idempotencyKey,
+  }: {
+    ownerUserId: string;
+    subject: string;
+    lines: readonly NoticeLine[];
+    idempotencyKey: string;
+  }): Promise<void> {
+    return this.send({
+      actingUserId: ownerUserId,
+      subject,
+      lines,
+      idempotencyKey,
+      recipients: (operator) => operator.userId === ownerUserId,
+    });
+  }
+
+  private async send({
+    actingUserId,
+    subject,
+    lines,
+    idempotencyKey,
+    recipients,
+  }: {
+    actingUserId: string;
+    subject: string;
+    lines: readonly NoticeLine[];
+    idempotencyKey: string;
+    recipients: (operator: { userId: string }) => boolean;
+  }): Promise<void> {
     try {
       const operators = await this.deps.ops.listPlatformOperators();
       const acting = operators.find((operator) => operator.userId === actingUserId);
-      const others = operators.filter(
-        (operator) => operator.userId !== actingUserId && operator.email,
-      );
-      if (others.length === 0) return;
+      const chosen = operators.filter((operator) => recipients(operator) && operator.email);
+      if (chosen.length === 0) return;
       const rendered = await this.deps.renderer.renderStaffAccessNotice({
         headline: subject,
         operatorName: acting?.name ?? acting?.email ?? actingUserId,
         details: [...lines],
       });
       await Promise.all(
-        others.map((operator) =>
+        chosen.map((operator) =>
           this.deps.notifications.sendEmail({
             to: operator.email ?? "",
             subject: rendered.subject,
@@ -59,7 +101,7 @@ export class StaffAccessNoticeService {
         ),
       );
     } catch (error) {
-      logger.warn({ error, subject }, "the staff access notice to other operators was not sent");
+      logger.warn({ error, subject }, "a staff access notice was not sent");
     }
   }
 }

@@ -98,7 +98,7 @@ describe("given a cost list with a model that has no price", () => {
   it("adds the model as a no-price row with no value, once", () => {
     const rows = completeness.unpricedRows({ completeness: partialCost });
     expect(rows).toEqual([expect.objectContaining({ label: "my-finetune-v2", value: null })]);
-    expect(rows[0]?.note).toBe("no price");
+    expect(rows[0]?.note).toBe("price unknown");
     expect(completeness.unpricedRows({ completeness: partialCost }, ["my-finetune-v2"])).toEqual(
       [],
     );
@@ -108,16 +108,16 @@ describe("given a cost list with a model that has no price", () => {
   it("shows that row in every widget that lists cost by model or by source", () => {
     expect(code("fd-cost-efficiency")).toContain("unpricedRows(summary");
     expect(code("cost-by-model")).toContain("unpricedRows(spend");
-    expect(code("top-models")).toContain("no price");
+    expect(code("top-models")).toContain("price unknown");
     expect(code("cost-by-source")).toContain("<UnpricedRow traces={unpriced} />");
   });
 });
 
 describe("given a source that sent no traces in the period", () => {
-  /** @scenario "Widget quality: a source with no runs reads No runs, never $0.00" */
-  it("reads No runs on its row of the spend split", () => {
+  /** @scenario "Widget quality: a source with no runs reads Nothing ran, never $0.00" */
+  it("reads Nothing ran on its row of the spend split", () => {
     const source = CATALOGUE_WIDGET_BUILDS["cost-by-source"];
-    expect(code("cost-by-source")).toContain('traces === 0 ? "No runs"');
+    expect(code("cost-by-source")).toContain('traces === 0 ? "Nothing ran"');
     expect(source?.queries.main).toContain("1 AS traces");
   });
 });
@@ -213,9 +213,9 @@ describe("given the cards whose face carried a generated sentence", () => {
     expect(code("ship-verdict")).not.toMatch(/can ship|Hold the newest run/);
     expect(code("so-verdict")).not.toContain("Ready to sign");
     expect(code("cost-by-source")).not.toContain("is test traffic");
-    expect(code("cost-by-source")).toContain('label="test traffic"');
-    expect(code("ck-attention")).toContain('detail={"The biggest drop of all "');
-    expect(code("ck-attention")).toContain('" (Cohen\'s kappa), under the 0.80 target."');
+    expect(code("cost-by-source")).toContain('label="of AI spend goes on testing"');
+    expect(code("ck-attention")).toContain('detail={"The biggest drop of "');
+    expect(code("ck-attention")).toContain('" of the way (aim for 0.75 or more)."');
   });
 });
 

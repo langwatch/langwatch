@@ -178,7 +178,7 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
   Scenario: An endpoint declared as minting a credential refuses an impersonating actor
     Given a REST route or tRPC procedure declares that it mints a credential
     When an operator acting as a user reaches it
-    Then it is refused with permission_denied (403) naming the declared permission
+    Then it is refused with impersonation_cannot_mint_credential (403), naming no permission, since no grant unlocks it
     And the handler never runs
     And the same caller acting as themselves reaches the handler
     And an endpoint that answers without a credential may not declare it, because it has no caller to refuse

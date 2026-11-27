@@ -70,7 +70,7 @@ The [sessions list](/coding-agents/sessions) shows each session's cost, duration
 ```bash
 langwatch query run "SELECT GitBranch, count() AS sessions, sum(ModelCalls) AS model_calls,
   sum(ToolCalls) AS tool_calls, round(sum(CostUsd), 2) AS cost_usd
-  FROM langwatch.coding_sessions
+  FROM coding_sessions
   WHERE GitBranch IN ('before-branch', 'after-branch') GROUP BY GitBranch"
 ```
 
@@ -81,7 +81,7 @@ For the feedback loop, compare tool durations per branch:
 ```bash
 langwatch query run "SELECT Branch, ToolName, count() AS runs,
   quantileExact(0.5)(DurationMs) AS median_ms, sum(DurationMs) AS total_ms
-  FROM langwatch.coding_session_events
+  FROM coding_session_events
   WHERE EventKind = 'tool_result' AND Branch IN ('before-branch', 'after-branch')
   GROUP BY Branch, ToolName ORDER BY total_ms DESC"
 ```

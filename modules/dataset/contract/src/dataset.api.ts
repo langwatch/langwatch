@@ -103,6 +103,11 @@ export interface DatasetApi {
       columnTypes?: DatasetColumns;
       datasetRecords?: UpsertDatasetInput["datasetRecords"];
       columnRenames?: UpsertDatasetInput["columnRenames"];
+      /**
+       * Refuse `datasetRecords` as an append does: above the plan's batch bound, or naming a
+       * column `columnTypes` lacks.
+       */
+      enforceBatchBound?: boolean;
     } & EditedBy,
   ) => Promise<Dataset>;
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult>;

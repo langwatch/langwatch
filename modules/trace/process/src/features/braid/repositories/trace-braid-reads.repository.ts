@@ -1,6 +1,7 @@
 import type { Authorization, CompiledWhere } from "@langwatch/authorization";
 
 import type { TraceSpanSummaryRecord } from "../../../repositories/trace-projected-read.repository.ts";
+import type { TraceSpanKey } from "../rules/braid-held-trace.rules.ts";
 import type { BraidedSpanGroup } from "../rules/braided-trace-totals.rules.ts";
 
 /** A draft or saved braid's condition as one statement renders it (ADR-201 §7). */
@@ -54,6 +55,24 @@ export abstract class TraceBraidReadsRepository {
     authorization: Authorization;
     sinceMs: number;
     limit: number;
+  }): Promise<string[]>;
+
+  /**
+   * In those traces, the parents of the project's own spans that are not its own spans: where a
+   * call into it came from. At most `limit`; the held rule matches them on the other side.
+   */
+  abstract findOutsideParents(input: {
+    authorization: Authorization;
+    traceIds: readonly string[];
+    sinceMs: number;
+    limit: number;
+  }): Promise<TraceSpanKey[]>;
+
+  /** The traces in which the project holds one of `spans`, as its own span. */
+  abstract findTracesHoldingSpans(input: {
+    authorization: Authorization;
+    spans: readonly TraceSpanKey[];
+    sinceMs: number;
   }): Promise<string[]>;
 
   /** The owner's latest span versions in those traces, counted per trace in one statement. */

@@ -31,6 +31,7 @@ import {
   type SaveSignInSecurityResult,
   type SessionImpersonation,
   type SessionImpersonationState,
+  type SignInFacts,
   type SignInSecuritySettings,
   type VerifiedBrowserSession,
   type AuthUsageCount,
@@ -176,6 +177,7 @@ import {
   type ProviderAccountRow,
 } from "../services/provider-account-link.service.ts";
 import { SessionBoundService } from "../services/session-bound.service.ts";
+import { SignInFactsService } from "../services/sign-in-facts.service.ts";
 import {
   SignInLockoutService,
   type SignInLockoutEvidence,
@@ -430,6 +432,19 @@ export class AuthModule implements AuthApiContract {
     return this.passkeyAssertions().hasPasskey(input);
   }
 
+  /** Set by {@link AuthModule.create}, once the session secret that keys the lock table is read. */
+  #signInFacts: SignInFactsService | null = null;
+
+  findSignInFacts(input: Readonly<{ email: string }>): Promise<SignInFacts[]> {
+    if (!this.#signInFacts) {
+      throw new AuthUnavailableError({
+        capability: "sign_in_facts",
+        processName: this.#processName,
+      });
+    }
+    return this.#signInFacts.findByEmail(input);
+  }
+
   passkeyAssertionOptions(input: {
     userId: string;
     challenge: string;
@@ -463,6 +478,7 @@ export class AuthModule implements AuthApiContract {
     priorSessions,
     twoStep,
     passwordResetMarks,
+    operatorAddressesFixed,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -481,6 +497,8 @@ export class AuthModule implements AuthApiContract {
     priorSessions: PriorSessionService;
     twoStep: TwoStepVerificationService;
     passwordResetMarks: PasswordResetMarks;
+    /** The hosted service keeps operating to staff, so an operator's address is fixed there. */
+    operatorAddressesFixed: boolean;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -509,6 +527,7 @@ export class AuthModule implements AuthApiContract {
     });
     this.#accounts = AccountLifecycleService.create({
       users: dependencies.users,
+      operatorAddressesFixed,
       credentials: {
         revokeAllBrowserSessions: (input) => this.revokeAllBrowserSessions(input),
         revokeCliTokens: (input) => this.revokeCliTokens(input),
@@ -620,6 +639,7 @@ export class AuthModule implements AuthApiContract {
 
     const app = new AuthModule({
       passwordResetMarks: accountRows,
+      operatorAddressesFixed: config.isSaas && config.nodeEnvironment !== "development",
       sessions,
       cliSessions,
       cliDeviceFlow: {
@@ -774,6 +794,13 @@ export class AuthModule implements AuthApiContract {
             }
           : undefined;
       app.#browserSession = identity;
+      app.#signInFacts = SignInFactsService.create({
+        users: dependencies.users,
+        passkeys: repositories.passkeys,
+        locks: repositories.signInLocks,
+        hashIdentifier: sessionSecret ? keyedIdentifierHasher(sessionSecret) : null,
+        now,
+      });
       app.#deriveQueryCacheKey = queryCacheKeyDeriver({ secret: sessionSecret });
       app.#signInHints = signInHintSealer({ secret: sessionSecret });
 

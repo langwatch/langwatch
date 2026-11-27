@@ -51,6 +51,28 @@ describe("signInErrorRedirectOf", () => {
   const redirectTo = (location: string) =>
     signInErrorRedirectOf({ status: 302, location, errorPageUrl, traceId: "trace_1" });
 
+  describe("given a sign-in that succeeded, for a signed-in person or a linked provider account", () => {
+    /** @scenario "A sign-in that succeeds is not read as a failure" */
+    it.each(["https://app.test/", "https://app.test/auth/signin?callbackUrl=%2Fprojects"])(
+      "passes the redirect to %s through unchanged",
+      (location) => {
+        expect(redirectTo(location)).toEqual({ kind: "pass" });
+      },
+    );
+
+    it("passes a callback that lands on the error screen with no error code through unchanged", () => {
+      expect(
+        signInErrorRedirectOf({
+          status: 302,
+          location: errorPageUrl,
+          errorPageUrl,
+          traceId: "trace_1",
+          isCallback: true,
+        }),
+      ).toEqual({ kind: "pass" });
+    });
+  });
+
   describe("given a sign-in refused with a handled error", () => {
     /** @scenario "A handled refusal crosses with its own code" */
     it.each([

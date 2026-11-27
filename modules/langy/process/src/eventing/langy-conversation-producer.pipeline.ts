@@ -14,6 +14,7 @@ import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-wor
 import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangyPullRequestsOpenedRecord } from "../rules/langy-ci-follow-up.rules.ts";
 import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import { LangyWorkerMetricsNullService } from "../services/langy-worker-metrics-null.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
@@ -116,6 +117,10 @@ function buildLangyConversationProducerPipeline(input: {
         processName,
         "langy conversation turn",
       ),
+    langyPullRequestStore: new ProducerOnlyAppendStore<LangyPullRequestsOpenedRecord>(
+      processName,
+      "langy pull request",
+    ),
     langyMessageProjectionStore: new ProducerOnlyAppendStore<LangyMessageProjectionRecord>(
       processName,
       "langy message",

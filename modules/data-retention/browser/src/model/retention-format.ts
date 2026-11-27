@@ -1,3 +1,5 @@
+import { ENTERPRISE_RETENTION_PRESETS } from "./retention-constants.ts";
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
@@ -6,6 +8,9 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(2)} ${units[i]}`;
 }
 
+/** A preset's stored value (whole weeks, so a little longer) reads as the preset's label. */
 export function formatDays(days: number): string {
-  return days === 0 ? "Indefinite" : `${days} days`;
+  if (days === 0) return "Indefinite";
+  const preset = ENTERPRISE_RETENTION_PRESETS.find((p) => p.days === days);
+  return preset ? preset.label : `${days} days`;
 }

@@ -204,8 +204,10 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@opentelemetry/api": "catalog:",
     "@tanstack/react-query": "catalog:",
     "idb-keyval": "catalog:",
     "lucide-react": "catalog:",
@@ -221,7 +223,6 @@
   "devDependencies": {
     "@emotion/react": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
-    "@opentelemetry/api": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
     "@testing-library/jest-dom": "catalog:",

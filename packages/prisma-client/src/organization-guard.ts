@@ -99,6 +99,16 @@ const hasUserBound = (clause: unknown): boolean => {
   return typeof userId === "string" || isNonEmptyStringList(userId);
 };
 
+/** One named owner's personal teams: a non-empty `ownerUserId` beside `isPersonal: true`. */
+const isOwnPersonalTeam = (clause: unknown): boolean => {
+  const ownerUserId = clauseField(clause, "ownerUserId");
+  return (
+    typeof ownerUserId === "string" &&
+    ownerUserId.trim().length > 0 &&
+    clauseField(clause, "isPersonal") === true
+  );
+};
+
 const isOrganizationIdValue = (value: unknown): boolean =>
   typeof value === "string" && value.trim().length > 0;
 
@@ -178,7 +188,15 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
-  Team: {},
+  // A member's own sidebar order, read and written by its (userId, organizationId, product) key.
+  DashboardSidebarOrder: {},
+  // One row per retention scope; read by organizationId, written by row id.
+  RetentionApplyStatus: {},
+  // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
+  // team has exactly one. Any other Team query, and every write, still names its organization.
+  Team: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isOwnPersonalTeam(clause),
+  },
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization. "Is this address invited
@@ -196,6 +214,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   SigningKey: {},
   // ADR-201 §2: an organization's braid setting, one row keyed by organizationId.
   AuthzOrganizationPolicy: {},
+  // ADR-201 §1: the braid writes the authz service sent; every read and write names its
+  // organization.
+  AuthzBraidWrite: {},
   // A request to join one organization (D12), read by organization or row id,
   // plus one READ bounded by subject: "what am I waiting on" spans every
   // organization one named user asked. Writes keyed on userId stay refused.
@@ -245,6 +266,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // cost row, and there is no query shape that wants more than one tenant's.
   DiscoveredPerson: {},
   DiscoveredAgent: {},
+  DiscoveredAgentListing: {},
+  // The governance agent registry and its feed: every read and write names one organization.
+  AgentRegistryEntry: {},
+  AgentRegistryEvent: {},
+  AgentRegistryBaseline: {},
+  // The kill switch: stop plans, AWS connections and stops, each read and written per organization.
+  AgentStopPlanTarget: {},
+  AgentStopPlan: {},
+  GovernanceAwsConnection: {},
+  AgentStop: {},
+  AgentStopClaim: {},
+  AgentStopTargetPriorState: {},
+  AgentRegistrySettings: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one
@@ -298,6 +332,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AiToolEntry: {},
   GatewayBudget: {},
   GatewayConnectUpstream: {},
+  // projectId is null for an organization-wide target, so the row is bound by
+  // organizationId, never by projectId.
+  GatewayA2ATarget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
   // organizationId, or by the parent budget (org-owned) through budgetId /
   // the compound unique key.
@@ -336,6 +373,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingOrganizationCreated: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isTraceWindowEndSweep(clause),
   },
+  // Nurturing's plan copy: one row per organization, by its id.
+  NurturingOrganizationPlan: {},
+  // Nurturing's gateway key copy: a key by its organization and id.
+  NurturingVirtualKey: {},
   // Nurturing's member copy: an organization's rows, or a READ of the named members' other rows.
   NurturingOrganizationMember: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
@@ -351,6 +392,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingTracedProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },
+  // The digest's enrolled cohort, one row per organization keyed by it. The weekly plan reads
+  // the whole list (organization ids only, no customer content); every write names one.
+  DigestCohortOrganization: {
+    platformScopeActions: ["findMany"],
+  },
+  // The digest's weekly folds: a project's week and a person's week within one organization.
+  // Written by the fold's row id, read by organization; the retention sweep across
+  // organizations is raw SQL that says why it skips the tenant check.
+  DigestProjectWeek: {},
+  DigestUserWeek: {},
+  // A person's digest send for one week, stamped with the organization whose week it carried;
+  // claimed by a create naming that organization, read back by its row id.
+  DigestSend: {},
 };
 
 /**

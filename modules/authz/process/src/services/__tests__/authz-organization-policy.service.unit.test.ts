@@ -11,6 +11,7 @@ import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memo
 import { RedisAuthzEpochRepository } from "../../repositories/redis/redis.authz-epoch.repository.ts";
 import {
   AuthzOrganizationPolicyService,
+  BRAIDS_ENABLED_CHANGED_ACTION,
   BRAIDS_POLICY_CHANGED_ACTION,
 } from "../authz-organization-policy.service.ts";
 
@@ -29,6 +30,7 @@ async function refusalOf(promise: Promise<unknown>): Promise<string | undefined>
 function setup({ epochDown = false } = {}) {
   const memory = AuthzMemoryStore.create();
   let bumps = 0;
+  let clock = 1_000;
   const epoch = RedisAuthzEpochRepository.create({
     redis: {
       get: async () => null,
@@ -40,6 +42,7 @@ function setup({ epochDown = false } = {}) {
     policies,
     epoch,
     auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
+    now: () => ++clock,
   });
   return { service, policies, memory, bumps: () => bumps };
 }
@@ -79,6 +82,76 @@ describe("AuthzOrganizationPolicyService", () => {
         }),
       ]);
       expect(bumps()).toBe(1);
+    });
+  });
+
+  describe("given an organisation that never turned Braids on", () => {
+    it("reads Braids as off", async () => {
+      const { service } = setup();
+
+      expect(await service.getOrganizationPolicy({ organizationId: ORG })).toMatchObject({
+        braidsEnabled: false,
+      });
+    });
+  });
+
+  describe("when ana turns Braids on and then off", () => {
+    /** @scenario Turning Braids on and off is in the audit log */
+    it("stores each change, audits it with the previous value and moves the epoch", async () => {
+      const { service, memory, bumps } = setup();
+
+      const on = await service.setBraidsEnabled({
+        organizationId: ORG,
+        braidsEnabled: true,
+        actor: ANA,
+      });
+      const off = await service.setBraidsEnabled({
+        organizationId: ORG,
+        braidsEnabled: false,
+        actor: ANA,
+      });
+
+      expect(on).toMatchObject({ braidsEnabled: true, updatedByUserId: "user_ana" });
+      expect(off).toMatchObject({ braidsEnabled: false });
+      expect(
+        memory.auditLogs.map(({ action, userId, organizationId, metadata }) => ({
+          action,
+          userId,
+          organizationId,
+          metadata,
+        })),
+      ).toEqual([
+        {
+          action: BRAIDS_ENABLED_CHANGED_ACTION,
+          userId: "user_ana",
+          organizationId: ORG,
+          metadata: { braidsEnabled: true, previous: false },
+        },
+        {
+          action: BRAIDS_ENABLED_CHANGED_ACTION,
+          userId: "user_ana",
+          organizationId: ORG,
+          metadata: { braidsEnabled: false, previous: true },
+        },
+      ]);
+      expect(bumps()).toBe(2);
+    });
+
+    it("leaves who may braid as it was", async () => {
+      const { service } = setup();
+      await service.setBraidsPolicy({
+        organizationId: ORG,
+        braidsOrganizationAdminsOnly: true,
+        actor: ANA,
+      });
+
+      const policy = await service.setBraidsEnabled({
+        organizationId: ORG,
+        braidsEnabled: true,
+        actor: ANA,
+      });
+
+      expect(policy).toMatchObject({ braidsEnabled: true, braidsOrganizationAdminsOnly: true });
     });
   });
 

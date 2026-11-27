@@ -32,7 +32,11 @@ const teamAssignmentsSchema = z.array(
 );
 const permissionsSchema = z.array(z.string());
 
-type SeatPredicate = (role: OrganizationUserRole, permissions: string[] | undefined) => boolean;
+type SeatPredicate = (
+  role: OrganizationUserRole,
+  permissions: string[] | undefined,
+  options?: { billingOnly?: boolean },
+) => boolean;
 
 /** A role's permissions where the organization defines it; undefined where it does not. */
 type PermissionsOf = (customRoleId: string | null | undefined) => string[] | undefined;
@@ -63,7 +67,9 @@ function inviteMemberType(
   permissionsOf: PermissionsOf,
 ): MemberType {
   const merged = mergedInvitePermissions(invite, permissionsOf);
-  return classifyMemberType(invite.role, merged.length > 0 ? merged : undefined);
+  return classifyMemberType(invite.role, merged.length > 0 ? merged : undefined, {
+    billingOnly: invite.billingOnly ?? false,
+  });
 }
 
 /** Whether a live invitation holds this seat. */
@@ -73,7 +79,9 @@ function inviteHoldsSeat(
   predicate: SeatPredicate,
 ): boolean {
   const merged = mergedInvitePermissions(invite, permissionsOf);
-  return predicate(invite.role, merged.length > 0 ? merged : undefined);
+  return predicate(invite.role, merged.length > 0 ? merged : undefined, {
+    billingOnly: invite.billingOnly ?? false,
+  });
 }
 
 /**
@@ -287,7 +295,9 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
         .map((member) => ({
           holder: { kind: "member" as const, userId: member.userId },
           seat: seatKindOf(
-            classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf)),
+            classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf), {
+              billingOnly: member.billingOnly ?? false,
+            }),
           ),
         })),
       ...[...this.memory.invites.values()]
@@ -319,7 +329,9 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     );
     if (!member) return null;
     const permissionsOf = this.#permissionsOf(organizationId);
-    return classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf));
+    return classifyMemberType(member.role, this.#memberPermissions(member, permissionsOf), {
+      billingOnly: member.billingOnly ?? false,
+    });
   }
 
   async findInvitationSeat({
@@ -352,7 +364,9 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
         member.organizationId === organizationId &&
         member.disabledAt === null &&
         (this.memory.users.get(member.userId)?.deactivatedAt ?? null) === null &&
-        predicate(member.role, this.#memberPermissions(member, permissionsOf)),
+        predicate(member.role, this.#memberPermissions(member, permissionsOf), {
+          billingOnly: member.billingOnly ?? false,
+        }),
     );
   }
 

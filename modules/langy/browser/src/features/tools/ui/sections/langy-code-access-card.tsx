@@ -28,6 +28,7 @@ import { useSession } from "../../../../behavior/auth-session.ts";
 import { describeError } from "../../../../behavior/errors.tsx";
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { selectConversationReadable, useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   type LangyLocalWorkspaceRead,
   parseLangyLocalWorkspace,
@@ -180,17 +181,18 @@ export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
   const { projectId, conversationId } = props;
   const superseded = props.superseded ?? false;
   const workspaceRevision = useLangyLocalControlStore((s) => s.workspaceRevision);
+  const readable = useLangyStore((s) => selectConversationReadable(s, conversationId));
   const workspace = api.langy.getLocalWorkspace.useQuery(
     { projectId, conversationId },
-    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!conversationId && !superseded },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && readable && !superseded },
   );
 
   // The live stream says the folder came or went; the query says what it is.
   const refetch = workspace.refetch;
   useEffect(() => {
-    if (workspaceRevision === 0) return;
+    if (workspaceRevision === 0 || !readable) return;
     void refetch();
-  }, [workspaceRevision, refetch]);
+  }, [workspaceRevision, refetch, readable]);
 
   if (superseded) return <SupersededState />;
   const data = workspace.data;
@@ -505,18 +507,21 @@ function AskingState({
           disabled={!onChoiceSelect}
           onClick={onPickLocal}
         />
-        <OptionRow
-          icon={<GitHubIcon size={15} />}
-          label={GITHUB_LABEL}
-          subtitle={GITHUB_SUBTITLE}
-          note={githubInstallNote({
-            known: !!organizationId && !github.isLoading,
-            installed,
-            account: installations[0]?.accountLogin,
-          })}
-          disabled={!onChoiceSelect || rememberChoice.isPending}
-          onClick={chooseGithub}
-        />
+        {/* An instance with no GitHub App has nothing to install: the folder is the only way. */}
+        {github.data?.configured === false ? null : (
+          <OptionRow
+            icon={<GitHubIcon size={15} />}
+            label={GITHUB_LABEL}
+            subtitle={GITHUB_SUBTITLE}
+            note={githubInstallNote({
+              known: !!organizationId && !github.isLoading,
+              installed,
+              account: installations[0]?.accountLogin,
+            })}
+            disabled={!onChoiceSelect || rememberChoice.isPending}
+            onClick={chooseGithub}
+          />
+        )}
         {installing && organizationId ? (
           <LangyGitHubConnectCard
             organizationId={organizationId}

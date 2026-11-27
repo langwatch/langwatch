@@ -468,9 +468,9 @@ describe("ScenarioService", () => {
         const repository = MemoryScenarioRepository.create();
         const service = ScenarioService.create(serviceOptions(repository, "test_suite_1"));
 
-        expect(() => service.createTestSuite({ projectId: "project-a", name: "   " })).toThrow(
-          ZodError,
-        );
+        await expect(
+          service.createTestSuite({ projectId: "project-a", name: "   " }),
+        ).rejects.toThrow(ZodError);
         expect(await service.listTestSuites({ projectId: "project-a" })).toEqual([]);
       });
     });

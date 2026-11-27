@@ -93,13 +93,20 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then Customer.io identifies the person with has_traces true
 
   @unit
+  Scenario: An organization's fact about an erased admin still reaches its other members
+    Given an organization whose admin was erased, with another active member
+    When a first trace or a coding agent's first session of the organization is delivered
+    Then the other member is told it
+    And the erased admin gets no call
+
+  @unit
   Scenario: A busy organization sends one batch per debounce window
     When traces of project-1 and project-2 are delivered inside 300 seconds
     Then each member is identified once
     And after 301 seconds each member is identified again with the later time
 
-  # Known limit: a trace the per-project window drops first is never recorded, so the stored time
-  # can lag by up to that window.
+  # The last-trace lane (project-facts-copies.feature) records every trace fact, whatever window
+  # the delivery's claims drop.
   @unit
   Scenario: A trace the organization's window drops still moves the stored time
     Given a trace of project-1 was just told to the members
@@ -118,7 +125,6 @@ Feature: An organization's session facts reach every active member in Customer.i
     Examples:
       | read            |
       | getPlacement    |
-      | recordLastTrace |
       | getAllMembers   |
 
   @unit
@@ -150,6 +156,12 @@ Feature: An organization's session facts reach every active member in Customer.i
     And the person is tracked joined_via_sso and joined_organization
 
   @unit
+  Scenario: A founder who signs up is identified with seat admin
+    Given a person signing up and creating the first organization
+    When the sign-up is identified
+    Then Customer.io identifies the person with seat admin
+
+  @unit
   Scenario: A join event carries the seat the person joined with
     Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
     When the signal is delivered
@@ -160,6 +172,31 @@ Feature: An organization's session facts reach every active member in Customer.i
     Given an invite_accepted or sso_auto_added signal for org-1 with no role, or one nurturing cannot name
     When the signal is delivered
     Then none of the join events carries a seat property
+
+  @unit
+  Scenario: A person who joins is identified with the seat they joined with
+    Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io identifies the person once with seat admin, member, lite_member or developer
+
+  @unit
+  Scenario: A person who joins with no known role is identified with no seat
+    Given an invite_accepted or sso_auto_added signal for org-1 with no role, or one nurturing cannot name
+    When the signal is delivered
+    Then the person is identified with no seat
+
+  @unit
+  Scenario: A person who joins is linked to the organization with the seat they joined with
+    Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io groups the person into org-1 with relationshipAttributes seat admin, member, lite_member or developer
+    And a role nurturing cannot name sends no relationship seat
+
+  @unit
+  Scenario: A founder who signs up is linked to their organization as admin
+    Given a signed_up signal for a new organization org-1
+    When the signal is delivered
+    Then Customer.io groups the founder into org-1 with relationshipAttributes seat admin
 
   @unit
   Scenario: A join is tracked as joined_organization beside its own event
@@ -203,6 +240,49 @@ Feature: An organization's session facts reach every active member in Customer.i
     Given a join that occurred at exactly 2026-11-06T00:00:00.000Z, and one at 1 ms earlier
     When each is decided
     Then the first is tracked joined_organization and the second is not
+
+  @unit
+  Scenario: A role change tells Customer.io the person's new seat
+    Given a member_role_changed signal for user-1 of org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io identifies the person once with seat admin, member, lite_member or developer
+
+  @unit
+  Scenario: A role change groups the person into the organization
+    Given a member_role_changed signal for user-1 of org-1
+    When the signal is delivered
+    Then Customer.io groups user-1 into org-1
+
+  @unit
+  Scenario: A role change or admission links the person to the organization with their new seat
+    Given a member's role changes to EXTERNAL
+    When the role change is delivered
+    Then Customer.io groups the person into the organization with relationshipAttributes seat lite_member
+
+  @unit
+  Scenario: A role change to a role with no seat sends no seat
+    Given a member_role_changed signal for user-1 of org-1 holding a role nurturing cannot name
+    When the signal is delivered
+    Then the person is not identified, and is still grouped into org-1
+
+  @unit
+  Scenario: A redelivered role change is sent once
+    Given the organization recorded a member_role_changed fact for user-1
+    When the same fact is delivered twice
+    Then Customer.io receives one identify and one group call
+
+  @unit
+  Scenario: An admitted member is sent their seat and linked to the organization
+    Given a member_admitted signal for user-1 of org-1 holding the role MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io identifies the person once with seat member, lite_member or developer
+    And Customer.io groups user-1 into org-1
+
+  @unit
+  Scenario: A redelivered admission is sent once
+    Given the organization recorded a member_admitted fact for user-1
+    When the same fact is delivered twice
+    Then Customer.io receives one identify and one group call
 
   @unit
   Scenario: A large organization's members go out in batches of one hundred

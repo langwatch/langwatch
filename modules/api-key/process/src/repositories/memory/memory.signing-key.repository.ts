@@ -98,17 +98,20 @@ export class MemorySigningKeyRepository implements SigningKeyRepository {
 
   async findCredentials(input: {
     organizationId: string;
-    publicId: string;
+    at: Instant;
   }): Promise<SigningKeyCredential[]> {
+    const at = input.at.epochMilliseconds;
     return [...this.#keys.values()]
-      .filter(
-        (key) => key.publicId === input.publicId && key.organizationId === input.organizationId,
-      )
+      .filter((key) => key.organizationId === input.organizationId)
       .map(({ id, projectId, publicId, secret, verifiesUntil, revokedAt }) => ({
         id,
         projectId,
         publicId,
-        secret,
+        secret:
+          revokedAt === null && (verifiesUntil === null || verifiesUntil.epochMilliseconds > at)
+            ? secret
+            : null,
+        unreadable: false,
         verifiesUntil,
         revokedAt,
       }));

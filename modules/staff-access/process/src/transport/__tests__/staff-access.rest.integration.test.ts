@@ -94,7 +94,7 @@ describe("given the staff access REST family", () => {
 
       await expect(
         send({ path: "/api/staff-access/ops/organizations?query=acm", bearer: opsToken }),
-      ).resolves.toMatchObject({ status: 200, body: { organizations: [{ slug: "acme" }] } });
+      ).resolves.toMatchObject({ status: 200, body: { items: [{ slug: "acme" }], total: 1 } });
       await expect(
         send({ path: `/api/staff-access/ops/organizations/${ACME.slug}/usage`, bearer: opsToken }),
       ).resolves.toMatchObject({ status: 200, body: { organization: { id: ACME.id } } });

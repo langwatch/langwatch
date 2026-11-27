@@ -8,7 +8,7 @@ import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } 
 import { BILLING_ROLE_KEY, builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
-const BRAIDS_MANAGE_PERMISSION = "braids:manage";
+export const BRAIDS_MANAGE_PERMISSION = "braids:manage";
 
 /**
  * ADR-171: a Developer holds its personal team and nothing shared. An

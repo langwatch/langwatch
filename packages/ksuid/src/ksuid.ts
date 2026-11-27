@@ -1,6 +1,6 @@
 import { encode, decode } from "./base62.ts";
 import { checkInstance, Instance } from "./instance.ts";
-import type { KsuidComponents, ParsedKsuid } from "./types.ts";
+import type { KsuidComponents, KsuidLayout, ParsedKsuid } from "./types.ts";
 import { checkPrefix, checkUint, DECODED_LEN, ENCODED_LEN, KSUID_REGEX } from "./validation.ts";
 
 /**
@@ -14,6 +14,7 @@ export class Ksuid {
   private readonly _timestamp: number;
   private readonly _instance: Instance;
   private readonly _sequenceId: number;
+  private readonly _layout: KsuidLayout;
   private _string?: string;
 
   /**
@@ -23,12 +24,20 @@ export class Ksuid {
    * @param timestamp - Unix timestamp in seconds (48-bit)
    * @param instance - The instance identifier
    * @param sequenceId - Sequence number for collision avoidance
+   * @param layout - Byte layout, "v2" unless the id is derived from stored inputs
    * @throws {ValidationError} If any parameter is invalid
    */
-  constructor({ environment, resource, timestamp, instance, sequenceId }: KsuidComponents) {
+  constructor({
+    environment,
+    resource,
+    timestamp,
+    instance,
+    sequenceId,
+    layout = "v2",
+  }: KsuidComponents) {
     checkPrefix("environment", environment);
     checkPrefix("resource", resource);
-    checkUint("timestamp", timestamp, 6);
+    checkUint("timestamp", timestamp, layout === "v1-legacy" ? 4 : 6);
     checkInstance("instance", instance);
     checkUint("sequenceId", sequenceId, 4);
 
@@ -37,6 +46,7 @@ export class Ksuid {
     this._timestamp = timestamp;
     this._instance = instance;
     this._sequenceId = sequenceId;
+    this._layout = layout;
   }
 
   /** The environment (e.g., 'prod', 'dev', 'staging') */
@@ -64,6 +74,24 @@ export class Ksuid {
     return this._sequenceId;
   }
 
+  /** The byte layout the string form is written in */
+  get layout(): KsuidLayout {
+    return this._layout;
+  }
+
+  /** The same identifier written in another layout; the two strings differ only in bytes 2-3 */
+  withLayout(layout: KsuidLayout): Ksuid {
+    if (layout === this._layout) return this;
+    return new Ksuid({
+      environment: this._environment,
+      resource: this._resource,
+      timestamp: this._timestamp,
+      instance: this._instance,
+      sequenceId: this._sequenceId,
+      layout,
+    });
+  }
+
   /** JavaScript Date object representing the creation time */
   get date(): Date {
     return new Date(this._timestamp * 1000);
@@ -84,26 +112,26 @@ export class Ksuid {
 
     const decoded = new Uint8Array(DECODED_LEN);
 
-    // Write timestamp (48 bits, 6 bytes)
-    // Note: JavaScript can't store 64-bit numbers accurately, so we use 48 bits
-    // This will become a problem at 8921556-12-07T10:44:16Z, lol
-    decoded[0] = 0; // High byte always 0
-    decoded[1] = 0; // High byte always 0
-    decoded[2] = (this._timestamp >> 40) & 0xff;
-    decoded[3] = (this._timestamp >> 32) & 0xff;
-    decoded[4] = (this._timestamp >> 24) & 0xff;
-    decoded[5] = (this._timestamp >> 16) & 0xff;
-    decoded[6] = (this._timestamp >> 8) & 0xff;
-    decoded[7] = this._timestamp & 0xff;
+    // 48-bit timestamp in bytes 2-7; bytes 0-1 stay zero. Shift counts in JS are taken mod 32,
+    // so the high 16 bits come from division, never from `>> 32`.
+    const low = this._timestamp % 2 ** 32;
+    const high =
+      this._layout === "v1-legacy" ? low & 0xffff : Math.floor(this._timestamp / 2 ** 32);
+    decoded[2] = (high >>> 8) & 0xff;
+    decoded[3] = high & 0xff;
+    decoded[4] = (low >>> 24) & 0xff;
+    decoded[5] = (low >>> 16) & 0xff;
+    decoded[6] = (low >>> 8) & 0xff;
+    decoded[7] = low & 0xff;
 
     // Write instance (9 bytes)
     const instanceBuffer = this._instance.toBuffer();
     decoded.set(instanceBuffer, 8);
 
     // Write sequence ID (4 bytes)
-    decoded[17] = (this._sequenceId >> 24) & 0xff;
-    decoded[18] = (this._sequenceId >> 16) & 0xff;
-    decoded[19] = (this._sequenceId >> 8) & 0xff;
+    decoded[17] = (this._sequenceId >>> 24) & 0xff;
+    decoded[18] = (this._sequenceId >>> 16) & 0xff;
+    decoded[19] = (this._sequenceId >>> 8) & 0xff;
     decoded[20] = this._sequenceId & 0xff;
 
     const encoded = encode(decoded);
@@ -143,23 +171,18 @@ export class Ksuid {
 
     // fullDecoded is a fixed-length (DECODED_LEN) Uint8Array filled in full
     // above, so every index read here is in-bounds by construction.
-    const timestamp =
-      (fullDecoded[2]! << 40) |
-      (fullDecoded[3]! << 32) |
-      (fullDecoded[4]! << 24) |
-      (fullDecoded[5]! << 16) |
-      (fullDecoded[6]! << 8) |
-      fullDecoded[7]!;
+    const high = (fullDecoded[2]! << 8) | fullDecoded[3]!;
+    const low = readUint32(fullDecoded, 4);
+    // A v1-legacy id repeats the low 16 bits in bytes 2-3; a v2 id has zero there until 2106.
+    // Both write the same bytes when the low 16 bits are zero, so that case reads as v2.
+    const layout: KsuidLayout = high !== 0 && high === (low & 0xffff) ? "v1-legacy" : "v2";
+    const timestamp = layout === "v1-legacy" ? low : high * 2 ** 32 + low;
 
     const instance = Instance.fromBuffer(fullDecoded.slice(8, 17));
 
-    const sequenceId =
-      (fullDecoded[17]! << 24) |
-      (fullDecoded[18]! << 16) |
-      (fullDecoded[19]! << 8) |
-      fullDecoded[20]!;
+    const sequenceId = readUint32(fullDecoded, 17);
 
-    return new Ksuid({ environment, resource, timestamp, instance, sequenceId });
+    return new Ksuid({ environment, resource, timestamp, instance, sequenceId, layout });
   }
 
   /**
@@ -171,13 +194,7 @@ export class Ksuid {
       return false;
     }
 
-    return (
-      this._environment === other._environment &&
-      this._resource === other._resource &&
-      this._timestamp === other._timestamp &&
-      this._instance.equals(other._instance) &&
-      this._sequenceId === other._sequenceId
-    );
+    return this.toString() === other.toString();
   }
 
   /**
@@ -197,6 +214,16 @@ export class Ksuid {
       string: this.toString(),
     };
   }
+}
+
+function readUint32(bytes: Uint8Array, offset: number): number {
+  return (
+    ((bytes[offset]! << 24) |
+      (bytes[offset + 1]! << 16) |
+      (bytes[offset + 2]! << 8) |
+      bytes[offset + 3]!) >>>
+    0
+  );
 }
 
 function splitPrefixId(input: string): ParsedKsuid {

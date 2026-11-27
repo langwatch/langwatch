@@ -8,6 +8,8 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { LangyAnswerActionProps } from "@langwatch/langy-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
+import type { ReactNode } from "react";
+import type * as rechartsModule from "recharts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { langyChoicesTimeline } from "../../../../transcript/model/langy-choices-timeline.ts";
@@ -39,6 +41,19 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
       graphs: { create: { useMutation: noopMutation } },
       langy: withFallback({ list: { useQuery: idleQuery } }),
     }),
+  };
+});
+
+/** jsdom reports every box as zero, so only a sized container shows what Recharts drew. */
+vi.mock("recharts", async () => {
+  const actual = await vi.importActual<typeof rechartsModule>("recharts");
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: ReactNode }) => (
+      <actual.ResponsiveContainer width={800} height={400}>
+        {children as never}
+      </actual.ResponsiveContainer>
+    ),
   };
 });
 
@@ -354,5 +369,40 @@ describe("StreamingAnswerWithCards", () => {
 
       expect(derivedFrames()).toHaveLength(0);
     });
+  });
+});
+
+describe("given a recorded answer that carries a timeseries card", () => {
+  const timeseries = {
+    type: "langy-card",
+    blockId: "time-saved",
+    kind: "timeseries",
+    provenance: "derived",
+    card: {
+      kind: "timeseries",
+      blockId: "time-saved",
+      title: "Hours saved per day",
+      unit: "count",
+      series: [
+        {
+          name: "hours_saved",
+          points: [
+            { t: 1792886400000, v: 3.1 },
+            { t: 1792972800000, v: 20.9 },
+          ],
+        },
+      ],
+    },
+  };
+
+  /** @scenario "A timeseries card draws its chart in the panel" */
+  it("draws the chart, never the missing-renderer line", () => {
+    renderMessage(assistantMessage({ parts: [timeseries], metadata: recorded }));
+
+    const [frame] = derivedFrames();
+    expect(derivedFrames()).toHaveLength(1);
+    expect(screen.getByText("Hours saved per day")).toBeDefined();
+    expect(frame?.querySelector(".recharts-area-curve")?.getAttribute("d")).toBeTruthy();
+    expect(screen.queryByText("No chart renderer configured.")).toBeNull();
   });
 });

@@ -88,6 +88,48 @@ Feature: The latest login wins over stale persisted telemetry wiring
       And the pin is kept out of the repository history via the local git
         exclude file
 
+    @unit
+    Scenario: a pin in a file that already existed is still kept out of git
+      Given .claude/settings.local.json exists and git does not ignore it
+      When the user runs `langwatch claude`
+      Then the local git exclude file covers .claude/settings.local.json
+
+    @unit
+    Scenario: a pin file git already ignores is not excluded twice
+      Given .gitignore already covers .claude/settings.local.json
+      When the user runs `langwatch claude`
+      Then the local git exclude file is left as it was
+
+    @unit
+    Scenario: no key is written into a pin file git tracks
+      Given git tracks .claude/settings.local.json
+      When the user runs `langwatch claude`
+      Then the ingest key is not written into that file
+      And a warning says git tracks it and how to stop tracking it
+
+    @unit
+    Scenario: a key an older run left in a tracked pin file is taken out
+      Given git tracks .claude/settings.local.json
+      And it carries a langwatch telemetry env from a previous login
+      When the user runs `langwatch claude`
+      Then the langwatch telemetry env is removed from that file
+      And the user's own settings in it are kept
+
+    @unit
+    Scenario: no key is written when git cannot say whether it tracks the pin file
+      Given git does not answer in time
+      When the user runs `langwatch claude`
+      Then the ingest key is not written into .claude/settings.local.json
+
+    @unit
+    Scenario: a git error is not taken as an untracked pin file
+      Given git tracks .claude/settings.local.json
+      And it carries a langwatch telemetry env from a previous login
+      And git fails reading its index
+      When the user runs `langwatch claude`
+      Then the ingest key is not written into that file
+      And the previous login's langwatch telemetry env is removed from it
+
     Scenario: the pin is refreshed when a different login runs next
       Given .claude/settings.local.json carries a pin from a previous login
       When the user runs `langwatch claude` under a new login

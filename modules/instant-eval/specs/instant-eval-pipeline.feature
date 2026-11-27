@@ -279,6 +279,25 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     And nothing is written
 
   @unit
+  Scenario: A run page whose every row was refused for the decision model's key fails with that reason
+    Given a project on its own decision model whose key was refused for every row of a page
+    When the page is judged
+    Then it throws "instant_eval_decision_model_key_invalid", which the outbox will not retry
+    And nothing is written, so the run fails instead of reading as "nothing matched"
+
+  @unit
+  Scenario: A run page with only some rows refused for the key, or skipped for another reason, is recorded
+    Given a page where some rows were refused for the key and the rest answered, or where every row was skipped as "classifier_not_configured"
+    When the page is judged
+    Then the page is recorded with those rows as skips
+
+  @unit
+  Scenario: A run page refused for LangWatch's own key is recorded, not blamed on the customer
+    Given a project on LangWatch's decision model whose key was refused for every row of a page
+    When the page is judged
+    Then the page is recorded with those rows as skips
+
+  @unit
   Scenario: A step failing with a refusal the outbox will not retry fails the run on that attempt
     Given a page step that throws a handled refusal the outbox will not retry, such as "connect_unreachable"
     When it fails on its first attempt

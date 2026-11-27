@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 
 import { FeatureIllustration } from "../components/brand/feature-illustration.tsx";
-import { FeatureLockup } from "../components/brand/feature-lockup.tsx";
 import { FeatureMark } from "../components/brand/feature-mark.tsx";
 
 const ROLES = [
@@ -45,24 +44,6 @@ function FeatureBranding() {
         </Text>
       </Stack>
 
-      <Section title="Lockup">
-        <Grid templateColumns="repeat(auto-fit, minmax(18rem, 1fr))" gap="4">
-          {(["light", "dark"] as const).map((mode) => (
-            <Box
-              key={mode}
-              className={`chakra-theme ${mode}`}
-              bg="bg.panel"
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="lg"
-              padding="6"
-            >
-              <FeatureLockup feature="braids" size="lg" tagline />
-            </Box>
-          ))}
-        </Grid>
-      </Section>
-
       <Section title="Mark: colour, one colour and the small master">
         <Flex gap="8" wrap="wrap" align="end" color="fg">
           <FeatureMark feature="braids" size={56} />
@@ -92,7 +73,6 @@ function FeatureBranding() {
 
       <Section title="Illustrations">
         <Grid templateColumns="repeat(auto-fit, minmax(22rem, 1fr))" gap="4">
-          <FeatureIllustration feature="braids" name="hero" />
           <FeatureIllustration feature="braids" name="empty-state" />
           <FeatureIllustration feature="braids" name="enterprise" />
         </Grid>

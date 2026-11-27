@@ -110,4 +110,33 @@ export const organizationProcessModule: PublishedProcessModule<
         return { ...report, opened: changed, dryRun };
       },
     }),
+    // Peers kept their own member copies before organization recorded member facts; this lists
+    // the memberships from then, so a peer's copy can be rebuilt from organization's log.
+    defineMigrationStep({
+      id: "organization:list-member-facts",
+      kind: "data",
+      mode: "background",
+      // An old pod changes memberships without recording a member fact, so list once it is gone.
+      needsOldWritersGone: true,
+      description:
+        "Lists every organization's active members, neither disabled nor deactivated, with when each joined.",
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+        const { changed, ...report } = await OrganizationPageBackfillService.create({
+          peers: {
+            page: async (input) => {
+              const { listed, ...page } = await app.listMemberFactsPage(input);
+              return { ...page, changed: listed };
+            },
+          },
+          pageSize: 200,
+        }).backfill({
+          after: typeof resumed === "string" ? resumed : undefined,
+          dryRun,
+          signal,
+          onPage: (page) => checkpoint.save({ report: page }),
+        });
+        return { ...report, listed: changed, dryRun };
+      },
+    }),
   ]);

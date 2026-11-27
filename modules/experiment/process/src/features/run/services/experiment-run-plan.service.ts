@@ -57,6 +57,7 @@ export class ExperimentRunPlanService {
     request,
     data,
     concurrency,
+    repeat,
     origin,
     persistResults,
     actor,
@@ -67,6 +68,8 @@ export class ExperimentRunPlanService {
     request: ExperimentRunPlanRequest;
     data: ExperimentRunPlanData;
     concurrency: number;
+    /** How many times the data's dataset rows repeat, already laid out in `data`. */
+    repeat?: number;
     origin: ExperimentRunOrigin;
     persistResults: boolean;
     actor?: ExperimentRunPlan["actor"];
@@ -89,6 +92,7 @@ export class ExperimentRunPlanService {
 
     return experimentRunPlanSchema.parse({
       concurrency,
+      ...(repeat !== undefined && repeat > 1 ? { repeat } : {}),
       origin,
       persistResults,
       ...(actor ? { actor } : {}),

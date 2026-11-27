@@ -21,6 +21,7 @@ type deliverRequest struct {
 	InstallationID  int64    `json:"installationId"`
 	Repo            string   `json:"repo"`
 	Number          int      `json:"number"`
+	HeadSHA         string   `json:"headSha"`
 	BadSignature    bool     `json:"badSignature"`
 	OmitSignature   bool     `json:"omitSignature"`
 	RawBody         string   `json:"rawBody"`
@@ -151,6 +152,50 @@ func (s *Server) payload(req deliverRequest) (map[string]any, error) {
 			"repository":   map[string]any{"name": name, "full_name": p.Repo, "owner": map[string]any{"login": s.ownerOf(p.Repo)}},
 			"pull_request": s.pullJSON(p),
 		}, nil
+	case "check_suite":
+		return s.checkSuitePayload(req, sender)
 	}
-	return nil, fmt.Errorf("githubsim builds ping, installation, installation_repositories and pull_request, not %q", req.Event)
+	return nil, fmt.Errorf("githubsim builds ping, installation, installation_repositories, pull_request and check_suite, not %q", req.Event)
+}
+
+// checkSuitePayload is the check_suite event for a pull request's head commit, its suite rolled up
+// from the commit's check runs. The caller holds s.mu.
+func (s *Server) checkSuitePayload(req deliverRequest, sender map[string]any) (map[string]any, error) {
+	p := s.findPull(req.Repo, req.Number)
+	if p == nil {
+		return nil, fmt.Errorf("no pull request %s#%d", req.Repo, req.Number)
+	}
+	if req.HeadSHA == "" {
+		return nil, errors.New("check_suite needs headSha")
+	}
+	repo, headRepo := s.repos[strings.ToLower(p.Repo)], s.repos[strings.ToLower(p.HeadRepo)]
+	if repo == nil {
+		return nil, fmt.Errorf("no repository %s", p.Repo)
+	}
+	headRepoID := repo.ID
+	if headRepo != nil {
+		headRepoID = headRepo.ID
+	}
+	suite := s.suiteFor(p.Repo, req.HeadSHA)
+	if suite == nil {
+		suite = map[string]any{"id": 1, "status": "queued", "conclusion": nil, "latest_check_runs_count": 0}
+	}
+	suite["head_branch"], suite["head_sha"] = p.HeadRef, req.HeadSHA
+	suite["pull_requests"] = []map[string]any{{
+		"number": p.Number,
+		"head":   map[string]any{"ref": p.HeadRef, "sha": req.HeadSHA, "repo": map[string]any{"id": headRepoID}},
+		"base":   map[string]any{"ref": "main", "repo": map[string]any{"id": repo.ID}},
+	}}
+	var installationRef any
+	if in := s.installationFor(p.Repo); in != nil {
+		installationRef = map[string]any{"id": in.ID}
+	}
+	name := p.Repo[strings.Index(p.Repo, "/")+1:]
+	return map[string]any{
+		"action": firstNonEmpty(req.Action, "completed"), "installation": installationRef, "sender": sender,
+		"repository": map[string]any{
+			"id": repo.ID, "name": name, "full_name": p.Repo, "owner": map[string]any{"login": s.ownerOf(p.Repo)},
+		},
+		"check_suite": suite,
+	}, nil
 }

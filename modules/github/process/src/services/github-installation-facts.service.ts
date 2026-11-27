@@ -1,12 +1,19 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { RecordInstallationConnectedCommandData } from "../eventing/github-lifecycle.events.ts";
+import type {
+  RecordInstallationConnectedCommandData,
+  RecordPullRequestChecksCompletedCommandData,
+} from "../eventing/github-lifecycle.events.ts";
 
 /** github_lifecycle's senders, bound once the pipeline registers in this process. */
 export type GithubLifecycleSenders = Readonly<{
   recordInstallationConnected: Pick<
     EventingCommandSender<RecordInstallationConnectedCommandData>,
+    "send"
+  >;
+  recordPullRequestChecksCompleted: Pick<
+    EventingCommandSender<RecordPullRequestChecksCompletedCommandData>,
     "send"
   >;
 }>;
@@ -36,6 +43,19 @@ export class GithubInstallationFactsService {
       tenantId: input.organizationId,
       organizationId: input.organizationId,
       installationId: input.installationId,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  }
+
+  /** Throws when github_lifecycle is not registered here or the record fails. */
+  async recordPullRequestChecksCompleted(
+    input: Omit<RecordPullRequestChecksCompletedCommandData, "tenantId" | "occurredAt">,
+  ): Promise<void> {
+    const senders = this.#senders;
+    if (!senders) throw new Error("github_lifecycle is not registered in this process");
+    await senders.recordPullRequestChecksCompleted.send({
+      ...input,
+      tenantId: input.organizationId,
       occurredAt: nowInstant().epochMilliseconds,
     });
   }

@@ -7,6 +7,8 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -58,6 +60,8 @@ async function boot(role: "api" | "worker") {
       testPeer({ token: CodingAgentApi, instance: createApiFixture<CodingAgentApi>() }),
       testPeer({ token: GatewayApi, instance: createApiFixture<GatewayApi>() }),
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>() }),
+      testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
       testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
       testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
       testPeer({ token: PromptApi, instance: createApiFixture<PromptApi>() }),

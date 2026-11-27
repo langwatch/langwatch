@@ -1207,6 +1207,7 @@ const transportOptions = ({
       ssoActivity,
       ssoMigration,
       linkProposals,
+      users,
     },
   });
   return {

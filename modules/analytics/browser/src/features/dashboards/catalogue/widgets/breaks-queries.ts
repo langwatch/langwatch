@@ -5,7 +5,14 @@
  */
 
 import { unfoldedRows } from "../../templates/model/lwql-gathered.ts";
-import { bucketOf, END, inPeriod, MIDPOINT, START } from "../../templates/model/lwql-period.ts";
+import {
+  bucketOf,
+  END,
+  firstTraceMetricsRow,
+  inPeriod,
+  MIDPOINT,
+  START,
+} from "../../templates/model/lwql-period.ts";
 
 // Typed span columns, never the SpanAttributes map, which runs out of memory on large projects.
 const SPAN_TYPE = "SpanType";
@@ -186,9 +193,10 @@ GROUP BY step
 ORDER BY traces DESC
 LIMIT 3`;
 
-export const TRAFFIC_AND_SPEND_SQL = `SELECT sum(TraceCount) AS traces, sum(CostSum) AS cost
-FROM trace_metrics_by_minute
-WHERE ${inPeriod("BucketStart")}`;
+export const TRAFFIC_AND_SPEND_SQL = `SELECT uniqExact(TraceId) AS traces, sum(TotalCost) AS cost
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
 
 const WRONG_TOOL_RESULTS = `FROM evaluation_metrics
 WHERE ${inPeriod("OccurredAt")}

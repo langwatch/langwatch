@@ -47,3 +47,24 @@ export const organizationTraceSharingDisabledEventDataSchema: OrganizationTraceS
 export type OrganizationTraceSharingDisabledEventData = z.infer<
   typeof organizationTraceSharingDisabledEventDataSchema
 >;
+
+export const ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE =
+  "lw.organization.docs_playground_sessions_disabled" as const;
+export const ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_VERSION = "2026-11-13" as const;
+
+/** Docs playground sessions switched off; api-key revokes the live docs session keys (ADR-185). */
+const organizationDocsPlaygroundSessionsDisabledEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  /** Who saved the change; absent for an organization key with no member. */
+  changedByUserId: z.string().min(1).nullish(),
+});
+export interface OrganizationDocsPlaygroundSessionsDisabledEventDataSchema extends Named<
+  typeof organizationDocsPlaygroundSessionsDisabledEventDataSchemaDefinition
+> {}
+export const organizationDocsPlaygroundSessionsDisabledEventDataSchema: OrganizationDocsPlaygroundSessionsDisabledEventDataSchema =
+  organizationDocsPlaygroundSessionsDisabledEventDataSchemaDefinition;
+export type OrganizationDocsPlaygroundSessionsDisabledEventData = z.infer<
+  typeof organizationDocsPlaygroundSessionsDisabledEventDataSchema
+>;

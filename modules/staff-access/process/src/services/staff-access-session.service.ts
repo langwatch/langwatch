@@ -3,6 +3,8 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { StaffAccessScope } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import {
+  isStaffAccessFunctionName,
+  STAFF_ACCESS_FUNCTIONS,
   STAFF_ACCESS_PRINCIPAL,
   STAFF_ACCESS_REVOKE_ALL_CONFIRMATION,
   StaffAccessAlreadyEndedError,
@@ -333,6 +335,7 @@ export class StaffAccessSessionService {
       scopes: row.scopes as StaffAccessScope[],
       organizationId: row.organizationId,
       organizationName: row.organizationName,
+      functions: row.functions.map((name) => functionViewOf({ name })),
       counterpartOrganizationId: row.counterpartOrganizationId,
       counterpartOrganizationName: row.counterpartOrganizationName,
       reason: row.reason,
@@ -350,4 +353,15 @@ export class StaffAccessSessionService {
       revokedAt: row.revokedAt ? isoText(row.revokedAt) : null,
     }));
   }
+}
+
+/** A function the approval names, as the page shows it; a name no longer registered shows bare. */
+function functionViewOf({ name }: { name: string }): {
+  name: string;
+  title: string;
+  scope: string;
+} {
+  if (!isStaffAccessFunctionName(name)) return { name, title: name, scope: "unknown" };
+  const { title, scope } = STAFF_ACCESS_FUNCTIONS[name];
+  return { name, title, scope };
 }

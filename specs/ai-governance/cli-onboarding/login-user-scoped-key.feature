@@ -40,6 +40,19 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
         action are not shown yet
 
     @integration
+    Scenario: the primary action and Deny are the same height on a phone
+      Given the user opened the authorize screen on a phone-width window
+      When the confirm and deny actions stack one above the other
+      Then the confirm action is drawn as tall as the deny action
+      And the same holds for the approve action after the code is confirmed
+
+    @integration
+    Scenario: a freshly minted code reads as 15 minutes
+      Given the CLI minted a code that expires in 15 minutes
+      When the user opens the authorize screen
+      Then the screen says the code expires in about 15 minutes
+
+    @integration
     Scenario: confirming the code reveals the access selection
       When the user confirms the code matches the one in their terminal
       Then the code section goes away

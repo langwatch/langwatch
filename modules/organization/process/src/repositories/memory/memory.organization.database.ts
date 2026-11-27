@@ -56,6 +56,10 @@ export interface MemoryOrganizationRow {
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** Whether the docs playground may connect (ADR-185); absent reads as on. */
+  docsPlaygroundSessionsEnabled?: boolean;
+  /** When the docs playground was last turned off; absent reads as never. */
+  docsPlaygroundSessionsDisabledAt?: Instant;
   /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
   lockoutAfterFailedAttempts?: number;
   lockoutMinutes?: number;
@@ -102,6 +106,8 @@ export interface MemoryOrganizationUserRow {
   fullSeatSince?: Instant | null;
   /** Set when admission left the person waiting for a seat. */
   seatPendingSince?: Instant | null;
+  /** A Billing-only member (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** One person, the fields the membership repository joins against. */
@@ -129,6 +135,8 @@ export interface MemoryOrganizationInviteRow {
   subscriptionId: string | null;
   acceptedByUserId: string | null;
   acceptedViaIdentifierId: string | null;
+  /** The Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
   createdAt: Instant;
   updatedAt: Instant;
 }

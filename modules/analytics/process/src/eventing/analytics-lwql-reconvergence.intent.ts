@@ -62,7 +62,11 @@ function failureCodeFields(store: LwqlStore, error: unknown) {
 }
 
 function driftFields(drift: LwqlAppOwnedDrift) {
-  const postgres = drift.postgres === "unknown" ? [] : drift.postgres.map((gap) => gap.view);
+  // An absent scoped schema names no view, so its kind stands in for one.
+  const postgres =
+    drift.postgres === "unknown"
+      ? []
+      : drift.postgres.map((gap) => ("view" in gap ? gap.view : gap.kind));
   return {
     clickHouseObjects: drift.clickHouse.length,
     postgresViews: postgres.length,

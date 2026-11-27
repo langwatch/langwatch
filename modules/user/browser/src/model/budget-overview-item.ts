@@ -1,5 +1,5 @@
 /**
- * The /me rendering of budgetOverview API: one row per budget binding
+ * The /coding-agents rendering of budgetOverview API: one row per budget binding
  * the user, most binding first. Details in tooltip.
  */
 export type BudgetOverviewItemView = {

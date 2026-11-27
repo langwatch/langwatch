@@ -1,6 +1,7 @@
 /**
  * The port interface for the Data Privacy screen; every scope is writable with
- * no plan gate or platform-admin capability.
+ * no plan gate or platform-admin capability. The plan is read only for the
+ * self-hosted PII redaction model, which comes with the Enterprise licence.
  */
 
 import { createContext, useContext } from "react";
@@ -36,6 +37,12 @@ export type PrivacyFailureNotice = {
   id?: string;
 };
 
+/**
+ * Whether the organization holds an Enterprise licence: not answered yet, held, not held, or
+ * unknown (the plan could not be read, or this reader may not read it).
+ */
+export type PrivacyLicence = "loading" | "enterprise" | "none" | "unknown";
+
 /** The one thing the screen is handed. */
 export abstract class DataPrivacyHostApi {
   /** The organization, team and project this page is about. */
@@ -52,6 +59,12 @@ export abstract class DataPrivacyHostApi {
   abstract succeeded(notice: PrivacySuccessNotice): void;
 
   abstract failed(failure: PrivacyFailureNotice): void;
+
+  /** Self-hosted only; on LangWatch Cloud the plan is not read and this is "unknown". */
+  abstract licence(): PrivacyLicence;
+
+  /** Whether this reader may activate a licence, so the advert links there. */
+  abstract mayManageLicence(): boolean;
 }
 
 const DataPrivacyHostContext = createContext<DataPrivacyHostApi | undefined>(void 0);

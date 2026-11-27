@@ -14,6 +14,17 @@ export interface CodingAgentTrpcProjectScopeSchema extends Named<
 export const codingAgentTrpcProjectScopeSchema: CodingAgentTrpcProjectScopeSchema =
   codingAgentTrpcProjectScopeSchemaDefinition;
 
+/** One session, by the id the Sessions screen lists it under. */
+const codingAgentTrpcSessionScopeSchemaDefinition = z.object({
+  projectId: z.string(),
+  sessionId: z.string(),
+});
+export interface CodingAgentTrpcSessionScopeSchema extends Named<
+  typeof codingAgentTrpcSessionScopeSchemaDefinition
+> {}
+export const codingAgentTrpcSessionScopeSchema: CodingAgentTrpcSessionScopeSchema =
+  codingAgentTrpcSessionScopeSchemaDefinition;
+
 /** One trace; `occurredAtMs` is the caller's hint for which partition holds it. */
 const codingAgentTrpcTraceScopeSchemaDefinition = z.object({
   projectId: z.string(),

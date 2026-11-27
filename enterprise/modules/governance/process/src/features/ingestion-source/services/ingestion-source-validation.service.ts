@@ -13,19 +13,26 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   findPullConfigComplaints,
+  findPullConfigFieldErrors,
   findPullCredentialComplaints,
 } from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
 import { isSameEnvironment } from "../../microsoft/rules/dataverse-environment-service.rules.ts";
 
 export class IngestionSourceValidationService {
-  private constructor(private readonly projects: Pick<ProjectApi, "findWithTeam">) {}
+  private constructor(
+    private readonly projects: Pick<ProjectApi, "findWithTeam">,
+    private readonly deploymentAwsIdentity: boolean,
+  ) {}
 
+  /** `deploymentAwsIdentity`: a keyless S3 polling source reads as the deployment (self-hosted). */
   static create({
     projects,
+    deploymentAwsIdentity = false,
   }: {
     projects: Pick<ProjectApi, "findWithTeam">;
+    deploymentAwsIdentity?: boolean;
   }): IngestionSourceValidationService {
-    return new IngestionSourceValidationService(projects);
+    return new IngestionSourceValidationService(projects, deploymentAwsIdentity);
   }
 
   assertPullSchedule(value: string | null | undefined): void {
@@ -114,7 +121,10 @@ export class IngestionSourceValidationService {
       return;
     }
 
-    throw new GovernanceValidationError(complaints.join(" "), { formErrors: complaints });
+    throw new GovernanceValidationError(complaints.join(" "), {
+      formErrors: complaints,
+      fieldErrors: findPullConfigFieldErrors(parserConfig),
+    });
   }
 
   /**
@@ -122,7 +132,9 @@ export class IngestionSourceValidationService {
    * that sends none keeps the stored ones and is not asked for them again.
    */
   assertPullCredentials(parserConfig: Record<string, unknown>): void {
-    const complaints = findPullCredentialComplaints(parserConfig);
+    const complaints = findPullCredentialComplaints(parserConfig, {
+      deploymentAwsIdentity: this.deploymentAwsIdentity,
+    });
     if (complaints.length === 0) {
       return;
     }

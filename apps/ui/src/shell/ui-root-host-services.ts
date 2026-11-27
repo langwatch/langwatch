@@ -1,10 +1,11 @@
 /**
- * What the composition root takes from auth, organization, analytics, navigation, trace and
- * ops, loaded through their declarations before anything renders (ARCHITECTURE.md 10.1).
+ * What the composition root takes from auth, authz, organization, analytics, navigation, trace
+ * and ops, loaded through their declarations before anything renders (ARCHITECTURE.md 10.1).
  */
 
 import { analyticsWeb } from "@langwatch/analytics-browser/declaration";
 import { authWeb } from "@langwatch/auth-browser/declaration";
+import { authzWeb } from "@langwatch/authz-browser/declaration";
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
 import { opsWeb } from "@langwatch/ops-browser/declaration";
@@ -14,6 +15,7 @@ import { traceWeb } from "@langwatch/trace-browser/declaration";
 import { langyThemeConfig } from "./ui/elements/langy/langy-theme.ts";
 
 const auth = authWeb.installation.capabilities;
+const authz = authzWeb.installation.capabilities;
 const organization = organizationWeb.installation.capabilities;
 const analytics = analyticsWeb.installation.capabilities;
 const navigation = navigationWeb.installation.capabilities;
@@ -33,6 +35,7 @@ export type UiRootHostServices = {
   commandBar: Awaited<ReturnType<typeof navigation.commandBar.load>>;
   presenceMenuItem: Awaited<ReturnType<typeof trace.presenceMenuItem.load>>;
   impersonationBanner: Awaited<ReturnType<typeof ops.impersonationBanner.load>>;
+  braidsPresence: Awaited<ReturnType<typeof authz.braidsPresence.load>>;
 };
 
 export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
@@ -49,6 +52,7 @@ export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
     commandBar,
     presenceMenuItem,
     impersonationBanner,
+    braidsPresence,
   ] = await Promise.all([
     auth.session.load(),
     auth.frontDoorTheme.load(),
@@ -62,6 +66,7 @@ export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
     navigation.commandBar.load(),
     trace.presenceMenuItem.load(),
     ops.impersonationBanner.load(),
+    authz.braidsPresence.load(),
   ]);
   return {
     session,
@@ -76,6 +81,7 @@ export async function loadUiRootHostServices(): Promise<UiRootHostServices> {
     commandBar,
     presenceMenuItem,
     impersonationBanner,
+    braidsPresence,
   };
 }
 

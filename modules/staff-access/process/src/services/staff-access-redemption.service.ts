@@ -1,9 +1,5 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  reachesOrganization,
-  type StaffAccessScope,
-  staffAccessPermissions,
-} from "@langwatch/authz-contract";
+import { type StaffAccessScope, staffAccessPermissions } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   STAFF_ACCESS_OPS_TOKEN_PREFIX,
@@ -15,7 +11,14 @@ import type {
   StaffAccessRequestRepository,
   StaffAccessRequestRow,
 } from "../repositories/staff-access.repository.ts";
-import { isoText, mintsOpsToken, mintToken, staffKeyKindOf } from "../rules/staff-access.rules.ts";
+import {
+  isCopySide,
+  isoText,
+  mintsOpsToken,
+  mintsOrganizationKey,
+  mintToken,
+  staffKeyKindOf,
+} from "../rules/staff-access.rules.ts";
 
 const PROJECTS_LISTED = 100;
 
@@ -25,7 +28,10 @@ type RedemptionDeps = Readonly<{
   projects: Pick<ProjectApi, "listByOrganization">;
 }>;
 
-/** What a redeemed request hands its agent (ADR-202): the staff key and the ops token. */
+/**
+ * What a redeemed request hands its agent (ADR-202): an organization key for content and
+ * support, and an ops token for `ops:read` and the approved functions.
+ */
 export class StaffAccessRedemptionService {
   private constructor(private readonly deps: RedemptionDeps) {}
 
@@ -42,7 +48,7 @@ export class StaffAccessRedemptionService {
   }): Promise<StaffAccessRedeemed> {
     const scopes = row.scopes as StaffAccessScope[];
     const organizationKey =
-      reachesOrganization(scopes) && row.organizationId
+      mintsOrganizationKey(scopes) && row.organizationId
         ? await this.deps.apiKeys.mintStaffAccessKey({
             organizationId: row.organizationId,
             permissions: staffAccessPermissions({ scopes }),
@@ -50,7 +56,9 @@ export class StaffAccessRedemptionService {
             kind: staffKeyKindOf(scopes),
           })
         : null;
-    const opsToken = mintsOpsToken(scopes) ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
+    const opsToken = mintsOpsToken({ scopes, functions: row.functions })
+      ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX)
+      : null;
     await this.deps.requests.attachCredentials({
       id: row.id,
       apiKeyId: organizationKey?.apiKeyId ?? null,
@@ -58,7 +66,7 @@ export class StaffAccessRedemptionService {
       opsTokenLookupId: opsToken?.lookupId ?? null,
     });
     const projects =
-      organizationKey && row.organizationId
+      row.organizationId && !isCopySide(scopes)
         ? (
             await this.deps.projects.listByOrganization({
               organizationId: row.organizationId,
@@ -74,6 +82,7 @@ export class StaffAccessRedemptionService {
       ...(row.organizationId ? { organizationId: row.organizationId } : {}),
       projects,
       scopes,
+      functions: [...row.functions],
       expiresAt: isoText(accessExpiresAt),
     };
   }

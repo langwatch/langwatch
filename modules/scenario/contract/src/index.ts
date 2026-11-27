@@ -40,6 +40,7 @@ export * from "./agent-test-scenario.ts";
 export * from "./features/run/run-actor.ts";
 export * from "./result-atoms.ts";
 export * from "./features/run/run-models.ts";
+export * from "./features/run/run-trace-wait.ts";
 export * from "./features/run/scenario-run-export.errors.ts";
 export * from "./scenario.responses.ts";
 export * from "./scenario-event.schemas.ts";

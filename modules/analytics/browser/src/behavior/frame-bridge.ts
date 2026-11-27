@@ -16,6 +16,8 @@
  */
 
 import type {
+  ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   ChartFrameLogSource,
   ChartFrameParamsSnapshot,
@@ -28,6 +30,8 @@ import type {
 import {
   CHART_FRAME_HEARTBEAT_TIMEOUT_MS,
   CHART_FRAME_PATH,
+  readChartAsk,
+  readChartSignal,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { nowInstant } from "@langwatch/time";
 
@@ -59,7 +63,8 @@ export interface ChartFrameLogEntry {
 export interface CreateFrameBridgeOptions {
   readonly iframe: HTMLIFrameElement;
   readonly executeQuery: ChartFrameExecuteQuery;
-  readonly dashboardContext: ChartFrameDashboardContext;
+  /** Read when the frame loads, so a theme switched since the bridge began sends its colours. */
+  readonly readDashboardContext: () => ChartFrameDashboardContext;
   /** Author-declared parameter defaults, delivered once on `lw:init`. */
   readonly params?: ChartFrameParamsSnapshot;
   /**
@@ -83,6 +88,10 @@ export interface CreateFrameBridgeOptions {
     target: string;
     params: Readonly<Record<string, unknown>>;
   }) => void;
+  /** `LW.askLangy(subject)` from the frame, read through `readChartAsk`; omitted, it no-ops. */
+  readonly onAskLangy?: (subject: ChartAskSubject) => void;
+  /** `LW.signal(state)` from the frame, read through `readChartSignal`; omitted, it no-ops. */
+  readonly onSignal?: (signal: ChartSignal) => void;
   /** Called once when the watchdog kills the frame. */
   readonly onTeardown: () => void;
   /**
@@ -135,7 +144,9 @@ export class FrameBridgeSession implements FrameBridge {
     this.#disposed = true;
     if (this.#watchdog !== null) clearInterval(this.#watchdog);
     this.#options.iframe.removeEventListener("load", this.#onFrameLoad);
-    document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    }
     for (const abort of this.#activeAborts.values()) abort.abort();
     this.#activeAborts.clear();
     this.#port?.close();
@@ -168,7 +179,7 @@ export class FrameBridgeSession implements FrameBridge {
     iframe.contentWindow.postMessage(
       {
         type: "lw:init",
-        dashboardContext: this.#options.dashboardContext,
+        dashboardContext: this.#options.readDashboardContext(),
         params: this.#options.params ?? {},
         source: this.#options.source,
       },
@@ -185,6 +196,11 @@ export class FrameBridgeSession implements FrameBridge {
 
   /** Suspended while hidden: background throttling hits both sides, so silence proves nothing. */
   #checkHeartbeat(): void {
+    // No document means the page is gone; stop the watchdog instead of reading it.
+    if (typeof document === "undefined") {
+      this.dispose();
+      return;
+    }
     if (document.visibilityState === "hidden") return;
     if (
       nowInstant().epochMilliseconds - this.#lastHeartbeatAt <=
@@ -219,6 +235,14 @@ export class FrameBridgeSession implements FrameBridge {
       case "lw:navigate":
         onNavigate?.({ target: message.target, params: message.params ?? {} });
         return;
+      case "lw:ask-langy":
+        this.#askLangy(message.subject);
+        return;
+      case "lw:signal": {
+        const reading = readChartSignal(message.signal);
+        if (reading.kind === "signal") this.#options.onSignal?.(reading.signal);
+        return;
+      }
       case "lw:log":
         onLog({ level: message.level, source: message.source, text: message.parts.join(" ") });
         return;
@@ -229,6 +253,11 @@ export class FrameBridgeSession implements FrameBridge {
         return;
     }
   };
+
+  #askLangy(raw: unknown): void {
+    const ask = readChartAsk(raw);
+    if (ask.kind === "subject") this.#options.onAskLangy?.(ask.subject);
+  }
 
   /** Past the in-flight cap a query is refused at once rather than piled onto the executor. */
   #handleQuery(

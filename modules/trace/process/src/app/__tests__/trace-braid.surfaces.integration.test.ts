@@ -122,13 +122,14 @@ function spanRow(input: {
   name: string;
   service: string;
   attributes: Record<string, string>;
+  parentSpanId?: string;
 }) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: input.tenantId,
     TraceId: traceId,
     SpanId: input.spanId,
-    ParentSpanId: null,
+    ParentSpanId: input.parentSpanId ?? null,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -392,6 +393,7 @@ beforeAll(async () => {
       spanRow({
         tenantId: owner,
         spanId: "owner-web",
+        parentSpanId: "reader-root",
         name: "specialist_secret_agent",
         service: "specialist-service",
         attributes: { orchestrator: "web", specialist: "only" },

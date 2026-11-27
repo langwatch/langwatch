@@ -35,6 +35,7 @@ export function liftSpanContribution({
     agent,
     name: span.name,
     attrs: span.spanAttributes,
+    resourceAttrs: span.resourceAttributes,
   });
   if (sessionKey === null && SPANS_REQUIRE_SESSION_KEY_AGENT_IDS.has(agent)) {
     return { outcome: "ignored" };

@@ -86,6 +86,14 @@ const traceListPageSchemaDefinition = z.object({
   items: z.array(traceListViewItemSchema),
   totalHits: z.number(),
   nextCursor: traceListCursorSchema.nullable(),
+  /**
+   * Traces in the range recorded while the organization is over its plan, left out of `items`
+   * (specs/billing/over-plan-trace-withholding.feature). `null` or absent = nothing withheld.
+   */
+  withheld: z
+    .object({ count: z.number(), members: z.number(), maxMembers: z.number() })
+    .nullable()
+    .optional(),
 });
 export interface TraceListPageSchema extends Named<typeof traceListPageSchemaDefinition> {}
 export const traceListPageSchema: TraceListPageSchema = traceListPageSchemaDefinition;

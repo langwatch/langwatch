@@ -27,6 +27,7 @@ function row(over: Partial<SortableSessionRow> & { gitBranch: string }): Sortabl
   return {
     title: "A generated title",
     agent: "claude_code",
+    startedAtMs: 1_000,
     lastUpdateAtMs: 1_000,
     totalTokens: 1_000,
     compactions: 1,

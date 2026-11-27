@@ -2,6 +2,7 @@ import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
 import { ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import type { EventLogPageCursor } from "./event-log-page-order.ts";
 import { readEventRecord } from "./eventReadSeat.ts";
 import type {
   EventStore as BaseEventStore,
@@ -18,7 +19,11 @@ import {
   validateEventTenant,
 } from "./eventStoreUtils.ts";
 import { rehydrationLowerBoundMs } from "./rehydrationWindow.ts";
-import type { EventRecord, EventRepository } from "./repositories/eventRepository.types.ts";
+import type {
+  EventLogProbe,
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types.ts";
 
 /**
  * Abstract base with template-method skeleton; subclasses customize via hooks like
@@ -359,7 +364,7 @@ export abstract class AbstractEventStore<
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     upToEvent: EventType;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }): Promise<readonly EventType[]> {
     const { aggregateId, context, aggregateType } = request;
@@ -396,7 +401,7 @@ export abstract class AbstractEventStore<
       context: EventStoreReadContext<EventType>;
       aggregateType: AggregateType;
       upToEvent: EventType;
-      after: { timestamp: number; eventId: string } | undefined;
+      after: EventLogPageCursor | undefined;
       limit: number;
     },
   ): Promise<readonly EventType[]> {
@@ -503,6 +508,69 @@ export abstract class AbstractEventStore<
               aggregateType,
               beforeTimestamp,
               beforeEventId,
+            },
+            error,
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
+  async probeEventsBefore({
+    aggregateId,
+    context,
+    aggregateType,
+    event,
+    ignoreEventIds,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    event: EventType;
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe> {
+    EventUtils.validateTenantId(context, `${this.constructor.name}.probeEventsBefore`);
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.probeEventsBefore`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log probe for an empty aggregateId (would scan the whole empty-id key range); reporting no events",
+      );
+      return { hasEvent: false, hasEarlierEvents: false };
+    }
+
+    return this.instrument(
+      `${this.constructor.name}.probeEventsBefore`,
+      {
+        "aggregate.id": String(aggregateId),
+        "tenant.id": context.tenantId,
+        "aggregate.type": aggregateType,
+        "probe.event_id": event.id,
+        "probe.timestamp": event.createdAt,
+      },
+      async () => {
+        try {
+          return await this.repository.probeEventRecordsBefore({
+            tenantId: context.tenantId,
+            aggregateType,
+            aggregateId,
+            eventTimestamp: event.createdAt,
+            eventId: event.id,
+            // The same partition-pruning anchor the store-miss re-fold's history read takes.
+            occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, event.occurredAt),
+            ignoreEventIds,
+          });
+        } catch (error) {
+          this.logError(
+            `${this.constructor.name}.probeEventsBefore`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              eventId: event.id,
+              eventTimestamp: event.createdAt,
             },
             error,
           );

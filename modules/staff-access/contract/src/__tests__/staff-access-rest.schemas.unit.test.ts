@@ -15,6 +15,7 @@ const request = {
   codeChallenge: challenge,
   codeChallengeMethod: "S256",
   machine: "laptop",
+  functions: ["org.snapshot"],
 };
 
 describe("staffAccessRequestBodySchema", () => {
@@ -39,6 +40,19 @@ describe("staffAccessRequestBodySchema", () => {
       scopes: ["org:metadata", "org:metadata"],
     });
     expect(result.error?.issues[0]?.path).toEqual(["scopes"]);
+  });
+
+  it("refuses org:metadata alone naming no function", () => {
+    const { functions: _functions, ...withoutFunctions } = request;
+    const result = staffAccessRequestBodySchema.safeParse(withoutFunctions);
+    expect(result.error?.issues[0]?.path).toEqual(["functions"]);
+  });
+
+  it("accepts org:support naming no function", () => {
+    const { functions: _functions, ...withoutFunctions } = request;
+    expect(
+      staffAccessRequestBodySchema.validate({ ...withoutFunctions, scopes: ["org:support"] }),
+    ).toBe(true);
   });
 
   it("refuses a plain challenge method and unknown fields", () => {

@@ -286,6 +286,19 @@ describe("given a shared folder with a link that leaves it", () => {
         "src/app.py",
       );
     });
+
+    /** @scenario "A search pattern that is not a valid regular expression is searched as plain text" */
+    it("searches a pattern that does not compile as plain text and says so", () => {
+      const found = grep({ params: { pattern: "print(" }, root });
+      expect(found).toContain("src/app.py:2:");
+      expect(found).toContain("searched as plain text");
+    });
+
+    it("still reads a valid pattern as a regular expression, with no note", () => {
+      const found = grep({ params: { pattern: "pri.t\\(" }, root });
+      expect(found).toContain("src/app.py:2:");
+      expect(found).not.toContain("plain text");
+    });
   });
 
   describe("when files are found by a glob", () => {

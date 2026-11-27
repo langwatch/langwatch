@@ -74,7 +74,7 @@ Feature: Data privacy policy configuration
     And PII is redacted at the strict level for "web-app"
 
   # The settings page shows an "effective" summary that follows the scope filter:
-  # "All you can see" shows the organization baseline, "This team" the team
+  # "All you can see" shows the organization baseline, "Team [name]" the team
   # baseline, and a project the full cascade, so an admin sees what each tier
   # contributes before a project's own rules apply.
 

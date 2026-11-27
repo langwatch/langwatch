@@ -58,6 +58,28 @@ Feature: Signing keys
       Then the key is listed as revoked
       And spans signed with it stop being marked verified within a minute
 
+    @unit
+    Scenario: Spans signed with unknown key ids cost no database read each
+      Given "orchestrator" holds a signing key in use
+      When spans arrive signed with many key ids no organisation holds
+      Then each is left unverified as an unknown key
+      And the organisation's keys are read from the store once a minute, not once per span
+      And the key in use still verifies
+
+    @unit
+    Scenario: A failed early re-read keeps the keys already held verifying
+      Given "orchestrator" holds a signing key whose spans verified in the last minute
+      When a span signed with an unknown key id asks for an early re-read and the store is down
+      Then that span is left unverified as unavailable
+      And spans signed with the held key still verify until the held keys' minute ends
+
+    @unit
+    Scenario: One signing key whose secret will not open leaves the others verifying
+      Given the organisation holds two live signing keys and one's stored secret will not open
+      When spans signed with each arrive
+      Then the span signed with the unreadable key is left unverified as unavailable
+      And the span signed with the other key still verifies
+
   Rule: Who may manage signing keys
 
     @unit
@@ -127,3 +149,63 @@ Feature: Signing keys
       When whether "orchestrator" signs its calls is asked
       Then the answer names the key used an hour ago
       And a project with only revoked keys signs nothing
+
+  Rule: Signing keys are braid management, behind release_braids, except listing and revoking
+    # The flag itself: modules/authz/specs/braids-release-flag.feature. Decided by Alex, 2026-11-18
+    # (option 1a): keys still verify while the flag is off, so a leaked key must be found to revoke.
+
+    @unit
+    Scenario: With release_braids off issuing and reading signing refuse with braids_not_enabled
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When its signing is asked, or a key is created or rotated
+      Then each call is refused with braids_not_enabled
+      And no key is issued
+
+    @unit
+    Scenario: Listing signing keys still works while release_braids is off
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When its keys are listed
+      Then the key is listed, so a leaked key can be found and revoked
+
+    @integration
+    Scenario: With release_braids off the keys panel offers Revoke but not Rotate or New key
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When ana opens the key's actions on the Braids page, which was linked to New signing key
+      Then Revoke is offered and Rotate is not
+      And the New signing key form does not open
+
+    @unit
+    Scenario: Revoking a signing key still works while release_braids is off
+      Given "orchestrator" holds a signing key
+      And release_braids is off for the organisation
+      When ana revokes the key
+      Then it is revoked at once, since revoking only narrows access
+
+    @unit
+    Scenario: release_braids is answered for each organisation's signing keys on its own
+      Given release_braids is on for one organisation and off for another
+      When a signing key is created for a project in each
+      Then the released organisation's project gets its key
+      And the other organisation's project is refused with braids_not_enabled
+
+    @unit
+    Scenario: Signed calls are still verified while release_braids is off
+      Given "orchestrator" holds a signing key issued while release_braids was on
+      And release_braids is then switched off for the organisation
+      When a span arrives signed with that key
+      Then its signature is still verified as orchestrator's
+
+  Rule: Issuing and rotating signing keys waits until the organisation turns Braids on
+    # Decided by Alex, 2026-11-18: Braids is on by default but an organisation admin turns it on
+    # in settings. The setting: modules/authz/specs/braids.feature.
+
+    @unit
+    Scenario: With Braids turned off a signing key cannot be created or rotated
+      Given "orchestrator" holds a signing key
+      And the organisation has Braids turned off
+      When a key is created or rotated
+      Then each call is refused with braids_turned_off
+      And its keys are still listed and a key can still be revoked

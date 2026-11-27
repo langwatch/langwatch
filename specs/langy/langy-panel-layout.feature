@@ -130,6 +130,13 @@ Feature: Langy panel layout modes
     Then the drawer's right edge sits left of the panel, with a strip of space between the two cards
     And on a phone the drawer still fills the screen as a sheet
 
+  @regression @integration
+  Scenario: A drawer opening beside a widened dock keeps the default gap
+    Given I widened the docked Langy panel beyond its default width
+    When a right-anchored drawer opens
+    Then the panel drops to its default width beside the drawer
+    And the gap between them stays the default 12px strip rather than growing with the dock width
+
   @integration
   Scenario: The docked companion keeps its own Minimise
     Given the Langy panel is riding beside an open drawer as the docked companion
@@ -150,3 +157,61 @@ Feature: Langy panel layout modes
     Then the first message is fully opaque with no fade above it
     When part of the conversation is scrolled off above
     Then the column dissolves under the header with a soft fade
+
+  # The panel's width is the user's to set. The free edge of the floating card
+  # and of the docked sidebar is a drag handle; the drawer companion keeps the
+  # dock width so the drawer beside it never has to move.
+
+  @integration
+  Scenario: Dragging the free edge resizes the panel
+    Given the Langy panel is open in sidebar mode or floating mode
+    When I drag the panel's resize handle toward the page
+    Then the panel follows the pointer and grows by the distance I dragged
+    And the width is saved once, when I release the handle
+    And the docked sidebar's page reservation follows the new width
+
+  @integration
+  Scenario: A floating card that dodged to the left corner is dragged from its right edge
+    Given a drawer is open and the floating card has moved to the left corner
+    When I drag the card's resize handle toward the page
+    Then the card grows by the distance I dragged
+
+  @unit
+  Scenario: The width stays within a usable range
+    Given a viewport of a known width
+    When I drag the panel narrower than its minimum or wider than its maximum
+    Then the width stops at the minimum, which keeps the composer usable
+    And it stops at the maximum, a share of the viewport that leaves the page usable
+
+  @unit
+  Scenario: A window resize re-clamps the chosen width
+    Given I chose a wide panel on a large window
+    When the window becomes narrower than my chosen width allows
+    Then the panel shrinks to the new maximum without forgetting my choice
+
+  @integration
+  Scenario: The handle resizes from the keyboard
+    Given the resize handle has focus
+    When I press the arrow key that points toward the page
+    Then the panel grows by one step and is saved
+    And the arrow key pointing away shrinks it
+    And the handle reports its current, minimum and maximum width as a separator
+
+  @integration
+  Scenario: Double-clicking the handle restores the default width
+    Given I have resized the panel
+    When I double-click the resize handle
+    Then the panel returns to the default width for its layout
+    And the stored choice is forgotten
+
+  @unit
+  Scenario: Each layout remembers its own width across reloads
+    Given I resized the floating card and the docked sidebar to different widths
+    When the page reloads
+    Then each layout opens at the width I chose for it
+    And a stored value that is not a usable number is ignored
+
+  @integration
+  Scenario: The handle is absent while the panel is minimised or beside a drawer
+    Given the Langy panel is minimised to its peek, or riding beside a drawer
+    Then the panel shows no resize handle

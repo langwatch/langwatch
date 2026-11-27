@@ -36,6 +36,49 @@ Feature: Fold projections read back their own state
     Then the fold starts from an empty state and applies the event
     And it does not read the event log
 
+  # A fold that rebuilds on a miss cannot tell a new aggregate from a saved state the
+  # answering replica has not caught up with yet. It asks the event log first, with two
+  # existence checks that read no events, and replays only when waiting did not help.
+
+  Scenario: a missed state on a new aggregate folds from empty without replaying the log
+    Given a fold that rebuilds its state from the event log when the store misses
+    And an aggregate whose log shows the delivered event and nothing before it
+    When the store misses its state
+    Then the fold starts from an empty state and applies the event
+    And it does not replay the aggregate's history from the event log
+
+  Scenario: a missed state the event log says exists is waited for before it is replayed
+    Given a fold that rebuilds its state from the event log when the store misses
+    And an aggregate whose log shows events before the delivered one
+    When the store misses its state
+    Then the job goes back to the queue for a jittered wait of a few seconds
+    And nothing is written and the history is not replayed
+
+  Scenario: a log that lags behind the delivered event is waited for too
+    Given a fold that rebuilds its state from the event log when the store misses
+    And an aggregate whose log does not show the delivered event yet
+    When the store misses its state
+    Then the job goes back to the queue for a jittered wait rather than calling the aggregate new
+
+  Scenario: a missed state that stays missing is rebuilt after the bounded wait
+    Given a fold that rebuilds its state from the event log when the store misses
+    And an aggregate whose log shows events before the delivered one
+    And the job has already waited twice for its state
+    When the store misses its state again
+    Then the fold rebuilds the aggregate's state from the event log
+
+  Scenario: an undecodable state is still rebuilt at once
+    Given a fold that rebuilds its state from the event log when the store misses
+    And a committed row the store finds but refuses because it was written under an older shape
+    When the next event for that aggregate arrives
+    Then the fold rebuilds the aggregate's state from the event log without waiting
+
+  Scenario: a coalesced batch takes the same path as a single event
+    Given a fold that rebuilds its state from the event log when the store misses
+    When a batch of events misses its state
+    Then the log is asked about the batch's latest event, not counting the batch's other events as earlier
+    And the batch folds from empty, waits whole or rebuilds exactly as a single event would
+
   Scenario: an out-of-order event is folded in place, not replayed
     Given a fold that declares how out-of-order events fold into its state
     And an aggregate whose events can arrive out of their business-time order

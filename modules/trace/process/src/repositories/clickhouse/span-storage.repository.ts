@@ -12,6 +12,7 @@ import {
   type WindowFallback,
 } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
+import type { KsuidLayout } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -56,7 +57,9 @@ type WithDateWrites<T, K extends keyof T> = {
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 
+import { spanTreeAgentMarksOf } from "../../rules/agent-call-graph.rules.ts";
 import {
+  AGENT_MARK_ATTRIBUTES_SELECT,
   chNumber,
   chString,
   chStringMap,
@@ -90,11 +93,14 @@ import {
 const TABLE_NAME = "stored_spans" as const;
 
 /**
- * Settings for every `stored_spans` insert.
+ * Settings for every `stored_spans` insert. Async deduplication is off, as the pinned server
+ * profile has it: the table replaces a repeated span by its key triple, and an insert with it
+ * off may share a statement with others waiting for a slot (ADR-187).
  */
 const SPAN_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
+  async_insert_deduplicate: 0,
   input_format_json_throw_on_bad_escape_sequence: 0,
 } as const;
 
@@ -224,6 +230,7 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
   SpanAttributes['langwatch.model.cacheCreation1hCostPerToken'] AS CustomCacheCreation1hRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
+  ${AGENT_MARK_ATTRIBUTES_SELECT},
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
 `;
@@ -374,6 +381,11 @@ function ownerColumn(braided: boolean, indent: string): string {
   return braided ? `TenantId,\n${indent}` : "";
 }
 
+/** The stored row's span kind, carried beside the legacy span shape. */
+function kindOf(span: NormalizedSpan | undefined): Pick<OwnedSpan, "kind"> {
+  return span === undefined ? {} : { kind: span.kind };
+}
+
 /** Spans mapped from full rows; under braids each owner's span names its owner. */
 function ownedSpansOf({
   rows,
@@ -385,7 +397,10 @@ function ownedSpansOf({
   braided: boolean;
 }): OwnedSpan[] {
   const normalized = rows.map(mapChRowToNormalized);
-  const spans = mapNormalizedSpansToSpans(normalized);
+  const spans = mapNormalizedSpansToSpans(normalized).map((span, index) => ({
+    ...span,
+    ...kindOf(normalized[index]),
+  }));
   if (!braided) return spans;
   return spans.map((span, index) => ({
     ...span,
@@ -541,6 +556,8 @@ const spanSummaryQueryRowSchema = z.looseObject({
   CustomCacheCreationRate: chString,
   CustomCacheCreation1hRate: chString,
   LwSpanCost: chString,
+  AgentAttributes: chStringMap.optional(),
+  AgentSpanKind: chNumber.optional(),
   StartTimeMs: chNumber,
   UpdatedAtMs: chNumber,
 });
@@ -782,6 +799,8 @@ interface ClickHouseSpanRecord {
   CreatedAt: number;
   UpdatedAt: number;
   _retention_days: number;
+  /** KSUID byte layout of ProjectionId; NULL on rows written before goose 00130. */
+  IdLayout: KsuidLayout | null;
 }
 
 /** The columns {@link SpanStorageClickHouseRepository.findStoredSpansByTraceId} selects. */
@@ -2036,6 +2055,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       CreatedAt: toDate(nowInstant()),
       UpdatedAt: toDate(nowInstant()),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      // The decoder mints every span id at v2 (span-record-identity.ts, #9575)
+      IdLayout: "v2",
     } satisfies ClickHouseSpanWriteRecord;
   }
 
@@ -2073,6 +2094,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       cacheCreationTokens,
       startTimeMs: Number(row.StartTimeMs),
       updatedAtMs: Number(row.UpdatedAtMs),
+      ...spanTreeAgentMarksOf({
+        name: row.SpanName,
+        attributes: row.AgentAttributes ?? {},
+        kind: row.AgentSpanKind ?? null,
+      }),
     };
   }
 }

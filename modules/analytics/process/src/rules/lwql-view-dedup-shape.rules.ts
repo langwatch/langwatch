@@ -14,6 +14,7 @@ export type LangWatchQLDedupStrategy =
 /** The strategies whose view gets a floored twin when its dedup declares a floor column. */
 export const FLOORED_DEDUP_STRATEGIES: ReadonlySet<LangWatchQLDedupStrategy> = new Set([
   "in-tuple",
+  "latest-in-order",
   "settled",
 ]);
 
@@ -37,8 +38,9 @@ export interface LangWatchQLViewDedup {
    */
   readonly tieBreakColumns?: readonly string[];
   /**
-   * Under `latest-in-order`: source columns no version of a row changes, grouped beside the sort
-   * key so a caller's range on them reaches the table's partition and primary key (ADR-006).
+   * Under `latest-in-order`: source columns no version of a row changes, kept beside the sort key
+   * in the subquery's order and `LIMIT 1 BY`. A caller's range on them does not prune through
+   * `LIMIT 1 BY`; only a floored twin's bound, read inside the subquery, does (ADR-006).
    */
   readonly stableColumns?: readonly string[];
   /**
@@ -52,9 +54,9 @@ export interface LangWatchQLViewDedup {
    */
   readonly signColumn?: string;
   /**
-   * An in-tuple dataset's column that never falls from one version of a row to the next, so a
-   * read bounded below on it may dedup from that bound alone (analytics ADR-005). Under
-   * `settled`, any column a retraction copies unchanged (analytics ADR-007).
+   * An in-tuple or latest-in-order dataset's column that never falls from one version of a row
+   * to the next, so a read bounded below on it may dedup from that bound alone (analytics
+   * ADR-005, ADR-006). Under `settled`, any column a retraction copies unchanged (ADR-007).
    */
   readonly floorColumn?: string;
 }

@@ -98,6 +98,60 @@ describe("TraceLogRecordIOService", () => {
       });
     });
 
+    describe("when a launcher declares the request inside its wrapper", () => {
+      /** @scenario A user prompt's declared input replaces the wrapped prompt */
+      it("takes the declared input, not the wrapped prompt", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: {
+              "event.name": "user_prompt",
+              prompt: "## Context\n[#support] Ada · message msg_1\nCan you check the build?",
+              "langwatch.input": "Can you check the build?",
+            },
+          }),
+        );
+
+        expect(result).toEqual({ input: "Can you check the build?", output: null });
+      });
+    });
+
+    describe("when a launcher declares the reply the agent posted", () => {
+      it("takes it as a declared output", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: { "event.name": "tool_result", "langwatch.output": "The build is green." },
+          }),
+        );
+
+        expect(result).toEqual({
+          input: null,
+          output: "The build is green.",
+          outputDeclared: true,
+        });
+      });
+
+      it("keeps the native side it did not declare", () => {
+        const result = service.extractIO(
+          record({
+            scopeName: CLAUDE_SCOPE,
+            attributes: {
+              "event.name": "user_prompt",
+              prompt: "Can you check the build?",
+              "langwatch.output": "The build is green.",
+            },
+          }),
+        );
+
+        expect(result).toEqual({
+          input: "Can you check the build?",
+          output: "The build is green.",
+          outputDeclared: true,
+        });
+      });
+    });
+
     describe("when a subagent emits a prompt on some other event", () => {
       it("ignores it, so a shell command cannot become the trace input", () => {
         const result = service.extractIO(

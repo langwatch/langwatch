@@ -29,11 +29,11 @@ describe("given a chart frame the bridge attaches to", () => {
         iframe,
         source: "export default () => null;",
         executeQuery: vi.fn(),
-        dashboardContext: {
+        readDashboardContext: () => ({
           timeWindow: { start: 0, end: 1 },
           granularitySeconds: 60,
           theme: "light",
-        },
+        }),
         onLog: vi.fn(),
         onHeightChange: vi.fn(),
         onTeardown: vi.fn(),

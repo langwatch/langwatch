@@ -13,6 +13,7 @@ import {
 const fields = {
   requestId: "staffrequest_1",
   scopes: ["org:support", "org:content"],
+  functions: ["org.snapshot", "org.api_keys"],
   organizationId: "org_acme",
   organizationName: "ACME",
   counterpartOrganizationId: null,
@@ -31,6 +32,15 @@ describe("approvalChallengeOf", () => {
     expect(approvalChallengeOf(fields)).toBe(
       approvalChallengeOf({ ...fields, scopes: ["org:content", "org:support"] }),
     );
+  });
+
+  /** @scenario "The passkey signs the list of functions" */
+  it("is the same for the functions in any order, and differs for another list", () => {
+    const base = approvalChallengeOf(fields);
+    expect(approvalChallengeOf({ ...fields, functions: ["org.api_keys", "org.snapshot"] })).toBe(
+      base,
+    );
+    expect(approvalChallengeOf({ ...fields, functions: ["org.snapshot"] })).not.toBe(base);
   });
 
   it("changes with the spend tick and with any shown field", () => {
@@ -87,7 +97,7 @@ describe("shownStatus", () => {
   const at = Temporal.Instant.from("2026-11-02T10:30:00Z");
   const expiresAt = Temporal.Instant.from("2026-11-02T10:10:00Z");
 
-  it("reads an undecided request past its ten minutes as expired", () => {
+  it("reads an undecided request past its window as expired", () => {
     expect(shownStatus({ status: "pending", expiresAt, accessExpiresAt: null, at })).toBe(
       "expired",
     );

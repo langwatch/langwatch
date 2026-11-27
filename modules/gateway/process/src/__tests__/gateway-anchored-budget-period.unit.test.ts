@@ -29,6 +29,7 @@ describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
           currentPeriodStartedAt: createdAt,
           lastResetAt: null,
           cycleAnchorAt: anchor,
+          timezone: null,
         },
         Temporal.Instant.from("2026-07-15T00:00:00.000Z"),
       ),
@@ -43,6 +44,7 @@ describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
           currentPeriodStartedAt: createdAt,
           lastResetAt: null,
           cycleAnchorAt: anchor,
+          timezone: null,
         },
         Temporal.Instant.from("2026-07-20T00:00:00.000Z"),
       ),
@@ -57,6 +59,7 @@ describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
           currentPeriodStartedAt: createdAt,
           lastResetAt: null,
           cycleAnchorAt: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
+          timezone: null,
         },
         Temporal.Instant.from("2026-08-04T12:00:00.000Z"),
       ),
@@ -71,6 +74,7 @@ describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
       currentPeriodStartedAt: resetAt,
       lastResetAt: resetAt,
       cycleAnchorAt: anchor,
+      timezone: null,
     };
 
     // Inside the period the reset opened, the reset instant outranks the
@@ -98,6 +102,7 @@ describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
           currentPeriodStartedAt: boundary,
           lastResetAt: null,
           cycleAnchorAt: anchor,
+          timezone: null,
         },
         Temporal.Instant.from("2026-07-15T12:00:00.000Z"),
       ),
@@ -119,6 +124,7 @@ describe("effectiveBudgetPeriod", () => {
       resetsAt: Temporal.Instant.from("2026-04-01T00:00:00.000Z"),
       lastResetAt: null,
       cycleAnchorAt: null,
+      timezone: null,
     };
     expect(effectiveBudgetPeriod(stale, now)).toEqual({
       currentPeriodStartedAt: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
@@ -132,6 +138,7 @@ describe("effectiveBudgetPeriod", () => {
       resetsAt: Temporal.Instant.from("2026-07-17T09:00:00.000Z"),
       lastResetAt: null,
       cycleAnchorAt: Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
+      timezone: null,
     };
     expect(effectiveBudgetPeriod(anchored, now)).toEqual({
       currentPeriodStartedAt: Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
@@ -149,6 +156,7 @@ describe("effectiveBudgetPeriod", () => {
           resetsAt: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
           lastResetAt: resetAt,
           cycleAnchorAt: null,
+          timezone: null,
         },
         now,
       ),
@@ -172,6 +180,7 @@ describe("effectiveBudgetPeriod", () => {
             resetsAt: sentinel,
             lastResetAt: null,
             cycleAnchorAt: null,
+            timezone: null,
           },
           now,
         ),

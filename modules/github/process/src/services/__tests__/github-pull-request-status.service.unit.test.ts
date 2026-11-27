@@ -118,6 +118,7 @@ class TestAppTokens implements GithubAppTokenCache {
       accountType: "Organization",
       accountId: "1",
       repositorySelection: "selected",
+      permissions: {},
       createdAt: new Date().toISOString(),
     });
   }
@@ -140,6 +141,9 @@ class TestAppTokens implements GithubAppTokenCache {
 
   computeRepoScopeKey(): string {
     return "scope";
+  }
+  readCommitChecks(): ReturnType<GithubAppTokenCache["readCommitChecks"]> {
+    throw new Error("not used");
   }
 }
 

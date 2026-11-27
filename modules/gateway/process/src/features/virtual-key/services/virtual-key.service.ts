@@ -169,8 +169,14 @@ export class VirtualKeyService {
   }
 
   /** Used by internal Gateway transports after their format check succeeds. */
-  async findBySecretInternal(secret: string): Promise<VirtualKeyWithScopes | null> {
-    return this.findByHashedSecretInternal(this.crypto.hashSecret(secret));
+  async findBySecretInternal(
+    secret: string,
+  ): Promise<(VirtualKeyWithScopes & { presentedPreviousSecret: boolean }) | null> {
+    const hashedSecret = this.crypto.hashSecret(secret);
+    const found = await this.findByHashedSecretInternal(hashedSecret);
+    return found
+      ? { ...found, presentedPreviousSecret: found.hashedSecret !== hashedSecret }
+      : null;
   }
 
   /** Mints a key, its scopes and its optional cap in one transaction. */

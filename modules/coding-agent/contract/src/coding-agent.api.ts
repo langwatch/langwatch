@@ -9,6 +9,7 @@ import type {
 } from "./coding-agent-trace-pull-request.ts";
 import type { CodingAgentTranscript } from "./coding-agent-transcript.ts";
 import type {
+  CodingAgentSessionLastTurn,
   CodingAgentSessionLookupInput,
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
@@ -63,10 +64,15 @@ export interface CodingAgentUsageCount {
 
 export interface CodingAgentApi {
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
-  findSessionForTrace(input: {
+  /** The session one trace belongs to, its name blanked unless the viewer may read content. */
+  findSessionForTraceForViewer(
+    input: { projectId: string; traceId: string; authorization: Authorization },
+    by: CodingAgentViewer,
+  ): Promise<CodingAgentSession | null>;
+  findLastTurnOfSession(input: {
     projectId: string;
-    traceId: string;
-  }): Promise<CodingAgentSession | null>;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null>;
   readTranscriptForViewer(input: {
     projectId: string;
     traceId: string;

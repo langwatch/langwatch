@@ -92,6 +92,7 @@ function collaborators({
   organizations?: SsoDomainOrganizations;
 } = {}): BetterAuthHookCollaborators {
   return {
+    users: createApiFixture<BetterAuthHookCollaborators["users"]>(),
     organizations,
     federation: licensed,
     invites: createApiFixture<BetterAuthHookCollaborators["invites"]>(),

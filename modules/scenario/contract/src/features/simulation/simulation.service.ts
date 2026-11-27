@@ -4,6 +4,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
@@ -107,10 +108,6 @@ export type SimulationLastResultSummariesInput = SimulationProjectDateRangeInput
   scenarioIds?: string[];
 };
 
-export type SimulationProjectIdsInput = {
-  projectIds: string[];
-};
-
 export type SimulationExportFilterInput = {
   projectId: string;
   scenarioSetId?: string;
@@ -162,7 +159,6 @@ export abstract class SimulationService {
   abstract getRunIdsForSet(
     input: SimulationScenarioSetInput,
   ): Promise<{ runIds: string[]; reachedCap: boolean }>;
-  abstract getDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>>;
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   /** The usage report's figure: scenario runs started since `since` (epoch ms). */
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
@@ -183,4 +179,5 @@ export abstract class SimulationService {
   abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
   abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
   abstract recordHooks(input: SimulationRecordHooks): Promise<void>;
+  abstract recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void>;
 }

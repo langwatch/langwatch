@@ -28,6 +28,8 @@ import {
   assertionOver,
   OLIVIA,
   PEDRO,
+  GLOBEX,
+  INITECH,
   requestBody,
   staffAccessWorld,
   VERIFIER,
@@ -77,11 +79,12 @@ function scenarios(backend: Backend): void {
   async function pending(
     w: ReturnType<typeof world>,
     scopes: Parameters<typeof requestBody>[0]["scopes"],
+    functions?: string[],
   ) {
     const agent = await w.enrol();
     const created = await w.app.createRequest({
       session: agent.session,
-      body: requestBody({ scopes }),
+      body: requestBody({ scopes, ...(functions ? { functions } : {}) }),
     });
     return { agent, created, requestId: created.requestId };
   }
@@ -92,12 +95,14 @@ function scenarios(backend: Backend): void {
     {
       scopes,
       spendApproved = false,
+      functions,
     }: {
       scopes: Parameters<typeof requestBody>[0]["scopes"];
       spendApproved?: boolean;
+      functions?: string[];
     },
   ) {
-    const { agent, requestId } = await pending(w, scopes);
+    const { agent, requestId } = await pending(w, scopes, functions);
     const typed = scopes.includes("org:content") || scopes.includes("org:support");
     await w.approve({
       choice: {
@@ -202,8 +207,8 @@ function scenarios(backend: Backend): void {
         }
       });
 
-      /** @scenario "An agent asks for access and gets an approval URL that lasts ten minutes" */
-      it("answers a request id and an approval URL that lapses in ten minutes", async () => {
+      /** @scenario "An agent asks for access and gets an approval URL that lasts two hours" */
+      it("answers a request id and an approval URL that lapses in two hours, and emails the owner", async () => {
         const w = world();
         const { created } = await pending(w, ["org:content"]);
 
@@ -211,8 +216,13 @@ function scenarios(backend: Backend): void {
           `https://app.langwatch.test/ops/agents/approve/${created.requestId}`,
         );
         expect(Date.parse(created.expiresAt) - Date.parse("2026-11-02T10:00:00Z")).toBe(
-          10 * 60 * 1000,
+          2 * 60 * 60 * 1000,
         );
+        const asked = w.state.mail.filter((mail) => mail.to === `${OLIVIA}@langwatch.test`);
+        expect(asked.map((mail) => mail.subject)).toEqual([
+          "Your agent is waiting for your approval",
+        ]);
+        expect(asked[0]?.html).toContain(created.approvalUrl);
         await expect(
           w.app.getApprovalRequest({ ...w.operator(OLIVIA), requestId: created.requestId }),
         ).resolves.toMatchObject({ organizationId: ACME.id, organizationName: ACME.name });
@@ -277,7 +287,7 @@ function scenarios(backend: Backend): void {
           reason: "fix ACME's broken evaluator",
           machine: "olivia-macbook",
           requestIp: AGENT_IP,
-          expiresAt: "2026-11-02T10:10:00.000Z",
+          expiresAt: "2026-11-02T12:00:00.000Z",
           status: "pending",
         });
       });
@@ -397,10 +407,10 @@ function scenarios(backend: Backend): void {
       });
 
       /** @scenario "An expired request cannot be approved or redeemed" */
-      it("refuses approving and redeeming a request past its ten minutes", async () => {
+      it("refuses approving and redeeming a request past its two hours", async () => {
         const w = world();
         const { agent, requestId } = await pending(w, ["org:metadata"]);
-        w.advance({ minutes: 11 });
+        w.advance({ minutes: 121 });
 
         await expect(
           codeOf(w.approve({ choice: { requestId, spendApproved: false } })),
@@ -601,10 +611,10 @@ function scenarios(backend: Backend): void {
         ).resolves.toBe("staff_write_not_allowed");
       });
 
-      /** @scenario "A metadata key cannot read run results or stored files" */
+      /** @scenario "A key without org:content cannot read run results or stored files" */
       it("refuses a content route to a key approved without org:content", async () => {
         const w = world();
-        await redeemed(w, { scopes: ["org:metadata"] });
+        await redeemed(w, { scopes: ["org:support"] });
         const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
         const results = gateRequest({
           apiKeyId,
@@ -725,7 +735,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "Revoking a session that already ended is refused" */
       it("refuses to revoke a session its agent already ended", async () => {
         const w = world();
-        const { agent, requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { agent, requestId } = await redeemed(w, { scopes: ["org:content"] });
         await w.app.endSession({ session: agent.session, requestId });
 
         await expect(
@@ -736,7 +746,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "Revoking a session whose hour ran out is refused" */
       it("refuses to revoke an expired session, before and after the sweep audits it", async () => {
         const w = world();
-        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { requestId } = await redeemed(w, { scopes: ["org:content"] });
         w.advance({ minutes: 61 });
 
         await expect(
@@ -769,7 +779,7 @@ function scenarios(backend: Backend): void {
       it("revokes every live session after the typed confirmation", async () => {
         const w = world();
         const first = await redeemed(w, { scopes: ["org:content"] });
-        const second = await redeemed(w, { scopes: ["org:metadata"] });
+        const second = await redeemed(w, { scopes: ["org:content"] });
         const keys = w.state.minted.map((key) => key.apiKeyId);
 
         await expect(
@@ -888,7 +898,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "Other operators are told when an agent redeems" */
       it("emails the other operators when a session starts", async () => {
         const w = world();
-        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { requestId } = await redeemed(w, { scopes: ["org:content"] });
 
         expect(
           w.state.mail.filter((mail) =>
@@ -946,7 +956,7 @@ function scenarios(backend: Backend): void {
           w.app.getRequestStatus({ session: agent.session, requestId }),
         ).resolves.toMatchObject({ status: "pending" });
 
-        w.advance({ minutes: 11 });
+        w.advance({ minutes: 121 });
         await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
         expect(w.state.audit.filter((row) => row.targetId === requestId)).toEqual([]);
         await expect(
@@ -970,7 +980,7 @@ function scenarios(backend: Backend): void {
         await expect(
           codeOf(w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER })),
         ).resolves.toBe("request_not_approved");
-        w.advance({ minutes: 11 });
+        w.advance({ minutes: 121 });
         await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
         expect(w.state.audit.filter((row) => row.targetId === requestId)).toEqual([]);
       });
@@ -1010,7 +1020,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "A revoke whose audit row fails is retried by the sweep" */
       it("writes the revoked row on the next sweep after a failed audit write", async () => {
         const w = world();
-        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { requestId } = await redeemed(w, { scopes: ["org:content"] });
         w.state.auditRefused = true;
 
         await expect(w.app.revokeSession({ ...w.operator(PEDRO), requestId })).rejects.toThrow(
@@ -1038,7 +1048,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "A revoke whose key revoke fails is retried by the sweep" */
       it("revokes the key and writes the row on the next sweep after a failed key revoke", async () => {
         const w = world();
-        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { requestId } = await redeemed(w, { scopes: ["org:content"] });
         const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
         w.state.keyRevokeRefused.add(apiKeyId);
 
@@ -1058,7 +1068,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "A natural expiry whose audit row fails is retried by the sweep" */
       it("audits the expiry on a later sweep after a failed write", async () => {
         const w = world();
-        const { requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { requestId } = await redeemed(w, { scopes: ["org:content"] });
         w.advance({ minutes: 61 });
         w.state.auditRefused = true;
 
@@ -1076,7 +1086,7 @@ function scenarios(backend: Backend): void {
         const w = world();
         const { requestId } = await pending(w, ["org:metadata"]);
         await w.approve({ choice: { requestId, spendApproved: false } });
-        w.advance({ minutes: 11 });
+        w.advance({ minutes: 121 });
 
         await w.app.sweepExpiredSessions({ at: w.state.at.epochMilliseconds });
         expect(endRows(w, requestId)).toEqual(["staffAccess.expired"]);
@@ -1085,8 +1095,8 @@ function scenarios(backend: Backend): void {
       /** @scenario "The kill switch reports how many sessions ended and how many failed" */
       it("ends the others and counts the one that failed", async () => {
         const w = world();
-        const first = await redeemed(w, { scopes: ["org:metadata"] });
-        const second = await redeemed(w, { scopes: ["org:metadata"] });
+        const first = await redeemed(w, { scopes: ["org:content"] });
+        const second = await redeemed(w, { scopes: ["org:content"] });
         const failing = w.state.minted[0]?.apiKeyId ?? "";
         w.state.keyRevokeRefused.add(failing);
 
@@ -1105,7 +1115,7 @@ function scenarios(backend: Backend): void {
       /** @scenario "Revoking an agent ends its live sessions and requests" */
       it("revokes its keys, ends its requests, audits the end and tells the other operators", async () => {
         const w = world();
-        const { agent, requestId } = await redeemed(w, { scopes: ["org:metadata"] });
+        const { agent, requestId } = await redeemed(w, { scopes: ["org:content"] });
         const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
         const asked = await w.app.createRequest({
           session: agent.session,
@@ -1160,7 +1170,9 @@ function scenarios(backend: Backend): void {
             lastSessionAt: "2026-11-01T08:00:00.000Z",
           },
           gateway: { requests30Days: 120, spendUsd30Days: 3.5 },
-          apiKeys: [{ id: "key_customer", lastUsedAt: "2026-11-01T09:00:00.000Z" }],
+          apiKeys: [
+            { id: "key_customer", kind: "service", lastUsedAt: "2026-11-01T09:00:00.000Z" },
+          ],
           membersSignedIn: 2,
         });
         expect(usage.classification).toContain("membersSignedIn");
@@ -1171,6 +1183,20 @@ function scenarios(backend: Backend): void {
             status: 200,
           }),
         ]);
+      });
+
+      /** @scenario "The usage answer names API keys by id and kind only" */
+      it("names each API key by id and kind, never by name", async () => {
+        const w = world();
+        const { session } = await opsCaller(w);
+
+        const usage = await w.app.getOrganizationUsage({ session, organization: ACME.slug });
+
+        expect(usage.apiKeys.length).toBeGreaterThan(0);
+        for (const key of usage.apiKeys) {
+          expect(Object.keys(key).toSorted()).toEqual(["id", "kind", "lastUsedAt"]);
+        }
+        expect(JSON.stringify(usage)).not.toContain('"CI"');
       });
 
       /** @scenario "Ops read is an allowlist" */
@@ -1216,6 +1242,322 @@ function scenarios(backend: Backend): void {
             ),
           ),
         ).resolves.toBe("staff_access_ip_mismatch");
+      });
+    });
+
+    describe("when a session calls ops functions", () => {
+      async function functionCaller(
+        w: ReturnType<typeof world>,
+        {
+          scopes = ["org:metadata"],
+          functions,
+        }: { scopes?: Parameters<typeof requestBody>[0]["scopes"]; functions: string[] },
+      ) {
+        const { answer, requestId } = await redeemed(w, { scopes, functions });
+        const caller = await Promise.resolve(
+          w.app.staffAccessDoor.identify?.({
+            request: requestFrom({ bearer: answer.opsToken ?? "" }),
+          }),
+        );
+        return { answer, requestId, session: caller?.session as StaffAccessDoorSession };
+      }
+
+      /** @scenario "A request names only functions that exist and fit its scopes" */
+      it("refuses an unknown function, one its scopes cannot reach, and metadata naming none", async () => {
+        const w = world();
+        const agent = await w.enrol();
+        const ask = (functions: string[]) =>
+          codeOf(
+            w.app.createRequest({
+              session: agent.session,
+              body: requestBody({ scopes: ["org:metadata"], functions }),
+            }),
+          );
+
+        await expect(ask(["org.nope"])).resolves.toBe("staff_function_unknown");
+        await expect(ask(["orgs.find"])).resolves.toBe("staff_function_scope_mismatch");
+        expect(
+          staffAccessRequestBodySchema.validate({
+            ...requestBody({ scopes: ["org:metadata"] }),
+            functions: [],
+          }),
+        ).toBe(false);
+      });
+
+      /** @scenario "A metadata session gets an ops token and no organization key" */
+      it("answers an ops token and the approved functions, and mints no organization key", async () => {
+        const w = world();
+        const { answer } = await redeemed(w, {
+          scopes: ["org:metadata"],
+          functions: ["org.snapshot", "org.api_keys"],
+        });
+
+        expect(answer.opsToken).toMatch(/^lwsa_/);
+        expect(answer.apiKey).toBeUndefined();
+        expect(answer.functions).toEqual(["org.api_keys", "org.snapshot"]);
+        expect(w.state.minted).toEqual([]);
+      });
+
+      /** @scenario "A metadata session calls only the functions its approval signed" */
+      /** @scenario "org.snapshot answers plan, counts, creation and flags" */
+      it("runs an approved function and refuses an unapproved or unknown one", async () => {
+        const w = world();
+        const { session } = await functionCaller(w, { functions: ["org.snapshot"] });
+
+        const answered = await w.app.callFunction({ session, name: "org.snapshot", input: {} });
+
+        expect(answered).toEqual({
+          name: "org.snapshot",
+          rows: 1,
+          output: {
+            organizationId: ACME.id,
+            createdAt: "2025-01-01T00:00:00.000Z",
+            plan: "growth",
+            membersCount: 2,
+            pendingInvitesCount: 1,
+            teamsCount: 1,
+            projectIds: [`${ACME.id}_project`],
+            flagsOn: ["release_trace_media_extraction"],
+          },
+        });
+        await expect(
+          codeOf(w.app.callFunction({ session, name: "org.api_keys", input: {} })),
+        ).resolves.toBe("staff_function_not_approved");
+        await expect(
+          codeOf(w.app.callFunction({ session, name: "org.nope", input: {} })),
+        ).resolves.toBe("staff_function_unknown");
+      });
+
+      /** @scenario "Support mode still drives the whole CLI against its organization" */
+      it("keeps the organization key for support and content, admitted by the gate", async () => {
+        const w = world();
+        await redeemed(w, { scopes: ["org:support", "org:content"], spendApproved: true });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+
+        expect(w.state.minted).toEqual([expect.objectContaining({ kind: "support" })]);
+        await expect(
+          w.app.staffAccessGate.admit(
+            gateRequest({
+              apiKeyId,
+              method: "POST",
+              writes: true,
+              permissions: ["prompts:update"],
+            }),
+          ),
+        ).resolves.toMatchObject({ spendApproved: true });
+      });
+
+      /** @scenario "A function call writes its trail row with the function, its input and the rows read" */
+      /** @scenario "org.ingestion_health answers trace counts per project and the last trace time" */
+      it("trails the function, its input and the rows it answered", async () => {
+        const w = world();
+        const { session, requestId } = await functionCaller(w, {
+          functions: ["org.ingestion_health"],
+        });
+        const input = { since: "2026-10-26T10:00:00Z" };
+
+        const answered = await w.app.callFunction({ session, name: "org.ingestion_health", input });
+
+        expect(answered.output).toEqual({
+          items: [
+            {
+              projectId: `${ACME.id}_project`,
+              traces: 42,
+              lastTraceAt: "2026-11-02T09:30:00.000Z",
+              planLimitRefusals: 3,
+            },
+          ],
+          total: 1,
+          truncated: false,
+          nextCursor: null,
+        });
+        const trail = await w.repositories.events.findByRequest({ requestId });
+        expect(trail).toEqual([
+          expect.objectContaining({
+            operation: "staffAccess.callFunction",
+            functionName: "org.ingestion_health",
+            functionInput: JSON.stringify(input),
+            rowCount: 1,
+            organizationId: ACME.id,
+            status: 200,
+          }),
+        ]);
+      });
+
+      /** @scenario "A function range is at most 31 days" */
+      it("refuses a range over 31 days and one that ends before it starts", async () => {
+        const w = world();
+        const { session } = await functionCaller(w, { functions: ["org.ingestion_health"] });
+        const call = (input: unknown) =>
+          codeOf(w.app.callFunction({ session, name: "org.ingestion_health", input }));
+
+        await expect(call({ since: "2026-09-20T00:00:00Z" })).resolves.toBe(
+          "staff_function_bad_input",
+        );
+        await expect(
+          call({ since: "2026-11-01T00:00:00Z", until: "2026-10-30T00:00:00Z" }),
+        ).resolves.toBe("staff_function_bad_input");
+      });
+
+      /** @scenario "A function's input is checked against its schema" */
+      /** @scenario "org.trace_presence says whether a trace exists in a project of the organization" */
+      it("answers presence in the organization's project and refuses another or a stray field", async () => {
+        const w = world();
+        const { session } = await functionCaller(w, { functions: ["org.trace_presence"] });
+        const call = (input: unknown) =>
+          w.app.callFunction({ session, name: "org.trace_presence", input });
+
+        await expect(
+          call({ projectId: `${ACME.id}_project`, traceId: "trace_stored" }),
+        ).resolves.toMatchObject({
+          output: { stored: true, spanCount: 7, firstSeenAt: "2026-11-02T09:00:00.000Z" },
+        });
+        await expect(
+          codeOf(call({ projectId: `${GLOBEX.id}_project`, traceId: "trace_stored" })),
+        ).resolves.toBe("staff_function_not_found");
+        await expect(
+          codeOf(call({ projectId: `${ACME.id}_project`, traceId: "t", text: "x" })),
+        ).resolves.toBe("staff_function_bad_input");
+      });
+
+      /** @scenario "org.api_keys answers ids, kinds and times, never names or secrets" */
+      /** @scenario "org.usage_limits answers the plan's limits beside what the organization used" */
+      /** @scenario "org.evaluator_errors answers runs and failures per evaluator by code" */
+      /** @scenario "queues.tenant answers the queue groups of one organization" */
+      it("answers keys, limits, evaluator errors and queues in page shape", async () => {
+        const w = world();
+        const { session } = await functionCaller(w, {
+          functions: ["org.api_keys", "org.usage_limits", "org.evaluator_errors", "queues.tenant"],
+        });
+        const call = (name: string, input: unknown = {}) =>
+          w.app.callFunction({ session, name, input });
+
+        const keys = await call("org.api_keys");
+        expect(keys.output).toMatchObject({
+          items: [{ id: "key_customer", kind: "service", lastUsedAt: "2026-11-01T09:00:00.000Z" }],
+        });
+        expect(JSON.stringify(keys.output)).not.toContain("CI");
+        await expect(call("org.usage_limits")).resolves.toMatchObject({
+          rows: 2,
+          output: {
+            items: [{ limit: "members", cap: null, used: null }, { limit: "traces_per_month" }],
+          },
+        });
+        await expect(
+          call("org.evaluator_errors", { since: "2026-10-30T00:00:00Z" }),
+        ).resolves.toMatchObject({
+          output: {
+            items: [{ evaluatorId: "monitor_1", errorsByCode: { provider_rate_limited: 4 } }],
+          },
+        });
+        await expect(call("queues.tenant")).resolves.toMatchObject({
+          output: { items: [{ queue: "events", pendingGroups: 2, dlqGroups: 1 }] },
+        });
+      });
+
+      /** @scenario "user.sign_in answers one exact email and nothing about anyone else" */
+      it("answers one account's sign-in state and nothing for an unknown email", async () => {
+        const w = world();
+        const { session } = await functionCaller(w, {
+          scopes: ["ops:read"],
+          functions: ["user.sign_in"],
+        });
+        const call = (email: string) =>
+          w.app.callFunction({ session, name: "user.sign_in", input: { email } });
+
+        await expect(call("olivia@acme.test")).resolves.toMatchObject({
+          output: { exists: true, methods: ["password", "google"], locked: false },
+        });
+        await expect(call("nobody@acme.test")).resolves.toMatchObject({
+          output: { exists: false, userId: null, methods: [] },
+        });
+      });
+
+      /** @scenario "Listing organizations answers a page and never cuts silently" */
+      it("pages organizations with a total, truncated and a cursor that reads on", async () => {
+        const w = world();
+        const { session } = await functionCaller(w, {
+          scopes: ["ops:read"],
+          functions: ["orgs.find"],
+        });
+
+        const first = await w.app.callFunction({
+          session,
+          name: "orgs.find",
+          input: { query: "a", limit: 1 },
+        });
+        const page = first.output as { total: number; truncated: boolean; nextCursor: string };
+        expect(page).toMatchObject({ total: 1, truncated: false });
+
+        const listed = await w.app.listOrganizations({ session, limit: 2 });
+        expect(listed).toMatchObject({ total: 3, truncated: true });
+        expect(listed.items.map((item) => item.id)).toEqual([ACME.id, GLOBEX.id]);
+        const rest = await w.app.listOrganizations({
+          session,
+          limit: 2,
+          cursor: listed.nextCursor ?? "",
+        });
+        expect(rest).toMatchObject({ total: 3, truncated: false, nextCursor: null });
+        expect(rest.items.map((item) => item.id)).toEqual([INITECH.id]);
+        await expect(
+          codeOf(w.app.listOrganizations({ session, cursor: "bm90LWEtY3Vyc29y" })),
+        ).resolves.toBe("staff_function_bad_cursor");
+      });
+
+      /** @scenario "The server lists the functions an agent may ask for" */
+      it("lists every function with its scope and input schema to a requester key", async () => {
+        const w = world();
+        const agent = await w.enrol();
+
+        const listed = await w.app.listFunctions({ session: agent.session });
+
+        expect(listed.total).toBe(listed.items.length);
+        expect(listed.items.find((fn) => fn.name === "org.trace_presence")).toMatchObject({
+          scope: "org",
+          personal: false,
+          inputSchema: { type: "object", required: ["projectId", "traceId"] },
+        });
+      });
+    });
+
+    describe("when a requester withdraws a request", () => {
+      /** @scenario "The requester withdraws a request it no longer needs" */
+      it("revokes an undecided request so it cannot be approved, and only for its requester", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:content"]);
+        const other = await w.enrol({ name: "second agent" });
+
+        await expect(
+          codeOf(w.app.withdrawRequest({ session: other.session, requestId })),
+        ).resolves.toBe("not_found");
+        await expect(w.app.withdrawRequest({ session: agent.session, requestId })).resolves.toEqual(
+          {
+            withdrawn: true,
+          },
+        );
+        await expect(
+          w.app.getRequestStatus({ session: agent.session, requestId }),
+        ).resolves.toMatchObject({ status: "revoked" });
+        await expect(
+          codeOf(
+            w.approve({
+              choice: { requestId, spendApproved: false, typedOrganizationName: ACME.name },
+            }),
+          ),
+        ).resolves.toBe("request_not_pending");
+      });
+
+      /** @scenario "A request that was decided cannot be withdrawn" */
+      it("refuses to withdraw an approved request", async () => {
+        const w = world();
+        const { agent, requestId } = await pending(w, ["org:content"]);
+        await w.approve({
+          choice: { requestId, spendApproved: false, typedOrganizationName: ACME.name },
+        });
+
+        await expect(
+          codeOf(w.app.withdrawRequest({ session: agent.session, requestId })),
+        ).resolves.toBe("request_not_pending");
       });
     });
   });

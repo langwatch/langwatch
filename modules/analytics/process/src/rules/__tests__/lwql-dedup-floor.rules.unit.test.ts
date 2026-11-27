@@ -3,13 +3,19 @@
  * A read bounded below on a view's floor column is sent to the floored view, and only then.
  * @see specs/lwql/dedup-floor.feature
  * @see modules/analytics/adrs/005-evaluation-metrics-dedup-floor.md
+ * @see modules/analytics/adrs/006-stock-widget-views-latest-in-order.md
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { floorLangWatchQLDedup } from "../lwql-dedup-floor.rules.ts";
+import { LangWatchQLViewDedupService } from "../../features/provisioning/services/langwatch-ql-view-dedup.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "../../features/provisioning/services/langwatch-ql-view-twin-statements.service.ts";
+import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { floorLangWatchQLDedup, flooredViewNames } from "../lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const START = "{dashboard_context_period_start:DateTime}";
@@ -213,9 +219,176 @@ describe("given a statement that reads evaluation_metrics", () => {
 describe("given a view whose dedup declares no floor column", () => {
   /** @scenario "A read bounded on another column keeps the whole-history dedup" */
   it("sends a read bounded on its time column as written", () => {
-    const sql = `SELECT TraceId FROM trace_metrics WHERE OccurredAt >= ${START}`;
+    const sql = `SELECT ScenarioRunId FROM simulations WHERE StartedAt >= ${START}`;
 
     expect(send(sql)).toBe(sql);
+  });
+});
+
+describe("given a statement that reads a latest-in-order view", () => {
+  /** @scenario "A read bounded below on a latest-in-order view's floor column reads its floored twin" */
+  it("reads trace_metrics' floored twin from the bound on OccurredAt", () => {
+    const where = `WHERE OccurredAt >= ${START} AND OccurredAt < ${END}`;
+
+    expect(send(`SELECT TraceId FROM trace_metrics ${where}`)).toBe(
+      `SELECT TraceId FROM trace_metrics__floor(lwql_floor = ${floorOf(START)}) ` +
+        `AS trace_metrics ${where}`,
+    );
+  });
+
+  /** @scenario "A read bounded below on a latest-in-order view's floor column reads its floored twin" */
+  it("floors a bound that takes the least of two query constants", () => {
+    const bound = `least(subtractDays(${START}, 1), subtractDays(${START}, 90))`;
+
+    expect(send(`SELECT 1 FROM trace_metrics WHERE OccurredAt >= ${bound}`)).toContain(
+      `trace_metrics__floor(lwql_floor = ${floorOf(bound)})`,
+    );
+  });
+
+  /** @scenario "A read bounded below on traces.OccurredAt or evaluations.ScheduledAt keeps the whole-history dedup" */
+  it.each([
+    ["traces", "OccurredAt"],
+    ["evaluations", "ScheduledAt"],
+  ])("sends a %s read bounded on %s as written", (view, column) => {
+    const sql = `SELECT TraceId FROM ${view} WHERE ${column} >= ${START} AND ${column} < ${END}`;
+
+    expect(send(sql)).toBe(sql);
+  });
+
+  /** @scenario "A read bounded below on traces.OccurredAt or evaluations.ScheduledAt keeps the whole-history dedup" */
+  it("sends a saved widget's aliased evaluations read with a lower date bound as written", () => {
+    const sql =
+      "SELECT e.EvaluatorName, count() AS runs FROM lwql.evaluations AS e " +
+      `WHERE e.ScheduledAt >= least(subtractDays(${START}, 1), subtractDays(${START}, 90)) ` +
+      "GROUP BY e.EvaluatorName";
+
+    expect(send(sql)).toBe(sql);
+  });
+
+  /** @scenario "Every trace_metrics read of the changes and capability-gap stock queries reads its floored twin" */
+  it.each(["ck-trend/changes", "ext-cost-per-doc/changes", "ck-top-ask/gap"])(
+    "sends every trace_metrics read of %s to its floored twin and its traces reads as written",
+    (label) => {
+      const sql = stock.get(label) ?? "";
+      const metricsReads = sql.match(/FROM trace_metrics\b/g) ?? [];
+      const tracesReads = sql.match(/FROM traces\b/g) ?? [];
+      const sent = send(sql);
+
+      expect(metricsReads.length, label).toBeGreaterThan(0);
+      expect(sent.match(/FROM trace_metrics__floor\(lwql_floor = /g), label).toHaveLength(
+        metricsReads.length,
+      );
+      expect(sent.match(/FROM traces\b/g) ?? [], label).toHaveLength(tracesReads.length);
+      expect(sent, label).not.toContain("traces__floor");
+    },
+  );
+});
+
+/**
+ * The deduplicated views that take no floor, and why. Every other one declares a floor column,
+ * so a new view cannot ship reading its whole history by accident (analytics ADR-006).
+ */
+const UNFLOORED: Readonly<Record<string, string>> = {
+  // FINAL keeps the caller's WHERE on the table read, so partitions prune without a twin.
+  spans: "FINAL: the caller's bound reaches the read",
+  coding_session_events: "FINAL: the caller's bound reaches the read",
+  coding_tool_results: "FINAL: the caller's bound reaches the read",
+  judgments: "FINAL: the caller's bound reaches the read",
+  // Rollups group on their key and supersede no version, so there is no dedup to floor.
+  trace_metrics_by_minute: "aggregating rollup: no version to floor",
+  model_usage_by_minute: "aggregating rollup: no version to floor",
+  evaluation_metrics_by_minute: "aggregating rollup: no version to floor",
+  gateway_budget_totals: "aggregating rollup: no version to floor",
+  simulation_metric_rollups: "aggregating rollup: no version to floor",
+  simulations: "StartedAt falls between versions: a run's queued row is stamped at fold time",
+  coding_sessions: "StartedAt is the minimum of the session's signals, so it falls (ADR-071)",
+  traces: "OccurredAt can fall when a fold misses its row (trace-summary.projection.ts:144,222)",
+  evaluations: "ScheduledAt can fall: a fold that misses or reads stale restamps it (ADR-006)",
+  // A floor on these would be exact (time column in the dedup key, or the version itself).
+  experiment_items: "follow-up: floor on OccurredAt, the version column",
+  simulation_trace_metrics: "follow-up: floor on OccurredAt, the version column",
+  governance_daily_cost_rollup: "follow-up: Day is in the dedup key",
+  governance_hourly_kpis: "follow-up: HourBucket is in the dedup key",
+  langy_usage_events: "follow-up: OccurredAt is in the dedup key",
+  logs: "follow-up: TimeUnixMs is in the dedup key",
+  metric_points: "follow-up: TimeUnixMs is in the dedup key",
+  metric_rollups: "follow-up: BucketStart is in the dedup key",
+  metric_series_definitions: "follow-up: floor on LastSeenAt, the version column",
+  session_metrics: "follow-up: floor on AsOf, the version column",
+  // Whether the time column holds across a row's versions is not yet read from their writers.
+  experiment_run_results: "not analysed: StartedAt stability across versions",
+  gateway_request_spend: "not analysed: OccurredAt stability across versions",
+  billing_events: "not analysed: EventTimestamp stability across versions",
+  coding_trace_sessions: "not analysed: OccurredAt stability across versions",
+  dspy_optimizer_steps: "not analysed: CreatedAt stability across versions",
+  gateway_budget_ledger: "not analysed: OccurredAt stability across versions",
+  governance_cost_restatements: "not analysed: Day stability across versions",
+  governance_security_events: "not analysed: EventTime stability across versions",
+  langy_conversation_messages: "not analysed: CreatedAt stability across versions",
+  legacy_event_log: "not analysed: EventOccurredAt stability across versions",
+  legacy_log_records: "not analysed: TimeUnixMs stability across versions",
+  legacy_metric_records: "not analysed: TimeUnixMs stability across versions",
+  log_ingestion_usage: "not analysed: AcceptedAt stability across versions",
+  metric_ingestion_usage: "not analysed: AcceptedAt stability across versions",
+  objects: "not analysed: created_at stability across versions",
+  test_suite_runs: "not analysed: StartedAt stability across versions",
+};
+
+/** The provisioning service's inputs (langwatch-ql-view-provisioning.service.ts). */
+const NAMES: LangWatchQLNames = {
+  database: "langwatch",
+  restrictedUser: "langwatch_lwql",
+  settingsProfile: "lwql_restricted",
+  keyMapTable: "lwql_api_key_tenant_map",
+  tenantSetting: "custom_api_key_hash",
+};
+
+describe("given every view the catalog deduplicates", () => {
+  const twinStatements = LangWatchQLViewTwinStatementsService.create();
+  const catalogShapes = LangWatchQLCatalogShapesService.create();
+  const viewDedup = LangWatchQLViewDedupService.create();
+  // A PostgreSQL-resident view holds one row per key and renders no dedup.
+  const deduplicated = LWQL_VIEW_CATALOG.filter(
+    (view) =>
+      !catalogShapes.isPostgresResident(view) &&
+      viewDedup.strategyFor({ view, dedup: SHIPPED_LWQL_DEDUP }) !== "none",
+  );
+
+  /** @scenario "Every deduplicated view floors a bounded read or says why it cannot" */
+  it("declares a floor column on each, or lists it with the reason it takes none", () => {
+    const unexplained = deduplicated
+      .filter((view) => view.dedup.floorColumn === undefined && !(view.name in UNFLOORED))
+      .map((view) => view.name);
+
+    expect(unexplained).toEqual([]);
+  });
+
+  /** @scenario "Every deduplicated view floors a bounded read or says why it cannot" */
+  it("lists only deduplicated views that declare no floor column", () => {
+    const listed = new Set(
+      deduplicated.filter((view) => view.dedup.floorColumn === undefined).map(({ name }) => name),
+    );
+
+    expect(Object.keys(UNFLOORED).filter((name) => !listed.has(name))).toEqual([]);
+  });
+
+  /** @scenario "Every deduplicated view floors a bounded read or says why it cannot" */
+  it("provisions a floored twin for each view that declares a floor column", () => {
+    const floored = deduplicated.filter((view) => view.dedup.floorColumn !== undefined);
+    const twinsOf = (view: (typeof floored)[number]) =>
+      twinStatements.flooredViewStatements({
+        names: NAMES,
+        sourceDatabase: "langwatch",
+        view,
+        dedup: SHIPPED_LWQL_DEDUP,
+      });
+
+    expect(floored.map((view) => [view.name, flooredViewNames([view]).length])).toEqual(
+      floored.map((view) => [view.name, 1]),
+    );
+    expect(floored.map((view) => [view.name, twinsOf(view).length])).toEqual(
+      floored.map((view) => [view.name, 1]),
+    );
   });
 });
 
