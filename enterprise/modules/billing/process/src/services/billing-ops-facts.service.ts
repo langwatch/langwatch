@@ -26,9 +26,12 @@ import {
   taxBehaviorOf,
 } from "../rules/billing-ops-facts.rules.ts";
 import type { OrganizationPricingService } from "./organization-pricing.service.ts";
+import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 const PRICE_PAGE = 100;
 const MAX_PRICE_PAGES = 50;
+/** Each Stripe page request; one slow page fails the read rather than holding the session. */
+const PRICE_PAGE_TIMEOUT_MS = 10_000;
 
 type OpsFactsDeps = Readonly<{
   isSaas: boolean;
@@ -37,6 +40,8 @@ type OpsFactsDeps = Readonly<{
   pricing: Pick<OrganizationPricingService, "getPricingModel">;
   /** Billing's Stripe prices; absent where the deployment holds no key. */
   prices?: Pick<StripePricesChannel, "listPriceTaxes">;
+  /** Names Stripe rate limits and unreachable or timed out requests. */
+  stripeErrors: StripeErrorTranslator;
 }>;
 
 /**
@@ -117,7 +122,8 @@ export class BillingOpsFactsService {
 
   /**
    * @throws {BillingFactsUnavailableError} off LangWatch Cloud or with no payment provider
-   * @throws {Error} when the account holds more prices than one read pages through
+   * @throws {BillingPriceCatalogueTooLargeError} past the page walk
+   * @throws {BillingProviderUnavailableError} when Stripe rate-limits, times out or is unreachable
    */
   async findStripePriceFacts(): Promise<BillingStripePriceFact[]> {
     this.requireCloud();
@@ -126,10 +132,15 @@ export class BillingOpsFactsService {
     const facts: BillingStripePriceFact[] = [];
     let startingAfter: string | undefined;
     for (let page = 0; page < MAX_PRICE_PAGES; page += 1) {
-      const listed = await prices.listPriceTaxes({
-        limit: PRICE_PAGE,
-        ...(startingAfter === undefined ? {} : { startingAfter }),
-      });
+      const listed = await prices
+        .listPriceTaxes({
+          limit: PRICE_PAGE,
+          timeoutMs: PRICE_PAGE_TIMEOUT_MS,
+          ...(startingAfter === undefined ? {} : { startingAfter }),
+        })
+        .catch((error: unknown) => {
+          throw this.deps.stripeErrors.translate(error);
+        });
       for (const price of listed.prices) {
         facts.push({
           priceId: price.id,

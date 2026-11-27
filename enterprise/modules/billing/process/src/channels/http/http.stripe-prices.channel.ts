@@ -37,11 +37,16 @@ export class HttpStripePricesChannel extends StripePricesChannel {
   async listPriceTaxes({
     limit,
     startingAfter,
+    timeoutMs,
   }: {
     limit: number;
     startingAfter?: string;
+    timeoutMs?: number;
   }): Promise<StripePriceTaxPage> {
-    const page = await this.stripe.prices.list({ limit, starting_after: startingAfter });
+    const page = await this.stripe.prices.list(
+      { limit, starting_after: startingAfter },
+      timeoutMs === undefined ? undefined : { timeout: timeoutMs },
+    );
     return {
       prices: page.data.map((price) => {
         const detail = toPriceDetail(price);

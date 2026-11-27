@@ -26,9 +26,13 @@ export type StripePriceTaxPage = Readonly<{ prices: StripePriceTaxListing[]; has
 export abstract class StripePricesChannel {
   /** At most `limit` prices, after the price `startingAfter` names when it is given. */
   abstract listPrices(input: { limit: number; startingAfter?: string }): Promise<StripePricePage>;
-  /** The same pages with each price's tax behaviour, which the catalogue file does not keep. */
+  /**
+   * The same pages with each price's tax behaviour, which the catalogue file does not keep;
+   * `timeoutMs` bounds each request, absent uses the client's own timeout.
+   */
   abstract listPriceTaxes(input: {
     limit: number;
     startingAfter?: string;
+    timeoutMs?: number;
   }): Promise<StripePriceTaxPage>;
 }

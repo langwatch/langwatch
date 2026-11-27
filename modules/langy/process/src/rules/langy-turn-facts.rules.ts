@@ -10,6 +10,7 @@ import type {
   LangyTurnOutcomeCount,
   LangyTurnToolCall,
 } from "@langwatch/langy-contract";
+import { getAllModels, modelProviders } from "@langwatch/model-provider-contract";
 import { Temporal } from "@langwatch/time";
 
 /** One stored turn with its conversation's owner and latest model, as the repository reads it. */
@@ -46,7 +47,11 @@ const KNOWN_CODES: ReadonlySet<string> = new Set([
   ...Object.keys(goErrorCodes),
 ]);
 const TOOL = /^[a-z][a-z0-9_]{0,39}$/;
-const MODEL = /^[a-z0-9][a-z0-9._:/-]{0,79}$/i;
+const CATALOGUE = getAllModels();
+/** Catalogue model names without their provider: a provider serving one keeps its name. */
+const CATALOGUE_MODEL_NAMES: ReadonlySet<string> = new Set(
+  Object.keys(CATALOGUE).map((id) => id.slice(id.indexOf("/") + 1)),
+);
 const ID_VALUE = /^[A-Za-z0-9_-]{4,64}$/;
 const ID_FIELD = /^([a-z][a-zA-Z]{0,30})(?:Id|_id)$/;
 const ID_FLAG = /--([a-z][a-z-]{0,30})-id(?:=|\s+)(["']?)([A-Za-z0-9_-]{4,64})\2(?=\s|$)/;
@@ -197,9 +202,17 @@ function turnStateOf(status: string): string {
   return TURN_STATES.has(status) ? status : "other";
 }
 
-function modelLabelOf(model: string | null): string {
+/**
+ * A catalogue model as itself, also under another provider; any other name, such as a deployment
+ * a customer named, as `<provider>/other`, or `other` when the provider is unknown too.
+ */
+export function modelLabelOf(model: string | null): string {
   if (model === null) return "unknown";
-  return MODEL.test(model) ? model : "other";
+  const slash = model.indexOf("/");
+  const provider = slash > 0 ? model.slice(0, slash) : "";
+  const name = model.slice(slash + 1);
+  if (Object.hasOwn(CATALOGUE, model) || CATALOGUE_MODEL_NAMES.has(name)) return model;
+  return Object.hasOwn(modelProviders, provider) ? `${provider}/other` : "other";
 }
 
 type OutcomeGroup = {

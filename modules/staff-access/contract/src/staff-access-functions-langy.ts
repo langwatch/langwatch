@@ -40,7 +40,7 @@ export const STAFF_ACCESS_LANGY_FUNCTIONS = {
         .object({
           /** UTC day the turn was created, YYYY-MM-DD. */
           day: z.string(),
-          /** The model the conversation's latest turn ran on, `unknown` when none was recorded. */
+          /** The latest turn's catalogue model, `<provider>/other` outside it, or `unknown`. */
           model: z.string(),
           turnState: z.string(),
           failureCode: z.string().nullable(),

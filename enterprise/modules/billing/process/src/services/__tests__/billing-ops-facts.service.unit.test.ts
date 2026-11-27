@@ -2,6 +2,7 @@
 /** @see modules/staff-access/specs/staff-access-functions-billing.feature */
 import type { StripePriceDetail } from "@langwatch/enterprise-billing-contract";
 import { Temporal } from "@langwatch/time";
+import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStripePricesChannel } from "../../channels/memory/memory.stripe-prices.channel.ts";
@@ -12,6 +13,7 @@ import type { OrganizationPricingRepository } from "../../repositories/organizat
 import type { BillingSubscriptionRecord } from "../../repositories/subscription.repository.ts";
 import { BillingOpsFactsService } from "../billing-ops-facts.service.ts";
 import { OrganizationPricingService } from "../organization-pricing.service.ts";
+import { StripeErrorTranslatorService } from "../stripe-error-translator.service.ts";
 
 const at = (iso: string) => Temporal.Instant.from(iso);
 
@@ -64,6 +66,7 @@ function compose({ isSaas = true, withStripe = true } = {}) {
     overPlan: MemoryOverPlanRepository.create(store),
     pricing: OrganizationPricingService.create(pricingModels),
     ...(withStripe ? { prices } : {}),
+    stripeErrors: StripeErrorTranslatorService.create(),
   });
   return { store, prices, service };
 }
@@ -234,6 +237,24 @@ describe("billing ops facts", () => {
       await expect(service.findStripePriceFacts()).rejects.toMatchObject({
         code: "billing_price_catalogue_too_large",
         meta: { maxPrices: 5000 },
+      });
+    });
+  });
+
+  describe("when Stripe cannot be reached or the request times out", () => {
+    /** @scenario "billing.stripe_prices refuses by name when Stripe is unreachable or slow" */
+    it("refuses the price catalogue as the provider being unavailable", async () => {
+      const { prices, service } = compose();
+      prices.refuse({
+        operation: "listPriceTaxes",
+        error: new Stripe.errors.StripeConnectionError({
+          type: "api_error",
+          message: "Request aborted due to timeout",
+        }),
+      });
+
+      await expect(service.findStripePriceFacts()).rejects.toMatchObject({
+        code: "billing_provider_unavailable",
       });
     });
   });

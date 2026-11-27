@@ -63,6 +63,7 @@ export class MemoryStripePricesChannel extends StripePricesChannel {
   }: {
     limit: number;
     startingAfter?: string;
+    timeoutMs?: number;
   }): Promise<StripePriceTaxPage> {
     const refusal = this.refusals.get("listPriceTaxes");
     if (refusal) throw refusal;

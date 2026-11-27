@@ -226,6 +226,7 @@ function composeOpsFacts({
     overPlan: repositories.overPlan,
     pricing,
     ...(stripe ? { prices: stripe.channels.prices } : {}),
+    stripeErrors: StripeErrorTranslatorService.create(),
   });
 }
 

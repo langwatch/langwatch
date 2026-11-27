@@ -68,6 +68,12 @@ Feature: Billing ops functions
     Then it is refused with "billing_price_catalogue_too_large" rather than answered in part
 
   @unit
+  Scenario: billing.stripe_prices refuses by name when Stripe is unreachable or slow
+    Given Stripe does not answer a price page within 10 seconds, or rate-limits the read
+    When an "ops:read" session calls "billing.stripe_prices"
+    Then it is refused 503 with "billing_provider_unavailable"
+
+  @unit
   Scenario: Unknown plan, state and tax values read as other
     Given a subscription row whose plan or state billing does not know
     When billing answers its facts

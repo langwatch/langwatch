@@ -15,6 +15,12 @@ Feature: Langy turn facts for ops functions
     And a CLI group outside the known groups reads "langwatch.other"
 
   @unit
+  Scenario: A turn's model reads as a catalogue model or its provider's other
+    Given turns that ran on "openai/gpt-5.4-mini", on "openai_codex/gpt-5.6-terra" and on a deployment a customer named under "azure"
+    Then their models read "openai/gpt-5.4-mini", "openai_codex/gpt-5.6-terra" and "azure/other"
+    And a name under no known provider reads "other" and no recorded model reads "unknown"
+
+  @unit
   Scenario: A tool call's target is an id-shaped value of an id field
     Given a tool call whose input names a dashboard id, or whose command passes "--dashboard-id"
     Then its target kind is "dashboard" and its target id is that id

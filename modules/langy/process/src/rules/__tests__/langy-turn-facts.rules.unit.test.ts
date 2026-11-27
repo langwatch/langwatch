@@ -2,7 +2,7 @@
 import type { LangyTurnToolCall } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { failureCodeOf, targetOf, toolLabelOf } from "../langy-turn-facts.rules.ts";
+import { failureCodeOf, modelLabelOf, targetOf, toolLabelOf } from "../langy-turn-facts.rules.ts";
 
 /** A snake_case value the error registry does not know, as a leaked key's text could be. */
 const KEY_SHAPED = ["acme", "key", "not", "a", "code"].join("_");
@@ -22,6 +22,17 @@ describe("given a failed turn's stored error", () => {
     expect(failureCodeOf(JSON.stringify({ code: "Not A Code" }))).toBe("other");
     expect(failureCodeOf(KEY_SHAPED)).toBe("other");
     expect(failureCodeOf(JSON.stringify({ code: KEY_SHAPED }))).toBe("other");
+  });
+});
+
+describe("given the models turns ran on", () => {
+  /** @scenario "A turn's model reads as a catalogue model or its provider's other" */
+  it("keeps catalogue models and reduces any other name to its provider", () => {
+    expect(modelLabelOf("openai/gpt-5.4-mini")).toBe("openai/gpt-5.4-mini");
+    expect(modelLabelOf("openai_codex/gpt-5.6-terra")).toBe("openai_codex/gpt-5.6-terra");
+    expect(modelLabelOf("azure/acme-support-prod")).toBe("azure/other");
+    expect(modelLabelOf("acme/support-prod")).toBe("other");
+    expect(modelLabelOf(null)).toBe("unknown");
   });
 });
 
