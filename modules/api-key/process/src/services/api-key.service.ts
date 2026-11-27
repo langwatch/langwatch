@@ -6,6 +6,7 @@ import {
   type ApiKeyBindingNames,
   type ApiKeyCredentialCheck,
   type ApiKeyDetail,
+  type ApiKeyFacts,
   type ApiKeyListEnrichment,
   type ApiKeyName,
   type ApiKeyProject,
@@ -181,6 +182,10 @@ export class ApiKeyService {
 
   async listAll(input: { organizationId: string }): Promise<ApiKey[]> {
     return this.catalog.listAll(input);
+  }
+
+  findKeyFactsForOrganization(input: { organizationId: string }): Promise<ApiKeyFacts[]> {
+    return this.catalog.findKeyFactsForOrganization(input);
   }
 
   async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {

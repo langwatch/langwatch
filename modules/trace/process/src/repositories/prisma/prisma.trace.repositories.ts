@@ -36,6 +36,7 @@ import { PrismaTraceAnnotationScoresRepository } from "./prisma.trace-annotation
 import { PrismaTraceAnnotationsRepository } from "./prisma.trace-annotations.repository.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
 import { PrismaTraceIngestSourceBillingRepository } from "./prisma.trace-ingest-source-billing.repository.ts";
+import { PrismaTracePlanLimitRefusalsRepository } from "./prisma.trace-plan-limit-refusals.repository.ts";
 import { PrismaTraceTopicNamesRepository } from "./prisma.trace-topic-names.repository.ts";
 
 /**
@@ -73,6 +74,7 @@ export class PostgresTraceRepositories {
       ingestSourceBilling: PrismaTraceIngestSourceBillingRepository.create({
         prisma: members.prisma,
       }),
+      planLimitRefusals: PrismaTracePlanLimitRefusalsRepository.create({ prisma: members.prisma }),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({

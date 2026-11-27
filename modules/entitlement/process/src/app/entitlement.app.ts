@@ -20,6 +20,7 @@ import {
   type SendUsageLimitWarningInput,
   type UsageLimitWarning,
   type UsageMonthBreakdown,
+  type OrganizationUsageLimits,
   type UsageStats,
   type PricingModel,
   PlanLimitExceededError,
@@ -50,6 +51,7 @@ import {
 } from "../eventing/usage.pipeline.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { coreBaselinePlan } from "../rules/plan-baseline.rules.ts";
+import { usageLimitsOf } from "../rules/usage-limits.rules.ts";
 import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
@@ -377,6 +379,12 @@ export class EntitlementModule implements EntitlementApiContract {
     const user = this.#resolveCaller(input);
 
     return this.#usage.getUsageStats(input.organizationId, user);
+  }
+
+  async getUsageLimits(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationUsageLimits> {
+    return usageLimitsOf(await this.#usage.getUsageStats(input.organizationId, undefined));
   }
 
   getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown> {

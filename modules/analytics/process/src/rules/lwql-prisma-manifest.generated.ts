@@ -869,6 +869,15 @@ export interface LwqlPrismaRows {
     readonly position: "Int";
     readonly createdAt: "DateTime";
   };
+  readonly DashboardSidebarOrder: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly organizationId: "String";
+    readonly homeProduct: "String";
+    readonly dashboardIds: "String[]";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly DashboardsV2: {
     readonly id: "String";
     readonly projectId: "String";
@@ -1481,6 +1490,12 @@ export interface LwqlPrismaRows {
     readonly sourceType: "String";
     readonly billed: "Boolean";
     readonly recordedAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly TracePlanLimitRefusal: {
+    readonly projectId: "String";
+    readonly day: "DateTime";
+    readonly refusals: "Int";
     readonly updatedAt: "DateTime";
   };
   readonly RetentionPolicy: {
@@ -3036,6 +3051,76 @@ export interface LwqlPrismaRows {
     readonly mounted: "Boolean";
     readonly lastAppliedEventId: "String";
     readonly updatedAt: "DateTime";
+  };
+  readonly StaffAccessRequester: {
+    readonly id: "String";
+    readonly ownerUserId: "String";
+    readonly name: "String";
+    readonly lookupId: "String";
+    readonly hashedSecret: "String";
+    readonly expiresAt: "DateTime";
+    readonly revokedAt: "DateTime?";
+    readonly lastUsedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+  };
+  readonly StaffAccessChallenge: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly purpose: "String";
+    readonly challenge: "String";
+    readonly expiresAt: "DateTime";
+    readonly usedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+  };
+  readonly StaffAccessRequest: {
+    readonly id: "String";
+    readonly requesterId: "String";
+    readonly ownerUserId: "String";
+    readonly scopes: "String[]";
+    readonly functions: "String[]";
+    readonly organizationId: "String?";
+    readonly organizationName: "String?";
+    readonly reason: "String";
+    readonly codeChallenge: "String";
+    readonly machine: "String";
+    readonly requestIp: "String?";
+    readonly status: "String";
+    readonly expiresAt: "DateTime";
+    readonly approvedAt: "DateTime?";
+    readonly spendApproved: "Boolean";
+    readonly approvalCredentialId: "String?";
+    readonly approvalSignature: "String?";
+    readonly signedHash: "String?";
+    readonly redeemedAt: "DateTime?";
+    readonly pinnedIp: "String?";
+    readonly apiKeyId: "String?";
+    readonly hashedOpsToken: "String?";
+    readonly opsTokenLookupId: "String?";
+    readonly accessExpiresAt: "DateTime?";
+    readonly revokedAt: "DateTime?";
+    readonly revokedByUserId: "String?";
+    readonly revokeCause: "String?";
+    readonly endAuditedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+  };
+  readonly StaffAccessEvent: {
+    readonly id: "String";
+    readonly requestId: "String";
+    readonly at: "DateTime";
+    readonly method: "String";
+    readonly path: "String";
+    readonly operation: "String";
+    readonly functionName: "String?";
+    readonly functionInput: "String?";
+    readonly rowCount: "Int?";
+    readonly permissions: "String[]";
+    readonly organizationId: "String?";
+    readonly projectId: "String?";
+    readonly status: "Int?";
+    readonly errorCode: "String?";
+    readonly durationMs: "Int?";
+    readonly ipAddress: "String?";
+    readonly userAgent: "String?";
   };
   readonly DigestCohortOrganization: {
     readonly organizationId: "String";

@@ -202,6 +202,9 @@ describe("the scope reset's coverage", () => {
     // What is mounted right now — a live count, not data.
     "dockShellClaims",
     "dockShifted",
+    "dockWidthPx",
+    // How wide this person likes each layout.
+    "panelWidths",
   ];
 
   describe("given every scoped field has been dirtied", () => {

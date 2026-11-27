@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 
 import type { MeProject, UserAvatarRestParams } from "./user-rest.schemas.ts";
+import type { UserSignInAccount } from "./user-sign-in-account.ts";
 import type { UserBudgetIncreaseRequested, UserHomePagePickerState } from "./user.responses.ts";
 import type {
   UserCodeAccessPreference,
@@ -85,6 +86,11 @@ export interface UserApi {
   searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
   /** The account holding an address, matched on its stored lower-cased form, however typed. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
+  /**
+   * The accounts behind one address, matched the way sign-in matches it, as ids, method codes,
+   * flags and times only (ADR-202). Empty when there is none or the text is no address.
+   */
+  findSignInAccounts(input: Readonly<{ email: string }>): Promise<UserSignInAccount[]>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
   /**

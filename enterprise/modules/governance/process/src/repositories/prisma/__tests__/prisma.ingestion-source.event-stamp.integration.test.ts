@@ -8,6 +8,7 @@
 import { randomBytes } from "node:crypto";
 
 import { aesEncryption } from "@langwatch/process-stores";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -39,7 +40,7 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
     await prisma.organization.delete({ where: { id: organizationId } });
   });
 
-  async function sourceWith(status: "awaiting_first_event" | "disabled") {
+  async function sourceWith(status: "awaiting_first_event" | "active" | "disabled") {
     const source = await prisma.ingestionSource.create({
       data: {
         organizationId,
@@ -69,14 +70,31 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
     it("says exactly one of racing stamps moved it live, and stamps every later one", async () => {
       const id = await sourceWith("awaiting_first_event");
       const later = Temporal.Instant.fromEpochMilliseconds(Date.parse("2026-11-13T11:00:00.000Z"));
-      // Every racing batch read the source before any stamp, so each tries the first-event write.
+      // Every racing batch read the source before any stamp, so each tries the first-event write;
+      // all three park behind a slower writer's row lock, so they truly overlap.
       const asRead = { id, status: "awaiting_first_event" };
+      let racing: { wentLive: boolean }[] = [];
 
-      const racing = await Promise.all([
-        repository.recordEventReceived(asRead, STAMPED_AT),
-        repository.recordEventReceived(asRead, STAMPED_AT),
-        repository.recordEventReceived(asRead, STAMPED_AT),
-      ]);
+      await raceOnOneRow<string>({
+        prisma,
+        table: "IngestionSource",
+        parked: 3,
+        first: async (tx) => {
+          await tx.ingestionSource.updateMany({
+            where: { id, organizationId },
+            data: { name: `Renamed while its batches wait ${suffix}` },
+          });
+          return "renamed";
+        },
+        second: async () => {
+          racing = await Promise.all([
+            repository.recordEventReceived(asRead, STAMPED_AT),
+            repository.recordEventReceived(asRead, STAMPED_AT),
+            repository.recordEventReceived(asRead, STAMPED_AT),
+          ]);
+          return "stamped";
+        },
+      });
       const after = await repository.recordEventReceived({ id, status: "active" }, later);
 
       expect(racing.filter(({ wentLive }) => wentLive)).toHaveLength(1);
@@ -96,6 +114,32 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
       const stamp = await repository.recordEventReceived(asRead, STAMPED_AT);
 
       expect(stamp).toEqual({ wentLive: false });
+      const stored = await prisma.ingestionSource.findUniqueOrThrow({ where: { id } });
+      expect(stored.status).toBe("disabled");
+      expect(stored.lastEventAt).toBeNull();
+    });
+
+    /** @scenario "A batch in flight when the source is disabled does not re-enable it" */
+    it("leaves it disabled when the disable commits while the stamp waits on the row", async () => {
+      const id = await sourceWith("active");
+
+      const answers = await raceOnOneRow<string>({
+        prisma,
+        table: "IngestionSource",
+        first: async (tx) => {
+          await tx.ingestionSource.updateMany({
+            where: { id, organizationId },
+            data: { status: "disabled" },
+          });
+          return "disabled";
+        },
+        second: async () => {
+          const stamp = await repository.recordEventReceived({ id, status: "active" }, STAMPED_AT);
+          return stamp.wentLive ? "went live" : "left alone";
+        },
+      });
+
+      expect(answers.second).toBe("left alone");
       const stored = await prisma.ingestionSource.findUniqueOrThrow({ where: { id } });
       expect(stored.status).toBe("disabled");
       expect(stored.lastEventAt).toBeNull();

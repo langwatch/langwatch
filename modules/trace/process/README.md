@@ -6,13 +6,13 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:90`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:91`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:205`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:206`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -1169,6 +1169,22 @@ The project's distinct traces over the last 24 hours.
 
 ```typescript
 countTracesInLastDay(input: { projectId: string }): Promise<number>;
+```
+
+#### `countIngestionByProject`
+
+A staff investigation's ingestion figures (ADR-202): one row per asked project, zeros when nothing arrived in `[since, until)` (epoch ms). Refusals are counted per UTC day, so a range takes every day it touches.
+
+```typescript
+countIngestionByProject(input: { projectIds: string[]; since: number; until: number; }): Promise<TraceIngestionCount[]>;
+```
+
+#### `findTracePresence`
+
+Whether a trace id is stored in the project, with counts and arrival times only (ADR-202).
+
+```typescript
+findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]>;
 ```
 
 #### `hasTraceWithAttribute`

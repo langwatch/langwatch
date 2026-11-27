@@ -33,12 +33,12 @@ import {
 } from "./langwatch-ql-clickhouse-drift.service.ts";
 import {
   LangWatchQLCollectionBindingService,
-  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlPostgresEndpoint,
   type LwqlPostgresSettings,
   NO_COLLECTION_STATE,
 } from "./langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLExternalCollectionAccessModelService } from "./langwatch-ql-external-collection-access-model.service.ts";
 import type { LwqlPostgresGap } from "./langwatch-ql-postgres-gaps.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
@@ -59,16 +59,7 @@ const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
-
-/** What an external collection leaves in the definition: never rendered, so never a password. */
-const NO_NAMED_COLLECTION_VALUES = {
-  collection: LWQL_RENDERED_NAMED_COLLECTION,
-  host: "",
-  port: 0,
-  database: "",
-  user: "",
-  password: "",
-};
+const externalCollectionAccessModel = LangWatchQLExternalCollectionAccessModelService.create();
 
 /** The SaaS-convention names every self-provisioning distribution shares. */
 export const LWQL_SELF_PROVISION_DEFAULTS = {
@@ -265,15 +256,15 @@ export class LangWatchQLSelfProvisioningService {
         only,
       });
     }
-    const definition = accessModelDefinition.build({
-      names,
-      passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
-      namedCollection:
-        externalCollection === undefined
-          ? collectionBinding.namedCollectionValues({ names, postgres, mode })
-          : NO_NAMED_COLLECTION_VALUES,
-      sourceDatabase,
-    });
+    const definition =
+      externalCollection === undefined
+        ? accessModelDefinition.build({
+            names,
+            passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
+            namedCollection: collectionBinding.namedCollectionValues({ names, postgres, mode }),
+            sourceDatabase,
+          })
+        : externalCollectionAccessModel.build({ names, restrictedPassword, sourceDatabase });
     const structural = accessModel.setupStatements({
       names,
       sourceDatabase,

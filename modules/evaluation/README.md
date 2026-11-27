@@ -11,7 +11,7 @@ Evaluations: running evaluators against traces, the evaluation runs that record 
 | Classification | core (`modules/catalogue.json`)                                                                                    |
 | Subjects       | evaluation                                                                                                         |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                |
-| Api token      | `EvaluationApi` = `moduleApi<EvaluationApi>()("evaluation")`, `contract/src/evaluation.api.ts:118` (27 operations) |
+| Api token      | `EvaluationApi` = `moduleApi<EvaluationApi>()("evaluation")`, `contract/src/evaluation.api.ts:121` (28 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                       |
 
 ## What evaluation owns
@@ -46,6 +46,6 @@ Anything else evaluation needs belongs to another module and is reached through 
 
 ## Who depends on evaluation
 
-[automation](../automation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
+[automation](../automation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [scenario](../scenario/README.md), [staff-access](../staff-access/README.md), [topic](../topic/README.md) (as a peer).
 
 <!-- readme:generated:end -->

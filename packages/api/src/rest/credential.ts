@@ -82,6 +82,7 @@ export function credentialPrincipalOfToken(
     ...(resolved.isLangySessionKey === undefined
       ? {}
       : { isLangySessionKey: resolved.isLangySessionKey }),
+    ...(resolved.isStaffAccessKey ? { isStaffAccessKey: true } : {}),
   };
 }
 
@@ -101,6 +102,7 @@ export function keyPrincipalOfApiKey(
     organizationId: resolved.organizationId,
     resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
     ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
+    ...(resolved.isStaffAccessKey ? { isStaffAccessKey: true } : {}),
   };
 }
 
@@ -190,6 +192,7 @@ const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
 const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
 const routeTemplates = new WeakMap<Request, string>();
+const admittedStaffSpend = new WeakMap<Request, boolean>();
 
 /** The project door states what it resolved, once per request. */
 export function recordProjectCredential(
@@ -309,6 +312,31 @@ export function admittedOwnerlessProjectKeyFor({
   );
 }
 
+/**
+ * Whether an organization or key door admitted an ownerless staff access key (ADR-202). Such a
+ * door asked the key's own grant at any project a route named, so that project's proof is the
+ * door's; other ownerless keys there stay refused, as before.
+ */
+export function admittedOwnerlessStaffKeyFor({
+  door,
+  request,
+}: {
+  door: "organization" | "api_key";
+  request: Request;
+}): boolean {
+  if (door === "organization") {
+    const credential = organizationCredentials.get(request);
+    return credential?.userId === null && credential.isStaffAccessKey === true;
+  }
+  const credential = keyCredentials.get(request);
+
+  return (
+    credential?.kind === "apiKey" &&
+    credential.userId === null &&
+    credential.isStaffAccessKey === true
+  );
+}
+
 /** The same, for the organization door. */
 export function organizationCredentialOfRequest(
   request: Request,
@@ -355,12 +383,29 @@ export function keyDoorPrincipalOfRequest(request: Request): RestKeyDoorPrincipa
   return credential;
 }
 
-/** The API key the key door resolved. An access token is no API key, so it is refused here. */
+/** The staff gate states whether it admitted this request with spend approval (ADR-202). */
+export function recordAdmittedStaffSpend({
+  request,
+  spendApproved,
+}: {
+  request: Request;
+  spendApproved: boolean;
+}): void {
+  admittedStaffSpend.set(request, spendApproved);
+}
+
+/** Whether the gate admitted this staff request with spend approval; false for none admitted. */
+function admittedStaffMaySpend(request: Request): boolean {
+  return admittedStaffSpend.get(request) === true;
+}
+
+/** The API key the key door resolved; a staff key carries its session's spend approval. */
 export function keyCredentialOfRequest(request: Request): RestKeyCredentialPrincipal {
   const credential = keyDoorPrincipalOfRequest(request);
   if (credential.kind === "cliAccessToken") throw new ProjectInvalidCredentialsError();
+  if (credential.kind !== "apiKey" || credential.isStaffAccessKey !== true) return credential;
 
-  return credential;
+  return { ...credential, staffSpendApproved: admittedStaffMaySpend(request) };
 }
 
 /** The same, for the SCIM door. */

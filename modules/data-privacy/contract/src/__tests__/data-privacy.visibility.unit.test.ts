@@ -7,6 +7,10 @@ import {
   isContentVisible,
   isContentVisibleToPublic,
   needsAudienceFacts,
+  needsOwnerFact,
+  needsRoleEverywhere,
+  ownsEveryGovernedProject,
+  viewerFactsFrom,
   type ViewerFacts,
 } from "../data-privacy.visibility.ts";
 
@@ -30,6 +34,15 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
     isProjectOwner: false,
     groupIds: [],
     ...partial,
+  };
+}
+
+/** The three role permissions a viewer holds at one project, named so a call reads plainly. */
+function permissions(held: { view: boolean; update: boolean; manage: boolean }) {
+  return {
+    "traces:view": held.view,
+    "traces:update": held.update,
+    "project:manage": held.manage,
   };
 }
 
@@ -156,5 +169,163 @@ describe("needsAudienceFacts and isContentVisibleToPublic", () => {
     expect(isContentVisibleToPublic(eff("capture"))).toBe(true);
     expect(isContentVisibleToPublic(eff("restrict", { admins: true }))).toBe(false);
     expect(isContentVisibleToPublic(eff("drop"))).toBe(false);
+  });
+});
+
+describe("viewerFactsFrom", () => {
+  const facts = (held: { view: boolean; update: boolean; manage: boolean }) =>
+    viewerFactsFrom({
+      held: permissions(held),
+      heldElsewhere: [],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+  describe("given a project Member, who writes traces but does not manage the project", () => {
+    it("reads them as the Members role, not as an admin", () => {
+      expect(facts({ view: true, update: true, manage: false })).toMatchObject({
+        isAdmin: false,
+        isMemberRole: true,
+        isViewer: false,
+      });
+    });
+
+    it("hides content restricted to admins from them", () => {
+      const viewer = facts({ view: true, update: true, manage: false });
+      expect(isContentVisible(eff("restrict", { admins: true }), viewer)).toBe(false);
+    });
+  });
+
+  describe("given a project Admin", () => {
+    it("reads them as an admin, not as the Members role", () => {
+      expect(facts({ view: true, update: true, manage: true })).toMatchObject({
+        isAdmin: true,
+        isMemberRole: false,
+        isViewer: false,
+      });
+    });
+  });
+
+  describe("given a Viewer, who only reads traces", () => {
+    it("reads them as a viewer", () => {
+      expect(facts({ view: true, update: false, manage: false })).toMatchObject({
+        isAdmin: false,
+        isMemberRole: false,
+        isViewer: true,
+      });
+    });
+  });
+});
+
+describe("viewerFactsFrom across the projects a read spans", () => {
+  /** @scenario "Admins-only content stays hidden when a read spans a project where the viewer is no admin" */
+  it("counts an admin only where they are admin at every project", () => {
+    const viewer = viewerFactsFrom({
+      held: permissions({ view: true, update: true, manage: true }),
+      heldElsewhere: [permissions({ view: true, update: true, manage: false })],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+    expect(viewer).toMatchObject({ isAdmin: false, isMemberRole: false, isViewer: false });
+    expect(isContentVisible(eff("restrict", { admins: true }), viewer)).toBe(false);
+  });
+
+  it("keeps the read's own membership when they hold no role at the other project", () => {
+    const viewer = viewerFactsFrom({
+      held: permissions({ view: true, update: true, manage: true }),
+      heldElsewhere: [permissions({ view: false, update: false, manage: false })],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+    expect(isContentVisible(eff("capture"), viewer)).toBe(true);
+    expect(isContentVisible(eff("restrict", { allMembers: true }), viewer)).toBe(true);
+  });
+});
+
+describe("needsRoleEverywhere and needsOwnerFact", () => {
+  it("asks the role at the other projects only when a restriction names a role", () => {
+    expect(needsRoleEverywhere(eff("restrict", { admins: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { members: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { viewers: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { allMembers: true, groupIds: ["g"] }))).toBe(false);
+    expect(needsRoleEverywhere(eff("capture"))).toBe(false);
+  });
+
+  it("reads ownership only for an owner audience, or for a viewer who is no member", () => {
+    const owner = [eff("restrict", { projectOwner: true })];
+    const admins = [eff("restrict", { admins: true }), eff("capture")];
+    expect(needsOwnerFact({ restrictions: owner, isMember: true })).toBe(true);
+    expect(needsOwnerFact({ restrictions: admins, isMember: true })).toBe(false);
+    expect(needsOwnerFact({ restrictions: admins, isMember: false })).toBe(true);
+  });
+});
+
+describe("ownsEveryGovernedProject", () => {
+  const owners: Record<string, string | null> = { a: "user-1", b: "user-1", c: "user-2", d: null };
+  const ownerOf = async (projectId: string) => owners[projectId];
+  const noFailure = () => {
+    throw new Error("no lookup was expected to fail");
+  };
+
+  it("counts the viewer as owner when they own every project the read spans", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a", "b"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(true);
+  });
+
+  /** @scenario "Owner-only content stays hidden when a read spans a project the viewer does not own" */
+  it("does not when one spanned project belongs to someone else", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a", "c"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("does not when a project has no owner, or no project is named", async () => {
+    for (const projectIds of [["d"], []]) {
+      await expect(
+        ownsEveryGovernedProject({
+          userId: "user-1",
+          projectIds,
+          ownerOf,
+          onLookupFailure: noFailure,
+        }),
+      ).resolves.toBe(false);
+    }
+  });
+
+  it("does not for a caller with no user", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: undefined,
+        projectIds: ["a"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("fails closed and reports the failure when an owner lookup throws", async () => {
+    const failures: unknown[] = [];
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a"],
+        ownerOf: () => Promise.reject(new Error("projects unreadable")),
+        onLookupFailure: (error) => failures.push(error),
+      }),
+    ).resolves.toBe(false);
+    expect(failures).toHaveLength(1);
   });
 });

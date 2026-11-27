@@ -5,6 +5,7 @@ import type { FeatureName } from "@langwatch/design-system/feature-mark";
 import {
   Activity,
   Anvil,
+  BotMessageSquare,
   Archive,
   BadgeCheck,
   Cloud,
@@ -437,7 +438,9 @@ function healthGroup(): SettingsMenuGroup {
 function toolsGroup({
   hasCloudOps,
   hosting,
-}: Pick<SettingsMenuGates, "hasCloudOps" | "hosting">): SettingsMenuGroup {
+  isPlatformAdmin,
+  hasAgentAccess,
+}: AdminMenuGates): SettingsMenuGroup {
   return {
     id: "admin-tools",
     label: "Tools",
@@ -446,6 +449,11 @@ function toolsGroup({
       // The cloud's gradual-rollout switch, also on a developer's machine; never self-hosted.
       ...(hasCloudOps || hosting === "local"
         ? [{ label: "Feature flags", href: "/ops/feature-flags", icon: Flag }]
+        : []),
+      // Operators approving their coding agents' access to customers: cloud only, behind the
+      // ops_agent_access_enabled flag, which the page itself answers not found without (ADR-202).
+      ...(hasCloudOps && isPlatformAdmin && hasAgentAccess
+        ? [{ label: "Agent access", href: "/ops/agents", icon: BotMessageSquare }]
         : []),
     ],
   };
@@ -501,7 +509,10 @@ export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
 export type AdminMenuGates = Pick<
   SettingsMenuGates,
   "hasCloudOps" | "hosting" | "hasOpsAccess" | "isPlatformAdmin"
->;
+> & {
+  /** The `ops_agent_access_enabled` system flag. */
+  hasAgentAccess: boolean;
+};
 
 /** The operator console's menu (/ops): its own sidebar, never appended to Settings. */
 export function adminMenu(gates: AdminMenuGates): SettingsMenuGroup[] {

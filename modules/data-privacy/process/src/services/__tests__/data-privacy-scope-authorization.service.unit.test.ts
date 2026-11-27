@@ -2,7 +2,11 @@
  * Who may write a privacy rule where.
  * Spec: specs/data-privacy/policy-configuration.feature
  */
-import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
+import {
+  builtinRoleGrants,
+  type AuthzApi,
+  type AuthzCanBatchByIdsInput,
+} from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -87,6 +91,45 @@ describe("DataPrivacyScopeAuthorizationService.assertCanWriteScope", () => {
         }),
       ).resolves.toBeUndefined();
     });
+  });
+});
+
+/** A caller holding one built-in role on every team and project, as authz grants it. */
+function serviceAsRole(role: "admin" | "member"): DataPrivacyScopeAuthorizationService {
+  const grants = (permission: string) => builtinRoleGrants({ role, permission });
+  const authz = createApiFixture<AuthzApi>({
+    hasPermission: async ({ permission }) => grants(permission),
+    canBatchByIds: async (input: AuthzCanBatchByIdsInput) => ({
+      teams: new Map(input.teams.map((team) => [team.teamId, grants(input.permission)])),
+      projects: new Map(
+        input.projects.map((project) => [project.projectId, grants(input.permission)]),
+      ),
+      organizationRole: null,
+    }),
+  });
+  return DataPrivacyScopeAuthorizationService.create({
+    directory: new FakeDirectory(),
+    permissions: DataPrivacyPermissionsService.create({ authz }),
+  });
+}
+
+describe("given a project rule, which beats the rules above it", () => {
+  const projectRule = { scopeType: "PROJECT" as const, scopeId: "web-app" };
+
+  /** @scenario "A project Member cannot write the project's privacy rule" */
+  it("refuses a project Member, who could otherwise lift an Admins-only rule", async () => {
+    await expect(
+      serviceAsRole("member").assertCanWriteScope({ userId: "user-1", scope: projectRule }),
+    ).rejects.toMatchObject({
+      code: "data_privacy_scope_write_forbidden",
+      meta: { scopeType: "PROJECT", requiredPermission: "project:manage" },
+    });
+  });
+
+  it("lets a project Admin write it", async () => {
+    await expect(
+      serviceAsRole("admin").assertCanWriteScope({ userId: "user-1", scope: projectRule }),
+    ).resolves.toBeUndefined();
   });
 });
 

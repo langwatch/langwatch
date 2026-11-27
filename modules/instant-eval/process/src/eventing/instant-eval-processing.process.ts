@@ -12,6 +12,7 @@ import {
   instantEvalPageJudgedEventSchema,
   instantEvalCancelRequestedEventSchema,
   instantEvalFinishedEventSchema,
+  instantEvalPageFailedEventSchema,
 } from "@langwatch/instant-eval-contract";
 
 import {
@@ -28,6 +29,7 @@ import {
   buildInstantEvalProcessEventView,
   handleInstantEvalCancelRequested,
   handleInstantEvalFinished,
+  handleInstantEvalPageFailed,
   handleInstantEvalPageJudged,
   handleInstantEvalPlanned,
   handleInstantEvalRequested,
@@ -74,6 +76,7 @@ export function instantEvalProcessManager(
       .on(instantEvalRequestedEventSchema, handleInstantEvalRequested)
       .on(instantEvalPlannedEventSchema, handleInstantEvalPlanned)
       .on(instantEvalPageJudgedEventSchema, handleInstantEvalPageJudged)
+      .on(instantEvalPageFailedEventSchema, handleInstantEvalPageFailed)
       .on(instantEvalCancelRequestedEventSchema, handleInstantEvalCancelRequested)
       .on(instantEvalFinishedEventSchema, handleInstantEvalFinished)
       .onWake(instantEvalWake)

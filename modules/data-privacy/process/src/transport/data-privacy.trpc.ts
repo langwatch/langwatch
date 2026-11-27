@@ -10,7 +10,7 @@ import { DataPrivacyApi, dataPrivacyTrpc } from "@langwatch/data-privacy-contrac
 const SCOPE_TARGETED_PERMISSIONS = [
   "organization:manage",
   "team:manage",
-  "project:update",
+  "project:manage",
 ] as const;
 
 function scopeTargeted(act: string): {

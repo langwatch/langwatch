@@ -10,8 +10,18 @@ import type { ReactNode } from "react";
 
 import { useFloatingLangyAtOpen } from "../../langy/behavior/use-floating-langy-at-open.ts";
 
-/** The chart's height in the drawer: room to read it, under the drawer's header. */
+/** The tallest the chart grows in the drawer: room to read it, under the drawer's header. */
 export const WIDGET_VIEW_CHART_HEIGHT_PX = 440;
+
+const WIDGET_VIEW_GROWTH = 1.6;
+
+/**
+ * The chart's height in the drawer, from its body height on the card: grown for the wider drawer
+ * and capped, so a short widget such as a row of numbers stays short instead of trailing a gap.
+ */
+export function widgetViewChartHeightPx(cardBodyHeightPx: number): number {
+  return Math.min(WIDGET_VIEW_CHART_HEIGHT_PX, Math.round(cardBodyHeightPx * WIDGET_VIEW_GROWTH));
+}
 
 export function WidgetLangyView({
   name,
@@ -19,6 +29,7 @@ export function WidgetLangyView({
   footer,
   actions,
   onClose,
+  chartHeightPx,
   chart,
 }: {
   name: string;
@@ -28,7 +39,9 @@ export function WidgetLangyView({
   /** The widget's Langy actions; absent when it shows none. */
   actions?: ReactNode;
   onClose: () => void;
-  /** The widget drawn at `WIDGET_VIEW_CHART_HEIGHT_PX`. */
+  /** From `widgetViewChartHeightPx`. */
+  chartHeightPx: number;
+  /** The widget drawn at `chartHeightPx`. */
   chart: ReactNode;
 }) {
   useInPlaceDrawer({ open: true });
@@ -44,7 +57,7 @@ export function WidgetLangyView({
       data-testid="widget-langy-view"
     >
       <VStack align="stretch" gap={3}>
-        <Box height={`${WIDGET_VIEW_CHART_HEIGHT_PX}px`} data-testid="widget-langy-view-chart">
+        <Box height={`${chartHeightPx}px`} data-testid="widget-langy-view-chart">
           {chart}
         </Box>
         {actions}

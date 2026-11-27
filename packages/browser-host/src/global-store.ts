@@ -68,23 +68,32 @@ onUiStorageReaderChange(() => {
   for (const restore of restores.values()) restore();
 });
 
-function hydrate<S>({ key, initial }: { key: string; initial: S }): S {
+function hydrate<S>({
+  key,
+  initial,
+  revive,
+}: {
+  key: string;
+  initial: S;
+  revive?: (saved: Partial<S>) => Partial<S>;
+}): S {
   const raw = readerUiStorage.getItem(key);
   if (!raw) return initial;
   try {
     const parsed: unknown = JSON.parse(raw);
     const saved =
       typeof parsed === "object" && parsed !== null && "state" in parsed ? parsed.state : null;
-    return typeof saved === "object" && saved !== null ? { ...initial, ...saved } : initial;
+    if (typeof saved !== "object" || saved === null) return initial;
+    return { ...initial, ...(revive ? revive(saved as Partial<S>) : saved) };
   } catch {
     return initial;
   }
 }
 
 /**
- * Declare a slice. `create` receives `set` and `get` scoped to this slice, as in zustand.
- * `persist` keeps picked preferences, never server data, under `key` (default `name`) for the
- * signed-in reader only; sign-out forgets them. Declaring a name twice replaces it.
+ * Declare a slice; `create` gets `set` and `get` scoped to it. `persist` keeps picked preferences
+ * (never server data) under `key` (default `name`) for the signed-in reader only; sign-out forgets
+ * them, and `revive` cleans what storage held on first read and on sign-in. A name twice replaces.
  */
 export function defineSlice<S extends object>({
   name,
@@ -93,7 +102,12 @@ export function defineSlice<S extends object>({
 }: {
   name: string;
   create: (set: SetSlice<S>, get: () => S) => S;
-  persist?: { key?: string; partialize: (state: S) => Partial<S> };
+  persist?: {
+    key?: string;
+    partialize: (state: S) => Partial<S>;
+    /** Cleans what storage held, once, as it is read back; a bad value never reaches the slice. */
+    revive?: (saved: Partial<S>) => Partial<S>;
+  };
 }): Slice<S> {
   if (!SLICE_NAME.test(name)) {
     throw new Error(`UI slice name "${name}" must be "<module>:<key>"`);
@@ -111,11 +125,13 @@ export function defineSlice<S extends object>({
     }
   };
   const initial = create(set, get);
-  root.setState({ [name]: persist ? hydrate({ key, initial }) : initial });
+  root.setState({ [name]: persist ? hydrate({ key, initial, revive: persist.revive }) : initial });
   if (persist) {
     // A new reader keeps the session-only keys and gets their own preferences, or initial ones.
     const base = (): S => ({ ...get(), ...persist.partialize(initial) });
-    restores.set(name, () => root.setState({ [name]: hydrate({ key, initial: base() }) }));
+    restores.set(name, () =>
+      root.setState({ [name]: hydrate({ key, initial: base(), revive: persist.revive }) }),
+    );
   } else {
     restores.delete(name);
   }

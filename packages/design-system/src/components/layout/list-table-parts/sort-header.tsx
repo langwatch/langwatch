@@ -70,6 +70,8 @@ export function SortHeader({
         gap={1}
         flexDirection={align === "end" ? "row-reverse" : "row"}
         font="inherit"
+        textTransform="inherit"
+        letterSpacing="inherit"
         color={sorted ? "fg" : "inherit"}
         cursor="pointer"
         borderRadius="xs"

@@ -188,6 +188,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
+  // A member's own sidebar order, read and written by its (userId, organizationId, product) key.
+  DashboardSidebarOrder: {},
   // One row per retention scope; read by organizationId, written by row id.
   RetentionApplyStatus: {},
   // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
@@ -491,6 +493,11 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // no customer content: only ids, domains, enums and credential references.
   "SsoConnection",
   "Subscription",
+  // Staff access (ADR-202): platform records about one organization, read across organizations
+  // by the operator console, the gate (by key id) and the expiry sweep. The staff-access module
+  // writes them only; no customer surface reads them.
+  "StaffAccessRequest",
+  "StaffAccessEvent",
 ];
 
 export const ORG_SCOPED_MODEL_NAMES: readonly string[] = Object.keys(ORG_SCOPED_MODELS);

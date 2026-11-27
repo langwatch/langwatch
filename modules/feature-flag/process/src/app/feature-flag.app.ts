@@ -136,6 +136,10 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
     return this.#flags.listOperatorCatalogue();
   }
 
+  findEnabledFlagsForOrganization(input: Readonly<{ organizationId: string }>): Promise<string[]> {
+    return this.#flags.findEnabledFlagsForOrganization(input);
+  }
+
   setEnabled(input: FeatureFlagWrite & { enabled: boolean }): Promise<void> {
     return this.#flags.setEnabled(input);
   }

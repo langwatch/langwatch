@@ -1,0 +1,52 @@
+{
+  "release": "3.31.0",
+  "previous": "3.30.0",
+  "cutAt": "2026-11-26T21:28:12+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261125160000_dashboards_v2_my_dashboard_owner",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboards v2 my dashboard owner"
+    },
+    {
+      "id": "prisma:20261126120000_stored_object_owner_links",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "stored-object",
+      "description": "Postgres schema: stored object owner links"
+    },
+    {
+      "id": "clickhouse:00135",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: trace analytics app version"
+    },
+    {
+      "id": "dashboard:mark-my-dashboards",
+      "kind": "data",
+      "mode": "background",
+      "owner": "dashboard",
+      "description": "Marks each member's existing My dashboard, so renaming it keeps it theirs.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:link-unowned-trace-media",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:replay-trace-analytics-app-version",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
+      "needsOldWritersGone": true
+    }
+  ]
+}

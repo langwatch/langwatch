@@ -99,9 +99,9 @@ The built-in detection matches known vendor key prefixes, key-shaped strings (a 
 |------------|---------------------|
 | Organization, department | `organization:manage` |
 | Team | `team:manage` |
-| Project | `project:update` |
+| Project | `project:manage` |
 
-Anyone with `project:view` can open the page for a project. Organization and department rules are listed only to people with `organization:manage`.
+Anyone with `project:view` can open the page for a project. A rule is listed only to people who hold the permission to write it at its scope, from the table above: organization and department rules to `organization:manage`, team rules to `team:manage`, project rules to `project:manage`. Everyone who can open the page sees the policy in force on the project.
 
 ## Boundaries
 
