@@ -5,6 +5,7 @@
  */
 
 import type { Monaco } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { useEffect } from "react";
 
 import { LW_GLOBAL_DTS } from "../model/dashboard-widget/lw-global-types.ts";
@@ -13,10 +14,12 @@ import {
   CSSTYPE_STUB_URI,
   LW_WIDGET_MODULES_DTS,
 } from "../model/dashboard-widget/lw-widget-module-types.ts";
+import { rawColourHints } from "../model/dashboard-widget/widget-colour-hints.ts";
 
 const LW_GLOBAL_DTS_URI = "file:///lw-global.d.ts";
 const LW_MODULES_DTS_URI = "file:///lw-modules.d.ts";
 const LW_ROW_TYPES_URI = "file:///lw-query-rows.d.ts";
+const COLOUR_HINT_OWNER = "lw-colour-hints";
 const TYPES_DIR = "../../node_modules/@types/";
 const REACT_INDEX_URI = "file:///node_modules/@types/react/index.d.ts";
 
@@ -134,4 +137,37 @@ export function useWidgetRowTypes({
     );
     return () => lib.dispose();
   }, [mounted, dts]);
+}
+
+/**
+ * Raw colours in the widget source as Hint markers: a nudge to `LW.palette`, never an error.
+ * Reads the model, not the React prop, so it follows the text as the author types.
+ */
+export function useWidgetColourHints({
+  mounted,
+}: {
+  mounted: { readonly monaco: Monaco; readonly editor: editor.IStandaloneCodeEditor } | undefined;
+}): void {
+  useEffect(() => {
+    const model = mounted?.editor.getModel();
+    if (!mounted || !model) return undefined;
+    const { monaco } = mounted;
+    const mark = () => {
+      monaco.editor.setModelMarkers(
+        model,
+        COLOUR_HINT_OWNER,
+        rawColourHints(model.getValue()).map((hint) => ({
+          severity: monaco.MarkerSeverity.Hint,
+          message: hint.message,
+          startLineNumber: hint.line,
+          startColumn: hint.column,
+          endLineNumber: hint.line,
+          endColumn: hint.column + hint.length,
+        })),
+      );
+    };
+    mark();
+    const subscription = model.onDidChangeContent(mark);
+    return () => subscription.dispose();
+  }, [mounted]);
 }

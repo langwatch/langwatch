@@ -91,13 +91,14 @@ For code outside a component (or when you need a raw promise instead of hook sem
 
 ### Colours and size: follow the dashboard
 
-The widget runs in a frame on the dashboard, in the reader's light or dark theme. The frame sets the theme's colours as CSS variables, so use only these, written as `var(--chakra-colors-fg)`:
+The widget runs in a frame on the dashboard, in the reader's light or dark theme. Charts read the chart palette and style set from the runtime, which resolves them for the current mode:
 
-- `--chakra-colors-fg` (text), `--chakra-colors-fg-subtle` (labels, axes), `--chakra-colors-border-muted` (grid lines, tile borders)
-- `--chakra-colors-bg-card` and `--chakra-colors-border-card` (a tooltip or panel), `--chakra-colors-fg-error`, `--chakra-colors-fg-success`
-- `--chakra-colors-chart-1` to `--chakra-colors-chart-8` (series colours)
+- `LW.palette.series[n]` (n from 0 to 7): the ordered series colours, first hue at 0. `LW.palette.mode` is `"light"` or `"dark"`.
+- `LW.chartStyle`: `barCornerRadius` and `dotSize` in px, and `track` (the background bar), `axis` (labels) and `grid` (gridlines) as CSS colours.
 
-Never write a hex colour, `white` or a light background such as `#f8fafc`: a stat tile like that is a white block in dark mode. A tile has no background of its own, only a `1px solid var(--chakra-colors-border-muted)` border. `LW.theme` (`"light"` or `"dark"`) is there for anything the variables do not cover.
+Text and surfaces still come from the CSS variables, written as `var(--chakra-colors-fg)`: `--chakra-colors-fg` (text), `--chakra-colors-fg-subtle`, `--chakra-colors-bg-card` and `--chakra-colors-border-card` (a tooltip or panel), `--chakra-colors-border-muted` (tile borders), `--chakra-colors-fg-error`, `--chakra-colors-fg-success`.
+
+A hard-coded colour still runs (hex, `rgb()`, `hsl()`, `white` or `black`), but the editor hints at it: use a theme value instead, so the chart follows the theme. Never write `white` or a light background such as `#f8fafc`: a stat tile like that is a white block in dark mode. A tile has no background of its own, only a `1px solid var(--chakra-colors-border-muted)` border. `LW.theme` (`"light"` or `"dark"`) is there for anything the variables do not cover.
 
 A new widget lands half the board wide and about 200 px tall inside. Fill that space rather than guessing a height: the outer element is `height: "100%"` and a flex column, at most one row of stat tiles goes on top, and the chart takes the rest (`flex: 1, minHeight: 0`, with `<ResponsiveContainer width="100%" height="100%">`). Never give a chart a fixed pixel height: one taller than the card hides its bars until the reader drags the card bigger.
 
@@ -201,11 +202,14 @@ export default function Widget() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows}>
-            <CartesianGrid stroke={color("border-muted")} vertical={false} />
+            <CartesianGrid stroke={LW.chartStyle.grid} vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize: 10, fill: color("fg-subtle") }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: color("fg-subtle") }} />
             <Tooltip
+              cursor={{ fill: LW.chartStyle.track }}
               contentStyle={{ background: color("bg-card"), border: `1px solid ${color("border-card")}` }}
+              itemStyle={{ color: color("fg") }}
+              labelStyle={{ color: color("fg-subtle") }}
             />
             <Bar dataKey="traces" fill={color("chart-1")} />
           </BarChart>

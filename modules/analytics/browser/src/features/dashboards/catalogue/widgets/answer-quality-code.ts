@@ -152,7 +152,7 @@ export const JUDGE_AGREEMENT_CODE = widgetCode({
     reviewed[row.evaluator] = (reviewed[row.evaluator] || 0) + num(row.reviewed);
   }
   const judges = Object.keys(reviewed).toSorted((a, b) => reviewed[b] - reviewed[a]).slice(0, 4);
-  const colours = [C.teal, C.orange, C.pink, "#9f7aea"];
+  const colours = [C.teal, C.orange, C.pink, LW.palette.series[4]];
   const weeks = {};
   for (const row of weekly.data) {
     const index = judges.indexOf(row.evaluator);

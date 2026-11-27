@@ -14,6 +14,31 @@ interface LwTimeWindow {
 type LwTheme = "light" | "dark";
 
 /**
+ * \`LW.palette\`: the eight ordered series colours (CSS colour strings) for \`mode\`.
+ * \`series[0]\` is the first hue.
+ */
+interface LwPalette {
+  readonly mode: LwTheme;
+  readonly series: readonly [
+    string, string, string, string, string, string, string, string,
+  ];
+}
+
+/** \`LW.chartStyle\`: shape metrics in px, and the greys a chart draws with. */
+interface LwChartStyle {
+  /** Corner radius for bar ends, in px. */
+  readonly barCornerRadius: number;
+  /** Marker diameter for points, in px. */
+  readonly dotSize: number;
+  /** Background bar behind a bar or gauge. */
+  readonly track: string;
+  /** Axis labels and tick text. */
+  readonly axis: string;
+  /** Gridlines. */
+  readonly grid: string;
+}
+
+/**
  * Host-supplied, read-only snapshot of the dashboard's own state —
  * everything a widget did NOT author itself. Set synchronously before
  * author code's first line runs; updates in place on
@@ -24,6 +49,11 @@ type LwTheme = "light" | "dark";
  * every host (e.g. the playground preview) can supply them.
  */
 interface LwDashboardContext {
+  /**
+   * The host's resolved colour map: design tokens such as \`fg\`, \`fg.subtle\`, \`bg.card\` and
+   * \`border.card\`, as CSS colour strings for the current theme. Read these, not hex.
+   */
+  readonly colors: Readonly<Record<string, string>>;
   readonly timeWindow: LwTimeWindow;
   readonly granularitySeconds: number;
   /** IANA zone name, e.g. "America/Sao_Paulo". */
@@ -191,6 +221,18 @@ interface LwApi {
 
   /** The dashboard's current color theme, fixed for the frame's lifetime. */
   readonly theme: LwTheme;
+
+  /**
+   * The chart series colours, in order, for the current mode. Use these instead of
+   * hard-coded hex so a chart reads in light and dark. Series one is the first hue.
+   */
+  readonly palette: LwPalette;
+
+  /**
+   * The chart style set for the current mode: bar corner radius, marker size, and the
+   * track, axis and grid greys. Read it beside \`LW.palette\`.
+   */
+  readonly chartStyle: LwChartStyle;
 
   /**
    * Runs one of the widget's declared queries by name, forwarding the given

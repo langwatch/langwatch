@@ -107,7 +107,7 @@ export const ERRORS_PER_DAY_CODE = widgetCode({
   recharts: MARKED_CHART_IMPORTS,
   parts: MARKED_PARTS,
   components: `const SHOWN = 4;
-const COLOURS = [C.red, C.orange, C.pink, "#9f7aea", C.faint];`,
+const COLOURS = [C.red, C.orange, C.pink, LW.palette.series[4], C.faint];`,
   queries: ["types", "rate", "changes"],
   body: `  if (rate.data.length === 0) return <Panel><CallToAction /></Panel>;
   const totals = {};

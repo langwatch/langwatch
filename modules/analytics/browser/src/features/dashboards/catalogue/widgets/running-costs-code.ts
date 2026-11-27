@@ -111,7 +111,7 @@ const SOURCES = [
   ["production", "Your app", C.teal, "application"],
   ["evaluations", "Automatic checks", C.orange, "evaluation"],
   ["simulations", "Simulated tests", C.pink, "simulation"],
-  ["experiments", "Playground and workflows", "#9f7aea", "playground"],
+  ["experiments", "Playground and workflows", LW.palette.series[4], "playground"],
   ["other", "Other", C.faint, undefined],
 ];
 

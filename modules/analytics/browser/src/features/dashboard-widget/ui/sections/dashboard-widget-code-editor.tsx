@@ -13,6 +13,7 @@ import { lazy, Suspense, useState } from "react";
 
 import {
   configureWidgetTypeScript,
+  useWidgetColourHints,
   useWidgetRowTypes,
 } from "../../../../behavior/lw-widget-monaco.ts";
 import { useEditorValueSync } from "../../../../behavior/use-editor-value-sync.ts";
@@ -51,6 +52,7 @@ export function DashboardWidgetCodeEditor({
     readonly editor: editor.IStandaloneCodeEditor;
   }>();
   useWidgetRowTypes({ mounted, dts: lwQueryRowTypesDts({ queries: queryColumns }) });
+  useWidgetColourHints({ mounted });
   useEditorValueSync({ editor: mounted?.editor, value });
 
   return (

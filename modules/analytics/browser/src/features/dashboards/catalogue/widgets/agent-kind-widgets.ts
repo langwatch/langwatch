@@ -553,8 +553,8 @@ const GEN_DROPOFF_CODE = widgetCode({
       gridTemplateColumns: "8rem 1fr 4rem", gap: 8, alignItems: "center", fontSize: 12,
       ...askCursor() }}>
       <span style={{ fontWeight: 500 }}>{label}</span>
-      <span style={{ height: 14, borderRadius: 4, background: C.muted }}>
-        <span style={{ display: "block", height: "100%", borderRadius: 4, background: C.teal,
+      <span style={{ height: 14, borderRadius: LW.chartStyle.barCornerRadius, background: C.muted }}>
+        <span style={{ display: "block", height: "100%", borderRadius: LW.chartStyle.barCornerRadius, background: C.teal,
           opacity: 0.8, width: (of > 0 ? (value / of) * 100 : 0) + "%" }} />
       </span>
       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>

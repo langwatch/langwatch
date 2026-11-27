@@ -1,27 +1,27 @@
 /**
- * The pieces every Flight Deck widget's stored TSX is put together from. The
- * sandbox has no Chakra and no shared module, so each widget carries its own
- * colours and helpers: what a member opens in the edit drawer runs as is.
+ * The pieces every Flight Deck widget's stored TSX is built from. The sandbox has no Chakra
+ * or shared module, so each widget carries its helpers. PALETTE, BARS and CHART_STYLE read
+ * LW.palette, LW.chartStyle and LW.dashboardContext.colors at runtime: no colour is copied.
  */
 
 import { CALLS_TO_ACTION, type WidgetSource } from "./widget-calls-to-action.ts";
 
 export type { WidgetSource } from "./widget-calls-to-action.ts";
 
-export const PALETTE = `const dark = LW.theme === "dark";
+export const PALETTE = `const TOKENS = LW.dashboardContext.colors;
 const C = {
-  text: dark ? "#f4f4f5" : "#18181b",
-  subtle: dark ? "#a1a1aa" : "#52525b",
-  faint: dark ? "#71717a" : "#a1a1aa",
-  border: dark ? "#27272a" : "#e4e4e7",
-  strong: dark ? "#3f3f46" : "#d4d4d8",
-  muted: dark ? "#27272a" : "#f4f4f5",
-  panel: dark ? "#18181b" : "#ffffff",
-  teal: dark ? "#2dd4bf" : "#0d9488",
-  orange: "#ed8926",
-  pink: "#ed64a6",
-  red: dark ? "#f87171" : "#dc2626",
-  green: dark ? "#4ade80" : "#16a34a",
+  text: TOKENS["fg"],
+  subtle: TOKENS["fg.subtle"],
+  faint: TOKENS["fg.subtle"],
+  border: LW.chartStyle.grid,
+  strong: TOKENS["border.card"],
+  muted: LW.chartStyle.track,
+  panel: TOKENS["bg.card"],
+  teal: LW.palette.series[5],
+  orange: LW.palette.series[0],
+  pink: LW.palette.series[7],
+  red: TOKENS["fg.error"],
+  green: TOKENS["fg.success"],
 };`;
 
 /**
@@ -75,7 +75,7 @@ function bucketUnit() {
   return seconds >= 604800 ? "week" : seconds >= 86400 ? "day" : "hour";
 }`;
 
-export const CHART_STYLE = `const AXIS = { fontSize: 14, fill: dark ? C.faint : "#666666" };
+export const CHART_STYLE = `const AXIS = { fontSize: 14, fill: LW.chartStyle.axis };
 const TIP = { background: C.panel, border: "1px solid " + C.border, borderRadius: 8, fontSize: 12 };
 const dot = (color) => ({ width: 8, height: 8, borderRadius: 4, background: color });
 
@@ -94,14 +94,15 @@ function Legend({ items, kind = "series" }) {
   );
 }`;
 
-export const BARS = `const RAMP = ["#4299e1", "#ed8926", "#9f7aea", "#48bb78", "#ed64a6", "#38b2ac", "#0bc5ea"];
+export const BARS = `const RAMP = LW.palette.series;
 // A headline model keeps its colour on every chart; any other name takes its rank's.
+// Indices into LW.palette.series, each the hue the model had before the palette changed.
 const FIXED_COLOURS = {
-  "gpt-5": 0,
-  "claude-sonnet-4.5": 1,
-  "llama-4-70b": 2,
-  "gemini-2.5-pro": 3,
-  "claude-opus-4.5": 4,
+  "gpt-5": 1,
+  "claude-sonnet-4.5": 0,
+  "llama-4-70b": 4,
+  "gemini-2.5-pro": 2,
+  "claude-opus-4.5": 7,
   "gpt-5-mini": 5,
 };
 const colourFor = (label, index) => RAMP[FIXED_COLOURS[label] ?? index % RAMP.length];
@@ -109,7 +110,7 @@ const ELLIPSIS = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "no
 const bar = (colour) => ({
   display: "block",
   height: "100%",
-  borderRadius: 4,
+  borderRadius: LW.chartStyle.barCornerRadius,
   opacity: 0.8,
   background: colour,
 });
@@ -135,7 +136,7 @@ function Bars({ rows, format, height, kind }) {
           <span style={{ width: 128, flexShrink: 0, color: C.subtle, ...ELLIPSIS }}>
             {row.label || "Unknown"}
           </span>
-          <span style={{ flex: 1, height: 16, borderRadius: 4, background: C.muted,
+          <span style={{ flex: 1, height: 16, borderRadius: LW.chartStyle.barCornerRadius, background: C.muted,
             fontSize: 10.5, lineHeight: "16px", paddingLeft: known(row.value) ? 0 : 6,
             color: C.faint }}>
             {known(row.value) ? (
@@ -365,7 +366,7 @@ const BUTTON = `const BUTTON = {
   border: 0,
   borderRadius: 8,
   background: C.teal,
-  color: "#ffffff",
+  color: "var(--chakra-colors-bg-card)",
   fontFamily: "inherit",
   fontSize: 12,
   fontWeight: 500,
@@ -384,8 +385,7 @@ export const FACE_FULL_MIN_HEIGHT_PX = 180;
  * the full face is 208px with a two-line line, 164px without its icon; the row is 75px.
  */
 const FIT_CSS = `.lw-row { display: none; }
-[data-lw-ask]:hover { background: rgba(127, 127, 127, 0.1); border-radius: 4px; }
-[data-lw-ask]:focus-visible { outline: 2px solid #0d9488; outline-offset: 1px; border-radius: 4px; }
+[data-lw-ask]:hover { background: var(--chakra-colors-bg-muted); border-radius: 4px; }
 @media (max-height: ${FACE_ICON_MIN_HEIGHT_PX - 1}px) { .lw-icon { display: none !important; } }
 @media (max-height: ${FACE_FULL_MIN_HEIGHT_PX - 1}px) {
   .lw-full { display: none !important; }
@@ -461,7 +461,9 @@ function panelCode(): string {
   return `const CENTRED = { display: "flex", flexDirection: "column", alignItems: "center",
   justifyContent: "center" };
 const FRAME_CSS = '@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400..700' +
-  '&display=swap"); body { padding: 6px 8px 8px; } ' + ${JSON.stringify(FIT_CSS)};
+  '&display=swap"); body { padding: 6px 8px 8px; } ' + ${JSON.stringify(FIT_CSS)} +
+  ' [data-lw-ask]:focus-visible { outline: 2px solid ' + C.teal +
+  '; outline-offset: 1px; border-radius: 4px; }';
 
 function Panel({ children }) {
   return (

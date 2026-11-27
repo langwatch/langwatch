@@ -5,6 +5,13 @@
  */
 
 import {
+  CHART_SERIES_TOKENS,
+  CHART_STYLE_METRICS,
+  CHART_STYLE_TOKENS,
+  chartPaletteOf,
+  chartStyleOf,
+} from "../../visualization/chart-palette.ts";
+import {
   CHART_FRAME_HEARTBEAT_INTERVAL_MS,
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
@@ -33,8 +40,32 @@ export function buildShimScript(): string {
   var resolveReady;
   var ready = new Promise(function (resolve) { resolveReady = resolve; });
 
+  // The palette and style set are resolved from the host's colour map, so they follow the
+  // mode the frame was given; a theme change remounts the frame, so they never go stale.
+  // A missing token keeps the previous values and logs once: the frame still runs, and the
+  // bundled charts fall back to their own token reads.
+  var colourWarned = false;
   function applyColors(context) {
     LW.theme = context.theme;
+    try {
+      var nextPalette = ${chartPaletteOf.toString()}({
+        colors: context.colors || {},
+        mode: context.theme,
+        seriesTokens: ${JSON.stringify(CHART_SERIES_TOKENS)}
+      });
+      var nextStyle = ${chartStyleOf.toString()}({
+        colors: context.colors || {},
+        styleTokens: ${JSON.stringify(CHART_STYLE_TOKENS)},
+        metrics: ${JSON.stringify(CHART_STYLE_METRICS)}
+      });
+      LW.palette = nextPalette;
+      LW.chartStyle = nextStyle;
+    } catch (error) {
+      if (!colourWarned && typeof console !== "undefined") {
+        colourWarned = true;
+        console.warn("LangWatch: " + (error && error.message));
+      }
+    }
     if (typeof document === "undefined" || !document.documentElement) return;
     if (context.theme === "light" || context.theme === "dark") {
       document.documentElement.style.colorScheme = context.theme;
@@ -87,6 +118,8 @@ export function buildShimScript(): string {
     dashboardContext: undefined,
     params: undefined,
     theme: undefined,
+    palette: undefined,
+    chartStyle: undefined,
     query: function (name, params) {
       return ready.then(function () {
         return new Promise(function (resolve, reject) {
