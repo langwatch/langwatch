@@ -86,6 +86,7 @@ function snapshotAs(role: "admin" | "member") {
     ),
     directory,
     permissions: DataPrivacyPermissionsService.create({ authz }),
+    apiKeys: { listAll: async () => [] },
   }).getSnapshot({ userId: "user-1", projectId: "web-app" });
 }
 
