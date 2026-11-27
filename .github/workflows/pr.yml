@@ -353,9 +353,12 @@ jobs:
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
-      - uses: langwatch/langwatch-pr-review-bot@87e7c462dfe93e9144b890053542870dc8291782 # main 2026-11-25
+      - uses: langwatch/langwatch-pr-review-bot@37cd3ca1858a9370daa0126cf75df342255e1306 # feat/approve-clean-reviews 2026-11-26
         with:
           slack_notify: "false"
+          # A review with no blocking finding posts APPROVE; the wait step above has
+          # already seen CI green.
+          approve: "true"
           # Bounds each of the bot's two claude calls (review and brief); the
           # bot's default of 60 would outlast the job timeout above.
           review_timeout_minutes: 20

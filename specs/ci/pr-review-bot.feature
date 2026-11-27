@@ -157,6 +157,14 @@ Feature: PR Review Bot workflow
     Then it is at least the wait step's limit plus twice review_timeout_minutes plus 5
     And a slow CI ends with the wait step's message naming the pending checks
 
+  @unit
+  Scenario: A review with no blocking finding approves the PR
+    Given the review job's bot step
+    When its inputs are checked
+    Then it passes approve "true"
+    And a review with no blocking finding posts an approval that counts as the required review
+    And the PR gets the review-bot-approved label, which a later blocking review removes
+
   # ============================================================================
   # Gating: Dependabot PRs
   # ============================================================================

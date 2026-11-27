@@ -153,6 +153,9 @@ them. Module code never reads `process.env`.
   ask for one re-review with `@coderabbitai review`. A lint, format or PR-body finding is CI's job: run the tool,
   never hand-edit for it. Fix the PR description just before merge; editing it
   needs no new review.
+- The review bot approves a non-draft PR from this repository (not a fork or
+  Dependabot) with no blocking finding once CI is green, and that approval
+  counts: don't wait for a human review to merge.
 - Commit messages are Conventional Commits (`feat(scope): …`, `fix: …`).
 - Branches: `issue123/slug` for issues, `feat/slug` for features.
 - Worktrees go in `.worktrees/<branch-with-slash-as-hyphen>` via

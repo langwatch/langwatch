@@ -67,7 +67,8 @@ var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // the invariants specs/ci/pr-review-bot.feature describes: the wait for
 // ci-complete, the wait for every other check, the skip gate, the trigger
 // types that can run a review, single-review-in-flight concurrency, full-SHA
-// pinning on every action it uses, and the required permissions block.
+// pinning on every action it uses, the required permissions block, and the
+// bot's opt-in to approving a review with no blocking finding.
 func PRReviewBot(repoRoot string) ([]string, error) {
 	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
 	if err != nil {
@@ -82,6 +83,7 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
 	problems = append(problems, prReviewBotPermissions(workflow)...)
 	problems = append(problems, prReviewBotPinning(workflow)...)
+	problems = append(problems, prReviewBotApproves(workflow)...)
 
 	return problems, nil
 }
@@ -168,6 +170,28 @@ func prReviewBotWaitsForChecks(workflow *ciscan.Workflow) []string {
 	problems = append(problems, botOrderProblems(job.Steps, waits)...)
 
 	return append(problems, timeoutProblems(job, job.Steps[waits])...)
+}
+
+// prReviewBotApproves checks the bot step passes approve: "true". Without it a
+// clean review posts a COMMENT, which never counts as the required approval,
+// so every PR quietly waits for a human again.
+func prReviewBotApproves(workflow *ciscan.Workflow) []string {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok { // prReviewBotGates reports a missing job
+		return nil
+	}
+	bot := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+		return strings.HasPrefix(step.Uses, prReviewBotBotAction)
+	})
+	if bot < 0 { // botOrderProblems reports a missing bot step
+		return nil
+	}
+	if fmt.Sprint(job.Steps[bot].With["approve"]) == "true" {
+		return nil
+	}
+
+	return []string{fmt.Sprintf(
+		`%s review job's bot step does not pass approve: "true", so a clean review posts a comment that never counts as the required approval`, PRReviewBotWorkflow)}
 }
 
 // prReviewBotJobTimeoutSpare is the minutes the review job's timeout must
