@@ -181,7 +181,7 @@ Feature: Langy panel layout modes
     Given a viewport of a known width
     When I drag the panel narrower than its minimum or wider than its maximum
     Then the width stops at the minimum, which keeps the composer usable
-    And it stops at the maximum, where the page (or an open drawer the card dodges) would keep less than 480 px, if the window can fit the minimum width and 480 px together
+    And it stops at the maximum, where the page (or an open drawer the card dodges) would keep less than 480 px, if the window can fit the minimum width and 480 px together, plus the 12 px floating inset when the card dodges a drawer
     And a floating card with no drawer stops at the window's edge gutter
 
   @unit
@@ -190,7 +190,7 @@ Feature: Langy panel layout modes
     When I drag the docked panel as wide as it will go
     Then the page beside it keeps at least 480 px when the window fits the panel's minimum width and 480 px
     And on a narrower window the panel stays at its minimum width
-    And a floating card dodging a drawer leaves the drawer the same room
+    And a floating card dodging a drawer leaves the drawer the same room when the window also fits its 12 px inset
 
   @unit
   Scenario: A window resize re-clamps the chosen width
