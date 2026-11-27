@@ -87,8 +87,12 @@ describe("a member of two organizations", () => {
       for (const send of planned) await digest.carryOut(send);
 
       const ofMember = digest.mail.filter((mail) => mail.to === emailOf(MEMBER));
-      expect(ofMember.map((mail) => tracesOf(mail)).toSorted()).toEqual([1_200, 5_000]);
-      expect(ofMember.map((mail) => mail.idempotencyKey).toSorted()).toEqual([
+      const traces = ofMember.map((mail) => tracesOf(mail)).toSorted((a, b) => (a ?? 0) - (b ?? 0));
+      const keys = ofMember
+        .map((mail) => mail.idempotencyKey)
+        .toSorted((a, b) => (a ?? "").localeCompare(b ?? ""));
+      expect(traces).toEqual([1_200, 5_000]);
+      expect(keys).toEqual([
         `digest:${MEMBER}:${ORGANIZATION}:${SENT_WEEK}`,
         `digest:${MEMBER}:${OTHER_ORGANIZATION}:${SENT_WEEK}`,
       ]);
