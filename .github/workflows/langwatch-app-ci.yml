@@ -194,6 +194,8 @@ jobs:
               - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
+              - 'cmd/waitcontainers/**'
+              - 'tools/waitcontainers/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
@@ -797,16 +799,22 @@ jobs:
       # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
       - name: Nx remote cache log
         if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        continue-on-error: true
         run: node dev/nx/remote-cache/launch.mjs report
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
@@ -898,11 +906,15 @@ jobs:
 
       - name: Extract test failures
         if: failure()
+        timeout-minutes: 2
+        continue-on-error: true
         working-directory: apps/${{ matrix.app == 'platform-api' && 'api' || matrix.app }}
         run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
@@ -911,6 +923,8 @@ jobs:
 
       - name: Upload unit test coverage to Codecov
         if: always() && hashFiles('apps/*/coverage/lcov.info') != ''
+        timeout-minutes: 3
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
           files: apps/api/coverage/lcov.info,apps/worker/coverage/lcov.info,apps/ui/coverage/lcov.info
@@ -980,40 +994,30 @@ jobs:
         shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}
     name: package-suites (${{ matrix.shard }}/${{ strategy.job-total }})
     #
-    # It DOES have services. This job absorbed the datastore lane at the
-    # deployment cutover: `test-integration` existed to shard the monolith's
-    # 1,017 integration files, and that corpus is gone — what is left are
-    # package suites, which this job already discovers. Standing the datastores
-    # up here is what keeps their integration halves running for real instead
-    # of self-skipping into a green job.
+    # It DOES stand up datastores, so the package suites' integration halves run
+    # for real instead of self-skipping into a green job. They start as plain
+    # containers, not a `services:` block (specs/ci/app-ci-datastores.feature).
     timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}
 
-    services:
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      postgres:
-        image: postgres:16
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: langwatch_ci
-          POSTGRES_PASSWORD: ci_password
-          POSTGRES_DB: langwatch_test
-        options: >-
-          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
+      # In the background: the image pulls overlap the checkout and install, and
+      # "Wait for Postgres and Redis" (cmd/waitcontainers) holds the first step that reads them.
+      # The Postgres check uses TCP: its first-boot init server listens only on the socket.
+      - name: Start Postgres and Redis in the background
+        timeout-minutes: 1
+        run: |
+          {
+            docker run -d --name postgres -p 5432:5432 \
+              -e POSTGRES_USER=langwatch_ci -e POSTGRES_PASSWORD=ci_password -e POSTGRES_DB=langwatch_test \
+              --health-cmd "PGPASSWORD=ci_password psql -h 127.0.0.1 -U langwatch_ci -d langwatch_test -c 'select 1'" \
+              --health-interval 2s --health-timeout 5s --health-retries 60 \
+              postgres:16 &
+            docker run -d --name redis -p 6379:6379 \
+              --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 60 \
+              redis:alpine &
+            wait
+          } > "$RUNNER_TEMP/datastores.log" 2>&1 < /dev/null &
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -1079,6 +1083,16 @@ jobs:
       # "no datastore here" (that made every package suite skip).
       - name: Build workspace packages
         run: pnpm run ensure:built
+
+      - name: Set up Go for the container wait
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Wait for Postgres and Redis
+        timeout-minutes: 5
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 240s postgres redis
 
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.
@@ -1206,6 +1220,7 @@ jobs:
       # changes; this names the `reads` row that closes it. Runs after a red suite too.
       - name: Check suites declare what they read outside their package
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
 
       # Keeps the saved cache bounded. Nothing records which entry a run read: a
@@ -1215,11 +1230,15 @@ jobs:
       # past 400 MB is emptied, so the save stores a small one the next run restores.
       - name: Drop the vitest transforms before saving if they grew past 400 MB
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        continue-on-error: true
         run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
       # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
       - name: Nx remote cache log
         if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        continue-on-error: true
         run: node dev/nx/remote-cache/launch.mjs report
 
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
@@ -1390,16 +1409,22 @@ jobs:
       # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
       - name: Nx remote cache log
         if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        continue-on-error: true
         run: node dev/nx/remote-cache/launch.mjs report
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}

@@ -59,6 +59,7 @@ var (
 		"tools/herrgen",
 		"tools/ciguard",
 		"tools/waitforchecks",
+		"tools/waitcontainers",
 		"tools/deployimpact",
 		"tools/operatornotes",
 		"tools/cachesweep",
