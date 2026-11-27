@@ -465,3 +465,26 @@ The cache is no longer local-only. ADR-206 adds an Nx remote cache in a private
 S3 bucket in the lw-dev AWS account, shared by CI and laptops, with namespaces
 that decide what main trusts. Nx Cloud is still not configured and `nxCloudId`
 is still absent, so nothing sends source or task metadata to Nx.
+
+## Amendment, 2026-11-27: typecheck and lint replay from the cache
+
+With the remote cache in place, the uncached root checks were the slowest part of
+CI's `checks` job: `workspace:typecheck` ran on every push (37 to 119 s on pull
+requests) and `pnpm lint:types` ran oxlint outside Nx (250 to 400 s). Both now
+replay a run whose inputs Nx has seen.
+
+`workspace:typecheck` (and `typecheck:src`) is `cache: true`. Its inputs are every
+file tsc can read (`*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}` outside `.claude` and
+`.nx`), the lockfile and the outputs of the tasks it depends on (the Prisma client
+and the four dist builds, which are gitignored and so invisible to a file input).
+Its outputs are the declarations, maps and build info of every project the root
+solution reaches, as globs (the `build:types` rule: a project with its own
+`build` keeps its `.d.ts`), so a hit leaves the same files a run would. On a miss
+the tsbuildinfo is still the incremental cache.
+
+`dev/nx/lint.mjs` resolves its scope (the changed files, or the projects a change
+reached) and runs `workspace:lint:tree` with that scope as arguments, which Nx
+hashes with the whole tree and the generated files. A type-aware scope past half
+the projects widens to all of them: it costs about the same, and the full scope is
+the one main runs, so main replays a pull request's result on the same tree.
+`pnpm lint:changed` stays direct: it lints the working tree of a laptop.

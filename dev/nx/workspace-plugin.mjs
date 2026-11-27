@@ -30,6 +30,15 @@ const referenced = (root, reference, seen) => {
   return seen;
 };
 
+// Build info a config writes outside its dist (apps/docs keeps it in .tsbuild).
+const buildInfoOutsideDist = (root, configs) =>
+  [...configs].flatMap((file) => {
+    const config = JSON.parse(readFileSync(join(root, file), "utf8").replace(/^\s*\/\/.*$/gm, ""));
+    const info = config.compilerOptions?.tsBuildInfoFile;
+    const path = info && normalize(join(dirname(file), info));
+    return path && !path.split("/").includes("dist") ? [`{workspaceRoot}/${path}`] : [];
+  });
+
 const contractBuilds = (root) =>
   readdirSync(join(root, "modules"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -79,16 +88,30 @@ export const createNodes = [
         "!{workspaceRoot}/.claude/**/*",
         "!{workspaceRoot}/.nx/**/*",
       ];
-      // The one root `tsc -b` (`pnpm typecheck`, bare `nx typecheck`): its tsbuildinfo
-      // is the incremental cache, so Nx caches nothing. `nx sync` writes every project
-      // reference first (ADR-150, 2026-10-10).
+      // The one root `tsc -b` (`pnpm typecheck`, bare `nx typecheck`), cached on every
+      // file tsc can read plus the generated files it depends on; its tsbuildinfo stays the
+      // incremental cache on a miss. `nx sync` writes every project reference first
+      // (ADR-150, 2026-10-10 and 2026-11-27).
+      const solution = referenced(workspaceRoot, "tsconfig.json", new Set());
+      const solutionDirs = [...new Set([...solution].map(dirname))].filter((dir) => dir !== ".");
       const typecheck = {
         executor: "nx:run-commands",
         options: {
           cwd: "{workspaceRoot}",
           command: "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b --builders 1 --checkers 1",
         },
-        cache: false,
+        cache: true,
+        inputs: [
+          "{workspaceRoot}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}",
+          "!{workspaceRoot}/.claude/**/*",
+          "!{workspaceRoot}/.nx/**/*",
+          "{workspaceRoot}/pnpm-lock.yaml",
+          { dependentTasksOutputFiles: "**/*", transitive: true },
+        ],
+        outputs: [
+          ...solutionDirs.flatMap((dir) => declarationOutputs(workspaceRoot, dir)),
+          ...buildInfoOutsideDist(workspaceRoot, solution),
+        ],
         syncGenerators: ["@nx/js:typescript-sync"],
         dependsOn: [
           "@langwatch/prisma-client:prisma:generate",
@@ -102,8 +125,23 @@ export const createNodes = [
         ...typecheck,
         options: { cwd: "{workspaceRoot}", command: "node dev/scripts/typecheck-src.mjs" },
       };
+      // `pnpm lint` and `pnpm lint:types` over a resolved scope (dev/nx/lint.mjs passes it
+      // as arguments, which Nx hashes); the plugin rules read files beyond the linted ones.
+      const lintTree = {
+        executor: "nx:run-commands",
+        options: { cwd: "{workspaceRoot}", command: "node dev/nx/lint.mjs" },
+        cache: true,
+        inputs: [
+          ...everything,
+          { runtime: "node --version" },
+          { dependentTasksOutputFiles: "**/*", transitive: true },
+        ],
+        outputs: [],
+        dependsOn: typecheck.dependsOn,
+      };
       const targets = {
         typecheck,
+        "lint:tree": lintTree,
         "typecheck:src": sourceTypecheck,
         "build:types": target,
         "lint:rules": make("lint-rules-run", "uvx --version", everything),

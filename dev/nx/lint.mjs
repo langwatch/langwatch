@@ -6,11 +6,11 @@ import { fileURLToPath } from "node:url";
 import { mergeDiagnostics } from "../../packages/oxlint-rules/src/unused-directives.mjs";
 import { memberRoots } from "./workspace-members.mjs";
 
-// `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel
-// processes over the tree; `--types` adds the type-aware rules as a third, over the
-// TypeScript projects. One unused-directive check spans the processes. `--changed`
-// and `--base <sha>` narrow a plain run to the changed files, a `--types` run to the
-// projects a change reached. ADR-150, TOOLING.md.
+// `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel processes;
+// `--types` adds the type-aware rules as a third. One unused-directive check spans them.
+// `--changed` and `--base <sha>` narrow a plain run to the changed files, a `--types` run
+// to the projects a change reached. All but `--changed` lint through the cached
+// `workspace:lint:tree` target, the resolved scope as its arguments. ADR-150, TOOLING.md.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const OXLINT = join(root, "node_modules/.bin/oxlint");
 const LINTABLE = /\.(?:[cm]?[jt]sx?)$/;
@@ -86,7 +86,15 @@ function affectedRoots({ roots, files, base }) {
   const nameOf = (member) =>
     JSON.parse(readFileSync(join(root, member, "package.json"), "utf8")).name;
 
-  return roots.filter((member) => names.has(nameOf(member)));
+  return widenedScope({ roots, reached: roots.filter((member) => names.has(nameOf(member))) });
+}
+
+/**
+ * Past half the projects a scoped type-aware run costs about a full one, and the full
+ * scope is the one main runs, so main replays the pull request's result from the cache.
+ */
+export function widenedScope({ roots, reached }) {
+  return reached.length * 2 > roots.length ? roots : reached;
 }
 
 /** nx.json's `lintGlobals` as root-relative globs: editing one re-lints everything. */
@@ -157,17 +165,43 @@ function print(diagnostic) {
   return `${diagnostic.filename}:${line}:${column}: ${diagnostic.message}${rule}${help}`;
 }
 
-async function main() {
-  const flags = process.argv.slice(2);
+/** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
+function lintThroughNx({ types, paths }) {
+  const args = ["exec", "nx", "run", "workspace:lint:tree", "--outputStyle=static", "--"];
+  const scoped = [...args, "--resolved", ...(types ? ["--types"] : []), ...paths];
+  const env = { ...process.env, FORCE_COLOR: "0", NX_LOAD_DOT_ENV_FILES: "false" };
+  const run = spawnSync("pnpm", scoped, { cwd: root, stdio: "inherit", env });
+
+  process.exit(run.status ?? 1);
+}
+
+/** The scopes this process lints itself; a run Nx should cache is handed to it instead. */
+function ownScopes(flags) {
   const baseFlag = flags.indexOf("--base");
   const types = flags.includes("--types");
   const base = baseFlag === -1 ? undefined : flags[baseFlag + 1];
+  if (flags.includes("--resolved")) {
+    const paths = flags.filter((flag, i) => !flag.startsWith("--") && flags[i - 1] !== "--base");
+    return [{ paths, ignores: [] }];
+  }
   const files = flags.includes("--changed") ? changedFiles(mergeBase()) : undefined;
   if (files?.length === 0) process.exit(0);
+  const resolved = scopes({ types, files, base });
+  if (files !== undefined) return resolved;
+  const paths = resolved.flatMap((scope) => scope.paths);
+  if (paths.length === 0) process.exit(0);
+
+  return lintThroughNx({ types, paths });
+}
+
+async function main() {
+  const flags = process.argv.slice(2);
+  const types = flags.includes("--types");
+  const resolvedScopes = ownScopes(flags);
 
   const ignored = ignoreArgs();
   const configs = types ? TYPES : PLAIN;
-  const runs = scopes({ types, files, base })
+  const runs = resolvedScopes
     .filter((scope) => scope.paths.length > 0)
     .map(async ({ paths, ignores }) => {
       const args = [...ignored, ...ignores, ...paths];

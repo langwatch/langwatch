@@ -53,7 +53,7 @@ Each layer is slower and sees more than the one before, so the cheap ones run
 first.
 
 ```
-  pnpm lint                 native rules and the langwatch   whole tree, uncached,
+  pnpm lint                 native rules and the langwatch   whole tree, cached,
      |                      plugin, two parallel processes   about 35 s
   pnpm lint:changed         the same, over the projects you  seconds
      |                      changed and their dependents
@@ -77,10 +77,13 @@ type-aware process, so a directive naming only a type-aware rule reads as unused
 there, as it always has.
 
 `--changed` and `--base <sha>` narrow every process to the projects
-`nx show projects --affected` names, plus the files no project owns. The Nx
-`lint` and `lint:types` targets (`dev/nx/lint-plugin.mjs`) stay for cached
-per-project runs (`nx affected -t lint:types`); `pnpm lint` no longer goes
-through them. `pnpm lint:changed` can miss a finding in an untouched file when
+`nx show projects --affected` names, plus the files no project owns. A
+`--types` scope that reaches more than half the projects widens to all of them.
+Every run but `--changed` resolves its scope and then runs through the cached
+`workspace:lint:tree` target with that scope as its arguments, so the same tree
+and scope replay the result (inputs: the whole tree and the generated files).
+The per-project `lint` and `lint:types` targets (`dev/nx/lint-plugin.mjs`)
+stay for `nx affected -t lint:types`. `pnpm lint:changed` can miss a finding in an untouched file when
 the cause is something no Nx input names, and it never runs the enforcer, so
 `pnpm lint:architecture` stays the check before push.
 
@@ -182,10 +185,10 @@ pnpm --filter <pkg> typecheck  # one package
 pnpm test:affected           # same for tests
 pnpm test:changed            # only the test files the change reaches by imports (ADR-186)
 pnpm lint:types:affected     # same for type-aware lint
-pnpm lint                    # whole-tree oxlint, uncached (oxlint is fast)
+pnpm lint                    # whole-tree oxlint, cached on the tree (workspace:lint:tree)
 pnpm lint:changed            # the same for what you changed and its dependents
 pnpm lint:architecture       # whole-tree policies
-pnpm typecheck               # one root tsc -b, incremental: rechecks only what changed
+pnpm typecheck               # one root tsc -b, cached on the tree; a miss rechecks only what changed
 pnpm sync:references         # nx sync: project references, after a dependency change
 ```
 

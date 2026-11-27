@@ -29,3 +29,14 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     When it prints "No files found to lint." and exits 1
     Then the lint run reports 0 problems and passes
     And output that is neither that line nor a JSON report still fails the run
+  Scenario: A type-aware scope past half the projects lints every project
+    Given a change that reaches more than half of the TypeScript projects
+    When lint:types runs with --base
+    Then oxlint is given every TypeScript project
+    And a change that reaches half of them or fewer is given only those
+
+  Scenario: The root typecheck and the lint runs replay from the cache
+    Given the workspace project's typecheck and lint:tree targets
+    Then both are cached
+    And typecheck hashes every file tsc reads and the generated files it depends on
+    And typecheck declares the declarations it writes as outputs, never a whole dist directory
