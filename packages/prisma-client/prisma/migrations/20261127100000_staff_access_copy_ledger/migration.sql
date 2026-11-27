@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS "StaffAccessCopyLedger" (
     "targetId" TEXT,
     "sourceProjectId" TEXT NOT NULL,
     "targetProjectId" TEXT,
+    "incomplete" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "StaffAccessCopyLedger_pkey" PRIMARY KEY ("id")
 );

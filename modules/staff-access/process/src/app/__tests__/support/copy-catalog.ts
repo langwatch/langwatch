@@ -250,7 +250,10 @@ export function copyCatalog() {
   } satisfies Partial<Record<keyof OrganizationApi, unknown>>;
 
   /** Runs before each evaluator is made, so a test can act in the middle of a copy. */
-  const hooks = { beforeEvaluatorCreate: async () => {} };
+  const hooks = {
+    beforeEvaluatorCreate: async () => {},
+    afterDatasetCreate: async () => {},
+  };
 
   const evaluators = createApiFixture<EvaluatorApi>({
     getAll: async ({ projectId }) =>
@@ -344,6 +347,7 @@ export function copyCatalog() {
       if (!source) throw new Error("no such dataset");
       const copied = { ...source, id: fresh("dataset"), projectId: targetProjectId };
       data.datasets.push(copied);
+      await hooks.afterDatasetCreate();
       return { id: copied.id } as never;
     },
   });

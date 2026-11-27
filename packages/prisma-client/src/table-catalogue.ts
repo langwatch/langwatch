@@ -3750,6 +3750,7 @@ export const prismaModelFieldCatalogue = {
     "targetId",
     "sourceProjectId",
     "targetProjectId",
+    "incomplete",
     "createdAt"
   ]
 } as const;

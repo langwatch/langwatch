@@ -341,6 +341,33 @@ function scenarios(backend: Backend): void {
         ).toHaveLength(1);
       });
 
+      /** @scenario "A copy that failed after its target existed is never made twice" */
+      it("keeps the reservation of a dataset whose content copy failed and never remakes it", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        const body = { sourceOpsToken: source.opsToken, projects: [seeded.project.id] };
+        w.copy.hooks.afterDatasetCreate = async () => {
+          throw new Error("content copy failed");
+        };
+
+        const first = await w.app.copyOrganization({ session: target.session, body });
+        w.copy.hooks.afterDatasetCreate = async () => {};
+        const rerun = await w.app.copyOrganization({ session: target.session, body });
+
+        expect(first.items.find((item) => item.kind === "dataset")).toMatchObject({
+          outcome: "failed",
+        });
+        expect(rerun.items.find((item) => item.kind === "dataset")).toMatchObject({
+          outcome: "skipped",
+          reason: "copy_interrupted",
+        });
+        const targetProjectId = first.items.find((item) => item.kind === "project")?.targetId;
+        expect(
+          w.copy.data.datasets.filter((dataset) => dataset.projectId === targetProjectId),
+        ).toHaveLength(1);
+      });
+
       /** @scenario "Kinds a copy cannot carry yet are skipped with a reason" */
       it("skips a workflow evaluator and an experiment monitor with their reasons", async () => {
         const w = world();

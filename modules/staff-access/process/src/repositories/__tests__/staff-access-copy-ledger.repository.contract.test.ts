@@ -33,6 +33,7 @@ function row(overrides: Partial<StaffAccessCopyLedgerRow>): StaffAccessCopyLedge
     targetId: `prompt_${randomUUID()}`,
     sourceProjectId: "project_source",
     targetProjectId: "project_target",
+    incomplete: null,
     createdAt: Temporal.Instant.from("2026-11-12T10:00:00Z"),
     ...overrides,
   };
@@ -70,12 +71,18 @@ function contract(name: string, repository: () => StaffAccessCopyLedgerRepositor
         id: done.id,
         targetId: "prompt_made",
         targetProjectId: "project_made",
+        incomplete: "prompt_versions_incomplete",
       });
       await ledger.release({ id: done.id });
       await ledger.release({ id: dropped.id });
 
       expect(await ledger.findForPair(pair)).toEqual([
-        { ...done, targetId: "prompt_made", targetProjectId: "project_made" },
+        {
+          ...done,
+          targetId: "prompt_made",
+          targetProjectId: "project_made",
+          incomplete: "prompt_versions_incomplete",
+        },
       ]);
     });
 

@@ -50,15 +50,21 @@ The copy is an ops operation of the `staff-access` module:
   is never written to a trail row, an audit row or an answer.
 - **A revoke stops a running copy.** Before each item the run rereads both
   approvals. Once either is revoked, lapsed or ended, nothing more is made,
-  the remaining items are reported `stopped`, the report says why, and both
-  audit logs get a `staffAccess.orgCopyStopped` row with what was made. Each
-  side's stop row is written on its own and retried, so one failed write never
-  costs the other organization its row.
+  the remaining items are reported `stopped` and the report says why. Each
+  audit log is then sent a `staffAccess.orgCopyStopped` row with what was made,
+  written on its own and retried three times; a side whose row still fails is
+  logged, and the other organization keeps its row. This last row is best
+  effort: the trail rows and the `staffAccess.orgCopy` rows written before the
+  run already name the copy in both organizations.
 - **An allowlist.** A copy carries projects, evaluators, monitors (created
   paused, in the same write),
   prompts with every version, and ready datasets. It never carries secrets,
   API keys, model providers, members, roles, SSO, billing, licence or usage.
-  A kind not on the list is not read at all.
+  A kind not on the list is not read at all. Projects are listed through
+  `ProjectApi.listByOrganization`, whose rows hold the project's own keys; the
+  copy keeps them in memory for the request, passes only the name, language
+  and framework on, and writes no project field beyond id and name to a report,
+  trail or audit row.
 - **Owners' APIs only.** Each kind is read and created through its owner's
   `*Api` (`ProjectApi`, `EvaluatorApi`, `MonitorApi`, `PromptApi`,
   `DatasetApi`, `OrganizationApi`). The copy uses plain create operations, not
@@ -70,14 +76,18 @@ The copy is an ops operation of the `staff-access` module:
   completed with its id after, so a source item never gets two targets: a
   concurrent run loses the reservation and makes nothing, a make that fails
   releases it, and a reservation left unfinished by a crash or a failed write
-  is reported `copy_interrupted` on every rerun instead of made again. A prompt
-  whose later version the owner refuses keeps its row and is reported
-  `prompt_versions_incomplete`. A rerun reports earlier items as
+  is reported `copy_interrupted` on every rerun instead of made again. Only an
+  owner's refusal by name (a handled error below 500) releases the
+  reservation, since any other failure may come after the target exists. A
+  prompt whose later version the owner refuses keeps its row with
+  `incomplete: prompt_versions_incomplete`, and every rerun reports it as
+  `already_copied` with that reason: the missing versions are not appended. A rerun reports earlier items as
   `already_copied` and makes only new ones. A dry run plans and creates nothing.
 
 ## Consequences
 
 The copy runs inside the request. A very large source organization can outrun
-the request timeout; a rerun continues where the ledger stopped. Workflows,
+the request timeout; a rerun continues where the ledger stopped, except for
+items reported `copy_interrupted` or incomplete, which need a look by hand. Workflows,
 scenarios, agents, dashboards, triggers and ClickHouse data (traces, runs) are
 specified as `@unimplemented` and need their owners' APIs first.

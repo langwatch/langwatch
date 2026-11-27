@@ -77,6 +77,13 @@ Feature: Copying an organization's setup into another organization
     And everything copied before reads as already copied
 
   @integration
+  Scenario: A copy that failed after its target existed is never made twice
+    Given a copy of ACME's dataset failed after the dataset was created in Globex
+    When the agent copies ACME into Globex again
+    Then the dataset is reported as "copy_interrupted"
+    And Globex holds one copy of the dataset
+
+  @integration
   Scenario: Kinds a copy cannot carry yet are skipped with a reason
     Given ACME has a workflow evaluator and a monitor attached to an experiment
     When the agent copies ACME into Globex
@@ -107,7 +114,7 @@ Feature: Copying an organization's setup into another organization
     When Olivia revokes the source session after the evaluator was made
     Then nothing more is made and every remaining item is reported as stopped
     And the report says why it stopped
-    And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row with the reason and what was made
+    And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row with the reason and what was made, each written on its own and retried
 
   @integration
   Scenario: A failed audit write copies nothing

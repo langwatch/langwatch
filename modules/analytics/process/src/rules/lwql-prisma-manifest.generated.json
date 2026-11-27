@@ -31910,6 +31910,15 @@
           "documentation": ""
         },
         {
+          "name": "incomplete",
+          "columnName": "incomplete",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Why the made target is short of its source, e.g. a prompt missing later versions."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",

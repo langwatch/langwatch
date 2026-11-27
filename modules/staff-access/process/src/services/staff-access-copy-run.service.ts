@@ -17,12 +17,13 @@ import {
   copyItem,
   copyKeyOf as keyOf,
   failureReason,
+  refusedBeforeMaking,
   selectProjects,
   withinGrant,
 } from "../rules/staff-access-copy.rules.ts";
 import {
   StaffAccessCopyMakeService,
-  type CopyPlaced as Placed,
+  type CopyMade as Placed,
   type CopyRun as Run,
   type CopyWork as Work,
 } from "./staff-access-copy-make.service.ts";
@@ -98,7 +99,11 @@ export class StaffAccessCopyRunService {
         key,
         row.targetId === null || row.targetProjectId === null
           ? INTERRUPTED
-          : { targetId: row.targetId, targetProjectId: row.targetProjectId },
+          : {
+              targetId: row.targetId,
+              targetProjectId: row.targetProjectId,
+              ...(row.incomplete ? { incomplete: row.incomplete } : {}),
+            },
       );
     }
     const { selected, unknown } = selectProjects({
@@ -185,6 +190,7 @@ export class StaffAccessCopyRunService {
       targetId: null,
       sourceProjectId: step.item.sourceProjectId,
       targetProjectId: null,
+      incomplete: null,
       createdAt: this.deps.now(),
     };
     try {
@@ -203,7 +209,7 @@ export class StaffAccessCopyRunService {
         run,
       });
     } catch (error) {
-      await this.releaseQuietly({ id: reservation.id });
+      if (refusedBeforeMaking(error)) await this.releaseQuietly({ id: reservation.id });
       return { ...step.item, outcome: "failed", reason: failureReason(error) };
     }
     if ("skipped" in made) {
@@ -214,7 +220,11 @@ export class StaffAccessCopyRunService {
     run.placed.set(keyOf(step.item.kind, step.item.sourceId), placedItem);
     const copied = { ...step.item, ...placedItem };
     try {
-      await this.deps.ledger.complete({ id: reservation.id, ...placedItem });
+      await this.deps.ledger.complete({
+        id: reservation.id,
+        ...placedItem,
+        incomplete: made.incomplete ?? null,
+      });
     } catch (error) {
       return { ...copied, outcome: "failed", reason: failureReason(error) };
     }
@@ -222,7 +232,7 @@ export class StaffAccessCopyRunService {
     return { ...copied, outcome: "copied", reason: null };
   }
 
-  /** A reservation whose make failed holds nothing; a failed release leaves it interrupted. */
+  /** Drops a reservation that made nothing; a failed release leaves it interrupted. */
   private async releaseQuietly({ id }: { id: string }): Promise<void> {
     try {
       await this.deps.ledger.release({ id });
@@ -322,7 +332,15 @@ export class StaffAccessCopyRunService {
       if (done === INTERRUPTED) {
         return { item: copyItem(base, "skipped", { reason: INTERRUPTED_REASON }), work: null };
       }
-      if (done) return { item: copyItem(base, "already_copied", done), work };
+      if (done) {
+        const { targetId, targetProjectId, incomplete } = done;
+        const item = copyItem(base, "already_copied", {
+          targetId,
+          targetProjectId,
+          reason: incomplete,
+        });
+        return { item, work };
+      }
       if (skipped) return { item: copyItem(base, "skipped", { reason: skipped }), work: null };
       return { item: copyItem(base, "planned"), work };
     };

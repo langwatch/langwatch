@@ -8446,6 +8446,8 @@ model StaffAccessCopyLedger {
   targetId             String?
   sourceProjectId      String
   targetProjectId      String?
+  /// Why the made target is short of its source, e.g. a prompt missing later versions.
+  incomplete           String?
   createdAt            DateTime @default(now())
 
   @@unique([targetOrganizationId, kind, sourceId])

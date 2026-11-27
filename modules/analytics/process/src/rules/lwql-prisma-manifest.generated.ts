@@ -3187,6 +3187,7 @@ export interface LwqlPrismaRows {
     readonly targetId: "String?";
     readonly sourceProjectId: "String";
     readonly targetProjectId: "String?";
+    readonly incomplete: "String?";
     readonly createdAt: "DateTime";
   };
 }

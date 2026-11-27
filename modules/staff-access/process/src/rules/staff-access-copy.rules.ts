@@ -114,6 +114,16 @@ export function failureReason(error: unknown): string {
   return "unexpected_error";
 }
 
+/**
+ * Whether the owner refused by name before making anything: a handled refusal below 500. Any
+ * other failure may come after the target was created, so its reservation is kept.
+ */
+export function refusedBeforeMaking(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, httpStatus } = error as { code?: unknown; httpStatus?: unknown };
+  return typeof code === "string" && typeof httpStatus === "number" && httpStatus < 500;
+}
+
 /** One report line; what is not given is null. */
 export function copyItem(
   base: Pick<StaffAccessCopyItem, "kind" | "name" | "sourceId" | "sourceProjectId">,

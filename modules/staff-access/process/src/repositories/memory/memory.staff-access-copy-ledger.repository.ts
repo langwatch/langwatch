@@ -40,13 +40,15 @@ export class MemoryStaffAccessCopyLedgerRepository implements StaffAccessCopyLed
     id,
     targetId,
     targetProjectId,
+    incomplete,
   }: {
     id: string;
     targetId: string;
     targetProjectId: string;
+    incomplete: string | null;
   }): Promise<void> {
     this.#rows = this.#rows.map((row) =>
-      row.id === id ? { ...row, targetId, targetProjectId } : row,
+      row.id === id ? { ...row, targetId, targetProjectId, incomplete } : row,
     );
   }
 

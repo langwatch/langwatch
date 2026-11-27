@@ -51,14 +51,16 @@ export class PrismaStaffAccessCopyLedgerRepository
     id,
     targetId,
     targetProjectId,
+    incomplete,
   }: {
     id: string;
     targetId: string;
     targetProjectId: string;
+    incomplete: string | null;
   }): Promise<void> {
     await this.database.staffAccessCopyLedger.updateMany({
       where: { id },
-      data: { targetId, targetProjectId },
+      data: { targetId, targetProjectId, incomplete },
     });
   }
 
