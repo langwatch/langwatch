@@ -30,7 +30,7 @@ const ORGANIZATION_TTL_MS = 60_000;
  * self-hosted without the licence, or Cloud at a price no organization admin accepted.
  */
 type Refused = Readonly<{ organizationId: string; firstInAMinute: boolean }>;
-export type PiiRedactionModelRouting =
+type PiiRedactionModelRouting =
   | Readonly<{ kind: "model"; organizationId: string; priced: boolean }>
   | Readonly<{ kind: "presidio" }>
   | (Refused & Readonly<{ kind: "not_licensed" }>)
