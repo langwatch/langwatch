@@ -755,7 +755,7 @@ class ManagedCatalog extends Catalog {
   }
 }
 class ManagedBedrockCatalog extends Catalog {
-  constructor(private readonly roleHop: "succeeds" | "fails" = "succeeds") {
+  constructor(public roleHop: "succeeds" | "fails" = "succeeds") {
     super();
   }
 
@@ -1551,6 +1551,32 @@ describe("ModelProviderService", () => {
         expect(sameWindow).toBe(first);
         expect(nextWindow).not.toBe(first);
         expect(modelProviders.getGatewayKeysEpoch({ organizationId: "org_2" })).toBe("");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "The gateway re-reads a managed row's keys before its session expires" */
+    it("retries a failed mint in the next window, replacing the stored-key fallback", async () => {
+      vi.useFakeTimers();
+      try {
+        const providers = new Providers();
+        providers.rows = [provider({ provider: "bedrock", customKeys: { MANAGED: "true" } })];
+        const catalog = new ManagedBedrockCatalog("fails");
+        const modelProviders = service(providers, catalog);
+        const windowStart = 5_986_000 * 5 * 60 * 1000;
+        vi.setSystemTime(windowStart);
+
+        const fallback = await modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" });
+        const failedWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+        catalog.roleHop = "succeeds";
+        vi.setSystemTime(windowStart + 5 * 60 * 1000);
+        const nextWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+        const minted = await modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" });
+
+        expect(fallback.customKeys).toEqual({ MANAGED: "true" });
+        expect(nextWindow).not.toBe(failedWindow);
+        expect(minted.customKeys).toMatchObject({ AWS_SESSION_TOKEN: "customer-role-session" });
       } finally {
         vi.useRealTimers();
       }
