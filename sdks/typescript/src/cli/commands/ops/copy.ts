@@ -111,7 +111,7 @@ const approveSide = async ({
   return { requestId: created.requestId, opsToken: redeemed.opsToken };
 };
 
-/** Ends a copy session; one that already ended has nothing left to revoke. */
+/** Ends a copy session and answers whether the end went through. */
 const endSide = async ({
   requestId,
   requesterKey,
@@ -120,14 +120,46 @@ const endSide = async ({
   requestId: string;
   requesterKey: string;
   endpoint: string;
-}): Promise<void> => {
-  await staffAccessFetch<unknown>({
+}): Promise<boolean> =>
+  staffAccessFetch<unknown>({
     method: "POST",
     path: `/api/staff-access/requests/${encodeURIComponent(requestId)}/end`,
     bearer: requesterKey,
     body: {},
     endpoint,
-  }).catch(() => undefined);
+  }).then(
+    () => true,
+    () => false,
+  );
+
+/** Ends every approved side, warns on stderr about each one still live, and answers their ids. */
+const endSides = async ({
+  approved,
+  requesterKey,
+  endpoint,
+}: {
+  approved: readonly Approved[];
+  requesterKey: string;
+  endpoint: string;
+}): Promise<string[]> => {
+  const stillLive: string[] = [];
+  for (const { requestId } of approved) {
+    if (!(await endSide({ requestId, requesterKey, endpoint }))) stillLive.push(requestId);
+  }
+  if (stillLive.length > 0) {
+    console.error(chalk.yellow(`Copy session still live: ${stillLive.join(", ")}`));
+  }
+  return stillLive;
+};
+
+/** Copy sessions this run could not end: they stay live until they lapse. */
+const sessionsStillLiveError = (requestIds: readonly string[]): Error => {
+  const message = `Could not end copy session ${requestIds.join(", ")}; it stays live until it lapses. The approver can revoke it on its approval page.`;
+  return Object.assign(new Error(message), {
+    ...commandValidationError(message, { requestIds }),
+    code: "copy_sessions_still_live",
+    kind: "copy_sessions_still_live",
+  });
 };
 
 /**
@@ -185,6 +217,8 @@ export const opsCopyCommand = async ({
   }
   console.error(chalk.gray("Waiting for both approvals..."));
   const approved: Approved[] = [];
+  const stillLive: string[] = [];
+  let result: CommandResult;
   try {
     for (const side of asked) {
       approved.push(await approveSide({ ...side, requesterKey, endpoint }));
@@ -201,15 +235,15 @@ export const opsCopyCommand = async ({
       },
       endpoint,
     });
-    return {
+    result = {
       data: report,
       table: () => printReport(report),
     };
   } finally {
-    for (const side of approved) {
-      await endSide({ requestId: side.requestId, requesterKey, endpoint });
-    }
+    stillLive.push(...(await endSides({ approved, requesterKey, endpoint })));
   }
+  if (stillLive.length > 0) throw sessionsStillLiveError(stillLive);
+  return result;
 };
 
 const printReport = (report: CopyReport): void => {

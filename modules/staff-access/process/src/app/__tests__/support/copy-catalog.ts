@@ -39,7 +39,16 @@ export function copyCatalog() {
     teams: [] as { id: string; organizationId: string }[],
   };
 
-  function addProject({ organizationId, name }: { organizationId: string; name: string }) {
+  function addProject({
+    organizationId,
+    name,
+    teamId = fresh("team"),
+    ...overrides
+  }: {
+    organizationId: string;
+    name: string;
+    teamId?: string;
+  } & Partial<Pick<CatalogProject, "kind" | "isPersonal" | "archivedAt">>) {
     const id = fresh("project");
     const project: CatalogProject = {
       id,
@@ -47,7 +56,7 @@ export function copyCatalog() {
       slug: `${name}-${id.slice(-6)}`,
       apiKey: "",
       lwqlKey: "",
-      teamId: fresh("team"),
+      teamId,
       language: "python",
       framework: "openai",
       kind: "application",
@@ -71,6 +80,7 @@ export function copyCatalog() {
       lastCodingAgentSessionAt: null,
       lastCodingAgentPullRequestAt: null,
       organizationId,
+      ...overrides,
     };
     data.projects.push(project);
     return project;
@@ -235,8 +245,9 @@ export function copyCatalog() {
       language: string;
       framework: string;
     }) => {
-      const project = addProject({ organizationId: input.organizationId, name: input.name });
-      return { ...project, teamId: input.teamId ?? fresh("team") };
+      const teamId = input.teamId ?? fresh("team");
+      if (!input.teamId) data.teams.push({ id: teamId, organizationId: input.organizationId });
+      return addProject({ organizationId: input.organizationId, name: input.name, teamId });
     },
   } satisfies Partial<Record<keyof ProjectApi, unknown>>;
 

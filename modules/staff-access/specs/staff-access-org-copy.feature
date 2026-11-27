@@ -243,6 +243,14 @@ Feature: Copying an organization's setup into another organization
     And it ends both sessions afterwards
 
   @integration
+  Scenario: The CLI says which copy session it could not end and fails
+    Given the server refuses to end the target session after a copy
+    When the agent runs "langwatch ops copy --from acme --to globex --dry-run"
+    Then it names the target session as still live on stderr
+    And it exits non-zero with "copy_sessions_still_live"
+    And the source session is still ended
+
+  @integration
   Scenario: The CLI refuses a project list that names no project
     When the agent runs "langwatch ops copy --from acme --to globex --projects ' , '"
     Then it fails before asking any approval

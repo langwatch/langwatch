@@ -34,6 +34,7 @@ let workDir: string;
 let requests: Record<string, unknown>[] = [];
 let copyCall: { auth: string; body: Record<string, unknown> } | null = null;
 let ended: string[] = [];
+let endRefused = new Set<string>();
 
 const run = (args: string[]): Promise<RunResult> =>
   new Promise((resolve) => {
@@ -110,6 +111,7 @@ const requesterRoute = ({ method, url, body }: { method: string; url: string; bo
     return { status: 200, payload: { organizationId: "org", opsToken: OPS_TOKENS[requestId] } };
   }
   if (match[2] === "/end") {
+    if (endRefused.has(requestId)) return { status: 500, payload: { error: "internal" } };
     ended.push(requestId);
     return { status: 200, payload: { status: "revoked" } };
   }
@@ -153,6 +155,7 @@ beforeEach(() => {
   requests = [];
   copyCall = null;
   ended = [];
+  endRefused = new Set();
 });
 
 afterEach(() => {
@@ -188,6 +191,31 @@ describe("langwatch ops copy", () => {
     expect(result.stdout).toContain("support-bot");
     expect(result.stdout).not.toContain(OPS_TOKENS.req_source);
     expect(fs.readdirSync(stateDir)).toEqual([]);
+  }, 30_000);
+
+  /** @scenario "The CLI says which copy session it could not end and fails" */
+  it("names the session whose end failed and exits non-zero", async () => {
+    endRefused = new Set(["req_target"]);
+
+    const result = await run([
+      "ops",
+      "copy",
+      "--from",
+      "acme",
+      "--to",
+      "globex",
+      "--dry-run",
+      "--format",
+      "json",
+    ]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: "copy_sessions_still_live", meta: { requestIds: ["req_target"] } },
+    });
+    expect(result.stderr).toContain("req_target");
+    expect(ended).toEqual(["req_source"]);
   }, 30_000);
 
   /** @scenario "The CLI refuses a project list that names no project" */

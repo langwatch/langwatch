@@ -1,6 +1,6 @@
 import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { Temporal } from "@langwatch/time";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { copyCatalog, type CopyCatalog } from "../../app/__tests__/support/copy-catalog.ts";
 import { MemoryStaffAccessCopyLedgerRepository } from "../../repositories/memory/memory.staff-access-copy-ledger.repository.ts";
@@ -124,14 +124,12 @@ describe("StaffAccessCopyRunService.execute", () => {
 
   /** @scenario "A copy of every project carries only live application projects" */
   it("plans only the live application project when every project is copied", async () => {
-    Object.assign(catalog.addProject({ organizationId: ACME.id, name: "rollup" }), {
-      kind: "aggregate",
-    });
-    Object.assign(catalog.addProject({ organizationId: ACME.id, name: "olivia-sandbox" }), {
-      isPersonal: true,
-    });
-    Object.assign(catalog.addProject({ organizationId: ACME.id, name: "retired" }), {
-      archivedAt: AT,
+    catalog.addProject({ organizationId: ACME.id, name: "rollup", kind: "aggregate" });
+    catalog.addProject({ organizationId: ACME.id, name: "olivia-sandbox", isPersonal: true });
+    catalog.addProject({
+      organizationId: ACME.id,
+      name: "retired",
+      archivedAt: new Date(AT.epochMilliseconds),
     });
 
     const everything = await run.plan({ source: ACME, target: GLOBEX, projects: undefined });
@@ -144,14 +142,14 @@ describe("StaffAccessCopyRunService.execute", () => {
   /** @scenario "A copied project joins the target's existing shared team" */
   it("creates the project in the target's shared team without making a new one", async () => {
     catalog.data.teams.push({ id: "team_globex_shared", organizationId: GLOBEX.id });
-    const create = vi.spyOn(catalog.projects, "createInOrganization");
 
     await executeAll(plan);
 
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId: GLOBEX.id, teamId: "team_globex_shared" }),
-    );
-    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("newTeamName");
+    const made = catalog.data.projects.filter((project) => project.organizationId === GLOBEX.id);
+    expect(made.map((project) => project.teamId)).toEqual(["team_globex_shared"]);
+    expect(catalog.data.teams.filter((team) => team.organizationId === GLOBEX.id)).toEqual([
+      { id: "team_globex_shared", organizationId: GLOBEX.id },
+    ]);
   });
 
   /** @scenario "A monitor whose evaluator was not copied is skipped" */
