@@ -69,6 +69,12 @@ import {
 } from "./jobEnvelope.ts";
 import { JobLatencyStats } from "./jobLatencyStats.ts";
 import {
+  DEFAULT_JOB_SPAN_SAMPLING,
+  isJobSpanSampled,
+  type JobSpanSampling,
+  withJobSpan,
+} from "./jobSpanSampling.ts";
+import {
   gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
@@ -162,21 +168,6 @@ function listedCandidatesOf(metadata: GroupQueueContextMetadata | undefined): {
 } {
   const scopeKey = scopeKeyOf(metadata);
   return scopeKey ? { candidatesKey: `${scopeKey}:candidates` } : {};
-}
-
-async function withActiveSpan<T>(
-  name: string,
-  options: Parameters<ReturnType<typeof trace.getTracer>["startActiveSpan"]>[1],
-  operation: (span: Span) => Promise<T>,
-): Promise<T> {
-  const tracer = trace.getTracer("langwatch.group-queue");
-  return tracer.startActiveSpan(name, options, async (span) => {
-    try {
-      return await operation(span);
-    } finally {
-      span.end();
-    }
-  });
 }
 
 export const JOB_RETRY_CONFIG = {
@@ -454,6 +445,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private readonly settleWindowMs: number;
   private readonly onExhausted?: (payload: Payload) => ExhaustedOutcome;
   private readonly spanAttributes?: (payload: Payload) => Attributes;
+  private readonly spanSampling: JobSpanSampling;
   private readonly processingQueue: fastq.queueAsPromised<DispatchedWork, void>;
   private readonly delay?: number;
   private readonly deduplication?: DeduplicationConfig<Payload>;
@@ -557,6 +549,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       drainTimeoutMs?: number;
       policy?: GroupQueuePolicy;
       logger?: Logger;
+      /** Which claimed jobs keep their consumer span; tests inject the ratio and draw. */
+      spanSampling?: JobSpanSampling;
     },
   ) {
     this.logger = options?.logger ?? createLogger("langwatch:group-queue");
@@ -596,6 +590,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
+    this.spanSampling = options?.spanSampling ?? DEFAULT_JOB_SPAN_SAMPLING;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
     this.dispatchListed = options?.dispatchListed ?? false;
     this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 300_000;
@@ -1540,19 +1535,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }): Promise<void> {
     const [first] = jobs;
     if (!first) return;
-    await withActiveSpan(
-      `${this.queueName}/${this.jobName}`,
-      {
-        kind: SpanKind.CONSUMER,
-        attributes: {
-          "queue.name": this.queueName,
-          "queue.job_name": this.jobName,
-          "queue.group_batch_size": jobs.length,
-          "queue.group_id": first.groupId,
-          ...this.customSpanAttributes(first.payload),
-        },
+    await withJobSpan({
+      name: `${this.queueName}/${this.jobName}`,
+      kind: SpanKind.CONSUMER,
+      attributes: {
+        "queue.name": this.queueName,
+        "queue.job_name": this.jobName,
+        "queue.group_batch_size": jobs.length,
+        "queue.group_id": first.groupId,
       },
-      async (span) => {
+      customAttributes: () => this.customSpanAttributes(first.payload),
+      sampled: isJobSpanSampled({
+        sampling: this.spanSampling,
+        traceId: first.contextMetadata?.traceId,
+        attempt: Math.max(...jobs.map((job) => job.attempt)),
+      }),
+      operation: async (span) => {
         for (const job of jobs) this.linkProducerSpan(span, job.contextMetadata);
         const leasedUntil = nowInstant().add({ milliseconds: JOB_RETRY_CONFIG.maxBackoffMs });
         await this.runAuditAll(
@@ -1568,7 +1566,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           this.runGroupBatchIn({ jobs, stops, span }),
         );
       },
-    );
+    });
   }
 
   /** The descent over one batch: each group's handler call, outcome and bisection state. */
@@ -1963,16 +1961,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       "queue.attempt_source": attemptSource({ attempt, jobAttempt }),
     };
 
-    Object.assign(spanAttributes, this.customSpanAttributes(payload));
-
     const bisection: BisectionDispatchState = { hasCommitted: false, splits: 0 };
-    await withActiveSpan(
-      spanName,
-      {
-        kind: SpanKind.CONSUMER,
-        attributes: spanAttributes,
-      },
-      async (span) => {
+    await withJobSpan({
+      name: spanName,
+      kind: SpanKind.CONSUMER,
+      attributes: spanAttributes,
+      customAttributes: () => this.customSpanAttributes(payload),
+      sampled: isJobSpanSampled({
+        sampling: this.spanSampling,
+        traceId: contextMetadata?.traceId,
+        attempt,
+      }),
+      operation: async (span) => {
         this.linkProducerSpan(span, contextMetadata);
         try {
           // Audit hook: onLeased fires once per leased payload (including each
@@ -2010,7 +2010,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           });
         }
       },
-    );
+    });
   }
 
   /** Links the job's span to the request that produced it, with its business context. */
@@ -2153,6 +2153,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const error = err instanceof Error ? err : new Error(String(err));
     const decision = this.failureDecision(err);
     const isRetryable = decision.retryable;
+    const handBack =
+      err instanceof HandBackGroupQueueError
+        ? handBackOutcome({
+            handedBackSince: job.handedBackSince,
+            now: nowEpochMs(),
+          })
+        : undefined;
+
+    // Before any write that can throw. A hand-back is no failure, so it leaves the span alone.
+    if (handBack?.kind !== "hand-back") {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    }
 
     // The batch stores its fold state only once, at the very end, so a
     // failure means nothing was persisted for the drained siblings.
@@ -2166,13 +2179,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       });
     }
 
-    if (err instanceof HandBackGroupQueueError) {
-      const outcome = handBackOutcome({
-        handedBackSince: job.handedBackSince,
-        now: nowEpochMs(),
-      });
-      if (outcome.kind === "hand-back") {
-        await this.handBackClaimedJob({ job, error, since: outcome.since, stopHeartbeat });
+    if (handBack) {
+      if (handBack.kind === "hand-back") {
+        await this.handBackClaimedJob({ job, error, since: handBack.since, stopHeartbeat });
         return;
       }
       this.logger.error(
@@ -2181,7 +2190,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           groupId,
           stagedJobId: job.stagedJobId,
           attempt,
-          handedBackSince: outcome.since,
+          handedBackSince: handBack.since,
           windowMs: HAND_BACK_CONFIG.windowMs,
           error,
         },
@@ -2190,8 +2199,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
     this.adaptiveSlots.jobFailed();
 
-    span.recordException(error);
-    span.setStatus({ code: SpanStatusCode.ERROR });
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
     const budget = attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts });
     if (isRetryable && attempt < budget && !quarantineError) {

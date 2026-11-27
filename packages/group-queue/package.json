@@ -38,6 +38,8 @@
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
