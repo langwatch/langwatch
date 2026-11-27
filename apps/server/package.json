@@ -53,7 +53,7 @@
     "commander": "catalog:",
     "concurrently": "catalog:",
     "execa": "^9.6.0",
-    "listr2": "^9.0.4",
+    "listr2": "^11.2.0",
     "ora": "catalog:",
     "pg": "catalog:",
     "prompts": "catalog:",
