@@ -134,6 +134,7 @@ export const APP_ERROR_CODES = [
   "billing_only_keeps_billing",
   "billing_only_no_team_access",
   "billing_plan_price_missing",
+  "billing_price_catalogue_too_large",
   "billing_provider_unavailable",
   "billing_quote_expired",
   "braid_across_organizations",

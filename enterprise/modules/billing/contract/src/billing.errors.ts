@@ -31,6 +31,28 @@ export class BillingFactsUnavailableError extends HandledError {
   }
 }
 
+/**
+ * The Stripe account holds more prices than the price facts read walks, so the catalogue would be
+ * answered short; refused rather than truncated.
+ */
+export class BillingPriceCatalogueTooLargeError extends HandledError {
+  declare readonly code: "billing_price_catalogue_too_large";
+
+  constructor({ maxPrices }: { maxPrices: number }) {
+    super(
+      "billing_price_catalogue_too_large",
+      `The Stripe account holds more than ${maxPrices} prices, more than the price facts read covers`,
+      {
+        httpStatus: 500,
+        fault: "platform",
+        meta: { maxPrices },
+        ...remediation("billing_price_catalogue_too_large"),
+      },
+    );
+    this.name = "BillingPriceCatalogueTooLargeError";
+  }
+}
+
 /** Billing requires an email; 422 validates the account field, not auth. */
 export class UserEmailRequiredError extends HandledError {
   declare readonly code: "billing_customer_email_required";

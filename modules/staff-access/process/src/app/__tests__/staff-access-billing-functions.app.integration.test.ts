@@ -9,11 +9,11 @@ import {
   ACME,
   caller,
   cloudBilling,
-  codeOf,
   ms,
   NOW,
   selfHostedBilling,
 } from "./support/staff-access-billing-world.ts";
+import { codeOf } from "./support/staff-access-world.ts";
 
 describe("the billing ops functions", () => {
   describe("given a metadata session on ACME approved for org.billing", () => {

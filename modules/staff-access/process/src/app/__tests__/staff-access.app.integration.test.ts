@@ -32,19 +32,10 @@ import {
   requestBody,
   staffAccessWorld,
   VERIFIER,
+  codeOf,
 } from "./support/staff-access-world.ts";
 
 type Backend = Readonly<{ name: string; repositories: () => StaffAccessRepositories }>;
-
-/** The code a promise rejects with, for asserting on codes rather than prose. */
-async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
 
 function requestFrom({ bearer, ip = AGENT_IP }: { bearer: string; ip?: string }): Request {
   const request = new Request("https://app.langwatch.test/api/staff-access/requests", {

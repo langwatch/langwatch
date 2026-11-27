@@ -4,37 +4,27 @@
  * Peers are stand-ins (see support/).
  * @see modules/staff-access/specs/staff-access-functions-people.feature
  */
-import { ClientAddress } from "@langwatch/api/policy";
 import type { StaffAccessDoorSession } from "@langwatch/staff-access-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import {
   ACME,
-  AGENT_IP,
   GLOBEX,
   requestBody,
   staffAccessWorld,
-  VERIFIER,
+  codeOf,
+  redeemedSession,
 } from "./support/staff-access-world.ts";
 
 type Scopes = Parameters<typeof requestBody>[0]["scopes"];
-
-async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
 
 function world() {
   return staffAccessWorld({ repositories: MemoryStaffAccessRepositories.create() });
 }
 
 /** A redeemed session naming `functions`, identified by its ops token at the door. */
-async function sessionFor({
+function sessionFor({
   w,
   scopes,
   functions,
@@ -43,19 +33,7 @@ async function sessionFor({
   scopes: Scopes;
   functions: string[];
 }): Promise<StaffAccessDoorSession> {
-  const agent = await w.enrol();
-  const { requestId } = await w.app.createRequest({
-    session: agent.session,
-    body: requestBody({ scopes, functions }),
-  });
-  await w.approve({ choice: { requestId, spendApproved: false } });
-  const answer = await w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER });
-  const request = new Request("https://app.langwatch.test/api/staff-access/functions", {
-    headers: { authorization: `Bearer ${answer.opsToken ?? ""}`, "user-agent": "langwatch-cli" },
-  });
-  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
-  const caller = await Promise.resolve(w.app.staffAccessDoor.identify?.({ request }));
-  return caller?.session as StaffAccessDoorSession;
+  return redeemedSession({ world: w, scopes, functions });
 }
 
 function expectNoPersonalText(output: unknown): void {

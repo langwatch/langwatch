@@ -62,6 +62,12 @@ Feature: Billing ops functions
     Then it is refused 403 with "billing_facts_unavailable"
 
   @unit
+  Scenario: billing.stripe_prices refuses a catalogue larger than its page walk
+    Given the Stripe account holds more than 5,000 prices
+    When an "ops:read" session calls "billing.stripe_prices"
+    Then it is refused with "billing_price_catalogue_too_large" rather than answered in part
+
+  @unit
   Scenario: Unknown plan, state and tax values read as other
     Given a subscription row whose plan or state billing does not know
     When billing answers its facts

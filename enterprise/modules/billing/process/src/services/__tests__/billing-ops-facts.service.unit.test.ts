@@ -222,4 +222,19 @@ describe("billing ops facts", () => {
       });
     });
   });
+
+  describe("when the Stripe account holds more prices than the read walks", () => {
+    /** @scenario "billing.stripe_prices refuses a catalogue larger than its page walk" */
+    it("refuses the price catalogue by name rather than answering part of it", async () => {
+      const { prices, service } = compose();
+      for (let index = 0; index <= 5000; index += 1) {
+        prices.seed({ price: price(`price_${index}`, null) });
+      }
+
+      await expect(service.findStripePriceFacts()).rejects.toMatchObject({
+        code: "billing_price_catalogue_too_large",
+        meta: { maxPrices: 5000 },
+      });
+    });
+  });
 });

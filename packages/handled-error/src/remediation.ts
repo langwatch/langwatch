@@ -39,6 +39,12 @@ const registry = {
       "On Cloud, check that the Stripe secret key is configured when the price catalogue is refused",
     ],
   },
+  billing_price_catalogue_too_large: {
+    tips: [
+      "Archive retired prices in the Stripe dashboard to bring the catalogue under the read's cap",
+      "Raise the price page cap in billing's ops facts service when the catalogue has really grown",
+    ],
+  },
   billing_only_keeps_billing: {
     tips: [
       "To stop a Billing-only member paying, remove them from the organization",

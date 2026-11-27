@@ -1518,61 +1518,62 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return Number(row?.Total ?? "0");
   }
 
-  /** One read per project, each routed to its own placement, latest version per run. */
+  /**
+   * One read for the whole organization, routed by its first project like countOrganizationRuns,
+   * latest version per run, one row per project with runs in the window.
+   */
   async findRunCountsByProject({
     projectIds,
     since,
     until,
   }: SimulationRunCountsInput): Promise<SimulationProjectRunCount[]> {
-    const counts = await Promise.all(
-      [...new Set(projectIds)].map((projectId) => this.countRunsOf({ projectId, since, until })),
-    );
-    return counts.filter((count) => count.runs > 0);
-  }
-
-  /** One tenant's runs in the window, each at its latest version. */
-  private async countRunsOf({
-    projectId,
-    since,
-    until,
-  }: {
-    projectId: string;
-    since: number;
-    until: number;
-  }): Promise<SimulationProjectRunCount> {
+    const tenantIds = [...new Set(projectIds)];
+    const [routingTenant] = tenantIds;
+    if (routingTenant === undefined) return [];
+    const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
     const window = `StartedAt >= fromUnixTimestamp64Milli(toInt64({since:String}))
          AND StartedAt < fromUnixTimestamp64Milli(toInt64({until:String}))`;
-    const client = await this.getClient(projectId);
+    const client = await this.getClient(routingTenant);
     const result = await client.query({
-      query: `SELECT toString(count()) AS Runs,
+      query: `SELECT t.TenantId AS ProjectId,
+              toString(count()) AS Runs,
               toString(uniqExact(if(t.ScenarioSetId = '', {defaultSetId:String}, t.ScenarioSetId))) AS Suites,
               toString(countIf(t.Status IN ('FAILED', 'ERROR'))) AS Failed
        FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
+       WHERE t.TenantId IN (${placeholders})
          AND t.${window}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
            FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
+           WHERE TenantId IN (${placeholders})
              AND ${window}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )`,
+         )
+       GROUP BY t.TenantId`,
       query_params: {
-        tenantId: projectId,
+        ...Object.fromEntries(tenantIds.map((id, i) => [`tenant${i}`, id])),
         since: String(since),
         until: String(until),
         defaultSetId: DEFAULT_SET_ID,
       },
       format: "JSONEachRow",
+      tenantIds,
     });
-    const [row] = await result.json<{ Runs: string; Suites: string; Failed: string }>();
-    return {
-      projectId,
-      runs: Number(row?.Runs ?? 0),
-      suites: Number(row?.Suites ?? 0),
-      failedRuns: Number(row?.Failed ?? 0),
-    };
+    const rows = await result.json<{
+      ProjectId: string;
+      Runs: string;
+      Suites: string;
+      Failed: string;
+    }>();
+    return rows
+      .map((row) => ({
+        projectId: row.ProjectId,
+        runs: Number(row.Runs),
+        suites: Number(row.Suites),
+        failedRuns: Number(row.Failed),
+      }))
+      .filter((count) => count.runs > 0);
   }
 
   /**

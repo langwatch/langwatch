@@ -5,7 +5,7 @@
 import { clickHouseQuerySourceSchema, type ClickHouseQuerySource } from "@langwatch/ops-contract";
 
 /** Each tagged source and the `log_comment` prefix that names it, in match order. */
-export const CLICKHOUSE_QUERY_SOURCE_PREFIXES: readonly Readonly<{
+const CLICKHOUSE_QUERY_SOURCE_PREFIXES: readonly Readonly<{
   source: Exclude<ClickHouseQuerySource, "other">;
   prefix: string;
 }>[] = [

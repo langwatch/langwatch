@@ -77,5 +77,6 @@ describe.skipIf(databaseUrl === null)("scenario runs per project", () => {
         { projectId: globex, runs: 2, suites: 1, failedRuns: 0 },
       ].toSorted((a, b) => a.projectId.localeCompare(b.projectId)),
     );
+    await expect(ch.repo.countOrganizationRuns({ projectIds: [acme, globex] })).resolves.toBe(5);
   });
 });

@@ -242,11 +242,4 @@ export async function caller({
   };
 }
 
-export async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
+export { codeOf } from "./staff-access-world.ts";

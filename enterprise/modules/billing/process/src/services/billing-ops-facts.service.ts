@@ -2,6 +2,7 @@
 
 import {
   BillingFactsUnavailableError,
+  BillingPriceCatalogueTooLargeError,
   type BillingFactState,
   type BillingFactSubscription,
   type BillingStripePriceFact,
@@ -145,7 +146,7 @@ export class BillingOpsFactsService {
       startingAfter = listed.prices.at(-1)?.id;
       if (!listed.hasMore || startingAfter === undefined) return facts;
     }
-    throw new Error(`The Stripe account holds more than ${MAX_PRICE_PAGES * PRICE_PAGE} prices`);
+    throw new BillingPriceCatalogueTooLargeError({ maxPrices: MAX_PRICE_PAGES * PRICE_PAGE });
   }
 
   private requireCloud(): void {

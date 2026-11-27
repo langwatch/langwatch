@@ -3,53 +3,23 @@
  * stand-in; Langy's own read is proven against Postgres in modules/langy.
  * @see modules/staff-access/specs/staff-access-functions-langy.feature
  */
-import { ClientAddress } from "@langwatch/api/policy";
-import type { StaffAccessDoorSession } from "@langwatch/staff-access-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import {
   ACME,
-  AGENT_IP,
   GLOBEX,
-  requestBody,
   staffAccessWorld,
-  VERIFIER,
+  codeOf,
+  redeemedSession,
 } from "./support/staff-access-world.ts";
 
 const PROJECT = `${ACME.id}_project`;
 
-async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
-
-function requestFrom({ bearer }: { bearer: string }): Request {
-  const request = new Request("https://app.langwatch.test/api/staff-access/functions", {
-    headers: { authorization: `Bearer ${bearer}`, "user-agent": "langwatch-cli" },
-  });
-  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
-  return request;
-}
-
 /** A redeemed `org:metadata` session on ACME naming `functions`, and a caller for them. */
 async function sessionFor({ functions }: { functions: string[] }) {
   const w = staffAccessWorld({ repositories: MemoryStaffAccessRepositories.create() });
-  const agent = await w.enrol();
-  const { requestId } = await w.app.createRequest({
-    session: agent.session,
-    body: requestBody({ scopes: ["org:metadata"], functions }),
-  });
-  await w.approve({ choice: { requestId, spendApproved: false } });
-  const answer = await w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER });
-  const caller = await Promise.resolve(
-    w.app.staffAccessDoor.identify?.({ request: requestFrom({ bearer: answer.opsToken ?? "" }) }),
-  );
-  const session = caller?.session as StaffAccessDoorSession;
+  const session = await redeemedSession({ world: w, scopes: ["org:metadata"], functions });
   return {
     platform: w.state.platform,
     call: (name: string, input: unknown) => w.app.callFunction({ session, name, input }),

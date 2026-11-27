@@ -3502,6 +3502,12 @@ const presentations = {
     title: "This plan isn't ready to buy yet",
     describe: () => "We've been notified. Contact support if you need it sooner.",
   },
+  billing_price_catalogue_too_large: {
+    // fault: platform. An ops read of the price catalogue; answering part of it would mislead.
+    title: "The price catalogue is too large to read",
+    describe: () =>
+      "The Stripe account holds more prices than this read covers, so it answers none rather than part of them.",
+  },
   billing_currency_unsupported: {
     // Account state, not an outage, and not fixable from the UI: the account is
     // locked to a currency we don't price plans in, so retrying never helps.

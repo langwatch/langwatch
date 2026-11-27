@@ -5,6 +5,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import type { ApiKey, ApiKeyApi } from "@langwatch/api-key-contract";
+import { ClientAddress } from "@langwatch/api/policy";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   type AuthApi,
@@ -26,7 +27,10 @@ import type { NotificationService, SendEmailCommand } from "@langwatch/notificat
 import type { OpsApi, OpsPlatformOperator } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { StaffAccessApprovalChoice } from "@langwatch/staff-access-contract";
+import type {
+  StaffAccessApprovalChoice,
+  StaffAccessDoorSession,
+} from "@langwatch/staff-access-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -700,4 +704,43 @@ function peoplePlan({ organizationId }: { organizationId: string }) {
     maxMembersLite: 2,
     overPlan: { sinceMs: Date.parse("2026-10-15T00:00:00Z"), members: 12, maxMembers: 10 },
   };
+}
+
+/** The code a promise rejects with, for asserting on codes rather than prose. */
+export async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await promise;
+    return undefined;
+  } catch (error) {
+    return (error as { code?: string }).code;
+  }
+}
+
+/** An agent's request for `functions`, approved and redeemed, as the door identifies its token. */
+export async function redeemedSession({
+  world,
+  scopes,
+  functions,
+}: {
+  world: StaffAccessWorld;
+  scopes: Parameters<typeof requestBody>[0]["scopes"];
+  functions: string[];
+}): Promise<StaffAccessDoorSession> {
+  const agent = await world.enrol();
+  const { requestId } = await world.app.createRequest({
+    session: agent.session,
+    body: requestBody({ scopes, functions }),
+  });
+  await world.approve({ choice: { requestId, spendApproved: false } });
+  const answer = await world.app.redeem({
+    session: agent.session,
+    requestId,
+    codeVerifier: VERIFIER,
+  });
+  const request = new Request("https://app.langwatch.test/api/staff-access/functions", {
+    headers: { authorization: `Bearer ${answer.opsToken ?? ""}`, "user-agent": "langwatch-cli" },
+  });
+  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
+  const identified = await Promise.resolve(world.app.staffAccessDoor.identify?.({ request }));
+  return identified?.session as StaffAccessDoorSession;
 }

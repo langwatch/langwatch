@@ -3,48 +3,26 @@
  * peers (see support/): ops answers the ClickHouse reads.
  * @see modules/staff-access/specs/staff-access-functions-telemetry.feature
  */
-import { ClientAddress } from "@langwatch/api/policy";
 import type { StaffAccessDoorSession } from "@langwatch/staff-access-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import {
   ACME,
-  AGENT_IP,
   requestBody,
   staffAccessWorld,
-  VERIFIER,
+  codeOf,
+  redeemedSession,
 } from "./support/staff-access-world.ts";
-
-async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
 
 const world = () => staffAccessWorld({ repositories: MemoryStaffAccessRepositories.create() });
 
 /** A redeemed `ops:read` session naming `functions`, as the door identifies its ops token. */
-async function opsReadSession(
+function opsReadSession(
   w: ReturnType<typeof world>,
   functions: string[],
 ): Promise<StaffAccessDoorSession> {
-  const agent = await w.enrol();
-  const { requestId } = await w.app.createRequest({
-    session: agent.session,
-    body: requestBody({ scopes: ["ops:read"], functions }),
-  });
-  await w.approve({ choice: { requestId, spendApproved: false } });
-  const answer = await w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER });
-  const request = new Request("https://app.langwatch.test/api/staff-access/functions", {
-    headers: { authorization: `Bearer ${answer.opsToken ?? ""}`, "user-agent": "langwatch-cli" },
-  });
-  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
-  const caller = await Promise.resolve(w.app.staffAccessDoor.identify?.({ request }));
-  return caller?.session as StaffAccessDoorSession;
+  return redeemedSession({ world: w, scopes: ["ops:read"], functions });
 }
 
 describe("the telemetry ops functions", () => {

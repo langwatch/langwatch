@@ -5,7 +5,7 @@ export interface ListedFunction {
 }
 
 /** How far back a suggested `since` reaches: inside every function's 31-day range. */
-export const SUGGESTED_RANGE_DAYS = 7;
+const SUGGESTED_RANGE_DAYS = 7;
 
 const DAY_MS = 86_400_000;
 

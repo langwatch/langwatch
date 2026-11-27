@@ -3,17 +3,15 @@
  * call. Peers are stand-ins (support/staff-access-platform-peers.ts) over the memory twins.
  * @see modules/staff-access/specs/staff-access-functions-platform.feature
  */
-import { ClientAddress } from "@langwatch/api/policy";
-import type { StaffAccessDoorSession } from "@langwatch/staff-access-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import {
   ACME,
-  AGENT_IP,
-  requestBody,
+  type requestBody,
   staffAccessWorld,
-  VERIFIER,
+  codeOf,
+  redeemedSession,
 } from "./support/staff-access-world.ts";
 
 type Scopes = Parameters<typeof requestBody>[0]["scopes"];
@@ -25,30 +23,9 @@ function world(): World {
   return staffAccessWorld({ repositories: MemoryStaffAccessRepositories.create() });
 }
 
-async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
-
 /** A redeemed session naming `functions`, and a caller for them. */
 async function caller(w: World, { scopes, functions }: { scopes: Scopes; functions: string[] }) {
-  const agent = await w.enrol();
-  const { requestId } = await w.app.createRequest({
-    session: agent.session,
-    body: requestBody({ scopes, functions }),
-  });
-  await w.approve({ choice: { requestId, spendApproved: false } });
-  const answer = await w.app.redeem({ session: agent.session, requestId, codeVerifier: VERIFIER });
-  const request = new Request("https://app.langwatch.test/api/staff-access/functions", {
-    headers: { authorization: `Bearer ${answer.opsToken ?? ""}`, "user-agent": "langwatch-cli" },
-  });
-  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
-  const identified = await Promise.resolve(w.app.staffAccessDoor.identify?.({ request }));
-  const session = identified?.session as StaffAccessDoorSession;
+  const session = await redeemedSession({ world: w, scopes, functions });
   return (name: string, input: unknown = {}) => w.app.callFunction({ session, name, input });
 }
 
