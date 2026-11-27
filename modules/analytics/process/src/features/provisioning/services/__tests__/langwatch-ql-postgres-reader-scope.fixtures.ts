@@ -232,11 +232,7 @@ export async function startScopeHarness({
 
   const admin = (sql: string) => runAs({ user: ADMIN, sql });
 
-  async function applyAll(statements: string[]): Promise<void> {
-    for (const statement of statements) {
-      await admin(statement);
-    }
-  }
+  const applyAll = (statements: string[]): Promise<void> => pg.applyAsAdmin(statements);
 
   const provisionViews = () => applyAll(deployStatements());
 
