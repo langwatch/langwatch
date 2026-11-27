@@ -5,14 +5,19 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
+import { createHash } from "node:crypto";
+
 import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import { describe, expect, it } from "vitest";
 
 import {
+  LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  NLP_LAMBDA_MEMORY_SIZE_MB,
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
   buildStudioLambdaConfig,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
+  studioLambdaConfigFingerprint,
   studioLambdaRolloutStanding,
   type StudioLambdaFleetFields,
 } from "../nlp-lambda-config.rules.ts";
@@ -81,6 +86,31 @@ describe("given a deployment that fronts the studio engine with a Lambda fleet",
       });
 
       expect(buildStudioLambdaEnvironment(config)).not.toHaveProperty(NLP_INTERNAL_SECRET_ENV);
+    });
+
+    /** @scenario "A function resolved before the shared secret was dropped is resolved again" */
+    it("digests differently from a release that left the shared secret in place", () => {
+      const config = buildStudioLambdaConfig({
+        fields: FIELDS,
+        langwatchEndpoint: "https://app.langwatch.test",
+        codeBlockTimeoutRawValue: undefined,
+        stagingThresholdBytesRawValue: undefined,
+        stagingTtlSecondsRawValue: undefined,
+      });
+      const environment = Object.entries(buildStudioLambdaEnvironment(config)).toSorted(
+        ([a], [b]) => a.localeCompare(b),
+      );
+      const keptTheSecret = createHash("sha256")
+        .update(
+          JSON.stringify({
+            environment,
+            memorySizeMb: NLP_LAMBDA_MEMORY_SIZE_MB,
+            timeoutSeconds: LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+          }),
+        )
+        .digest("hex");
+
+      expect(studioLambdaConfigFingerprint(config)).not.toBe(keptTheSecret);
     });
   });
 

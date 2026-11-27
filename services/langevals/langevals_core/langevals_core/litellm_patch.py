@@ -619,13 +619,35 @@ def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
     )
 
 
+# litellm falls back to server variables named like these (OPENAI_BASE_URL,
+# AZURE_API_BASE, AWS_BEDROCK_RUNTIME_ENDPOINT, ...) when a call names no endpoint.
+_SERVER_ENDPOINT_SUFFIXES = ("_API_BASE", "_BASE_URL", "_ENDPOINT")
+
+
+def _server_endpoint_hosts() -> set:
+    """The hosts of the endpoints the server's own environment names."""
+    hosts = set()
+    for name, value in os.environ.items():
+        if not name.upper().endswith(_SERVER_ENDPOINT_SUFFIXES):
+            continue
+        try:
+            parts = urlsplit(value.strip())
+            host = parts.hostname
+        except ValueError:
+            continue
+        if parts.scheme.lower() in ("http", "https") and host:
+            hosts.add(host)
+    return hosts
+
+
 def egress_fence(kwargs: dict, env: dict) -> Fence:
     """The fence one call runs under; a request-chosen endpoint is judged up front.
 
-    A server-chosen endpoint is admitted by host. Every connection the call
-    makes, redirects included, is judged again by the transport."""
+    A server-chosen endpoint, on the call or in the server's environment, is
+    admitted by host. Every connection the call makes, redirects included, is
+    judged again by the transport."""
     request_fence = Fence(policy=server_egress_policy())
-    admitted = set()
+    admitted = _server_endpoint_hosts()
     for argument in ENDPOINT_ARGUMENTS:
         value = kwargs.get(argument)
         if not isinstance(value, str) or value == "":

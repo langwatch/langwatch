@@ -306,12 +306,16 @@ type served struct {
 	stale     string
 }
 
-// admit is the last check before a resolved bundle serves. It refuses a key the
-// change feed revoked after its confirmation began, and, when FailClosedAfter
+// admit is the last check before a resolved bundle serves. It refuses a key
+// past its expiration date, one the change feed revoked after its confirmation
+// began, and, when FailClosedAfter
 // is set, a key nothing confirmed recently while its org's feed is silent. A
 // key past KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
+	if b.KeyExpired(time.Now()) {
+		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+	}
 	if b.VirtualKeyID != "" {
 		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
 			if d, kept := s.liftDenialBefore(b.VirtualKeyID, authStart, "confirmation"); kept {
@@ -346,29 +350,29 @@ var errKeyRecheckDue = errors.New("key re-check due")
 
 // recheckKey checks a key the change feed has not vouched for lately. A
 // refusal stands. A check that cannot reach the control plane, or that runs
-// past keyRecheckWait, serves the cached answer; the check still evicts a key
-// it finds refused, so the next request is refused. fresh reports a new answer.
-func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (answer served, fresh bool, err error) {
+// past keyRecheckWait, hands back the cached answer for Resolve to admit again;
+// the check still evicts a key it finds refused, so the next request is refused.
+func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (served, error) {
 	call := s.joinReconfirm(k.key, k.h)
 	if call == nil {
-		return cached, false, nil
+		return cached, nil
 	}
 	timer := time.NewTimer(keyRecheckWait)
 	defer timer.Stop()
 	select {
 	case <-call.done:
 	case <-timer.C:
-		return cached, false, nil
+		return cached, nil
 	case <-ctx.Done():
-		return cached, false, nil
+		return cached, nil
 	}
 	switch {
 	case call.err == nil:
-		return call.answer, true, nil
+		return call.answer, nil
 	case classifyRefreshError(call.err) == classTransportFailure:
-		return cached, false, nil
+		return cached, nil
 	default:
-		return served{}, false, call.err
+		return served{}, call.err
 	}
 }
 
@@ -548,10 +552,14 @@ func (s *Service) keepCachedConfig(h [64]byte, in cachedConfigKeep) served {
 	return served{bundle: &merged, authStart: start}
 }
 
-// dropRejected evicts both cached copies of a key the control plane refused.
+// dropRejected evicts both cached copies of a key the control plane refused,
+// and fences the credential so a fetch begun before the refusal cannot
+// publish it again.
 func (s *Service) dropRejected(h [64]byte, err error) {
-	s.l1.Remove(h)
-	s.lastKnown.Remove(h)
+	s.recordInvalidation(invalidation{keys: []string{presentedScope(h)}}, func() {
+		s.l1.Remove(h)
+		s.lastKnown.Remove(h)
+	})
 	s.logger.Error("auth_cache_hard_evict", zap.String("reason", "reconfirm_rejection"), zap.Error(err))
 }
 

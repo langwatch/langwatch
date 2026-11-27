@@ -2,12 +2,14 @@
  * @vitest-environment node
  * `GET /api/image-proxy` pinned to main's statuses, bodies and cache header, for signed-in callers.
  */
+import type { Authorize } from "@langwatch/api/access";
 import { SessionReader } from "@langwatch/api/hosting";
 import {
   BrowserSessionIdentity,
   canonicalErrorResponse,
   createRestRuntime,
 } from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -50,10 +52,10 @@ function proxy() {
       verify: async (request: Request) =>
         request.headers.get("cookie") === SIGNED_IN ? { userId: "user_1" } : null,
     }),
-    authz: {
+    authz: createApiFixture<Authorize>({
       getDecision: async () => ({ permitted: false, organizationRole: null }),
       getPlatformDecision: async () => ({ permitted: false }),
-    },
+    }),
     publicBaseUrl: void 0,
   });
   const runtime = createRestRuntime({

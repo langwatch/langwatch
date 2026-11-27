@@ -136,10 +136,22 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     But a runtime host that is neither amazonaws.com nor on the allowlist is still refused
 
   @unit
+  Scenario: A Bedrock credential reaches only AWS regional hosts
+    Bedrock connections are judged by host rather than through the egress
+    proxy, so a PrivateLink endpoint on a private address keeps working. The
+    host is built from the credential's region, so the region is held to
+    AWS's region identifiers.
+
+    Given a Bedrock credential whose region is not an AWS region identifier
+    When a request is dispatched through it
+    Then it is refused before any connection is made
+    And a credential with region "eu-west-1" is dispatched as before
+
+  @unit
   Scenario Outline: A provider on a private address is dispatched to only when the egress policy admits its host
-    Every provider connection goes through the gateway's egress proxy, which
-    judges each host on its own, so the allowlist lifts the refusal for the
-    hosts it names and no other.
+    Every provider connection except Bedrock's (held to AWS hosts above) goes
+    through the gateway's egress proxy, which judges each host on its own, so
+    the allowlist lifts the refusal for the hosts it names and no other.
 
     Given BLOCK_LOCAL_HTTP_CALLS is <block> and ALLOWED_PROXY_HOSTS is <allowlist>
     When the gateway dispatches to "llm-proxy.internal" on a private address

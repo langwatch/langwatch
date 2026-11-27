@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/langwatch/langwatch/pkg/ssrf"
@@ -106,10 +107,20 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 	return nil
 }
 
+// awsRegion is an AWS region identifier (us-east-1, us-gov-east-1), the same
+// pattern bifrost accepts as a model prefix. Bedrock hosts are built from the
+// region, so this keeps every Bedrock connection on AWS's regional endpoints.
+var awsRegion = regexp.MustCompile(`^[a-z]{2,3}(?:-[a-z]+)+-\d+$`)
+
 func validateCredentialEndpoints(ctx context.Context, cred domain.Credential, policy customerEndpointPolicy) error {
 	if baseURL := credBaseURL(cred); baseURL != "" {
 		if err := validateCustomerEndpoint(ctx, baseURL, policy); err != nil {
 			return fmt.Errorf("base_url rejected: %w", err)
+		}
+	}
+	if cred.ProviderID == domain.ProviderBedrock {
+		if region := credExtra(cred, "region", "aws_region_name"); region != "" && !awsRegion.MatchString(region) {
+			return fmt.Errorf("bedrock region is not an AWS region identifier")
 		}
 	}
 	if cred.ProviderID == domain.ProviderAzure {

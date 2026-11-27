@@ -20,10 +20,11 @@ import socket
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import httpx
 import litellm
 import pytest
 
-from langevals_core import litellm_patch
+from langevals_core import egress, litellm_patch
 from langevals_core.litellm_patch import patch_litellm
 from langevals_core.request_env import request_env
 
@@ -352,6 +353,27 @@ class TestADestinationThePolicyAdmits:
         assert response.choices[0].message.content == "yes"
         assert provider.hits == ["/chat/completions"]
 
+    def test_an_endpoint_the_server_environment_names_is_admitted_by_host(
+        self, block_local, monkeypatch, provider
+    ):
+        monkeypatch.setenv("OPENAI_API_KEY", "server-key")
+        monkeypatch.setenv("OPENAI_BASE_URL", f"http://127.0.0.1:{provider.port}")
+
+        response = complete({"X_LITELLM_temperature": "0"})
+
+        assert response.choices[0].message.content == "yes"
+        assert provider.hits == ["/chat/completions"]
+
+    def test_a_request_naming_the_servers_private_endpoint_is_still_refused(
+        self, block_local, monkeypatch, provider
+    ):
+        monkeypatch.setenv("OPENAI_BASE_URL", f"http://127.0.0.1:{provider.port}")
+
+        code = refused(request_for(f"http://127.0.0.1:{provider.port}/other"))
+
+        assert code == "private_address"
+        assert provider.hits == []
+
 
 class TestTheConnectionItself:
     def test_a_name_that_rebinds_after_the_check_is_dialled_at_the_checked_address(
@@ -367,6 +389,26 @@ class TestTheConnectionItself:
         assert provider.hits == []
         assert connects == [(PUBLIC_IP, provider.port)]
         assert lookups, "the name was never resolved by the fence"
+
+    def test_a_concurrent_connection_dials_only_addresses_its_own_fence_checked(
+        self, block_local, fake_dns
+    ):
+        """One call's server-admitted private answer never reaches another call."""
+        fake_dns("shared.provider.test", ["10.20.30.40"], [PUBLIC_IP])
+        policy = egress.server_egress_policy()
+        admitting = egress.Fence(policy, frozenset({"shared.provider.test"}))
+        url = httpx.URL("http://shared.provider.test/v1")
+
+        with (
+            admitting.active(),
+            egress._guarded(url),
+            egress.Fence(policy).active(),
+            pytest.raises(egress.EgressDestinationRefusedError) as raised,
+            egress._guarded(url),
+        ):
+            pass
+
+        assert raised.value.code == "private_address"
 
     def test_a_redirect_onto_the_local_network_is_refused(
         self, block_local, monkeypatch

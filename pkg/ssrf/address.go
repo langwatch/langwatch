@@ -157,8 +157,9 @@ func Classify(addr netip.Addr) Category {
 // compatible ::a.b.c.d, translated ::ffff:0:a.b.c.d) to that IPv4 address; only
 // those exact prefixes, so other IPv6 addresses are untouched. :: and ::1 stay
 // IPv6 unspecified and loopback. Mirrors unmap() in packages/egress address.ts.
+// An IPv6 zone is dropped first: the zone never changes which rule applies.
 func unmap(addr netip.Addr) netip.Addr {
-	addr = addr.Unmap()
+	addr = addr.WithZone("").Unmap()
 	if !addr.Is6() || addr.IsUnspecified() || addr.IsLoopback() {
 		return addr
 	}

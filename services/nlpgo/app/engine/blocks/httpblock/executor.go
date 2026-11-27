@@ -176,7 +176,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if carriesCredentials(req) || urlCarriesCredentials(httpReq.URL) {
 		client = clientFollowingSameOrigin(e.client)
 	}
-	resp, err := client.Do(httpReq)
+	resp, err := clientJudgingEachHop(client, e.ssrf).Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("httpblock: %w", err)
 	}

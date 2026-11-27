@@ -3,10 +3,12 @@ package httpblock_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -821,6 +823,7 @@ func TestSafeDialer_ReachesLoopbackOnlyThroughALoopbackNameOrTheAllowlist(t *tes
 // @scenario "A workflow HTTP call never reaches a link-local address"
 func TestCheckURL_RefusesLinkLocalWhateverThePolicy(t *testing.T) {
 	linkLocal := func(string) ([]net.IP, error) { return []net.IP{net.ParseIP("169.254.1.1")}, nil }
+	unresolvable := func(string) ([]net.IP, error) { return nil, errors.New("no such host") }
 	for _, tc := range []struct {
 		name string
 		url  string
@@ -830,6 +833,9 @@ func TestCheckURL_RefusesLinkLocalWhateverThePolicy(t *testing.T) {
 		{"a name resolving to link-local, local calls allowed", "http://runtime.example:9001/", httpblock.SSRFOptions{AllowLocal: true, Resolver: linkLocal}},
 		{"an allowlisted name resolving to link-local", "http://runtime.example:9001/", httpblock.SSRFOptions{AllowedHosts: []string{"runtime.example"}, Resolver: linkLocal}},
 		{"an IPv6 link-local literal, local calls allowed", "http://[fe80::1]:9001/", httpblock.SSRFOptions{AllowLocal: true}},
+		{"a scoped IPv6 link-local literal, local calls allowed", "http://[fe80::1%25eth0]:9001/", httpblock.SSRFOptions{AllowLocal: true}},
+		{"a scoped IPv6 link-local literal, allowlisted", "http://[fe80::1%25eth0]:9001/", httpblock.SSRFOptions{AllowedHosts: []string{"fe80::1%eth0"}}},
+		{"a scoped IPv6 link-local literal, never looked up", "http://[fe80::1%25eth0]:9001/", httpblock.SSRFOptions{AllowLocal: true, Resolver: unresolvable}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			require.ErrorIs(t, httpblock.CheckURL(tc.url, tc.opts), httpblock.ErrSSRFBlocked)
@@ -838,4 +844,48 @@ func TestCheckURL_RefusesLinkLocalWhateverThePolicy(t *testing.T) {
 			require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 		})
 	}
+}
+
+// @scenario "A workflow HTTP call never reaches a link-local address"
+func TestExecute_ARedirectThroughAProxyIsJudgedBeforeItIsSent(t *testing.T) {
+	var proxied []string
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxied = append(proxied, r.URL.String())
+		if r.URL.Host == "public.example" {
+			http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer proxy.Close()
+	proxyURL, err := url.Parse(proxy.URL)
+	require.NoError(t, err)
+
+	exec := httpblock.New(httpblock.Options{
+		Client: &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}},
+		SSRF: httpblock.SSRFOptions{
+			AllowLocal: true,
+			Resolver:   func(string) ([]net.IP, error) { return []net.IP{net.ParseIP("93.184.216.34")}, nil },
+		},
+	})
+	_, err = exec.Execute(context.Background(), httpblock.Request{Method: http.MethodGet, URL: "http://public.example/start"})
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	assert.Equal(t, []string{"http://public.example/start"}, proxied, "the redirect target never reaches the proxy")
+}
+
+// @scenario "The HTTP block falls back across the addresses it checked"
+func TestSafeDialer_RefusesAResolverAnswerItCannotRead(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1"), {10, 0, 0}}, nil
+		},
+	})
+	_, err = dial(context.Background(), "tcp", net.JoinHostPort("agent.localhost", port))
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }

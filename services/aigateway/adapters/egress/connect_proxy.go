@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"sync"
@@ -20,6 +21,9 @@ import (
 
 // connectRequestTimeout bounds how long a client may take to send CONNECT.
 const connectRequestTimeout = 10 * time.Second
+
+// maxConnectHeadBytes caps the CONNECT request head read before authorizing.
+const maxConnectHeadBytes = 16 << 10
 
 // proxyUser is the fixed user name; the per-process token is the password.
 const proxyUser = "langwatch-egress"
@@ -34,6 +38,9 @@ type ConnectProxy struct {
 	dialer   Dialer
 	token    string
 	logger   *zap.Logger
+	// ctx ends every upstream dial when Close runs.
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	mu     sync.Mutex
 	conns  map[net.Conn]struct{}
@@ -54,11 +61,14 @@ func StartConnectProxy(dialer Dialer, logger *zap.Logger) (*ConnectProxy, error)
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	p := &ConnectProxy{
 		listener: listener,
 		dialer:   dialer,
 		token:    hex.EncodeToString(secret),
 		logger:   logger,
+		ctx:      ctx,
+		cancel:   cancel,
 		conns:    map[net.Conn]struct{}{},
 	}
 	p.wg.Add(1)
@@ -86,6 +96,7 @@ func (p *ConnectProxy) Close() {
 		return
 	}
 	p.closed = true
+	p.cancel()
 	_ = p.listener.Close()
 	for conn := range p.conns {
 		_ = conn.Close()
@@ -133,11 +144,13 @@ func (p *ConnectProxy) untrack(conn net.Conn) {
 
 func (p *ConnectProxy) handle(client net.Conn) {
 	_ = client.SetReadDeadline(time.Now().Add(connectRequestTimeout))
-	reader := bufio.NewReader(client)
+	head := &io.LimitedReader{R: client, N: maxConnectHeadBytes}
+	reader := bufio.NewReader(head)
 	req, err := http.ReadRequest(reader)
 	if err != nil {
 		return
 	}
+	head.N = math.MaxInt64
 	if req.Method != http.MethodConnect {
 		writeStatus(client, http.StatusMethodNotAllowed)
 		return
@@ -147,7 +160,7 @@ func (p *ConnectProxy) handle(client net.Conn) {
 		return
 	}
 	target := req.URL.Host
-	upstream, err := p.dialer.DialContext(context.Background(), "tcp", target)
+	upstream, err := p.dialer.DialContext(p.ctx, "tcp", target)
 	if err != nil {
 		status := http.StatusBadGateway
 		if errors.Is(err, ErrBlocked) {

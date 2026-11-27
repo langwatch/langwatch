@@ -116,7 +116,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		}
 		return nil
 	}
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := literalIP(host); ip != nil {
 		if ipBlocked(ip, opts, host) {
 			return ErrSSRFBlocked
 		}
@@ -195,22 +195,37 @@ func (o SSRFOptions) lookup() ssrf.Lookup {
 	}
 	return func(_ context.Context, host string) ([]netip.Addr, error) {
 		ips, err := o.Resolver(host)
+		if err != nil {
+			return nil, err
+		}
 		addrs := make([]netip.Addr, 0, len(ips))
 		for _, ip := range ips {
-			if addr, ok := netip.AddrFromSlice(ip); ok {
-				addrs = append(addrs, addr)
+			addr, ok := netip.AddrFromSlice(ip)
+			if !ok {
+				return nil, ErrSSRFBlocked // an answer the policy cannot judge is refused
 			}
+			addrs = append(addrs, addr)
 		}
-		return addrs, err
+		return addrs, nil
 	}
 }
 
 // addrsOf is the literal address, or what the name resolves to.
 func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := literalIP(host); ip != nil {
 		return []net.IP{ip}, nil
 	}
 	return resolveHost(host, opts)
+}
+
+// literalIP is host as an address literal, a scoped IPv6 one included, the
+// way the connection parses it; nil when host is a name.
+func literalIP(host string) net.IP {
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return nil
+	}
+	return net.IP(addr.WithZone("").AsSlice())
 }
 
 // anyNeverPermitted reports whether an allow-listed host reaches cloud metadata

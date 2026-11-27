@@ -751,14 +751,11 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 	}
 	bundle, err := s.admit(ctx, h, answer)
 	if errors.Is(err, errKeyRecheckDue) {
-		var fresh bool
-		answer, fresh, err = s.recheckKey(ctx, presentedKey{key: key, h: h}, answer)
-		switch {
-		case err != nil:
-		case fresh:
-			bundle, err = s.admit(ctx, h, answer)
-		default:
-			bundle = answer.bundle
+		// Admit again after the wait: a denial or expiry may have landed in it.
+		if answer, err = s.recheckKey(ctx, presentedKey{key: key, h: h}, answer); err == nil {
+			if bundle, err = s.admit(ctx, h, answer); errors.Is(err, errKeyRecheckDue) {
+				err = nil // the re-check had its say
+			}
 		}
 	}
 	if errors.Is(err, domain.ErrAuthUpstream) {

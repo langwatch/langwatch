@@ -69,6 +69,7 @@ func keyScope(id string) string        { return "vk:" + id }
 func projectScope(id string) string    { return "project:" + id }
 func orgScope(id string) string        { return "org:" + id }
 func credentialScope(id string) string { return "credential:" + id }
+func presentedScope(h [64]byte) string { return "presented:" + string(h[:]) }
 
 // guardKeys lists the identities a bundle can be reached by.
 func guardKeys(b *domain.Bundle) []string {
@@ -135,7 +136,7 @@ func (s *Service) publishFetched(h [64]byte, stored *entry, since uint64) bool {
 	g := s.invalidations
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	keys := guardKeys(stored.bundle)
+	keys := append(guardKeys(stored.bundle), presentedScope(h))
 	if g.evicted.reachedSince(keys, since) {
 		s.logger.Debug("auth_cache_publish_dropped_stale",
 			zap.String("vk_id", stored.bundle.VirtualKeyID))

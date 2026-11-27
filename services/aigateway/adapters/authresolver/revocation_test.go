@@ -23,6 +23,7 @@ func orgBundle(vkID string, exp time.Time) *domain.Bundle {
 // hookResolver runs during a ResolveKey call, so a test can land a change-feed
 // event while a resolve is in flight.
 type hookResolver struct {
+	mu     sync.Mutex
 	bundle *domain.Bundle
 	err    error
 	during func()
@@ -31,11 +32,16 @@ type hookResolver struct {
 }
 
 func (r *hookResolver) ResolveKey(_ context.Context, _ domain.PresentedKey) (*domain.Bundle, error) {
+	r.mu.Lock()
 	r.calls++
-	if r.during != nil {
-		r.during()
-		r.during = nil
+	during := r.during
+	r.during = nil
+	r.mu.Unlock()
+	if during != nil {
+		during()
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return r.bundle, r.err
 }
 

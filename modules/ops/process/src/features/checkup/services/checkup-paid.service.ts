@@ -130,10 +130,12 @@ export class CheckupPaidService {
         detail:
           "The checkup could not read the gateway's control plane from the signed " +
           `GET /internal/control-plane: ${probe.reason}. An older gateway build has no such ` +
-          "route, and a 401 means the two sides hold different secrets.",
+          "route. A 401 means the gateway refused the signature: the two sides hold different " +
+          "secrets, or their clocks are more than 300 seconds apart.",
         fix:
           "Upgrade the gateway to the release that ships with this app, set the same " +
-          "LW_GATEWAY_INTERNAL_SECRET on the app and the gateway, then run this check again.",
+          "LW_GATEWAY_INTERNAL_SECRET on the app and the gateway, keep both hosts' clocks in " +
+          "sync, then run this check again.",
         docsPath: CHECKUP_DOCS.gateway,
       };
     }

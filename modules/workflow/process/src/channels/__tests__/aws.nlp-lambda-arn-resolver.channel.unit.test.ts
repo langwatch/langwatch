@@ -292,6 +292,25 @@ describe("given a project whose studio engine needs a function", () => {
       expect(updates(sent)).toHaveLength(1);
     });
 
+    /** @scenario "A function AWS will not reconcile mid-update is resolved again soon" */
+    it("marks the resolution unprotected while the shared secret could not be dropped", async () => {
+      const carrying = deployed({
+        Environment: { Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand" } },
+      });
+      const { subject } = resolver({
+        reads: [
+          { Configuration: carrying },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: carrying },
+        ],
+        rejectUpdateWith: new Error("An update is in progress for resource"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+        unprotected: true,
+      });
+    });
+
     /** @scenario "AWS errors are matched by exception name, not message text" */
     it("recognises a ResourceConflictException by its name whatever its message says", async () => {
       class Conflict extends Error {
@@ -403,6 +422,60 @@ describe("given pods of two releases serving the same project during a rollout",
         unprotected: true,
       });
       expect(writes(sent)).toEqual([]);
+    });
+  });
+
+  describe("when Lambda cannot return the tags of a function carrying the shared secret", () => {
+    const carrying = (revision: string) => {
+      const configuration = {
+        ...READY,
+        RevisionId: revision,
+        Environment: {
+          Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand", UNMANAGED: "keep-me" },
+        },
+      };
+      return [
+        { Configuration: configuration },
+        {
+          Code: { ImageUri: "registry/nlp:v10" },
+          Configuration: configuration,
+          TagsError: { ErrorCode: "AccessDeniedException", Message: "lambda:ListTags" },
+        },
+      ];
+    };
+
+    /** @scenario "A function whose order cannot be read still loses the shared secret" */
+    it("drops only the secret, against the revision it read", async () => {
+      const { sent, subject } = resolver({ config: ORDERED, reads: carrying("rev-1") });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toMatchObject({ arn: ARN, unprotected: true });
+      expect(writes(sent)).toEqual(["UpdateFunctionConfigurationCommand"]);
+      expect(
+        sent.find((call) => call.name === "UpdateFunctionConfigurationCommand")!.input,
+      ).toEqual({
+        FunctionName: "langwatch_nlp-project-1",
+        RevisionId: "rev-1",
+        Environment: { Variables: { ...desired, UNMANAGED: "keep-me" } },
+      });
+    });
+
+    /** @scenario "A function whose order cannot be read still loses the shared secret" */
+    it("still answers when AWS refuses the removal", async () => {
+      class Moved extends Error {
+        override readonly name = "PreconditionFailedException";
+      }
+      const { subject } = resolver({
+        config: ORDERED,
+        reads: carrying("rev-1"),
+        rejectUpdateWith: new Moved("the revision moved"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+        unprotected: true,
+      });
     });
   });
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import type { NlpLambdaFleetCredentials } from "@langwatch/workflow-contract";
 
 /** Every per-project studio function is named for the project behind it. */
@@ -121,9 +122,27 @@ export function buildStudioLambdaEnvironment(config: StudioLambdaConfig): Record
   };
 }
 
+/** Removed from a function wherever it carries them: user code there reads this environment. */
+export const STUDIO_LAMBDA_REMOVED_ENVIRONMENT: readonly string[] = [NLP_INTERNAL_SECRET_ENV];
+
+/** A function's variables without the removed ones, and whether it carried any. */
+export function withoutRemovedEnvironment(
+  variables: Readonly<Record<string, string>> | undefined,
+): {
+  kept: Record<string, string>;
+  carriedRemoved: boolean;
+} {
+  const kept = { ...variables };
+  const carried = STUDIO_LAMBDA_REMOVED_ENVIRONMENT.filter((name) => name in kept);
+  for (const name of carried) delete kept[name];
+
+  return { kept, carriedRemoved: carried.length > 0 };
+}
+
 /**
  * A digest of everything reconciliation pushes to a function: its environment,
- * memory and timeout. A cached ARN resolved under another digest is stale.
+ * the variables it removes, memory and timeout. A cached ARN resolved under
+ * another digest is stale.
  */
 export function studioLambdaConfigFingerprint(config: StudioLambdaConfig): string {
   const environment = Object.entries(buildStudioLambdaEnvironment(config)).toSorted(([a], [b]) =>
@@ -131,6 +150,7 @@ export function studioLambdaConfigFingerprint(config: StudioLambdaConfig): strin
   );
   const desired = JSON.stringify({
     environment,
+    removedEnvironment: STUDIO_LAMBDA_REMOVED_ENVIRONMENT,
     memorySizeMb: NLP_LAMBDA_MEMORY_SIZE_MB,
     timeoutSeconds: LAMBDA_INVOCATION_TIMEOUT_SECONDS,
   });

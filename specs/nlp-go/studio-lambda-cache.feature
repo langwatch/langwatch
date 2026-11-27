@@ -139,6 +139,7 @@ Feature: Per-project NLP Lambda resolution
     When the pod resolves that project
     Then it answers with the function's ARN, marked as left unprotected
     And it sends no UpdateFunctionCode, UpdateFunctionConfiguration or TagResource call
+    But a function carrying the engine hop's shared secret has that variable alone removed
 
   @unit
   Scenario: A pod that cannot record its order does not move the image

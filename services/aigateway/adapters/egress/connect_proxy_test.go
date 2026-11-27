@@ -2,10 +2,14 @@ package egress
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,4 +106,62 @@ func TestConnectProxyAnswersOnlyItsOwnAuthenticatedConnect(t *testing.T) {
 	_, _, status = proxyRequest(t, proxy, "GET http://"+target+"/ HTTP/1.1\r\nHost: "+target+"\r\n\r\n")
 	assert.Equal(t, http.StatusMethodNotAllowed, status)
 	assert.Empty(t, accepted)
+}
+
+func TestConnectProxyKeepsBytesSentWithTheConnectRequest(t *testing.T) {
+	target, _ := echoListener(t)
+	proxy := startProxy(t, NewPolicy(true, []string{"127.0.0.1"}))
+
+	conn, reader, status := proxyRequest(t, proxy, connect(proxy, target, true)+"ping\n")
+	require.Equal(t, http.StatusOK, status)
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	line, err := reader.ReadString('\n')
+	require.NoError(t, err)
+	assert.Equal(t, "ping\n", line)
+}
+
+func TestConnectProxyRefusesAnOversizedRequestHead(t *testing.T) {
+	proxy := startProxy(t, NewPolicy(false, nil))
+	conn, err := net.Dial("tcp", proxy.listener.Addr().String())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	go func() {
+		_, _ = io.WriteString(conn, "CONNECT example.com:443 HTTP/1.1\r\nX-Pad: "+strings.Repeat("a", 4*maxConnectHeadBytes))
+	}()
+
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_, err = io.ReadAll(conn)
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		t.Fatal("the proxy kept reading an oversized request head instead of closing")
+	}
+}
+
+func TestConnectProxyCloseCancelsAPendingDial(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	slow := func(ctx context.Context, _ string) ([]netip.Addr, error) {
+		entered <- struct{}{}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(5 * time.Second):
+			return nil, errors.New("lookup gave up")
+		}
+	}
+	proxy, err := StartConnectProxy(NewPolicy(false, nil).WithLookup(slow).Dialer(30*time.Second), nil)
+	require.NoError(t, err)
+	conn, err := net.Dial("tcp", proxy.listener.Addr().String())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	_, err = io.WriteString(conn, connect(proxy, "slow.example:443", true))
+	require.NoError(t, err)
+	<-entered
+
+	closed := make(chan struct{})
+	go func() { proxy.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close waited on a dial the proxy no longer needs")
+	}
 }

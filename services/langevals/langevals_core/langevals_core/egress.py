@@ -187,7 +187,10 @@ class Fence:
         host = _bare_host(host)
         if host in _METADATA_HOSTS:
             raise _refuse_metadata()
-        addresses = _addresses_of(host)
+        return self.judge_addresses(host, _addresses_of(host))
+
+    def judge_addresses(self, host: str, addresses: tuple[str, ...]) -> Destination:
+        """The addresses a name answered, judged for this fence's host."""
         if any(classify(address) == "metadata" for address in addresses):
             raise _refuse_metadata()
         allowed = host in self.policy.allowed_hosts or host in self.admitted_hosts
@@ -241,35 +244,41 @@ def egress_refusal(
     return None
 
 
-# Host -> the checked addresses of every in-flight connection to it.
-_pins: dict[str, dict[int, tuple[str, ...]]] = {}
+# Host -> [checked addresses, in-flight connections]. Every connection to a
+# host in flight at once shares one answer, judged by each one's own fence.
+_pins: dict[str, list] = {}
 _pins_lock = threading.Lock()
 
 
 @contextmanager
-def _pinned(destination: Destination) -> Iterator[None]:
-    if _parse_ip(destination.host) is not None:
+def _pinned(fence: Fence, destination: Destination) -> Iterator[None]:
+    host = destination.host
+    if _parse_ip(host) is not None:
         yield
         return
-    key = object()
     with _pins_lock:
-        _pins.setdefault(destination.host, {})[id(key)] = destination.addresses
+        entry = _pins.get(host)
+        if entry is None:
+            _pins[host] = [destination.addresses, 1]
+        else:
+            fence.judge_addresses(host, entry[0])
+            entry[1] += 1
     try:
         yield
     finally:
         with _pins_lock:
-            entries = _pins[destination.host]
-            del entries[id(key)]
-            if not entries:
-                del _pins[destination.host]
+            entry = _pins[host]
+            entry[1] -= 1
+            if entry[1] == 0:
+                del _pins[host]
 
 
 def _pinned_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     """A pinned name answers with its checked addresses, so a second lookup cannot rebind it."""
     name = host.decode("ascii", "ignore") if isinstance(host, bytes) else host
     with _pins_lock:
-        entries = _pins.get(_bare_host(name)) if isinstance(name, str) else None
-        addresses = next(iter(entries.values())) if entries else None
+        entry = _pins.get(_bare_host(name)) if isinstance(name, str) else None
+        addresses = entry[0] if entry else None
     if addresses is None:
         return _system_getaddrinfo(host, port, family, type, proto, flags)
     answers = []
@@ -300,7 +309,7 @@ def _guarded(url: httpx.URL) -> Iterator[None]:
             "unresolvable_host",
             f"Could not resolve the model endpoint host {destination.host}",
         )
-    with _pinned(destination):
+    with _pinned(fence, destination):
         yield
 
 

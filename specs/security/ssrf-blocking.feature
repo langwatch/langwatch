@@ -279,7 +279,9 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       And the first address does not answer
       When the NLP service's HTTP block connects to that hostname
       Then it connects to the next checked address, never to one it did not check
-      And each address gets an equal share of the time left, so one silent address cannot spend it all
+      And each address of one family gets an equal share of the time left, so one silent address cannot spend it all
+      And the other address family starts after a short delay while the first is still trying
+      And one deadline covers the lookup and every connection attempt
 
   Rule: Link-local addresses are never a destination
     Link-local is where platform services answer (cloud metadata, the AWS
@@ -291,6 +293,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Given BLOCK_LOCAL_HTTP_CALLS is "false", or ALLOWED_PROXY_HOSTS names the host
       When a workflow HTTP call targets a link-local literal or a name resolving to one
       Then the check and the connection both refuse it with an SSRF block error
+      And a redirect to one is refused before it is sent, through an outbound proxy too
 
   Rule: Loopback is never reached by rebinding a name
     The early check and the connection each resolve the name, so a name can

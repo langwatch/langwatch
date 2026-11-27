@@ -614,6 +614,32 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a cached key last confirmed 2 minutes ago under a silent change feed
       Then the key serves and the control plane is not asked
 
+    @unit
+    Scenario: a disable or revoke that lands while the key check waits is refused
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      When the key is revoked while its key check is still waiting on the control plane
+      And the request stops waiting before the check answers
+      Then the request is refused as revoked, not served from the cache
+
+    @unit
+    Scenario: a key whose expiration date passes while the key check waits is refused as expired
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      When the key's expiration date passes while its key check is still waiting
+      Then the request is refused as expired, not served from the cache
+
+    @unit
+    Scenario: a key check slower than the limit still serves its answer
+      Given a key re-check limit shorter than the key check takes
+      And a cached key last confirmed 2 minutes ago under a silent change feed
+      When the control plane confirms the key
+      Then the key serves
+
+    @unit
+    Scenario: a fetch begun before the control plane refused a key cannot cache it again
+      Given a fetch for a cached key is in flight
+      When a key check finds the key refused and evicts it
+      Then the fetch's answer is not published to the cache
+
   Rule: A change-feed backlog refuses a key locally only for the state it ends in
 
     # A gateway that starts reads its organization's whole change history from

@@ -16,7 +16,6 @@ import {
   type FunctionConfiguration,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
-import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 
 import {
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
@@ -26,6 +25,7 @@ import {
   buildStudioLambdaEnvironment,
   recordedImageOrder,
   studioLambdaRolloutStanding,
+  withoutRemovedEnvironment,
   type StudioLambdaConfig,
 } from "../rules/nlp-lambda-config.rules.ts";
 import { type NlpLambdaArnResolver, type NlpLambdaResolution } from "./nlp-lambda.channel.ts";
@@ -219,6 +219,11 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
         { projectId: input.projectId, tagsError: details.TagsError },
         "could not read the studio Lambda's tags; leaving it as it is",
       );
+      await this.dropRemovedEnvironment({
+        functionName: input.functionName,
+        projectId: input.projectId,
+        deployed: details.Configuration ?? input.existing,
+      });
 
       return unprotected;
     }
@@ -249,8 +254,43 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       projectId: input.projectId,
       deployed: details.Configuration ?? input.existing,
     });
+    if (reconciled.kind === "blocked") return unprotected;
 
-    return { current: reconciled ?? current, ...this.ownImage() };
+    return {
+      current: reconciled.kind === "updated" ? reconciled.configuration : current,
+      ...this.ownImage(),
+    };
+  }
+
+  /**
+   * Whatever release owns the function, none puts a removed variable back, so
+   * removing one is safe where the order is unknown. Every other variable is
+   * kept, and the write lands only on the revision that was read.
+   */
+  private async dropRemovedEnvironment(input: {
+    functionName: string;
+    projectId: string;
+    deployed: FunctionConfiguration;
+  }): Promise<void> {
+    const { kept, carriedRemoved } = withoutRemovedEnvironment(
+      input.deployed.Environment?.Variables,
+    );
+    if (!carriedRemoved) return;
+
+    try {
+      await this.options.lambda.send(
+        new UpdateFunctionConfigurationCommand({
+          FunctionName: input.functionName,
+          RevisionId: input.deployed.RevisionId,
+          Environment: { Variables: kept },
+        }),
+      );
+    } catch (error) {
+      this.options.logger?.warn(
+        { projectId: input.projectId, error },
+        "could not remove the engine hop's shared secret from the studio Lambda; leaving it as it is",
+      );
+    }
   }
 
   /** An image moved without its order would be reverted by the older release, so none moves. */
@@ -306,20 +346,24 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
     functionName: string;
     projectId: string;
     deployed: FunctionConfiguration;
-  }): Promise<FunctionConfiguration | null> {
+  }): Promise<
+    | { kind: "level" }
+    | { kind: "updated"; configuration: FunctionConfiguration }
+    | { kind: "blocked" }
+  > {
     const desired = buildStudioLambdaEnvironment(this.options.config);
-    // User code reads this environment, so the engine hop's shared secret is dropped wherever set.
-    const { [NLP_INTERNAL_SECRET_ENV]: carriedSecret, ...deployedEnv } =
-      input.deployed.Environment?.Variables ?? {};
+    const { kept: deployedEnv, carriedRemoved } = withoutRemovedEnvironment(
+      input.deployed.Environment?.Variables,
+    );
     const drifted =
-      carriedSecret !== undefined ||
+      carriedRemoved ||
       Object.entries(desired).some(([key, value]) => deployedEnv[key] !== value) ||
       input.deployed.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB ||
       input.deployed.Timeout !== LAMBDA_INVOCATION_TIMEOUT_SECONDS;
-    if (!drifted) return null;
+    if (!drifted) return { kind: "level" };
 
     try {
-      return await this.options.lambda.send(
+      const configuration = await this.options.lambda.send(
         new UpdateFunctionConfigurationCommand({
           FunctionName: input.functionName,
           // Merged rather than replaced: a variable set out of band is not
@@ -329,6 +373,8 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
           Timeout: LAMBDA_INVOCATION_TIMEOUT_SECONDS,
         }),
       );
+
+      return { kind: "updated", configuration };
     } catch (error) {
       if (isUpdateInProgress(error)) {
         this.options.logger?.info(
@@ -336,7 +382,7 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
           "another update is in flight; leaving the configuration",
         );
 
-        return null;
+        return { kind: "blocked" };
       }
       throw error;
     }

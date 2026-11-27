@@ -26,6 +26,7 @@ func TestCheckDialRefusesWhatThePolicyDoesNotAllow(t *testing.T) {
 		{"0.0.0.0:80", false, false},
 		{"168.63.129.16:80", false, false},
 		{"[::ffff:169.254.169.254]:80", false, false},
+		{"[fd00:ec2::254%eth0]:80", false, false},
 		{"not-an-address", false, false},
 		{"llm.internal:443", false, false},
 	}
