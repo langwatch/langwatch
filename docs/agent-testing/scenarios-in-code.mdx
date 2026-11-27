@@ -293,7 +293,10 @@ def seeded_customer():
             delete_order(order_id)
         except Exception as error:
             errors.append(error)
-    delete_test_customer(customer["id"])
+    try:
+        delete_test_customer(customer["id"])
+    except Exception as error:
+        errors.append(error)
     if errors:
         raise ExceptionGroup("cleanup failed", errors)
 ```
