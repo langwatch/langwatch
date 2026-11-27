@@ -26,7 +26,7 @@
     "vitest": "catalog:"
   },
   "engines": {
-    "bun": ">=1.3.13",
+    "bun": ">=1.4.4",
     "node": ">=24"
   },
   "nx": {
