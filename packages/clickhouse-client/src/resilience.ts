@@ -15,6 +15,18 @@ export const TRANSIENT_NETWORK_CODES: ReadonlySet<string> = new Set([
   "EAI_AGAIN",
 ]);
 
+/**
+ * ClickHouse's TOO_MANY_SIMULTANEOUS_QUERIES (202): the server refused the statement before
+ * running it because every slot was taken, so another attempt after a backoff is always safe.
+ */
+export function isServerBusy(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return (
+    String(Reflect.get(error, "code")) === "202" ||
+    Reflect.get(error, "type") === "TOO_MANY_SIMULTANEOUS_QUERIES"
+  );
+}
+
 /** Statuses the server uses for "busy, come back". */
 export const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([429, 502, 503]);
 
@@ -68,6 +80,7 @@ export function isTransientClickHouseError({
   if (!(error instanceof Error)) return false;
 
   if (isDriverTimeout(error)) return true;
+  if (isServerBusy(error)) return true;
 
   for (const fragment of transientMessageFragments) {
     if (error.message.includes(fragment)) return true;

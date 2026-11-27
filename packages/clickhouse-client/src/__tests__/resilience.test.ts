@@ -168,6 +168,29 @@ describe("isTransientClickHouseError", () => {
     });
   });
 
+  describe("given the server refusing the statement because every slot is taken", () => {
+    describe("when the driver error carries code 202 and no fragments are supplied", () => {
+      it("retries", () => {
+        const error = Object.assign(new Error("Too many simultaneous queries. Maximum: 50."), {
+          code: "202",
+          type: "TOO_MANY_SIMULTANEOUS_QUERIES",
+        });
+
+        expect(isTransientClickHouseError({ error })).toBe(true);
+      });
+    });
+
+    describe("when only the type names the refusal", () => {
+      it("retries", () => {
+        const error = Object.assign(new Error("Too many simultaneous queries."), {
+          type: "TOO_MANY_SIMULTANEOUS_QUERIES",
+        });
+
+        expect(isTransientClickHouseError({ error })).toBe(true);
+      });
+    });
+  });
+
   describe("given a query the server will never accept", () => {
     describe("when the failure is a syntax error", () => {
       it("fails fast rather than spending the budget", () => {

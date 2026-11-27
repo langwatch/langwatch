@@ -10,6 +10,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 
 import { type ClickHouseClient, ClickHouseError, createClient } from "@clickhouse/client";
+import { runWithRetry } from "@langwatch/clickhouse-client";
 import {
   type GooseOptions,
   parseConnectionUrl,
@@ -83,16 +84,24 @@ export type ImageUpgradeInputs = Readonly<{
   publish?: (channel: string, message: string) => Promise<unknown>;
 }>;
 
-/** Rows as JSON; a database goose has not created yet holds none (upgrade-command.feature). */
+/**
+ * Rows as JSON; a database goose has not created yet holds none (upgrade-command.feature). A busy
+ * server (TOO_MANY_SIMULTANEOUS_QUERIES) or a dropped connection is retried with backoff.
+ */
 export function sqlReader({
   client,
+  retry = {},
 }: {
   client: Pick<ClickHouseClient, "query">;
+  retry?: Parameters<typeof runWithRetry>[1];
 }): UpgradeClickHouse {
   return {
     async queryRows<Row extends object>(sql: string): Promise<Row[]> {
       try {
-        return await (await client.query({ query: sql, format: "JSONEachRow" })).json<Row>();
+        return await runWithRetry(
+          async () => (await client.query({ query: sql, format: "JSONEachRow" })).json<Row>(),
+          retry,
+        );
       } catch (error) {
         if (error instanceof ClickHouseError && error.type === "UNKNOWN_DATABASE") return [];
         throw error;

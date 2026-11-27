@@ -946,7 +946,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $serverMaxConcurrentQueries := int .Values.clickhouse.external.serverMaxConcurrentQueries }}
 {{- if .Values.clickhouse.chartManaged }}
   {{- $serverNodes = int .Values.clickhouse.replicas }}
-  {{- $serverMaxConcurrentQueries = int (index (.Values.clickhouse.env | default dict) "MAX_CONCURRENT_QUERIES" | default 300) }}
+  {{/* The bundled image sets max_concurrent_queries to min(cores * 25, 200), cores rounded up
+       (infra/clickhouse-serverless/internal/config/compute.go); env MAX_CONCURRENT_QUERIES wins. */}}
+  {{- $cpu := toString (.Values.clickhouse.cpu | default 2) }}
+  {{- $cores := 1 }}
+  {{- if hasSuffix "m" $cpu }}
+    {{- $cores = div (add (int (trimSuffix "m" $cpu)) 999) 1000 }}
+  {{- else }}
+    {{- $cores = int (ceil (float64 $cpu)) }}
+  {{- end }}
+  {{- $cores = max $cores 1 }}
+  {{- $imageMaxConcurrentQueries := min (mul $cores 25) 200 }}
+  {{- $serverMaxConcurrentQueries = int (index (.Values.clickhouse.env | default dict) "MAX_CONCURRENT_QUERIES" | default $imageMaxConcurrentQueries) }}
 {{- end }}
 - name: CLICKHOUSE_CLIENT_REPLICAS
   value: {{ $clientReplicas | quote }}
