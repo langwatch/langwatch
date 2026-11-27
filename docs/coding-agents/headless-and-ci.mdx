@@ -152,6 +152,16 @@ Every run recorded from then on adds its traces, tokens and cost to that one ses
 
 If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins over the shell export, so add `langwatch.session.id` to the value in the managed settings file instead.
 
+## Name the account an agent runs on
+
+A harness that runs agents on several subscription logins can say which login each session used, so you can chart usage per account. Add the account attributes to the same resource attributes:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.account.id=4f1c9e2a7b6d4c3e8a1f0b2c3d4e5f60,langwatch.account.name=Work%20Max,langwatch.account.source=pool"
+```
+
+Percent-encode spaces and commas in values, as `OTEL_RESOURCE_ATTRIBUTES` requires. To show how much of its limit an account used, stamp the provider's own figure on each record as `langwatch.account.usage.percent`, with `langwatch.account.usage.window`, `langwatch.account.usage.resets_at` and `langwatch.account.usage.read_at`, and `langwatch.account.limited_until` while it is out of usage. The full list is on [Usage](/coding-agents/usage-analytics#subscription-accounts).
+
 ## See your machines
 
 Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).

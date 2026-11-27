@@ -13,21 +13,25 @@ import { describe, expect, it } from "vitest";
 
 import {
   levelChangeConfirmation,
+  levelChangeStep,
   modelAcceptanceOf,
   organizationPiiLevel,
   organizationRule,
-  PII_REDACTION_MODEL_PRICE,
   PII_REDACTION_MODEL_PRICE_UNIT,
   piiRedactionModelOfferOf,
   piiRedactionModelPrice,
-  ruleSaveConfirmation,
+  piiRedactionModelPriceIn,
+  PII_LEVEL_STEP_WAITING,
+  ruleSaveStep,
   strictFallbackNote,
   STRICT_RULE_BASED_NOTES,
-  SWITCH_TO_MODEL_CONFIRMATION,
+  switchToModelConfirmation,
+  switchToModelStep,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
 
 type Licence = Parameters<typeof piiRedactionModelOfferOf>[0]["licence"];
+const readPrice = async () => {};
 
 describe("given the deployment and the PII redaction model flags", () => {
   describe("when the deployment is self-hosted", () => {
@@ -47,6 +51,8 @@ describe("given the deployment and the PII redaction model flags", () => {
         splitFlag: true,
         licence,
         mayManageLicence,
+        currency: "USD",
+        readPrice,
       });
 
     /** @scenario The Strict offer on a self-hosted deployment follows the license and the model flag */
@@ -54,8 +60,8 @@ describe("given the deployment and the PII redaction model flags", () => {
       expect(selfHosted({ licence: "enterprise", modelFlag: true })).toEqual({
         kind: "model",
         free: true,
-        licensed: true,
         split: false,
+        licensed: true,
       });
     });
 
@@ -122,17 +128,21 @@ describe("given the deployment and the PII redaction model flags", () => {
           splitFlag,
           licence: "none",
           mayManageLicence: true,
+          currency: "USD",
+          readPrice,
         });
       expect(cloud({ modelFlag: false, freeFlag: true })).toBeNull();
       expect(cloud({ modelFlag: true, freeFlag: false })).toEqual({
         kind: "model",
         free: false,
         split: false,
+        currency: "USD",
       });
       expect(cloud({ modelFlag: true, freeFlag: true })).toEqual({
         kind: "model",
         free: true,
         split: false,
+        licensed: false,
       });
     });
 
@@ -145,8 +155,10 @@ describe("given the deployment and the PII redaction model flags", () => {
         splitFlag: true,
         licence: "none",
         mayManageLicence: true,
+        currency: "USD",
+        readPrice,
       });
-      expect(cloud).toEqual({ kind: "model", free: false, split: true });
+      expect(cloud).toEqual({ kind: "model", free: false, split: true, currency: "USD" });
       const selfHosted = piiRedactionModelOfferOf({
         isSaaS: false,
         modelFlag: true,
@@ -154,8 +166,87 @@ describe("given the deployment and the PII redaction model flags", () => {
         splitFlag: true,
         licence: "enterprise",
         mayManageLicence: true,
+        currency: "USD",
+        readPrice,
       });
       expect(selfHosted).toMatchObject({ kind: "model", split: false });
+    });
+
+    /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
+    it("prices the model in the subscription's currency", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: false,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "EUR",
+          readPrice,
+        }),
+      ).toEqual({ kind: "model", free: false, split: false, currency: "EUR" });
+    });
+
+    /** @scenario "The price currency is the subscription's, read from its Growth plan" */
+    it("quotes no price until the subscription's currency is read, loading or failed", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: false,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "unknown",
+          readPrice,
+        }),
+      ).toEqual({
+        kind: "model",
+        free: false,
+        split: false,
+        currency: "unknown",
+        loading: false,
+        readPrice,
+      });
+    });
+
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("marks the first read in flight as loading, so the price area offers no retry yet", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: false,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "loading",
+          readPrice,
+        }),
+      ).toEqual({
+        kind: "model",
+        free: false,
+        split: false,
+        currency: "unknown",
+        loading: true,
+        readPrice,
+      });
+    });
+
+    it("offers Strict as included to a free organization whatever the currency reading", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: true,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "unknown",
+          readPrice,
+        }),
+      ).toEqual({ kind: "model", free: true, split: false, licensed: false });
     });
   });
 });
@@ -164,8 +255,8 @@ describe("given the rate billing charges for the PII redaction model", () => {
   describe("when it is 500 nano-dollars per character", () => {
     /** @scenario The price is derived from the rate billing charges */
     it("reads $0.50 per 1M characters", () => {
-      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500 })).toBe("$0.50");
-      expect(`${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500, currency: "USD" })).toBe("$0.50");
+      expect(`${piiRedactionModelPriceIn("USD")} ${PII_REDACTION_MODEL_PRICE_UNIT}`).toBe(
         "$0.50 per 1M characters excl. VAT, pay as you go",
       );
     });
@@ -173,7 +264,15 @@ describe("given the rate billing charges for the PII redaction model", () => {
 
   describe("when the rate changes", () => {
     it("follows it", () => {
-      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_250 })).toBe("$1.25");
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_250, currency: "USD" })).toBe("$1.25");
+    });
+  });
+
+  describe("when the organization's subscription is in euros", () => {
+    /** @scenario "The euro price is 0.85 of the dollar rate" */
+    it("reads €0.425 per 1M characters, 0.85 of the dollar rate unrounded", () => {
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 500, currency: "EUR" })).toBe("€0.425");
+      expect(piiRedactionModelPrice({ nanoUsdPerCharacter: 1_000, currency: "EUR" })).toBe("€0.85");
     });
   });
 });
@@ -246,24 +345,58 @@ describe("given the organization's resolved PII level", () => {
 describe("given the switch to the model, which records the acceptance and saves no level", () => {
   /** @scenario Accepting the price from the picker switches the organization to the model */
   it("names the model's price alone, says it covers every Strict rule and keeps the level", () => {
-    expect(SWITCH_TO_MODEL_CONFIRMATION).toEqual({
+    expect(switchToModelConfirmation("USD")).toEqual({
       title: "Switch to the PII Redaction Model?",
       description:
         "$0.50 per 1M characters excl. VAT, pay as you go. This covers every Strict rule in your organization: each one moves to the model and is billed. Your organization's level does not change.",
       confirmLabel: "Accept and switch",
     });
   });
+
+  /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
+  it("names the euro price to an organization paying in euros", () => {
+    expect(switchToModelConfirmation("EUR").description).toMatch(/^€0\.425 per 1M characters/);
+  });
+
+  /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+  it("waits for the price before the subscription's currency is read", () => {
+    const priced = { kind: "model", free: false, split: false, currency: "EUR" } as const;
+    expect(
+      switchToModelStep({ ...priced, currency: "unknown", loading: false, readPrice }),
+    ).toEqual({ kind: "wait" });
+    expect(switchToModelStep(priced)).toEqual({
+      kind: "ask",
+      confirmation: switchToModelConfirmation("EUR"),
+    });
+  });
 });
 
 describe("given a change of the organization's level", () => {
+  const priced = { kind: "model", free: false, split: false, currency: "USD" } as const;
+  const included = { kind: "model", free: true, split: false, licensed: false } as const;
+  const priceUnknown = { ...priced, currency: "unknown", loading: false, readPrice } as const;
+  const accepted = "accepted" as const;
+
+  describe("when Strict is picked before the subscription's currency is read", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("waits for the price, while a change to Essential still asks only to replace Custom", () => {
+      const step = (from: "essential" | "strict" | "custom", to: "essential" | "strict") =>
+        levelChangeStep({ from, to, model: priceUnknown, acceptance: "can-accept" });
+      expect(step("essential", "strict")).toEqual({ kind: "wait" });
+      expect(step("strict", "essential")).toEqual({ kind: "save" });
+      const replace = step("custom", "essential");
+      expect(replace.kind === "ask" && replace.confirmation.confirmLabel).toBe("Replace");
+    });
+  });
+
   describe("when Essential turns into Strict for a paying organization", () => {
     it("asks with the model and its price", () => {
       expect(
         levelChangeConfirmation({
           from: "essential",
           to: "strict",
-          free: false,
-          acceptance: "accepted",
+          model: priced,
+          acceptance: accepted,
         }),
       ).toEqual({
         title: "Turn on Strict?",
@@ -274,13 +407,29 @@ describe("given a change of the organization's level", () => {
     });
   });
 
+  describe("when Essential turns into Strict for an organization paying in euros", () => {
+    /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
+    it("asks with the euro price", () => {
+      expect(
+        levelChangeConfirmation({
+          from: "essential",
+          to: "strict",
+          model: { ...priced, currency: "EUR" },
+          acceptance: accepted,
+        })?.description,
+      ).toBe(
+        "Strict uses the LangWatch PII Redaction Model at €0.425 per 1M characters excl. VAT, pay as you go. Turn it on?",
+      );
+    });
+  });
+
   describe("when the prompt records the organization's acceptance", () => {
     /** @scenario Picking Strict through the price prompt records the acceptance first */
     it("says the acceptance covers every Strict rule in the organization", () => {
       const asking = levelChangeConfirmation({
         from: "essential",
         to: "strict",
-        free: false,
+        model: priced,
         acceptance: "can-accept",
       });
       expect(asking?.description).toBe(
@@ -290,8 +439,8 @@ describe("given a change of the organization's level", () => {
         levelChangeConfirmation({
           from: "essential",
           to: "strict",
-          free: false,
-          acceptance: "accepted",
+          model: priced,
+          acceptance: accepted,
         })?.description,
       ).not.toContain("every Strict rule");
     });
@@ -303,7 +452,7 @@ describe("given a change of the organization's level", () => {
         levelChangeConfirmation({
           from: "essential",
           to: "strict",
-          free: true,
+          model: included,
           acceptance: "not-needed",
         }),
       ).toBeNull();
@@ -316,8 +465,8 @@ describe("given a change of the organization's level", () => {
         levelChangeConfirmation({
           from: "custom",
           to: "essential",
-          free: false,
-          acceptance: "accepted",
+          model: priced,
+          acceptance: accepted,
         })?.description,
       ).toBe("This replaces your custom PII settings with Essential.");
     });
@@ -329,8 +478,8 @@ describe("given a change of the organization's level", () => {
         levelChangeConfirmation({
           from: "custom",
           to: "strict",
-          free: false,
-          acceptance: "accepted",
+          model: priced,
+          acceptance: accepted,
         })?.description,
       ).toBe(
         "This replaces your custom PII settings. Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. Turn it on?",
@@ -344,8 +493,8 @@ describe("given a change of the organization's level", () => {
         levelChangeConfirmation({
           from: "strict",
           to: "essential",
-          free: false,
-          acceptance: "accepted",
+          model: priced,
+          acceptance: accepted,
         }),
       ).toBeNull();
     });
@@ -385,84 +534,99 @@ describe("given the fallback note", () => {
 });
 
 describe("given a rule saved from the drawer", () => {
-  const model = { kind: "model", free: false, split: false } as const;
+  const model = { kind: "model", free: false, split: false, currency: "USD" } as const;
+  const priceUnknown = { ...model, currency: "unknown", loading: false, readPrice } as const;
+  const turnsStrictOn = {
+    before: { pii: { level: "essential" as const } },
+    after: { pii: { level: "strict" as const } },
+  };
+  const confirmationOf = (step: ReturnType<typeof ruleSaveStep>) =>
+    step.kind === "ask" ? step.confirmation : null;
+
+  describe("when it turns Strict on where Strict is the model at a euro price", () => {
+    /** @scenario "Saving a rule at Strict asks with the euro price on a euro Growth subscription" */
+    it("asks with the euro price", () => {
+      const step = ruleSaveStep({
+        offer: { ...model, currency: "EUR" },
+        acceptance: "accepted",
+        ...turnsStrictOn,
+      });
+      expect(confirmationOf(step)?.description).toContain("€0.425 per 1M characters");
+    });
+  });
 
   describe("when it turns Strict on where Strict is the model at a price", () => {
     it("asks with the price", () => {
-      expect(
-        ruleSaveConfirmation({
-          offer: model,
-          acceptance: "accepted",
-          before: { pii: { level: "essential" } },
-          after: { pii: { level: "strict" } },
-        })?.confirmLabel,
-      ).toBe("Turn on Strict");
+      const step = ruleSaveStep({ offer: model, acceptance: "accepted", ...turnsStrictOn });
+      expect(confirmationOf(step)?.confirmLabel).toBe("Turn on Strict");
     });
 
     it("asks an admin who has the price to accept still", () => {
+      const step = ruleSaveStep({ offer: model, acceptance: "can-accept", ...turnsStrictOn });
+      expect(confirmationOf(step)?.confirmLabel).toBe("Turn on Strict");
+    });
+  });
+
+  describe("when it turns Strict on before the subscription's currency is read", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("waits rather than saving unasked, and its message quotes no price", () => {
       expect(
-        ruleSaveConfirmation({
-          offer: model,
-          acceptance: "can-accept",
-          before: { pii: { level: "essential" } },
-          after: { pii: { level: "strict" } },
-        })?.confirmLabel,
-      ).toBe("Turn on Strict");
+        ruleSaveStep({ offer: priceUnknown, acceptance: "can-accept", ...turnsStrictOn }),
+      ).toEqual({ kind: "wait" });
+      expect(PII_LEVEL_STEP_WAITING.description).not.toMatch(/[$€]/);
     });
   });
 
   /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
   it("does not ask when nothing new is billed", () => {
     const strict = { pii: { level: "strict" as const } };
+    const save = { kind: "save" };
+    const accepted = "accepted" as const;
     expect(
-      ruleSaveConfirmation({ offer: model, acceptance: "accepted", before: strict, after: strict }),
-    ).toBeNull();
+      ruleSaveStep({ offer: model, acceptance: accepted, before: strict, after: strict }),
+    ).toEqual(save);
     expect(
-      ruleSaveConfirmation({
-        offer: { kind: "model", free: true, split: false },
+      ruleSaveStep({ offer: priceUnknown, acceptance: accepted, before: strict, after: strict }),
+    ).toEqual(save);
+    expect(
+      ruleSaveStep({
+        offer: { kind: "model", free: true, split: false, licensed: false },
         acceptance: "not-needed",
         before: undefined,
         after: strict,
       }),
-    ).toBeNull();
+    ).toEqual(save);
     expect(
-      ruleSaveConfirmation({
+      ruleSaveStep({
         offer: { kind: "rule-based", note: "licence", activate: true },
         acceptance: "not-needed",
         before: undefined,
         after: strict,
       }),
-    ).toBeNull();
+    ).toEqual(save);
     expect(
-      ruleSaveConfirmation({
-        offer: null,
-        acceptance: "not-needed",
-        before: undefined,
-        after: strict,
-      }),
-    ).toBeNull();
+      ruleSaveStep({ offer: null, acceptance: "not-needed", before: undefined, after: strict }),
+    ).toEqual(save);
     expect(
-      ruleSaveConfirmation({
+      ruleSaveStep({
         offer: model,
-        acceptance: "accepted",
+        acceptance: accepted,
         before: undefined,
         after: { pii: { level: "essential" } },
       }),
-    ).toBeNull();
+    ).toEqual(save);
     // Strict saved by a member who cannot accept stays rule-based, so nothing is billed.
+    expect(ruleSaveStep({ offer: model, acceptance: "awaiting-admin", ...turnsStrictOn })).toEqual(
+      save,
+    );
     expect(
-      ruleSaveConfirmation({
-        offer: model,
-        acceptance: "awaiting-admin",
-        before: { pii: { level: "essential" } },
-        after: strict,
-      }),
-    ).toBeNull();
+      ruleSaveStep({ offer: priceUnknown, acceptance: "awaiting-admin", ...turnsStrictOn }),
+    ).toEqual(save);
   });
 });
 
 describe("given where the organization stands on the model's price", () => {
-  const priced = { kind: "model", free: false, split: false } as const;
+  const priced = { kind: "model", free: false, split: false, currency: "USD" } as const;
 
   /** @scenario Saving a rule asks for the price only when it turns Strict on at a price */
   it("needs an acceptance only on Cloud at a price, until an admin gives it", () => {
@@ -475,9 +639,9 @@ describe("given where the organization stands on the model's price", () => {
     expect(acceptanceOf(priced, true, false)).toBe("accepted");
     expect(acceptanceOf(priced, false, true)).toBe("can-accept");
     expect(acceptanceOf(priced, false, false)).toBe("awaiting-admin");
-    expect(acceptanceOf({ kind: "model", free: true, split: false }, false, true)).toBe(
-      "not-needed",
-    );
+    expect(
+      acceptanceOf({ kind: "model", free: true, split: false, licensed: false }, false, true),
+    ).toBe("not-needed");
     expect(
       acceptanceOf({ kind: "model", free: true, licensed: true, split: false }, false, true),
     ).toBe("not-needed");

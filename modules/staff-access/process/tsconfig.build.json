@@ -36,7 +36,7 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../scenario/contract/tsconfig.build.json"
+      "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
@@ -66,13 +66,7 @@
       "path": "../../../packages/mail/tsconfig.build.json"
     },
     {
-      "path": "../../langy/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
-    },
-    {
-      "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -93,10 +87,10 @@
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+      "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../../data-retention/contract/tsconfig.build.json"
+      "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/contract/tsconfig.build.json"
@@ -126,10 +120,25 @@
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/secrets/tsconfig.build.json"
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
+      "path": "../../scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../instant-eval/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     }
   ]
 }

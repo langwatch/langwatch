@@ -12,6 +12,12 @@ Feature: Ops agent access from the CLI
     And no ".env" file is written
 
   @integration
+  Scenario: The CLI keeps waiting through a status read the server failed to answer
+    Given a pending access request
+    When one status read fails with a server error while the approver decides
+    Then the CLI keeps waiting and redeems the key once approved
+
+  @integration
   Scenario: Setup reads the requester key from stdin
     When the agent runs "pbpaste | langwatch ops setup" with the key on the clipboard
     Then the key is stored in a 0600 file beside the CLI config

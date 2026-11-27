@@ -2,7 +2,7 @@
  * The ops functions' pure decisions (ADR-202, amendment 2026-11-25): which functions fit which
  * scopes, the range limit, and keyset pages over a sort key with an opaque cursor.
  */
-import type { StaffAccessScope } from "@langwatch/authz-contract";
+import { reachesOrganization, type StaffAccessScope } from "@langwatch/authz-contract";
 import {
   isStaffAccessFunctionName,
   STAFF_ACCESS_FUNCTION_LIMITS,
@@ -35,7 +35,7 @@ export type StaffAccessFunctionRuns<Names extends StaffAccessFunctionName> = {
 
 const cursorShape = z.object({ f: z.string(), k: z.string() });
 
-/** `lookup` and `platform` functions need `ops:read`; `org` functions an organization scope. */
+/** `lookup` and `platform` need `ops:read`; `org` an organization scope (a copy side is none). */
 export function functionFitsScopes({
   name,
   scopes,
@@ -44,7 +44,7 @@ export function functionFitsScopes({
   scopes: readonly StaffAccessScope[];
 }): boolean {
   const { scope } = STAFF_ACCESS_FUNCTIONS[name];
-  if (scope === "org") return scopes.some((granted) => granted !== "ops:read");
+  if (scope === "org") return reachesOrganization(scopes);
   return scopes.includes("ops:read");
 }
 

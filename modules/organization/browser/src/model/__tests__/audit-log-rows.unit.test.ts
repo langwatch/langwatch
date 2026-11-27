@@ -32,6 +32,9 @@ describe("given a recorded action slug", () => {
     ["governance.agent.restore_failed", "Restore failed"],
     ["governance.agent.quarantined", "Quarantined agent"],
     ["governance.agent.restored", "Restored agent"],
+    ["staffAccess.orgCopy", "LangWatch staff started an organization setup copy"],
+    ["staffAccess.orgCopyPlanned", "LangWatch staff planned an organization setup copy"],
+    ["staffAccess.orgCopyStopped", "LangWatch staff organization setup copy stopped"],
   ])("reads %s as %s", (action, phrase) => {
     expect(auditActionPhrase(action)).toBe(phrase);
   });

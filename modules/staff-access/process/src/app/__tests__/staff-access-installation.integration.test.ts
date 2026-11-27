@@ -8,8 +8,10 @@ import { AuthApi } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
@@ -23,6 +25,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
 import { StaffAccessApi } from "@langwatch/staff-access-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -70,6 +73,9 @@ async function boot(role: "api" | "worker") {
       testPeer({ token: ScenarioApi, instance: createApiFixture<ScenarioApi>() }),
       testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
       testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>() }),
+      testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
+      testPeer({ token: PromptApi, instance: createApiFixture<PromptApi>() }),
+      testPeer({ token: DatasetApi, instance: createApiFixture<DatasetApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

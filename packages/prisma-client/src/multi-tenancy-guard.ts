@@ -143,6 +143,9 @@ const GLOBAL_MODELS = [
   // Nurturing's erased accounts, by a hash of the id alone: an erasure spans every organization,
   // like AuthzUserStanding; written in raw SQL only.
   "NurturingErasedUser",
+  // The organization copy ledger: one row spans a source and a target organization, written and
+  // read only by the staff-access copy, never by a customer surface.
+  "StaffAccessCopyLedger",
 ] as const;
 
 /**

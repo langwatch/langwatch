@@ -430,12 +430,8 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When a Growth checkout in dollars is built
       Then it carries the metered PII redaction item with no quantity
 
-    @unit
-    Scenario: A Growth checkout in euros carries no PII redaction price
-      Given a Stripe mode where the PII redaction price is provisioned
-      When a Growth checkout in euros is built
-      Then it carries no PII redaction item
-      # The meter counts dollars; a euro subscription cannot hold a dollar price.
+    # A Growth checkout in euros carries GROWTH_PII_REDACTION_EUR on the same dollar meter,
+    # at 0.85 euros per dollar: enterprise/modules/billing/specs/euro-usage-prices.feature.
 
     @unit
     Scenario: A Growth checkout works where the PII redaction price is not provisioned

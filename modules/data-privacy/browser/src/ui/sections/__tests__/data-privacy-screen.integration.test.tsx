@@ -22,6 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DataPrivacyHostApi,
+  type PrivacyBillingCurrencyReading,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
@@ -129,6 +130,12 @@ class TestPrivacyHost extends DataPrivacyHostApi {
   mayManageLicence(): boolean {
     return false;
   }
+
+  billingCurrency(): PrivacyBillingCurrencyReading {
+    return "USD";
+  }
+
+  async refreshBillingCurrency(): Promise<void> {}
 }
 
 function renderScreen(host: TestPrivacyHost) {

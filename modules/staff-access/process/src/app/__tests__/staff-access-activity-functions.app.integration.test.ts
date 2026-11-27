@@ -10,6 +10,7 @@ import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.
 import {
   ACME,
   GLOBEX,
+  INITECH,
   requestBody,
   staffAccessWorld,
   codeOf,
@@ -211,6 +212,7 @@ describe("the activity ops functions", () => {
       expect(w.state.activityAsks.map((ask) => ask.projectIds)).toEqual([
         [ACME_PROJECT],
         [`${GLOBEX.id}_project`],
+        [`${INITECH.id}_project`],
       ]);
       expect(JSON.stringify(answered.output)).not.toContain(ACME.name);
     });

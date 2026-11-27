@@ -12,6 +12,7 @@ export {
   intentAccessorOf,
   TEST_CONSTANTS,
 } from "./services/__tests__/testHelpers.ts";
+export { IDLE_REPLAY_CLAIMS_INDEX } from "./replay/replayClaimsIndex.ts";
 export { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore.ts";
 export type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
 export type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queues/index.ts";

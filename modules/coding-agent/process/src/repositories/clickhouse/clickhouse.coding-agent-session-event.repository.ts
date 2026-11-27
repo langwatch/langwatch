@@ -98,6 +98,14 @@ interface ClickHouseWriteRecord {
   RepositoryOwner: string;
   RepositoryName: string;
   Branch: string;
+  AccountId: string;
+  AccountName: string;
+  AccountSource: string;
+  AccountUsagePercent: number | null;
+  AccountUsageWindow: string;
+  AccountUsageResetsAt: ClickHouseMoment | null;
+  AccountUsageReadAt: ClickHouseMoment | null;
+  AccountLimitedUntil: ClickHouseMoment | null;
   UpdatedAt: ClickHouseMoment;
   _retention_days: number;
 }
@@ -484,6 +492,23 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       RepositoryOwner: record.repositoryOwner,
       RepositoryName: record.repositoryName,
       Branch: record.branch,
+      AccountId: record.accountId,
+      AccountName: record.accountName,
+      AccountSource: record.accountSource,
+      AccountUsagePercent: record.accountUsagePercent,
+      AccountUsageWindow: record.accountUsageWindow,
+      AccountUsageResetsAt:
+        record.accountUsageResetsAtMs === null
+          ? null
+          : clickHouseMomentOf(record.accountUsageResetsAtMs),
+      AccountUsageReadAt:
+        record.accountUsageReadAtMs === null
+          ? null
+          : clickHouseMomentOf(record.accountUsageReadAtMs),
+      AccountLimitedUntil:
+        record.accountLimitedUntilMs === null
+          ? null
+          : clickHouseMomentOf(record.accountLimitedUntilMs),
       UpdatedAt: writtenAt,
       _retention_days: retentionDays,
     };

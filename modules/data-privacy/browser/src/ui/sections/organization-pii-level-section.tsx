@@ -3,24 +3,27 @@
  * setForScope. Spec: modules/data-privacy/specs/pii-redaction-level-picker.feature
  */
 
-import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
+import type { DataPrivacySnapshot, PiiLevel } from "@langwatch/data-privacy-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import type { InFlight } from "../../behavior/use-in-flight.ts";
+import { type InFlight, useInFlight } from "../../behavior/use-in-flight.ts";
 import type { AcceptPiiRedactionModel } from "../../behavior/use-pii-redaction-model-acceptance.ts";
 import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
 import {
   awaitsAcceptance,
-  levelChangeConfirmation,
+  levelChangeStep,
   type ModelAcceptance,
   organizationPiiLevel,
   organizationRule,
   type OrganizationPiiLevel,
   otherPiiLevelLabel,
+  type PiiLevelStep,
+  type PiiRedactionModel,
+  piiLevelStepDialog,
   showsStrictRule,
-  SWITCH_TO_MODEL_CONFIRMATION,
+  switchToModelStep,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
@@ -90,15 +93,69 @@ function useOptimisticPick({
   };
 }
 
+/** What the prompt does next for a choice: a level change's step, or the switch's. */
+function stepOfChoice({
+  choice,
+  from,
+  model,
+  acceptance,
+}: {
+  choice: Asking;
+  from: PiiLevel;
+  model: PiiRedactionModel;
+  acceptance: ModelAcceptance;
+}): PiiLevelStep {
+  if (choice.kind === "switch") return switchToModelStep(model);
+  return levelChangeStep({ from, to: choice.level, model, acceptance });
+}
+
+/** Reads the plan again for a model priced before its currency is known; otherwise nothing. */
+function priceReaderOf(model: PiiRedactionModel): () => Promise<void> {
+  return !model.free && model.currency === "unknown" ? model.readPrice : async () => {};
+}
+
+/** A waiting choice left with nothing to ask (the model turned free) applies as a direct one. */
+function useApplyWaitingChoice({
+  asking,
+  from,
+  model,
+  acceptance,
+  ready,
+  apply,
+}: {
+  asking: Asking | null;
+  from: PiiLevel | undefined;
+  model: PiiRedactionModel;
+  acceptance: ModelAcceptance;
+  ready: boolean;
+  apply: (choice: Asking) => void;
+}) {
+  const kind =
+    asking && from !== undefined
+      ? stepOfChoice({ choice: asking, from, model, acceptance }).kind
+      : null;
+  const run = useEffectEvent(() => {
+    if (asking && ready) apply(asking);
+  });
+  useEffect(() => {
+    if (kind === "save") run();
+  }, [kind]);
+}
+
+/** The open prompt, dismissed once the page shows another organization than it was opened for. */
+function useAskingFor(organizationId: string | undefined) {
+  const [asking, setAsking] = useState<Asking | null>(null);
+  if (asking && asking.organizationId !== organizationId) setAsking(null);
+  return [asking, setAsking] as const;
+}
+
 /**
  * Strict at a price, or replacing Custom, asks first; a free organization is never asked. Until
  * an admin accepts the price, Strict is rule-based: confirming the price, by picking Strict or
  * by switching a rule-based Strict to the model, records the acceptance first.
  */
 export function OrganizationPiiLevelSection({
-  free,
-  licensed = false,
-  split = false,
+  model,
   acceptance,
   onAccept,
   acceptanceInFlight,
@@ -107,10 +164,8 @@ export function OrganizationPiiLevelSection({
   snapshot,
   onSaved,
 }: {
-  free: boolean;
-  licensed?: boolean;
-  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
-  split?: boolean;
+  /** Strict's model: its price in the subscription's currency, or why it is included. */
+  model: PiiRedactionModel;
   acceptance: ModelAcceptance;
   onAccept: AcceptPiiRedactionModel;
   /** The page's acceptance in flight: a pick made meanwhile would be overwritten by its save. */
@@ -126,9 +181,20 @@ export function OrganizationPiiLevelSection({
     organizationId,
     stored: snapshot.effectiveOrganization?.pii.level,
   });
-  const [asking, setAsking] = useState<Asking | null>(null);
-  // A prompt opened for one organization is dismissed once the page shows another.
-  if (asking && asking.organizationId !== organizationId) setAsking(null);
+  const [asking, setAsking] = useAskingFor(organizationId);
+  const readingPrice = useInFlight();
+  const ready = !!organizationId && !!snapshot.effectiveOrganization;
+  useApplyWaitingChoice({
+    asking,
+    from: snapshot.effectiveOrganization?.pii.level,
+    model,
+    acceptance,
+    ready,
+    apply: (choice) => {
+      setAsking(null);
+      settle(choice);
+    },
+  });
   if (!organizationId || !snapshot.effectiveOrganization) return null;
 
   const storedPii = snapshot.effectiveOrganization.pii;
@@ -136,10 +202,18 @@ export function OrganizationPiiLevelSection({
   const picked = optimistic.picked;
   const shown = picked && picked.over === stored ? picked.level : stored;
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
-  const confirmationFor = (level: OrganizationPiiLevel) =>
-    levelChangeConfirmation({ from: storedPii.level, to: level, free, acceptance });
-  const levelConfirmation = asking?.kind === "level" ? confirmationFor(asking.level) : null;
-  const confirmation = asking?.kind === "switch" ? SWITCH_TO_MODEL_CONFIRMATION : levelConfirmation;
+  const stepOf = (choice: Asking) =>
+    stepOfChoice({ choice, from: storedPii.level, model, acceptance });
+  // Read live: a choice waiting for the price asks with it once the plan answers.
+  const step = asking ? stepOf(asking) : null;
+  const confirmation = piiLevelStepDialog(step);
+  const readPrice = () => readingPrice.run(priceReaderOf(model));
+  const choose = (choice: Asking) => {
+    const next = stepOf(choice).kind;
+    if (next === "save") return settle(choice);
+    setAsking(choice);
+    if (next === "wait") void readPrice();
+  };
 
   const save = async (level: OrganizationPiiLevel) => {
     optimistic.show({ organizationId, level, over: stored });
@@ -157,6 +231,10 @@ export function OrganizationPiiLevelSection({
       host.failed({ error, fallbackTitle: "Couldn't change the organization's PII level" });
     }
   };
+  // A choice with nothing to ask: a level saves; the switch has nothing to record.
+  const settle = (choice: Asking) => {
+    if (choice.kind === "level") void save(choice.level);
+  };
 
   return (
     <>
@@ -167,28 +245,21 @@ export function OrganizationPiiLevelSection({
           level: storedPii.level,
           entityCount: storedPii.entities.length,
         })}
-        free={free}
-        licensed={licensed}
-        split={split}
+        model={model}
         awaitingAcceptance={awaitsAcceptance(acceptance)}
         strictRuleShown={showsStrictRule({ rules: snapshot.rules })}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending || acceptanceInFlight.inFlight}
-        onPick={(level) =>
-          confirmationFor(level)
-            ? setAsking({ organizationId, kind: "level", level })
-            : void save(level)
-        }
+        onPick={(level) => choose({ organizationId, kind: "level", level })}
         onSwitchToModel={
-          acceptance === "can-accept"
-            ? () => setAsking({ organizationId, kind: "switch" })
-            : undefined
+          acceptance === "can-accept" ? () => choose({ organizationId, kind: "switch" }) : undefined
         }
       />
       <ConfirmDialog
         open={confirmation !== null}
         onClose={() => setAsking(null)}
         onConfirm={() => {
+          if (step?.kind === "wait") return void readPrice();
           const choice = asking;
           setAsking(null);
           if (!choice) return;
@@ -200,6 +271,7 @@ export function OrganizationPiiLevelSection({
         title={confirmation?.title ?? ""}
         description={confirmation?.description ?? ""}
         confirmLabel={confirmation?.confirmLabel}
+        loading={step?.kind === "wait" && readingPrice.inFlight}
         tone="default"
       />
     </>

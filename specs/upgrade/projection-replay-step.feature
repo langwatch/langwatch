@@ -13,6 +13,12 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Then the step is a data step that runs in the background under the module's id
 
   @unit
+  Scenario: A projection replay step waits for the queue's claimed-groups backfill and for older images to be gone
+    Given a module declares a projection replay step for the lane "directoryMembers"
+    Then the step runs only after "ops:fill-queue-tenant-claims"
+    And only once no older image serves, so the queue's claimed-groups index it drains on is complete (ADR-092)
+
+  @unit
   Scenario: A replay step fills an empty read model from its owner's log
     Given an empty read model and an owner's log holding three events over two aggregates
     When the step replays the lane "directoryMembers"
@@ -348,3 +354,13 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the step replays the lane
     Then the other tenant's stream stops before the batch is split
     And every row is written once, as a replay that never hit the limit writes them
+
+  @integration
+  Scenario: Every projection replay step a worker installs runs after the claimed-groups fill
+    Given the worker's installed modules
+    When they list their upgrade steps
+    Then ops:fill-queue-tenant-claims is a background data step after old writers
+    And each projection replay step lists it in its after
+
+  # That this step stays the replayer's only caller is the projection-replay-sole-caller
+  # architecture policy: specs/tooling/lint-projection-replay-sole-caller.feature.

@@ -178,7 +178,7 @@ export class MemoryMonitorRepository implements MonitorRepository {
       name: input.name,
       slug: input.slug,
       executionMode: input.executionMode,
-      enabled: true,
+      enabled: input.enabled ?? true,
       preconditions: input.preconditions,
       parameters: input.parameters,
       mappings: input.mappings,

@@ -26,6 +26,7 @@ export {
 export {
   PROJECTION_REPLAY_FROM_START,
   PROJECTION_REPLAY_SINCE,
+  QUEUE_TENANT_CLAIMS_FILL_STEP,
   type LaneReplayer,
   defineProjectionReplayStep,
   projectionReplaySinceOf,

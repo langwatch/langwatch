@@ -170,6 +170,12 @@ export abstract class QueueRepository {
     scanBudget: number;
     jobReadBudget: number;
   }): Promise<TenantQueueCount[]>;
+
+  /** One paced slice of the claimed-groups backfill (ADR-092); cursor "0" back means done. */
+  abstract fillTenantClaims(params: {
+    cursor: string;
+    maxScanCalls: number;
+  }): Promise<{ cursor: string; listed: number }>;
 }
 
 export class NullQueueRepository extends QueueRepository {
@@ -321,5 +327,9 @@ export class NullQueueRepository extends QueueRepository {
 
   async readPublishedPendingDrift(): Promise<number> {
     return 0;
+  }
+
+  async fillTenantClaims(): Promise<{ cursor: string; listed: number }> {
+    return { cursor: "0", listed: 0 };
   }
 }

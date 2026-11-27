@@ -7,6 +7,7 @@ import type {
   PasskeyAssertionResponse,
 } from "@langwatch/auth-contract";
 import type { StaffAccessScope } from "@langwatch/authz-contract";
+import { namesOrganization } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type {
   OrganizationApi,
@@ -21,6 +22,7 @@ import {
   StaffAccessNotConfiguredError,
   StaffAccessRateLimitedError,
   StaffAccessRequestNotPendingError,
+  StaffCopySameOrganizationError,
   type StaffAccessApprovalView,
   type StaffAccessRedeemed,
   type StaffAccessRequestBody,
@@ -38,15 +40,15 @@ import type {
 import { functionsFor } from "../rules/staff-access-function.rules.ts";
 import {
   approvalChallengeOf,
+  approvalFieldsOf,
   assertPending,
   assertRedeemable,
   isoText,
   later,
   organizationNameMatches,
+  pendingRequestRow,
   pkceChallengeOf,
-  reachesOrganization,
   STAFF_ACCESS_RATE_WINDOW_MS,
-  STAFF_ACCESS_REQUEST_TTL_MS,
   STAFF_ACCESS_REQUESTS_PER_HOUR,
   STAFF_ACCESS_SESSION_TTL_MS,
   typedNameRequired,
@@ -128,41 +130,26 @@ export class StaffAccessRequestService {
       throw new StaffAccessRateLimitedError({ retryAfterMs: STAFF_ACCESS_RATE_WINDOW_MS });
     }
     const functions = functionsFor({ names: body.functions ?? [], scopes: body.scopes });
-    const organization = reachesOrganization(body.scopes)
+    const organization = namesOrganization(body.scopes)
       ? await this.resolveOrganization({ organization: body.organization ?? "" })
       : null;
-
-    const row: StaffAccessRequestRow = {
+    const counterpart = body.counterpartOrganization
+      ? await this.resolveOrganization({ organization: body.counterpartOrganization })
+      : null;
+    if (counterpart && counterpart.id === organization?.id) {
+      throw new StaffCopySameOrganizationError();
+    }
+    const row = pendingRequestRow({
       id: generate("staffrequest").toString(),
       requesterId,
       ownerUserId,
-      scopes: [...body.scopes],
+      body,
       functions,
-      organizationId: organization?.id ?? null,
-      organizationName: organization?.name ?? null,
-      reason: body.reason,
-      codeChallenge: body.codeChallenge,
-      machine: body.machine,
-      requestIp: ipAddress,
-      status: "pending",
-      expiresAt: later({ at, ms: STAFF_ACCESS_REQUEST_TTL_MS }),
-      approvedAt: null,
-      spendApproved: false,
-      approvalCredentialId: null,
-      approvalSignature: null,
-      signedHash: null,
-      redeemedAt: null,
-      pinnedIp: null,
-      apiKeyId: null,
-      hashedOpsToken: null,
-      opsTokenLookupId: null,
-      accessExpiresAt: null,
-      revokedAt: null,
-      revokedByUserId: null,
-      revokeCause: null,
-      endAuditedAt: null,
-      createdAt: at,
-    };
+      organization,
+      counterpart,
+      ipAddress,
+      at,
+    });
     await this.deps.requests.create(row);
     const approvalUrl = `${publicBaseUrl.replace(/\/+$/, "")}/ops/agents/approve/${row.id}`;
     await this.deps.notices.tellOwner({
@@ -290,6 +277,9 @@ export class StaffAccessRequestService {
         ...(row.functions.length > 0
           ? [{ label: "Functions", value: row.functions.join(", ") }]
           : []),
+        ...(row.counterpartOrganizationName
+          ? [{ label: "Other organization of the copy", value: row.counterpartOrganizationName }]
+          : []),
         { label: "Reason", value: row.reason },
         { label: "Machine", value: row.machine },
         { label: "Runs that spend allowed", value: spendApproved ? "Yes" : "No" },
@@ -393,19 +383,7 @@ export class StaffAccessRequestService {
     ) {
       throw new StaffAccessOrganizationNameMismatchError();
     }
-    const challenge = approvalChallengeOf({
-      requestId: row.id,
-      scopes: row.scopes,
-      functions: row.functions,
-      organizationId: row.organizationId,
-      organizationName: row.organizationName,
-      reason: row.reason,
-      machine: row.machine,
-      requestIp: row.requestIp,
-      codeChallenge: row.codeChallenge,
-      spendApproved,
-      expiresAt: isoText(row.expiresAt),
-    });
+    const challenge = approvalChallengeOf(approvalFieldsOf({ row, spendApproved }));
     return { row, challenge, spendApproved };
   }
 
@@ -467,6 +445,7 @@ export class StaffAccessRequestService {
         withoutSpend: typedNameRequired({ scopes, spendApproved: false }),
       },
       spendOffered: scopes.includes("org:support"),
+      copyGrant: row.copyGrant,
     };
   }
 }

@@ -14,8 +14,13 @@ import {
   PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS,
   PII_REDACTION_NANO_USD_PER_CHARACTER,
 } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import { GROWTH_USAGE_EUR_PER_USD } from "@langwatch/enterprise-billing-contract";
 
-import type { PrivacyLicence } from "./data-privacy-host.ts";
+import type {
+  PrivacyBillingCurrency,
+  PrivacyBillingCurrencyReading,
+  PrivacyLicence,
+} from "./data-privacy-host.ts";
 
 /** The two levels the organization picker offers. */
 export type OrganizationPiiLevel = "essential" | "strict";
@@ -25,23 +30,26 @@ export const PII_REDACTION_MODEL_NAME = "LangWatch PII Redaction Model";
 const NANO_USD_PER_USD = 1_000_000_000;
 const PRICE_UNIT_CHARACTERS = 1_000_000;
 
-/** "$0.50": the rate billing charges, per 1M characters (ADR-201). */
+/** "$0.50", or "€0.425" to a euro subscription: the rate billing charges per 1M characters. */
 export function piiRedactionModelPrice({
   nanoUsdPerCharacter,
+  currency,
 }: {
   nanoUsdPerCharacter: number;
+  currency: PrivacyBillingCurrency;
 }): string {
   const usd = (nanoUsdPerCharacter * PRICE_UNIT_CHARACTERS) / NANO_USD_PER_USD;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
     minimumFractionDigits: 2,
-  }).format(usd);
+    maximumFractionDigits: 3,
+  }).format(currency === "EUR" ? usd * GROWTH_USAGE_EUR_PER_USD : usd);
 }
 
-export const PII_REDACTION_MODEL_PRICE = piiRedactionModelPrice({
-  nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER,
-});
+/** The published price in the subscription's currency. */
+export const piiRedactionModelPriceIn = (currency: PrivacyBillingCurrency): string =>
+  piiRedactionModelPrice({ nanoUsdPerCharacter: PII_REDACTION_NANO_USD_PER_CHARACTER, currency });
 export const PII_REDACTION_MODEL_PRICE_UNIT = "per 1M characters excl. VAT, pay as you go";
 
 export const STRICT_BILLING_NOTE =
@@ -94,12 +102,29 @@ export const STRICT_AWAITS_ADMIN_NOTE =
   "Strict stays rule-based (Presidio), at no charge, until an organization admin accepts the model's price.";
 
 /**
- * What the page offers for Strict: the model (free on the free list, or with the licence
- * self-hosted), the rule-based detector with a note, or null for today's page.
+ * The model on offer: priced in the subscription's currency; priced before that currency is read,
+ * so no price is quoted, picking Strict waits and `readPrice` reads the plan again; or included
+ * (free list on Cloud, licence self-hosted). `split`: long spans go in parts (ADR-207).
  */
+export type PiiRedactionModel =
+  | PricedOrIncludedModel
+  | {
+      kind: "model";
+      free: false;
+      split: boolean;
+      currency: "unknown";
+      /** The first read is still in flight: the price area waits quietly, offering no retry. */
+      loading: boolean;
+      readPrice: () => Promise<void>;
+    };
+
+type PricedOrIncludedModel =
+  | { kind: "model"; free: false; split: boolean; currency: PrivacyBillingCurrency }
+  | { kind: "model"; free: true; split: boolean; licensed: boolean };
+
+/** What the page offers for Strict: the model, the rule-based detector with a note, or null. */
 export type PiiRedactionModelOffer =
-  /** `split`: the organization's long spans go to the model in parts (ADR-207); Cloud only. */
-  | { kind: "model"; free: boolean; licensed?: boolean; split: boolean }
+  | PiiRedactionModel
   | { kind: "rule-based"; note: Exclude<StrictRuleBasedNote, "licence"> }
   /** `activate`: this reader may activate a license, so the advert links there. */
   | { kind: "rule-based"; note: "licence"; activate: boolean }
@@ -117,6 +142,8 @@ export function piiRedactionModelOfferOf({
   splitFlag,
   licence,
   mayManageLicence,
+  currency,
+  readPrice,
 }: {
   isSaaS: boolean;
   /** `undefined` while the flags are not answered yet: no offer then, so nothing flashes. */
@@ -125,14 +152,30 @@ export function piiRedactionModelOfferOf({
   splitFlag: boolean;
   licence: PrivacyLicence;
   mayManageLicence: boolean;
+  /** The subscription's currency, which a priced Cloud offer quotes in. */
+  currency: PrivacyBillingCurrencyReading;
+  /** Reads the subscription's plan again, for a price not read yet. */
+  readPrice: () => Promise<void>;
 }): PiiRedactionModelOffer {
-  if (isSaaS)
-    return modelFlag === true ? { kind: "model", free: freeFlag, split: splitFlag } : null;
+  if (isSaaS) {
+    if (modelFlag !== true) return null;
+    if (freeFlag) return { kind: "model", free: true, split: splitFlag, licensed: false };
+    return currency === "unknown" || currency === "loading"
+      ? {
+          kind: "model",
+          free: false,
+          split: splitFlag,
+          currency: "unknown",
+          loading: currency === "loading",
+          readPrice,
+        }
+      : { kind: "model", free: false, split: splitFlag, currency };
+  }
   if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };
   return modelFlag
-    ? { kind: "model", free: true, licensed: true, split: false }
+    ? { kind: "model", free: true, split: false, licensed: true }
     : { kind: "rule-based", note: "turn-on" };
 }
 
@@ -176,40 +219,50 @@ const ACCEPTANCE_COVERS =
   "This covers every Strict rule in your organization: each one moves to the model and is billed. ";
 
 /** The switch records the acceptance and saves no level, so it names the price alone. */
-export const SWITCH_TO_MODEL_CONFIRMATION: LevelChangeConfirmation = {
+export const switchToModelConfirmation = (
+  currency: PrivacyBillingCurrency,
+): LevelChangeConfirmation => ({
   title: "Switch to the PII Redaction Model?",
-  description: `${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. ${ACCEPTANCE_COVERS}Your organization's level does not change.`,
+  description: `${piiRedactionModelPriceIn(currency)} ${PII_REDACTION_MODEL_PRICE_UNIT}. ${ACCEPTANCE_COVERS}Your organization's level does not change.`,
   confirmLabel: "Accept and switch",
-};
+});
 
 export function levelChangeConfirmation({
   from,
   to,
-  free,
+  model,
   acceptance,
 }: {
   from: PiiLevel;
   to: OrganizationPiiLevel;
-  free: boolean;
+  model: PricedOrIncludedModel;
   acceptance: ModelAcceptance;
 }): LevelChangeConfirmation | null {
   const replacesCustom = from === "custom" ? "This replaces your custom PII settings. " : "";
-  if (to === "strict" && !free) {
+  if (to === "strict" && !model.free) {
     const covers = acceptance === "can-accept" ? ACCEPTANCE_COVERS : "";
     return {
       title: "Turn on Strict?",
-      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. ${covers}Turn it on?`,
+      description: `${replacesCustom}Strict uses the ${PII_REDACTION_MODEL_NAME} at ${piiRedactionModelPriceIn(model.currency)} ${PII_REDACTION_MODEL_PRICE_UNIT}. ${covers}Turn it on?`,
       confirmLabel: "Turn on Strict",
     };
   }
-  if (replacesCustom) {
-    return {
-      title: "Replace custom PII settings?",
-      description: `This replaces your custom PII settings with ${to === "strict" ? "Strict" : "Essential"}.`,
-      confirmLabel: "Replace",
-    };
-  }
-  return null;
+  return replaceCustomConfirmation({ from, to });
+}
+
+function replaceCustomConfirmation({
+  from,
+  to,
+}: {
+  from: PiiLevel;
+  to: OrganizationPiiLevel;
+}): LevelChangeConfirmation | null {
+  if (from !== "custom") return null;
+  return {
+    title: "Replace custom PII settings?",
+    description: `This replaces your custom PII settings with ${to === "strict" ? "Strict" : "Essential"}.`,
+    confirmLabel: "Replace",
+  };
 }
 
 export const ESSENTIAL_FINDS = "Emails, phones, cards, IPs and national IDs";
@@ -222,11 +275,53 @@ export function organizationPiiLevel(level: PiiLevel | undefined): OrganizationP
   return level === "essential" || level === "strict" ? level : null;
 }
 
+/** What a level change or a rule save does next: save, ask first, or wait for the price. */
+export type PiiLevelStep =
+  | { kind: "save" }
+  | { kind: "ask"; confirmation: LevelChangeConfirmation }
+  | { kind: "wait" };
+
+export const PII_LEVEL_STEP_WAITING: LevelChangeConfirmation = {
+  title: "Turn on Strict?",
+  description:
+    "Strict's price is in your subscription's currency, which hasn't loaded yet. Try again to read it.",
+  confirmLabel: "Try again",
+};
+
+/** A change to Strict before the price is read waits; any other asks what it asks, or saves. */
+export function levelChangeStep({
+  from,
+  to,
+  model,
+  acceptance,
+}: {
+  from: PiiLevel;
+  to: OrganizationPiiLevel;
+  model: PiiRedactionModel;
+  acceptance: ModelAcceptance;
+}): PiiLevelStep {
+  if (!model.free && model.currency === "unknown") {
+    if (to === "strict") return { kind: "wait" };
+    const replaces = replaceCustomConfirmation({ from, to });
+    return replaces ? { kind: "ask", confirmation: replaces } : { kind: "save" };
+  }
+  const confirmation = levelChangeConfirmation({ from, to, model, acceptance });
+  return confirmation ? { kind: "ask", confirmation } : { kind: "save" };
+}
+
+/** The switch quotes the price, so it waits for the currency; an included model asks nothing. */
+export function switchToModelStep(model: PiiRedactionModel): PiiLevelStep {
+  if (model.free) return { kind: "save" };
+  if (model.currency === "unknown") return { kind: "wait" };
+  return { kind: "ask", confirmation: switchToModelConfirmation(model.currency) };
+}
+
 /**
- * A rule saved at Strict where Strict is the model at a price asks first, unless it was Strict.
- * A reader who cannot accept the price is not asked: their Strict stays rule-based, unbilled.
+ * A rule turned to Strict where the model has a price asks first, quoting it; before the
+ * subscription's currency is read it waits rather than saving unasked. A reader who cannot
+ * accept the price is not asked: their Strict stays rule-based, unbilled. Anything else saves.
  */
-export function ruleSaveConfirmation({
+export function ruleSaveStep({
   offer,
   acceptance,
   before,
@@ -236,10 +331,16 @@ export function ruleSaveConfirmation({
   acceptance: ModelAcceptance;
   before: DataPrivacyConfig | undefined;
   after: DataPrivacyConfig;
-}): LevelChangeConfirmation | null {
-  if (offer?.kind !== "model" || offer.free || acceptance === "awaiting-admin") return null;
-  if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return null;
-  return levelChangeConfirmation({ from: "essential", to: "strict", free: false, acceptance });
+}): PiiLevelStep {
+  if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return { kind: "save" };
+  if (offer?.kind !== "model" || acceptance === "awaiting-admin") return { kind: "save" };
+  return levelChangeStep({ from: "essential", to: "strict", model: offer, acceptance });
+}
+
+/** What a step's dialog says, in the drawer or the level picker: its question, the wait or none. */
+export function piiLevelStepDialog(step: PiiLevelStep | null): LevelChangeConfirmation | null {
+  if (step?.kind === "ask") return step.confirmation;
+  return step?.kind === "wait" ? PII_LEVEL_STEP_WAITING : null;
 }
 
 /** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */

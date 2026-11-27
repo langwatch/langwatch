@@ -12,6 +12,7 @@ import {
   type PasskeyAssertionResponse,
   PasskeyAssertionRefusedError,
 } from "@langwatch/auth-contract";
+import { namesOrganization, type StaffAccessScope } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -24,6 +25,7 @@ import {
   type LangyTurnOutcomeCount,
   type LangyTurnOutcomeCounts,
 } from "@langwatch/langy-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import type { OpsApi, OpsPlatformOperator } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -41,6 +43,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { StaffAccessRepositories } from "../../../repositories/staff-access.repositories.ts";
 import { StaffAccessModule } from "../../staff-access.app.ts";
+import { copyCatalog } from "./copy-catalog.ts";
 import { activityPeers, type ActivityAsk } from "./staff-access-activity-peers.ts";
 import {
   platformPeers,
@@ -52,6 +55,7 @@ export const OLIVIA = "user_olivia";
 export const PEDRO = "user_pedro";
 export const ACME = { id: "org_acme", slug: "acme", name: "ACME" };
 export const GLOBEX = { id: "org_globex", slug: "globex", name: "Globex" };
+export const INITECH = { id: "org_initech", slug: "initech", name: "Initech" };
 export const AGENT_IP = "203.0.113.7";
 export const VERIFIER = "v".repeat(43);
 export const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
@@ -108,6 +112,11 @@ export function staffAccessWorld({
     passkeys: new Set([OLIVIA]),
     audit: [] as RecordAuditLogCommand[],
     auditRefused: false,
+    /** Refuses only this action in this organization, counting each refused try. */
+    auditRefusedFor: null as { organizationId: string; action: string } | null,
+    auditRefusedTries: 0,
+    /** Organizations the organization owner no longer answers for. */
+    organizationsGone: new Set<string>(),
     usersRefused: false,
     keyRevokeRefused: new Set<string>(),
     mail: [] as SendEmailCommand[],
@@ -225,7 +234,8 @@ export function staffAccessWorld({
     ...activityPeers.auth(),
   });
 
-  const summaries = [ACME, GLOBEX].map((organization) => ({
+  const copy = copyCatalog();
+  const summaries = [ACME, GLOBEX, INITECH].map((organization) => ({
     ...organization,
     createdAt: Temporal.Instant.from("2025-01-01T00:00:00Z"),
   }));
@@ -240,7 +250,9 @@ export function staffAccessWorld({
     listAllIds: async () => ({ ids: [ACME.id, GLOBEX.id, "org_empty"], next: null }),
     countMemberSeats: async ({ organizationId }) => peopleSeats({ organizationId }),
     findProvisioningSummary: async (id: string) =>
-      summaries.find((summary) => summary.id === id) ?? null,
+      state.organizationsGone.has(id)
+        ? null
+        : (summaries.find((summary) => summary.id === id) ?? null),
     listProvisioningSummaries: async () => summaries,
     getAllMembers: async () => [{ id: "member_1" }, { id: "member_2" }] as never,
     getOpsSnapshot: async ({ organizationId }) => ({
@@ -251,14 +263,13 @@ export function staffAccessWorld({
       teamsCount: 1,
       projectIds: [`${organizationId}_project`],
     }),
+    listTeams: copy.organizations.listTeams as never,
   });
 
   const projects = createApiFixture<ProjectApi>({
-    listByOrganization: async ({ organizationId }) =>
-      ({
-        data: [{ id: `${organizationId}_project`, slug: "acme-support", name: "acme-support" }],
-        pagination: { page: 1, limit: 100, total: 1 },
-      }) as never,
+    listByOrganization: copy.projects.listByOrganization as never,
+    findById: copy.projects.findById as never,
+    createInOrganization: copy.projects.createInOrganization as never,
     listIdsByOrganization: async ({ organizationId }) => [`${organizationId}_project`],
   });
 
@@ -312,6 +323,15 @@ export function staffAccessWorld({
   const auditLog = createApiFixture<AuditLogApi>({
     record: async (command) => {
       if (state.auditRefused) throw new Error("audit log unavailable");
+      const refused = state.auditRefusedFor;
+      if (
+        refused &&
+        command.organizationId === refused.organizationId &&
+        command.action === refused.action
+      ) {
+        state.auditRefusedTries++;
+        throw new Error("audit log unavailable");
+      }
       state.audit.push(command);
       return { id: `audit_${state.audit.length}`, occurredAt: 0 };
     },
@@ -340,7 +360,6 @@ export function staffAccessWorld({
     dependencies: {
       ops,
       langy: langyStandIn(state.platform),
-      monitors: platformPeers.monitors(),
       dataRetention: platformPeers.dataRetention(),
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: async () => state.flag,
@@ -424,6 +443,14 @@ export function staffAccessWorld({
       instantEvals: activityPeers.instantEvals(state.activityAsks),
       scenarios: activityPeers.scenarios(state.activityAsks, [ACME.id]),
       billing,
+      evaluators: copy.evaluators,
+      monitors: createApiFixture<MonitorApi>({
+        getAllByIds: platformPeers.monitors().getAllByIds,
+        list: copy.monitors.list,
+        create: copy.monitors.create,
+      }),
+      prompts: copy.prompts,
+      datasets: copy.datasets,
     },
     now: () => state.at,
   });
@@ -470,22 +497,23 @@ export function staffAccessWorld({
     state.at = state.at.add({ minutes });
   }
 
-  return { app, state, repositories, operator, enrol, approve, advance, requesterSession };
+  return { app, state, repositories, copy, operator, enrol, approve, advance, requesterSession };
 }
 
 /** A valid request body for the scopes given. */
 export function requestBody({
   scopes,
   organization = ACME.slug,
+  counterpartOrganization,
   reason = "fix ACME's broken evaluator",
   functions,
 }: {
-  scopes: ("ops:read" | "org:metadata" | "org:content" | "org:support")[];
+  scopes: StaffAccessScope[];
   organization?: string;
+  counterpartOrganization?: string;
   reason?: string;
   functions?: string[];
 }) {
-  const reachesOrganization = scopes.some((scope) => scope !== "ops:read");
   const metadataOnly =
     scopes.includes("org:metadata") &&
     !scopes.includes("org:content") &&
@@ -494,7 +522,8 @@ export function requestBody({
   return {
     ...(named.length > 0 ? { functions: named } : {}),
     scopes,
-    ...(reachesOrganization ? { organization } : {}),
+    ...(namesOrganization(scopes) ? { organization } : {}),
+    ...(counterpartOrganization ? { counterpartOrganization } : {}),
     reason,
     codeChallenge: CHALLENGE,
     codeChallengeMethod: "S256" as const,

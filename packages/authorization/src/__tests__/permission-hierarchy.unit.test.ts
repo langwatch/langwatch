@@ -285,11 +285,12 @@ describe("the append-only registry", () => {
     expect(findPermissionIndex(SPAN_BRAID_PERMISSION)).toBe(INDICES_BEFORE_BRAIDS.length + 1);
   });
 
-  it("appends the A2A target permissions, then opsRead:view, after spans:braided, moving no earlier index", () => {
+  it("appends the A2A target permissions, then opsRead:view and opsCopy:create, after spans:braided, moving no earlier index", () => {
     expect(ALL_PERMISSIONS.slice(INDICES_BEFORE_BRAIDS.length + 2)).toEqual([
       "gatewayA2aTargets:view",
       "gatewayA2aTargets:manage",
       "opsRead:view",
+      "opsCopy:create",
     ]);
   });
 

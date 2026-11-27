@@ -29240,6 +29240,16 @@ Every run recorded from then on adds its traces, tokens and cost to that one ses
 
 If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins over the shell export, so add `langwatch.session.id` to the value in the managed settings file instead.
 
+## Name the account an agent runs on
+
+A harness that runs agents on several subscription logins can say which login each session used, so you can chart usage per account. Add the account attributes to the same resource attributes:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.account.id=4f1c9e2a7b6d4c3e8a1f0b2c3d4e5f60,langwatch.account.name=Work%20Max,langwatch.account.source=pool"
+```
+
+Percent-encode spaces and commas in values, as `OTEL_RESOURCE_ATTRIBUTES` requires. To show how much of its limit an account used, stamp the provider's own figure on each record as `langwatch.account.usage.percent`, with `langwatch.account.usage.window`, `langwatch.account.usage.resets_at` and `langwatch.account.usage.read_at`, and `langwatch.account.limited_until` while it is out of usage. The full list is on [Usage](/coding-agents/usage-analytics#subscription-accounts).
+
 ## See your machines
 
 Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
@@ -30922,6 +30932,48 @@ Usage rolls up everything your sessions spent. Read your own numbers at [/coding
 The personal page opens on this month: what you spent, how many requests you made, and the model you used most, with spend over time and a breakdown by tool underneath.
 
 The **coding-agent usage** card summarizes the last 30 days across your assistants: cost, tokens, active time, and how many sessions you ran. Sessions that reported only metrics still count, so the card is complete even for tools set up with usage-only telemetry.
+
+## Subscription accounts
+
+If your agents run on subscription logins, such as a few Claude Max accounts shared by many agents, LangWatch records which account each model call and rate limit ran on. You chart them yourself in a [dashboard](/features/dashboards) widget or [query them](/features/querying-your-data) with LangWatchQL.
+
+Claude Code sends its account id (`user.account_uuid`) and Codex sends its own (`user.account_id`), so their accounts are recorded without setup. A launcher that runs agents on several logins can name each one, and report its usage, with these attributes, on each record or once in `OTEL_RESOURCE_ATTRIBUTES`:
+
+| Attribute | Value |
+| --- | --- |
+| `langwatch.account.id` | An opaque id for the account. Never an email address. |
+| `langwatch.account.name` | A label for the account, such as `Work Max`. |
+| `langwatch.account.source` | `personal`, `pool` or `computer`. |
+| `langwatch.account.usage.percent` | The provider's usage figure, 0 to 100. |
+| `langwatch.account.usage.window` | The window it is for, such as `five_hour` or `seven_day`. |
+| `langwatch.account.usage.resets_at` | When that window resets, ISO 8601. |
+| `langwatch.account.usage.read_at` | When the figure was read, ISO 8601. |
+| `langwatch.account.limited_until` | While the account is out of usage, when it can run again, ISO 8601. |
+
+A value on the record wins over the same attribute on the resource. The percent is the figure the provider reported. Providers publish no token allowance for these plans, so LangWatch never estimates a percent from tokens.
+
+### Chart your accounts
+
+The `coding_session_events` view carries the account as `AccountId`, `AccountName`, `AccountSource`, `AccountUsagePercent`, `AccountUsageWindow`, `AccountUsageResetsAt`, `AccountUsageReadAt` and `AccountLimitedUntil`. They are set on `model_call` and `rate_limit` rows only. Other rows, and calls that named no account, have an empty `AccountId`.
+
+This widget query sums each account's tokens over the dashboard's period and keeps its newest name and usage figure:
+
+```sql
+SELECT
+  AccountId,
+  argMaxIf(AccountName, TimeUnixMs, AccountName != '') AS AccountName,
+  sumIf(InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens, EventKind = 'model_call') AS Tokens,
+  countIf(EventKind = 'rate_limit') AS RateLimits,
+  argMaxIf(AccountUsagePercent, TimeUnixMs, AccountUsagePercent IS NOT NULL) AS UsagePercent
+FROM coding_session_events
+WHERE TimeUnixMs >= {dashboard_context_period_start:DateTime}
+  AND TimeUnixMs < {dashboard_context_period_end:DateTime}
+  AND AccountId != ''
+GROUP BY AccountId
+ORDER BY AccountName
+```
+
+For a burndown per day, add `toDate(TimeUnixMs) AS Day` to the select and to `GROUP BY`. From the command line, run the same statement with `langwatch query` and `subtractDays(now(), 7)` in place of the period placeholders.
 
 ## Query it from the command line
 
@@ -69390,12 +69442,12 @@ Card numbers and Brazilian CPF are checksum-validated before redaction. Attribut
 
 On LangWatch Cloud, an organization that has the model turned on sees an **Essential** or **Strict** picker on the page. Strict then runs the LangWatch PII Redaction Model, which finds names, places and other personal data that rule-based detection misses.
 
-- **Price:** $0.50 per 1M characters, excluding VAT, pay as you go. A span of 1,000 characters costs $0.0005.
+- **Price:** $0.50 per 1M characters, excluding VAT, pay as you go. A span of 1,000 characters costs $0.0005. On a plan paid in euros it is €0.425 per 1M characters, 0.85 euros for each dollar.
 - **What is billed:** each span, log record or metric point the model answers, by the characters it was sent, even when it finds no personal data. Essential detection runs first, so a phone number is already masked and counted as its marker. A metric's attributes are sent again with every export, and each export is billed.
 - **No free amount and no minimum:** billing starts at the first character of the month, and a short span costs only its characters: 50 characters cost $0.000025.
 - **Long spans:** where long-span splitting is on for your organization, a span of 8,001 to 32,000 characters is sent to the model in several overlapping parts. It is billed once, on its own characters; the overlap between parts is free.
 - **Fallbacks are free:** a span with over 32,000 characters left after Essential detection (over 8,000 where splitting is not on), one the model cannot split safely (such as escaped JSON) or with no free slot, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged.
-- **How it is billed:** monthly, as its own line on a Growth plan paid in US dollars. Each answered record is one `pii_redaction` row on the [billing events](/ai-gateway/billing-events) ledger. A [gateway budget](/ai-gateway/budgets) does not cap it, so a spent budget never turns redaction off.
+- **How it is billed:** monthly, as its own line on a Growth plan, in the plan's currency. Each answered record is one `pii_redaction` row on the [billing events](/ai-gateway/billing-events) ledger. A [gateway budget](/ai-gateway/budgets) does not cap it, so a spent budget never turns redaction off.
 - **Choosing it:** the model is not billed until an organization admin accepts the price. The page asks an admin to confirm it before it turns Strict on; cancel and the organization keeps its current level. Essential never calls the model and is never charged. An organization that has Strict included sees it as "Included for your organization", with no price.
 - **Already on Strict:** an organization on Strict without a recorded acceptance, including one that confirmed the price before this change, keeps rule-based detection (Presidio) at no charge until an organization admin accepts again. This holds however Strict was set: on the organization, a team or a project, through the API or by a member who is not an organization admin.
 - **Switching to the model:** the page shows Strict as "Currently on rule-based (Presidio), no charge", also when only a team or project rule sets it. An organization admin can press **Switch to the PII Redaction Model** and accept the price; billing starts from that moment.
@@ -71094,7 +71146,9 @@ Every judged query and run is one spend event on the [billing events](/ai-gatewa
 
 ## PII redaction model
 
-Strict PII redaction with the LangWatch PII Redaction Model is priced separately from events, at **$0.50 per 1M characters** sent to the model, excluding VAT. Spans, log records and metric points are all billed this way. There is no free monthly amount and no minimum per record, and a record the model does not answer is not charged. See [Strict with the LangWatch PII Redaction Model](/platform/data-privacy#strict-with-the-langwatch-pii-redaction-model) for what is billed and how to turn it on.
+Strict PII redaction with the LangWatch PII Redaction Model is priced separately from events, at **$0.50 per 1M characters** sent to the model, excluding VAT, or **€0.425 per 1M characters** on a plan paid in euros. Spans, log records and metric points are all billed this way.
+
+There is no free monthly amount and no minimum per record, and a record the model does not answer is not charged. See [Strict with the LangWatch PII Redaction Model](/platform/data-privacy#strict-with-the-langwatch-pii-redaction-model) for what is billed and how to turn it on.
 
 ## Custom data retention
 

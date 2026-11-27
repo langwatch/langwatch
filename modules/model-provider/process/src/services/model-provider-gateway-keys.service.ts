@@ -11,8 +11,12 @@ import type { ModelProviderCatalog } from "./registry-model-provider-catalog.ser
 
 const logger = createLogger("langwatch:model-provider:gateway-keys");
 
-/** Shorter than the one-hour session a role hop mints, so the gateway re-reads keys in time. */
-const MANAGED_SESSION_RENEWAL_MS = 45 * 60 * 1000;
+/**
+ * How often the gateway re-reads a managed row's keys: well inside the one-hour session a role
+ * hop mints, and short enough that a failed mint is retried within one window, with no failure
+ * state shared across control-plane pods.
+ */
+const MANAGED_KEYS_WINDOW_MS = 5 * 60 * 1000;
 
 type ModelProviderGatewayKeysOptions = {
   repository: ModelProviderRepository;
@@ -81,6 +85,6 @@ export class ModelProviderGatewayKeysService {
       organizationId: input.organizationId,
       provider: "bedrock",
     });
-    return managed ? `managed-${Math.floor(nowEpochMs() / MANAGED_SESSION_RENEWAL_MS)}` : "";
+    return managed ? `managed-${Math.floor(nowEpochMs() / MANAGED_KEYS_WINDOW_MS)}` : "";
   }
 }

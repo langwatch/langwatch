@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- * Nurturing's key copy as a peer map filled at deploy: the real replay engine over seeded owner
- * logs, the module's own steps, memory repositories. The per-fact memory twin is the oracle.
- * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
- */
 import {
   InMemoryProcessStore,
   type ReplayEvent,
@@ -13,6 +6,14 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * Nurturing's key copy as a peer map filled at deploy: the real replay engine over seeded owner
+ * logs, the module's own steps, memory repositories. The per-fact memory twin is the oracle.
+ * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
+ */
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import {
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordVkLifecycleCommandData,
@@ -31,6 +32,7 @@ import {
   isMigrationStep,
   type MigrationStep,
   type MigrationStepReport,
+  QUEUE_TENANT_CLAIMS_FILL_STEP,
 } from "@langwatch/upgrade/step";
 import {
   USER_AGGREGATE_TYPE,
@@ -156,6 +158,7 @@ const laneReplayerOver = (
 ) =>
   projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: log,
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
@@ -373,7 +376,7 @@ describe("given people were erased before nurturing kept erasure marks", () => {
     expect(ids.indexOf(KEYS_STEP)).toBeGreaterThan(ids.indexOf(USER_MARKS_STEP));
     expect(ids.indexOf(KEYS_STEP)).toBeGreaterThan(ids.indexOf(IDENTITY_MARKS_STEP));
     expect(steps.find(({ id }) => id === KEYS_STEP)).toMatchObject({
-      after: [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
+      after: [USER_MARKS_STEP, IDENTITY_MARKS_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
     });
   });
 

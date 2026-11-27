@@ -1,4 +1,5 @@
 import {
+  NO_ACCOUNT_COLUMNS,
   codingAgentSessionEventRecordSchema,
   type CodingAgentSession,
   type CodingAgentSessionBranchRecord,
@@ -305,6 +306,7 @@ export function sessionEventRecord(
     repositoryOwner: "",
     repositoryName: "",
     branch: "",
+    ...NO_ACCOUNT_COLUMNS,
     ...overrides,
   });
 }

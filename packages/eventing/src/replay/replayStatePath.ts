@@ -225,6 +225,7 @@ export async function replayStateProjection({
   try {
     await waitForActiveJobs({
       redis: ctx.redis,
+      claims: ctx.claims,
       aggregates: allAggregates,
       projectionName: projection.projectionName,
       kind: "state",

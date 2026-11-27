@@ -17,6 +17,7 @@ import {
   expect,
   it,
   type MockInstance,
+  onTestFinished,
   vi,
 } from "vitest";
 
@@ -155,6 +156,23 @@ const DOCS_PAGE_FIXTURE = [
  */
 function urlOf(input: URL | Request): string {
   return input instanceof URL ? input.href : input.url;
+}
+
+/** Answers every call off this host with a 401, so a tool's API call never waits on the network. */
+function stubRemoteApiRefusal(): MockInstance {
+  const realFetch = globalThis.fetch;
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const requestUrl = typeof input === "string" ? input : urlOf(input);
+      if (requestUrl.startsWith("http://127.0.0.1:")) return realFetch(input, init);
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: "Invalid API key" }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
 }
 
 function stubDocsFetch(): MockInstance {
@@ -1648,8 +1666,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         },
       });
 
-      // Call search_traces — the API endpoint is real but the key is fake,
-      // so this will fail with an API error, NOT a config error
+      // The upstream API refuses the fake key, so the tool fails with an API error, NOT a config
+      // error
+      const apiSpy = stubRemoteApiRefusal();
+      onTestFinished(() => apiSpy.mockRestore());
       const toolRes = await sendRequest({
         server,
         body: {
@@ -1675,6 +1695,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // These config errors indicate AsyncLocalStorage context loss
       expect(content[0]?.text).not.toContain("Config not initialized");
       expect(content[0]?.text).not.toContain("LANGWATCH_API_KEY is required");
+      expect(apiSpy).toHaveBeenCalled();
     });
   });
 
@@ -1727,6 +1748,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       // 4. Call search_traces — should reach the API, not fail on config
+      const apiSpy = stubRemoteApiRefusal();
+      onTestFinished(() => apiSpy.mockRestore());
       const toolRes = await sendRequest({
         server,
         body: {
@@ -1748,6 +1771,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(content[0]?.text).not.toContain("Config not initialized");
       expect(content[0]?.text).not.toContain("LANGWATCH_API_KEY is required");
+      expect(apiSpy).toHaveBeenCalled();
     });
   });
 

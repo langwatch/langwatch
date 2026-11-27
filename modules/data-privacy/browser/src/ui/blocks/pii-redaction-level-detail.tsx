@@ -6,6 +6,7 @@ import {
   ESSENTIAL_MISSES,
   organizationPiiLevel,
   PII_REDACTION_MODEL_NAME,
+  type PiiRedactionModel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { PiiRedactionExample } from "../elements/pii-redaction-example.tsx";
 import { PiiRedactionModelPrice } from "../elements/pii-redaction-model-price.tsx";
@@ -13,15 +14,10 @@ import { PiiRedactionModelPrice } from "../elements/pii-redaction-model-price.ts
 /** In the rule drawer: what the rule's level runs, Strict's price, and what it stores. */
 export function PiiRedactionLevelDetail({
   level,
-  free,
-  licensed = false,
-  split = false,
+  model,
 }: {
   level: PiiLevel;
-  free: boolean;
-  licensed?: boolean;
-  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
-  split?: boolean;
+  model: PiiRedactionModel;
 }) {
   const shown = organizationPiiLevel(level);
   if (!shown) return null;
@@ -36,7 +32,7 @@ export function PiiRedactionLevelDetail({
             <Badge size="sm" variant="subtle" colorPalette="green">
               {PII_REDACTION_MODEL_NAME}
             </Badge>
-            <PiiRedactionModelPrice free={free} licensed={licensed} split={split} />
+            <PiiRedactionModelPrice model={model} />
           </>
         ) : (
           <Badge size="sm" variant="subtle" colorPalette="gray">

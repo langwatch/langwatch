@@ -71,6 +71,8 @@ export function session(overrides: Partial<StaffAccessSessionView> = {}) {
         scope: "org",
       },
     ],
+    counterpartOrganizationId: null,
+    counterpartOrganizationName: null,
     reason: "check why the ACME evaluator fails",
     machine: "olivia-mbp",
     requestIp: "203.0.113.7",
@@ -99,6 +101,7 @@ export function approvalView(overrides: Partial<StaffAccessApprovalView> = {}) {
     }),
     typedNameRequired: { withSpend: false, withoutSpend: false },
     spendOffered: false,
+    copyGrant: [],
     ...overrides,
   } satisfies StaffAccessApprovalView;
 }

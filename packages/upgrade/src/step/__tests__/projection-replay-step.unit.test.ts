@@ -129,6 +129,14 @@ describe("defineProjectionReplayStep", () => {
         mode: "background",
       });
     });
+
+    /** @scenario "A projection replay step waits for the queue's claimed-groups backfill and for older images to be gone" */
+    it("runs after the claimed-groups backfill, once older images are gone", () => {
+      const { step } = runOnce({ replayer: replayerOverLog(), resumeFrom: null });
+
+      expect(step.after).toContain("ops:fill-queue-tenant-claims");
+      expect(step.needsOldWritersGone).toBe(true);
+    });
   });
 
   describe("given a step that never ran", () => {
