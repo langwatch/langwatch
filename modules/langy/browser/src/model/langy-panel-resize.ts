@@ -1,7 +1,6 @@
 import {
   FLOATING_PANEL_MIN_WIDTH,
   FLOATING_PANEL_VIEWPORT_GUTTER,
-  FLOATING_PANEL_VIEWPORT_SHARE,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
 } from "./langy-panel-layout.ts";
@@ -23,17 +22,14 @@ export interface LangyPanelWidthBounds {
 
 const SIDEBAR_MIN_WIDTH = 320;
 const LIMITS = {
-  floating: {
-    min: FLOATING_PANEL_MIN_WIDTH,
-    cap: 760,
-    viewportShare: FLOATING_PANEL_VIEWPORT_SHARE,
-  },
-  sidebar: { min: SIDEBAR_MIN_WIDTH, cap: 640, viewportShare: 0.5 },
+  floating: { min: FLOATING_PANEL_MIN_WIDTH },
+  sidebar: { min: SIDEBAR_MIN_WIDTH },
 } as const;
 
 /**
- * The widest the panel may be, the narrowest that keeps the composer usable, and the default,
- * all for one viewport. A viewport not yet measured (<= 0) falls back to the absolute caps.
+ * The widest the panel may be (whatever the window can show, less its edge gutter), the
+ * narrowest that keeps the composer usable, and the default, all for one viewport. A viewport
+ * not yet measured (<= 0) caps at the default so the bound stays finite.
  */
 export function resolvePanelWidthBounds({
   placement,
@@ -42,22 +38,12 @@ export function resolvePanelWidthBounds({
   placement: LangyResizablePlacement;
   viewportWidth: number;
 }): LangyPanelWidthBounds {
-  const limits = LIMITS[placement];
   const measured = viewportWidth > 0;
   const fitsViewport = measured ? viewportWidth - FLOATING_PANEL_VIEWPORT_GUTTER : Infinity;
-  const min = Math.min(limits.min, fitsViewport);
-  const max = Math.floor(
-    Math.max(
-      min,
-      Math.min(
-        limits.cap,
-        measured ? Math.max(limits.min, viewportWidth * limits.viewportShare) : Infinity,
-        fitsViewport,
-      ),
-    ),
-  );
+  const min = Math.min(LIMITS[placement].min, fitsViewport);
   const preferred =
     placement === "floating" ? resolveFloatingPanelWidth(viewportWidth) : SIDEBAR_PANEL_WIDTH;
+  const max = Math.floor(Math.max(min, measured ? fitsViewport : preferred));
   return { min, max, default: Math.round(Math.min(max, Math.max(min, preferred))) };
 }
 
