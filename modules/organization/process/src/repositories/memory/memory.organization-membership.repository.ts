@@ -57,6 +57,7 @@ import type {
   UnfinishedSeatAdmission,
   WaitingMember,
 } from "../organization-membership.repository.ts";
+import { RoleVersionMovedError } from "../organization-membership.repository.ts";
 import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
 import { MemoryOrganizationSeatRepository } from "./memory.organization-seat.repository.ts";
 import {
@@ -503,6 +504,12 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((row) => row.teamId);
   }
 
+  async getRoleVersion(params: { organizationId: string; userId: string }): Promise<number> {
+    const row = this.membershipRow(params);
+    if (!row) throw new MemberNotFoundError(params.userId);
+    return row.roleVersion ?? 0;
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;
@@ -921,6 +928,10 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (!row) throw new MemberNotFoundError(userId);
     // As the ledger does: a role's grants land only on a live membership.
     if (row.disabledAt) throw new BindingMissingError();
+    const roleVersion = row.roleVersion ?? 0;
+    if (input.expectedRoleVersion !== undefined && input.expectedRoleVersion !== roleVersion) {
+      throw new RoleVersionMovedError(userId);
+    }
 
     if (isAdminDemotion({ currentRole: row.role, role })) {
       if (
@@ -934,6 +945,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     this.assertCustomRolesAssignable({ organizationId, updates: effectiveTeamRoleUpdates });
     row.role = role;
     row.billingOnly = false;
+    row.roleVersion = roleVersion + 1;
     row.updatedAt = nowInstant();
     this.applySeatTransition({ row, seat: input.seat });
     this.applyDeveloperSeat({ organizationId, userId, role });

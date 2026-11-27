@@ -1,12 +1,14 @@
 import { generate } from "@langwatch/ksuid";
-import type {
-  AdminDataResult,
-  AdminListResult,
-  AdminOperationInput,
-  AdminOperationParams,
-  AdminOperationResult,
+import {
+  AdminSubscriptionAlreadyActiveError,
+  type AdminDataResult,
+  type AdminListResult,
+  type AdminOperationInput,
+  type AdminOperationParams,
+  type AdminOperationResult,
 } from "@langwatch/ops-contract";
 
+import { holdsLivePlanSlot } from "../../rules/subscription-live-plan.rules.ts";
 import { InstanceAdminRepository } from "../instance-admin.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
@@ -51,12 +53,23 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
               ? String(given)
               : generate(resource).toString(),
         };
+        this.refuseSecondLivePlan({ resource, rows, written: [row] });
         rows.set(row.id, row);
         return { data: row };
       }
       case "update":
+        this.refuseSecondLivePlan({
+          resource,
+          rows,
+          written: this.merged({ rows, ids: [id], data: params.data }),
+        });
         return { data: this.merge({ rows, id, data: params.data }) };
       case "updateMany":
+        this.refuseSecondLivePlan({
+          resource,
+          rows,
+          written: this.merged({ rows, ids, data: params.data }),
+        });
         for (const each of ids) this.merge({ rows, id: each, data: params.data });
         return { data: ids };
       case "delete": {
@@ -104,6 +117,51 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
     const rows = new Map<string, AdminRow>();
     this.store.adminRows.set(resource, rows);
     return rows;
+  }
+
+  /** The rows a write would leave, unwritten. */
+  private merged({
+    rows,
+    ids,
+    data,
+  }: {
+    rows: Map<string, AdminRow>;
+    ids: string[];
+    data: AdminOperationParams["data"];
+  }): AdminRow[] {
+    return ids.flatMap((id) => {
+      const existing = rows.get(id);
+      return existing ? [{ ...existing, ...data, id }] : [];
+    });
+  }
+
+  /** The one-live-plan index the Prisma twin's table holds, refused before anything is written. */
+  private refuseSecondLivePlan({
+    resource,
+    rows,
+    written,
+  }: {
+    resource: AdminOperationInput["resource"];
+    rows: Map<string, AdminRow>;
+    written: AdminRow[];
+  }): void {
+    if (resource !== "subscription") return;
+    const writtenIds = new Set(written.map((row) => String(row.id)));
+    const slots = [
+      ...[...rows.values()].filter((row) => !writtenIds.has(String(row.id))),
+      ...written,
+    ].filter(holdsLivePlanSlot);
+    for (const row of written.filter(holdsLivePlanSlot)) {
+      const organizationId = String(row.organizationId);
+      const holders = slots.filter((each) => each.organizationId === row.organizationId);
+      if (holders.length < 2) continue;
+      throw new AdminSubscriptionAlreadyActiveError({
+        organizationId,
+        activeSubscriptionIds: holders
+          .map((each) => String(each.id))
+          .filter((id) => !writtenIds.has(id)),
+      });
+    }
   }
 
   private merge({

@@ -2388,36 +2388,36 @@ interface Input {
 type Output = z.infer<typeof memberRoleWithSeatResultSchema>; // ../contract/src/seat-role-change.ts:54
 
 // organization.completeSeatRoleChange
-// Input: completeSeatRoleChangeInputSchema, ../contract/src/seat-role-change.ts:89
+// Input: completeSeatRoleChangeInputSchema, ../contract/src/seat-role-change.ts:95
 interface Input {
   organizationId: string;
   changeId: string;
 }
-// Output: seatRoleChangeOutcomeSchema, ../contract/src/seat-role-change.ts:98
+// Output: seatRoleChangeOutcomeSchema, ../contract/src/seat-role-change.ts:104
 interface Output {
-  status: "waiting" | "applied" | "failed" | "seat_only";
+  status: "waiting" | "applied" | "failed" | "seat_only" | "superseded";
   reason: string | null;
 }
 
 // organization.pendingSeatRoleChange
 type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:37
-// Output: pendingSeatRoleChangeSchema, ../contract/src/seat-role-change.ts:117
+// Output: pendingSeatRoleChangeSchema, ../contract/src/seat-role-change.ts:123
 type Output = {
   changeId: string;
   role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   url: string;
-  status: "waiting" | "applied" | "failed" | "seat_only";
+  status: "waiting" | "applied" | "failed" | "seat_only" | "superseded";
   reason: string | null;
 } | null;
 
 // organization.recordBlockedRoleChange
-// Input: recordBlockedRoleChangeInputSchema, ../contract/src/seat-role-change.ts:73
+// Input: recordBlockedRoleChangeInputSchema, ../contract/src/seat-role-change.ts:79
 interface Input {
   organizationId: string;
   userId: string;
   role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
 }
-// Output: recordBlockedRoleChangeResultSchema, ../contract/src/seat-role-change.ts:80
+// Output: recordBlockedRoleChangeResultSchema, ../contract/src/seat-role-change.ts:86
 interface Output {
   recorded: boolean;
 }

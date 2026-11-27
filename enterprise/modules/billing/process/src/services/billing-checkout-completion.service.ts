@@ -1,5 +1,6 @@
 import {
   Currency,
+  SubscriptionAlreadyActiveError,
   SubscriptionRecordNotFoundError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
@@ -210,29 +211,23 @@ export class BillingCheckoutCompletionService {
     ) {
       return { earlyReturn: false, duplicate: true };
     }
-    const linkedId =
-      alreadyLinked?.id ?? (await this.landOnLivePlan(subscriptionClientReferenceId));
-
-    const updateResult = await this.subscriptionRepository.linkStripeId({
-      id: linkedId,
-      stripeSubscriptionId: subscriptionId,
-    });
-
-    if (updateResult.count === 0) {
-      logger.error(
-        { subscriptionClientReferenceId },
-        "[stripeWebhook] No subscription found for checkout",
-      );
-
-      throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
+    let failures: unknown[];
+    try {
+      failures = await this.landPaidPlan({
+        pendingId: subscriptionClientReferenceId,
+        subscriptionId,
+        alreadyLinkedId: alreadyLinked?.id ?? null,
+      });
+    } catch (error) {
+      // Another checkout took the live plan, or linked the operator's row, after the check above.
+      if (!(error instanceof SubscriptionAlreadyActiveError)) throw error;
+      const refused = await this.refuseSecondPlan({
+        pendingId: subscriptionClientReferenceId,
+        stripeSubscriptionId: subscriptionId,
+      });
+      if (!refused) throw error;
+      return { earlyReturn: false, duplicate: true };
     }
-
-    // A failed follow-up still lets the plan land, then fails the delivery so
-    // Stripe redelivers it: every step here is safe to repeat.
-    const failures = await this.syncPaidPlan({
-      subscriptionId,
-      startsPlan: alreadyLinked === null,
-    });
 
     const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
@@ -255,6 +250,35 @@ export class BillingCheckoutCompletionService {
     if (failures.length > 0) throw failures[0];
 
     return { earlyReturn: false };
+  }
+
+  /** Links the paid subscription to its row and starts the plan; follow-up failures returned. */
+  private async landPaidPlan({
+    pendingId,
+    subscriptionId,
+    alreadyLinkedId,
+  }: {
+    pendingId: string;
+    subscriptionId: string;
+    alreadyLinkedId: string | null;
+  }): Promise<unknown[]> {
+    const linkedId =
+      alreadyLinkedId ??
+      (await this.landOnLivePlan({ pendingId, stripeSubscriptionId: subscriptionId }));
+    const updateResult = await this.subscriptionRepository.linkStripeId({
+      id: linkedId,
+      stripeSubscriptionId: subscriptionId,
+    });
+    if (updateResult.count === 0) {
+      logger.error(
+        { subscriptionClientReferenceId: pendingId },
+        "[stripeWebhook] No subscription found for checkout",
+      );
+      throw new SubscriptionRecordNotFoundError(pendingId);
+    }
+    // A failed follow-up still lets the plan land, then fails the delivery so
+    // Stripe redelivers it: every step here is safe to repeat.
+    return this.syncPaidPlan({ subscriptionId, startsPlan: alreadyLinkedId === null });
   }
 
   /** Lands the paid plan; a refused old-plan retirement is returned so the delivery fails later. */
@@ -331,7 +355,13 @@ export class BillingCheckoutCompletionService {
    * or activated in Ops) is the organization's live plan: the checkout lands on it, so the
    * organization keeps one active subscription. Several such rows are left to ops.
    */
-  private async landOnLivePlan(pendingId: string): Promise<string> {
+  private async landOnLivePlan({
+    pendingId,
+    stripeSubscriptionId,
+  }: {
+    pendingId: string;
+    stripeSubscriptionId: string;
+  }): Promise<string> {
     const live = await this.subscriptionRepository.findLiveUnlinkedBeside({ pendingId });
     const [only] = live;
     if (only && isCustomDeal(only)) {
@@ -351,7 +381,11 @@ export class BillingCheckoutCompletionService {
         targetKind: "organization",
         targetId: only.organizationId,
       });
-      await this.subscriptionRepository.adoptCheckout({ pendingId, liveId: only.id });
+      await this.subscriptionRepository.adoptCheckout({
+        pendingId,
+        liveId: only.id,
+        stripeSubscriptionId,
+      });
       logger.warn(
         { organizationId: only.organizationId, pendingId, liveId: only.id },
         "[stripeWebhook] Checkout landed on the organization's live unlinked subscription",

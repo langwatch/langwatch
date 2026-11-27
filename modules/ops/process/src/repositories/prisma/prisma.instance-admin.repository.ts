@@ -1,4 +1,5 @@
 import {
+  AdminSubscriptionAlreadyActiveError,
   adminUserSortFieldSchema,
   type AdminDataResult,
   type AdminListResult,
@@ -13,6 +14,7 @@ import { PlanTypes, Prisma, SubscriptionStatus } from "@langwatch/prisma-client/
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
 import { toAdminUserRow } from "../../rules/admin-user-row.rules.ts";
+import { isSecondLivePlanViolation } from "../../rules/subscription-live-plan.rules.ts";
 import { InstanceAdminRepository } from "../instance-admin.repository.ts";
 import {
   type AdminDatabase,
@@ -241,12 +243,33 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     }
   }
 
-  private executeDefault(input: AdminOperationInput): Promise<AdminDataResult> {
+  private async executeDefault(input: AdminOperationInput): Promise<AdminDataResult> {
     const params = this.defaultParams(input.method, input.params);
-    return defaultHandler(
-      { method: input.method, resource: input.resource, params },
-      this.database,
+    try {
+      return await defaultHandler(
+        { method: input.method, resource: input.resource, params },
+        this.database,
+      );
+    } catch (error) {
+      if (input.resource !== "subscription" || !isSecondLivePlanViolation(error)) throw error;
+      throw await this.secondLivePlanRefusal(input);
+    }
+  }
+
+  /** The refusal naming the live plan a write raced; the organization comes from the write. */
+  private async secondLivePlanRefusal(
+    input: AdminOperationInput,
+  ): Promise<AdminSubscriptionAlreadyActiveError> {
+    const given = input.params.data?.organizationId;
+    const ids = [input.params.id, ...this.stringArray(input.params.ids)]
+      .filter((id) => id !== undefined && id !== null && id !== "")
+      .map(String);
+    const stored = typeof given === "string" ? [] : await this.findSubscriptionStates({ ids });
+    const organizationId = typeof given === "string" ? given : (stored[0]?.organizationId ?? "");
+    const activeSubscriptionIds = (await this.findActiveSubscriptionIds({ organizationId })).filter(
+      (id) => !ids.includes(id),
     );
+    return new AdminSubscriptionAlreadyActiveError({ organizationId, activeSubscriptionIds });
   }
 
   private defaultParams(method: AdminOperationInput["method"], params: AdminOperationParams) {

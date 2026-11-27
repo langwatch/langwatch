@@ -348,3 +348,111 @@ describe("given the organization already holds an active Growth seat plan linked
     });
   });
 });
+
+describe("given two seat checkouts for the organization are paid at the same moment", () => {
+  describe("when the second one's plan is activated after the first went live past its check", () => {
+    const raced = async () => {
+      const w = world();
+      w.store.subscriptions.push(
+        growthRow({
+          id: "sub_db_live",
+          status: SubscriptionStatus.ACTIVE,
+          stripeSubscriptionId: "sub_stripe_live",
+        }),
+        growthRow({ id: "sub_db_second" }),
+      );
+      // The second completion read the organization before the first plan went live.
+      vi.spyOn(
+        MemoryBillingSubscriptionRepository.prototype,
+        "findLiveLinkedBeside",
+      ).mockResolvedValueOnce([]);
+      await w.complete("sub_db_second");
+      return w;
+    };
+    afterEach(() => vi.restoreAllMocks());
+
+    /** @scenario "A checkout paid in a race with another is refused as a second plan" */
+    it("refuses the activation, cancels and refunds the second plan and keeps the first", async () => {
+      const { store, stripeSubscriptions, duplicates, active } = await raced();
+
+      expect(active().map((row) => row.id)).toEqual(["sub_db_live"]);
+      expect(store.subscriptions.find((row) => row.id === "sub_db_second")).toMatchObject({
+        status: SubscriptionStatus.CANCELLED,
+        stripeSubscriptionId: "sub_stripe_paid",
+      });
+      expect(stripeSubscriptions.cancellations).toEqual([
+        { subscriptionId: "sub_stripe_paid", prorate: false },
+      ]);
+      expect(duplicates.reportDuplicateActive).toHaveBeenCalledWith({
+        organizationId: ORG,
+        subscriptionIds: ["sub_db_live", "sub_db_second"],
+      });
+    });
+
+    /** @scenario "A checkout paid in a race with another is refused as a second plan" */
+    it("starts nothing for the refused checkout", async () => {
+      const { announcer } = await raced();
+
+      expect(announcer.subscriptionActivated).not.toHaveBeenCalled();
+      expect(announcer.seatCheckoutPaid).not.toHaveBeenCalled();
+      expect(announcer.checkoutCompleted).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given two seat checkouts are paid onto the row an operator made, at the same moment", () => {
+  describe("when the second one reaches the row after the first linked it", () => {
+    const raced = async () => {
+      const w = world();
+      const operator = growthRow({
+        status: SubscriptionStatus.ACTIVE,
+        stripeSubscriptionId: "sub_stripe_live",
+        maxMembers: 5,
+      });
+      w.store.subscriptions.push(operator, growthRow({ id: "sub_db_second", maxMembers: 9 }));
+      // The second completion read the operator's row while it was still unlinked.
+      vi.spyOn(
+        MemoryBillingSubscriptionRepository.prototype,
+        "findLiveUnlinkedBeside",
+      ).mockResolvedValueOnce([{ ...operator, stripeSubscriptionId: null, customLimits: false }]);
+      vi.spyOn(
+        MemoryBillingSubscriptionRepository.prototype,
+        "findLiveLinkedBeside",
+      ).mockResolvedValueOnce([]);
+      await w.complete("sub_db_second");
+      return w;
+    };
+    afterEach(() => vi.restoreAllMocks());
+
+    /** @scenario "Two checkouts paid onto an operator's row keep the first one's plan" */
+    it("keeps the first checkout's link and seats on the operator's row", async () => {
+      const { store, active } = await raced();
+
+      expect(active()).toEqual([
+        expect.objectContaining({
+          id: "sub_db_ops",
+          stripeSubscriptionId: "sub_stripe_live",
+          maxMembers: 5,
+        }),
+      ]);
+      expect(store.subscriptions.find((row) => row.id === "sub_db_second")).toMatchObject({
+        status: SubscriptionStatus.CANCELLED,
+        stripeSubscriptionId: "sub_stripe_paid",
+      });
+    });
+
+    /** @scenario "Two checkouts paid onto an operator's row keep the first one's plan" */
+    it("cancels the second plan in Stripe and alerts ops", async () => {
+      const { stripeSubscriptions, duplicates, announcer } = await raced();
+
+      expect(stripeSubscriptions.cancellations).toEqual([
+        { subscriptionId: "sub_stripe_paid", prorate: false },
+      ]);
+      expect(duplicates.reportDuplicateActive).toHaveBeenCalledWith({
+        organizationId: ORG,
+        subscriptionIds: ["sub_db_ops", "sub_db_second"],
+      });
+      expect(announcer.seatCheckoutPaid).not.toHaveBeenCalled();
+    });
+  });
+});

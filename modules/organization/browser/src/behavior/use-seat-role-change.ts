@@ -22,7 +22,7 @@ import { reportUnexpected } from "./report-unexpected.ts";
 
 export type SeatRoleFlow =
   | { step: "idle" }
-  | { step: "busy" | "done" | "stuck" | "failed"; role: OrganizationUserRole }
+  | { step: "busy" | "done" | "stuck" | "failed" | "superseded"; role: OrganizationUserRole }
   | { step: "waiting"; role: OrganizationUserRole; changeId: string; url: string }
   | { step: "seat_only"; role: OrganizationUserRole; reason: string };
 
@@ -64,6 +64,7 @@ function flowOnSettled({
   role: OrganizationUserRole;
 }): SeatRoleFlow {
   if (settled.status === "seat_only") return { step: "seat_only", role, reason: settled.reason };
+  if (settled.status === "superseded") return { step: "superseded", role };
   return { step: settled.status === "applied" ? "done" : "failed", role };
 }
 
@@ -176,7 +177,7 @@ async function askPaid({
 
 /** A settled change, as the drawer shows it. */
 export type SeatRoleSettled =
-  | { status: "applied" | "failed"; reason: null }
+  | { status: "applied" | "failed" | "superseded"; reason: null }
   | { status: "seat_only"; reason: string };
 
 /** While a change waits on its payment: asks each time the admin comes back to this window. */

@@ -1,11 +1,13 @@
 import {
   GROWTH_SEAT_PLAN_TYPES,
+  SubscriptionAlreadyActiveError,
   type GrowthSeatPlanType,
 } from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
+import { isSecondLivePlanViolation } from "../../rules/one-live-plan.rules.ts";
 import { CUSTOM_LIMIT_COLUMNS, hasCustomLimits } from "../../rules/seat-checkout-guard.rules.ts";
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
@@ -155,18 +157,23 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     kept: KeptSeats | null;
     repairsUpTo: Instant;
   }): Promise<void> {
-    await this.prisma.subscription.update({
-      where: { id },
-      data: {
-        status: "ACTIVE",
-        maxMembers,
-        seatLineQuantity: maxMembers,
-        seatLineQuantityAt: toDate(nowInstant()),
-        endDate: null,
-        seatsKept: kept?.seats ?? null,
-        seatsKeptUntil: kept ? toDate(kept.until) : null,
-      },
-    });
+    try {
+      await this.prisma.subscription.update({
+        where: { id },
+        data: {
+          status: "ACTIVE",
+          maxMembers,
+          seatLineQuantity: maxMembers,
+          seatLineQuantityAt: toDate(nowInstant()),
+          endDate: null,
+          seatsKept: kept?.seats ?? null,
+          seatsKeptUntil: kept ? toDate(kept.until) : null,
+        },
+      });
+    } catch (error) {
+      if (isSecondLivePlanViolation(error)) throw new SubscriptionAlreadyActiveError();
+      throw error;
+    }
     await this.prisma.subscription.updateMany({
       where: { id, seatRepairSince: { lte: toDate(repairsUpTo) } },
       data: NO_SEAT_REPAIR,

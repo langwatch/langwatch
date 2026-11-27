@@ -165,3 +165,40 @@ describe("given an organization with an active subscription", () => {
     });
   });
 });
+
+describe("given an organization with an active subscription linked to Stripe", () => {
+  describe("when a second linked active write reaches the store past the service's check", () => {
+    /** @scenario "The database refuses a second linked active subscription the Back office check missed" */
+    it("refuses with ops_subscription_already_active naming the live one and writes nothing", async () => {
+      const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
+      const linked = (id: string, status: string) =>
+        subscriptionWrite("create", {
+          data: {
+            id,
+            organizationId: "org_acme",
+            status,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+            stripeSubscriptionId: `${id}_stripe`,
+          },
+        });
+      await repository.execute(linked("sub_live", "ACTIVE"));
+      await repository.execute(linked("sub_second", "PENDING"));
+
+      await expect(
+        repository.execute(
+          subscriptionWrite("update", { id: "sub_second", data: { status: "ACTIVE" } }),
+        ),
+      ).rejects.toMatchObject({
+        code: "ops_subscription_already_active",
+        meta: { organizationId: "org_acme", activeSubscriptionIds: ["sub_live"] },
+      });
+      await expect(repository.execute(linked("sub_third", "ACTIVE"))).rejects.toMatchObject({
+        code: "ops_subscription_already_active",
+      });
+      const second = await repository.execute(
+        subscriptionWrite("update", { id: "sub_second", data: {} }),
+      );
+      expect((second.data as { status: string }).status).toBe("PENDING");
+    });
+  });
+});

@@ -1192,6 +1192,7 @@ describe("seatEventSubscription", () => {
           stripeSubscriptions,
           subscriptions,
           abandoned,
+          duplicates,
           prices: {
             ...prices,
             GROWTH_INSTANT_EVAL_USD: "price_instant_eval_usd",

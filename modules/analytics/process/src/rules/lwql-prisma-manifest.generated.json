@@ -3573,6 +3573,15 @@
           "documentation": "Set when an admin disables this membership to stay within the licensed\nseat count. The person loses access to this organization only, keeps\ntheir role, department and everything they did, and frees their seat.\nReversible: re-enabling restores access if a seat is available.\nSeat counting excludes disabled memberships. See\nseat-reconciliation.feature."
         },
         {
+          "name": "roleVersion",
+          "columnName": "roleVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Moved by one on every role write. A role change waiting on a seat payment keeps the\nversion it was asked at and applies only while it still holds, so a later role\nwrite always wins. See role-change-seat.feature."
+        },
+        {
           "name": "pendingSsoGrantId",
           "columnName": "pendingSsoGrantId",
           "type": "String",

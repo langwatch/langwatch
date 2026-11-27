@@ -13,10 +13,12 @@ export type PendingSeatRoleChangeRecord = Readonly<{
   payment: SeatPayment;
   url: string;
   status: SeatRoleChangeStatus;
-  /** Why the role was not written once the seat was paid (`seat_only`); null otherwise. */
+  /** Why the role was not written (`seat_only`, `superseded`); null otherwise. */
   reason: string | null;
   /** Epoch milliseconds. */
   createdAt: number;
+  /** The member's role version when the change was asked; a later role write moves it. */
+  roleVersion?: number;
 }>;
 
 /** One change, always read inside its organization. */

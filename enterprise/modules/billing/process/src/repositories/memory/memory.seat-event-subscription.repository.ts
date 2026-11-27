@@ -5,6 +5,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
+import { refuseSecondLivePlan } from "../../rules/one-live-plan.rules.ts";
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
@@ -156,7 +157,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     const index = this.store.subscriptions.findIndex((subscription) => subscription.id === id);
     const current = this.store.subscriptions[index];
     if (!current) throw new Error(`No subscription "${id}" exists.`);
-    this.store.subscriptions[index] = {
+    const reactivated = {
       ...current,
       status: "ACTIVE",
       maxMembers,
@@ -164,6 +165,8 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: kept?.seats ?? null,
       seatsKeptUntil: kept?.until ?? null,
     };
+    refuseSecondLivePlan({ rows: this.store.subscriptions, written: reactivated });
+    this.store.subscriptions[index] = reactivated;
     this.store.seatLineTargets.set(id, { quantity: maxMembers, at: nowInstant() });
     const pending = this.store.seatRepairs.get(id);
     if (pending && Temporal.Instant.compare(pending.since, repairsUpTo) <= 0) {

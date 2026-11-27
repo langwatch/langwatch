@@ -1572,6 +1572,33 @@ describe("<MemberAccessEditor/>", () => {
       expect(screen.getByText("The seat is free for anyone.")).toBeTruthy();
     });
 
+    /** @scenario "A seat change a later role change replaced says so in the drawer" */
+    it("says a later role change replaced the seat change, and names no paid seat", async () => {
+      mockPendingChange.current = {
+        changeId: "change-1",
+        role: OrganizationUserRole.ADMIN,
+        url: "https://pay.example.test/invoice",
+        status: "waiting",
+        reason: null,
+      };
+      mockCompleteChange.mockResolvedValue({
+        status: "superseded",
+        reason: "a later role change for this member replaced it",
+      });
+      renderLite();
+
+      fireEvent.focus(window);
+
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-superseded")).toBeTruthy();
+      });
+      expect(
+        screen.getByText("A later role change for Sam replaced this one, so it was not applied."),
+      ).toBeTruthy();
+      expect(screen.queryByText(/paid/)).toBeNull();
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Stuck billing shows the calm state with Contact support" */
     it("shows the calm state and puts the role field back when billing is held", async () => {
       mockChangeWithSeat.mockRejectedValue({

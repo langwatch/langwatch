@@ -67,7 +67,11 @@ export abstract class BillingWebhookSubscriptionRepository {
 
   abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
 
-  abstract adoptCheckout(input: { pendingId: string; liveId: string }): Promise<void>;
+  abstract adoptCheckout(input: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void>;
 
   /** Cancels the row only while its checkout is still PENDING; answers the rows it cancelled. */
   abstract cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]>;

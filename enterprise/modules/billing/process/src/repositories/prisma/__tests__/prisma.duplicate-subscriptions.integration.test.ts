@@ -15,6 +15,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant } from "@langwatch/time";
 import type Stripe from "stripe";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
@@ -85,7 +86,7 @@ describe.skipIf(!DB_URL)("duplicate active subscriptions on Postgres", () => {
   it("finds the operator's unlinked row beside a checkout and lands the checkout on it", async () => {
     const organizationId = await organization("adopt");
     const live = await row(organizationId, "ops", { status: "ACTIVE", maxMembers: 3 });
-    await row(organizationId, "linked", { status: "ACTIVE", stripe: true });
+    await row(organizationId, "linked", { status: "ACTIVE", stripe: true, plan: "LAUNCH" });
     const pending = await row(organizationId, "checkout", {
       status: "PENDING",
       maxMembers: 7,
@@ -95,10 +96,19 @@ describe.skipIf(!DB_URL)("duplicate active subscriptions on Postgres", () => {
     const found = await subscriptions.findLiveUnlinkedBeside({ pendingId: pending });
     expect(found.map((each) => each.id)).toEqual([live]);
 
-    await subscriptions.adoptCheckout({ pendingId: pending, liveId: live });
+    await subscriptions.adoptCheckout({
+      pendingId: pending,
+      liveId: live,
+      stripeSubscriptionId: `${pending}_stripe`,
+    });
 
     const adopted = await prisma.subscription.findUniqueOrThrow({ where: { id: live } });
-    expect(adopted).toMatchObject({ status: "ACTIVE", maxMembers: 7, maxRetentionDays: 180 });
+    expect(adopted).toMatchObject({
+      status: "ACTIVE",
+      maxMembers: 7,
+      maxRetentionDays: 180,
+      stripeSubscriptionId: `${pending}_stripe`,
+    });
     expect(await statusOf(pending)).toBe("CANCELLED");
   });
 
@@ -257,5 +267,149 @@ describe.skipIf(!DB_URL)("duplicate active subscriptions on Postgres", () => {
     expect(await statusOf(stray)).toBe("CANCELLED");
     expect(await statusOf(kept)).toBe("ACTIVE");
     expect(await statusOf(pending)).toBe("PENDING");
+  });
+
+  describe("given the one-live-plan index", () => {
+    const linked = async (
+      organizationId: string,
+      suffix: string,
+      data: {
+        status: "ACTIVE" | "PENDING" | "CANCELLED";
+        plan?: "GROWTH_SEAT_EUR_MONTHLY" | "LAUNCH";
+        createdAt?: Date;
+      },
+    ) => {
+      const id = `${run}_${suffix}`;
+      await prisma.subscription.create({
+        data: {
+          id,
+          organizationId,
+          plan: data.plan ?? "GROWTH_SEAT_EUR_MONTHLY",
+          status: data.status,
+          stripeSubscriptionId: `${id}_stripe`,
+          ...(data.createdAt ? { createdAt: data.createdAt } : {}),
+        },
+      });
+      return id;
+    };
+    const activeCount = (organizationId: string) =>
+      prisma.subscription.count({ where: { organizationId, status: "ACTIVE" } });
+
+    /** @scenario "The database refuses a second live Stripe-backed plan for an organization" */
+    it("lets one of two linked plans activated at once go live and refuses the other", async () => {
+      const organizationId = await organization("race");
+      const first = await linked(organizationId, "race_a", { status: "PENDING" });
+      const second = await linked(organizationId, "race_b", { status: "PENDING" });
+
+      const outcomes = await Promise.allSettled([
+        subscriptions.activate({ id: first, previousStatus: "PENDING" }),
+        subscriptions.activate({ id: second, previousStatus: "PENDING" }),
+      ]);
+
+      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+      const refused = outcomes.flatMap((outcome) =>
+        outcome.status === "rejected" ? [outcome.reason] : [],
+      );
+      expect(refused).toEqual([expect.objectContaining({ code: "subscription_already_active" })]);
+      expect(await activeCount(organizationId)).toBe(1);
+    });
+
+    /** @scenario "The database refuses a second live Stripe-backed plan for an organization" */
+    it("refuses a new plan beside a live one created long before the index", async () => {
+      const organizationId = await organization("old_live");
+      await linked(organizationId, "old_live", {
+        status: "ACTIVE",
+        createdAt: new Date("2025-01-01T00:00:00Z"),
+      });
+      const fresh = await linked(organizationId, "old_live_new", { status: "PENDING" });
+
+      await expect(
+        subscriptions.activate({ id: fresh, previousStatus: "PENDING" }),
+      ).rejects.toMatchObject({ code: "subscription_already_active" });
+      expect(await statusOf(fresh)).toBe("PENDING");
+    });
+
+    /** @scenario "The database refuses a second live Stripe-backed plan for an organization" */
+    it("refuses a seat change bringing a cancelled linked row back beside the live one", async () => {
+      const organizationId = await organization("reactivate");
+      await linked(organizationId, "reactivate_live", { status: "ACTIVE" });
+      const old = await linked(organizationId, "reactivate_old", { status: "CANCELLED" });
+
+      await expect(
+        seats.reactivateWithSeats({
+          id: old,
+          maxMembers: 4,
+          kept: null,
+          repairsUpTo: nowInstant(),
+        }),
+      ).rejects.toMatchObject({ code: "subscription_already_active" });
+      expect(await statusOf(old)).toBe("CANCELLED");
+    });
+
+    /** @scenario "The database refuses a second live Stripe-backed plan for an organization" */
+    it("activates a seat plan beside the tiered plan it replaces", async () => {
+      const organizationId = await organization("tiered");
+      await linked(organizationId, "tiered_live", { status: "ACTIVE", plan: "LAUNCH" });
+      const seat = await linked(organizationId, "tiered_seat", { status: "PENDING" });
+
+      await subscriptions.activate({ id: seat, previousStatus: "PENDING" });
+
+      expect(await activeCount(organizationId)).toBe(2);
+    });
+  });
+
+  describe("given an operator's active row with no Stripe link", () => {
+    /** @scenario "Two checkouts paid onto an operator's row keep the first one's plan" */
+    it("lets one of two checkouts moved onto it at once link it and refuses the other", async () => {
+      const organizationId = await organization("adopt_race");
+      const live = await row(organizationId, "adopt_race_ops", { status: "ACTIVE", maxMembers: 3 });
+      const first = await row(organizationId, "adopt_race_a", { status: "PENDING", maxMembers: 5 });
+      const second = await row(organizationId, "adopt_race_b", {
+        status: "PENDING",
+        maxMembers: 9,
+      });
+
+      const outcomes = await Promise.allSettled(
+        [first, second].map((pendingId) =>
+          subscriptions.adoptCheckout({
+            pendingId,
+            liveId: live,
+            stripeSubscriptionId: `${pendingId}_stripe`,
+          }),
+        ),
+      );
+
+      const won = outcomes.findIndex((outcome) => outcome.status === "fulfilled");
+      expect(outcomes.filter((outcome) => outcome.status === "rejected")).toEqual([
+        expect.objectContaining({
+          reason: expect.objectContaining({ code: "subscription_already_active" }),
+        }),
+      ]);
+      const winner = [first, second][won] ?? "";
+      const loser = [first, second][1 - won] ?? "";
+      expect(await prisma.subscription.findUniqueOrThrow({ where: { id: live } })).toMatchObject({
+        stripeSubscriptionId: `${winner}_stripe`,
+        maxMembers: winner === first ? 5 : 9,
+      });
+      expect(await statusOf(winner)).toBe("CANCELLED");
+      expect(await statusOf(loser)).toBe("PENDING");
+    });
+
+    /** @scenario "Two checkouts paid onto an operator's row keep the first one's plan" */
+    it("refuses linking another Stripe id once linked and accepts the same one again", async () => {
+      const organizationId = await organization("relink");
+      const live = await row(organizationId, "relink_ops", { status: "ACTIVE" });
+      await subscriptions.linkStripeId({ id: live, stripeSubscriptionId: `${live}_a` });
+
+      await expect(
+        subscriptions.linkStripeId({ id: live, stripeSubscriptionId: `${live}_b` }),
+      ).rejects.toMatchObject({ code: "subscription_already_active" });
+      await expect(
+        subscriptions.linkStripeId({ id: live, stripeSubscriptionId: `${live}_a` }),
+      ).resolves.toEqual({ count: 1 });
+      expect(
+        await subscriptions.linkStripeId({ id: `${run}_missing`, stripeSubscriptionId: "x" }),
+      ).toEqual({ count: 0 });
+    });
   });
 });

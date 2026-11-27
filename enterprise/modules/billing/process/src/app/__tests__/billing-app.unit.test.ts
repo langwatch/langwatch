@@ -637,18 +637,25 @@ describe("a seat change refused for two live subscriptions", () => {
       const { subscriptions } = world.repositories;
       const acme = world.store.organizations.get(ACME);
       if (acme) world.store.organizations.set(ACME, { ...acme, pricingModel: "SEAT_EVENT" });
-      for (const stripeSubscriptionId of ["sub_live_1", "sub_live_2"]) {
-        const row = await subscriptions.createPending({
-          organizationId: ACME,
-          plan: "GROWTH_SEAT_EUR_MONTHLY",
+      const row = await subscriptions.createPending({
+        organizationId: ACME,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      await subscriptions.updateStatus({ id: row.id, status: "ACTIVE" });
+      await subscriptions.updateQuantities({
+        id: row.id,
+        maxMembers: 5,
+        maxMessagesPerMonth: null,
+      });
+      await subscriptions.linkStripeId({ id: row.id, stripeSubscriptionId: "sub_live_1" });
+      const live = await subscriptions.findByStripeId("sub_live_1");
+      // A pair from before the one-live-plan index: the migration leaves the older one outside it.
+      if (live) {
+        world.store.subscriptions.push({
+          ...live,
+          id: "sub_db_older",
+          stripeSubscriptionId: "sub_live_2",
         });
-        await subscriptions.updateStatus({ id: row.id, status: "ACTIVE" });
-        await subscriptions.updateQuantities({
-          id: row.id,
-          maxMembers: 5,
-          maxMessagesPerMonth: null,
-        });
-        await subscriptions.linkStripeId({ id: row.id, stripeSubscriptionId });
       }
       const save = (change: { upgradeMembers: boolean; totalMembers: number }) =>
         world.app

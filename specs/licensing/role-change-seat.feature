@@ -166,7 +166,15 @@ Feature: Adding a seat with a role change
       Given "Sam" waits to become an Admin on a seat invoice
       And a seat frees up and an administrator makes "Sam" a Member
       When billing records that the seat invoice was paid
-      Then "Sam" stays a Member and the waiting change ends as seat only
+      Then "Sam" stays a Member and the waiting change ends as replaced
+
+    @unit
+    Scenario: A replaced change whose settling failed never applies its older role
+      Given "Sam" waits to become an Admin on a seat invoice
+      And a later role write for "Sam" commits, but ending the waiting change fails
+      When billing records that the seat invoice was paid
+      Then "Sam" keeps the later role and the waiting change ends as replaced
+      And a paid change with no later role write still applies when delivered again
 
     @unit
     Scenario: A paid fact that cannot apply yet is delivered again
@@ -319,6 +327,14 @@ Feature: Adding a seat with a role change
       When the drawer learns the change settled
       Then it says "1 seat added and paid, but Sam's role could not be changed: <reason>."
       And it says "The seat is free for anyone."
+
+    @integration
+    Scenario: A seat change a later role change replaced says so in the drawer
+      Given "Sam" waited to become an Admin on a seat payment
+      And a later role change for "Sam" replaced it
+      When the drawer learns the change settled
+      Then it says "A later role change for Sam replaced this one, so it was not applied."
+      And it says nothing about a paid seat
 
     @integration
     Scenario: Stuck billing shows the calm state with Contact support

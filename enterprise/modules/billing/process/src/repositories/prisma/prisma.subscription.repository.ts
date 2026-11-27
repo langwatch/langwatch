@@ -1,4 +1,8 @@
-import { SubscriptionStatus, TIERED_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
+import {
+  SubscriptionAlreadyActiveError,
+  SubscriptionStatus,
+  TIERED_PLAN_TYPES,
+} from "@langwatch/enterprise-billing-contract";
 import type {
   PrismaClient,
   PlanTypes as PrismaPlanTypes,
@@ -6,6 +10,7 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import { isSecondLivePlanViolation } from "../../rules/one-live-plan.rules.ts";
 import { hasCustomLimits } from "../../rules/seat-checkout-guard.rules.ts";
 import {
   BillingSubscriptionRepository,
@@ -144,19 +149,23 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
 
   async updateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord> {
     return subscriptionRecordOf(
-      await this.prisma.subscription.update({
-        where: { id: input.id },
-        data: { status: input.status as PrismaSubscriptionStatus },
-      }),
+      await oneLivePlan(() =>
+        this.prisma.subscription.update({
+          where: { id: input.id },
+          data: { status: input.status as PrismaSubscriptionStatus },
+        }),
+      ),
     );
   }
 
   async updatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord> {
     return subscriptionRecordOf(
-      await this.prisma.subscription.update({
-        where: { id: input.id },
-        data: { plan: input.plan as PrismaPlanTypes },
-      }),
+      await oneLivePlan(() =>
+        this.prisma.subscription.update({
+          where: { id: input.id },
+          data: { plan: input.plan as PrismaPlanTypes },
+        }),
+      ),
     );
   }
 
@@ -174,10 +183,21 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     id: string;
     stripeSubscriptionId: string;
   }): Promise<{ count: number }> {
-    return this.prisma.subscription.updateMany({
-      where: { id: input.id },
-      data: { stripeSubscriptionId: input.stripeSubscriptionId },
-    });
+    return oneLivePlan(() =>
+      this.prisma.$transaction(async (tx) => {
+        const [locked] = await findLockedLinks({ tx, id: input.id });
+        if (!locked) return { count: 0 };
+        refuseOtherLink({
+          current: locked.stripeSubscriptionId,
+          stripeSubscriptionId: input.stripeSubscriptionId,
+        });
+        await tx.subscription.update({
+          where: { id: input.id },
+          data: { stripeSubscriptionId: input.stripeSubscriptionId },
+        });
+        return { count: 1 };
+      }),
+    );
   }
 
   async activate(input: {
@@ -195,11 +215,13 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     if (input.previousStatus !== SubscriptionStatus.ACTIVE) {
       data.startDate = toDate(nowInstant());
     }
-    const row = await this.prisma.subscription.update({
-      where: { id: input.id },
-      data,
-      include: { organization: true },
-    });
+    const row = await oneLivePlan(() =>
+      this.prisma.subscription.update({
+        where: { id: input.id },
+        data,
+        include: { organization: true },
+      }),
+    );
 
     return { ...subscriptionRecordOf(row), organization: row.organization };
   }
@@ -323,27 +345,41 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     return row ? [subscriptionRecordOf(row)] : [];
   }
 
-  async adoptCheckout({ pendingId, liveId }: { pendingId: string; liveId: string }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const pending = await tx.subscription.findUniqueOrThrow({ where: { id: pendingId } });
-      await tx.subscription.update({
-        where: { id: liveId },
-        data: {
-          plan: pending.plan,
-          maxMembers: pending.maxMembers,
-          ...(pending.maxRetentionDays === null
-            ? {}
-            : { maxRetentionDays: pending.maxRetentionDays }),
-        },
-      });
-      await tx.subscription.update({
-        where: { id: pendingId },
-        data: {
-          status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-          endDate: toDate(nowInstant()),
-        },
-      });
-    });
+  async adoptCheckout({
+    pendingId,
+    liveId,
+    stripeSubscriptionId,
+  }: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void> {
+    await oneLivePlan(() =>
+      this.prisma.$transaction(async (tx) => {
+        const pending = await tx.subscription.findUniqueOrThrow({ where: { id: pendingId } });
+        const [locked] = await findLockedLinks({ tx, id: liveId });
+        if (!locked) throw new Error(`No subscription "${liveId}" exists.`);
+        refuseOtherLink({ current: locked.stripeSubscriptionId, stripeSubscriptionId });
+        await tx.subscription.update({
+          where: { id: liveId },
+          data: {
+            plan: pending.plan,
+            maxMembers: pending.maxMembers,
+            stripeSubscriptionId,
+            ...(pending.maxRetentionDays === null
+              ? {}
+              : { maxRetentionDays: pending.maxRetentionDays }),
+          },
+        });
+        await tx.subscription.update({
+          where: { id: pendingId },
+          data: {
+            status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
+            endDate: toDate(nowInstant()),
+          },
+        });
+      }),
+    );
   }
 
   async updateQuantities(input: {
@@ -353,20 +389,70 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization> {
-    const row = await this.prisma.subscription.update({
-      where: { id: input.id },
-      data: {
-        status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
-        lastPaymentFailedDate: null,
-        maxMembers: input.maxMembers,
-        ...(input.maxMembersDeveloper === undefined
-          ? {}
-          : { maxMembersDeveloper: input.maxMembersDeveloper }),
-        maxMessagesPerMonth: input.maxMessagesPerMonth,
-      },
-      include: { organization: true },
-    });
+    const row = await oneLivePlan(() =>
+      this.prisma.subscription.update({
+        where: { id: input.id },
+        data: {
+          status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
+          lastPaymentFailedDate: null,
+          maxMembers: input.maxMembers,
+          ...(input.maxMembersDeveloper === undefined
+            ? {}
+            : { maxMembersDeveloper: input.maxMembersDeveloper }),
+          maxMessagesPerMonth: input.maxMessagesPerMonth,
+        },
+        include: { organization: true },
+      }),
+    );
 
     return { ...subscriptionRecordOf(row), organization: row.organization };
+  }
+}
+
+type SubscriptionTransaction = Parameters<
+  Parameters<BillingSubscriptionDatabase["$transaction"]>[0] extends (tx: infer T) => unknown
+    ? (tx: T) => unknown
+    : never
+>[0];
+
+/**
+ * The row's Stripe link, read after touching the row so its lock is held to the end of the
+ * transaction: two checkouts linking one row take turns. Empty when the row is gone.
+ */
+async function findLockedLinks({
+  tx,
+  id,
+}: {
+  tx: SubscriptionTransaction;
+  id: string;
+}): Promise<{ stripeSubscriptionId: string | null }[]> {
+  const { count } = await tx.subscription.updateMany({
+    where: { id },
+    data: { updatedAt: toDate(nowInstant()) },
+  });
+  if (count === 0) return [];
+  return tx.subscription.findMany({ where: { id }, select: { stripeSubscriptionId: true } });
+}
+
+/** A row another checkout linked first keeps its plan; a redelivery of the same link passes. */
+function refuseOtherLink({
+  current,
+  stripeSubscriptionId,
+}: {
+  current: string | null;
+  stripeSubscriptionId: string;
+}): void {
+  if (current !== null && current !== stripeSubscriptionId) {
+    throw new SubscriptionAlreadyActiveError();
+  }
+}
+
+/** A write the one-live-plan index refuses is the domain's refusal of a second live plan. */
+async function oneLivePlan<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isSecondLivePlanViolation(error)) throw new SubscriptionAlreadyActiveError();
+    throw error;
   }
 }

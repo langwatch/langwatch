@@ -210,6 +210,13 @@ Feature: Platform administration package boundary
     Then the write is refused with ops_subscription_already_active naming the active subscription
     And nothing is written
 
+  @unit @integration
+  Scenario: The database refuses a second linked active subscription the Back office check missed
+    Given an organization with an active subscription linked to Stripe
+    When a second linked active write for it reaches the database past the service's check
+    Then the write is refused with ops_subscription_already_active naming the active subscription
+    And nothing is written
+
   @unit
   Scenario: The Back office still edits an organization's one active subscription
     Given an organization with an active subscription and a PENDING one

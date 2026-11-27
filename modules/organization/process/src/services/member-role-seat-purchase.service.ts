@@ -12,6 +12,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { RoleVersionMovedError } from "../repositories/organization-membership.repository.ts";
 import type {
   PendingSeatRoleChangeRecord,
   PendingSeatRoleChangeRepository,
@@ -39,6 +40,7 @@ type RoleChange = (
     userId: string;
     role: OrganizationUserRole;
     planUser?: { id: string; name?: string | null; email?: string | null };
+    expectedRoleVersion?: number;
   }>,
   by: OrganizationCaller,
 ) => Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
@@ -52,6 +54,8 @@ type ChangeInput = Readonly<{
 
 type Dependencies = {
   changeMemberRole: RoleChange;
+  /** The member's role version; every role write moves it, so a paid change sees a newer one. */
+  roleVersion: (input: { organizationId: string; userId: string }) => Promise<number>;
   billing: Pick<BillingApi, "addFullSeat" | "settleSeatPayment" | "recordBlockedSeatChange">;
   /** The member's name as the members page shows it. */
   memberName: (input: { organizationId: string; userId: string }) => Promise<string>;
@@ -101,6 +105,8 @@ export class MemberRoleSeatPurchaseService {
     });
     if (waiting) return this.resumeWaiting({ waiting, input });
 
+    // Read before the seat is bought: any role write after it replaces this change.
+    const roleVersion = await this.dependencies.roleVersion({ organizationId, userId });
     const purchase = await this.buySeat({ input, by });
     if (purchase.status === "added") {
       try {
@@ -131,6 +137,7 @@ export class MemberRoleSeatPurchaseService {
       status: "waiting",
       reason: null,
       createdAt: nowInstant().epochMilliseconds,
+      roleVersion,
     });
     if (!saved) {
       // A concurrent change saved this payment first: that one is the change it pays for.
@@ -176,8 +183,8 @@ export class MemberRoleSeatPurchaseService {
   }
 
   /**
-   * Settles the change a newer role write replaced. Retried, since a change left waiting would
-   * apply its older role once paid; the role already changed, so a last failure is only logged.
+   * Settles the change a newer role write replaced. Retried; when every try fails the change
+   * stays waiting, and its paid write is refused later because the role version moved.
    */
   private async supersede({ organizationId, id }: { organizationId: string; id: string }) {
     for (let attempt = 1; attempt <= SUPERSEDE_ATTEMPTS; attempt++) {
@@ -185,7 +192,7 @@ export class MemberRoleSeatPurchaseService {
         await this.dependencies.pending.settle({
           organizationId,
           id,
-          status: "seat_only",
+          status: "superseded",
           reason: REPLACED,
         });
         return;
@@ -456,9 +463,27 @@ export class MemberRoleSeatPurchaseService {
     if (!(await stillHeld())) return waitingOutcome;
     try {
       await this.underClaim({ organizationId, id, token }, () =>
-        this.dependencies.changeMemberRole({ organizationId, userId, role, planUser: by }, by),
+        this.dependencies.changeMemberRole(
+          {
+            organizationId,
+            userId,
+            role,
+            planUser: by,
+            ...(record.roleVersion === undefined
+              ? {}
+              : { expectedRoleVersion: record.roleVersion }),
+          },
+          by,
+        ),
       );
     } catch (error) {
+      if (error instanceof RoleVersionMovedError) {
+        logger.info(
+          { organizationId, changeId: id },
+          "a later role write replaced the paid change",
+        );
+        return settle("superseded", REPLACED);
+      }
       logger.warn({ organizationId, changeId: id, error }, "seat paid, then the role was refused");
       return settle("seat_only", refusalReason(error));
     }

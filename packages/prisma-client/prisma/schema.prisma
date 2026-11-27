@@ -1105,6 +1105,11 @@ model OrganizationUser {
   /// seat-reconciliation.feature.
   disabledAt DateTime?
 
+  /// Moved by one on every role write. A role change waiting on a seat payment keeps the
+  /// version it was asked at and applies only while it still holds, so a later role
+  /// write always wins. See role-change-seat.feature.
+  roleVersion Int @default(0)
+
   /// Stable grant intent for an unfinished automatic SSO admission.
   /// Cleared after the authoritative grant is observed; never inferred from missing access.
   pendingSsoGrantId String?
@@ -4901,6 +4906,9 @@ model Subscription {
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
 
+  // One live Stripe-backed plan per organization, raw SQL in
+  // 20261127180500_subscription_one_live_stripe_plan because Prisma cannot
+  // express a partial unique index: "Subscription_one_live_stripe_plan_key".
   @@index([organizationId])
 }
 

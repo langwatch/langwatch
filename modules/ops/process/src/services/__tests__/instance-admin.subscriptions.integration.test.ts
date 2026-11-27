@@ -105,4 +105,39 @@ describe.skipIf(!DB_URL)("the Back office's subscription writes on Postgres", ()
     const live = await prisma.subscription.findUniqueOrThrow({ where: { id: `${run}_live` } });
     expect(live.maxMembers).toBe(9);
   });
+
+  /** @scenario "The database refuses a second linked active subscription the Back office check missed" */
+  it("refuses a second linked active row written past the service's check", async () => {
+    const repository = PrismaInstanceAdminRepository.create(prisma);
+    const { id: otherOrganizationId } = await prisma.organization.create({
+      data: { name: "ACME", slug: `--${run}-linked` },
+    });
+    const linked = (id: string) =>
+      write("create", {
+        data: {
+          id,
+          organizationId: otherOrganizationId,
+          status: "ACTIVE",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
+          stripeSubscriptionId: `${id}_stripe`,
+        },
+      });
+    try {
+      await repository.execute(linked(`${run}_linked_a`));
+
+      await expect(repository.execute(linked(`${run}_linked_b`))).rejects.toMatchObject({
+        code: "ops_subscription_already_active",
+        meta: {
+          organizationId: otherOrganizationId,
+          activeSubscriptionIds: [`${run}_linked_a`],
+        },
+      });
+      expect(
+        await prisma.subscription.count({ where: { organizationId: otherOrganizationId } }),
+      ).toBe(1);
+    } finally {
+      await prisma.subscription.deleteMany({ where: { organizationId: otherOrganizationId } });
+      await prisma.organization.delete({ where: { id: otherOrganizationId } });
+    }
+  });
 });

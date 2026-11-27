@@ -229,6 +229,8 @@ export class OrganizationMemberRoleService {
     /** Whose holdings bound the grants the change writes. */
     caller: AuthzGrantCaller;
     planUser?: OrganizationPlanUser;
+    /** Writes only while the member's role version still reads this (role-change-seat.feature). */
+    expectedRoleVersion?: number;
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId, caller } = params;
 
@@ -289,7 +291,15 @@ export class OrganizationMemberRoleService {
       organizationId,
       work: (lease) =>
         this.writeRoleChange({
-          change: { organizationId, userId, role, effectiveTeamRoleUpdates, currentUserId, caller },
+          change: {
+            organizationId,
+            userId,
+            role,
+            effectiveTeamRoleUpdates,
+            currentUserId,
+            caller,
+            expectedRoleVersion: params.expectedRoleVersion,
+          },
           currentMember,
           oldPermissions: userPermissions,
           planUser: params.planUser,

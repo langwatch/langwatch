@@ -54,8 +54,14 @@ export const memberRoleWithSeatResultSchema: MemberRoleWithSeatResultSchema =
   memberRoleWithSeatResultSchemaDefinition;
 export type MemberRoleWithSeatResult = z.infer<typeof memberRoleWithSeatResultSchema>;
 
-/** Where a change waiting on a payment stands. */
-export const seatRoleChangeStatusSchema = z.enum(["waiting", "applied", "failed", "seat_only"]);
+/** Where a change waiting on a payment stands; `superseded` when a later role write replaced it. */
+export const seatRoleChangeStatusSchema = z.enum([
+  "waiting",
+  "applied",
+  "failed",
+  "seat_only",
+  "superseded",
+]);
 export type SeatRoleChangeStatus = z.infer<typeof seatRoleChangeStatusSchema>;
 
 /** A role change the seat offer refused for two live subscriptions, kept for its admin. */

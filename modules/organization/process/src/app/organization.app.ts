@@ -442,6 +442,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#joinRequests = infrastructure.joinRequests;
     application.#seatRoleChanges = MemberRoleSeatPurchaseService.create({
       changeMemberRole: (input, by) => application.changeMemberRole(input, by),
+      roleVersion: (input) => application.#dependencies.membership.getRoleVersion(input),
       billing: setup.dependencies.billing,
       pending: setup.repositories.pendingSeatRoleChanges,
       memberName: async (input) => {
@@ -1485,6 +1486,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       role: OrganizationUserRole;
       teamRoleUpdates?: { teamId: string; userId: string; role: string; customRoleId?: string }[];
       planUser?: { id: string; name?: string | null; email?: string | null };
+      /** Writes only while the member's role version still reads this. */
+      expectedRoleVersion?: number;
     }>,
     by: OrganizationCaller | null,
   ): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }> {

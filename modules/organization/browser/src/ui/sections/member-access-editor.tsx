@@ -893,9 +893,9 @@ function useSeatRolePanel({
     onChanged,
   });
   const step = seat.flow.step;
-  // A refused seat leaves the role as it is, so the picker shows the role they still hold.
+  // A refused or replaced seat change leaves the role as it is, so the picker shows the role held.
   useEffect(() => {
-    if (step === "stuck") setPendingSeat(memberSeat);
+    if (step === "stuck" || step === "superseded") setPendingSeat(memberSeat);
   }, [step, memberSeat, setPendingSeat]);
 
   // An offer refused for two live subscriptions shows the calm state before any click.
@@ -971,6 +971,15 @@ function SeatRolePanel({
       >
         The seat is free for anyone.
       </Banner>
+    );
+  }
+  if (flow.step === "superseded") {
+    return (
+      <Banner
+        status="info"
+        title={`A later role change for ${editor.memberName} replaced this one, so it was not applied.`}
+        data-testid="seat-role-superseded"
+      />
     );
   }
   if (flow.step === "waiting") {

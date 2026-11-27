@@ -108,7 +108,11 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.findLiveLinkedBeside(input);
   }
 
-  adoptCheckout(input: { pendingId: string; liveId: string }): Promise<void> {
+  adoptCheckout(input: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void> {
     return this.subscriptions.adoptCheckout(input);
   }
 

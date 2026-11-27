@@ -21,6 +21,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryPendingSeatRoleChangeRepository } from "../../repositories/memory/memory.pending-seat-role-change.repository.ts";
+import { RoleVersionMovedError } from "../../repositories/organization-membership.repository.ts";
 import { seatRoleChangeReturnPath } from "../../rules/seat-role-change.rules.ts";
 import {
   MemberRoleSeatPurchaseService,
@@ -49,11 +50,20 @@ function world({
     refuseAfterSeat: false,
     adminCanManage: true,
     roleWrites: 0,
+    /** Moved by every role write, as the membership row's role version is. */
+    roleVersion: 0,
     purchase: { status: "added" } as SeatPurchase | Error,
     payments: new Map<string, SeatPaymentStatus>(),
   };
   const changeMemberRole = vi.fn(
-    async (input: { userId: string; role: OrganizationUserRole }, _by: OrganizationCaller) => {
+    async (
+      input: { userId: string; role: OrganizationUserRole; expectedRoleVersion?: number },
+      _by: OrganizationCaller,
+    ) => {
+      const expected = input.expectedRoleVersion;
+      if (expected !== undefined && expected !== state.roleVersion) {
+        throw new RoleVersionMovedError(input.userId);
+      }
       if (state.refuseOtherwise) throw new CannotDisableLastAdminError();
       if (state.refuseAfterSeat && state.used < state.paid) throw new CannotDisableLastAdminError();
       if (state.used >= state.paid) {
@@ -63,6 +73,7 @@ function world({
       }
       state.used += 1;
       state.roleWrites += 1;
+      state.roleVersion += 1;
       state.roles.set(input.userId, input.role);
       return { teamsLeftWithoutAdmin: [] };
     },
@@ -83,6 +94,7 @@ function world({
   let ids = 0;
   const service = MemberRoleSeatPurchaseService.create({
     changeMemberRole,
+    roleVersion: async () => state.roleVersion,
     billing: createApiFixture<BillingApi>(
       { addFullSeat, settleSeatPayment, recordBlockedSeatChange },
       "BillingApi",
@@ -429,7 +441,7 @@ describe("MemberRoleSeatPurchaseService", () => {
       expect(newer).toMatchObject({ status: "changed", seatAdded: false });
       expect(state.roles.get(SAM)).toBe("MEMBER");
       expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
-        status: "seat_only",
+        status: "superseded",
         reason: "a later role change for this member replaced it",
       });
     });
@@ -454,7 +466,7 @@ describe("MemberRoleSeatPurchaseService", () => {
       expect(state.roles.get(SAM)).toBe("MEMBER");
       expect(state.roleWrites).toBe(1);
       expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
-        status: "seat_only",
+        status: "superseded",
       });
     });
 
@@ -713,28 +725,72 @@ describe("MemberRoleSeatPurchaseService", () => {
     });
 
     /** @scenario "A newer role change replaces the one waiting on its payment" */
-    it("retries ending the replaced change, and keeps the newer role when that keeps failing", async () => {
-      const once = await waiting();
-      once.state.paid += 1;
-      const settle = once.pending.settle.bind(once.pending);
-      vi.spyOn(once.pending, "settle")
+    it("retries ending the replaced change", async () => {
+      const { state, service, pending } = await waiting();
+      state.paid += 1;
+      const settle = pending.settle.bind(pending);
+      vi.spyOn(pending, "settle")
         .mockRejectedValueOnce(new Error("redis down"))
         .mockImplementation(settle);
 
-      await once.service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+      await service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
 
-      expect(await once.service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
-        status: "seat_only",
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "superseded",
       });
+    });
 
-      const never = await waiting();
-      never.state.paid += 1;
-      vi.spyOn(never.pending, "settle").mockRejectedValue(new Error("redis down"));
+    /** @scenario "A replaced change whose settling failed never applies its older role" */
+    it("keeps the newer role when ending the replaced change keeps failing, then supersedes the paid write", async () => {
+      const { state, service, pending, pay } = await waiting();
+      state.paid += 1;
+      const settle = pending.settle.bind(pending);
+      const failing = vi.spyOn(pending, "settle").mockRejectedValue(new Error("redis down"));
 
-      const newer = await never.service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+      const newer = await service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+      failing.mockImplementation(settle);
+      pay("in_seat");
+      await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
 
       expect(newer).toMatchObject({ status: "changed", seatAdded: false });
-      expect(never.state.roles.get(SAM)).toBe("MEMBER");
+      expect(state.roles.get(SAM)).toBe("MEMBER");
+      expect(state.roleWrites).toBe(1);
+      expect(await service.complete({ organizationId: ORG, changeId: "change_1" })).toEqual({
+        status: "superseded",
+        reason: "a later role change for this member replaced it",
+      });
+    });
+
+    /** @scenario "A replaced change whose settling failed never applies its older role" */
+    it("supersedes the paid change after any later role write, even one made elsewhere", async () => {
+      const { state, service, pay } = await waiting();
+      state.roleVersion += 1;
+      state.roles.set(SAM, "MEMBER");
+      pay("in_seat");
+
+      const outcome = await service.complete({ organizationId: ORG, changeId: "change_1" });
+
+      expect(outcome.status).toBe("superseded");
+      expect(state.roles.get(SAM)).toBe("MEMBER");
+    });
+
+    /** @scenario "A replaced change whose settling failed never applies its older role" */
+    it("applies a paid change on retry when no later role write committed", async () => {
+      const { state, service, pay, pending } = await waiting();
+      pay("in_seat");
+      const held = { organizationId: ORG, id: "change_1", token: "other-applier" };
+      await pending.claim(held);
+
+      await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
+        SeatRoleChangeNotAppliedYetError,
+      );
+      await pending.release(held);
+      await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
+
+      expect(state.roles.get(SAM)).toBe("ADMIN");
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "applied",
+      });
     });
 
     it("refuses a change another organization asks about", async () => {

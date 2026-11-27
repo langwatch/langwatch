@@ -629,6 +629,7 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "billingOnly",
     "disabledAt",
+    "roleVersion",
     "pendingSsoGrantId",
     "membershipStamp",
     "fullSeatSince",
