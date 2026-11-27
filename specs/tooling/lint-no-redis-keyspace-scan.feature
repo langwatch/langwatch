@@ -30,13 +30,13 @@ Feature: The no-redis-keyspace-scan lint rule
 
   @unit
   Scenario: A keyspace walk in any other spelling is reported
-    Given a scan with an options object or a template-literal MATCH, a scanBufferStream, a scanIterator and redis.keys("gq:*")
+    Given a scan with an options object or a template-literal MATCH, a scanBufferStream, a scanIterator, redis.keys("gq:*"), redis.call("SCAN", ...) and conn.scan(cursor)
     When the no-redis-keyspace-scan rule runs over them
     Then it reports keyspaceScan on each call
 
   @unit
   Scenario: A SCAN or KEYS inside a Lua script is reported
-    Given a Lua source string calling redis.call("SCAN", ...) and a template calling redis.call('KEYS', ...)
+    Given a Lua source string calling redis.call("SCAN", ...) and a template calling redis.call('KEYS', ...), one with a space before the bracket
     When the no-redis-keyspace-scan rule runs over them
     Then it reports luaKeyspaceScan on each, naming the command
 

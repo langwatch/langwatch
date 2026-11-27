@@ -41,3 +41,15 @@ Feature: GroupQueue lists each tenant's claimed groups
     Given a claimed group missing from the index, as a previous release would leave it
     When the backfill walks the keyspace in paced steps to the end
     Then the group is listed
+
+  @integration
+  Scenario: A heartbeat keeps the tenant's claim list alive
+    Given a claimed group of a tenant whose claim list is close to expiring
+    When the worker's heartbeat refreshes the claim
+    Then the claim list's expiry is pushed back to the claim records' key lifetime
+
+  @integration
+  Scenario: A dead worker's surviving claim stays listed
+    Given a claimed group whose active key expired while its claimed record remains
+    When the tenant's claimed groups are read
+    Then the group is still listed

@@ -3,7 +3,7 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { GroupStagingScripts } from "../scripts.ts";
+import { GROUP_KEY_TTL_MS, GroupStagingScripts } from "../scripts.ts";
 import { backfillTenantClaims, readTenantClaimedGroups } from "../tenantClaims.ts";
 
 const SUITE = "{test/gqclaims/";
@@ -120,6 +120,37 @@ describe("tenant claims index", () => {
 
       expect(await q.claimed()).toEqual([]);
       expect(await redis.smembers(q.indexKey("tenant-a"))).toEqual([]);
+    });
+  });
+
+  describe("given a claimed group whose worker keeps heartbeating", () => {
+    /** @scenario "A heartbeat keeps the tenant's claim list alive" */
+    it("pushes the claim list's expiry back to the key lifetime", async () => {
+      const q = freshQueue();
+      const claim = await q.claim();
+      await redis.pexpire(q.indexKey("tenant-a"), 1_000);
+
+      const refreshed = await q.scripts.refreshActiveKey({
+        groupId: GROUP,
+        stagedJobId: claim.stagedJobId,
+        claimToken: claim.claimToken,
+        activeTtlSec: 60,
+      });
+
+      expect(refreshed).toBe(true);
+      expect(await redis.pttl(q.indexKey("tenant-a"))).toBeGreaterThan(GROUP_KEY_TTL_MS - 60_000);
+    });
+  });
+
+  describe("given a claimed group whose worker died", () => {
+    /** @scenario "A dead worker's surviving claim stays listed" */
+    it("keeps the group listed while its claimed record remains", async () => {
+      const q = freshQueue();
+      await q.claim();
+      await redis.del(`${q.keyPrefix}group:${GROUP}:active`);
+
+      expect(await redis.exists(`${q.keyPrefix}group:${GROUP}:claimed`)).toBe(1);
+      expect(await q.claimed()).toEqual([GROUP]);
     });
   });
 

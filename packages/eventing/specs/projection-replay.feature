@@ -144,6 +144,13 @@ Feature: Projection replay
     And it waits until the group is no longer listed
     And it sends no SCAN to Redis (ADR-092)
 
+  @integration
+  Scenario: A replay drain on real Redis waits for a group the queue claimed
+    Given the event-sourcing queue has claimed a state projection's group for a tenant on a real Redis
+    When a replay batch for that tenant waits for admitted work
+    Then it keeps waiting while the group is claimed
+    And it finishes once the queue completes the group
+
   @unit
   Scenario: A replay drain refuses an index that is not ready
     Given the queue's claimed-groups index is not ready, because older workers still serve or the backfill has not finished

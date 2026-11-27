@@ -51,18 +51,21 @@ calls and 88 s, longer than the 60 s drain timeout.
    the step, so readiness turns off with it. Readiness is a port supplied by the composition, like
    `EventLogIndexReadiness`: ops builds it from the ledger for operator replays. Deploy-time replays
    are ready by construction, since `defineProjectionReplayStep` now always declares
-   `needsOldWritersGone` and runs after the backfill step. When it is not ready, the drain fails the batch with a named error, and
+   `needsOldWritersGone` and runs after the backfill step; a guard test keeps that step the only
+   caller of the deploy-time `replayLane`. When it is not ready, the drain fails the batch with a named error, and
    the batch retries on the replay's next run. Rejected: a Redis "ready" marker, which survives a
    rollback. Rejected: falling back to SCAN, which brings this incident back whenever readiness is
    off or not wired.
 6. **Backfill once, budgeted.** `ops:fill-queue-tenant-claims` is a background step with
    `needsOldWritersGone: true`. It walks the keyspace once for `group:*:active` and `group:*:claimed`
-   through a paced, resumable SCAN, then adds each group to its tenant's set. It is the only
+   in slices of 200 SCAN calls, checkpointing the cursor between slices so a restart resumes, then
+   adds each group to its tenant's set. It is the only
    keyspace walk this decision allows. Deploy-time projection replay steps declare it in `after`.
 7. **No keyspace walks on live paths.** The lint rule `no-redis-keyspace-scan` refuses every walk
    spelling outside an allowlist of budgeted, operator-paced sweeps, each with its reason: `scan`
    and `scanBuffer` (with options, from cursor `"0"`, or on a Redis-named client), the stream and
-   iterator forms, `keys`, and `SCAN`/`KEYS` inside a Lua source string (see Gates).
+   iterator forms, `keys`, a raw `call("SCAN"|"KEYS")`, and `SCAN`/`KEYS` inside a Lua source string
+   (see Gates).
 
 ## Constants
 
@@ -96,7 +99,7 @@ calls and 88 s, longer than the 60 s drain timeout.
 | -------------------------- | ------------------------- | ------------------------- | --------------------------------------------------------------------------------------- |
 | Claim script adds one SADD | yes (revert)              | large: every job          | integration tests on real Redis plus a before/after bench of claim cost                 |
 | Drain reads the index      | yes                       | large: replay correctness | the integration test that today's check and the index agree, plus fail-closed unit test |
-| Backfill step              | yes (idempotent set adds) | small                     | `needsOldWritersGone`, paced SCAN, rerunnable                                           |
+| Backfill step              | yes (idempotent set adds) | small                     | `needsOldWritersGone`, sliced and checkpointed SCAN, rerunnable                         |
 | Lint rule at error         | yes                       | small                     | the rule's fixture tests and a clean tree                                               |
 
 ## Rejected alternatives
@@ -111,6 +114,8 @@ calls and 88 s, longer than the 60 s drain timeout.
 - Positive: the drain check costs a handful of calls. About half of production Redis CPU comes back.
   Batches stop timing out on large databases.
 - Negative: one more set write per claim. During an upgrade, replays wait until the backfill is done.
+- Negative, accepted: if an older image comes back while a replay step runs, its claims go unlisted
+  and that run's drain may stop waiting early. The rollback reopens the step, which runs again.
 - Neutral, pre-existing: a new rebuild job can still start after the check, because its lane is never
   paused. It is tracked separately.
 
@@ -125,3 +130,6 @@ calls and 88 s, longer than the 60 s drain timeout.
   lost to rollback (round-3 judge). Captain: Sergio Esteban.
 - v2, 2026-11-26: the lint rule widened to bare-cursor scans, `keys` and Lua `SCAN`/`KEYS` after the
   verifier found those spellings slipped through v1's MATCH/COUNT check. Captain: Sergio Esteban.
+- v3, 2026-11-27: review round. The deploy-time replayer's trust is pinned by a sole-caller guard
+  test; the lint rule also catches raw `call("SCAN")` and spaced Lua calls; the backfill is called
+  sliced, not paced; the older-image rollback risk is recorded. Captain: Sergio Esteban.

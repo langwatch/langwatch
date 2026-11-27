@@ -72,6 +72,8 @@ describe("given a Redis client used on a live path", () => {
           "redis.scanBufferStream({ match: 'gq:*' });",
           "for await (const key of client.scanIterator({ MATCH: 'gq:*' })) {}",
           'store.keys("gq:*");',
+          'redis.call("SCAN", cursor, "MATCH", pattern);',
+          "conn.scan(cursor);",
         ].join("\n"),
       );
 
@@ -81,6 +83,8 @@ describe("given a Redis client used on a live path", () => {
         [3, "scanBufferStream"],
         [4, "scanIterator"],
         [5, "keys"],
+        [6, "call"],
+        [7, "scan"],
       ]);
     });
   });
@@ -92,12 +96,14 @@ describe("given a Redis client used on a live path", () => {
         [
           'const A = "local r = redis.call(\\"SCAN\\", ARGV[1])";',
           "const B = `for _, k in ipairs(redis.call('KEYS', ARGV[1])) do end`;",
+          "const C = `local page = redis.call ( 'scan', ARGV[1])`;",
         ].join("\n"),
       );
 
       expect(found.map((finding) => [finding.line, finding.data.command])).toEqual([
         [1, "SCAN"],
         [2, "KEYS"],
+        [3, "SCAN"],
       ]);
     });
   });
