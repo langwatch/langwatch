@@ -42,6 +42,7 @@ const connection = databaseUrl
 /** The key the task's lock hashes; the task keeps it private, so the probe names it too. */
 const LOCK_KEY_PROBE =
   "SELECT pg_try_advisory_xact_lock(hashtextextended('lwql:self-provision', 0)) AS acquired";
+const LOCK_KEY_WAIT = "SELECT pg_advisory_xact_lock(hashtextextended('lwql:self-provision', 0))";
 const STATEMENT_PAUSE_MS = 10;
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
@@ -180,7 +181,18 @@ describe.skipIf(!databaseUrl)("LangWatchQL self-provision lock", () => {
       release();
       await Promise.all(holders);
 
-      expect(await tryKey()).toBe(true);
+      // Other suites on the shared database take the same key, so wait for it; a lock that
+      // outlived the holder's transaction would stay on its pooled connection and time out.
+      const acquireKey = () =>
+        client().$transaction(
+          async (tx) => {
+            await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '10s'");
+            await tx.$executeRawUnsafe(LOCK_KEY_WAIT);
+            return true;
+          },
+          { timeout: 15_000 },
+        );
+      await expect(acquireKey()).resolves.toBe(true);
     });
   });
 });
