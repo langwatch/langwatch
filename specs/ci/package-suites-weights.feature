@@ -42,6 +42,15 @@ Feature: The package-suites weights are refreshed by a command
       When the weights are computed
       Then it keeps the committed weight rather than the replay's seconds
 
+    # Main replays most unit suites from the cache, so a package whose browser
+    # lane ran but whose unit lane only replayed read as a few seconds.
+    @unit
+    Scenario: A package partly replayed from the cache never weighs less than its committed weight
+      Given a package one of whose scripts every sampled run replayed from the cache
+      And the committed weights file names it at more than the measured sum
+      When the weights are computed
+      Then it keeps the committed weight
+
     @unit
     Scenario: A package's weight is the median of its runs, summed over its scripts
       Given a package whose unit and integration scripts were measured in three runs

@@ -65,6 +65,19 @@ func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
 	assert.InDelta(t, 45.0, weights["@x/ran"], 0.001)
 }
 
+// @scenario "A package partly replayed from the cache never weighs less than its committed weight"
+func TestWeighKeepsTheCommittedWeightWhenAScriptOnlyReplayed(t *testing.T) {
+	previous := ParseWeights("@x/browser  176\n@x/process  371\n")
+
+	weights := Weigh([][]Measurement{
+		{m("@x/browser", "test", 4, true), m("@x/browser", "test:browser", 18, false)},
+		{m("@x/process", "test", 4, true), m("@x/process", "test:integration", 800, false)},
+	}, previous)
+
+	assert.InDelta(t, 176.0, weights["@x/browser"], 0.001)
+	assert.InDelta(t, 804.0, weights["@x/process"], 0.001)
+}
+
 // @scenario "A package's weight is the median of its runs, summed over its scripts"
 func TestWeighSumsTheMedianOfEachScript(t *testing.T) {
 	weights := Weigh([][]Measurement{
