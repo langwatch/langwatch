@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, matchesGlob } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { typecheckTarget } from "../typecheck-plugin.mjs";
 import { createNodes } from "../workspace-plugin.mjs";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -11,43 +13,81 @@ const [[, { projects }]] = create(["nx.json"], {}, { workspaceRoot });
 const { targets } = projects["dev/nx"];
 
 void describe("workspace targets", () => {
-  /** @scenario "The root typecheck and the lint runs replay from the cache" */
-  void it("caches the root typecheck and the lint runs", () => {
-    assert.equal(targets.typecheck.cache, true);
+  /** @scenario "The source typecheck and the plain lint replay from the cache" */
+  void it("caches the source typecheck and the plain lint", () => {
     assert.equal(targets["typecheck:src"].cache, true);
     assert.equal(targets["lint:tree"].cache, true);
+    assert.equal(targets.typecheck, undefined);
+    assert.equal(targets["lint:tree:types"], undefined);
   });
 
-  /** @scenario "The root typecheck and the lint runs replay from the cache" */
+  /** @scenario "The source typecheck and the plain lint replay from the cache" */
   void it("hashes the sources of what tsc reads and of the files its dependencies generate", () => {
-    const { inputs, dependsOn } = targets.typecheck;
+    const { inputs, dependsOn } = targets["typecheck:src"];
     assert.ok(inputs.includes("{workspaceRoot}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}"));
     assert.ok(inputs.includes("{workspaceRoot}/**/*.prisma"));
-    assert.ok(inputs.includes("{workspaceRoot}/sdks/typescript/copy-types.sh"));
     assert.ok(inputs.every((input) => input.dependentTasksOutputFiles === undefined));
     assert.ok(dependsOn.includes("@langwatch/prisma-client:prisma:generate"));
   });
+});
 
-  /** @scenario "The root typecheck and the lint runs replay from the cache" */
-  void it("declares the declarations typecheck writes as globs, never a dist directory", () => {
-    const { outputs } = targets.typecheck;
-    assert.ok(outputs.includes("{workspaceRoot}/packages/time/dist/**/*.d.ts"));
-    assert.ok(outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.tsbuildinfo"));
-    assert.ok(!outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.d.ts"));
-    assert.ok(outputs.includes("{workspaceRoot}/packages/mail/dist/typecheck/**/*.d.ts"));
-    assert.ok(outputs.every((output) => !output.endsWith("/dist")));
+void describe("per-project typecheck", () => {
+  const time = typecheckTarget(workspaceRoot, "packages/time");
+
+  /** @scenario "A project's typecheck replays unless its own files or its dependencies' declarations changed" */
+  void it("runs after its dependencies' typecheck and hashes the declarations they emit", () => {
+    assert.equal(time.cache, true);
+    assert.ok(time.dependsOn.includes("^typecheck"));
+    assert.ok(time.inputs.includes("default"));
+    assert.ok(!time.inputs.includes("^production"));
+    const emitted = time.inputs.find((input) => input.dependentTasksOutputFiles !== undefined);
+    assert.equal(emitted.transitive, true);
   });
 
-  /** @scenario "Type-aware lint reads declarations typecheck built from hashed sources" */
-  void it("runs the type-aware lint after typecheck and the plain lint without it", () => {
-    assert.ok(targets["lint:tree:types"].dependsOn.includes("typecheck"));
-    assert.ok(!targets["lint:tree"].dependsOn.includes("typecheck"));
-    assert.equal(targets["lint:tree:types"].cache, true);
+  /** @scenario "A change that keeps a package's declarations replays its dependants" */
+  void it("hashes what its dependencies emit, not their sources", () => {
+    assert.ok(time.inputs.every((input) => typeof input !== "string" || !input.startsWith("^")));
+    const { dependentTasksOutputFiles: glob } = time.inputs.find(
+      (input) => input.dependentTasksOutputFiles !== undefined,
+    );
+    assert.ok(matchesGlob("packages/time/dist/index.d.ts", glob));
+    assert.ok(!matchesGlob("sdks/typescript/dist/index.js", glob));
+    assert.ok(!matchesGlob("packages/time/dist/tsconfig.build.tsbuildinfo", glob));
+  });
+
+  /** @scenario "A project's typecheck replays unless its own files or its dependencies' declarations changed" */
+  void it("declares the declarations it writes as globs, never a dist directory", () => {
+    assert.ok(time.outputs.includes("{workspaceRoot}/packages/time/dist/**/*.d.ts"));
+    assert.ok(time.outputs.every((output) => !output.endsWith("/dist")));
+    const ksuid = typecheckTarget(workspaceRoot, "packages/ksuid");
+    assert.ok(ksuid.outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.tsbuildinfo"));
+    assert.ok(!ksuid.outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.d.ts"));
+    const mail = typecheckTarget(workspaceRoot, "packages/mail");
+    assert.ok(mail.outputs.includes("{workspaceRoot}/packages/mail/dist/typecheck/**/*.d.ts"));
+  });
+
+  /** @scenario "Generated sources and built declarations exist before a project's typecheck" */
+  void it("runs the project's own generators and, when its published types are built, its build", () => {
+    const prisma = typecheckTarget(workspaceRoot, "packages/prisma-client");
+    assert.ok(prisma.dependsOn.includes("prisma:generate"));
+    assert.ok(typecheckTarget(workspaceRoot, "sdks/typescript").dependsOn.includes("build"));
+    assert.ok(!time.dependsOn.includes("build"));
   });
 
   /** @scenario "Build info written outside dist is a typecheck output" */
   void it("declares build info a config writes outside its dist", () => {
-    const { outputs } = targets.typecheck;
+    const { outputs } = typecheckTarget(workspaceRoot, "apps/docs");
     assert.ok(outputs.includes("{workspaceRoot}/apps/docs/.tsbuild/tsconfig.tsbuildinfo"));
+  });
+});
+
+void describe("type-aware lint", () => {
+  const nx = JSON.parse(readFileSync(join(workspaceRoot, "nx.json"), "utf8"));
+
+  /** @scenario "Type-aware lint runs per project after that project's typecheck" */
+  void it("runs each project's lint:types after its typecheck, and the plain lint without it", () => {
+    assert.deepEqual(nx.targetDefaults["lint:types"].dependsOn, ["typecheck"]);
+    assert.equal(nx.targetDefaults["lint:types"].cache, true);
+    assert.ok(!targets["lint:tree"].dependsOn.some((task) => task.endsWith("typecheck")));
   });
 });

@@ -490,3 +490,37 @@ hashes with the whole tree. A type-aware scope past half
 the projects widens to all of them: it costs about the same, and the full scope is
 the one main runs, so main replays a pull request's result on the same tree.
 `pnpm lint:changed` stays direct: it lints the working tree of a laptop.
+
+## Amendment, 2026-11-27: typecheck and type-aware lint per project
+
+The root targets of the amendment above hashed the whole tree, so every code push missed both and
+CI's `checks` job paid the full run (about 1.5 min typecheck, 4 to 6 min type-aware
+lint). Both are per project again, ordered by the graph and cached.
+
+`typecheck` is each package's own `typecheck` script (`tsc -b` over its container
+tsconfig.json). `dev/nx/typecheck-plugin.mjs` adds what Nx needs to the script target
+without replacing it: `cache`, `dependsOn: ["^typecheck"]` plus the project's own
+generators (`prisma:generate`, the langy and evaluator generators) and, for a package
+whose `types` its build writes (the SDK, ksuid, mail, the MCP server, webhook-verify),
+its `build`. Inputs are the project's own files (`default` minus Markdown), `npmDeps`,
+`typescript`, and the `.ts`/`.json` files every task it depends on emitted
+(`dependentTasksOutputFiles`, transitive): its dependencies' declarations and generated
+sources, never their sources. A dependency's body change that keeps its `.d.ts` leaves
+every dependant's hash unchanged. Outputs are the declaration globs of the 2026-09-30
+amendment per project, plus build info outside dist (apps/docs `.tsbuild`).
+
+The 2026-10-10 removal measured 16 to 35 s per package on TypeScript 5. On TypeScript 7
+a package checks in 0.1 to 2.5 s cold, so the per-project run on a full miss costs
+about what the root `tsc -b` did, and Nx runs four at a time. `tsc -b` in a package
+still walks its references, but `^typecheck` has built them, so the walk only reads
+their build info. `pnpm typecheck` is `nx run-many -t typecheck`; `pnpm typecheck:src`
+stays the root build without test programs, cached on the tree.
+
+`lint:types` depends on its project's `typecheck` and hashes the same dependency
+declarations beside `default`, `^production` and `lintGlobals` (the plugin rules read
+dependency sources and the globals). Its command is `dev/nx/lint.mjs --resolved --types
+{projectRoot}`, so the native, plugin and type-aware processes share one unused-directive
+check as in the tree run. `pnpm lint:types` runs every project's target; `--base` no
+longer narrows it, the cache does. Plain `pnpm lint` stays the tree target: one project
+at a time it took 280 s against 36 s for the tree (2026-10-05 table), and a miss of the
+tree run costs about 25 s.

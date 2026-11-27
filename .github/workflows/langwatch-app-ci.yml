@@ -415,10 +415,10 @@ jobs:
   # parity, OpenAPI clients, typecheck and the CI self-test. Each check is its
   # own step and every step runs even when an earlier one failed, so one run
   # reports every failure. They run in sequence, not in parallel: the
-  # type-aware lint reads the packages' dist declarations, so its Nx target runs
-  # workspace:typecheck (tsc -b) first, after the dist snapshot is restored; the
-  # typecheck step then replays that run. The CI self-test runs last: it stages
-  # a failing test in apps/api.
+  # type-aware lint reads the packages' dist declarations, so typecheck runs
+  # first, after the dist snapshot is restored, and each project's lint:types
+  # replays the typecheck tasks it depends on. The CI self-test runs last: it
+  # stages a failing test in apps/api.
   checks:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' || needs.changes.outputs.feature-parity == 'true'
@@ -759,15 +759,23 @@ jobs:
           mkdir -p "$(dirname "$manifest")"
           cp "$current" "$manifest"
 
-      # Type-aware rules over the affected projects in one process (shared parse;
-      # ADR-150), beside the native and plugin processes its directive check needs.
-      # Its Nx target depends on workspace:typecheck, so the declarations it reads are
-      # built from the hashed sources first (or replayed); the typecheck step replays it.
-      - name: Oxlint type-aware, affected projects (blocking)
+      # One cached `typecheck` task per project (`tsc -b` in the package), after its
+      # dependencies' typecheck: a project whose own files and dependencies' declarations
+      # are unchanged replays from the Nx cache. Nx keeps running every task that does not
+      # depend on a failed one (tsc -b skips those too), and the job still fails.
+      - name: Run typecheck (every workspace package)
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        env:
-          BASE: ${{ steps.lint-scope.outputs.base }}
-        run: pnpm lint:types ${BASE:+--base "$BASE"}
+        id: typecheck
+        run: pnpm run typecheck
+
+      # Type-aware rules, one cached `lint:types` task per TypeScript project, each after
+      # that project's typecheck (the step above), so the declarations it reads were built
+      # from hashed sources or replayed. The cache narrows the run: an unchanged project
+      # and its unchanged dependencies replay. Native, plugin and type-aware processes per
+      # project share one unused-directive check (ADR-150).
+      - name: Oxlint type-aware, every project (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: pnpm lint:types
 
       # The SDK clients and the docs site copy against the OpenAPI document the
       # routes generate: regenerate them with `make sync-all-openapi` and fail
@@ -816,14 +824,6 @@ jobs:
             echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
             exit 1
           fi
-
-      # Not --no-bail: one package's failure should not hide the rest, and a
-      # migration in flight tends to break several at once. The job still fails.
-      # One pass: the step above leaves no stale declaration to re-check against.
-      - name: Run typecheck (every workspace package)
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        id: typecheck
-        run: pnpm run typecheck
 
       # Saved even when the typecheck fails, so one red commit on main does not
       # leave every later run cold. Safe: tsbuildinfo keeps the errors, and a

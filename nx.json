@@ -82,6 +82,7 @@
     "./dev/nx/npm-deps-plugin.mjs",
     "./dev/nx/helm-plugin.mjs",
     "./dev/nx/workspace-plugin.mjs",
+    "./dev/nx/typecheck-plugin.mjs",
     "./dev/nx/test-reads-plugin.mjs",
     "./dev/nx/haven-plugin.mjs",
     "./dev/nx/remote-cache-plugin.mjs"
@@ -297,14 +298,7 @@
     ],
     "lint:types": {
       "cache": true,
-      "dependsOn": [
-        "^build",
-        "^prisma:generate",
-        {
-          "projects": ["workspace"],
-          "target": "build:types"
-        }
-      ],
+      "dependsOn": ["typecheck"],
       "inputs": [
         "default",
         "^production",
@@ -312,6 +306,13 @@
         "npmDeps",
         {
           "externalDependencies": ["oxlint", "oxlint-tsgolint"]
+        },
+        {
+          "dependentTasksOutputFiles": "**/*.{ts,tsx,mts,cts,json}",
+          "transitive": true
+        },
+        {
+          "runtime": "node --version"
         }
       ],
       "outputs": []

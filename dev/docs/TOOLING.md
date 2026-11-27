@@ -76,14 +76,14 @@ runner keeps an unused-directive report only when every process made it
 type-aware process, so a directive naming only a type-aware rule reads as unused
 there, as it always has.
 
-`--changed` and `--base <sha>` narrow every process to the projects
-`nx show projects --affected` names, plus the files no project owns. A
-`--types` scope that reaches more than half the projects widens to all of them.
-Every run but `--changed` resolves its scope and then runs through the cached
-`workspace:lint:tree` target with that scope as its arguments, so the same tree
-and scope replay the result (inputs: the whole tree).
-The per-project `lint` and `lint:types` targets (`dev/nx/lint-plugin.mjs`)
-stay for `nx affected -t lint:types`. `pnpm lint:changed` can miss a finding in an untouched file when
+A plain run resolves its scope (`--base <sha>`: the changed files, plus the tree
+when a lint global changed) and runs through the cached `workspace:lint:tree` target
+with that scope as its arguments, so the same tree and scope replay the result
+(inputs: the whole tree). `pnpm lint:types` runs every TypeScript project's cached
+`lint:types` target (`dev/nx/lint-plugin.mjs`), each after that project's
+`typecheck`; an unchanged project replays, so `--base` changes nothing there.
+`--changed` lints the working tree itself; with `--types` it takes the projects
+`nx show projects --affected` names, all of them past half. `pnpm lint:changed` can miss a finding in an untouched file when
 the cause is something no Nx input names, and it never runs the enforcer, so
 `pnpm lint:architecture` stays the check before push.
 
@@ -95,7 +95,7 @@ everything it depends on, and a few global configs (`sharedGlobals`,
 `~/.nx/<workspace-id>/cache`.
 
 ```
-  @langwatch/foo:typecheck
+  @langwatch/foo:test
      inputs = foo/**  +  deps' production files  +  tsconfig.shared.json ...
                 |
                 v
@@ -105,6 +105,11 @@ everything it depends on, and a few global configs (`sharedGlobals`,
                 v
            run it, store the result under 9f2f...
 ```
+
+`typecheck` hashes what its dependencies' tasks emitted instead of their sources:
+their `.d.ts` files and the files their generators write. A change inside a function
+body leaves the declarations as they were, so only that package's typecheck runs and
+its dependants replay.
 
 That only works if "everything it depends on" is true. A package that imports
 `@langwatch/bar` without declaring it would never be rebuilt when `bar` changes,
@@ -186,9 +191,11 @@ pnpm test:affected           # same for tests
 pnpm test:changed            # only the test files the change reaches by imports (ADR-186)
 pnpm lint:types:affected     # same for type-aware lint
 pnpm lint                    # whole-tree oxlint, cached on the tree (workspace:lint:tree)
+pnpm lint:types              # every project's type-aware lint, cached per project
 pnpm lint:changed            # the same for what you changed and its dependents
 pnpm lint:architecture       # whole-tree policies
-pnpm typecheck               # one root tsc -b, cached on the tree; a miss rechecks only what changed
+pnpm typecheck               # every package's typecheck, cached; reruns what a change reached
+pnpm typecheck:src           # one root tsc -b without the test programs, cached on the tree
 pnpm sync:references         # nx sync: project references, after a dependency change
 ```
 

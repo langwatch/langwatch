@@ -35,21 +35,38 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     Then oxlint is given every TypeScript project
     And a change that reaches half of them or fewer is given only those
 
-  Scenario: The root typecheck and the lint runs replay from the cache
-    Given the workspace project's typecheck and lint:tree targets
+  Scenario: A project's typecheck replays unless its own files or its dependencies' declarations changed
+    Given every TypeScript project's typecheck target
+    Then it is cached and runs after its dependencies' typecheck
+    And it hashes its own files and the declarations its dependencies' tasks emitted, never their sources
+    And it declares the declarations it writes as outputs, never a whole dist directory
+
+  Scenario: A change that keeps a package's declarations replays its dependants
+    Given a change to a function body in a package other packages depend on
+    When pnpm typecheck runs
+    Then that package's typecheck runs
+    And its dependants' typecheck replays from the cache, because the declarations they hash are unchanged
+
+  Scenario: Generated sources and built declarations exist before a project's typecheck
+    Given a project whose sources import a generated file, or whose published types its build writes
+    Then its typecheck runs that generator or that build first
+    And the files they write are part of its hash
+
+  Scenario: The source typecheck and the plain lint replay from the cache
+    Given the workspace project's typecheck:src and lint:tree targets
     Then both are cached
-    And typecheck hashes the sources of every file tsc reads, never the contents of a dist directory
-    And typecheck declares the declarations it writes as outputs, never a whole dist directory
+    And typecheck:src hashes the sources of every file tsc reads, never the contents of a dist directory
+
   Scenario: Lint runs replay through Nx except a lint of the working tree
     Given a lint run with --changed
     Then it lints the working tree's changes itself
-    And a full run or a --base run resolves its scope and lints it through the cached Nx target
+    And a full or --base plain run resolves its scope and lints it through the cached Nx target
     And the target's run lints only the paths it was given, dropping the flags and the --base value
 
-  Scenario: Type-aware lint reads declarations typecheck built from hashed sources
-    Given the type-aware lint reads the packages' dist declarations
-    When lint:types runs through Nx
-    Then workspace:typecheck runs or replays first
+  Scenario: Type-aware lint runs per project after that project's typecheck
+    Given a full or --base lint:types run
+    Then every TypeScript project's cached lint:types target runs, whatever the --base value
+    And each one runs after that project's typecheck, so the declarations it reads are built from hashed sources
     And the plain lint does not wait for typecheck
 
   Scenario: Build info written outside dist is a typecheck output

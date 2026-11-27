@@ -42,12 +42,21 @@ void describe("routeFlags", () => {
   });
 
   /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
-  void it("sends a full or --base run through Nx", () => {
+  void it("sends a full or --base plain run through the tree target", () => {
     assert.deepEqual(routeFlags([]), { route: "nx", types: false, base: undefined });
-    assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {
+    assert.deepEqual(routeFlags(["--base", "abc123"]), {
       route: "nx",
-      types: true,
+      types: false,
       base: "abc123",
+    });
+  });
+
+  /** @scenario "Type-aware lint runs per project after that project's typecheck" */
+  void it("sends a full or --base type-aware run to every project's lint:types", () => {
+    assert.deepEqual(routeFlags(["--types"]), { route: "projects", types: true });
+    assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {
+      route: "projects",
+      types: true,
     });
   });
 
