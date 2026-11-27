@@ -7,9 +7,9 @@
 import { trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
-  NodeTracerProvider,
+  TracerProvider,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-node";
+} from "@opentelemetry/sdk-trace";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ComparisonError } from "../errors";
@@ -42,12 +42,12 @@ describe("Experiment.compare", () => {
   });
 
   let exporter: InMemorySpanExporter;
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
 
   beforeEach(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
     trace.setGlobalTracerProvider(provider);
   });

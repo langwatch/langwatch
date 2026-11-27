@@ -7,10 +7,10 @@
 import { trace, context } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
-  NodeTracerProvider,
+  TracerProvider,
   SimpleSpanProcessor,
   InMemorySpanExporter,
-} from "@opentelemetry/sdk-trace-node";
+} from "@opentelemetry/sdk-trace";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { LangWatch } from "@/client-sdk";
@@ -19,8 +19,8 @@ const originalFetch = globalThis.fetch;
 
 const setupTestTracer = () => {
   const exporter = new InMemorySpanExporter();
-  const spanProcessor = new SimpleSpanProcessor(exporter);
-  const provider = new NodeTracerProvider({
+  const spanProcessor = new SimpleSpanProcessor({ exporter });
+  const provider = new TracerProvider({
     spanProcessors: [spanProcessor],
   });
   // Register context manager for async context propagation (parent-child spans)
@@ -50,7 +50,7 @@ const mockFetch = () => {
 };
 
 describe("Experiment origin and span parenting", () => {
-  let tracerProvider: NodeTracerProvider | null = null;
+  let tracerProvider: TracerProvider | null = null;
   let exporter: InMemorySpanExporter;
   let langwatch: LangWatch;
 

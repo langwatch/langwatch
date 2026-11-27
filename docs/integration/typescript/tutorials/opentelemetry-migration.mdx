@@ -27,6 +27,13 @@ The LangWatch observability SDK is built on OpenTelemetry and passes through all
 </Info>
 
 <Note>
+  langwatch 3.x needs OpenTelemetry JS 3.x (`@opentelemetry/api` 1.10, `@opentelemetry/sdk-trace`
+  3.x). If your app is still on OpenTelemetry JS 2.x, stay on langwatch 2.x.
+
+  On an older `@opentelemetry/api`, a CommonJS app gets an error naming that range, but an ESM app fails at import with `SyntaxError: The requested module '@opentelemetry/api' does not provide an export named 'SeverityNumber'` (or `'createNoopLogger'`): Node links every module before any LangWatch code runs. Both mean the same fix: install `@opentelemetry/api@~1.10.0`.
+</Note>
+
+<Note>
   For consistent attribute naming and semantic conventions, see our [Semantic
   Conventions](/integration/typescript/tutorials/semantic-conventions) guide which covers both
   OpenTelemetry standards and LangWatch's custom attributes.
@@ -38,7 +45,7 @@ LangWatch supports all OpenTelemetry NodeSDK configuration options:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
-import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
+import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { envDetector, processDetector, hostDetector } from "@opentelemetry/resources";
@@ -87,13 +94,13 @@ const handle = setupObservability({
 <Step title="Before: Direct NodeSDK Usage">
   ```typescript
   import { NodeSDK } from "@opentelemetry/sdk-node";
-  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
+  import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
   const sdk = new NodeSDK({
     serviceName: "my-service",
     spanProcessors: [
-      new BatchSpanProcessor(new JaegerExporter())
+      new BatchSpanProcessor({ exporter: new OTLPTraceExporter() })
     ],
     instrumentations: [new HttpInstrumentation()],
     sampler: new TraceIdRatioBasedSampler(0.1),
@@ -107,8 +114,8 @@ const handle = setupObservability({
 <Step title="After: Using LangWatch with Same Configuration">
   ```typescript
   import { setupObservability } from "langwatch/observability/node";
-  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
+  import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 
   const handle = setupObservability({
     langwatch: {
@@ -116,7 +123,7 @@ const handle = setupObservability({
     },
     serviceName: "my-service",
     spanProcessors: [
-      new BatchSpanProcessor(new JaegerExporter())
+      new BatchSpanProcessor({ exporter: new OTLPTraceExporter() })
     ],
     instrumentations: [new HttpInstrumentation()],
     sampler: new TraceIdRatioBasedSampler(0.1),
@@ -140,7 +147,7 @@ Implement sophisticated sampling strategies for different use cases:
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
 
-import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
+import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace";
 
 // Sample based on trace ID ratio
 const ratioSampler = new TraceIdRatioBasedSampler(0.1); // 10% sampling
@@ -338,17 +345,15 @@ const handle = setupObservability({
 
   // Batch processing configuration
   spanProcessors: [
-    new BatchSpanProcessor(
-      new LangWatchExporter({
+    new BatchSpanProcessor({
+      exporter: new LangWatchExporter({
         apiKey: process.env.LANGWATCH_API_KEY,
       }),
-      {
-        maxQueueSize: 4096,
-        maxExportBatchSize: 1024,
-        scheduledDelayMillis: 1000,
-        exportTimeoutMillis: 30000,
-      },
-    ),
+      maxQueueSize: 4096,
+      maxExportBatchSize: 1024,
+      scheduledDelayMillis: 1000,
+      exportTimeoutMillis: 30000,
+    }),
   ],
 });
 ```

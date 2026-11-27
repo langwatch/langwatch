@@ -3,8 +3,11 @@
  *
  * See ADR-058 and specs/ui/browser-errors.feature.
  */
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { describe, expect, it } from "vitest";
 
 import { UrlScrubSpanProcessor } from "./urlScrubSpanProcessor.ts";
@@ -17,8 +20,8 @@ function exportedSpan({
   attributes: Record<string, string>;
 }) {
   const exporter = new InMemorySpanExporter();
-  const provider = new WebTracerProvider({
-    spanProcessors: [new UrlScrubSpanProcessor(), new SimpleSpanProcessor(exporter)],
+  const provider = new TracerProvider({
+    spanProcessors: [new UrlScrubSpanProcessor(), new SimpleSpanProcessor({ exporter })],
   });
   const span = provider.getTracer("test").startSpan(name);
   span.setAttributes(attributes);

@@ -2,13 +2,18 @@
  * @vitest-environment node
  * Runtime-boundary proofs for the event-subscriber seam (ADR-049 §3). These
  */
+
+import {
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
 import { context, SpanKind, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
@@ -73,21 +78,20 @@ const aggregateType = createTestAggregateType();
 const tenantId = createTestTenantId();
 const context_ = createTestEventStoreReadContext(tenantId);
 
-let provider: NodeTracerProvider;
+let provider: TracerProvider;
 let exporter: InMemorySpanExporter;
+let tracing: InstalledTestTracing;
 
 beforeAll(() => {
   exporter = new InMemorySpanExporter();
-  provider = new NodeTracerProvider({
-    spanProcessors: [new SimpleSpanProcessor(exporter)],
+  provider = new TracerProvider({
+    spanProcessors: [new SimpleSpanProcessor({ exporter })],
   });
-  provider.register();
+  tracing = installTestTracing({ provider });
 });
 
 afterAll(async () => {
-  await provider.shutdown();
-  trace.disable();
-  context.disable();
+  await tracing.uninstall();
 });
 
 afterEach(() => {

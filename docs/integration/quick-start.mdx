@@ -73,7 +73,7 @@ uv add langwatch
 ```
 
 ```bash JavaScript
-npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+npm install langwatch
 ```
 ```bash Go
 go get github.com/langwatch/langwatch/sdks/go
@@ -111,18 +111,16 @@ const nextConfig = {
 
 module.exports = nextConfig;
 
-// ./src/instrumentation.ts - Configure LangWatch export
-import { registerOTel } from "@vercel/otel";
-import { LangWatchExporter } from "langwatch";
+// ./src/instrumentation.node.ts - Configure LangWatch export (reads LANGWATCH_API_KEY)
+import { setupObservability } from "langwatch/observability/node";
 
-export function register() {
-  registerOTel({
-    serviceName: "your-app-name", // Give your service a clear name
-    traceExporter: new LangWatchExporter({
-      apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
-      projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
-    }),
-  });
+setupObservability({ serviceName: "your-app-name" }); // Give your service a clear name
+
+// ./src/instrumentation.ts - Load it on the Node.js runtime only
+export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./instrumentation.node");
+  }
 }
 
 // ./src/index.ts - Enable telemetry where needed

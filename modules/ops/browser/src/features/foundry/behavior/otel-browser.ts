@@ -1,7 +1,6 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import { BatchSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import * as attributes from "langwatch/observability/semconv";
 
@@ -56,7 +55,7 @@ export function createFoundryProvider({
     timeoutMillis: 60_000,
   });
 
-  const provider = new WebTracerProvider({
+  const provider = new TracerProvider({
     resource,
     // Match Foundry's interactive defaults — that flow drives traces
     // reliably one-per-provider, so we want the same processor sizing
@@ -64,10 +63,7 @@ export function createFoundryProvider({
     // cap; the foundry can produce a couple of hundred spans per
     // trace at most, so 256 is plenty without ever splitting.
     spanProcessors: [
-      new BatchSpanProcessor(exporter, {
-        maxQueueSize: 8192,
-        exportTimeoutMillis: 30_000,
-      }),
+      new BatchSpanProcessor({ exporter, maxQueueSize: 8192, exportTimeoutMillis: 30_000 }),
     ],
   });
 

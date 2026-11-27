@@ -4,14 +4,14 @@
  * Best-effort throughout: telemetry that breaks the page it measures leaves it untraced.
  */
 
+import { context, propagation, trace } from "@opentelemetry/api";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { DocumentLoadInstrumentation } from "@opentelemetry/instrumentation-document-load";
 import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import { BatchSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from "@opentelemetry/semantic-conventions/incubating";
 
@@ -55,7 +55,7 @@ export function startBrowserTracing({
   started = true;
 
   try {
-    const provider = new WebTracerProvider({
+    const provider = new TracerProvider({
       sampler: createBrowserSampler({ ratio: sampleRatio }),
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: RUM_SERVICE_NAME,
@@ -66,22 +66,21 @@ export function startBrowserTracing({
         new SessionSpanProcessor(),
         // Ahead of the exporter, so no query string is in what it reads.
         new UrlScrubSpanProcessor(),
-        new BatchSpanProcessor(
-          new OTLPTraceExporter({
+        new BatchSpanProcessor({
+          exporter: new OTLPTraceExporter({
             url: RUM_TRACES_PATH,
             headers: sessionHeader(),
           }),
-        ),
+        }),
       ],
     });
 
-    provider.register({
-      // A navigation parents the fetches it triggers; the stock stack manager
-      // cannot follow the async gap between the two. See
-      // `navigationContextManager.ts`.
-      contextManager: new NavigationContextManager().enable(),
-      propagator: new W3CTraceContextPropagator(),
-    });
+    trace.setGlobalTracerProvider(provider);
+    // A navigation parents the fetches it triggers; the stock stack manager
+    // cannot follow the async gap between the two. See
+    // `navigationContextManager.ts`.
+    context.setGlobalContextManager(new NavigationContextManager().enable());
+    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
     registerInstrumentations({
       instrumentations: [

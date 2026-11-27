@@ -6,10 +6,10 @@
 
 import { trace } from "@opentelemetry/api";
 import {
-  NodeTracerProvider,
+  TracerProvider,
   SimpleSpanProcessor,
   InMemorySpanExporter,
-} from "@opentelemetry/sdk-trace-node";
+} from "@opentelemetry/sdk-trace";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { LangWatch } from "@/client-sdk";
@@ -22,8 +22,8 @@ const originalFetch = globalThis.fetch;
  */
 const setupTestTracer = () => {
   const exporter = new InMemorySpanExporter();
-  const spanProcessor = new SimpleSpanProcessor(exporter);
-  const provider = new NodeTracerProvider({
+  const spanProcessor = new SimpleSpanProcessor({ exporter });
+  const provider = new TracerProvider({
     spanProcessors: [spanProcessor],
   });
   trace.setGlobalTracerProvider(provider);
@@ -31,7 +31,7 @@ const setupTestTracer = () => {
 };
 
 describe("Target Trace Isolation", () => {
-  let tracerProvider: NodeTracerProvider | null = null;
+  let tracerProvider: TracerProvider | null = null;
 
   beforeEach(() => {
     vi.resetAllMocks();

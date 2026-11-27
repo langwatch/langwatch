@@ -13,7 +13,7 @@ import { manifestDependencies } from "../boundaries/manifests.ts";
 /**
  * Browser-only packages. Used by both backend boundary guard and frontend portability check,
  * so changes propagate together. OpenTelemetry entries are deliberately narrow (only the
- * three browser-specific: `WebTracerProvider`, DOM/`window.fetch` instrumentation).
+ * DOM and `window.fetch` instrumentation; `@opentelemetry/sdk-trace` runs in both).
  */
 export const BROWSER_ONLY_PACKAGES = [
   "react",
@@ -27,7 +27,6 @@ export const BROWSER_ONLY_PACKAGES = [
   "@ark-ui",
   "@emotion",
   "@zag-js",
-  "@opentelemetry/sdk-trace-web",
   "@opentelemetry/instrumentation-document-load",
   "@opentelemetry/instrumentation-fetch",
 ] as const;

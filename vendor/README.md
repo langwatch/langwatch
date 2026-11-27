@@ -3,8 +3,12 @@
 Holds a dependency as a tarball only when the workspace needs a build that is
 not on npm yet.
 
-No package is vendored at the moment: `@langwatch/scenario` comes from npm,
-pinned in the `pnpm-workspace.yaml` catalog and its two `overrides` lines.
+Vendored now: `langwatch-scenario-1.8.2-dev.otel3.tgz`
+(sha256 `f4c19138904e588db45b2d3715b222ce23a510dec3e674c31039ea9a877647f9`),
+scenario 1.8.1 moved to OpenTelemetry JS 3.x (langwatch/scenario#1059 at
+`ea55a83e`). Published 1.8.1 still runs OpenTelemetry JS 2.x, which cannot
+share a process with this repository's SDK. Point back at npm once that PR
+ships.
 
 ## Vendoring an unreleased build
 

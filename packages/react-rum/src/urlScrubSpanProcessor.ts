@@ -3,7 +3,7 @@
 // and names share paths `/share/:id` in span names and string attributes before export.
 
 import type { Context } from "@opentelemetry/api";
-import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace";
 
 import { redactSharePaths, stripUrlQueries } from "./browserErrors.ts";
 

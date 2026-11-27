@@ -13,9 +13,16 @@ import {
   type ProcessRef,
   ProcessRuntime,
 } from "@langwatch/eventing";
-import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import {
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
+import { SpanKind, trace } from "@opentelemetry/api";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
@@ -50,23 +57,21 @@ const subscriberContext: EventSubscriberContext = {
 };
 
 describe("Langy process trace continuity", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
   let store: InMemoryProcessStore;
 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    provider.register();
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   beforeEach(() => {

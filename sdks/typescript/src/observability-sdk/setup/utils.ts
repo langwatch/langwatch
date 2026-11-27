@@ -60,22 +60,15 @@ function hasAttachableProcessorRegistry(obj: unknown): boolean {
   return listProcessorRegistryCandidates(obj).some(Array.isArray);
 }
 
-function isConcreteProviderName(name: unknown): boolean {
-  return typeof name === "string" && ["NodeTracerProvider", "BasicTracerProvider"].includes(name);
-}
-
 /**
- * Returns the concrete OpenTelemetry provider (NodeTracerProvider or BasicTracerProvider),
- * either from the given provider or its delegate, or undefined if not found.
+ * Returns the concrete OpenTelemetry SDK provider, either the given provider
+ * or its proxy delegate, or undefined. Matched by shape (a span processor
+ * registry or `addSpanProcessor`), never by class name.
  */
 export function getConcreteProvider(provider: unknown): unknown {
   if (!provider || typeof provider !== "object") return undefined;
 
   // Check provider itself
-  const constructorName = readMember(provider.constructor, "name");
-  if (isConcreteProviderName(constructorName)) {
-    return provider;
-  }
   if (typeof readMember(provider, "addSpanProcessor") === "function") {
     return provider;
   }
@@ -97,10 +90,6 @@ export function getConcreteProvider(provider: unknown): unknown {
 
   if (!delegate || typeof delegate !== "object") return void 0;
 
-  const delegateConstructorName = readMember(delegate.constructor, "name");
-  if (isConcreteProviderName(delegateConstructorName)) {
-    return delegate;
-  }
   if (typeof readMember(delegate, "addSpanProcessor") === "function") {
     return delegate;
   }

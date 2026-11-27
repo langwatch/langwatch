@@ -1,4 +1,4 @@
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import { type ReadableSpan } from "@opentelemetry/sdk-trace";
 
 export interface Criteria {
   instrumentationScopeName?: Match[];

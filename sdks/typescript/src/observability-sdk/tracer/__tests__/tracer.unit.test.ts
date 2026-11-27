@@ -52,16 +52,17 @@ describe("tracer.ts", () => {
   });
 
   describe("getLangWatchTracer()", () => {
-    it("gets tracer from global provider", () => {
+    it("gets tracer from global provider when a span starts", () => {
       // Mock the global tracer provider
       const globalGetTracerSpy = vi
         .spyOn(otelTrace, "getTracerProvider")
         .mockReturnValue(mockProvider);
 
       const globalTracer = getLangWatchTracer("global-tracer", "2.0.0");
+      globalTracer.startSpan("first-span").end();
 
       expect(globalGetTracerSpy).toHaveBeenCalled();
-      expect(mockProvider.getTracer).toHaveBeenCalledWith("global-tracer", "2.0.0");
+      expect(mockProvider.getTracer).toHaveBeenCalledWith("global-tracer", "2.0.0", undefined);
       expect(globalTracer).toBeDefined();
 
       globalGetTracerSpy.mockRestore();

@@ -148,6 +148,7 @@ describe("daemonSocketDir", () => {
       // the shared path left those directories approved, so the client kept
       // judging the daemon viable, spawning one every second miss, and every
       // one of them died at bind().
+      process.env.TMPDIR = "/tmp"; // long HOMEs fall back here; not the host's
       for (let length = 30; length <= 90; length++) {
         process.env.HOME = "/" + "h".repeat(length);
         const socketPath = path.join(daemonSocketDir(), `${"0".repeat(16)}.sock`);

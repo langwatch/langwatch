@@ -3,9 +3,17 @@
  *
  * Tests OTel W3C carrier propagation and trace continuity across dispatch.
  */
+
+import {
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OutboxDispatcherService } from "../outbox/outboxDispatcherService.ts";
@@ -22,26 +30,22 @@ import {
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
 describe("process-manager trace continuity", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
   let store: InMemoryProcessStore;
   let service: ProcessManagerService<PilotState>;
 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    // Registers the global tracer provider, the AsyncLocalStorage context
-    // manager, and the composite W3C trace-context + baggage propagator.
-    provider.register();
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   beforeEach(() => {

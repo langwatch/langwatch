@@ -1,3 +1,5 @@
+import { inspect } from "node:util";
+
 import {
   type Span,
   type SpanContext,
@@ -160,7 +162,8 @@ export class MockSpan implements Span {
   }
 
   // Helper methods for assertions
-  public getAttributeValue(key: string): AttributeValue | undefined {
+  /** api 1.10 widens AttributeValue to unknown, which already includes undefined. */
+  public getAttributeValue(key: string): AttributeValue {
     return this._attributes[key];
   }
 
@@ -376,7 +379,7 @@ export const matchers = {
         pass: hasAttribute && actualValue === expectedValue,
         message: () =>
           hasAttribute
-            ? `Expected span to have attribute "${key}" with value "${String(expectedValue)}", but got "${String(actualValue)}"`
+            ? `Expected span to have attribute "${key}" with value ${inspect(expectedValue)}, but got ${inspect(actualValue)}`
             : `Expected span to have attribute "${key}" but it was not found`,
       };
     }

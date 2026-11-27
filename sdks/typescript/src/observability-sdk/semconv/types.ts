@@ -1,7 +1,6 @@
 // Utility type to pull out all values of keys on an object, and only allow types which
 
-import { type AttributeValue } from "@opentelemetry/api";
-import { type AnyValue } from "@opentelemetry/api-logs";
+import { type AnyValue, type AttributeValue } from "@opentelemetry/api";
 
 import type * as langwatchAttributes from "./attributes";
 import type * as otelAttributes from "./otel";

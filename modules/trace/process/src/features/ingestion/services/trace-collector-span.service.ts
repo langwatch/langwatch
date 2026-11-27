@@ -6,7 +6,7 @@ import type {
   Span,
   SpanTypes,
 } from "@langwatch/trace-contract";
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
+import { ESpanKind } from "@opentelemetry/otlp-transformer";
 
 function spanTypeToESpanKind(type: SpanTypes): ESpanKind {
   switch (type) {

@@ -76,7 +76,6 @@
     "generate:server-types": "./copy-types.sh"
   },
   "dependencies": {
-    "@opentelemetry/api-logs": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/exporter-logs-otlp-proto": "catalog:",
@@ -84,8 +83,7 @@
     "@opentelemetry/otlp-exporter-base": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-logs": "catalog:",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-node": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "liquidjs": "catalog:",
     "open": "^11.0.0",
     "openapi-fetch": "^0.17.0",
@@ -103,14 +101,12 @@
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/instrumentation": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",
-    "@opentelemetry/sdk-trace-web": "catalog:",
     "@types/debug": "catalog:",
     "@types/js-yaml": "catalog:",
     "@types/node": "catalog:",
     "@types/prompts": "catalog:",
     "@types/ws": "catalog:",
     "@typescript-eslint/parser": "^8.58.1",
-    "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "catalog:",
     "chalk": "catalog:",
     "commander": "catalog:",
@@ -141,12 +137,10 @@
     "@langchain/core": ">=0.3.0 <2.0.0",
     "@langchain/langgraph": ">=0.4.0 <2.0.0",
     "@langchain/openai": ">=0.6.0 <2.0.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/context-zone": ">=1.19.0 <3.0.0",
-    "@opentelemetry/exporter-trace-otlp-grpc": ">=0.221.0 <1.0.0",
-    "@opentelemetry/instrumentation": ">=0.200.0 <1.0.0",
-    "@opentelemetry/sdk-metrics": ">=2.0.0 <3.0.0",
-    "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0",
+    "@opentelemetry/api": ">=1.10.0 <1.11.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": ">=0.301.0 <1.0.0",
+    "@opentelemetry/instrumentation": ">=0.301.0 <1.0.0",
+    "@opentelemetry/sdk-metrics": ">=3.0.0 <4.0.0",
     "langchain": ">=0.3.0 <2.0.0"
   },
   "peerDependenciesMeta": {
@@ -162,9 +156,6 @@
     "@langchain/openai": {
       "optional": true
     },
-    "@opentelemetry/context-zone": {
-      "optional": true
-    },
     "@opentelemetry/exporter-trace-otlp-grpc": {
       "optional": true
     },
@@ -172,9 +163,6 @@
       "optional": true
     },
     "@opentelemetry/sdk-metrics": {
-      "optional": true
-    },
-    "@opentelemetry/sdk-trace-web": {
       "optional": true
     },
     "langchain": {

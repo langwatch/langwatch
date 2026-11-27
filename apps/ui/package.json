@@ -118,7 +118,7 @@
     "@langwatch/scenario": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/api": "catalog:",
-    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
     "@playwright/test": "catalog:",
     "@testing-library/jest-dom": "catalog:",

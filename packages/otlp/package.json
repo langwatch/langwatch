@@ -39,7 +39,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

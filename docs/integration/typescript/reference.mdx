@@ -12,6 +12,12 @@ icon: terminal
 
 Initializes the LangWatch observability system for Node.js environments, enabling data collection and tracing for your LLM application. This is typically the first function you'll call when integrating LangWatch.
 
+<Note>
+langwatch 3.x needs OpenTelemetry JS 3.x (`@opentelemetry/api` 1.10, `@opentelemetry/sdk-trace` 3.x). If your app is still on OpenTelemetry JS 2.x, stay on langwatch 2.x.
+
+On an older `@opentelemetry/api`, a CommonJS app gets an error naming that range, but an ESM app fails at import with `SyntaxError: The requested module '@opentelemetry/api' does not provide an export named 'SeverityNumber'` (or `'createNoopLogger'`): Node links every module before any LangWatch code runs. Both mean the same fix: install `@opentelemetry/api@~1.10.0`.
+</Note>
+
 <CodeGroup>
 ```typescript Basic Setup
 import { setupObservability } from "langwatch/observability/node";
@@ -27,7 +33,6 @@ setupObservability({
 
 ```typescript Advanced Setup
 import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 setupObservability({
   langwatch: {
@@ -50,7 +55,7 @@ setupObservability({
 
 ```typescript Custom Configuration
 import { setupObservability } from "langwatch/observability/node";
-import { SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { type SpanProcessor } from "@opentelemetry/sdk-trace";
 
 const customSpanProcessor: SpanProcessor = /* your custom processor */;
 

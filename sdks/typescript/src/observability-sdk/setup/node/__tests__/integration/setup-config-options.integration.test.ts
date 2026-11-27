@@ -1,7 +1,7 @@
 import { trace } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { resetObservabilitySdkConfig } from "../../../../config.js";
@@ -400,7 +400,7 @@ describe("setupObservability Integration - Configuration Options", () => {
   it("handles invalid/conflicting options gracefully", async () => {
     const logger = createMockLogger();
     // e.g., both spanProcessors and consoleTracing
-    const processor = new SimpleSpanProcessor(new OTLPTraceExporter());
+    const processor = new SimpleSpanProcessor({ exporter: new OTLPTraceExporter() });
     const options: SetupObservabilityOptions = {
       langwatch: { apiKey: "test-api-key" },
       spanProcessors: [processor],

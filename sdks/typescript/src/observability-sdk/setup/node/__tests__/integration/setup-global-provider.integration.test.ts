@@ -1,5 +1,5 @@
 import { trace } from "@opentelemetry/api";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { TracerProvider } from "@opentelemetry/sdk-trace";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { isConcreteProvider } from "../../../utils";
@@ -11,8 +11,8 @@ function createMockLogger() {
 
 describe("setupObservability Integration - Existing Global Provider", () => {
   it("detects a real global provider and returns no-op", async () => {
-    const provider = new NodeTracerProvider();
-    provider.register();
+    const provider = new TracerProvider();
+    trace.setGlobalTracerProvider(provider);
     const logger = createMockLogger();
 
     const handle = setupObservability({
@@ -32,11 +32,11 @@ describe("setupObservability Integration - Existing Global Provider", () => {
 });
 
 describe("setupObservability Integration - attachToExistingProvider", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
 
   beforeEach(() => {
-    provider = new NodeTracerProvider();
-    provider.register();
+    provider = new TracerProvider();
+    trace.setGlobalTracerProvider(provider);
   });
 
   afterEach(async () => {
@@ -44,7 +44,7 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
     trace.disable();
   });
 
-  it("attaches LangWatch processor to real NodeTracerProvider", async () => {
+  it("attaches LangWatch processor to a real TracerProvider", async () => {
     const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
@@ -118,11 +118,11 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
 
 describe("setupObservability Integration - Dedicated TracerProvider", () => {
   it("attaches LangWatch exporter to dedicated provider without touching global", async () => {
-    const sentry = new NodeTracerProvider();
-    sentry.register();
+    const sentry = new TracerProvider();
+    trace.setGlobalTracerProvider(sentry);
     const sentryProcessorsBefore = (sentry as any)._activeSpanProcessor._spanProcessors.length;
 
-    const lwProvider = new NodeTracerProvider();
+    const lwProvider = new TracerProvider();
     const lwProcessorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
@@ -144,11 +144,11 @@ describe("setupObservability Integration - Dedicated TracerProvider", () => {
   });
 
   it("skips checkForEarlyExit when dedicated provider is passed", async () => {
-    const sentry = new NodeTracerProvider();
-    sentry.register();
+    const sentry = new TracerProvider();
+    trace.setGlobalTracerProvider(sentry);
     const logger = createMockLogger();
 
-    const lwProvider = new NodeTracerProvider();
+    const lwProvider = new TracerProvider();
     const handle = setupObservability({
       tracerProvider: lwProvider,
       langwatch: { apiKey: "test-key" },
@@ -162,7 +162,7 @@ describe("setupObservability Integration - Dedicated TracerProvider", () => {
   });
 
   it("honors advanced.disabled even when dedicated provider is passed", async () => {
-    const lwProvider = new NodeTracerProvider();
+    const lwProvider = new TracerProvider();
     const processorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 

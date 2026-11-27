@@ -2,13 +2,13 @@ import {
   context,
   diag,
   DiagConsoleLogger,
+  logs,
   metrics,
   propagation,
   trace,
   type ContextManager,
   type TextMapPropagator,
 } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
   CompositePropagator,
@@ -36,14 +36,15 @@ import {
 import { LoggerProvider, type LogRecordProcessor } from "@opentelemetry/sdk-logs";
 import type { IMetricReader, MeterProvider, ViewOptions } from "@opentelemetry/sdk-metrics";
 import {
+  TracerProvider,
   type IdGenerator,
   type Sampler,
   type SpanLimits,
   type SpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+} from "@opentelemetry/sdk-trace";
 
 import { type Logger } from "../../../logger";
+import { getSamplerFromEnv, getSpanLimitsFromEnv } from "../../otel-env";
 import { ATTR_SERVICE_NAME } from "../../semconv/otel";
 import { loadInstrumentation, loadSdkMetrics } from "./optional-peers";
 
@@ -179,7 +180,7 @@ function getLogRecordLimitsFromEnv() {
 
 /**
  * The telemetry graph this SDK registers with the OpenTelemetry API, built
- * from `@opentelemetry/sdk-trace-node` so no OTLP exporter -- and so no
+ * from `@opentelemetry/sdk-trace` so no OTLP exporter -- and so no
  * gRPC -- is loaded for a process that never asked for one.
  */
 export class NodeSdk {
@@ -187,7 +188,7 @@ export class NodeSdk {
   private readonly instrumentations: Instrumentation[];
   private readonly disabled: boolean;
 
-  private tracerProvider: NodeTracerProvider | undefined;
+  private tracerProvider: TracerProvider | undefined;
   private loggerProvider: LoggerProvider | undefined;
   private meterProvider: MeterProvider | undefined;
 
@@ -256,9 +257,10 @@ export class NodeSdk {
     // would only claim the global slot and drop everything sent to it.
     if (spanProcessors.length === 0) return;
 
-    this.tracerProvider = new NodeTracerProvider({
-      sampler: this.configuration.sampler,
-      spanLimits: this.configuration.spanLimits,
+    this.tracerProvider = new TracerProvider({
+      sampler:
+        this.configuration.sampler ?? getSamplerFromEnv({ logger: this.configuration.logger }),
+      spanLimits: getSpanLimitsFromEnv(this.configuration.spanLimits),
       resource,
       idGenerator: this.configuration.idGenerator,
       spanProcessors,

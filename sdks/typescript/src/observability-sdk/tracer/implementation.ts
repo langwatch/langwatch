@@ -4,6 +4,7 @@ import {
   type Context,
   type Exception,
   SpanStatusCode,
+  type Tracer,
   type TracerProvider,
   trace,
 } from "@opentelemetry/api";
@@ -18,7 +19,58 @@ import { type LangWatchTracer } from "./types";
  * @returns A LangWatch tracer with enhanced functionality
  */
 export function getLangWatchTracer(name: string, version?: string): LangWatchTracer {
-  return getLangWatchTracerFromProvider(trace.getTracerProvider(), name, version);
+  return getLangWatchTracerFromProvider(globalTracerProvider, name, version);
+}
+
+/**
+ * Reads the global provider on every span, not once: api 1.10 ships separate CommonJS and ESM
+ * builds, and a tracer taken from one build before the other registers a provider stays a no-op.
+ */
+const globalTracerProvider: TracerProvider = {
+  getTracer: (name, version, options) => new GlobalTracer(name, version, options),
+};
+
+class GlobalTracer implements Tracer {
+  constructor(
+    private readonly name: string,
+    private readonly version?: string,
+    private readonly options?: Parameters<TracerProvider["getTracer"]>[2],
+  ) {}
+
+  private current(): Tracer {
+    return trace.getTracerProvider().getTracer(this.name, this.version, this.options);
+  }
+
+  startSpan(name: string, options?: SpanOptions, context?: Context): Span {
+    return this.current().startSpan(name, options, context);
+  }
+
+  startActiveSpan<F extends (span: Span) => unknown>(name: string, fn: F): ReturnType<F>;
+  startActiveSpan<F extends (span: Span) => unknown>(
+    name: string,
+    options: SpanOptions,
+    fn: F,
+  ): ReturnType<F>;
+  startActiveSpan<F extends (span: Span) => unknown>(
+    name: string,
+    options: SpanOptions,
+    context: Context,
+    fn: F,
+  ): ReturnType<F>;
+  startActiveSpan<F extends (span: Span) => unknown>(
+    name: string,
+    optionsOrFn: SpanOptions | F,
+    contextOrFn?: Context | F,
+    fn?: F,
+  ): ReturnType<F> {
+    const tracer = this.current();
+    if (typeof optionsOrFn === "function") return tracer.startActiveSpan(name, optionsOrFn);
+    if (typeof contextOrFn === "function") {
+      return tracer.startActiveSpan(name, optionsOrFn, contextOrFn);
+    }
+    if (contextOrFn && fn) return tracer.startActiveSpan(name, optionsOrFn, contextOrFn, fn);
+    throw new Error("Expected a span callback as the last argument");
+  }
 }
 
 /**

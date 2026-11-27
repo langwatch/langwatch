@@ -1,7 +1,7 @@
 import { type ExportResult } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { type CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import { type ReadableSpan } from "@opentelemetry/sdk-trace";
 
 import { buildAuthHeaders } from "../../internal/api/auth";
 import {

@@ -4,15 +4,16 @@
  * these tests assert the span and value the proxy actually produces —
  * a stub can agree with a wrapper that is wrong.
  */
-import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
+import { SpanStatusCode } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { installTestTracing, type InstalledTestTracing } from "../testing.ts";
 import { traced } from "../traced.ts";
 
 class ExampleService {
@@ -87,22 +88,20 @@ class ExampleService {
 }
 
 describe("traced()", () => {
-  let provider: NodeTracerProvider;
+  let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    provider.register();
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   afterEach(() => {

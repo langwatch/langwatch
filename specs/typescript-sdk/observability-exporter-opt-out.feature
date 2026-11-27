@@ -6,7 +6,7 @@
 # That makes gRPC mandatory for every customer who installs this package for
 # Node observability, including the overwhelming majority who export over
 # HTTP and will never speak gRPC. Standing the graph up from
-# `@opentelemetry/sdk-trace-node` (three dependencies, no exporters) lets each
+# `@opentelemetry/sdk-trace` (three dependencies, no exporters) lets each
 # protocol be an optional peer: supported when wanted, absent when not.
 
 Feature: Choosing an OTLP exporter without paying for the ones you do not use

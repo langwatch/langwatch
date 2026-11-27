@@ -1,7 +1,10 @@
 /** @see modules/auth/specs/request-credential-census.feature */
-import { context, propagation, trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { trace } from "@opentelemetry/api";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import pino from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -15,6 +18,7 @@ import {
   runWithCredentialSlot,
   type CensusRequest,
 } from "../request/credentialCensus.ts";
+import { installTestTracing, type InstalledTestTracing } from "../trace/testing.ts";
 
 function inMemoryLogger() {
   const lines: Record<string, unknown>[] = [];
@@ -186,17 +190,15 @@ describe("censusClientOf()", () => {
 
 describe("noteRequestCredential()", () => {
   const exporter = new InMemorySpanExporter();
-  const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  let tracing: InstalledTestTracing;
 
   beforeAll(() => {
-    provider.register();
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   describe("when two credentials are noted for one request", () => {

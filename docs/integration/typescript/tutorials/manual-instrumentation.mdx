@@ -315,17 +315,17 @@ Configure custom exporters alongside LangWatch:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 const handle = setupObservability({
   // Use custom span processors
   spanProcessors: [
-    new BatchSpanProcessor(
-      new OTLPTraceExporter({
+    new BatchSpanProcessor({
+      exporter: new OTLPTraceExporter({
         url: "https://custom-collector.com/v1/traces",
       }),
-    ),
+    }),
   ],
 
   // Or use a single trace exporter
@@ -365,25 +365,25 @@ const handle = setupObservability({
 Configure multiple exporters for different destinations:
 
 ```typescript
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
   serviceName: "my-service",
   spanProcessors: [
     // Send to Jaeger for debugging
-    new BatchSpanProcessor(
-      new JaegerExporter({
-        endpoint: "http://localhost:14268/api/v1/traces",
+    new BatchSpanProcessor({
+      exporter: new OTLPTraceExporter({
+        url: "http://localhost:4318/v1/traces", // Jaeger's OTLP receiver
       }),
-    ),
+    }),
     // Send to LangWatch for production monitoring
-    new BatchSpanProcessor(
-      new LangWatchExporter({
+    new BatchSpanProcessor({
+      exporter: new LangWatchExporter({
         apiKey: process.env.LANGWATCH_API_KEY,
       }),
-    ),
+    }),
   ],
 });
 ```
@@ -393,20 +393,18 @@ const handle = setupObservability({
 Optimize batch processing for high-volume applications:
 
 ```typescript
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
 import { LangWatchExporter } from "langwatch";
 
-const batchProcessor = new BatchSpanProcessor(
-  new LangWatchExporter({
+const batchProcessor = new BatchSpanProcessor({
+  exporter: new LangWatchExporter({
     apiKey: process.env.LANGWATCH_API_KEY,
   }),
-  {
-    maxQueueSize: 2048, // Maximum number of spans in queue
-    maxExportBatchSize: 512, // Maximum spans per batch
-    scheduledDelayMillis: 5000, // Export interval
-    exportTimeoutMillis: 30000, // Export timeout
-  },
-);
+  maxQueueSize: 2048, // Maximum number of spans in queue
+  maxExportBatchSize: 512, // Maximum spans per batch
+  scheduledDelayMillis: 5000, // Export interval
+  exportTimeoutMillis: 30000, // Export timeout
+});
 
 const handle = setupObservability({
   langwatch: "disabled", // Disabled we report to LangWatch via the `batchProcessor`

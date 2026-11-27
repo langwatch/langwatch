@@ -15,8 +15,6 @@
     "@langchain/core": "^1.5.1",
     "@langchain/langgraph": "^1.7.5",
     "@langchain/openai": "^1.8.5",
-    "@opentelemetry/context-async-hooks": "^2.0.1",
-    "@opentelemetry/sdk-node": "^0.217.0",
     "cli-markdown": "^3.5.1",
     "langwatch": "file:../../",
     "zod": "^4.6.6"
@@ -27,8 +25,6 @@
   },
   "overrides": {
     "@grpc/grpc-js": ">=1.14.5 <2",
-    "@opentelemetry/core": ">=2.8.0 <3",
-    "@opentelemetry/propagator-jaeger": ">=2.9.0 <3",
     "axios": ">=1.20.0 <2",
     "handlebars": ">=4.7.10 <5",
     "js-yaml": ">=4.3.2 <5",

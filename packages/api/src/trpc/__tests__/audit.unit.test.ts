@@ -6,8 +6,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { context as otelContext, propagation, trace } from "@opentelemetry/api";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
-import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
-import { StackContextManager } from "@opentelemetry/sdk-trace-web";
+import { TracerProvider, StackContextManager } from "@opentelemetry/sdk-trace";
 import { TRPCError } from "@trpc/server";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -1191,7 +1190,7 @@ describe("callerTraceContext", () => {
      */
     it("keeps the local span as the parent instead of re-extracting", () => {
       otelContext.setGlobalContextManager(new StackContextManager().enable());
-      const provider = new BasicTracerProvider();
+      const provider = new TracerProvider();
       const httpSpan = provider.getTracer("test").startSpan("POST /api");
 
       try {

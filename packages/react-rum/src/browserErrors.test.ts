@@ -4,8 +4,11 @@
  * See ADR-058 and specs/ui/browser-errors.feature.
  */
 import { trace } from "@opentelemetry/api";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -138,7 +141,7 @@ describe("sanitiseErrorMessage", () => {
 
 describe("startBrowserErrorCapture", () => {
   const exporter = new InMemorySpanExporter();
-  const provider = new WebTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
   const original = console.error;
   const swallowed: unknown[][] = [];
 

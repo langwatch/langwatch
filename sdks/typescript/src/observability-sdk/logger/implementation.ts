@@ -1,5 +1,4 @@
-import { context } from "@opentelemetry/api";
-import { type AnyValue, type Logger } from "@opentelemetry/api-logs";
+import { context, type AnyValue, type Logger } from "@opentelemetry/api";
 
 import { shouldCaptureOutput } from "../config";
 import * as intSemconv from "../semconv";

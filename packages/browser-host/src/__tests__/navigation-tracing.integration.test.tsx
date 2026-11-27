@@ -7,11 +7,11 @@
 import { NavigationContextManager } from "@langwatch/react-rum";
 import { context, trace } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
+  TracerProvider,
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 import { act, cleanup, render } from "@testing-library/react";
 import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "react-router";
@@ -26,8 +26,8 @@ import { useNavigationTracing } from "../telemetry/navigation-tracing.ts";
 const telemetry = { enabled: true };
 
 const exporter = new InMemorySpanExporter();
-const provider = new BasicTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(exporter)],
+const provider = new TracerProvider({
+  spanProcessors: [new SimpleSpanProcessor({ exporter })],
 });
 const contextManager = new NavigationContextManager();
 

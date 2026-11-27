@@ -7,16 +7,16 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
-import { context, propagation, trace } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
+import { context, logs, propagation, trace } from "@opentelemetry/api";
 import { ExportResultCode, type ExportResult } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import {
   BatchSpanProcessor,
   SimpleSpanProcessor,
+  TracerProvider,
   type ReadableSpan,
   type SpanExporter,
-} from "@opentelemetry/sdk-trace-base";
+} from "@opentelemetry/sdk-trace";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type Logger } from "../../../../logger";
@@ -68,9 +68,6 @@ const start = (options: SetupObservabilityOptions, logger: Logger): Observabilit
   return handle;
 };
 
-const providerName = (provider: unknown): string | undefined =>
-  typeof provider === "object" && provider !== null ? provider.constructor.name : void 0;
-
 const endSpan = (name: string): void => {
   trace.getTracer("exporter-opt-out").startSpan(name).end();
 };
@@ -114,9 +111,7 @@ describe("given a Node process setting up LangWatch observability", () => {
 
       // The exporter the default path builds is the OTLP HTTP/protobuf one.
       expect(LangWatchTraceExporter.prototype).toBeInstanceOf(OTLPTraceExporter);
-      expect(providerName(getConcreteProvider(trace.getTracerProvider()))).toBe(
-        "NodeTracerProvider",
-      );
+      expect(getConcreteProvider(trace.getTracerProvider())).toBeInstanceOf(TracerProvider);
       expect(trace.getTracer("exporter-opt-out").startSpan("recorded").isRecording()).toBe(true);
 
       // And the graph that just started declares no gRPC anywhere: not in
@@ -126,9 +121,16 @@ describe("given a Node process setting up LangWatch observability", () => {
       const dependencies: Record<string, string> = JSON.parse(manifest).dependencies;
       expect(Object.keys(dependencies).filter((name) => name.includes("grpc"))).toEqual([]);
 
-      const requireFromSdk = createRequire(PACKAGE_JSON_PATH);
-      const traceProviderManifest: { dependencies: Record<string, string> } = requireFromSdk(
-        "@opentelemetry/sdk-trace-node/package.json",
+      // `@opentelemetry/sdk-trace` exports only ".", so its manifest is read from disk.
+      const traceProviderEntry = createRequire(PACKAGE_JSON_PATH).resolve(
+        "@opentelemetry/sdk-trace",
+      );
+      const traceProviderRoot = traceProviderEntry.slice(
+        0,
+        traceProviderEntry.lastIndexOf("/dist/"),
+      );
+      const traceProviderManifest: { dependencies: Record<string, string> } = JSON.parse(
+        readFileSync(resolve(traceProviderRoot, "package.json"), "utf8"),
       );
       expect(
         Object.keys(traceProviderManifest.dependencies).filter(
@@ -201,7 +203,10 @@ describe("given a Node process setting up LangWatch observability", () => {
       const logger = createRecordingLogger();
       const exporter = new RecordingSpanExporter();
 
-      start({ langwatch: "disabled", spanProcessors: [new SimpleSpanProcessor(exporter)] }, logger);
+      start(
+        { langwatch: "disabled", spanProcessors: [new SimpleSpanProcessor({ exporter })] },
+        logger,
+      );
 
       const tracer = trace.getTracer("exporter-opt-out");
       await tracer.startActiveSpan("parent", async (parent) => {
@@ -228,16 +233,14 @@ describe("given a Node process setting up LangWatch observability", () => {
 
       try {
         start(
-          { langwatch: "disabled", spanProcessors: [new SimpleSpanProcessor(exporter)] },
+          { langwatch: "disabled", spanProcessors: [new SimpleSpanProcessor({ exporter })] },
           logger,
         );
         await new Promise((done) => setImmediate(done));
 
-        expect(providerName(getConcreteProvider(trace.getTracerProvider()))).toBe(
-          "NodeTracerProvider",
-        );
+        expect(getConcreteProvider(trace.getTracerProvider())).toBeInstanceOf(TracerProvider);
         expect(logger.lines).toContain(
-          "Successfully registered NodeTracerProvider globally for Next.js 15",
+          "Successfully registered the tracer provider globally for Next.js 15",
         );
 
         endSpan("through-the-global-provider");
@@ -253,7 +256,7 @@ describe("given a Node process setting up LangWatch observability", () => {
     it("exports the buffered spans before shutdown resolves", async () => {
       const logger = createRecordingLogger();
       const exporter = new RecordingSpanExporter();
-      const buffered = new BatchSpanProcessor(exporter, { scheduledDelayMillis: 60_000 });
+      const buffered = new BatchSpanProcessor({ exporter, scheduledDelayMillis: 60_000 });
 
       const handle = start({ langwatch: "disabled", spanProcessors: [buffered] }, logger);
       endSpan("buffered");

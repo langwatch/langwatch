@@ -145,7 +145,7 @@ setupObservability({
 
 ```typescript Via BatchSpanProcessor
 import { setupObservability } from "langwatch/observability/node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace";
 import { LangWatchTraceExporter } from "langwatch";
 
 setupObservability({
@@ -153,7 +153,7 @@ setupObservability({
   // integration to prevent double exporting
   langwatch: "disabled",
   spanProcessors: [
-    new BatchSpanProcessor(new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] })),
+    new BatchSpanProcessor({ exporter: new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] }) }),
   ],
 });
 ```

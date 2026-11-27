@@ -3,7 +3,7 @@
  */
 
 import { type Span as OtelSpan, trace } from "@opentelemetry/api";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace";
 import { beforeAll, afterAll, afterEach, expect } from "vitest";
 
 import { LangWatch } from "../../../client-sdk";
@@ -60,7 +60,7 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
     apiKey: E2E_CONFIG.apiKey!,
     endpoint: E2E_CONFIG.endpoint,
   });
-  const spanProcessor = new SimpleSpanProcessor(exporter);
+  const spanProcessor = new SimpleSpanProcessor({ exporter });
 
   console.debug("🔧 Calling setupObservability...");
   setupObservability({
