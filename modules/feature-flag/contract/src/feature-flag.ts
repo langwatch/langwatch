@@ -253,7 +253,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Runs a Scenario Connector agent's setup, call and teardown blocks in the code runner (ADR-194). Off by default on every deployment until the owner decides the defaults; enable per project or organization via a targeting rule, or for a whole install with RELEASE_SCENARIO_CONNECTOR_STEPS. Off, a run of a connector agent records that connector steps are not released for the project, ends as an error and is not scored, and no block reaches the code runner.",
+      "Runs a Scenario Connector agent's setup, call and teardown blocks in the code runner (ADR-194). Off by default on cloud and self-hosted; turn it on per project (or organization) with a targeting rule, or for a whole install with RELEASE_SCENARIO_CONNECTOR_STEPS. On, the Scenario Connector card shows in the new-agent list. Off, the card is hidden and a run of a connector agent records that connector steps are not released for the project, ends as an error and is not scored, and no block reaches the code runner.",
   },
   {
     key: "release_voice_agents_enabled",

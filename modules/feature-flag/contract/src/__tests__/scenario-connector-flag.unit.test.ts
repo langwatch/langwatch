@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The Scenario Connector release gate (ADR-194) stays off by default on every deployment until the
- * owner decides its defaults.
+ * The Scenario Connector release gate (ADR-194) is off by default on cloud and self-hosted, and is
+ * turned on per project.
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 import { describe, expect, it } from "vitest";
