@@ -72,3 +72,35 @@ export const groupTemplates = <T extends { id: string }>({
       templates: templates.filter((template) => headingFor(template.id) === heading),
     }))
     .filter((group) => group.templates.length > 0);
+
+/** One stop in the message list: an email and one of its variants. */
+export interface ListStop {
+  id: string;
+  fixture: string;
+}
+
+/**
+ * The stop one step from `selected` in list order, wrapping at both ends: an email's
+ * variants come before the next email. An unknown or empty `selected` lands on the first.
+ */
+export const stepSelection = ({
+  templates,
+  selected,
+  direction,
+}: {
+  templates: readonly { id: string; fixtures: readonly { name: string }[] }[];
+  selected: ListStop | null;
+  direction: 1 | -1;
+}): ListStop | null => {
+  const stops = groupTemplates({ templates }).flatMap((group) =>
+    group.templates.flatMap((template) =>
+      template.fixtures.map((fixture) => ({ id: template.id, fixture: fixture.name })),
+    ),
+  );
+  if (stops.length === 0) return null;
+  const current = stops.findIndex(
+    (stop) => stop.id === selected?.id && stop.fixture === selected.fixture,
+  );
+  if (current === -1) return stops[0] ?? null;
+  return stops[(current + direction + stops.length) % stops.length] ?? null;
+};

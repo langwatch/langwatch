@@ -16,7 +16,7 @@ import { useEffect, useState, type JSX, type ReactNode } from "react";
 
 import { PropsForm } from "./props-form.tsx";
 import { documentUrl as documentUrlOf, fetchRender, isStaticStudio } from "./studio-endpoints.ts";
-import { groupTemplates } from "./studio-groups.ts";
+import { groupTemplates, stepSelection } from "./studio-groups.ts";
 import {
   prepareMailDocument,
   renderResponseSchema,
@@ -68,6 +68,8 @@ export const InspectView = ({
   const template = templates.find((entry) => entry.id === selected?.id) ?? null;
   const fixtureIndex =
     template?.fixtures.findIndex((fixture) => fixture.name === selected?.fixture) ?? -1;
+
+  useArrowKeyStepping({ templates, selected, onSelect });
 
   useEffect(() => {
     if (!selected || currentProps === null) return;
@@ -153,6 +155,37 @@ export const InspectView = ({
     </Page>
   );
 };
+
+const ARROW_DIRECTION: Record<string, 1 | -1> = { ArrowRight: 1, ArrowLeft: -1 };
+
+/** Typing or a control's own arrow handling keeps its keys; modified arrows are the browser's. */
+const keepsArrowKeys = (event: KeyboardEvent): boolean => {
+  if (event.defaultPrevented) return true;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return true;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.closest("input, textarea, select") !== null;
+};
+
+/** Left and right arrows step through the message list as clicking would. */
+function useArrowKeyStepping({
+  templates,
+  selected,
+  onSelect,
+}: Pick<InspectViewProps, "templates" | "selected" | "onSelect">): void {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const direction = ARROW_DIRECTION[event.key];
+      if (!direction || keepsArrowKeys(event)) return;
+      const next = stepSelection({ templates, selected, direction });
+      if (!next) return;
+      event.preventDefault();
+      onSelect(next.id, next.fixture);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [templates, selected, onSelect]);
+}
 
 /** The live props form, or under the built studio the fixture's props, read-only. */
 function PropsPanelBody({
