@@ -36,6 +36,10 @@ export type StaffAccessRequestRow = Readonly<{
   functions: string[];
   organizationId: string | null;
   organizationName: string | null;
+  counterpartOrganizationId: string | null;
+  counterpartOrganizationName: string | null;
+  /** What a copy target may create, fixed when the request was made; empty otherwise. */
+  copyGrant: string[];
   reason: string;
   codeChallenge: string;
   machine: string;
@@ -79,6 +83,23 @@ export type StaffAccessEventRow = Readonly<{
   durationMs: number | null;
   ipAddress: string | null;
   userAgent: string | null;
+}>;
+
+/** One object an organization copy made: which source object became which target object. */
+export type StaffAccessCopyLedgerRow = Readonly<{
+  id: string;
+  requestId: string;
+  sourceOrganizationId: string;
+  targetOrganizationId: string;
+  kind: string;
+  sourceId: string;
+  /** Null while the copy of this source is reserved and its target is not made yet. */
+  targetId: string | null;
+  sourceProjectId: string;
+  targetProjectId: string | null;
+  /** Why a made target is short of its source (a prompt missing later versions); else null. */
+  incomplete: string | null;
+  createdAt: Instant;
 }>;
 
 export interface StaffAccessRequesterRepository {
@@ -178,4 +199,23 @@ export interface StaffAccessEventRepository {
     rowCount?: number;
   }): Promise<void>;
   findByRequest(input: { requestId: string }): Promise<StaffAccessEventRow[]>;
+}
+
+export interface StaffAccessCopyLedgerRepository {
+  /** Every object earlier copies made from the source organization into the target one. */
+  findForPair(input: {
+    sourceOrganizationId: string;
+    targetOrganizationId: string;
+  }): Promise<StaffAccessCopyLedgerRow[]>;
+  /** Reserves one source before its target is made; false when another copy holds it. */
+  reserve(row: StaffAccessCopyLedgerRow): Promise<boolean>;
+  /** Names the target a reservation made. */
+  complete(input: {
+    id: string;
+    targetId: string;
+    targetProjectId: string;
+    incomplete: string | null;
+  }): Promise<void>;
+  /** Drops a reservation that made nothing; a completed row is never removed. */
+  release(input: { id: string }): Promise<void>;
 }

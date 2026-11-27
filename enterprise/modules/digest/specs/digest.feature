@@ -1,13 +1,15 @@
 Feature: Weekly digest emails
-  LangWatch Cloud sends each person one weekly email about their week's usage, picked from five
-  templates by what their data shows, and sent through our own mailer. Operators choose the cohort
-  and arm the send in Cloud admin; nothing is sent until they do. Anyone can unsubscribe in one
-  click; an unsubscribe is recorded.
+  LangWatch Cloud sends each person a weekly email for each organization they are in, about that
+  organization's week alone and naming it, picked from five templates by what their data shows,
+  and sent through our own mailer. Every organization is in: there is no enrolment. Operators arm
+  the send in Cloud admin; nothing is sent until they do. A person opts out once, for every
+  organization, in one click from the email or with a switch in their settings; an unsubscribe is
+  recorded.
   Design: dev/docs/plans/weekly-digest.md
 
   # Built: the pick, the folds' redelivery rule, the weekly send through our own mailer, the
-  # one-click unsubscribe and its rate limit, the operators' switches and clearing digest rows on
-  # user erasure. The other folds' peer intake, click tracking and its rate limit, the "what's
+  # one-click unsubscribe and its rate limit, the operators' switch and clearing digest rows on
+  # user erasure, and the settings switch. The other folds' peer intake, click tracking and its rate limit, the "what's
   # new" card and the Cloud admin gallery and its metrics are @unimplemented.
 
   # Picking a template
@@ -73,17 +75,81 @@ Feature: Weekly digest emails
 
   # Folding the week
 
-  @integration
-  Scenario: Trace spans fold into the project's week as they arrive
-    Given spans received for a project across two traces, one with an error
-    When the digest subscriber has handled their events
-    Then the project's week holds 2 traces, 1 error and the summed tokens and cost
+  @unit
+  Scenario: Trace spans are never folded
+    Given a span fact stored before spans stopped being folded
+    When the project's week folds it
+    Then the fact still parses and the week is unchanged
 
-  @integration @unimplemented
-  Scenario: A burst of spans for one project drains as batched appends
-    Given 500 spans received for one project within a second
-    When the digest subscriber has handled them
-    Then the project's week counts all 500 and fewer than 500 appends were made
+  @integration
+  Scenario: Trace numbers are read from analytics, never folded
+    Given analytics answers a project's week with its traces, errors, tokens, cost, durations and models
+    When a member's traces email is built
+    Then it shows exactly those numbers, the change on the week before's traces
+    And each project's week is read once however many members are sent to
+
+  @integration
+  Scenario: An email counts only the live, shared or own projects the recipient may view
+    Given an organization with a project, another member's personal project, an archived project and a governance project
+    When an admin of the organization is sent the week
+    Then the email shows the shared project alone and analytics is not asked about the others
+    And a member is still shown their own personal project
+
+  @integration
+  Scenario: An aggregate project is never read for an email
+    Given an organization with a project and an aggregate project reading its members
+    When an admin of the organization is sent the week
+    Then the email shows the project alone and analytics is not asked about the aggregate
+    And a member whose only project is an aggregate is sent nothing and nothing fails
+
+  @integration
+  Scenario: A failed read of last week drops the change line, not the email
+    Given analytics cannot answer the week before the sent one
+    When a member is sent the week
+    Then the email is sent without its change on last week
+
+  @integration
+  Scenario: A failed read of the sent week fails the send for a retry
+    Given analytics cannot answer the sent week
+    When a member's send is handled
+    Then it fails, no email is sent and the week is not claimed
+
+  @integration
+  Scenario: Analytics is read a few reads at a time
+    Given an organization with thirty projects
+    When a member is sent the week
+    Then no more than eight analytics reads run at once
+
+  @integration
+  Scenario: A plan keeps walking past a failure, then fails once so it retries
+    Given an organization, or a member, whose ask cannot be made
+    When the plan runs
+    Then every other ask is made, the plan fails once at the end and the week is not marked planned
+    And the retry asks only what was missed
+
+  @integration
+  Scenario: A project whose week cannot be read is left out of the email
+    Given analytics cannot answer one of two visible projects' sent week
+    When a member is sent the week
+    Then the email is about the readable project alone
+
+  @integration
+  Scenario: A send fails for a retry when no visible project's week can be read
+    Given analytics cannot answer any visible project's sent week
+    When a member's send is handled
+    Then it fails and no email is sent
+
+  @integration
+  Scenario: Each organization is planned as its own intent, a page of ids at a time
+    Given three organizations whose ids are paged one at a time
+    When the hourly plan runs
+    Then one plan is asked for each organization
+
+  @integration
+  Scenario: A quiet week sends nothing
+    Given analytics answers a project's week with no traces
+    When a member's send is handled
+    Then no email is sent and no model breakdown is asked for
 
   @integration
   Scenario: Coding-agent facts fold into the person's week
@@ -99,11 +165,10 @@ Feature: Weekly digest emails
     And a week whose series all fit shows its totals without "at least"
 
   @unit
-  Scenario: A span counts under the model that answered it
-    Given a span that names the model it asked for and the model that answered
-    When it is folded into the project's week
-    Then it counts under the model that answered
-    And a span whose answering model is blank counts under the model it asked for
+  Scenario: Impersonating staff can see a person's email choice but not change it
+    Given staff impersonating a person
+    When they read and set the person's weekly digest preference
+    Then the read shows the person's own choice and the write is refused
 
   @unit
   Scenario: A coding-agent repository is named with its owner when one was reported
@@ -129,8 +194,14 @@ Feature: Weekly digest emails
     Then the project's week counts it once
 
   @integration
-  Scenario: A project of an organization not enrolled folds nothing
-    Given a project whose organization is not enrolled
+  Scenario: A project of an organization that was never enrolled folds
+    Given a project whose organization was never enrolled
+    When its evaluation completes
+    Then its week is folded under its organization
+
+  @integration
+  Scenario: A project that belongs to no organization folds nothing
+    Given a project that names no organization
     When its evaluation completes
     Then no week is folded for it
 
@@ -154,21 +225,21 @@ Feature: Weekly digest emails
     Then no email is sent
 
   @integration
-  Scenario: Nothing is sent while no organization is enrolled
-    Given the send is armed and no organization is enrolled
+  Scenario: An organization that was never enrolled is sent to
+    Given the send is armed and an organization that was never enrolled with three members
     When the scheduled wake runs
-    Then no email is sent
+    Then each member receives an email for it
 
   @integration
-  Scenario: Each enrolled member gets one email a week
-    Given the send is armed and an enrolled organization with three members
+  Scenario: Each member gets one email a week
+    Given the send is armed and an organization with three members
     When the scheduled wake runs twice
     Then each member receives exactly one email for this ISO week
     And every email carries an RFC 8058 one-click unsubscribe
 
   @integration
   Scenario: Arming before Monday 08:00 UTC sends last week once, from 08:00
-    Given an enrolled organization with three members
+    Given an organization with three members
     When the send is armed at 03:00 UTC on a Monday and the wake runs every hour
     Then nothing is planned before 08:00
     And from 08:00 each member receives exactly one email, for last week
@@ -195,7 +266,7 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: An organization admin near the plan limit is sent the plan's numbers
-    Given the send is armed and an enrolled organization at 90% of its monthly limit
+    Given the send is armed and an organization at 90% of its monthly limit
     When the week's emails are sent
     Then its admin's email is digest-plan-pressure with the usage, the count and the limit
     And its other members' emails are not
@@ -214,14 +285,8 @@ Feature: Weekly digest emails
     Then that member receives none
 
   @integration
-  Scenario: A member of an organization unenrolled after planning is skipped
-    Given the week's sends are planned for an enrolled organization
-    When the organization is unenrolled before its sends are handled
-    Then its members receive none
-
-  @integration
   Scenario: A member who left or was disabled after planning is skipped
-    Given the week's sends are planned for an enrolled organization
+    Given the week's sends are planned for an organization
     When a member leaves it, or is disabled, before their send is handled
     Then that member receives none
 
@@ -241,7 +306,7 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: Disarming after the week is planned sends nothing more
-    Given the week's sends are planned for an enrolled organization
+    Given the week's sends are planned for an organization
     When the send is disarmed before its sends are handled
     Then no member receives one
 
@@ -253,18 +318,24 @@ Feature: Weekly digest emails
     Then that member receives none and no send is recorded for them
 
   @integration
-  Scenario: A member of two enrolled organizations is sent the busier one's week
-    Given a member of two enrolled organizations
-    When both organizations' sends are handled, in either order
-    Then they receive one email, from the organization where their week had the most activity
-    And on equal activity from the organization with the lowest id
+  Scenario: A member of two organizations is sent one email per organization
+    Given a member of two organizations, each with its own week
+    When the week is planned and both organizations' sends are handled
+    Then they receive two emails, one per organization
+    And each shows only that organization's week and names it in the subject
+    And the two sends carry distinct keys: digest:{userId}:{organizationId}:{isoWeek}
 
   @integration
-  Scenario: The home organization is chosen once, when the week is planned
-    Given a member of two enrolled organizations, one busier for them when the week is planned
-    When the other organization becomes busier before both sends are handled
-    Then they receive exactly one email, from the organization that was busier at plan time
-    And if they leave that organization before its send, the other organization's send mails them
+  Scenario: The resend of the same member, organization and week is dropped
+    Given a member's send for one organization was handled
+    When the same send is handled again, or the week is planned again
+    Then they receive that organization's email once
+
+  @integration
+  Scenario: An opted-out member receives none, in any organization
+    Given a member of two organizations who opted out
+    When both organizations' sends are handled
+    Then they receive none
 
   @integration
   Scenario: A pick that cannot be built falls through to the next eligible template
@@ -287,10 +358,10 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: One unreadable organization does not stall the others' plan
-    Given two enrolled organizations, the first of which cannot be read
+    Given two organizations, the first of which cannot be read
     When the scheduled wake runs
     Then the other organization's sends are asked
-    And the week stays unplanned so the next wake retries the unreadable one
+    And the unreadable one's own plan fails and is retried alone, without asking the first twice
 
   @integration @unimplemented
   Scenario: Every link in a sent email is a tracked redirect
@@ -303,7 +374,21 @@ Feature: Weekly digest emails
   @integration
   Scenario: One-click unsubscribe from the mail client
     When a POST with a valid unsubscribe token arrives
-    Then the member is unsubscribed and the send it came from is recorded
+    Then the member is unsubscribed from every organization's digest and the send it came from is recorded
+
+  @integration
+  Scenario: The email's footer link opens the person's email preferences
+    When a digest email is sent
+    Then its footer link is /settings/profile#email-preferences
+    And its List-Unsubscribe header is still the signed one-click address
+
+  @integration
+  Scenario: A person turns the weekly digest off and on in their settings
+    Given a signed-in person on their Profile page
+    When they turn the Weekly digest switch off and on again
+    Then each choice is saved as their one opt-out, the same one the unsubscribe link writes
+    And a failed save leaves the switch where it was and says so
+    And the call names no user: it is always the signed-in person's own
 
   @integration
   Scenario: A forged or tampered unsubscribe token is refused
@@ -382,52 +467,45 @@ Feature: Weekly digest emails
   @unit
   Scenario: The digest admin is refused where cloud ops is off
     Given ops's cloud-ops capability is off
-    When staff on the ops list enrol an organization
+    When staff on the ops list arm the send
     Then the call is refused with not_found
 
   @unit
   Scenario: Only operators on the ops list use the digest admin
     Given a signed-in user who is not on the ops back-office list
-    When they enrol an organization
+    When they arm the send
     Then the call is refused with not_found
 
   @unit
   Scenario: Someone who is not staff is answered not-found by the digest admin door
     Given a signed-in person who is not Cloud admin staff
-    When they enrol an organization, arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call is refused with not_found and the digest is never reached
 
   @unit
   Scenario: A digest admin write needs ops:manage, not ops:view
     Given Cloud admin staff who hold ops:view but not ops:manage
-    When they enrol an organization, arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call is refused with permission_denied and the digest is never reached
 
   @unit
   Scenario: Staff holding ops:manage reach the digest as themselves
     Given Cloud admin staff who hold ops:manage
-    When they enrol an organization, arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call reaches the digest, naming them as the operator
 
   @unit
   Scenario: The digest asks ops to admit the operator behind every admin control
     Given Cloud admin staff the platform door admits, where ops's cloud-ops capability is off
-    When they enrol an organization, arm the send or send a test
-    Then each call is refused with not_found and nothing is enrolled, armed or sent
-
-  @unit
-  Scenario: An operator enrols and unenrols organizations
-    Given an operator ops admits to manage the digest
-    When they enrol two organizations and then unenrol one
-    Then each call answers the settings with the enrolled organizations sorted
-    And only the organization still enrolled is enrolled
+    When they arm the send, send a test, or send themself their own or a person's digests
+    Then each call is refused with not_found and nothing is armed or sent
 
   @unit
   Scenario: An operator arms and disarms the weekly send
-    Given an operator ops admits to manage the digest, and an enrolled organization
+    Given an operator ops admits to manage the digest
     When they arm the send and then disarm it
     Then each call answers the settings with the switch as set
-    And the stored switch matches it, with the enrolment unchanged
+    And the stored switch matches it
 
   @integration @unimplemented
   Scenario: The gallery previews a person's email for every eligible template
@@ -443,51 +521,128 @@ Feature: Weekly digest emails
 
   @integration
   Scenario: Sending a test goes only to the operator
-    When an operator sends themself a test of a member's email
+    When an operator sends themself a test of a member's email for an organization
     Then only the operator receives it
     And no DigestSend row is written
 
   @integration
-  Scenario: A test send respects enrolment
-    Given an organization that is not enrolled
-    When an operator sends themself a test of a member's email
-    Then the call is refused with digest_organization_not_enrolled
-    And no email is sent
-
-  @integration
   Scenario: A test send respects a member's opt-out
-    Given an enrolled organization and a member who unsubscribed
+    Given an organization and a member who unsubscribed
     When an operator sends themself a test of that member's email
     Then the call is refused with digest_member_unsubscribed
     And no email is sent
 
   @integration
   Scenario: A test send of someone who is not a member is refused
-    Given an enrolled organization
+    Given an organization
     When an operator sends themself a test of a person who is not its member
     Then the call is refused with digest_member_not_found
     And no email is sent
 
   @integration
   Scenario: A test send to an operator with no email address is refused
-    Given an enrolled organization
+    Given an organization
     When an operator whose account has no email address sends themself a test of a member's email
     Then the call is refused with digest_operator_address_missing
     And no email is sent
 
   @integration
   Scenario: A test send of a member whose pick has nothing to show is refused
-    Given an enrolled organization and a member whose pick has nothing to show this week
+    Given an organization and a member whose pick has nothing to show this week
     When an operator sends themself a test of that member's email
     Then the call is refused with digest_nothing_to_send
     And no email is sent
 
   @integration
   Scenario: A test email's unsubscribe link names the operator, not the member
-    Given an enrolled organization
+    Given an organization
     When an operator sends themself a test of a member's email
     And the test email's one-click unsubscribe is followed
     Then the operator is unsubscribed and the member is not
+
+  @integration
+  Scenario: An operator sends themself every digest they would get
+    Given an operator who is a member of two organizations, each with a busy week
+    When they send themself their digests
+    Then they receive one test per organization, picked as their own weekly email would be
+    And each subject names its organization and is marked [Test]
+    And the answer lists each organization by name with the template it was sent with
+    And no DigestSend row is written
+
+  @integration
+  Scenario: An organization with nothing to send is skipped and reported
+    Given an operator in two organizations, one of which has nothing to show them this week
+    When they send themself their digests
+    Then they receive the one with something to show
+    And the other is reported as skipped with nothing to send, not as an error
+
+  @integration
+  Scenario: An operator who opted out is sent none of their digests
+    Given an operator in two organizations who opted out of the digest
+    When they send themself their digests
+    Then no email is sent
+    And each organization is reported as skipped because they opted out
+
+  @integration
+  Scenario: One organization failing does not keep the operator's other digests from going
+    Given an operator in two organizations, one of whose weeks cannot be read
+    When they send themself their digests
+    Then they receive the other organization's test
+    And the unreadable one is reported as failed
+
+  @integration
+  Scenario: An operator's hidden system organization is not sent
+    Given an operator in two organizations, one of which is the install's hidden system organization
+    When they send themself their digests
+    Then only the other organization's test is sent and listed, as the weekly send would mail them
+
+  @integration
+  Scenario: Sending yourself your digests without an email address is refused
+    Given an operator whose account has no email address
+    When they send themself their digests
+    Then the call is refused with digest_operator_address_missing
+    And no email is sent
+
+  @integration
+  Scenario: Staff with ops:manage send themselves their digests from their settings
+    Given Cloud admin staff holding ops:manage on their Profile page
+    When they press "Send me my digests" under Email preferences
+    Then each of their organizations is listed with what was sent, or why nothing was
+    And someone without ops:manage sees no such button
+
+  @integration
+  Scenario: Staff send themselves a person's digests as that person would get them
+    Given a member in two organizations, each with a busy week, and an operator
+    When the operator sends themself the member's digests by the member's email, as they would get them
+    Then the operator receives one test per organization, picked as the member's weekly email would be
+    And the member is sent nothing
+    And the answer names the member and lists each organization with the template it was sent with
+
+  @unit @integration
+  Scenario: Staff force one digest for a person, past its threshold
+    Given a member whose busiest project had 40 traces this week, below the traces-week threshold
+    When the operator sends themself the member's digests with traces week forced
+    Then the operator receives the traces-week email for that week, though the weekly send would pick nothing
+
+  @unit @integration
+  Scenario: A forced digest with no data for the person is skipped, not sent
+    Given a member who is not an admin, and an admin, of an organization with a plan limit
+    When the operator forces plan usage for each in turn
+    Then the admin's test is sent with plan usage
+    And each of the member's organizations is reported as skipped with no data for this digest
+
+  @integration
+  Scenario: Sending a person's digests to an address no account has is refused
+    Given an address no account has
+    When an operator sends themself that person's digests
+    Then the call is refused with digest_person_not_found
+    And no email is sent
+
+  @integration
+  Scenario: Staff send themselves a person's digests from their settings
+    Given Cloud admin staff holding ops:manage on their Profile page
+    When they enter a person's email, choose a digest and press "Send test to me"
+    Then the person and each of their organizations are listed with what was sent, or why nothing was
 
   @integration @unimplemented
   Scenario: Metrics count sends, unique clickers and unsubscribes by template and week

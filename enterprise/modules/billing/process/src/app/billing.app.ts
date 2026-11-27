@@ -1219,6 +1219,8 @@ export class BillingModule
     const piiRedactionSpend = PiiRedactionSpendQueryService.create({
       isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
       listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      findPiiRedactionModelAcceptedAtMs: (input) =>
+        repositories.reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
@@ -1241,14 +1243,17 @@ export class BillingModule
       isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
       queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
       isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
-      subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
+      subscriptionPriceLine: async ({ stripeCustomerId, prices, billingMonth }) =>
         stripeSubscriptions === void 0
           ? { carried: false }
           : priceLineOf({
               subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
                 customerId: stripeCustomerId,
               }),
-              prices: [{ priceName: price, priceId: catalogue().prices[price] }],
+              prices: prices.map((priceName) => ({
+                priceName,
+                priceId: catalogue().prices[priceName],
+              })),
               billingMonth,
             }),
       organizationCache: repositories.organizationCache,

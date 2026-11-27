@@ -70,7 +70,16 @@ describe.skipIf(!databaseUrl)("given digest weeks around a cutoff in two organiz
       for (const [isoWeek, traces] of Object.entries(TRACES_OF)) {
         const key = `${organizationId}:${isoWeek}`;
         await projectWeeks.store(
-          projection({ ...emptyProjectWeek(), projectId, organizationId, isoWeek, traces }, key),
+          projection(
+            {
+              ...emptyProjectWeek(),
+              projectId,
+              organizationId,
+              isoWeek,
+              scenarios: { runs: traces, passed: 0, failed: 0 },
+            },
+            key,
+          ),
           { aggregateId: key, key, tenantId },
         );
         await userWeeks.store(
@@ -105,7 +114,7 @@ describe.skipIf(!databaseUrl)("given digest weeks around a cutoff in two organiz
   const projectWeeksIn = async (organizationId: string) =>
     Object.fromEntries(
       (await projectWeeks.findWeeks({ isoWeeks: [BEFORE, CUTOFF, AFTER], organizationId })).map(
-        ({ isoWeek, traces }) => [isoWeek, traces],
+        ({ isoWeek, scenarios }) => [isoWeek, scenarios.runs],
       ),
     );
   const userWeeksIn = async (organizationId: string) =>

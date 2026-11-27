@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  bindTrpcMiddlewareContext,
-  createTrpcRuntime,
-  TrpcRootDefinition,
-  type TrpcRuntimeMembers,
-} from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The digest's operator controls behind the platform door (Q42): non-staff are answered
  * not-found, staff lacking ops:manage are refused by name, anonymous is 401; past the door the
  * app still asks ops to admit the operator on every control. Spec: digest.feature.
  */
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import {
+  bindTrpcMiddlewareContext,
+  createTrpcRuntime,
+  TrpcRootDefinition,
+  type TrpcRuntimeMembers,
+} from "@langwatch/api/trpc";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DigestApi, DigestSettings } from "@langwatch/enterprise-digest-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -35,10 +36,11 @@ const GRANTS: Readonly<Record<string, readonly string[]>> = {
   "user-staff": ["ops:view", "ops:manage"],
 };
 
-const ENROL = { organizationId: "org_acme", enrolled: true };
 const ARM = { armed: true };
 const TEST_SEND = { organizationId: "org_acme", userId: "user_member" };
-const SETTINGS: DigestSettings = { armed: false, enrolledOrganizationIds: [] };
+const TEST_FOR = { email: "member@acme.test", template: "auto" } as const;
+const TESTS_FOR = { person: { name: null, email: TEST_FOR.email }, organizations: [] };
+const SETTINGS: DigestSettings = { armed: false };
 
 const root = TrpcRootDefinition.forContext<Context>().create({});
 
@@ -79,29 +81,47 @@ function door(app: DigestApi) {
   const mountOptions = {
     middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx: Context) => ctx.operator)],
   };
-  const as = (id: string | null) => ({
-    actor: id ? ({ type: "user", id } as const) : null,
+  const as = (id: string | null, impersonatorId?: string) => ({
+    actor: id
+      ? ({ type: "user", id, ...(impersonatorId ? { impersonatorId } : {}) } as const)
+      : null,
     operator: id ? { id, email: `${id}@langwatch.test` } : null,
   });
 
-  return (id: string | null) =>
-    runtime.mount(digestTrpcTransport, () => app, mountOptions).createCaller(as(id));
+  return (id: string | null, impersonatorId?: string) =>
+    runtime
+      .mount(digestTrpcTransport, () => app, mountOptions)
+      .createCaller(as(id, impersonatorId));
 }
 
 /** An app that records each control it is asked, and by which operator. */
 function recordingDigest(reached: string[]) {
   return door(
     createApiFixture<DigestApi>({
-      setEnrolled: async ({ operator }) => {
-        reached.push(`setEnrolled:${operator?.id}`);
-        return SETTINGS;
-      },
       setArmed: async ({ operator }) => {
         reached.push(`setArmed:${operator?.id}`);
         return SETTINGS;
       },
       sendTest: async ({ operator }) => {
         reached.push(`sendTest:${operator?.id}`);
+      },
+      sendMyTests: async ({ operator }) => {
+        reached.push(`sendMyTests:${operator?.id}`);
+        return { organizations: [] };
+      },
+      sendTestFor: async ({ operator }) => {
+        reached.push(`sendTestFor:${operator?.id}`);
+        return TESTS_FOR;
+      },
+      getPreference: async ({ userId }) => {
+        reached.push(`getPreference:${userId}`);
+        return { subscribed: true };
+      },
+      setPreference: async ({ userId, subscribed, impersonatorId }) => {
+        reached.push(
+          `setPreference:${userId}:${subscribed}${impersonatorId ? `:by ${impersonatorId}` : ""}`,
+        );
+        return { subscribed };
       },
     }),
   );
@@ -114,6 +134,7 @@ async function digestWithCloudOpsOff() {
   const mail = MemoryDigestMailChannel.create();
   const app = await DigestModule.create({
     dependencies: {
+      analytics: createApiFixture<AnalyticsApi>({}, "AnalyticsApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       ops: createApiFixture<OpsApi>(
         {
@@ -154,9 +175,10 @@ describe("the digest's operator controls at the platform door", () => {
 
       const stranger = digest("user-stranger");
       const refusals = await Promise.all([
-        stranger.setEnrolled(ENROL).catch((error: unknown) => error),
         stranger.setArmed(ARM).catch((error: unknown) => error),
         stranger.sendTest(TEST_SEND).catch((error: unknown) => error),
+        stranger.sendMyTests({}).catch((error: unknown) => error),
+        stranger.sendTestFor(TEST_FOR).catch((error: unknown) => error),
       ]);
       const anonymous = await digest(null)
         .setArmed(ARM)
@@ -177,9 +199,10 @@ describe("the digest's operator controls at the platform door", () => {
       const viewer = recordingDigest(reached)("user-viewer");
 
       const refusals = await Promise.all([
-        viewer.setEnrolled(ENROL).catch((error: unknown) => error),
         viewer.setArmed(ARM).catch((error: unknown) => error),
         viewer.sendTest(TEST_SEND).catch((error: unknown) => error),
+        viewer.sendMyTests({}).catch((error: unknown) => error),
+        viewer.sendTestFor(TEST_FOR).catch((error: unknown) => error),
       ]);
 
       expect(refusals.map(codeOf)).toEqual(
@@ -195,14 +218,16 @@ describe("the digest's operator controls at the platform door", () => {
       const reached: string[] = [];
       const staff = recordingDigest(reached)("user-staff");
 
-      await expect(staff.setEnrolled(ENROL)).resolves.toEqual(SETTINGS);
       await expect(staff.setArmed(ARM)).resolves.toEqual(SETTINGS);
       await expect(staff.sendTest(TEST_SEND)).resolves.toEqual({ ok: true });
+      await expect(staff.sendMyTests({})).resolves.toEqual({ organizations: [] });
+      await expect(staff.sendTestFor(TEST_FOR)).resolves.toEqual(TESTS_FOR);
 
       expect(reached).toEqual([
-        "setEnrolled:user-staff",
         "setArmed:user-staff",
         "sendTest:user-staff",
+        "sendMyTests:user-staff",
+        "sendTestFor:user-staff",
       ]);
     });
   });
@@ -214,18 +239,79 @@ describe("the digest's operator controls at the platform door", () => {
       const staff = call("user-staff");
 
       const refusals = [
-        await staff.setEnrolled(ENROL).catch((error: unknown) => error),
         await staff.setArmed(ARM).catch((error: unknown) => error),
         await staff.sendTest(TEST_SEND).catch((error: unknown) => error),
+        await staff.sendMyTests({}).catch((error: unknown) => error),
+        await staff.sendTestFor(TEST_FOR).catch((error: unknown) => error),
       ];
 
       expect(refusals.map(codeOf)).toEqual(
         refusals.map(() => ({ trpc: "NOT_FOUND", code: "not_found" })),
       );
-      expect(askedOps).toEqual(["user-staff", "user-staff", "user-staff"]);
-      expect(await repositories.audience.findEnrolled()).toEqual([]);
+      expect(askedOps).toEqual(["user-staff", "user-staff", "user-staff", "user-staff"]);
       expect((await repositories.audience.getSettings()).armed).toBe(false);
       expect(mail.sent).toEqual([]);
+    });
+  });
+});
+
+describe("the digest's own-preference procedures", () => {
+  describe("when a signed-in person who is not staff reads and sets their choice", () => {
+    /** @scenario "A person turns the weekly digest off and on in their settings" */
+    it("reaches the application as themselves, with no staff grant needed", async () => {
+      const reached: string[] = [];
+      const pat = recordingDigest(reached)("user-pat");
+
+      await expect(pat.getMyPreference({})).resolves.toEqual({ subscribed: true });
+      await expect(pat.setMyPreference({ subscribed: false })).resolves.toEqual({
+        subscribed: false,
+      });
+
+      expect(reached).toEqual(["getPreference:user-pat", "setPreference:user-pat:false"]);
+    });
+
+    /** @scenario "A person turns the weekly digest off and on in their settings" */
+    it("cannot name another person: the input carries no user", async () => {
+      const reached: string[] = [];
+      const pat = recordingDigest(reached)("user-pat");
+
+      await pat.setMyPreference({ subscribed: false, userId: "user-sam" } as never);
+
+      expect(reached).toEqual(["setPreference:user-pat:false"]);
+    });
+  });
+
+  describe("when staff impersonate a person", () => {
+    /** @scenario "Impersonating staff can see a person's email choice but not change it" */
+    it("reads the person's own choice and names the impersonator on a write", async () => {
+      const reached: string[] = [];
+      const staff = recordingDigest(reached)("user-pat", "user-staff");
+
+      await staff.getMyPreference({});
+      await staff.setMyPreference({ subscribed: false });
+
+      expect(reached).toEqual([
+        "getPreference:user-pat",
+        "setPreference:user-pat:false:by user-staff",
+      ]);
+    });
+  });
+
+  describe("when nobody is signed in", () => {
+    it("refuses with 401 before the application", async () => {
+      const reached: string[] = [];
+      const anonymous = recordingDigest(reached)(null);
+
+      const refusals = await Promise.all([
+        anonymous.getMyPreference({}).catch((error: unknown) => error),
+        anonymous.setMyPreference({ subscribed: false }).catch((error: unknown) => error),
+      ]);
+
+      expect(refusals.map((refusal) => codeOf(refusal).trpc)).toEqual([
+        "UNAUTHORIZED",
+        "UNAUTHORIZED",
+      ]);
+      expect(reached).toEqual([]);
     });
   });
 });

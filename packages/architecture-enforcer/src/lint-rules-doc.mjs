@@ -108,7 +108,7 @@ export function renderLintRuleDocs(root = workspaceRoot) {
     "`defineRule` declaration each one is written in. A printed message is `what`, then a",
     "one-line `why`, then `fix`.",
     "",
-    ...names.map((name) => `- [\`langwatch/${name}\`](#langwatch${name.replaceAll("-", "")})`),
+    ...names.map((name) => `- [\`langwatch/${name}\`](#langwatch${name})`),
     "",
     ...names.flatMap((name) => ruleSection(root, name, rules[name])),
   ];

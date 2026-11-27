@@ -5,8 +5,10 @@ ADR-001). Requirements: `enterprise/modules/digest/specs/digest.feature`.
 
 LangWatch Cloud sends each person one short weekly email about what their usage did that week, with an
 optional "what's new" card. Mail goes out through our own `NotificationApi.sendEmail`; no third party.
-It is sent weekly, anyone can unsubscribe in one click, and we measure clicks and unsubscribes. We start with
-a hand-picked cohort, chosen from a gallery in Cloud admin that previews each person's real email first.
+It is sent weekly, anyone can unsubscribe in one click or from Profile settings, and we measure clicks and
+unsubscribes. We start with
+everyone, one email per person per organization (digest ADR-002); there is no enrolment, only the `armed`
+kill switch and each person's opt-out.
 
 ## Home
 
@@ -17,25 +19,23 @@ operator route admits through `OpsApi.admitCloudAdmin` and answers `not_found` e
 
 ## Where the numbers come from
 
-Every number is a running projection digest folds from the owners' events as they happen; nothing is
-queried per person at send time. Subscribers live in digest, on each owner's pipeline (§9, nurturing's
-shape): each extracts bounded facts and sends digest's `recordActivity` command, keyed by aggregate
-`(projectId, isoWeek)` or `(userId, isoWeek)`, with `coalesceMaxBatch` so a burst of spans drains as one
-batched append (coding-agent's source subscribers are the precedent, ADR-056).
+Trace numbers (traces, errors, tokens, cost, p50/p95, top models by traces) are read from analytics
+(`AnalyticsApi.getTimeseries`) when an email needs them, never folded: platform span traffic writes no
+digest row (ADR-002). The other facts are still folded from the owners' events: subscribers live in
+digest, on each owner's pipeline (§9, nurturing's shape), extract bounded facts and send digest's
+`recordActivity` command, keyed by aggregate `(projectId, isoWeek)` or `(userId, isoWeek)`.
 
 | Owner event                                    | Facts folded                                                                                                                                                                                                                  |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| trace span received / recorded                 | traces (root spans), spans, errors, tokens, cost, latency histogram, top models (capped)                                                                                                                                      |
 | coding-agent span/log/metric facts contributed | per user: sessions (distinct `sessionId`, capped set in the fold), tokens, cost, active time; from the agents' own OTel metrics via the contract's name normalisation: lines, commits, pull requests (`*.pull_request.count`) |
-| evaluation completed                           | runs, passed, failed, errored, per evaluator (capped)                                                                                                                                                                         |
-| scenario simulation run finished               | runs, passed, failed per project                                                                                                                                                                                              |
-| plan limit                                     | the one read at send: `EntitlementApi.getUsage`, for each member's send                                                                                                                                                       |
+| evaluation completed                           | runs, passed, failed, per evaluator (capped)                                                                                                                                                                                  |
+| scenario run finished (`scenarioRunFinished`)  | simulation runs: runs, passed, failed (`applyScenario`)                                                                                                                                                                       |
+| plan limit (read, not folded)                  | `EntitlementApi.getUsage`, read once per send for the plan-pressure pick                                                                                                                                                      |
 
-Suite items are not folded: no template reads them. Only projects of enrolled organizations fold.
+Suite items are not folded: no template reads them. Every live project folds.
 
-Projections (fold, Postgres, the sent week and its four-week baseline kept, older rows swept by the hourly wake):
-`DigestProjectWeek`, `DigestUserWeek`. Latency is a fixed bucket histogram so p50/p95 fold without
-keeping spans. Folds hold ids and numbers only; names and addresses are read from `UserApi`,
+Projections (Postgres, the sent week and its four-week baseline kept, older rows swept by the hourly wake):
+`DigestProjectWeek`, `DigestUserWeek`. Folds hold ids and numbers only; names and addresses are read from `UserApi`,
 `OrganizationApi` and `ProjectApi` when an email is rendered, never stored (nurturing's rule).
 
 ## Templates (separate, in `@langwatch/mail`)
@@ -59,11 +59,9 @@ Until the "what's new" editor exists no card is published, so a person whose pic
 
 ## Tables (Postgres, owned by digest)
 
-- `DigestCohortOrganization`: organizations enrolled in the send (default: none, so nothing sends).
-  Only their projects fold.
 - `DigestSubscription`: per user; `unsubscribedAt`, `unsubscribedFromSendId`. No row = subscribed.
 - `DigestProjectWeek`, `DigestUserWeek`: the fold projections above; the send reads them.
-- `DigestSend`: one per user per week (id `userId:isoWeek`), holding template, ISO week, sentAt.
+- `DigestSend`: one per person per organization per week (id `userId:organizationId:isoWeek`), holding template, ISO week, sentAt.
 - `DigestSettings`: a singleton holding `armed` (the weekly send's master switch, default false) and the
   last planned week.
 - Not built: `DigestClick` (send id, link key, at), `DigestUpdate` (the "what's new" card), and
@@ -71,15 +69,15 @@ Until the "what's new" editor exists no card is published, so a person whose pic
 
 ## Pipeline (`digest`)
 
-- Subscribers on trace, coding-agent, evaluation and scenario events → `recordActivity` →
+- Subscribers on coding-agent, evaluation and scenario events → `recordActivity` →
   the two weekly fold projections, all week long.
 - Scheduled process manager (`digest_send`), hourly wake: from Monday 08:00 UTC hands the outbox
   one plan of last week, and before then none. When settings are armed and that week is not
-  yet planned, the plan asks one send per enrolled member, and each ask becomes one `sendDigest`
-  intent keyed `(userId, isoWeek)`, so a redelivery sends nothing. The intent reads the finished
-  week's folds, picks the template, renders it, claims the `DigestSend` row and, only if it took
-  the claim, sends it with the idempotency key `digest:{userId}:{isoWeek}`. Disarmed sends, unsubscribed users,
-  people with no address and members of organizations no longer enrolled are skipped when the intent
+  yet planned, the plan asks one plan per organization, which asks one send per member, and each ask
+  becomes one `sendDigest` intent keyed `(userId, organizationId, isoWeek)`, so a redelivery sends nothing. The intent reads the finished
+  week (trace numbers from analytics, the rest from the folds), picks the template, renders it, claims the `DigestSend` row and, only if it took
+  the claim, sends it with the idempotency key `digest:{userId}:{organizationId}:{isoWeek}`. Disarmed sends, unsubscribed users
+  and people with no address are skipped when the intent
   is handled. The same wake sweeps folds older than the sent week's four-week baseline.
 
 ## Transports
@@ -93,14 +91,14 @@ Until the "what's new" editor exists no card is published, so a person whose pic
     a link key only, the target URL read from `DigestSend.links`, so there is no open redirect), and a
     per-caller rate limit on that click route. The unsubscribe routes are limited per caller, as
     automation's pair is, and past the limit answer 429 `digest_unsubscribe_rate_limited`.
-- tRPC `digest.*` (Cloud admin only, `ops:manage`): enrol/unenrol an organization, arm/disarm, send
+- tRPC `digest.*` (Cloud admin only, `ops:manage`): arm/disarm, send
   myself a test of a member's email (to the operator's own address, `[Test]` in the subject, no
-  `DigestSend` row). Not built: cohort list, preview, refresh, the update editor, metrics.
+  `DigestSend` row). Not built: preview, refresh, the update editor, metrics.
 
 ## Gallery: `/ops/cloud/digests` (digest's browser package, `requires: "ops:manage"`; not built)
 
-- Cohort table from the current and last week's folds, sortable by: coding-agent cost, coding-agent sessions,
-  traces this week, % of plan limit, scenario runs, members, template picked. Enrolled toggle per row.
+- Organization table from the current and last week's numbers, sortable by: coding-agent cost, coding-agent sessions,
+  traces this week, % of plan limit, scenario runs, members, template picked.
 - A person's row opens their email: every eligible template side by side (desktop, mobile, dark),
   the picked one marked, and "send to me" as a test.
 - "What's new" editor with a live card preview. An arm switch that shows how many people would receive mail.
@@ -109,4 +107,4 @@ Until the "what's new" editor exists no card is published, so a person whose pic
 ## Out of v1
 
 Open tracking (Apple Mail privacy pre-fetch inflates opens past use), per-template unsubscribe (one
-list, one opt-out), per-timezone send time, a link from user settings. Add them when the metrics call for it.
+list, one opt-out), per-timezone send time. Add them when the metrics call for it.

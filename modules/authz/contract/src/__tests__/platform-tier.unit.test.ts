@@ -18,16 +18,20 @@ describe("the platform tier", () => {
         expect(bindingScopeCanGrantPermission({ scopeType, permission: "opsRead:view" })).toBe(
           false,
         );
+        expect(bindingScopeCanGrantPermission({ scopeType, permission: "opsCopy:create" })).toBe(
+          false,
+        );
       },
     );
   });
 
   describe("given the built-in platform-operator role", () => {
     /** @scenario The platform grant confers nothing but ops permissions */
-    it("carries ops:view, ops:manage and opsRead:view and nothing else", () => {
+    it("carries ops:view, ops:manage, opsRead:view and opsCopy:create and nothing else", () => {
       expect([...builtinRolePermissions(PLATFORM_OPERATOR_ROLE_ID)].toSorted()).toEqual([
         "ops:manage",
         "ops:view",
+        "opsCopy:create",
         "opsRead:view",
       ]);
     });

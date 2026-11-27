@@ -4,8 +4,13 @@ import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "@langwatch/design-system/provider-model-selector";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
+  judgePickerOptions,
+  LANGWATCH_JUDGE_MODEL_ID,
+  langwatchJudgePickerOption,
   LATEST_ALIAS_PROVIDERS,
   modelDisplayLabel,
   modelPickerOption,
@@ -35,8 +40,16 @@ export function SimulationModelSelect({
   featureKey: "scenarios.user_simulator" | "scenarios.judge";
   size?: "sm" | "md" | "full";
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
+  // LangWatch's own scenario judge, listed for the judge only and only where its flag is on.
+  // Asked of the organization only, as Default models and every server check ask it.
+  const judgePreview = useFeatureFlag(FrontendFlags.release_langwatch_judge_preview, {
+    projectId: NOT_TARGETED,
+    organizationId: organization?.id ?? NOT_TARGETED,
+    enabled: featureKey === "scenarios.judge" && !!organization?.id,
+  });
+  const isJudgePreviewOffered = featureKey === "scenarios.judge" && judgePreview.enabled;
 
   const projectProviders = useProjectModelProviders({ projectId });
 
@@ -72,16 +85,22 @@ export function SimulationModelSelect({
 
   // Configured custom-model display names, keyed by `<provider>/<modelId>`.
   const displayNames = useMemo(
-    () => buildCustomModelDisplayNames(projectProviders.data ?? []),
+    () => ({
+      ...buildCustomModelDisplayNames(projectProviders.data ?? []),
+      [LANGWATCH_JUDGE_MODEL_ID]: langwatchJudgePickerOption().label,
+    }),
     [projectProviders.data],
   );
 
   const query = useMemo(
     () => ({
-      data: options.map((modelValue) => modelPickerOption({ displayNames, modelValue })),
+      data: judgePickerOptions({
+        llmOptions: options.map((modelValue) => modelPickerOption({ displayNames, modelValue })),
+        isJudgePreviewOffered,
+      }),
       isLoading: projectProviders.isLoading,
     }),
-    [options, displayNames, projectProviders.isLoading],
+    [options, displayNames, projectProviders.isLoading, isJudgePreviewOffered],
   );
 
   const inheritModel = resolvedDefault.data?.model ?? "";

@@ -21,7 +21,7 @@ export type DigestUpdate = z.infer<typeof digestUpdateSchema>;
 export const digestCommonFields = {
   weekLabel: z.string().min(1).describe("The week this covers, e.g. Sep 22 to 28"),
   whatsNew: digestUpdateSchema.optional().describe("Published for the week, or absent"),
-  unsubscribeUrl: z.url().describe("Already a tracked redirect"),
+  preferencesUrl: z.url().describe("Where the footer link opens: the person's email preferences"),
 };
 
 /** Pastel cuts over a solid, so a client that drops gradients keeps a flat tint. */
@@ -105,12 +105,12 @@ const Hero = ({ value, caption }: { value: string; caption: string }) => (
   </Section>
 );
 
-/** Why it arrived, and the one-click way out. */
-const DigestFootNote = ({ reason, unsubscribeUrl }: { reason: string; unsubscribeUrl: string }) => (
+/** Why it arrived, and where to turn it off: the person's email preferences. */
+const DigestFootNote = ({ reason, preferencesUrl }: { reason: string; preferencesUrl: string }) => (
   <>
     {`${reason} `}
-    <InlineLink href={unsubscribeUrl}>Unsubscribe</InlineLink>
-    {" from the weekly summary."}
+    <InlineLink href={preferencesUrl}>Manage your email preferences</InlineLink>
+    {" to turn off the weekly summary."}
   </>
 );
 
@@ -124,7 +124,7 @@ export const DigestFrame = ({
   hero,
   whatsNew,
   reason,
-  unsubscribeUrl,
+  preferencesUrl,
   children,
 }: {
   preview: string;
@@ -132,13 +132,13 @@ export const DigestFrame = ({
   hero?: { value: string; caption: string };
   whatsNew?: DigestUpdate;
   reason: string;
-  unsubscribeUrl: string;
+  preferencesUrl: string;
   children?: ReactNode;
 }) => (
   <EmailLayout
     preview={preview}
     heading={heading}
-    footNote={<DigestFootNote reason={reason} unsubscribeUrl={unsubscribeUrl} />}
+    footNote={<DigestFootNote reason={reason} preferencesUrl={preferencesUrl} />}
   >
     {hero && <Hero value={hero.value} caption={hero.caption} />}
     {whatsNew && <WhatsNewCard update={whatsNew} />}

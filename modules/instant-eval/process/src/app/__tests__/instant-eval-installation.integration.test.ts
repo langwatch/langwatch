@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-api.feature
  * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  * @see specs/model-providers/instant-evals-decision-model.feature
+ * @see specs/lwql/eval-functions.feature
  */
 import type {
   AnalyticsApi,
@@ -23,6 +24,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  INSTANT_EVALS_SEARCH_ROUTER_FLAG,
   InstantEvalApi,
   type InstantEvalActor,
   InstantEvalMemoryJudgeInProductionError,
@@ -161,7 +163,9 @@ function installation({
   recordOptIn = async () => undefined,
   decisionModel = { kind: "langwatch" },
   judgeClassify,
+  judge = {},
   isHostedOff = false,
+  isSearchRouted = false,
 }: {
   /** What the release flag answers: on the hosted service it releases an enterprise plan only. */
   isReleased?: boolean;
@@ -194,8 +198,12 @@ function installation({
   decisionModel?: DecisionModelResolution;
   /** The Instant Evals judge's classify, for a test that reads what it was asked. */
   judgeClassify?: InstantEvalJudgeApi["classify"];
+  /** Further Instant Evals judge operations a test answers itself. */
+  judge?: Partial<InstantEvalJudgeApi>;
   /** Whether LangWatch switched its hosted model off for the organization. */
   isHostedOff?: boolean;
+  /** What the search router flag answers, apart from the release flag. */
+  isSearchRouted?: boolean;
 } = {}) {
   return (
     createApp({ role: "api" })
@@ -268,8 +276,11 @@ function installation({
         }),
         authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
-          isEnabled: async (flagKey) =>
-            flagKey === INSTANT_EVALS_HOSTED_DISABLED_FLAG ? isHostedOff : isReleased,
+          isEnabled: async (flagKey) => {
+            if (flagKey === INSTANT_EVALS_HOSTED_DISABLED_FLAG) return isHostedOff;
+            if (flagKey === INSTANT_EVALS_SEARCH_ROUTER_FLAG) return isSearchRouted;
+            return isReleased;
+          },
         }),
         // A project runs on LangWatch Instant (preview) unless a test names its own model
         // (ADR-182).
@@ -280,6 +291,7 @@ function installation({
         "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>({
           isClassifierConfigured: async () => judgeKey !== null,
           ...(judgeClassify ? { classify: judgeClassify } : {}),
+          ...judge,
         }),
       })
   );
@@ -811,6 +823,52 @@ describe("given a project whose Instant Evals column names its own decision mode
       );
 
       expect(leaf.asked.map((request) => request.decisionModel?.apiKey)).toEqual(["customer-key"]);
+    });
+  });
+});
+
+describe("given a judged query on LangWatch's cloud judge", () => {
+  const judgedQuery = async ({ isSearchRouted }: { isSearchRouted: boolean }) => {
+    const leaf = judgeLeaf();
+    await withInstallation(
+      {
+        isSearchRouted,
+        isFreePlan: false,
+        judgeClassify: leaf.classify,
+        judge: {
+          queryHoldPricing: async () => INSTANT_EVAL_PRICING,
+          recordSpend: async () => undefined,
+        },
+      },
+      (api) =>
+        api.judgeQuery({
+          projectId: PROJECT,
+          judgements: [JUDGEMENT],
+          rows: [{ polite: "thank you" }],
+        }),
+    );
+    return leaf.asked;
+  };
+
+  describe("when the search router flag is on", () => {
+    /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+    it("hands the judge the search route and a cost ceiling", async () => {
+      const asked = await judgedQuery({ isSearchRouted: true });
+
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.route).toEqual({ job: "search" });
+      expect(asked[0]?.costCeiling).toBeDefined();
+    });
+  });
+
+  describe("when the search router flag is off", () => {
+    /** @scenario "With the search router flag off a judged query sends no route" */
+    it("hands the judge no route and no cost ceiling", async () => {
+      const asked = await judgedQuery({ isSearchRouted: false });
+
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.route).toBeUndefined();
+      expect(asked[0]?.costCeiling).toBeUndefined();
     });
   });
 });

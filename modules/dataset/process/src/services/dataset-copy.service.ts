@@ -1,5 +1,7 @@
 import {
   copyDatasetInputSchema,
+  DatasetChunkCountMissingError,
+  DatasetCopyInterruptedError,
   type CopyDatasetInput,
   type Dataset,
   type DatasetNameInput,
@@ -7,6 +9,7 @@ import {
 } from "@langwatch/dataset-contract";
 
 import type { DatasetContent, DatasetSeedRow } from "../app/dataset.app.ts";
+import { assertReady } from "../rules/dataset-chunk-lines.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
@@ -56,23 +59,29 @@ export class DatasetCopyService {
       });
     }
 
+    // Refuse before the target exists, so a refusal never leaves a half-made copy behind.
+    assertReady(source);
+    if (source.chunkCount === null) throw new DatasetChunkCountMissingError(source.id);
     // The new dataset is born empty in object storage; the content copy fills its chunks.
     const target = await this.deps.upsertDataset({
       projectId: parsed.targetProjectId,
       name,
       columnTypes: source.columnTypes,
     });
-    await options.content.copyDataset({
-      source,
-      sourceProjectId: parsed.sourceProjectId,
-      target,
-      targetProjectId: parsed.targetProjectId,
-    });
-
-    return this.deps.getBySlugOrId({
-      projectId: parsed.targetProjectId,
-      slugOrId: target.id,
-    });
+    try {
+      await options.content.copyDataset({
+        source,
+        sourceProjectId: parsed.sourceProjectId,
+        target,
+        targetProjectId: parsed.targetProjectId,
+      });
+      return await this.deps.getBySlugOrId({
+        projectId: parsed.targetProjectId,
+        slugOrId: target.id,
+      });
+    } catch (cause) {
+      throw new DatasetCopyInterruptedError({ targetDatasetId: target.id, cause });
+    }
   }
 
   /**

@@ -1,28 +1,39 @@
 import { memoryRedisDouble, redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { ReplayClaimsIndex } from "../replayClaimsIndex.ts";
 import { waitForActiveJobs } from "../replayDrain.ts";
+
+/** A claims index listing `groups` until each is released; records every question asked. */
+function claimsIndexHolding(groups: string[], { ready = true }: { ready?: boolean } = {}) {
+  const held = new Set(groups);
+  const asked: { tenantId: string; groupIdPrefix: string }[] = [];
+  return {
+    asked,
+    release: (groupId: string) => held.delete(groupId),
+    isReady: async () => ready,
+    claimedGroups: async (question: { tenantId: string; groupIdPrefix: string }) => {
+      asked.push(question);
+      return [...held].filter((groupId) => groupId.startsWith(question.groupIdPrefix));
+    },
+  } satisfies ReplayClaimsIndex & Record<string, unknown>;
+}
 
 describe("replay drain", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("scans the tenant-scoped state queue until its active group drains", async () => {
+  /** @scenario "A replay drain asks the queue for a tenant's claimed groups instead of walking Redis" */
+  it("asks the queue for the tenant's claimed state groups until the group drains, never scanning", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
-
-    const scan = vi
-      .fn()
-      .mockResolvedValueOnce([
-        "0",
-        ["{event-sourcing/jobs}:gq:group:project-1/state/conversationState/conversation-1:active"],
-      ])
-      .mockResolvedValue(["0", []]);
-    const redis = redisDouble({ scan });
+    const scan = vi.fn().mockResolvedValue(["0", []]);
+    const claims = claimsIndexHolding(["project-1/state/conversationState/conversation-1"]);
 
     const drained = waitForActiveJobs({
-      redis,
+      redis: redisDouble({ scan }),
+      claims,
       aggregates: [
         {
           tenantId: "project-1",
@@ -34,28 +45,33 @@ describe("replay drain", () => {
       kind: "state",
       maxWaitMs: 1_000,
     });
-
+    await vi.advanceTimersByTimeAsync(0);
+    claims.release("project-1/state/conversationState/conversation-1");
     await vi.advanceTimersByTimeAsync(200);
     await drained;
 
-    expect(scan).toHaveBeenNthCalledWith(
-      1,
-      "0",
-      "MATCH",
-      "{event-sourcing/jobs}:gq:group:project-1/state/conversationState/*:active",
-      "COUNT",
-      500,
-    );
-    // The second poll also asks for a claimed record a dead worker left behind.
-    expect(scan).toHaveBeenNthCalledWith(
-      3,
-      "0",
-      "MATCH",
-      "{event-sourcing/jobs}:gq:group:project-1/state/conversationState/*:claimed",
-      "COUNT",
-      500,
-    );
-    expect(scan).toHaveBeenCalledTimes(3);
+    expect(claims.asked).toEqual([
+      { tenantId: "project-1", groupIdPrefix: "project-1/state/conversationState/" },
+      { tenantId: "project-1", groupIdPrefix: "project-1/state/conversationState/" },
+    ]);
+    expect(scan).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A replay drain refuses an index that is not ready" */
+  it("fails closed with a named code when the claims index is not ready", async () => {
+    const scan = vi.fn().mockResolvedValue(["0", []]);
+
+    const drained = waitForActiveJobs({
+      redis: redisDouble({ scan }),
+      claims: claimsIndexHolding([], { ready: false }),
+      aggregates: [{ tenantId: "project-1", aggregateType: "trace", aggregateId: "trace-1" }],
+      projectionName: "spanAnalytics",
+      kind: "map",
+      maxWaitMs: 1_000,
+    });
+
+    await expect(drained).rejects.toMatchObject({ code: "replay_claims_index_not_ready" });
+    expect(scan).not.toHaveBeenCalled();
   });
 
   describe("given a group a worker that died left a claimed record for, with no active key", () => {
@@ -67,6 +83,27 @@ describe("replay drain", () => {
     function redisHolding(claimedKey: string) {
       const redis = memoryRedisDouble();
       return { redis, seed: () => redis.hset(claimedKey, "token", "1000.1") };
+    }
+
+    /** The queue's view of the same record: listed while the claimed key exists. */
+    function claimsOver({
+      redis,
+      claimedKey,
+    }: {
+      redis: ReturnType<typeof memoryRedisDouble>;
+      claimedKey: string;
+    }): ReplayClaimsIndex {
+      const groupId = claimedKey.slice(
+        "{event-sourcing/jobs}:gq:group:".length,
+        -":claimed".length,
+      );
+      return {
+        isReady: async () => true,
+        claimedGroups: async ({ groupIdPrefix }) =>
+          (await redis.hget(claimedKey, "token")) !== null && groupId.startsWith(groupIdPrefix)
+            ? [groupId]
+            : [],
+      };
     }
 
     async function waitsUntilClaimedRecordGoes({
@@ -84,6 +121,7 @@ describe("replay drain", () => {
       let settled = false;
       const drained = waitForActiveJobs({
         redis,
+        claims: claimsOver({ redis, claimedKey }),
         aggregates,
         projectionName,
         kind,
@@ -112,7 +150,7 @@ describe("replay drain", () => {
     });
 
     /** @scenario "A projection replay waits for a group holding a claimed record" */
-    it("treats a scanned state group as in flight until the record is gone", async () => {
+    it("treats a listed state group as in flight until the record is gone", async () => {
       const drained = await waitsUntilClaimedRecordGoes({
         claimedKey: `${GROUP_PREFIX}/state/conversationState/conversation-1:claimed`,
         projectionName: "conversationState",

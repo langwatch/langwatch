@@ -2555,6 +2555,25 @@ const presentations = {
     title: "That request was already answered",
     describe: () => "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
   },
+  judge_preview_budget_exhausted: {
+    title: "Your free LangWatch Judge budget is used up",
+    describe: () =>
+      "This run was not judged. Upgrade your plan under Settings, Plan & billing, or pick another judge model.",
+  },
+  judge_preview_not_available: {
+    title: "LangWatch Judge (preview) isn't available for this project",
+    describe: () =>
+      "It is off for this organization, or this project cannot use it yet. Pick another judge model.",
+  },
+  judge_preview_request_invalid: {
+    title: "LangWatch Judge (preview) can't judge this run",
+    describe: () =>
+      "The run asked for a judgement this judge doesn't support. Pick another judge model for it.",
+  },
+  judge_preview_unavailable: {
+    title: "LangWatch Judge (preview) couldn't answer right now",
+    describe: () => "This run was not judged. Run it again, or pick another judge model.",
+  },
   join_request_already_pending: {
     title: "You have already asked",
     describe: () =>
@@ -3050,6 +3069,34 @@ const presentations = {
     title: "Secrets are unavailable",
     describe: () =>
       "The development secrets source could not be read. Sign in to it and try again.",
+  },
+  staff_copy_source_invalid: {
+    title: "The copy's source session is not valid",
+    describe: () =>
+      "An organization copy names its source session by that session's own ops token, and this one was not recognised.",
+  },
+  staff_copy_scope_missing: {
+    title: "This approval does not cover a copy",
+    describe: () =>
+      "A copy needs one approval for copy:source on the source organization and one for copy:target on the target, each naming the other organization.",
+  },
+  staff_copy_same_organization: {
+    title: "The source and target are the same organization",
+    describe: () => "A copy goes from one organization into a different one.",
+  },
+  staff_copy_approvals_mismatch: {
+    title: "The two approvals do not belong together",
+    describe: () => "Both approvals of a copy must come from the same agent and the same operator.",
+  },
+  staff_copy_direction_mismatch: {
+    title: "The two approvals name different copies",
+    describe: () =>
+      "Each approval of a copy names the other organization, and these two do not name each other.",
+  },
+  staff_copy_window_closed: {
+    title: "The source approval is no longer live",
+    describe: () =>
+      "Both approvals of a copy must be live at the same time, and the source one expired, ended or was revoked.",
   },
   staff_access_unavailable: {
     title: "Staff access is not available here",
@@ -4989,6 +5036,10 @@ const presentations = {
     describe: () =>
       "Only active members of this organization can get a test digest. Pick someone else.",
   },
+  digest_impersonation_refused: {
+    title: "Can't change this while impersonating",
+    describe: () => "Email preferences belong to the person. Stop impersonating to change them.",
+  },
   digest_link_invalid: {
     title: "This link isn't valid",
     describe: () => "It may have expired or been changed. Use the link from the latest email.",
@@ -5006,9 +5057,9 @@ const presentations = {
     title: "Your account has no email address",
     describe: () => "Add an email address to your account, then send the test again.",
   },
-  digest_organization_not_enrolled: {
-    title: "Organization not enrolled",
-    describe: () => "Enrol this organization in the digest before sending a test.",
+  digest_person_not_found: {
+    title: "No account with that email",
+    describe: () => "No LangWatch account uses that email address. Check it and try again.",
   },
   digest_member_unsubscribed: {
     title: "Member opted out",

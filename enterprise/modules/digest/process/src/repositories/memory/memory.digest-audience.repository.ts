@@ -9,29 +9,11 @@ export class MemoryDigestAudienceRepository implements DigestAudienceRepository 
     return new MemoryDigestAudienceRepository();
   }
 
-  readonly #enrolled = new Set<string>();
   /** Each opted-out person, with the send their unsubscribe came from. */
   readonly #unsubscribed = new Map<string, string>();
   #settings: DigestSettingsRecord = { armed: false, lastPlannedWeek: null };
 
   private constructor() {}
-
-  findEnrolled(): Promise<string[]> {
-    return Promise.resolve([...this.#enrolled]);
-  }
-
-  setEnrolled({
-    organizationId,
-    enrolled,
-  }: {
-    organizationId: string;
-    enrolled: boolean;
-    by: string;
-  }): Promise<void> {
-    if (enrolled) this.#enrolled.add(organizationId);
-    else this.#enrolled.delete(organizationId);
-    return Promise.resolve();
-  }
 
   findUnsubscribed({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
     return Promise.resolve(userIds.filter((userId) => this.#unsubscribed.has(userId)));

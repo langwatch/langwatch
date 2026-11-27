@@ -84,6 +84,8 @@ async function judgeQuery(spend: InstantEvalJudgedSpendService): Promise<void> {
     spend,
     holdPricing: async () => INSTANT_EVAL_PRICING,
     queryTokenBudget: 4_000_000,
+    searchRouting: { isRouted: async () => false },
+    ownModels: { isOwnDecisionModel: async () => false },
     now: () => AT,
   });
   await queries.judgeQuery({

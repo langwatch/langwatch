@@ -47,6 +47,11 @@ import type { BlobStoreService } from "./blob-store.service.ts";
 import type { ImpersonationService } from "./impersonation.service.ts";
 import type { InsightScheduleOpsService } from "./insight-schedule-ops.service.ts";
 import type { InstanceAdminService } from "./instance-admin.service.ts";
+import type {
+  QueueTenantClaimsFillService,
+  TenantClaimsFillInput,
+  TenantClaimsFillOutcome,
+} from "./queue-tenant-claims-fill.service.ts";
 import type { QueueService } from "./queue.service.ts";
 import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
 
@@ -60,6 +65,7 @@ export class OpsService {
   private readonly insightSchedules: InsightScheduleOpsService;
   private readonly anomalyState: AnomalyStateRepository | null;
   private readonly queues: QueueService;
+  private readonly claimsFill: QueueTenantClaimsFillService;
   readonly eventExplorer: OpsExplorers["eventExplorer"];
   readonly managerExplorer: OpsExplorers["managerExplorer"];
   readonly replay: OpsExplorers["replay"];
@@ -74,6 +80,7 @@ export class OpsService {
     insightSchedules: InsightScheduleOpsService;
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
+    claimsFill: QueueTenantClaimsFillService;
     explorers: OpsExplorers;
   }) {
     this.eventExplorer = deps.explorers.eventExplorer;
@@ -88,6 +95,7 @@ export class OpsService {
     this.insightSchedules = deps.insightSchedules;
     this.anomalyState = deps.anomalyState;
     this.queues = deps.queues;
+    this.claimsFill = deps.claimsFill;
   }
 
   static create(options: {
@@ -99,6 +107,7 @@ export class OpsService {
     insightSchedules: InsightScheduleOpsService;
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
+    claimsFill: QueueTenantClaimsFillService;
     explorers: OpsExplorers;
   }): OpsService {
     return new OpsService(options);
@@ -405,6 +414,10 @@ export class OpsService {
 
   reconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome> {
     return this.queues.reconcilePending(input);
+  }
+
+  fillQueueTenantClaims(input: TenantClaimsFillInput): Promise<TenantClaimsFillOutcome> {
+    return this.claimsFill.fill(input);
   }
 
   readQueuePendingDrift(input: { queueNames: string[] }): Promise<number> {

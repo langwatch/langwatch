@@ -1,7 +1,7 @@
 /**
- * The LLM legs' request and answer: one question as a forced `evaluation` tool call, on
- * Anthropic Messages or OpenAI Responses. Yes or no reads the tool's `result`, a score its
- * `score` inside the question's range, a category its `label` among the offered options.
+ * The LLM legs' request and answer: one question as a forced `evaluation` tool call, on each LLM
+ * wire. Yes or no reads the tool's `result`, a score its `score` inside the question's range, a
+ * category its `label` among the offered options.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
@@ -9,15 +9,22 @@ import type {
   InstantEvalBooleanQuestion,
   InstantEvalCategoryQuestion,
   InstantEvalJudgeJob,
+  InstantEvalJudgeLlmKind,
+  InstantEvalJudgeReasoningEffort,
   InstantEvalQuestion,
+  InstantEvalScenarioJudgeTool,
   InstantEvalScoreQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
 import type { InstantEvalLlmJudgeValue } from "./instant-eval-judge-sureness.rules.ts";
+import {
+  instantEvalLlmToolCallBodyOf,
+  readInstantEvalLlmToolCall,
+} from "./instant-eval-llm-tool-call-wire.rules.ts";
 
-const INSTANT_EVAL_LLM_JUDGE_WIRES = ["anthropic_messages", "openai_responses"] as const;
-export type InstantEvalLlmJudgeWire = (typeof INSTANT_EVAL_LLM_JUDGE_WIRES)[number];
+/** An LLM leg's wire is its backend kind. */
+export type InstantEvalLlmJudgeWire = InstantEvalJudgeLlmKind;
 
 const SEARCH_SYSTEM_PROMPT =
   "You are an LLM evaluator answering a yes/no question about a trace or conversation";
@@ -80,11 +87,7 @@ const TYPED_REASONING = {
     "A short justification, written before the answer: what the instructions measure, the evidence in the content that settles it (quote the values or name the tool result), and the answer that follows.",
 } as const;
 
-type EvaluationTool = Readonly<{
-  name: string;
-  description: string;
-  parameters: Readonly<Record<string, unknown>>;
-}>;
+type EvaluationTool = InstantEvalScenarioJudgeTool;
 
 function scoreTool({ min, max }: { min: number; max: number }): EvaluationTool {
   return {
@@ -126,8 +129,6 @@ function categoryTool(question: InstantEvalCategoryQuestion): EvaluationTool {
     },
   };
 }
-
-const MAX_OUTPUT_TOKENS = 8_000;
 
 /** One LLM leg's messages and the tool it is forced to call. */
 interface InstantEvalLlmJudgePrompt {
@@ -194,70 +195,48 @@ function categoryList(question: InstantEvalCategoryQuestion): string {
     .join("\n");
 }
 
+/**
+ * The request body: the tool-call wire's, with the one tool forced. A reasoning effort goes on
+ * OpenAI Responses alone, only when the backend sets one, with a reasoning-sized output cap.
+ */
 export function instantEvalLlmJudgeBodyOf({
   wire,
   model,
   prompt,
+  reasoningEffort,
+  maxOutputTokens,
 }: {
   wire: InstantEvalLlmJudgeWire;
   model: string;
   prompt: InstantEvalLlmJudgePrompt;
+  reasoningEffort?: InstantEvalJudgeReasoningEffort;
+  maxOutputTokens?: number;
 }): Record<string, unknown> {
   const { system, user, tool } = prompt;
-  if (wire === "anthropic_messages") {
-    return {
-      model,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system,
-      messages: [{ role: "user", content: user }],
-      tools: [{ name: tool.name, description: tool.description, input_schema: tool.parameters }],
-      tool_choice: { type: "tool", name: tool.name },
-    };
-  }
-  return {
+  return instantEvalLlmToolCallBodyOf({
+    wire,
     model,
-    input: [
-      { role: "developer", content: system },
-      { role: "user", content: user },
-    ],
-    max_output_tokens: MAX_OUTPUT_TOKENS,
-    store: false,
-    tools: [{ type: "function", ...tool, strict: false }],
-    tool_choice: { type: "function", name: tool.name },
-  };
+    prompt: { system, user, tools: [tool], forcedTool: tool.name },
+    ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+  });
 }
 
 const resultSchema = z.object({ result: z.union([z.boolean(), z.enum(["true", "false"])]) });
 const scoreSchema = z.object({ score: z.union([z.number(), z.string().trim().min(1)]) });
 const labelSchema = z.object({ label: z.string() });
 
-const anthropicResponseSchema = z.object({
-  content: z.array(
-    z.object({ type: z.string(), name: z.string().optional(), input: z.unknown().optional() }),
-  ),
-  usage: z
-    .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
-    .optional(),
-});
-
-const openAiResponseSchema = z.object({
-  output: z.array(
-    z.object({ type: z.string(), name: z.string().optional(), arguments: z.string().optional() }),
-  ),
-  usage: z
-    .object({ input_tokens: z.number().optional(), output_tokens: z.number().optional() })
-    .optional(),
-});
-
 type Reading =
   | Readonly<{ outcome: "value"; value: InstantEvalLlmJudgeValue }>
-  | Readonly<{ outcome: "none" }>;
+  | Readonly<{ outcome: "none"; stoppedBy?: string }>;
 
-/** What one LLM answer said: a value, or none, and the tokens it billed either way. */
+/**
+ * What one LLM answer said: a value, or none, and the tokens it billed either way. An OpenAI
+ * answer the provider marked incomplete names why in `stoppedBy` (e.g. `max_output_tokens`).
+ */
 type InstantEvalLlmJudgeReading = Reading & Readonly<{ inputTokens: number; outputTokens: number }>;
 
-const UNREADABLE: InstantEvalLlmJudgeReading = { outcome: "none", inputTokens: 0, outputTokens: 0 };
-
+/** The tool-call wire's reading of the `evaluation` call, then its value for the question. */
 export function readInstantEvalLlmJudgeAnswer({
   wire,
   body,
@@ -267,30 +246,13 @@ export function readInstantEvalLlmJudgeAnswer({
   body: unknown;
   question: InstantEvalQuestion;
 }): InstantEvalLlmJudgeReading {
-  if (wire === "anthropic_messages") {
-    const parsed = anthropicResponseSchema.safeParse(body);
-    if (!parsed.success) return UNREADABLE;
-    const call = parsed.data.content.find(
-      (part) => part.type === "tool_use" && part.name === TOOL_NAME,
-    );
-    return { ...valueOf({ input: call?.input, question }), ...usageOf(parsed.data.usage) };
-  }
-  const parsed = openAiResponseSchema.safeParse(body);
-  if (!parsed.success) return UNREADABLE;
-  const call = parsed.data.output.find(
-    (item) => item.type === "function_call" && item.name === TOOL_NAME,
-  );
-  const input = argumentsOf(call?.arguments);
-  return { ...valueOf({ input, question }), ...usageOf(parsed.data.usage) };
-}
-
-function argumentsOf(raw: string | undefined): unknown {
-  if (raw === undefined) return undefined;
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return undefined;
-  }
+  const reading = readInstantEvalLlmToolCall({ wire, body, tools: [TOOL_NAME] });
+  const { inputTokens, outputTokens } = reading;
+  const input = reading.outcome === "called" ? reading.input : undefined;
+  const value = valueOf({ input, question });
+  const stoppedBy =
+    value.outcome === "none" && reading.outcome === "none" ? reading.stoppedBy : undefined;
+  return { ...value, ...(stoppedBy ? { stoppedBy } : {}), inputTokens, outputTokens };
 }
 
 function valueOf({ input, question }: { input: unknown; question: InstantEvalQuestion }): Reading {
@@ -340,8 +302,4 @@ function labelValueOf({
     names.find((name) => name === said) ??
     names.find((name) => name.trim().toLowerCase() === loose);
   return label === undefined ? { outcome: "none" } : { outcome: "value", value: { label } };
-}
-
-function usageOf(usage: { input_tokens?: number; output_tokens?: number } | undefined) {
-  return { inputTokens: usage?.input_tokens ?? 0, outputTokens: usage?.output_tokens ?? 0 };
 }

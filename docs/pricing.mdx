@@ -36,6 +36,8 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
 
+Routed search is the exception, and LangWatch turns it on per organization. With it on, a judged query is answered by the LangWatch Judge and charged what its judge calls cost LangWatch, plus 30%, at most 0.78 USD per query by default. Runs keep the rate above. See [Limits and cost](/features/instant-evals/limits-and-cost#routed-search).
+
 Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
@@ -46,7 +48,9 @@ Every judged query and run is one spend event on the [billing events](/ai-gatewa
 
 ## PII redaction model
 
-Strict PII redaction with the LangWatch PII Redaction Model is priced separately from events, at **$0.50 per 1M characters** sent to the model, excluding VAT. Spans, log records and metric points are all billed this way. There is no free monthly amount and no minimum per record, and a record the model does not answer is not charged. See [Strict with the LangWatch PII Redaction Model](/platform/data-privacy#strict-with-the-langwatch-pii-redaction-model) for what is billed and how to turn it on.
+Strict PII redaction with the LangWatch PII Redaction Model is priced separately from events, at **$0.50 per 1M characters** sent to the model, excluding VAT, or **€0.425 per 1M characters** on a plan paid in euros. Spans, log records and metric points are all billed this way.
+
+There is no free monthly amount and no minimum per record, and a record the model does not answer is not charged. See [Strict with the LangWatch PII Redaction Model](/platform/data-privacy#strict-with-the-langwatch-pii-redaction-model) for what is billed and how to turn it on.
 
 ## Custom data retention
 

@@ -1,5 +1,7 @@
 import {
   BILLING_REPORT_COMMAND_TYPES,
+  GROWTH_INSTANT_EVAL_PRICE_NAMES,
+  GROWTH_PII_REDACTION_PRICE_NAMES,
   reportUsageForMonthCommandDataSchema,
   type ReportUsageForMonthCommandData,
   type StripePriceName,
@@ -41,6 +43,10 @@ import type { PiiRedactionSpendQueryService } from "../services/pii-redaction-sp
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
+
+/** Either currency's price prices a usage meter; a subscription has one currency. */
+const INSTANT_EVAL_PRICES = Object.values(GROWTH_INSTANT_EVAL_PRICE_NAMES);
+const PII_REDACTION_PRICES = Object.values(GROWTH_PII_REDACTION_PRICE_NAMES);
 
 const NOT_USAGE_BILLED_LOG: Record<Exclude<NotUsageBilledReason, "not_found">, string> = {
   not_usage_priced: "organization is not on usage-based pricing, skipping usage reporting",
@@ -107,7 +113,7 @@ function toError(value: unknown): Error {
 }
 
 export interface ReportUsageForMonthCommandDeps {
-  organizations: BillingReportOrganizationRepository;
+  organizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
   billingCheckpoints: BillingCheckpointRepository;
   getUsageReportingService: () => UsageReportingService | undefined;
   /** The Instant Evals meter's total, read off the gateway spend ledger. */
@@ -123,13 +129,13 @@ export interface ReportUsageForMonthCommandDeps {
   /** Whether Stripe holds the PII redaction meter in this mode; creating it starts charging. */
   isPiiRedactionMeterProvisioned: () => boolean;
   /**
-   * Whether the customer's subscription has a line on the price, and since when: Stripe bills an
-   * unpriced meter event at nothing, and usage bills only from the line (ADR-201 decision 10,
-   * ADR-174 decisions 18 and 26). A throw holds the month and counts toward the breaker.
+   * Whether the customer's subscriptions have a line on any of the prices (one per currency), and
+   * since when: Stripe bills an unpriced meter event at nothing, and usage bills only from the line
+   * (ADR-201 decisions 10 and 11, ADR-174 decisions 18 and 26). A throw holds the month.
    */
   subscriptionPriceLine: (input: {
     stripeCustomerId: string;
-    price: StripePriceName;
+    prices: readonly StripePriceName[];
     billingMonth: string;
   }) => Promise<PriceLine>;
   /** Queues a report: a convergence re-run, or a spend report's one follow-up. */
@@ -230,9 +236,9 @@ function totalWithinContractCeiling({
 }
 
 /**
- * A month the subscription or line window narrows never reports below what it already reported:
- * the window keeps use before an upgrade or a line off what is still to send, never takes back
- * what was sent (ADR-174 decisions 23 and 26). A whole-month read keeps its lower corrections.
+ * A month a seat, line or PII acceptance narrows never reports below what it reported: use before
+ * it is kept off what is still to send, never taken back once sent (ADR-174 decisions 23 and 26,
+ * ADR-201 decision 15). A whole-month read keeps its lower corrections.
  */
 function notBelowReportedInNarrowedWindow({
   measured,
@@ -313,7 +319,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
             ? Promise.resolve(WHOLE_MONTH_LINE)
             : deps.subscriptionPriceLine({
                 stripeCustomerId,
-                price: "GROWTH_INSTANT_EVAL_USD",
+                prices: INSTANT_EVAL_PRICES,
                 billingMonth,
               }),
         followsCountedEvent: false,
@@ -346,7 +352,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         priceLine: ({ stripeCustomerId, billingMonth }) =>
           deps.subscriptionPriceLine({
             stripeCustomerId,
-            price: "GROWTH_PII_REDACTION_USD",
+            prices: PII_REDACTION_PRICES,
             billingMonth,
           }),
         followsCountedEvent: false,
@@ -356,19 +362,23 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
           billingMonth,
           usageBilledSinceMs,
           lastReportedTotal,
-        }) =>
-          notBelowReportedInNarrowedWindow({
-            measured: await deps.queryPiiRedactionSpendTotal({
-              organizationId,
-              billingMonth,
-              usageBilledSinceMs,
-            }),
-            meter: PII_REDACTION_USD_EVENT_NAME,
+        }) => {
+          const measured = await deps.queryPiiRedactionSpendTotal({
             organizationId,
             billingMonth,
             usageBilledSinceMs,
+          });
+          return notBelowReportedInNarrowedWindow({
+            measured,
+            meter: PII_REDACTION_USD_EVENT_NAME,
+            organizationId,
+            billingMonth,
+            // The acceptance narrows the month as the line does; only the spend read knows it.
+            usageBilledSinceMs:
+              measured.outcome === "counted" ? measured.fromMs : usageBilledSinceMs,
             lastReportedTotal,
-          }),
+          });
+        },
         toValue: instantEvalMeterUnitsToUsd,
         identifier: piiRedactionMeterIdentifier,
       },

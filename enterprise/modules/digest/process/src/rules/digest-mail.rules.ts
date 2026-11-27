@@ -5,10 +5,16 @@ import { sendEmailCommandSchema } from "@langwatch/notification-contract";
 import type { DigestMail, RenderedDigestMail } from "../channels/digest-mail.channel.ts";
 
 /**
- * The address both the email's unsubscribe link (GET, a page) and its RFC 8058 header (POST) use.
+ * The address the email's RFC 8058 List-Unsubscribe header (POST) and its page (GET) use.
  * It lives here, not in the send service, so the route can name it without a transport naming a service.
  */
 export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
+
+/**
+ * Where the email's footer link goes: the signed-in settings page that holds the weekly digest's
+ * on/off switch. Signed-out clicks sign in first; the one-click header never uses it.
+ */
+export const DIGEST_EMAIL_PREFERENCES_PATH = "/settings/profile#email-preferences";
 
 /** The digest's own renders on `@langwatch/mail`'s `MailRender`, one per template that sends. */
 export type DigestMailRender = Pick<
@@ -31,7 +37,11 @@ export async function renderDigestMail({
   mail: DigestMail;
   renderer: DigestMailRender;
 }): Promise<RenderedDigestMail> {
-  const { subject, html } = await renderTemplate({ mail, renderer });
+  const { subject: templateSubject, html } = await renderTemplate({ mail, renderer });
+  // A person in several organizations gets one email per organization: the name tells them apart.
+  const subject = mail.organizationName
+    ? `${mail.organizationName}: ${templateSubject}`
+    : templateSubject;
   const email = sendEmailCommandSchema.parse({
     to: mail.to,
     subject: mail.test ? `[Test] ${subject}` : subject,

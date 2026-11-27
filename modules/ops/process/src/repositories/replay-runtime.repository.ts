@@ -7,5 +7,9 @@ import type { OpsReplayRuntime } from "../app/ops.app.ts";
  * deployment cannot serve a replay; the retention the rebuilt rows carry is the caller's to pass.
  */
 export abstract class ReplayRuntimeRepository {
-  abstract create(input: { retention: RetentionPolicyResolver }): OpsReplayRuntime;
+  abstract create(input: {
+    retention: RetentionPolicyResolver;
+    /** Whether the queue's claimed-groups index may be trusted (ADR-092). */
+    claimsIndexReady: () => Promise<boolean>;
+  }): OpsReplayRuntime;
 }

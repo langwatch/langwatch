@@ -1,0 +1,30 @@
+# Leaves only Ubuntu's own apt sources enabled on a hosted runner. The image ships third-party
+# repositories (packages.microsoft.com on ubuntu-26.04 answers 403 and is "no longer signed"),
+# and one broken source fails every apt-get update, including the one playwright --with-deps runs.
+#
+# Usage, before any step that runs apt-get or installs Playwright's system packages:
+#   - uses: ./.github/actions/apt-ubuntu-sources
+# Spec: specs/ci/apt-ubuntu-sources.feature
+name: apt-ubuntu-sources
+description: Disable every apt source that is not an Ubuntu archive, naming each one in the log.
+runs:
+  using: composite
+  steps:
+    - name: Disable third-party apt sources
+      id: apt-ubuntu-sources
+      shell: bash
+      run: |
+        dir="${APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+        disabled="${APT_DISABLED_DIR:-/etc/apt/sources.disabled}"
+        [ -d "$dir" ] || exit 0
+        as_root=sudo
+        [ -w "$dir" ] && as_root=
+        shopt -s nullglob
+        for source in "$dir"/*.list "$dir"/*.sources; do
+          others=$(grep -v '^[[:space:]]*#' "$source" | grep -Eo 'https?://[^/[:space:]]+' | sort -u \
+            | grep -Ev '^https?://([a-z0-9-]+\.)*ubuntu\.com$' || true)
+          [ -n "$others" ] || continue
+          $as_root mkdir -p "$disabled"
+          $as_root mv "$source" "$disabled/"
+          echo "Disabled the apt source $source ($(echo $others)): only Ubuntu archives stay enabled"
+        done

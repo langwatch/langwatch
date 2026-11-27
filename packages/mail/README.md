@@ -1,6 +1,6 @@
 # @langwatch/mail
 
-The fifteen transactional messages the identity, organization and billing surfaces
+Every transactional message the identity, organization and billing surfaces
 send. Rendering lives here; notification owns sending (`NotificationApi.sendEmail`).
 
 ## The preview studio
@@ -9,11 +9,14 @@ send. Rendering lives here; notification owns sending (`NotificationApi.sendEmai
 pnpm --filter @langwatch/mail dev     # http://localhost:5566
 ```
 
-Every message, every fixture, rendered live. The left rail lists them; the centre
-shows the email at desktop and mobile widths with HTML and plain-text tabs, a dark
-preview toggle, copy-HTML and open-in-new-tab; the right pane is a form generated
-from the template's zod schema that re-renders as you type. Props that fail the
-schema are shown as a rejection rather than a broken email.
+Every message, every fixture, rendered live. The left rail lists them under plain
+headings (`preview/studio-groups.ts` maps each id; an unmapped one lands under Other);
+clicking one opens its first fixture, and a message with several fixtures shows them as
+chips under its row. The centre shows the email at desktop and mobile widths with HTML
+and plain-text tabs, copy-HTML and open-in-new-tab; under it, **Edit sample data** opens a
+form generated from the template's zod schema that re-renders as you type. Props that fail
+the schema are shown as a rejection rather than a broken email. A short guide sits at the
+top until it is dismissed.
 
 It renders in Node through the same `@react-email` call the product sends with, so
 the preview cannot drift from the mail that arrives. Editing a template file

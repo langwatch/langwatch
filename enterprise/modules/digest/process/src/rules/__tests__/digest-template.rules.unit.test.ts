@@ -11,6 +11,7 @@ import {
   type DigestTemplateInput,
   eligibleDigestTemplates,
   pickDigestTemplate,
+  pickDigestTemplatesToTry,
 } from "../digest-template.rules.ts";
 
 type InputOverrides = {
@@ -314,6 +315,95 @@ describe("pickDigestTemplate()", () => {
       expect(pickDigestTemplate(input({ project: { traces: 999 } })).template).toBe(
         "digest-whats-new",
       );
+    });
+  });
+});
+
+describe("pickDigestTemplatesToTry()", () => {
+  describe("when a staff test asks for what the person would get", () => {
+    /** @scenario "Staff send themselves a person's digests as that person would get them" */
+    it("tries the weekly send's own order", () => {
+      const quiet = input({ project: { traces: 12_000 } });
+
+      expect(pickDigestTemplatesToTry({ template: "auto", input: quiet })).toEqual(
+        eligibleDigestTemplates(quiet),
+      );
+    });
+  });
+
+  describe("when a staff test forces a template below its threshold", () => {
+    /** @scenario "Staff force one digest for a person, past its threshold" */
+    it("tries that template alone", () => {
+      const light = input({
+        member: { isOrganizationAdmin: true, codingAgentSessions: 1 },
+        project: { traces: 40 },
+      });
+
+      expect(pickDigestTemplatesToTry({ template: "digest-traces-week", input: light })).toEqual([
+        { template: "digest-traces-week" },
+      ]);
+      expect(
+        pickDigestTemplatesToTry({ template: "digest-coding-agent-week", input: light }),
+      ).toEqual([{ template: "digest-coding-agent-week" }]);
+      expect(pickDigestTemplatesToTry({ template: "digest-plan-pressure", input: light })).toEqual([
+        { template: "digest-plan-pressure" },
+      ]);
+    });
+
+    it("forces a scenario trend the way the rate moved, however little", () => {
+      const slightlyWorse = input({
+        // 15% failing against a 10% baseline: below the threshold the weekly send needs.
+        project: { scenarioRuns: 20, scenarioFailures: 3, baselineWeeks: NO_BASELINE_FAILURES },
+      });
+
+      expect(
+        pickDigestTemplatesToTry({ template: "digest-scenarios-trend", input: slightlyWorse }),
+      ).toEqual([{ template: "digest-scenarios-trend", direction: "more_failing" }]);
+    });
+  });
+
+  describe("when a forced scenario trend's rate equals its baseline's", () => {
+    /** @scenario "A forced digest with no data for the person is skipped, not sent" */
+    it("tries nothing, at the same rate or with no failures either week", () => {
+      const toTry = (project: NonNullable<InputOverrides["project"]>) =>
+        pickDigestTemplatesToTry({ template: "digest-scenarios-trend", input: input({ project }) });
+
+      expect(
+        toTry({ scenarioRuns: 20, scenarioFailures: 2, baselineWeeks: NO_BASELINE_FAILURES }),
+      ).toEqual([]);
+      expect(
+        toTry({
+          scenarioRuns: 20,
+          scenarioFailures: 0,
+          baselineWeeks: [{ runs: 10, failures: 0 }],
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a forced template has no data for the person", () => {
+    /** @scenario "A forced digest with no data for the person is skipped, not sent" */
+    it("tries nothing", () => {
+      const toTry = (
+        template: Parameters<typeof pickDigestTemplatesToTry>[0]["template"],
+        of = input(),
+      ) => pickDigestTemplatesToTry({ template, input: of });
+
+      expect(
+        toTry("digest-plan-pressure", input({ organization: { monthlyLimitUsedPercent: 99 } })),
+      ).toEqual([]);
+      expect(
+        toTry(
+          "digest-plan-pressure",
+          input({
+            member: { isOrganizationAdmin: true },
+            organization: { monthlyLimitUsedPercent: null },
+          }),
+        ),
+      ).toEqual([]);
+      expect(toTry("digest-scenarios-trend", input({ project: { scenarioRuns: 10 } }))).toEqual([]);
+      expect(toTry("digest-coding-agent-week")).toEqual([]);
+      expect(toTry("digest-traces-week", input({ project: null }))).toEqual([]);
     });
   });
 });

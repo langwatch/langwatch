@@ -29,6 +29,7 @@ import {
   OLIVIA,
   PEDRO,
   GLOBEX,
+  INITECH,
   requestBody,
   staffAccessWorld,
   VERIFIER,
@@ -1488,15 +1489,16 @@ function scenarios(backend: Backend): void {
         const page = first.output as { total: number; truncated: boolean; nextCursor: string };
         expect(page).toMatchObject({ total: 1, truncated: false });
 
-        const listed = await w.app.listOrganizations({ session, limit: 1 });
-        expect(listed).toMatchObject({ total: 2, truncated: true, items: [{ id: ACME.id }] });
+        const listed = await w.app.listOrganizations({ session, limit: 2 });
+        expect(listed).toMatchObject({ total: 3, truncated: true });
+        expect(listed.items.map((item) => item.id)).toEqual([ACME.id, GLOBEX.id]);
         const rest = await w.app.listOrganizations({
           session,
-          limit: 1,
+          limit: 2,
           cursor: listed.nextCursor ?? "",
         });
-        expect(rest).toMatchObject({ total: 2, truncated: false, nextCursor: null });
-        expect(rest.items.map((item) => item.id)).toEqual([GLOBEX.id]);
+        expect(rest).toMatchObject({ total: 3, truncated: false, nextCursor: null });
+        expect(rest.items.map((item) => item.id)).toEqual([INITECH.id]);
         await expect(
           codeOf(w.app.listOrganizations({ session, cursor: "bm90LWEtY3Vyc29y" })),
         ).resolves.toBe("staff_function_bad_cursor");

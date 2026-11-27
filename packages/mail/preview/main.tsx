@@ -2,6 +2,7 @@ import "@langwatch/design-system-internal/styles.css";
 import "./app.css";
 import {
   applyThemeChoice,
+  Button,
   Callout,
   consoleLinks,
   IconMonitor,
@@ -9,6 +10,7 @@ import {
   IconSun,
   Page,
   SegmentedControl,
+  Stack,
   Text,
   TopBar,
 } from "@langwatch/design-system-internal";
@@ -17,7 +19,7 @@ import { createRoot } from "react-dom/client";
 
 import { GalleryView, type Density } from "./gallery-view.tsx";
 import { InspectView } from "./inspect-view.tsx";
-import { galleryUrl, templatesUrl } from "./studio-endpoints.ts";
+import { galleryUrl, isStaticStudio, templatesUrl } from "./studio-endpoints.ts";
 import {
   galleryResponseSchema,
   templatesResponseSchema,
@@ -141,12 +143,15 @@ const Studio = (): JSX.Element => {
   }, []);
 
   const nav = (
-    <StudioTopBar
-      view={view}
-      onViewChange={setView}
-      previewScheme={previewScheme}
-      onPreviewSchemeChange={setPreviewScheme}
-    />
+    <>
+      <StudioTopBar
+        view={view}
+        onViewChange={setView}
+        previewScheme={previewScheme}
+        onPreviewSchemeChange={setPreviewScheme}
+      />
+      <StudioGuide />
+    </>
   );
 
   if (failure || !templates) {
@@ -376,6 +381,53 @@ function StudioTopBar({
         </>
       }
     />
+  );
+}
+
+const GUIDE_DISMISSED_KEY = "mailroom.guide.dismissed";
+
+/** Storage can throw (private windows, blocked cookies); the guide then just shows again. */
+const readGuideDismissed = (): boolean => {
+  try {
+    return window.localStorage.getItem(GUIDE_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+/** A short "how to use this" note above both views, hidden for good once dismissed. */
+function StudioGuide(): JSX.Element | null {
+  const [dismissed, setDismissed] = useState(readGuideDismissed);
+  if (dismissed) return null;
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      window.localStorage.setItem(GUIDE_DISMISSED_KEY, "1");
+    } catch {
+      // Hidden for this visit only.
+    }
+  };
+  return (
+    <div className="mailroom-guide">
+      <Callout title="How to use this">
+        <Stack gap={2}>
+          <Text as="p">
+            Every email LangWatch sends, rendered with sample data. Pick an email on the left (some
+            have more than one version), switch Desktop or Mobile and HTML or Text above the
+            preview, or open Gallery to see them all at once. The left and right arrow keys step
+            through the emails and their versions.{" "}
+            {isStaticStudio
+              ? "This copy is read-only: run `pnpm --filter @langwatch/mail dev` to edit the sample data."
+              : "Open Edit sample data under the preview to change what it shows."}
+          </Text>
+          <div>
+            <Button size="sm" variant="ghost" onClick={dismiss}>
+              Got it, hide this
+            </Button>
+          </div>
+        </Stack>
+      </Callout>
+    </div>
   );
 }
 

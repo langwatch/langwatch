@@ -2,6 +2,8 @@ import { admitsCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import { NormalizedSpanKind, type NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
+import { accountColumnsOf } from "../coding-agent-account.rules.ts";
 import { liftSpanContribution, type SpanContribution } from "../coding-agent-span-facts.rules.ts";
 
 const TRACE_ID = "trace-1";
@@ -116,5 +118,28 @@ describe("liftSpanContribution", () => {
     );
 
     expect(lifted.sessionId).toBe("cc-run-1");
+  });
+
+  /** @scenario a resource account id never names the session's user */
+  it("keys the account on the resource's agent account id without setting the session's user", () => {
+    const stateProjection = CodingAgentSessionStateProjection.create();
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "session.id": "cc-run-3" },
+          resourceAttributes: { "user.account_uuid": "5a6b7c8d-0000-4000-8000-000000000002" },
+        }),
+      }),
+    );
+
+    expect(accountColumnsOf(lifted.facts).accountId).toBe("5a6b7c8d-0000-4000-8000-000000000002");
+    const session = stateProjection.withIdentity(
+      stateProjection.createInitCodingAgentSession(),
+      lifted.facts,
+    );
+    expect(session.userId).toBeNull();
   });
 });

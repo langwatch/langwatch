@@ -6,7 +6,7 @@ The server half of [scenario](../README.md). Scenarios and simulations: authored
 
 ## Installation
 
-`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareContext(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…).withIdIndexes(SCENARIO_ID_INDEXES, …).withIdIndexes(SCENARIO_SECOND_ID_INDEXES, …)`, `src/scenario.module.ts:35`.
+`defineProcessModule("scenario").withRepositories(scenarioRepositories).withChannels(scenarioChannels).withApi(ScenarioModule).withTransports(…, …, …, judgePreviewRest, scenarioAgentTestRest, scenarioEventsRest, scenarioGenerateRest, scenarioRunExportRest, scenarioVoiceRest, scenarioTrpcTransport).provideMiddlewareContext(…).withEventing(scenarioLifecycleEventing).withEventing(simulationProcessingEventing).withMigrations(…).withIdIndexes(SCENARIO_ID_INDEXES, …).withIdIndexes(SCENARIO_SECOND_ID_INDEXES, …)`, `src/scenario.module.ts:36`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,12 +14,20 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The scenario application: what every scenario door calls, and what peer features such as Suite reach it by.
 
-Peers call these through the token, declared at `../contract/src/scenario.api.ts:254`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scenario.api.ts:255`; nothing else in this package is public.
 
 #### `generateScenario`
 
 ```typescript
 generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse>;
+```
+
+#### `completeJudgePreviewChat`
+
+One call of the scenario judge on LangWatch Judge (preview): its verdict or its turn decision, answered as the tool call the judge asked for. Throws when the judge may not or cannot answer.
+
+```typescript
+completeJudgePreviewChat(input: JudgePreviewChatInput): Promise<JudgePreviewChatCompletion>;
 ```
 
 #### `reportScenarioEvent`
@@ -501,6 +509,28 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Sc
 ```
 
 ## REST transport
+
+### `judgePreviewRest`
+
+|             |                                          |
+| ----------- | ---------------------------------------- |
+| Declared at | `src/transport/judge-preview.rest.ts:16` |
+| Base URL    | none: each route's path is its address   |
+| Addressing  | literal                                  |
+| Credential  | project                                  |
+
+#### `POST /api/judge-preview/v1/chat/completions` · `completeJudgePreviewChat`
+
+Answer one call of the scenario judge with LangWatch Judge (preview): the verdict on a run's criteria, or whether the conversation goes on. Not streamed. LangWatch Cloud only.
+
+Permission `scenarios:create`. Hidden from the OpenAPI document. Declared at `src/transport/judge-preview.rest.ts:20`.
+
+Answers at `/api/judge-preview/v1/chat/completions`.
+
+```typescript
+type Body = z.infer<typeof judgePreviewChatRequestSchema>; // ../contract/src/judge-preview-chat.ts:44
+type Response = z.infer<typeof judgePreviewChatCompletionSchema>; // ../contract/src/judge-preview-chat.ts:79
+```
 
 ### `scenarioAgentTestRest`
 
@@ -1480,9 +1510,9 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:118`. Events: `Simul
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:273`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:274`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:276`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:282`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:283`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:285`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:96`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:98`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:100` |

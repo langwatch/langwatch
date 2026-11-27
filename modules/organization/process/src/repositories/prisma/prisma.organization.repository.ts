@@ -392,6 +392,39 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     `;
   }
 
+  async isPiiRedactionModelAccepted({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<boolean> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { piiRedactionModelAcceptedAt: true },
+    });
+    return !!row?.piiRedactionModelAcceptedAt;
+  }
+
+  async recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    // As the Instant Evals consent: a second admin parked on the row lock re-checks the
+    // condition and keeps the first record.
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "Organization"
+         SET "piiRedactionModelAcceptedAt" = ${toDate(input.at)},
+             "piiRedactionModelAcceptedByUserId" = ${input.userId},
+             "updatedAt" = now()
+       WHERE "id" = ${input.organizationId}
+         AND "piiRedactionModelAcceptedAt" IS NULL
+    `;
+  }
+
   async recordPrivateDataplaneSeen(input: {
     organizationId: string;
     clickhouseLabel: string | null;

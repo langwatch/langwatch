@@ -162,8 +162,8 @@ describe("BillingEventsPage", () => {
     expect(screen.getByTestId("billing-events-table")).toHaveTextContent("Instant Evals");
   });
 
-  /** @scenario A spend row with no virtual key and the own decision model request type reads as Instant Evals on your own model */
-  it("names a keyless own decision model row Instant Evals (own model)", () => {
+  /** @scenario A spend row with no virtual key and the own decision model request type reads as Own model */
+  it("names a keyless own decision model row Own model", () => {
     listQuery.mockReturnValue({
       data: {
         rows: [{ ...SPEND_ROW, virtualKeyId: "", requestType: "instant_eval_decision_model" }],
@@ -175,9 +175,7 @@ describe("BillingEventsPage", () => {
       isFetching: false,
     });
     renderPage();
-    expect(screen.getByTestId("billing-events-table")).toHaveTextContent(
-      "Instant Evals (own model)",
-    );
+    expect(screen.getByTestId("billing-events-table")).toHaveTextContent("Own model");
   });
 
   /** @scenario A spend row with no virtual key and the pii redaction request type reads as PII redaction */

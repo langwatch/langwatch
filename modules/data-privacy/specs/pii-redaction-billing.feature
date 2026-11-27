@@ -116,9 +116,12 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Given a self-hosted deployment, where the install runs the model itself
       When the model answers a strict batch of 1,000 characters
       Then one priced fact is recorded with a price of zero
-      And the free list is not read, so no flag has to be set for it
+      And neither the free list nor an acceptance of the price is read, so no flag has to be set for it
 
   Rule: An organization on the free list is recorded at no charge
+
+    The free list is read when a batch is routed, not when its call is priced: the call is priced
+    as it was routed, so a free-list change during a call of up to 50 seconds never prices it.
 
     @unit
     Scenario: A free organization's call is recorded at a price of zero
@@ -134,11 +137,67 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Then the free list is not read again
 
     @unit
-    Scenario: A call whose free list cannot be read is not recorded
+    Scenario: A batch whose free list cannot be read goes to Presidio and is priced for nobody
       Given an organization whose free-list entry cannot be read
-      When the model answers a strict batch of 1,000 characters
-      Then no priced fact is recorded, so no call is fixed at a price of zero
-      And the failure is logged at error with the organization, the project and the full price
+      When a strict batch of 1,000 characters is routed
+      Then Presidio answers it, the model is not called and no priced fact is recorded
+      And the batch is counted with the reason routing_error
+
+    @unit
+    Scenario: The spend recorder prices a call as it was routed and reads no flag
+      Given a call the model answered, routed as priced or as free
+      When its priced fact is recorded
+      Then a priced call is recorded at the published rate and a free one at zero
+      And the recorder reads neither the free list nor any other flag
+
+  Rule: Only an organization whose admin accepted the price is billed
+
+    ADR-201 decision 15. Spend recorded before an organization admin accepted the price (by a
+    release that routed Strict organizations to the model without asking) is never billed: the
+    month starts at the latest of its first day, the growth seat's start, the price line's creation
+    (ADR-174 decision 26) and the acceptance, and counts nothing without one. A month the acceptance
+    narrows never reports below what it already sent, so no PII redaction delta goes negative.
+
+    @unit
+    Scenario: An organization that accepted the price is billed only from the moment it accepted
+      Given an organization whose admin accepted the PII redaction model's price on the 10th of the month
+      And PII redaction spend recorded before and after that moment
+      When the month is reported
+      Then the meter's total counts only the spend from the moment of acceptance on
+
+    @unit
+    Scenario: The PII redaction month starts at the later of its price line and the acceptance
+      Given a PII redaction price line added on the 3rd and an acceptance on the 10th, or the other way round
+      And PII redaction spend on the 5th and the 20th
+      When the month is reported
+      Then only the spend from the 10th on is billed
+
+    @unit
+    Scenario: A month the acceptance narrows never reports below what it already sent
+      Given PII redaction spend already reported for the whole month
+      And an acceptance on the 10th, or none
+      When the month is reported
+      Then no negative PII redaction event is sent and the reported total is kept
+
+    @unit
+    Scenario: An organization that never accepted the price reports no PII redaction spend
+      Given an organization with PII redaction spend this month and no acceptance of the price
+      When the month is reported
+      Then the meter's total is zero and the spend ledger is not read
+
+    @unit
+    Scenario: A month that ended before the organization accepted reports no PII redaction spend
+      Given an organization whose admin accepted the price after a month ended
+      And PII redaction spend recorded in that month
+      When that month is reported
+      Then the meter's total is zero and the spend ledger is not read
+
+    @unit
+    Scenario: The acceptance is the organization's own record, kept once
+      Given an organization admin accepts the PII redaction model's price
+      And another admin accepts it later
+      Then the organization keeps the first moment and the first admin
+      And an unknown organization reads as not accepted
 
   Rule: The Cloud price holds for each kind of customer
 
@@ -148,7 +207,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
     @unit
     Scenario: A paying organization's long and simple spans are each priced by their characters
-      Given an organization not on the free list, with a Strict project
+      Given an organization not on the free list, whose admin accepted the price, with a Strict project
       When the model answers a long span of 7,900 characters and a simple span of 50 characters
       Then the long span is one priced fact of 3,950,000 nano dollars
       And the simple span is one priced fact of 25,000 nano dollars, raised to no minimum
@@ -156,7 +215,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
     @unit
     Scenario: The characters priced are the ones sent to the model, after standard detection
-      Given an organization not on the free list, with a Strict project
+      Given an organization not on the free list, whose admin accepted the price, with a Strict project
       When it sends a span whose text holds a phone number
       Then standard detection masks the phone number in-process before the model is called
       And the priced fact counts the characters of the masked text the model was sent
@@ -311,10 +370,28 @@ Feature: A PII redaction model call is priced per character, written to the spen
     @unit
     Scenario: A pending PII redaction total is replayed even while the price is missing
       Given a PII redaction meter event whose send was cut off before it was confirmed
+      And the spend from the organization's acceptance on still covers its total
       And a subscription that no longer carries the PII redaction price
       When the month is reported
       Then the pending total is sent again under its own identifier
       # Stripe forgets an identifier after a day; waiting for the price could count it twice.
+
+    @unit
+    Scenario: A pending PII redaction total above the spend the acceptance covers is replayed and kept
+      Given a PII redaction meter event whose send was cut off before it was confirmed
+      And its total is above the spend recorded from the organization's acceptance on, or there is no acceptance
+      When the month is reported twice
+      Then the pending total is sent again under its own identifier and kept as reported
+      And no later report sends a negative PII redaction event
+      # Stripe may already hold the cut-off send; only its own identifier tells Stripe not to count it twice.
+
+    @unit
+    Scenario: A pending PII redaction total is replayed without waiting for the spend to be read
+      Given a PII redaction meter event whose send was cut off before it was confirmed
+      And the spend from the organization's acceptance on cannot be read, or its read fails
+      When the month is reported
+      Then the pending total is sent again under its own identifier at once
+      # Waiting for the read could outlast the day Stripe keeps an identifier, and count it twice.
 
     @unit
     Scenario: Usage is reported once the subscription carries the PII redaction price
@@ -353,12 +430,8 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When a Growth checkout in dollars is built
       Then it carries the metered PII redaction item with no quantity
 
-    @unit
-    Scenario: A Growth checkout in euros carries no PII redaction price
-      Given a Stripe mode where the PII redaction price is provisioned
-      When a Growth checkout in euros is built
-      Then it carries no PII redaction item
-      # The meter counts dollars; a euro subscription cannot hold a dollar price.
+    # A Growth checkout in euros carries GROWTH_PII_REDACTION_EUR on the same dollar meter,
+    # at 0.85 euros per dollar: enterprise/modules/billing/specs/euro-usage-prices.feature.
 
     @unit
     Scenario: A Growth checkout works where the PII redaction price is not provisioned

@@ -12,6 +12,12 @@ describe("functionFitsScopes", () => {
     expect(functionFitsScopes({ name: "org.snapshot", scopes: ["org:metadata"] })).toBe(true);
     expect(functionFitsScopes({ name: "org.snapshot", scopes: ["ops:read"] })).toBe(false);
   });
+
+  it("never lets a copy side reach an org function", () => {
+    expect(functionFitsScopes({ name: "org.api_keys", scopes: ["copy:source"] })).toBe(false);
+    expect(functionFitsScopes({ name: "org.api_keys", scopes: ["copy:target"] })).toBe(false);
+    expect(functionFitsScopes({ name: "org.api_keys", scopes: ["org:metadata"] })).toBe(true);
+  });
 });
 
 describe("rangeOf", () => {

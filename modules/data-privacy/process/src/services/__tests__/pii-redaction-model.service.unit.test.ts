@@ -13,6 +13,7 @@ import {
 } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -30,6 +31,7 @@ import type { DataPrivacyProjectScopeRepository } from "../../repositories/data-
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import {
   PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
+  PII_REDACTION_MODEL_FREE_FLAG,
   PII_REDACTION_MODEL_TIMEOUT_MS,
 } from "../../rules/pii-redaction-model.rules.ts";
 import { piiRedactionRequestIdKey } from "../../rules/pii-redaction-spend.rules.ts";
@@ -158,6 +160,10 @@ function setup({
   modelConfigured = true,
   allowlisted = true,
   flagFails = false,
+  free = false,
+  freeFails = false,
+  accepted = true,
+  acceptanceFails = false,
   model,
   modelTimeoutMs = 60_000,
   presidioChannel,
@@ -169,6 +175,12 @@ function setup({
   modelConfigured?: boolean;
   allowlisted?: boolean;
   flagFails?: boolean;
+  /** On the free list: the model at a price of zero, with no acceptance needed. */
+  free?: boolean;
+  freeFails?: boolean;
+  /** An organization admin accepted the model's price. */
+  accepted?: boolean;
+  acceptanceFails?: boolean;
   model?: PresidioChannel;
   modelTimeoutMs?: number;
   presidioChannel?: PresidioChannel;
@@ -184,11 +196,29 @@ function setup({
   const dlp = MemoryGoogleDlpChannel.create();
 
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
+  const freeList = { free };
   const featureFlags = createApiFixture<FeatureFlagApi>({
     isEnabled: async (key, target) => {
       flagReads.push({ key, target });
+      if (key === PII_REDACTION_MODEL_FREE_FLAG) {
+        if (freeFails) throw new Error("flag store unreachable");
+        return freeList.free;
+      }
       if (flagFails) throw new Error("flag store unreachable");
       return allowlisted;
+    },
+  });
+  const freeListReads = () => flagReads.filter(({ key }) => key === PII_REDACTION_MODEL_FREE_FLAG);
+  const setFree = (value: boolean) => {
+    freeList.free = value;
+  };
+
+  const acceptanceReads: string[] = [];
+  const organizations = createApiFixture<OrganizationApi>({
+    isPiiRedactionModelAccepted: async ({ organizationId }) => {
+      acceptanceReads.push(organizationId);
+      if (acceptanceFails) throw new Error("database unreachable");
+      return accepted;
     },
   });
 
@@ -224,9 +254,7 @@ function setup({
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
   const priced: PiiRedactionSpendPricedEventData[] = [];
   const spend = PiiRedactionSpendService.create({
-    selfHosted: false,
     requestIdKey: piiRedactionRequestIdKey("test-key-pepper"),
-    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
     recordSpendPriced: async (fact) => {
       priced.push(fact);
     },
@@ -246,6 +274,7 @@ function setup({
         method: "pii_redaction_model",
       }),
       featureFlags,
+      organizations,
       scopes: DataPrivacyProjectScopeService.create({ repository }),
       selfHosted,
       entitlements,
@@ -272,6 +301,9 @@ function setup({
     memoryModel,
     dlp,
     flagReads,
+    freeListReads,
+    setFree,
+    acceptanceReads,
     planReads,
     scopeReads,
     failNextScopeRead,
@@ -412,6 +444,21 @@ describe("PiiRedactionModelService", () => {
         expect(sent(presidio)).toHaveLength(0);
         expect(planReads).toEqual([ORGANIZATION_ID]);
       });
+
+      /** @scenario "A self-hosted install's call is recorded at a price of zero without reading the free list" */
+      it("records the call at zero and reads neither the free list nor the acceptance", async () => {
+        const { analysis, memoryModel, priced, freeListReads, acceptanceReads } = setup({
+          selfHosted: true,
+          accepted: false,
+        });
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        await analysis.clearPresidio(strictBatch());
+
+        expect(priced).toEqual([expect.objectContaining({ characters: 8, priceNanoUsd: 0 })]);
+        expect(freeListReads()).toEqual([]);
+        expect(acceptanceReads).toEqual([]);
+      });
     });
 
     /** @scenario "A self-hosted organization's plan is read once a minute" */
@@ -474,6 +521,165 @@ describe("PiiRedactionModelService", () => {
     });
   });
 
+  describe("given LangWatch Cloud and an organization on the model flag, not on the free list", () => {
+    describe("when no organization admin accepted the model's price", () => {
+      /** @scenario "A Strict organization that never accepted the price stays on Presidio, unbilled" */
+      it("sends the batch to Presidio, counts it not_accepted and prices nothing", async () => {
+        const { analysis, presidio, memoryModel, sent, fallbacks, priced } = setup({
+          accepted: false,
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(0);
+        expect(sent(presidio)).toHaveLength(1);
+        expect(fallbacks).toEqual(["not_accepted"]);
+        expect(priced).toEqual([]);
+      });
+
+      /** @scenario "A Strict organization that never accepted the price stays on Presidio, unbilled" */
+      it("logs the organization once a minute, not once per batch", async () => {
+        vi.useFakeTimers();
+        try {
+          const { analysis, presidio, usage, fallbacks } = setup({ accepted: false });
+          for (let batch = 0; batch < 3; batch++) presidio.answerWith(anonymized("call <PERSON>"));
+          const outcomes = () => usage.map((line) => [line.level, line.fields.outcome]);
+
+          await analysis.clearPresidio(strictBatch());
+          await vi.advanceTimersByTimeAsync(59_999);
+          await analysis.clearPresidio(strictBatch());
+          expect(outcomes()).toEqual([["info", "not_accepted"]]);
+          expect(usage[0]?.fields).toMatchObject({ organizationId: ORGANIZATION_ID, findings: 0 });
+
+          await vi.advanceTimersByTimeAsync(1);
+          await analysis.clearPresidio(strictBatch());
+          expect(outcomes()).toEqual([
+            ["info", "not_accepted"],
+            ["info", "not_accepted"],
+          ]);
+          expect(fallbacks).toEqual(["not_accepted", "not_accepted", "not_accepted"]);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when an organization admin accepted the model's price", () => {
+      /** @scenario "An organization that accepted the price goes to the model and is priced" */
+      it("sends the batch to the model and prices it at the published rate", async () => {
+        const { analysis, presidio, memoryModel, sent, priced, acceptanceReads } = setup({
+          accepted: true,
+        });
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        await analysis.clearPresidio(strictBatch());
+
+        expect(sent(memoryModel)).toHaveLength(1);
+        expect(sent(presidio)).toHaveLength(0);
+        expect(priced).toEqual([expect.objectContaining({ characters: 8, priceNanoUsd: 4_000 })]);
+        expect(acceptanceReads).toEqual([ORGANIZATION_ID]);
+      });
+    });
+
+    /** @scenario "The free list and the acceptance are read once a minute per organization" */
+    /** @scenario "The free list is read once per minute per organization" */
+    it("reads the free list and the acceptance once a minute", async () => {
+      vi.useFakeTimers();
+      try {
+        const { analysis, memoryModel, freeListReads, acceptanceReads } = setup();
+        for (let batch = 0; batch < 4; batch++) memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        await Promise.all([
+          analysis.clearPresidio(strictBatch()),
+          analysis.clearPresidio(strictBatch()),
+        ]);
+        await vi.advanceTimersByTimeAsync(59_999);
+        await analysis.clearPresidio(strictBatch());
+        expect(freeListReads()).toHaveLength(1);
+        expect(acceptanceReads).toEqual([ORGANIZATION_ID]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await analysis.clearPresidio(strictBatch());
+        expect(freeListReads()).toHaveLength(2);
+        expect(acceptanceReads).toEqual([ORGANIZATION_ID, ORGANIZATION_ID]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "The free list and the acceptance are read once a minute per organization" */
+    it("sends the batch to Presidio as a routing error when the acceptance cannot be read", async () => {
+      const { analysis, presidio, memoryModel, sent, fallbacks, priced } = setup({
+        acceptanceFails: true,
+      });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(fallbacks).toEqual(["routing_error"]);
+      expect(priced).toEqual([]);
+    });
+
+    /** @scenario "A batch whose free list cannot be read goes to Presidio and is priced for nobody" */
+    it("sends the batch to Presidio as a routing error when the free list cannot be read", async () => {
+      const { analysis, presidio, memoryModel, sent, fallbacks, priced } = setup({
+        freeFails: true,
+      });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(fallbacks).toEqual(["routing_error"]);
+      expect(priced).toEqual([]);
+    });
+  });
+
+  describe("given LangWatch Cloud and an organization on the model flag and the free list", () => {
+    /** @scenario "An organization on the free list reaches the model with no acceptance" */
+    it("sends the batch to the model, records it at zero and never reads the acceptance", async () => {
+      const { analysis, memoryModel, sent, priced, acceptanceReads } = setup({
+        free: true,
+        accepted: false,
+      });
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(priced).toEqual([expect.objectContaining({ characters: 8, priceNanoUsd: 0 })]);
+      expect(acceptanceReads).toEqual([]);
+    });
+
+    /** @scenario "A free-list change during a model call never prices that call" */
+    it("records the call at zero when the organization leaves the free list mid-call", async () => {
+      let answer: (() => void) | undefined;
+      const slowModel: PresidioChannel = {
+        detect: (input: PiiDetectionRequest) =>
+          input.texts.length === 0
+            ? Promise.resolve({ kind: "detected", results: [] })
+            : new Promise((resolve) => {
+                answer = () => resolve(anonymized("call <PERSON>"));
+              }),
+      };
+      const { analysis, priced, setFree, freeListReads } = setup({
+        free: true,
+        accepted: false,
+        model: slowModel,
+      });
+
+      const clearing = analysis.clearPresidio(strictBatch());
+      await vi.waitFor(() => expect(answer).toBeDefined());
+      setFree(false);
+      answer?.();
+
+      await expect(clearing).resolves.toEqual(["call [PERSON]"]);
+      expect(priced).toEqual([expect.objectContaining({ characters: 8, priceNanoUsd: 0 })]);
+      expect(freeListReads()).toHaveLength(1);
+    });
+  });
+
   describe("given an organization allowlisted for the model", () => {
     /** @scenario "An allowlisted organization's strict analysis goes to the PII redaction model" */
     it("sends the batch to the model and leaves Presidio uncalled", async () => {
@@ -489,6 +695,10 @@ describe("PiiRedactionModelService", () => {
         {
           key: "release_pii_redaction_model_enabled",
           target: { kind: "project", projectId: PROJECT_ID, organizationId: ORGANIZATION_ID },
+        },
+        {
+          key: "release_pii_redaction_model_free",
+          target: { kind: "organization", organizationId: ORGANIZATION_ID },
         },
       ]);
     });

@@ -84,6 +84,7 @@ function snapshots({
     }),
     permissions: DataPrivacyPermissionsService.create({ authz }),
     apiKeys: { listAll },
+    acceptance: { isAccepted: async () => true },
     clock: () => fromDate(NOW),
   });
 }

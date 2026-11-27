@@ -14,6 +14,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -77,14 +78,37 @@ const permissions = createApiFixture<AuthzApi>({
 });
 const entitlements = createApiFixture<EntitlementApi>();
 
-/** One Cloud organization with the model flag on, its project at `level`, and its spend stored. */
-async function cloudCustomer({ free, level }: { free: boolean; level: "STRICT" | "ESSENTIAL" }) {
+/**
+ * One Cloud organization with the model flag on, its project at `level` (written as project
+ * settings and the API do, or by its organization rule), and its spend stored.
+ */
+async function cloudCustomer({
+  free,
+  level,
+  accepted = true,
+  via = "project",
+}: {
+  free: boolean;
+  level: "STRICT" | "ESSENTIAL";
+  /** An organization admin accepted the model's price. */
+  accepted?: boolean;
+  via?: "project" | "organization";
+}) {
   const model = analyserAnswering({ redacted: "<redacted by the model>", calls: 2 });
   const presidio = analyserAnswering({ redacted: "<redacted by Presidio>", calls: 1 });
   const flags = new Set([
     PII_REDACTION_MODEL_FLAG,
     ...(free ? [PII_REDACTION_MODEL_FREE_FLAG] : []),
   ]);
+  const acceptance = { accepted };
+  const acceptances: { organizationId: string; userId: string }[] = [];
+  const organizations = createApiFixture<OrganizationApi>({
+    isPiiRedactionModelAccepted: async () => acceptance.accepted,
+    recordPiiRedactionModelAcceptance: async (input) => {
+      acceptances.push(input);
+      acceptance.accepted = true;
+    },
+  });
   const app = await createDataPrivacyTestApp({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
@@ -92,6 +116,7 @@ async function cloudCustomer({ free, level }: { free: boolean; level: "STRICT" |
       }),
       permissions,
       entitlements,
+      organizations,
     },
     settings: {
       isSaas: true,
@@ -110,7 +135,16 @@ async function cloudCustomer({ free, level }: { free: boolean; level: "STRICT" |
     processStore: InMemoryProcessStore.createForTesting(),
   });
   app.connectSpendCommands(eventing.register(app.spendPipeline()).commands);
-  await app.setPiiRedactionLevel({ projectId: PROJECT_ID, level });
+  if (via === "project") {
+    await app.setPiiRedactionLevel({ projectId: PROJECT_ID, level });
+  } else {
+    await app.setForScope({
+      organizationId: ORGANIZATION_ID,
+      scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID },
+      personalOnly: false,
+      config: { pii: { level: level === "STRICT" ? "strict" : "essential" } },
+    });
+  }
 
   const send = async (span: OtlpSpan) => {
     await app.redactSpan({
@@ -129,7 +163,7 @@ async function cloudCustomer({ free, level }: { free: boolean; level: "STRICT" |
     });
     return events.map((event) => piiRedactionSpendPricedEventDataSchema.parse(event.data));
   };
-  return { send, priced, model, presidio };
+  return { app, send, priced, model, presidio, acceptances };
 }
 
 describe("given the Cloud price of the PII redaction model", () => {
@@ -210,6 +244,53 @@ describe("given the Cloud price of the PII redaction model", () => {
       expect(customer.model.batches()).toEqual([]);
       expect(customer.presidio.batches()).toHaveLength(1);
       expect(await customer.priced()).toEqual([]);
+    });
+  });
+
+  describe("when a paying organization on Strict never accepted the price", () => {
+    /** @scenario "Strict set through the API, project settings or a rule stays on Presidio until the price is accepted" */
+    it.each([
+      { writer: "project settings or the API", via: "project" },
+      { writer: "its organization rule", via: "organization" },
+    ] as const)(
+      "redacts through Presidio and prices nothing, Strict set by $writer",
+      async ({ via }) => {
+        const customer = await cloudCustomer({
+          free: false,
+          level: "STRICT",
+          accepted: false,
+          via,
+        });
+
+        const redacted = await customer.send(spanWith({ spanId: "span-long", input: LONG_SPAN }));
+
+        expect(redacted).toBe("<redacted by Presidio>");
+        expect(customer.model.batches()).toEqual([]);
+        expect(customer.presidio.batches()).toHaveLength(1);
+        expect(await customer.priced()).toEqual([]);
+      },
+    );
+  });
+
+  describe("when an organization admin accepts the price for a Strict organization", () => {
+    /** @scenario "Only an organization admin can accept the price" */
+    /** @scenario "An organization that accepted the price goes to the model and is priced" */
+    it("records the admin's acceptance, then the model answers and the call is priced", async () => {
+      const customer = await cloudCustomer({ free: false, level: "STRICT", accepted: false });
+
+      await customer.app.acceptPiiRedactionModel({
+        organizationId: ORGANIZATION_ID,
+        userId: "admin-1",
+      });
+      const redacted = await customer.send(spanWith({ spanId: "span-simple", input: SIMPLE_SPAN }));
+
+      expect(customer.acceptances).toEqual([
+        { organizationId: ORGANIZATION_ID, userId: "admin-1" },
+      ]);
+      expect(redacted).toBe("<redacted by the model>");
+      expect(await customer.priced()).toEqual([
+        expect.objectContaining({ characters: 50, priceNanoUsd: 25_000 }),
+      ]);
     });
   });
 

@@ -164,6 +164,8 @@ jobs:
           test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
           echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
+      - uses: ./.github/actions/apt-ubuntu-sources
+
       # Install ONLY tools that aren't predeps but the CLI needs to operate
       # (lsof for port-collision detection on linux). Postgres, redis,
       # clickhouse, uv, and goose all flow through their respective predeps,

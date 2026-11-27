@@ -19,7 +19,7 @@ import {
   type ReplayEventSource,
   ReplayService,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
+import { testEventSchema, IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -195,6 +195,7 @@ async function bootWorker({ log = identityLog }: { log?: ReplayEvent[] } = {}) {
     processStore: InMemoryProcessStore.createForTesting(),
     replayEngine: () => ({
       service: new ReplayService({
+        claims: IDLE_REPLAY_CLAIMS_INDEX,
         eventSource: new SeededIdentityLog(log),
         redis: memoryRedisDouble({
           script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

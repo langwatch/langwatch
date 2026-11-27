@@ -112,6 +112,7 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/checkup": UNDOCUMENTED_CHECKUP,
   "/api/v1/staff-access/functions": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/functions/{functionName}": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/copies": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/ops/organizations": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/ops/organizations/{organization}/usage": UNDOCUMENTED_STAFF_ACCESS,
   "/api/v1/staff-access/ops/queues": UNDOCUMENTED_STAFF_ACCESS,

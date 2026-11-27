@@ -15,6 +15,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { MemoryScenarioChildChannel } from "../channels/memory/memory.scenario-child.channel.ts";
+import type { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryScenarioCancellationRepository } from "../repositories/memory/memory.scenario-cancellation.repository.ts";
 import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
@@ -58,6 +59,7 @@ function harness({
       voicePublicUrl: async () => scenarioTestVoicePublicUrl,
       nlpServiceUrl,
     },
+    judgePreviewAvailability: createApiFixture<JudgePreviewAvailabilityService>(),
   });
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   executor.connect({ pool, resources: { own: (name) => void owned.push(name) } });

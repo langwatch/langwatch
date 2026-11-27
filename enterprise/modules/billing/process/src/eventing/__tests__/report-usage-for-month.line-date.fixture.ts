@@ -29,6 +29,8 @@ export const ON_THE_5TH_MS = Date.UTC(2026, 1, 5, 12);
 export const ON_THE_10TH_MS = Date.UTC(2026, 1, 10, 9);
 export const ON_THE_12TH_MS = Date.UTC(2026, 1, 12, 15);
 export const ON_THE_20TH_MS = Date.UTC(2026, 1, 20, 18);
+/** An organization admin accepted the PII redaction price before the month (ADR-201). */
+const ACCEPTED_BEFORE_THE_MONTH_MS = Date.UTC(2026, 0, 15);
 /** One dollar of spend, in the nano-USD the ledger holds. */
 export const ONE_DOLLAR_NANO_USD = 1_000_000_000;
 
@@ -94,12 +96,15 @@ export function billing({
   ledger,
   lines,
   stripe,
+  piiAcceptedAtMs = ACCEPTED_BEFORE_THE_MONTH_MS,
 }: {
   organization?: BillingReportOrganizationLookup;
   ledger: LedgerRow[];
   lines: Partial<Record<StripePriceName, PriceLine>>;
   /** The customer's subscriptions at Stripe; when given, the lines are read off them. */
   stripe?: readonly BillingSubscription[];
+  /** When an organization admin accepted the PII redaction price, or null when none did. */
+  piiAcceptedAtMs?: number | null;
 }) {
   const repositories = MemoryBillingRepositories.create();
   const meterEvents: { eventName: string; value: number }[] = [];
@@ -124,7 +129,10 @@ export function billing({
     },
   };
   const instantEval = InstantEvalSpendQueryService.create(peers);
-  const piiRedaction = PiiRedactionSpendQueryService.create(peers);
+  const piiRedaction = PiiRedactionSpendQueryService.create({
+    ...peers,
+    findPiiRedactionModelAcceptedAtMs: async () => piiAcceptedAtMs,
+  });
   const handler = ReportUsageForMonthCommandHandler.create({
     organizations: { getOrganizationForBilling: async () => organization },
     billingCheckpoints: repositories.checkpoints,
@@ -140,12 +148,12 @@ export function billing({
     isInstantEvalMeterProvisioned: () => true,
     queryPiiRedactionSpendTotal: (input) => piiRedaction.queryPiiRedactionSpendTotal(input),
     isPiiRedactionMeterProvisioned: () => true,
-    subscriptionPriceLine: async ({ price, billingMonth }) =>
+    subscriptionPriceLine: async ({ prices, billingMonth }) =>
       stripe === undefined
-        ? (lines[price] ?? NO_LINE)
+        ? (prices.map((price) => lines[price]).find((line) => line !== undefined) ?? NO_LINE)
         : priceLineOf({
             subscriptions: stripe,
-            prices: [{ priceName: price, priceId: PRICE_IDS[price] }],
+            prices: prices.map((priceName) => ({ priceName, priceId: PRICE_IDS[priceName] })),
             billingMonth,
           }),
     selfDispatch: async () => {},

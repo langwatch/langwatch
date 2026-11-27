@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestApi,
@@ -29,6 +30,8 @@ import { DigestOperatorsService } from "../services/digest-operators.service.ts"
 import { DigestSendService } from "../services/digest-send.service.ts";
 import { DigestSettingsService } from "../services/digest-settings.service.ts";
 import { DigestSourceService } from "../services/digest-source.service.ts";
+import { DigestTestSendService } from "../services/digest-test-send.service.ts";
+import { DigestTraceReadService } from "../services/digest-trace-read.service.ts";
 import { DigestUnsubscribeService } from "../services/digest-unsubscribe.service.ts";
 import { DigestUserErasureService } from "../services/digest-user-erasure.service.ts";
 import { DigestWeekService } from "../services/digest-week.service.ts";
@@ -41,20 +44,22 @@ type DigestSetup = FeatureSetup<
 >;
 
 /**
- * The weekly digest. Operators enrol organizations and arm the send through Cloud admin; the
- * week's folds pick each member's template, which is rendered and sent through our own mailer,
- * and the one-click unsubscribe is honoured here (ADR-001).
+ * The weekly digest, on for every organization. Operators arm the send through Cloud admin; the
+ * week's folds pick each member's template per organization, which is rendered and sent through
+ * our own mailer, and each person's opt-out is honoured here (ADR-001, ADR-002).
  */
 export class DigestModule implements DigestApiContract {
   static readonly contract = DigestApi;
   static readonly dependencies = {
+    /** The week's trace numbers per project, read when an email is composed. */
+    analytics: AnalyticsApi,
     /** Which of the week's projects each member may view; the email shows no other. */
     authz: AuthzApi,
     /** Admits Cloud admin staff, and answers not_found where cloud ops is off. */
     ops: OpsApi,
-    /** Who an enrolled organization's members are, which are admins, and its name. */
+    /** Every organization, who its members are, which are admins, and its name. */
     organizations: OrganizationApi,
-    /** An enrolled organization's projects, a personal project's owner, a project's name. */
+    /** An organization's projects and each project's organization, a personal project's owner, a project's name. */
     projects: ProjectApi,
     /**
      * The address each email goes to, read at send time and never stored; and whether the
@@ -72,6 +77,7 @@ export class DigestModule implements DigestApiContract {
   readonly #commands: DigestCommandsService;
   readonly #settings: DigestSettingsService;
   readonly #sends: DigestSendService;
+  readonly #tests: DigestTestSendService;
   readonly #unsubscribes: DigestUnsubscribeService;
   readonly #pipeline: DigestPipeline;
   readonly #sendPipeline: DigestSendPipeline;
@@ -81,6 +87,7 @@ export class DigestModule implements DigestApiContract {
     commands: DigestCommandsService;
     settings: DigestSettingsService;
     sends: DigestSendService;
+    tests: DigestTestSendService;
     unsubscribes: DigestUnsubscribeService;
     pipeline: DigestPipeline;
     sendPipeline: DigestSendPipeline;
@@ -89,6 +96,7 @@ export class DigestModule implements DigestApiContract {
     this.#commands = parts.commands;
     this.#settings = parts.settings;
     this.#sends = parts.sends;
+    this.#tests = parts.tests;
     this.#unsubscribes = parts.unsubscribes;
     this.#pipeline = parts.pipeline;
     this.#sendPipeline = parts.sendPipeline;
@@ -116,13 +124,12 @@ export class DigestModule implements DigestApiContract {
       now: nowEpochMs,
     });
     const source = DigestSourceService.create({
-      audience: repositories.audience,
       projects: dependencies.projects,
       recordProject: (activity) => commands.recordProject(activity),
       recordUser: (activity) => commands.recordUser(activity),
-      now: nowEpochMs,
     });
     const weeks = DigestWeekService.create({
+      traces: DigestTraceReadService.create({ analytics: dependencies.analytics, now: nowEpochMs }),
       projectWeeks: repositories.projectWeeks,
       userWeeks: repositories.userWeeks,
       entitlement: dependencies.entitlement,
@@ -140,13 +147,19 @@ export class DigestModule implements DigestApiContract {
       unsubscribes,
       publicBaseUrl: config.publicBaseUrl,
       requestSend: (request) => commands.requestSend(request),
+      requestOrganizationPlan: (request) => commands.requestOrganizationPlan(request),
       now: nowEpochMs,
     });
     return new DigestModule({
       operators: DigestOperatorsService.create({ ops: dependencies.ops }),
       commands,
-      settings: DigestSettingsService.create({ audience: repositories.audience }),
+      settings: DigestSettingsService.create({ audience: repositories.audience, now: nowEpochMs }),
       sends,
+      tests: DigestTestSendService.create({
+        sends,
+        users: dependencies.users,
+        organizations: dependencies.organizations,
+      }),
       unsubscribes,
       pipeline: buildDigestPipeline({
         projectWeeks: repositories.projectWeeks,
@@ -180,24 +193,33 @@ export class DigestModule implements DigestApiContract {
     this.#commands.connectSend(commands);
   }
 
-  setEnrolled: DigestApiContract["setEnrolled"] = async ({ operator, organizationId, enrolled }) =>
-    this.#settings.setEnrolled({
-      organizationId,
-      enrolled,
-      by: await this.#operators.admitManager(operator),
-    });
-
   setArmed: DigestApiContract["setArmed"] = async ({ operator, armed }) => {
     await this.#operators.admitManager(operator);
     return this.#settings.setArmed({ armed });
   };
 
-  sendTest: DigestApiContract["sendTest"] = async ({ operator, organizationId, userId }) =>
-    this.#sends.sendTest({
+  sendTest: DigestApiContract["sendTest"] = async ({ operator, organizationId, userId }) => {
+    await this.#sends.sendTest({
       organizationId,
       userId,
       operatorId: await this.#operators.admitManager(operator),
     });
+  };
+
+  sendMyTests: DigestApiContract["sendMyTests"] = async ({ operator }) =>
+    this.#tests.sendMyTests({ operatorId: await this.#operators.admitManager(operator) });
+
+  sendTestFor: DigestApiContract["sendTestFor"] = async ({ operator, email, template }) =>
+    this.#tests.sendTestFor({
+      email,
+      template,
+      operatorId: await this.#operators.admitManager(operator),
+    });
+
+  getPreference: DigestApiContract["getPreference"] = (input) => this.#settings.preference(input);
+
+  setPreference: DigestApiContract["setPreference"] = (input) =>
+    this.#settings.setPreference(input);
 
   isSubscribed: DigestApiContract["isSubscribed"] = (input) =>
     this.#unsubscribes.isSubscribed(input);

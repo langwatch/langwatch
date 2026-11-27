@@ -396,7 +396,15 @@
     "RepositoryHost <- RepositoryHost",
     "RepositoryOwner <- RepositoryOwner",
     "RepositoryName <- RepositoryName",
-    "Branch <- Branch"
+    "Branch <- Branch",
+    "AccountId <- AccountId",
+    "AccountName <- AccountName",
+    "AccountSource <- AccountSource",
+    "AccountUsagePercent <- AccountUsagePercent",
+    "AccountUsageWindow <- AccountUsageWindow",
+    "AccountUsageResetsAt <- AccountUsageResetsAt",
+    "AccountUsageReadAt <- AccountUsageReadAt",
+    "AccountLimitedUntil <- AccountLimitedUntil"
   ],
   "coding_tool_results <- stored_spans": [
     "TenantId <- TenantId",

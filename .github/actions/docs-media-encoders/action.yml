@@ -53,6 +53,8 @@ runs:
       with:
         path: ~/.cache/ffmpeg-debs
         key: ${{ steps.ffmpeg-key.outputs.key }}
+    - uses: ./.github/actions/apt-ubuntu-sources
+      if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true'
     - name: Install ffmpeg
       id: ffmpeg-install
       if: steps.media-cache.outputs.cache-hit != 'true' && steps.media-restore.outputs.cache-hit != 'true'

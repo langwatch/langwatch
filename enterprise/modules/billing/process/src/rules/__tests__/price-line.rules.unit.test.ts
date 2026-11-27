@@ -4,6 +4,7 @@
  * @see enterprise/modules/billing/specs/usage-billed-from-line-date.feature
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  * @see modules/data-privacy/specs/pii-redaction-billing.feature
+ * @see enterprise/modules/billing/specs/euro-usage-prices.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -303,6 +304,75 @@ describe("priceLineOf", () => {
           billingMonth: BILLING_MONTH,
         }),
       ).toEqual(since(ON_THE_10TH_MS));
+    });
+  });
+});
+
+describe("priceLineOf, given a meter priced in two currencies", () => {
+  const instantEvalPrices = [
+    { priceName: "GROWTH_INSTANT_EVAL_USD", priceId: "price_instant_eval_usd" },
+    { priceName: "GROWTH_INSTANT_EVAL_EUR", priceId: "price_instant_eval_eur" },
+  ];
+  const lineOfEither = (subscriptions: BillingSubscription[]) =>
+    priceLineOf({ subscriptions, prices: instantEvalPrices, billingMonth: BILLING_MONTH });
+
+  describe("when one listed subscription has a line on the euro price", () => {
+    /** @scenario "A line on either currency's price counts as the meter's price" */
+    it.each([
+      ["its id", { priceId: "price_instant_eval_eur" }],
+      ["its lookup key", { priceId: "price_eur_new", lookupKey: "GROWTH_INSTANT_EVAL_EUR" }],
+      ["its langwatch_key", { priceId: "price_eur_old", langwatchKey: "GROWTH_INSTANT_EVAL_EUR" }],
+    ] as const)("carries it from that line's date, found by %s", (_how, overrides) => {
+      expect(
+        lineOfEither([
+          subscription({
+            status: "canceled",
+            items: [line(BEFORE_THE_MONTH_MS, { priceId: "price_seat_usd" })],
+            endedAtMs: ON_THE_6TH_MS,
+          }),
+          subscription({
+            items: [
+              line(ON_THE_10TH_MS, { priceId: "price_seat_eur" }),
+              line(ON_THE_10TH_MS, overrides),
+            ],
+          }),
+        ]),
+      ).toEqual(since(ON_THE_10TH_MS));
+    });
+  });
+
+  describe("when no subscription has a line on either price", () => {
+    /** @scenario "A line on either currency's price counts as the meter's price" */
+    it("carries nothing", () => {
+      expect(
+        lineOfEither([
+          subscription({
+            items: [
+              line(ON_THE_10TH_MS, { priceId: "price_seat_eur" }),
+              line(ON_THE_10TH_MS, { priceId: "price_events_eur" }),
+            ],
+          }),
+        ]),
+      ).toEqual({ carried: false });
+    });
+  });
+
+  describe("when the mode maps neither price", () => {
+    /** @scenario "A line on either currency's price counts as the meter's price" */
+    it("carries nothing, whatever the subscriptions carry", () => {
+      expect(
+        priceLineOf({
+          subscriptions: [
+            subscription({
+              items: [
+                line(ON_THE_10TH_MS, { priceId: "price_x", lookupKey: "GROWTH_INSTANT_EVAL_EUR" }),
+              ],
+            }),
+          ],
+          prices: instantEvalPrices.map(({ priceName }) => ({ priceName, priceId: undefined })),
+          billingMonth: BILLING_MONTH,
+        }),
+      ).toEqual({ carried: false });
     });
   });
 });

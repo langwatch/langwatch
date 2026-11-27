@@ -50,6 +50,7 @@ const snapshot: DataPrivacySnapshot = {
     projects: [],
   },
   audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
+  piiRedactionModelAccepted: false,
 };
 
 describe("EffectiveSummary", () => {

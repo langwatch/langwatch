@@ -151,3 +151,24 @@ Feature: Projection replay from the operator console
     Given the api registers its pipelines for commands only
     When the projections and subscribers are listed
     Then the list carries the consume side the worker runs
+
+  @unit @replay
+  Scenario: An operator replay trusts the queue's claimed-groups index only once its backfill is done and no older image serves
+    Given the step "ops:fill-queue-tenant-claims" is done or not needed, and every live process ships it
+    Then the replay's claimed-groups index is ready
+    But while the step is pending, or a live process does not ship it, the index is not ready (ADR-092)
+
+  @unit
+  Scenario: The claimed-groups backfill resumes from its saved cursor and stops on its signal
+    Given the backfill step saved a cursor partway through the keyspace walk
+    When it runs again
+    Then it walks on from that cursor in slices, saving each slice's cursor and count
+    And it reports finished when the walk returns to cursor "0"
+    And when its signal is aborted it stops before the next slice and reports not finished
+
+  @unit
+  Scenario: The claimed-groups backfill rests between slices so live traffic keeps Redis
+    Given the backfill walks the keyspace in three slices
+    When it runs
+    Then it pauses between each pair of slices
+    And it pauses neither before the first slice nor after the last

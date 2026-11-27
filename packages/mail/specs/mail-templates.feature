@@ -85,6 +85,19 @@ Feature: The transactional messages LangWatch sends
     And every entry carries a non-empty subject line and a non-empty rendered body
 
   @unit
+  Scenario: The studio lists every message under a plain heading
+    When the studio groups the registered templates for its message list
+    Then each template sits under one fixed heading, in the headings' order
+    And a template no heading names sits under Other, last
+
+  @unit
+  Scenario: The arrow keys step through each email's variants before the next email
+    Given an email with more than one variant is open in the studio
+    When the next stop in the message list is asked for
+    Then it is that email's next variant, then the next email under the headings
+    And stepping past either end of the list wraps to the other end
+
+  @unit
   Scenario: The studio's shareable link survives a copy-paste
     Given a person has edited a template's props in the studio
     When those props are encoded into the link's fragment

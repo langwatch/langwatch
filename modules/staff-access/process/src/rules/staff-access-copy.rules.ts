@@ -1,0 +1,219 @@
+/**
+ * The pure decisions of an organization copy (module ADR-002): which approvals pair up, which
+ * source projects a copy takes, and how its report adds up.
+ */
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { StaffAccessScope } from "@langwatch/authz-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import type {
+  StaffAccessCopyItem,
+  StaffAccessCopyKind,
+  StaffAccessCopyOutcome,
+  StaffAccessCopyReport,
+} from "@langwatch/staff-access-contract";
+
+/** The scope each side of a copy was approved for. */
+export const COPY_SOURCE_SCOPES: readonly StaffAccessScope[] = ["copy:source"];
+export const COPY_TARGET_SCOPES: readonly StaffAccessScope[] = ["copy:target"];
+
+/** What making one item of each kind asks of the target grant. */
+export const COPY_KIND_PERMISSIONS: Readonly<
+  Record<StaffAccessCopyKind, readonly AuthzPermission[]>
+> = {
+  project: ["project:create"],
+  evaluator: ["evaluations:create"],
+  monitor: ["evaluations:create"],
+  prompt: ["prompts:create", "prompts:update"],
+  dataset: ["datasets:create"],
+};
+
+/** The ledger key of one source object: `${kind}:${sourceId}`. */
+export const copyKeyOf = (kind: StaffAccessCopyKind, sourceId: string): string =>
+  `${kind}:${sourceId}`;
+
+/** Whether the target's signed grant covers making an item of this kind. */
+export function withinGrant({
+  kind,
+  grant,
+}: {
+  kind: StaffAccessCopyKind;
+  grant: readonly string[];
+}): boolean {
+  return COPY_KIND_PERMISSIONS[kind].every((permission) => grant.includes(permission));
+}
+
+/** At most this many item names go into each organization's audit row. */
+export const COPY_AUDIT_NAMES_MAX = 200;
+
+export function holdsScopes({
+  scopes,
+  needed,
+}: {
+  scopes: readonly string[];
+  needed: readonly StaffAccessScope[];
+}): boolean {
+  return needed.every((scope) => scopes.includes(scope));
+}
+
+/** The projects a copy takes: every one when none is named, else those named by id or slug. */
+export function selectProjects<Project extends { id: string; slug: string }>({
+  projects,
+  named,
+}: {
+  projects: readonly Project[];
+  named: readonly string[] | undefined;
+}): { selected: Project[]; unknown: string[] } {
+  if (!named) return { selected: [...projects], unknown: [] };
+  const selected = projects.filter((project) =>
+    named.some((name) => name === project.id || name === project.slug),
+  );
+  const unknown = named.filter(
+    (name) => !projects.some((project) => name === project.id || name === project.slug),
+  );
+  return { selected, unknown };
+}
+
+/** How many items ended each way. */
+export function copyTotals(items: readonly StaffAccessCopyItem[]): StaffAccessCopyReport["totals"] {
+  const totals: Record<StaffAccessCopyOutcome, number> = {
+    planned: 0,
+    copied: 0,
+    already_copied: 0,
+    skipped: 0,
+    failed: 0,
+    stopped: 0,
+  };
+  for (const item of items) totals[item.outcome] += 1;
+  return totals;
+}
+
+/**
+ * What the audit rows say a copy is about to make (`planned`), or made before it stopped
+ * (`made`): every target this run created, a failed item that still holds its target included.
+ */
+export function auditedPlan({
+  items,
+  select = "planned",
+}: {
+  items: readonly StaffAccessCopyItem[];
+  select?: "planned" | "made";
+}): {
+  counts: Record<string, number>;
+  names: string[];
+  /** How many chosen items are past the name cap and named only in `counts`. */
+  namesOmitted: number;
+} {
+  const chosen = items.filter((item) =>
+    select === "planned"
+      ? item.outcome === "planned"
+      : item.outcome === "copied" || (item.outcome === "failed" && item.targetId !== null),
+  );
+  const counts: Record<string, number> = {};
+  for (const item of chosen) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
+  const names = chosen.slice(0, COPY_AUDIT_NAMES_MAX).map((item) => `${item.kind}: ${item.name}`);
+  return { counts, names, namesOmitted: chosen.length - names.length };
+}
+
+/** The reason an error gives the report: its handled code, or a plain "unexpected_error". */
+export function failureReason(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const { code } = error as { code: unknown };
+    if (typeof code === "string" && code !== "") return code;
+  }
+  return "unexpected_error";
+}
+
+/**
+ * Whether the owner refused by name before making anything: a handled refusal below 500. Each
+ * owner's copy runs its refusals before it creates the target; any other failure may come after
+ * the target exists, so its reservation is kept.
+ */
+export function refusedBeforeMaking(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, httpStatus } = error as { code?: unknown; httpStatus?: unknown };
+  return typeof code === "string" && typeof httpStatus === "number" && httpStatus < 500;
+}
+
+/** One report line; what is not given is null. */
+export function copyItem(
+  base: Pick<StaffAccessCopyItem, "kind" | "name" | "sourceId" | "sourceProjectId">,
+  outcome: StaffAccessCopyItem["outcome"],
+  extra: Partial<Pick<StaffAccessCopyItem, "targetId" | "targetProjectId" | "reason">> = {},
+): StaffAccessCopyItem {
+  return {
+    ...base,
+    outcome,
+    targetId: extra.targetId ?? null,
+    targetProjectId: extra.targetProjectId ?? null,
+    reason: extra.reason ?? null,
+  };
+}
+
+/** The model settings a version carries as they are; the two that can name a dataset are apart. */
+const PLAIN_PROMPT_SETTINGS = [
+  "temperature",
+  "maxTokens",
+  "topP",
+  "frequencyPenalty",
+  "presencePenalty",
+  "seed",
+  "topK",
+  "minP",
+  "repetitionPenalty",
+  "reasoning",
+  "verbosity",
+  "responseFormat",
+  "parameters",
+] as const satisfies readonly (keyof VersionedPrompt)[];
+type PlainPromptSetting = (typeof PLAIN_PROMPT_SETTINGS)[number];
+type PromptSetting = PlainPromptSetting | "promptingTechnique" | "demonstrations";
+export type PromptVersionFields = Pick<
+  VersionedPrompt,
+  "prompt" | "messages" | "inputs" | "outputs" | "model"
+> &
+  Partial<Pick<VersionedPrompt, PromptSetting>>;
+
+type Demonstrations = NonNullable<VersionedPrompt["demonstrations"]>;
+type Technique = NonNullable<VersionedPrompt["promptingTechnique"]>;
+
+/**
+ * Demonstrations without the dataset they name: the id and name point at a dataset of the source
+ * organization, so only the inline rows go along, and nothing when there are none.
+ */
+function inlineDemonstrations(
+  demonstrations: Demonstrations | undefined,
+): { demonstrations: Demonstrations } | Record<string, never> {
+  if (!demonstrations?.inline) return {};
+  return { demonstrations: { inline: demonstrations.inline } };
+}
+
+function techniqueWithoutDatasetLink(technique: Technique): Technique {
+  const { demonstrations, ...rest } = technique;
+  return { ...rest, ...inlineDemonstrations(demonstrations) };
+}
+
+/** The configuration one prompt version carries; ids, authors, tags and lineage stay behind. */
+export function promptFields(version: VersionedPrompt): PromptVersionFields {
+  return {
+    prompt: version.prompt,
+    messages: version.messages,
+    inputs: version.inputs,
+    outputs: version.outputs,
+    model: version.model,
+    ...plainSettings(version),
+    ...(version.promptingTechnique === undefined
+      ? {}
+      : { promptingTechnique: techniqueWithoutDatasetLink(version.promptingTechnique) }),
+    ...inlineDemonstrations(version.demonstrations),
+  };
+}
+
+function plainSettings(
+  version: VersionedPrompt,
+): Partial<Pick<VersionedPrompt, PlainPromptSetting>> {
+  const settings: Partial<Pick<VersionedPrompt, PlainPromptSetting>> = {};
+  for (const key of PLAIN_PROMPT_SETTINGS) {
+    if (version[key] !== undefined) Object.assign(settings, { [key]: version[key] });
+  }
+  return settings;
+}

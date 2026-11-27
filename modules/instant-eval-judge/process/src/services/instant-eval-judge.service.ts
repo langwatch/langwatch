@@ -103,6 +103,7 @@ export class InstantEvalJudgeService {
     signal,
     decisionModel,
     route,
+    costCeiling,
     requestKey,
   }: InstantEvalClassification & {
     requestKey?: string | undefined;
@@ -126,7 +127,14 @@ export class InstantEvalJudgeService {
     const { classifier, limiter, router } = this.deps;
     // The router skips a missing classifier itself, and its table may never reach it.
     if (route) {
-      return router.classify({ projectId, text, questions, route, ...(signal ? { signal } : {}) });
+      return router.classify({
+        projectId,
+        text,
+        questions,
+        route,
+        ...(signal ? { signal } : {}),
+        ...(costCeiling ? { costCeiling } : {}),
+      });
     }
     if (!classifier) return instantEvalSkipped("classifier_not_configured");
     return classifier.classify({ projectId, text, questions, limiter }, ...signalArgs);
@@ -177,9 +185,34 @@ export class InstantEvalJudgeService {
       const judgement = await this.classifyOnce({ ...call, requestKey });
       return { outcome: "judged", judgement, priceUsd: 0 };
     }
+    const admission = await this.admit({ projectId, isRouted: call.route !== undefined });
+    if (admission.outcome === "refused") return admission;
+
+    const spend = { organizationId: admission.organizationId, projectId, requestKey };
+    const judgement = await this.classifyRecordingStop({ spend, call });
+    // A skip billed nothing, so it records nothing; a routed cost with no input tokens still bills.
+    if (!isInstantEvalSpendBillable(judgement))
+      return { outcome: "judged", judgement, priceUsd: 0 };
+
+    const { inputTokens, costNanoUsd } = judgement;
+    const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
+    return { outcome: "judged", judgement, priceUsd };
+  }
+
+  /**
+   * What every metered call checks before anything is sent: LangWatch Cloud, a project the judge
+   * has learned, and a free budget not yet spent. A refusal names its code and calls nothing.
+   */
+  async admit({
+    projectId,
+    isRouted,
+  }: {
+    projectId: string;
+    isRouted: boolean;
+  }): Promise<InstantEvalJudgeAdmission> {
     // Off cloud nothing judges, so the project's placement is never the reason to give. A routed
     // call needs no hosted classifier key: boot checks the keys its table can reach.
-    if (!this.deps.isCloud || (!this.deps.classifier && !call.route)) {
+    if (!this.deps.isCloud || (!this.deps.classifier && !isRouted)) {
       return refused({ code: "classifier_not_configured", message: NOT_CONFIGURED_MESSAGE });
     }
     const placement = await this.deps.repositories.projects.getPlacement({ projectId });
@@ -201,16 +234,7 @@ export class InstantEvalJudgeService {
       });
       return refused({ code: "instant_eval_free_budget_exhausted", message });
     }
-
-    const spend = { organizationId, projectId, requestKey };
-    const judgement = await this.classifyRecordingStop({ spend, call });
-    // A skip billed nothing, so it records nothing; a routed cost with no input tokens still bills.
-    if (!isInstantEvalSpendBillable(judgement))
-      return { outcome: "judged", judgement, priceUsd: 0 };
-
-    const { inputTokens, costNanoUsd } = judgement;
-    const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
-    return { outcome: "judged", judgement, priceUsd };
+    return { outcome: "admitted", organizationId };
   }
 
   /**
@@ -244,20 +268,28 @@ export class InstantEvalJudgeService {
     }
   }
 
-  /** One paid call, priced and recorded. The router prices all it returns: a cost marks routed. */
-  private async priceAndRecord({
+  /**
+   * One paid call, priced and recorded. The router prices all it returns: a cost marks routed.
+   * `model` and `requests` are a routed job's own spend model and count, when it has them.
+   */
+  async priceAndRecord({
     organizationId,
     projectId,
     requestKey,
     inputTokens,
     costNanoUsd,
+    model,
+    requests,
   }: {
     organizationId: string;
     projectId: string;
     requestKey?: string | undefined;
     inputTokens: number;
     costNanoUsd: number | undefined;
+    model?: string | undefined;
+    requests?: number | undefined;
   }): Promise<number> {
+    const routed = this.priced(pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd }));
     const { priceUsd, fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
@@ -267,8 +299,9 @@ export class InstantEvalJudgeService {
       }),
       inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
+      requests,
       ...this.pricing(),
-      routed: this.priced(pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd })),
+      routed: routed && { ...routed, model },
     });
     await this.record({ fact });
     return priceUsd;
@@ -349,12 +382,19 @@ export class InstantEvalJudgeService {
   }
 }
 
+type InstantEvalJudgeRefusal = Extract<InstantEvalJudgeAnswer, { outcome: "refused" }>;
+
+/** A call that may go on, under the organization its project belongs to, or its refusal. */
+export type InstantEvalJudgeAdmission =
+  | Readonly<{ outcome: "admitted"; organizationId: string }>
+  | InstantEvalJudgeRefusal;
+
 function refused({
   code,
   message,
 }: {
   code: InstantEvalJudgeRefusalCode;
   message: string;
-}): InstantEvalJudgeAnswer {
+}): InstantEvalJudgeRefusal {
   return { outcome: "refused", code, message };
 }

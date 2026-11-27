@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The owners' events, folded into weeks. Digest's own subscribers listen on each owner's
- * pipeline (§9) and send its record commands. Only projects of enrolled organizations fold.
+ * pipeline (§9) and send its record commands. Every project's activity folds.
  * Design: dev/docs/plans/weekly-digest.md
  */
 import {
@@ -25,10 +25,6 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   simulationRunFinishedEventDataSchema,
 } from "@langwatch/scenario-contract";
-import {
-  recordTraceSpanEventDataSchema,
-  SPAN_RECORDED_EVENT_TYPE,
-} from "@langwatch/trace-contract";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
 import type { DigestModule } from "../app/digest.app.ts";
@@ -54,12 +50,7 @@ const REDELIVERY_WINDOW_MS = 60 * 60 * 1000;
 
 type Source = Pick<
   DigestSourceService,
-  | "mayFold"
-  | "spanRecorded"
-  | "evaluationCompleted"
-  | "scenarioFinished"
-  | "codingAgentSpan"
-  | "codingAgentMetric"
+  "evaluationCompleted" | "scenarioFinished" | "codingAgentSpan" | "codingAgentMetric"
 >;
 
 function digestActivity(deps: {
@@ -86,21 +77,11 @@ function digestActivity(deps: {
       .withEvents([projectActivityRecordedEventSchema, userActivityRecordedEventSchema])
       .withPostgresProjection(projectWeekProjection({ store: deps.projectWeeks }))
       .withPostgresProjection(userWeekProjection({ store: deps.userWeeks }))
-      // Every recorded span reaches this lane: the filter keeps jobs to the enrolled cohort's.
-      .withPeerSubscriber("spanRecorded", {
-        eventType: SPAN_RECORDED_EVENT_TYPE,
-        data: recordTraceSpanEventDataSchema,
-        handle: (data) => deps.source.spanRecorded(data.span),
-        options: { enqueue: { filter: (data) => deps.source.mayFold(data.span.tenantId) } },
-      })
       .withPeerSubscriber("evaluationCompleted", {
         eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
         data: evaluationLifecycleCompletedEventDataSchema,
         handle: (data) => deps.source.evaluationCompleted(data),
-        options: { enqueue: { filter: (data) => deps.source.mayFold(data.projectId) } },
       })
-      // No enqueue filter: the finished fact's data names no project (only the job's tenant
-      // does, which a filter is not shown), so the handler drops runs outside the cohort.
       .withPeerSubscriber("scenarioRunFinished", {
         eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
         data: simulationRunFinishedEventDataSchema,
@@ -111,13 +92,11 @@ function digestActivity(deps: {
         eventType: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
         data: spanFactsContributionSchema,
         handle: (data) => deps.source.codingAgentSpan(data),
-        options: { enqueue: { filter: (data) => deps.source.mayFold(data.tenantId) } },
       })
       .withPeerSubscriber("codingAgentMetricFacts", {
         eventType: METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
         data: metricFactsContributionSchema,
         handle: (data) => deps.source.codingAgentMetric(data),
-        options: { enqueue: { filter: (data) => deps.source.mayFold(data.tenantId) } },
       })
       // User's erasure fact: digest deletes its own rows naming the person, and sends nothing.
       .withPeerSubscriber("userErased", {

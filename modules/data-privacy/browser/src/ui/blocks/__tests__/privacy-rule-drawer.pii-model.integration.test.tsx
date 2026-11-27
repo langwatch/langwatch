@@ -45,7 +45,9 @@ function renderDrawer({ piiRedactionModelOffered }: { piiRedactionModelOffered: 
       projectId="proj-1"
       isSaving={false}
       piiRedactionModelOffer={
-        piiRedactionModelOffered ? { kind: "model", free: false, split: false } : null
+        piiRedactionModelOffered
+          ? { kind: "model", free: false, split: false, currency: "USD" }
+          : null
       }
       onSave={vi.fn()}
       scopePicker={() => <div data-testid="scope-picker" />}

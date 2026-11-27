@@ -1,11 +1,18 @@
+import chalk from "chalk";
+
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
-import { handledErrorFrom } from "../../../internal/api/errors";
+import { handledErrorFrom, isLangWatchHandledError } from "../../../internal/api/errors";
 import { getEndpoint } from "../../utils/endpoint";
 import { commandAuthError } from "../../utils/errorOutput";
 import { printOpsSessionNotice } from "../../utils/identityNotice";
-import { loadRequesterKey, OPS_REQUESTER_KEY_ENV, readOpsSession } from "../../utils/opsSession";
+import {
+  forgetPendingRequest,
+  loadRequesterKey,
+  OPS_REQUESTER_KEY_ENV,
+  readOpsSession,
+} from "../../utils/opsSession";
 
 /** A local "not authorised yet" refusal, thrown as an Error so stacks and catches keep working. */
 export const opsAuthError = (message: string): Error =>
@@ -87,4 +94,86 @@ export const staffAccessFetch = async <T>({
       message,
     }) ?? new Error(`${method} ${path} failed: ${message}`)
   );
+};
+
+/** How often a waiting request asks whether it was decided. */
+export const OPS_POLL_INTERVAL_MS = 2_000;
+
+export interface RequestStatus {
+  status: string;
+  expiresAt?: string;
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Polls the request until it is decided or its approval window closes. A failed read keeps it
+ * polling, and each distinct failure is said once on stderr so an outage is never silent.
+ */
+export const waitForDecision = async ({
+  requestId,
+  endpoint,
+  requesterKey,
+  expiresAt,
+}: {
+  requestId: string;
+  endpoint: string;
+  requesterKey: string;
+  expiresAt: string;
+}): Promise<string> => {
+  const deadline = Date.parse(expiresAt);
+  let lastFailure: string | undefined;
+  for (;;) {
+    const current = await pollStatus({ requestId, endpoint, requesterKey });
+    if ("failure" in current) {
+      if (current.failure !== lastFailure) {
+        console.error(
+          chalk.yellow(`Could not read request ${requestId} (${current.failure}); still waiting.`),
+        );
+      }
+      lastFailure = current.failure;
+    } else if (current.status !== "pending") {
+      return current.status;
+    }
+    if (Number.isFinite(deadline) && Date.now() >= deadline) return "expired";
+    await sleep(OPS_POLL_INTERVAL_MS);
+  }
+};
+
+/** One status read; a failed read the platform did not refuse by name answers its failure. */
+const pollStatus = async ({
+  requestId,
+  endpoint,
+  requesterKey,
+}: {
+  requestId: string;
+  endpoint: string;
+  requesterKey: string;
+}): Promise<RequestStatus | { failure: string }> => {
+  try {
+    return await staffAccessFetch<RequestStatus>({
+      method: "GET",
+      path: `/api/staff-access/requests/${encodeURIComponent(requestId)}`,
+      bearer: requesterKey,
+      endpoint,
+    });
+  } catch (error) {
+    if (isLangWatchHandledError(error) && error.httpStatus < 500) throw error;
+    return { failure: error instanceof Error ? error.message : String(error) };
+  }
+};
+
+export const refuseUndecided = ({
+  requestId,
+  status,
+}: {
+  requestId: string;
+  status: string;
+}): never => {
+  forgetPendingRequest({ requestId });
+  if (status === "denied") throw opsAuthError(`Request ${requestId} was denied.`);
+  if (status === "expired") {
+    throw opsAuthError(`Request ${requestId} expired before it was approved. Request again.`);
+  }
+  throw opsAuthError(`Request ${requestId} is ${status}; it cannot be redeemed.`);
 };

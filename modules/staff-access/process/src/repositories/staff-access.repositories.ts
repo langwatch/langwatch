@@ -1,5 +1,6 @@
 import type {
   StaffAccessChallengeRepository,
+  StaffAccessCopyLedgerRepository,
   StaffAccessEventRepository,
   StaffAccessRequestRepository,
   StaffAccessRequesterRepository,
@@ -10,4 +11,5 @@ export type StaffAccessRepositories = Readonly<{
   challenges: StaffAccessChallengeRepository;
   requests: StaffAccessRequestRepository;
   events: StaffAccessEventRepository;
+  copyLedger: StaffAccessCopyLedgerRepository;
 }>;

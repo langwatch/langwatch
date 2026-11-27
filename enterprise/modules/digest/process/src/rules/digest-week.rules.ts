@@ -9,8 +9,6 @@ export const SEND_HOUR_UTC = 8;
 /** The weeks before the sent one that the scenario baseline averages over. */
 export const BASELINE_WEEKS = 4;
 
-/** Upper bounds of the latency histogram's buckets; one overflow bucket follows. */
-export const LATENCY_BUCKETS_MS = [100, 250, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000];
 export const MAX_MODELS = 20;
 export const MAX_EVALUATORS = 20;
 export const MAX_SESSIONS = 200;
@@ -110,16 +108,27 @@ export const projectWeekStateSchema = z.object({
   projectId: z.string(),
   organizationId: z.string(),
   isoWeek: z.string(),
-  traces: z.number(),
-  errors: z.number(),
-  tokens: z.number(),
-  costUsd: z.number(),
-  latency: z.array(z.number()),
-  models: z.record(z.string(), z.number()),
   evaluators: z.record(z.string(), outcomeCountsSchema),
   scenarios: outcomeCountsSchema,
 });
+/** What the project's folds hold: outcomes only, since trace numbers are read from analytics. */
 export type ProjectWeekState = z.infer<typeof projectWeekStateSchema>;
+
+/** What analytics says a project's traces did in one week; never stored. */
+export type TraceWeek = Readonly<{
+  traces: number;
+  errors: number;
+  tokens: number;
+  costUsd: number;
+  /** Median and 95th-percentile trace duration. */
+  p50Ms: number;
+  p95Ms: number;
+  /** Traces per model, the most used first. */
+  models: Readonly<Record<string, number>>;
+}>;
+
+/** A project's week as an email reads it: its outcome folds and its trace numbers. */
+export type ProjectWeek = ProjectWeekState & TraceWeek;
 
 export const userWeekStateSchema = z.object({
   userId: z.string(),
@@ -150,12 +159,6 @@ export function emptyProjectWeek(): ProjectWeekState {
     projectId: "",
     organizationId: "",
     isoWeek: "",
-    traces: 0,
-    errors: 0,
-    tokens: 0,
-    costUsd: 0,
-    latency: LATENCY_BUCKETS_MS.map(() => 0).concat(0),
-    models: {},
     evaluators: {},
     scenarios: noOutcomes(),
   };
@@ -205,30 +208,6 @@ export function addOutcome({
     passed: counts.passed + (outcome === "passed" ? 1 : 0),
     failed: counts.failed + (outcome === "failed" ? 1 : 0),
   };
-}
-
-export function latencyBucketOf(durationMs: number): number {
-  const index = LATENCY_BUCKETS_MS.findIndex((bound) => durationMs <= bound);
-  return index === -1 ? LATENCY_BUCKETS_MS.length : index;
-}
-
-/** A percentile read off the histogram: the upper bound of the bucket it lands in. */
-export function latencyPercentile({
-  latency,
-  percentile,
-}: {
-  latency: readonly number[];
-  percentile: number;
-}): number {
-  const total = latency.reduce((sum, count) => sum + count, 0);
-  if (total === 0) return 0;
-  const target = Math.ceil((percentile / 100) * total);
-  let seen = 0;
-  for (const [index, count] of latency.entries()) {
-    seen += count;
-    if (seen >= target) return LATENCY_BUCKETS_MS[index] ?? LATENCY_BUCKETS_MS.at(-1) ?? 0;
-  }
-  return LATENCY_BUCKETS_MS.at(-1) ?? 0;
 }
 
 /** A person's week, summed from the agents' converged metric series. */

@@ -67,4 +67,11 @@ export const dataPrivacyTrpcTransport: TrpcRouterDeclaration<
       userId: actor.id,
     });
   })
+
+  /** Accepting the model's price binds the whole organization: its admins' act alone. */
+  .procedure("acceptPiiRedactionModel")
+  .withPermission("organization:manage")
+  .handle(async ({ app, input, actor }) => {
+    await app.acceptPiiRedactionModel({ organizationId: input.organizationId, userId: actor.id });
+  })
   .build();

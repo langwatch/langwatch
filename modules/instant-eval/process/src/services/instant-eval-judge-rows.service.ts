@@ -10,11 +10,16 @@ import {
   InstantEvalClassifierUnavailableError,
   InstantEvalJudgeStoppedError,
   pickInstantEvalJudgementRoutedSpend,
+  type InstantEvalJudgeCostCeiling,
+  type InstantEvalJudgeRouteRequest,
   type InstantEvalJudgement,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
+import type {
+  InstantEvalClassifyRequest,
+  InstantEvalJudgeChannel,
+} from "../channels/instant-eval-judging.channel.ts";
 import {
   assertInstantEvalPageBudget,
   instantEvalJudgedRows,
@@ -68,7 +73,8 @@ export class InstantEvalJudgeRowsService {
 
   /**
    * One request per text, at most {@link concurrency} in flight. `tokenBudget` caps the whole
-   * batch before anything is sent; absent, it is a page's (the judge's state per row).
+   * batch before anything is sent; absent, it is a page's (the judge's state per row). A routed
+   * batch sends `route` and its `costCeiling` with every request.
    */
   async judgeRows({
     projectId,
@@ -76,12 +82,16 @@ export class InstantEvalJudgeRowsService {
     questions,
     tokenBudget,
     signal,
+    route,
+    costCeiling,
   }: {
     projectId: string;
     rows: readonly Record<string, unknown>[];
     questions: readonly InstantEvalRunQuestion[];
     tokenBudget?: number;
     signal: AbortSignal | null;
+    route?: InstantEvalJudgeRouteRequest;
+    costCeiling?: InstantEvalJudgeCostCeiling;
   }): Promise<InstantEvalRowsJudgement> {
     const { limits } = this.judge;
     const units = instantEvalJudgementUnits({ rows, questions, limits });
@@ -101,12 +111,13 @@ export class InstantEvalJudgeRowsService {
     };
     const cells = new Map<number, Map<string, InstantEvalVerdict | null>>();
     const lost: unknown[] = [];
+    const routing = { ...(route ? { route } : {}), ...(costCeiling ? { costCeiling } : {}) };
     const isCancelled = await inParallel({
       items: units,
       limit: this.concurrency,
       signal,
       run: async (unit) => {
-        const judgement = await this.#classify({ projectId, unit, signal, usage, lost });
+        const judgement = await this.#classify({ projectId, unit, signal, usage, lost, routing });
         record({ unit, judgement: judgement ?? LOST_JUDGEMENT, cells, usage });
       },
     });
@@ -136,6 +147,7 @@ export class InstantEvalJudgeRowsService {
     signal,
     usage,
     lost,
+    routing,
   }: {
     projectId: string;
     unit: InstantEvalJudgementUnit;
@@ -143,6 +155,7 @@ export class InstantEvalJudgeRowsService {
     usage: InstantEvalJudgeUsage;
     /** Where the reason a unit was lost is kept. */
     lost: unknown[];
+    routing: Pick<InstantEvalClassifyRequest, "route" | "costCeiling">;
   }): Promise<InstantEvalJudgement | null> {
     try {
       return await this.judge.classify(
@@ -150,6 +163,7 @@ export class InstantEvalJudgeRowsService {
           projectId,
           text: unit.text,
           questions: unit.questions.map((question) => question.question),
+          ...routing,
         },
         signal ?? undefined,
       );

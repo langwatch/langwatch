@@ -7,6 +7,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -57,6 +58,7 @@ async function harness() {
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      judges: createApiFixture<InstantEvalJudgeApi>(),
       evaluations: createApiFixture<EvaluationApi>(),
       users: {} as UserApi,
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "organization-1" }),
@@ -396,6 +398,7 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         repositories,
         dependencies: {
           agents: createApiFixture<AgentApi>(),
+          judges: createApiFixture<InstantEvalJudgeApi>(),
           evaluations: createApiFixture<EvaluationApi>(),
           users: createApiFixture<UserApi>(),
           projects: createApiFixture<ProjectApi>(),
@@ -445,6 +448,7 @@ describe("given a live process whose scenario registry reads ClickHouse", () => 
       }),
       dependencies: {
         agents: createApiFixture<AgentApi>(),
+        judges: createApiFixture<InstantEvalJudgeApi>(),
         evaluations: createApiFixture<EvaluationApi>(),
         users: createApiFixture<UserApi>(),
         projects: createApiFixture<ProjectApi>(),

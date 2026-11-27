@@ -357,6 +357,25 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organization.instantEvalsEnabledByUserId = input.userId;
   }
 
+  async isPiiRedactionModelAccepted({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<boolean> {
+    return !!this.memory.organizations.get(organizationId)?.piiRedactionModelAcceptedAt;
+  }
+
+  async recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization || organization.piiRedactionModelAcceptedAt) return;
+    organization.piiRedactionModelAcceptedAt = input.at;
+    organization.piiRedactionModelAcceptedByUserId = input.userId;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,

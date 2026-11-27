@@ -8,18 +8,24 @@ Feature: Profile - who I am here, and where I am signed in
   # /settings/profile, the second page of the YOU section
   # (specs/navigation/settings-shell-v2.feature). Security is its sibling and
   # holds everything about CHANGING how you prove who you are; this page reads
-  # it back and changes only the two things nowhere else changes.
+  # it back and changes only the three things nowhere else changes: the name, the photo and
+  # whether the weekly digest email reaches me.
   #
-  # FOUR BANDS, each a narrower kind of "you" than the one above:
+  # FIVE BANDS, each a narrower kind of "you" than the one above, the last
+  # being the mail that reaches you:
   #
   #   your details ──► sign-in methods ──► where you are signed in ──► your keys
+  #                                                                      │
+  #                                                          email preferences
   #
   # ONE MUTATION SURFACE PER SUBJECT. The name and the photo are set here
   # because nowhere else sets them. Addresses, passkeys and passwords are
   # SUMMARISED here and managed on Security; API keys are summarised here and
   # managed on the API Keys page. Two pages that both added an address would be
   # two places for the same refusal to be worded differently. Signing one
-  # browser out is the single exception, because it has no other home.
+  # browser out is an exception, because it has no other home. The weekly digest switch is the
+  # other: it and the signed unsubscribe link in every digest email write ONE shared row, so
+  # either undoes the other and the page shows whichever was last.
   #
   # The photo already worked, on a page about personal API keys. The name did
   # not: it was rendered read-only beside it, and the only writers of it were
@@ -258,6 +264,16 @@ Feature: Profile - who I am here, and where I am signed in
       Given the read of my keys fails
       When I open my profile
       Then I am told what could not be read, in words, with a trace to quote
+
+  # ── Email preferences ──────────────────────────────────────────────────
+
+  Rule: the mail I get is chosen last, below my keys
+
+    @integration
+    Scenario: The profile shows my email preferences after my keys
+      When I open my profile
+      Then I see an Email preferences band
+      And it comes after my keys
 
   Rule: the page keeps the settings look
 

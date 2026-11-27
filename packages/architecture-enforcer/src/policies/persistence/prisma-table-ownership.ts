@@ -107,7 +107,7 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     owner: "organization",
     readers: ["scim", "entitlement", "billing", "licensing"],
     reason:
-      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b); licensing reads a licence customer's name and slug, never through OrganizationApi (C3c, R40), and how many organisations an install holds for a domain claim (Q9, R40)",
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, and when an admin accepted the PII redaction model price, from which its PII spend is billed (ADR-201), its other writes being facts organization applies (R42, round 46 D-b); licensing reads a licence customer's name and slug, never through OrganizationApi (C3c, R40), and how many organisations an install holds for a domain claim (Q9, R40)",
     writes: [
       {
         reader: "billing",

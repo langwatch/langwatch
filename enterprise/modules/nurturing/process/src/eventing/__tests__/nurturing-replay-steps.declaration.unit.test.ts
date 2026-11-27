@@ -12,7 +12,11 @@ import type { ProjectionLaneReplayer } from "@langwatch/eventing";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
+import {
+  isMigrationStep,
+  type MigrationStep,
+  QUEUE_TENANT_CLAIMS_FILL_STEP,
+} from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { nurturingProcessModule } from "../../nurturing.module.ts";
@@ -130,23 +134,28 @@ describe("given the nurturing module installed on a worker", () => {
       expect(step.after).toEqual(expected[index]?.after);
     }
     expect(steps.map(({ after }) => after)).toEqual([
-      undefined,
-      undefined,
-      [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
-      undefined,
-      undefined,
-      [PROJECT_CREATED_FACTS_STEP],
-      undefined,
-      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_CREATED_FACTS_STEP],
-      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, MEMBER_LISTING_STEP],
-      [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
-      [USER_MARKS_STEP, IDENTITY_MARKS_STEP],
-      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_LISTING_STEP],
-      undefined,
-      [PROJECT_LISTING_STEP],
-      undefined,
-      undefined,
-      undefined,
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [PROJECT_CREATED_FACTS_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [
+        USER_MARKS_STEP,
+        IDENTITY_MARKS_STEP,
+        PROJECT_CREATED_FACTS_STEP,
+        QUEUE_TENANT_CLAIMS_FILL_STEP,
+      ],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, MEMBER_LISTING_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_LISTING_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [PROJECT_LISTING_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [QUEUE_TENANT_CLAIMS_FILL_STEP],
     ]);
     // The image ships code-steps.json, not this declaration: a stale list breaks here too.
     const codeSteps = JSON.parse(readFileSync(CODE_STEPS_JSON, "utf8")) as { id: string }[];

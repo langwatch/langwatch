@@ -9,6 +9,8 @@ export type DigestMail = DigestTemplateProps &
     to: string;
     /** The RFC 8058 one-click address the mail client POSTs to. */
     oneClickUnsubscribeUrl: string;
+    /** The organization this week is about, named in the subject; null when it has no name. */
+    organizationName: string | null;
     /** One person's week; a retry carries the same key. Absent on an operator's test. */
     idempotencyKey?: string;
     /** An operator's test of someone else's week: marked in the subject. */
