@@ -1,3 +1,4 @@
+import { sealAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EMPTY_AUDIENCE,
@@ -107,5 +108,52 @@ describe("given input restricted to the project owner", () => {
       expect(protections.canSeeCapturedInput).toBe(false);
       expect(protections.canSeeCapturedOutput).toBe(true);
     });
+  });
+});
+
+describe("given an aggregate the viewer owns, reading a member project owned by someone else", () => {
+  const OTHERS = "proj_someone_elses";
+  const proof = sealAuthorization({
+    actor: { type: "user", id: OWNER },
+    principal: { type: "user", id: OWNER },
+    scope: { organizationId: "organization-1" },
+    grants: [
+      { projectId: project.id, permissions: ["traces:view"], via: [], kind: "own" },
+      {
+        projectId: OTHERS,
+        permissions: ["traces:view"],
+        via: ["grant_0"],
+        kind: "shared",
+        condition: { type: "trace", from: 0, until: null },
+      },
+    ],
+    expiresAt: Date.now() + 60_000,
+    purpose: { kind: "route", route: "test" },
+  });
+
+  /** @scenario "Owner-only content stays hidden when a read spans a project the viewer does not own" */
+  it("hides input that project restricts to its own owner", async () => {
+    const protections = await TraceViewerProtectionService.create({
+      authz: createApiFixture<AuthzApi>({
+        hasPermission: async ({ permission }) => permission === "traces:view",
+      }),
+      projects: createApiFixture<ProjectApi>({
+        findWithTeam: async (id) =>
+          id === OTHERS ? { ...project, id: OTHERS, ownerUserId: "user-other" } : project,
+      }),
+      plans: createApiFixture<PlanProvider>({}),
+      dataPrivacy: createApiFixture<DataPrivacyApi>({
+        getResolvedForProjects: async () => ownerOnlyInput,
+      }),
+      fallbackVisibilityDays: 30,
+      logger: createTestLogger().logger,
+    }).resolve({
+      projectId: project.id,
+      userId: OWNER,
+      publiclyShared: false,
+      authorization: proof,
+    });
+
+    expect(protections.canSeeCapturedInput).toBe(false);
   });
 });
