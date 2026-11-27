@@ -146,6 +146,7 @@ export function LangyPanelFrame({
   const bounds = resolvePanelWidthBounds({
     placement: sizing,
     viewportWidth: placement.viewportWidth,
+    besideDrawer: placement.floatingDodgesDrawer,
   });
   const { resizing, widthPx, handleProps } = useLangyPanelDrag({
     resizable,
