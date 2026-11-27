@@ -660,7 +660,7 @@ jobs:
       # After the generated files, so the REST cross-check can mount the api.
       - name: Set up Go
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -719,7 +719,7 @@ jobs:
       # locally and commit the result.
       - name: Set up Go for the SDK client
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: sdks/go/client/go.mod
           cache: true
@@ -729,7 +729,7 @@ jobs:
       # node_modules tree; name the workspace lockfile instead.
       - name: Set up uv
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: true
           save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -807,7 +807,7 @@ jobs:
         if: failure() && github.ref == 'refs/heads/main'
         timeout-minutes: 3
         continue-on-error: true
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -925,7 +925,7 @@ jobs:
         if: always() && hashFiles('apps/*/coverage/lcov.info') != ''
         timeout-minutes: 3
         continue-on-error: true
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v5
         with:
           files: apps/api/coverage/lcov.info,apps/worker/coverage/lcov.info,apps/ui/coverage/lcov.info
           flags: unit
@@ -1085,7 +1085,7 @@ jobs:
         run: pnpm run ensure:built
 
       - name: Set up Go for the container wait
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -1122,7 +1122,7 @@ jobs:
       # reports "skipped", the job exits 0, and every guard it contains is
       # silently unenforced. REQUIRE_HELM_TESTS below turns a skip into a
       # failure, so this setup can never quietly rot.
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5
       - name: Build chart dependencies
         run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
@@ -1260,7 +1260,7 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -1360,7 +1360,7 @@ jobs:
       # declarations, so the generated files and the four dist-resolving
       # packages (SDK, mcp-server, ksuid, mail) come first.
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -1417,7 +1417,7 @@ jobs:
         if: failure() && github.ref == 'refs/heads/main'
         timeout-minutes: 3
         continue-on-error: true
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
@@ -1452,7 +1452,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+      - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}
           allowed-skips: affected, checks, test-unit, package-suites, build
