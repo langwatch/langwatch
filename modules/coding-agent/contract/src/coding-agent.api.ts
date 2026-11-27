@@ -2,7 +2,6 @@ import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { TraceSessionGroupsInput, TracesSessionsPage } from "@langwatch/trace-contract";
 
-import type { CodingAgentAccountBurndownPage } from "./coding-agent-account-burndown.ts";
 import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.events.ts";
 import type {
   CodingAgentTracePullRequestInput,
@@ -93,14 +92,6 @@ export interface CodingAgentApi {
     input: CodingAgentSessionEventsPageInput,
   ): Promise<CodingAgentSessionEventsPage>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
-  /**
-   * The trailing week per subscription account, over the same projects as the sessions list (an
-   * aggregate project spans its members). Its cost follows `cost:view`.
-   */
-  readAccountBurndownForViewer(
-    input: { projectId: string; authorization: Authorization },
-    by: CodingAgentViewer,
-  ): Promise<CodingAgentAccountBurndownPage>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   /**
    * The Sessions screen's rows, cut to what this viewer may see (title under

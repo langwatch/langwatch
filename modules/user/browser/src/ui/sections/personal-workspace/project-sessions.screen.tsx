@@ -6,7 +6,6 @@ import { codingAgentsPath } from "@langwatch/user-contract";
 import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/personal-workspace-session.ts";
-import { SubscriptionAccountsSection } from "../subscription-accounts-section.tsx";
 
 /**
  * The project's Sessions page: every coding-agent session it recorded, and
@@ -37,10 +36,7 @@ export function ProjectSessionsScreen() {
             fact that is not known to be true. */}
         {!isResolved && <Skeleton height="180px" borderRadius="md" />}
         {isResolved && project ? (
-          <>
-            <SubscriptionAccountsSection projectId={project.id} />
-            <CodingAgentSessionsTable projectId={project.id} projectSlug={project.slug} />
-          </>
+          <CodingAgentSessionsTable projectId={project.id} projectSlug={project.slug} />
         ) : null}
         {isResolved && !project && (
           <NoDataInfoBlock

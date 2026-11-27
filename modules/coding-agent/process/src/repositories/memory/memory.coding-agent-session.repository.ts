@@ -5,7 +5,6 @@ import type {
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 
-import { tracesFenceOf } from "../../rules/coding-agent-traces-fence.rules.ts";
 import {
   CodingAgentSessionRepository,
   type OtherSessionKind,
@@ -100,11 +99,33 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
     toMs: number;
     limit: number;
   }): Promise<CodingAgentSession[]> {
-    const fence = tracesFenceOf(input.authorization);
-    if (fence.kind === "refused") throw new AccessNotGrantedError("traces:view");
-    const inFence = fence.admits;
+    // Mirrors `fenceFor` in the clickhouse client, which a memory twin may not import:
+    // no own grant with the permission, or a narrowing that matches nothing, is refused.
+    const carrying = input.authorization.grants.filter((grant) =>
+      grant.permissions.includes("traces:view"),
+    );
+    if (!carrying.some((grant) => grant.kind === "own")) {
+      throw new AccessNotGrantedError("traces:view");
+    }
+    const grants = carrying.filter(
+      (grant) =>
+        input.authorization.narrowedTo === undefined ||
+        grant.projectId === input.authorization.narrowedTo,
+    );
+    if (grants.length === 0) {
+      throw new AccessNotGrantedError("traces:view");
+    }
     const admitted = (row: CodingAgentSession) =>
-      inFence({ tenantId: row.tenantId, atMs: row.startedAtMs });
+      grants.some((grant) => {
+        if (grant.projectId !== row.tenantId) return false;
+        if (grant.kind === "own") return true;
+        const window = grant.condition;
+        return (
+          window?.type === "trace" &&
+          row.startedAtMs >= (window.from ?? 0) &&
+          (window.until === null || window.until === undefined || row.startedAtMs < window.until)
+        );
+      });
     return this.rows()
       .filter(admitted)
       .filter((row) => withinWindow(row.startedAtMs, { fromMs: input.fromMs, toMs: input.toMs }))

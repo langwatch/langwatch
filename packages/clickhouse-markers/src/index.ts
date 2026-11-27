@@ -1,15 +1,14 @@
 /**
  * Each table's partition key a grant's window applies to: `OccurredAt` trace_summaries and
  * trace_analytics, `StartTime` stored_spans, `ScheduledAt` evaluation_runs, `Timestamp` logs,
- * `StartedAt` coding_agent_sessions, `TimeUnixMs` coding_agent_session_events, `BucketStart`
- * the trace and evaluation minute rollups. */
+ * `StartedAt` coding_agent_sessions, `BucketStart` the trace and evaluation minute rollups.
+ */
 export const TENANT_SCOPE_TIME_COLUMNS = [
   "OccurredAt",
   "StartTime",
   "ScheduledAt",
   "Timestamp",
   "StartedAt",
-  "TimeUnixMs",
   "BucketStart",
 ] as const;
 export type TenantScopeTimeColumn = (typeof TENANT_SCOPE_TIME_COLUMNS)[number];

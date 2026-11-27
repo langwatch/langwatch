@@ -1,6 +1,4 @@
-import type { Authorization } from "@langwatch/authorization";
 import type {
-  CodingAgentAccountReading,
   CodingAgentSessionCursor,
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -27,17 +25,6 @@ export abstract class CodingAgentSessionEventRepository {
     sessionIds: string[];
     fromMs: number;
   }): Promise<SessionModelTotalsRow[]>;
-
-  /**
-   * The model calls and rate-limit rows a proof may read that name an account, deduplicated and
-   * grouped by account, UTC day, agent and model, with the newest name, source and reading per
-   * group.
-   */
-  abstract summariseAccountUsage(input: {
-    authorization: Authorization;
-    fromMs: number;
-    toMs: number;
-  }): Promise<AccountUsageGroupRow[]>;
 
   /**
    * The sessions whose stamped fact rows name one repository's branches: finds
@@ -74,30 +61,4 @@ export interface SessionModelTotalsRow {
   costUsd: number;
   /** The calls' AI units, a count beside the dollar figure; 0 for an agent that reports none. */
   aiUnits: number;
-}
-
-/** A value an account reported, with when it was reported, so groups can be merged newest first. */
-interface Reported<T> {
-  value: T;
-  atMs: number;
-}
-
-/** One (account, UTC day, agent, model) group of an account's rows. */
-export interface AccountUsageGroupRow {
-  accountId: string;
-  /** `YYYY-MM-DD`, UTC. */
-  day: string;
-  agent: string;
-  /** '' for the rate-limit rows, which name no model. */
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  costUsd: number;
-  rateLimitEvents: number;
-  name: Reported<string> | null;
-  source: Reported<string> | null;
-  /** The newest reading in the group; `atMs` is when it was read, else when its row happened. */
-  reading: (CodingAgentAccountReading & { atMs: number }) | null;
 }

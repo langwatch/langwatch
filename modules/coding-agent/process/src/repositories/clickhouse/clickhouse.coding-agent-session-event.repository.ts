@@ -1,10 +1,4 @@
-import type { Authorization } from "@langwatch/authorization";
-import {
-  AuthorizedClickHouse,
-  type ClickHouseQueryClient,
-  type IdBoundOptions,
-} from "@langwatch/clickhouse-client";
-import { tenantScope } from "@langwatch/clickhouse-markers";
+import { type ClickHouseQueryClient, type IdBoundOptions } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -13,10 +7,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  AccountUsageGroupRow,
-  CodingAgentSessionEventRepository as SessionEventsRepository,
-} from "../coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
 import { clickHouseMomentOf, routingTenantOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
@@ -188,17 +179,10 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     return new CodingAgentSessionEventsClickHouseRepository(clickhouse, defaultTraceRetentionDays);
   }
 
-  /** The proof-checked reader the account read goes through, as the sessions list (ADR-177). */
-  private readonly authorized: AuthorizedClickHouse;
-
   private constructor(
     private readonly clickhouse: ClickHouseQueryClient,
     private readonly defaultTraceRetentionDays: number,
-  ) {
-    this.authorized = new AuthorizedClickHouse({
-      resolveClient: () => Promise.resolve(clickhouse),
-    });
-  }
+  ) {}
 
   async ensure(records: CodingAgentSessionEventRecord[], retentionDays?: number): Promise<void> {
     const [first] = records;
@@ -579,108 +563,6 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     };
   }
 
-  async summariseAccountUsage({
-    authorization,
-    fromMs,
-    toMs,
-  }: {
-    authorization: Authorization;
-    fromMs: number;
-    toMs: number;
-  }): Promise<AccountUsageGroupRow[]> {
-    const reader = this.authorized.as(authorization, { reads: "traces" });
-    // Aggregates skip NULL, so each reported value rides a one-element tuple: the newest row's
-    // own NULL (no limit any more) must win over an older limit. RecordId breaks key ties.
-    // ID_BOUND_SKIP: the fence's trailing week, bounded by the caller's own window.
-    const result = await reader.query<ClickHouseAccountGroupRow>({
-      query: `
-        SELECT
-          AccountId,
-          toString(toDate(TimeUnixMs, 'UTC')) AS Day,
-          Agent,
-          Model,
-          sumIf(InputTokens, EventKind = 'model_call') AS InputTokens,
-          sumIf(OutputTokens, EventKind = 'model_call') AS OutputTokens,
-          sumIf(CacheReadTokens, EventKind = 'model_call') AS CacheReadTokens,
-          sumIf(CacheCreationTokens, EventKind = 'model_call') AS CacheWriteTokens,
-          sumIf(CostUsd, EventKind = 'model_call') AS CostUsd,
-          countIf(EventKind = 'rate_limit') AS RateLimitEvents,
-          argMaxIf(AccountName, (TimeUnixMs, RecordId), AccountName != '') AS Name,
-          maxIf(toUnixTimestamp64Milli(TimeUnixMs), AccountName != '') AS NameAtMs,
-          argMaxIf(AccountSource, (TimeUnixMs, RecordId), AccountSource != '') AS Source,
-          maxIf(toUnixTimestamp64Milli(TimeUnixMs), AccountSource != '') AS SourceAtMs,
-          maxIf(ReadingKeyMs, HasReading) AS ReadingAtMs,
-          tupleElement(argMaxIf(tuple(AccountUsagePercent), (ReadingKeyMs, TimeUnixMs, RecordId), HasReading), 1) AS Percent,
-          argMaxIf(AccountUsageWindow, (ReadingKeyMs, TimeUnixMs, RecordId), HasReading) AS UsageWindow,
-          tupleElement(argMaxIf(tuple(toUnixTimestamp64Milli(AccountUsageResetsAt)), (ReadingKeyMs, TimeUnixMs, RecordId), HasReading), 1) AS ResetsAtMs,
-          tupleElement(argMaxIf(tuple(toUnixTimestamp64Milli(AccountUsageReadAt)), (ReadingKeyMs, TimeUnixMs, RecordId), HasReading), 1) AS ReadAtMs,
-          tupleElement(argMaxIf(tuple(toUnixTimestamp64Milli(AccountLimitedUntil)), (ReadingKeyMs, TimeUnixMs, RecordId), HasReading), 1) AS LimitedUntilMs
-        FROM (
-          SELECT
-            AccountId, TimeUnixMs, RecordId, EventKind, Agent, Model,
-            InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, CostUsd,
-            AccountName, AccountSource, AccountUsagePercent, AccountUsageWindow,
-            AccountUsageResetsAt, AccountUsageReadAt, AccountLimitedUntil,
-            (
-              AccountUsagePercent IS NOT NULL
-              OR AccountUsageResetsAt IS NOT NULL
-              OR AccountLimitedUntil IS NOT NULL
-            ) AS HasReading,
-            coalesce(
-              toUnixTimestamp64Milli(AccountUsageReadAt),
-              toUnixTimestamp64Milli(TimeUnixMs)
-            ) AS ReadingKeyMs
-          FROM ${TABLE_NAME}
-          WHERE ${tenantScope("TimeUnixMs")}
-            AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND TimeUnixMs < fromUnixTimestamp64Milli({toMs:Int64})
-            AND AccountId != ''
-            AND EventKind IN ('model_call', 'rate_limit')
-          ORDER BY TenantId, SessionId, TimeUnixMs, RecordId, UpdatedAt DESC
-          LIMIT 1 BY TenantId, SessionId, TimeUnixMs, RecordId
-        )
-        GROUP BY AccountId, Day, Agent, Model
-      `,
-      query_params: { fromMs, toMs },
-      format: "JSONEachRow",
-    });
-    const rows = await result.json();
-
-    return rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapAccountGroup(row));
-  }
-
-  private static mapAccountGroup(row: ClickHouseAccountGroupRow): AccountUsageGroupRow {
-    const nameAtMs = Number(row.NameAtMs);
-    const sourceAtMs = Number(row.SourceAtMs);
-    const readingAtMs = Number(row.ReadingAtMs);
-
-    return {
-      accountId: row.AccountId,
-      day: row.Day,
-      agent: row.Agent,
-      model: row.Model,
-      inputTokens: Number(row.InputTokens),
-      outputTokens: Number(row.OutputTokens),
-      cacheReadTokens: Number(row.CacheReadTokens),
-      cacheWriteTokens: Number(row.CacheWriteTokens),
-      costUsd: Number(row.CostUsd),
-      rateLimitEvents: Number(row.RateLimitEvents),
-      name: row.Name !== "" ? { value: row.Name, atMs: nameAtMs } : null,
-      source: row.Source !== "" ? { value: row.Source, atMs: sourceAtMs } : null,
-      reading:
-        readingAtMs > 0
-          ? {
-              percent: row.Percent === null ? null : Number(row.Percent),
-              window: row.UsageWindow !== "" ? row.UsageWindow : null,
-              resetsAtMs: row.ResetsAtMs === null ? null : Number(row.ResetsAtMs),
-              readAtMs: row.ReadAtMs === null ? null : Number(row.ReadAtMs),
-              limitedUntilMs: row.LimitedUntilMs === null ? null : Number(row.LimitedUntilMs),
-              atMs: readingAtMs,
-            }
-          : null,
-    };
-  }
-
   async findSessionsByStampedBranch({
     tenantIds,
     repositoryHost,
@@ -755,28 +637,4 @@ interface ClickHouseModelTotalsRow {
   CacheCreationTokens: string;
   CostUsd: number;
   AiUnits: number;
-}
-
-/** One (account, day, agent, model) group as ClickHouse returns it: 64-bit numbers as strings. */
-interface ClickHouseAccountGroupRow {
-  AccountId: string;
-  Day: string;
-  Agent: string;
-  Model: string;
-  InputTokens: string;
-  OutputTokens: string;
-  CacheReadTokens: string;
-  CacheWriteTokens: string;
-  CostUsd: number;
-  RateLimitEvents: string;
-  Name: string;
-  NameAtMs: string;
-  Source: string;
-  SourceAtMs: string;
-  ReadingAtMs: string;
-  Percent: number | null;
-  UsageWindow: string;
-  ResetsAtMs: string | null;
-  ReadAtMs: string | null;
-  LimitedUntilMs: string | null;
 }

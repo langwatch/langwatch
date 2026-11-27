@@ -2,7 +2,6 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { Authorization } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
-  type CodingAgentAccountBurndownPage,
   type CodingAgentSessionLookupInput,
   CodingAgentApi as CodingAgentApiToken,
   type CodingAgentPullRequestUsageRead,
@@ -70,7 +69,6 @@ import {
   encodeSessionCursor,
   readSessionCursor,
 } from "../rules/coding-agent-session-cursor.rules.ts";
-import { CodingAgentAccountBurndownService } from "../services/coding-agent-account-burndown.service.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
@@ -254,10 +252,6 @@ export class CodingAgentModule implements CodingAgentApi {
     }).build();
     return new CodingAgentModule({
       codingAgents: service,
-      accountBurndown: CodingAgentAccountBurndownService.create({
-        sessionEvents: repositories.sessionEvents,
-        clock: SystemCodingAgentClockService.create(),
-      }),
       github: dependencies.github,
       traces: dependencies.traces,
       scope,
@@ -276,7 +270,6 @@ export class CodingAgentModule implements CodingAgentApi {
   }
 
   readonly #codingAgents: CodingAgentSessionService;
-  readonly #accountBurndown: CodingAgentAccountBurndownService;
   readonly #github: GithubApi;
   readonly #traces: TraceApi;
   readonly #scope: CodingAgentScopeReads;
@@ -290,7 +283,6 @@ export class CodingAgentModule implements CodingAgentApi {
 
   private constructor({
     codingAgents,
-    accountBurndown,
     github,
     traces,
     scope,
@@ -303,7 +295,6 @@ export class CodingAgentModule implements CodingAgentApi {
     retention,
   }: {
     codingAgents: CodingAgentSessionService;
-    accountBurndown: CodingAgentAccountBurndownService;
     github: GithubApi;
     traces: TraceApi;
     scope: CodingAgentScopeReads;
@@ -316,7 +307,6 @@ export class CodingAgentModule implements CodingAgentApi {
     retention: RetentionPolicyResolver;
   }) {
     this.#codingAgents = codingAgents;
-    this.#accountBurndown = accountBurndown;
     this.#github = github;
     this.#traces = traces;
     this.#scope = scope;
@@ -447,23 +437,6 @@ export class CodingAgentModule implements CodingAgentApi {
   /** The project's "at a glance" totals over a window. */
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
     return this.#codingAgents.getUsageTotals(input);
-  }
-
-  /** The project's subscription accounts over the trailing week; cost follows `cost:view`. */
-  async readAccountBurndownForViewer(
-    input: { projectId: string; authorization: Authorization },
-    by: CodingAgentViewer,
-  ): Promise<CodingAgentAccountBurndownPage> {
-    const visibility = await this.#visibility.readVisibility({
-      userId: by.id,
-      projectId: input.projectId,
-      authorization: input.authorization,
-    });
-
-    return this.#accountBurndown.readWeek({
-      authorization: input.authorization,
-      canSeeCosts: visibility.canSeeCosts,
-    });
   }
 
   /** The usage report's figures (ADR-156, section 10). */

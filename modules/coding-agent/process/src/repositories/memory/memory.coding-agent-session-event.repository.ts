@@ -1,14 +1,10 @@
-import { AccessNotGrantedError, type Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSessionCursor,
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
 } from "@langwatch/coding-agent-contract";
 
-import { utcDayOf } from "../../rules/coding-agent-account.rules.ts";
-import { tracesFenceOf } from "../../rules/coding-agent-traces-fence.rules.ts";
 import {
-  type AccountUsageGroupRow,
   CodingAgentSessionEventRepository,
   type SessionModelTotalsRow,
 } from "../coding-agent-session-event.repository.ts";
@@ -97,34 +93,6 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
     return [...totals.values()];
   }
 
-  async summariseAccountUsage(input: {
-    authorization: Authorization;
-    fromMs: number;
-    toMs: number;
-  }): Promise<AccountUsageGroupRow[]> {
-    const fence = tracesFenceOf(input.authorization);
-    if (fence.kind === "refused") throw new AccessNotGrantedError("traces:view");
-    const inFence = fence.admits;
-    const groups = new Map<string, AccountUsageGroupRow>();
-    const held = this.memory.sessionEvents
-      .filter(
-        (row) => row.accountId !== "" && inFence({ tenantId: row.tenantId, atMs: row.timeUnixMs }),
-      )
-      .filter((row) => row.eventKind === "model_call" || row.eventKind === "rate_limit")
-      .filter((row) => row.timeUnixMs >= input.fromMs && row.timeUnixMs < input.toMs)
-      .toSorted(byTimeThenRecordId);
-
-    for (const row of held) {
-      const day = utcDayOf(row.timeUnixMs);
-      const key = `${row.accountId}:${day}:${row.agent}:${row.model}`;
-      const group = groups.get(key) ?? emptyAccountGroup({ row, day });
-      addToAccountGroup({ group, row });
-      groups.set(key, group);
-    }
-
-    return [...groups.values()];
-  }
-
   /** Fact stamps are a ClickHouse-side projection; this tier holds none. */
   async findSessionsByStampedBranch(): Promise<{ tenantId: string; sessionId: string }[]> {
     return [];
@@ -147,66 +115,6 @@ function emptyTotals(held: CodingAgentSessionEventRecord): SessionModelTotalsRow
     costUsd: 0,
     aiUnits: 0,
   };
-}
-
-function emptyAccountGroup({
-  row,
-  day,
-}: {
-  row: CodingAgentSessionEventRecord;
-  day: string;
-}): AccountUsageGroupRow {
-  return {
-    accountId: row.accountId,
-    day,
-    agent: row.agent,
-    model: row.model,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-    costUsd: 0,
-    rateLimitEvents: 0,
-    name: null,
-    source: null,
-    reading: null,
-  };
-}
-
-/** Rows arrive oldest first, so each later value replaces the one before it. */
-function addToAccountGroup({
-  group,
-  row,
-}: {
-  group: AccountUsageGroupRow;
-  row: CodingAgentSessionEventRecord;
-}): void {
-  if (row.eventKind === "model_call") {
-    group.inputTokens += row.inputTokens;
-    group.outputTokens += row.outputTokens;
-    group.cacheReadTokens += row.cacheReadTokens;
-    group.cacheWriteTokens += row.cacheCreationTokens;
-    group.costUsd += row.costUsd;
-  } else {
-    group.rateLimitEvents += 1;
-  }
-  if (row.accountName !== "") group.name = { value: row.accountName, atMs: row.timeUnixMs };
-  if (row.accountSource !== "") group.source = { value: row.accountSource, atMs: row.timeUnixMs };
-  const hasReading =
-    row.accountUsagePercent !== null ||
-    row.accountUsageResetsAtMs !== null ||
-    row.accountLimitedUntilMs !== null;
-  const atMs = row.accountUsageReadAtMs ?? row.timeUnixMs;
-  if (hasReading && (group.reading === null || atMs >= group.reading.atMs)) {
-    group.reading = {
-      percent: row.accountUsagePercent,
-      window: row.accountUsageWindow !== "" ? row.accountUsageWindow : null,
-      resetsAtMs: row.accountUsageResetsAtMs,
-      readAtMs: row.accountUsageReadAtMs,
-      limitedUntilMs: row.accountLimitedUntilMs,
-      atMs,
-    };
-  }
 }
 
 function asEvent(record: CodingAgentSessionEventRecord): CodingAgentSessionEvent {

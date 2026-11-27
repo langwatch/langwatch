@@ -23,10 +23,6 @@ vi.mock("../behavior/lent-coding-agent-tables.tsx", () => ({
   },
 }));
 
-vi.mock("../ui/sections/subscription-accounts-section.tsx", () => ({
-  SubscriptionAccountsSection: () => <div data-testid="subscription-accounts" />,
-}));
-
 import { fakePersonalWorkspaceHost, personalWorkspaceHostWrapper } from "../testing.tsx";
 import ProjectPullRequestsPage from "../ui/sections/personal-workspace/project-pull-requests.screen.tsx";
 import ProjectSessionsPage from "../ui/sections/personal-workspace/project-sessions.screen.tsx";

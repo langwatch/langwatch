@@ -1,8 +1,6 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { codingAgentAccountColumnsSchema } from "./coding-agent-account-burndown.ts";
-
 const countByNameSchema = z.record(z.string(), z.number());
 // The legacy service deliberately accepts non-finite limits and clamps them
 // to its safe page size. Keep that behaviour at the new boundary.
@@ -227,9 +225,45 @@ export const codingAgentSessionEventSchema: CodingAgentSessionEventSchema =
   codingAgentSessionEventSchemaDefinition;
 
 /**
+ * The account columns every per-call row carries (migration 00136). Blank strings and nulls on
+ * rows from before the columns existed and on rows with no account. Percent and instants are only
+ * ever what the account itself reported; nothing here is derived from tokens.
+ */
+const codingAgentAccountColumnsSchemaDefinition = z
+  .object({
+    accountId: z.string(),
+    accountName: z.string(),
+    accountSource: z.string(),
+    accountUsagePercent: z.number().nullable(),
+    accountUsageWindow: z.string(),
+    accountUsageResetsAtMs: z.number().nullable(),
+    accountUsageReadAtMs: z.number().nullable(),
+    accountLimitedUntilMs: z.number().nullable(),
+  })
+  .strict();
+export interface CodingAgentAccountColumnsSchema extends Named<
+  typeof codingAgentAccountColumnsSchemaDefinition
+> {}
+export const codingAgentAccountColumnsSchema: CodingAgentAccountColumnsSchema =
+  codingAgentAccountColumnsSchemaDefinition;
+export type CodingAgentAccountColumns = z.infer<typeof codingAgentAccountColumnsSchema>;
+
+/** A row with no account: what every row from before the columns reads as. */
+export const NO_ACCOUNT_COLUMNS: CodingAgentAccountColumns = Object.freeze({
+  accountId: "",
+  accountName: "",
+  accountSource: "",
+  accountUsagePercent: null,
+  accountUsageWindow: "",
+  accountUsageResetsAtMs: null,
+  accountUsageReadAtMs: null,
+  accountLimitedUntilMs: null,
+});
+
+/**
  * One durable row in the ordered coding-agent session-event read model. `aiUnits` (00123) and
- * the account columns (00136) are written for the pull-request and subscription-account reads,
- * not part of the events answer.
+ * the account columns (00136) are written for the pull-request read and LWQL queries, not part
+ * of the events answer.
  */
 const codingAgentSessionEventRecordSchemaDefinition = codingAgentSessionEventSchema
   .safeExtend({

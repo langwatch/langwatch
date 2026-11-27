@@ -29242,7 +29242,7 @@ If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins ov
 
 ## Name the account an agent runs on
 
-A harness that runs agents on several subscription logins can say which login each session used, so the Usage page shows a card per account. Add the account attributes to the same resource attributes:
+A harness that runs agents on several subscription logins can say which login each session used, so you can chart usage per account. Add the account attributes to the same resource attributes:
 
 ```bash
 export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.account.id=4f1c9e2a7b6d4c3e8a1f0b2c3d4e5f60,langwatch.account.name=Work%20Max,langwatch.account.source=pool"
@@ -29255,7 +29255,6 @@ Percent-encode spaces and commas in values, as `OTEL_RESOURCE_ATTRIBUTES` requir
 Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
 
 **Also check:** [Team projects](/coding-agents/team-projects) for pinning interactive machines to a shared project with a login.
-
 ---
 
 # FILE: ./coding-agents/openai-codex.mdx
@@ -30935,18 +30934,14 @@ The **coding-agent usage** card summarizes the last 30 days across your assistan
 
 ## Subscription accounts
 
-If your agents run on subscription logins, such as a few Claude Max accounts shared by many agents, the **Subscription accounts** section shows one card per account for the last seven days. The section appears on your personal page and on a project's Sessions page.
+If your agents run on subscription logins, such as a few Claude Max accounts shared by many agents, LangWatch records which account each model call and rate limit ran on. You chart them yourself in a [dashboard](/features/dashboards) widget or [query them](/features/querying-your-data) with LangWatchQL.
 
-Each card shows the agents and top model that ran on the account, the tokens it used so far this week, its cost, and the usage percent the account last reported, with when it was read and when it resets. A card says **Out of usage until** a time while the account is limited.
-
-The percent is the figure the provider reported for the account. Providers publish no token allowance for these plans, so LangWatch never estimates a percent from tokens, and an account that reported none shows no percent.
-
-Claude Code sends its account id (`user.account_uuid`) and Codex sends its own (`user.account_id`), so their accounts show up without setup. A launcher that runs agents on several logins can name each one, and report its usage, with these attributes, on each record or once in `OTEL_RESOURCE_ATTRIBUTES`:
+Claude Code sends its account id (`user.account_uuid`) and Codex sends its own (`user.account_id`), so their accounts are recorded without setup. A launcher that runs agents on several logins can name each one, and report its usage, with these attributes, on each record or once in `OTEL_RESOURCE_ATTRIBUTES`:
 
 | Attribute | Value |
 | --- | --- |
 | `langwatch.account.id` | An opaque id for the account. Never an email address. |
-| `langwatch.account.name` | The label shown on the card, such as `Work Max`. |
+| `langwatch.account.name` | A label for the account, such as `Work Max`. |
 | `langwatch.account.source` | `personal`, `pool` or `computer`. |
 | `langwatch.account.usage.percent` | The provider's usage figure, 0 to 100. |
 | `langwatch.account.usage.window` | The window it is for, such as `five_hour` or `seven_day`. |
@@ -30954,7 +30949,30 @@ Claude Code sends its account id (`user.account_uuid`) and Codex sends its own (
 | `langwatch.account.usage.read_at` | When the figure was read, ISO 8601. |
 | `langwatch.account.limited_until` | While the account is out of usage, when it can run again, ISO 8601. |
 
-A value on the record wins over the same attribute on the resource. The newest reading per account is the one shown.
+A value on the record wins over the same attribute on the resource. The percent is the figure the provider reported. Providers publish no token allowance for these plans, so LangWatch never estimates a percent from tokens.
+
+### Chart your accounts
+
+The `coding_session_events` view carries the account on every row as `AccountId`, `AccountName`, `AccountSource`, `AccountUsagePercent`, `AccountUsageWindow`, `AccountUsageResetsAt`, `AccountUsageReadAt` and `AccountLimitedUntil`. Rows with no account have an empty `AccountId`.
+
+This widget query sums each account's tokens over the dashboard's period and keeps its newest name and usage figure:
+
+```sql
+SELECT
+  AccountId,
+  argMaxIf(AccountName, TimeUnixMs, AccountName != '') AS AccountName,
+  sumIf(InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens, EventKind = 'model_call') AS Tokens,
+  countIf(EventKind = 'rate_limit') AS RateLimits,
+  argMaxIf(AccountUsagePercent, TimeUnixMs, AccountUsagePercent IS NOT NULL) AS UsagePercent
+FROM coding_session_events
+WHERE TimeUnixMs >= {dashboard_context_period_start:DateTime}
+  AND TimeUnixMs < {dashboard_context_period_end:DateTime}
+  AND AccountId != ''
+GROUP BY AccountId
+ORDER BY AccountName
+```
+
+For a burndown per day, add `toDate(TimeUnixMs) AS Day` to the select and to `GROUP BY`. From the command line, run the same statement with `langwatch query` and `subtractDays(now(), 7)` in place of the period placeholders.
 
 ## Query it from the command line
 
@@ -30982,7 +31000,6 @@ See the [coding agents API reference](/api-reference/coding-agents/overview).
 The Teams page at `/governance/teams` lists every team's spend and requests over the last 30 days. **Governance > People** at `/governance/people` ranks each person by spend, and a person's row opens their page, personal AI use included. To count spend by cost center, assign people, teams and projects to departments on [People](/ai-governance/people).
 
 **Also check:** [Sessions](/coding-agents/sessions) for the per-session detail behind these rollups, and [Compare provider costs](/coding-agents/compare-provider-costs) to price your real usage mix against other providers.
-
 ---
 
 # FILE: ./concepts.mdx

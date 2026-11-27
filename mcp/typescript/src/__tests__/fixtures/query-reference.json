@@ -3604,6 +3604,70 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "AccountId",
+              "type": "String",
+              "description": "Subscription account the call ran on: langwatch.account.id, else the agent's own account id. Empty when none was sent.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountName",
+              "type": "String",
+              "description": "Label the account's owner set, empty when none was sent.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountSource",
+              "type": "LowCardinality(String)",
+              "description": "Where the login came from: personal, pool or computer, as the launcher reported it.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountUsagePercent",
+              "type": "Nullable(Float64)",
+              "description": "The provider's own usage figure for the account, 0 to 100, as last reported. NULL when none was sent.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountUsageWindow",
+              "type": "LowCardinality(String)",
+              "description": "Which usage window the percent is for, such as five_hour or seven_day.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountUsageResetsAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When that usage window resets, NULL when not reported.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountUsageReadAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the launcher read the usage figure, NULL when not reported.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AccountLimitedUntil",
+              "type": "Nullable(DateTime64(3))",
+              "description": "Set while the account is out of usage: when it can run again.",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT SessionId, TimeUnixMs, RecordId\nFROM coding_session_events\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"

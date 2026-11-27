@@ -154,7 +154,7 @@ If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins ov
 
 ## Name the account an agent runs on
 
-A harness that runs agents on several subscription logins can say which login each session used, so the Usage page shows a card per account. Add the account attributes to the same resource attributes:
+A harness that runs agents on several subscription logins can say which login each session used, so you can chart usage per account. Add the account attributes to the same resource attributes:
 
 ```bash
 export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.account.id=4f1c9e2a7b6d4c3e8a1f0b2c3d4e5f60,langwatch.account.name=Work%20Max,langwatch.account.source=pool"

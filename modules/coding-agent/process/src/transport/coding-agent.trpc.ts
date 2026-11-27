@@ -33,12 +33,6 @@ export const codingAgentTrpcTransport: TrpcRouterDeclaration<
     app.getUsageTotals({ projectId: input.projectId, ...windowOf(input) }),
   )
 
-  .procedure("accountBurndown")
-  .withPermission(CODING_AGENT_PERMISSION)
-  .handle(({ app, input, actor, authorization }) =>
-    app.readAccountBurndownForViewer({ projectId: input.projectId, authorization }, actor),
-  )
-
   .procedure("recentSessions")
   .withPermission(CODING_AGENT_PERMISSION)
   .handle(({ app, input }) =>

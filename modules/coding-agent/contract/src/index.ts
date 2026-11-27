@@ -1,5 +1,4 @@
 export * from "./coding-agent.ts";
-export * from "./coding-agent-account-burndown.ts";
 export * from "./telemetry/coding-agent-account.ts";
 export * from "./coding-agent.api.ts";
 export * from "./coding-agent.config.ts";

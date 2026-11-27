@@ -6,7 +6,6 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { traceSessionGroupsInputSchema, tracesSessionsPageSchema } from "@langwatch/trace-contract";
 
-import { codingAgentAccountBurndownPageSchema } from "./coding-agent-account-burndown.ts";
 import { codingAgentTranscriptSchema } from "./coding-agent-transcript.ts";
 import {
   codingAgentTrpcProjectScopeSchema,
@@ -31,12 +30,6 @@ export const codingAgentTrpc = defineTrpcContract("codingAgents")
   .query("usageTotals")
   .withInput(codingAgentTrpcUsageTotalsInputSchema)
   .withOutput(codingAgentUsageTotalsSchema)
-
-  // The trailing week per subscription account: tokens and cost per day, and the usage the
-  // account itself last reported.
-  .query("accountBurndown")
-  .withInput(codingAgentTrpcProjectScopeSchema)
-  .withOutput(codingAgentAccountBurndownPageSchema)
 
   // The stored rows verbatim, newest first, for the personal usage card.
   .query("recentSessions")

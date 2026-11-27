@@ -2803,6 +2803,57 @@ const CODING_AGENT_SESSION_EVENTS: UngatedViewDefinition = {
       description: "Branch active when the event happened.",
       sourceColumns: ["Branch"],
     },
+    {
+      name: "AccountId",
+      type: "String",
+      description:
+        "Subscription account the call ran on: langwatch.account.id, else the agent's own account id. Empty when none was sent.",
+      sourceColumns: ["AccountId"],
+    },
+    {
+      name: "AccountName",
+      type: "String",
+      description: "Label the account's owner set, empty when none was sent.",
+      sourceColumns: ["AccountName"],
+    },
+    {
+      name: "AccountSource",
+      type: "LowCardinality(String)",
+      description:
+        "Where the login came from: personal, pool or computer, as the launcher reported it.",
+      sourceColumns: ["AccountSource"],
+    },
+    {
+      name: "AccountUsagePercent",
+      type: "Nullable(Float64)",
+      description:
+        "The provider's own usage figure for the account, 0 to 100, as last reported. NULL when none was sent.",
+      sourceColumns: ["AccountUsagePercent"],
+    },
+    {
+      name: "AccountUsageWindow",
+      type: "LowCardinality(String)",
+      description: "Which usage window the percent is for, such as five_hour or seven_day.",
+      sourceColumns: ["AccountUsageWindow"],
+    },
+    {
+      name: "AccountUsageResetsAt",
+      type: "Nullable(DateTime64(3))",
+      description: "When that usage window resets, NULL when not reported.",
+      sourceColumns: ["AccountUsageResetsAt"],
+    },
+    {
+      name: "AccountUsageReadAt",
+      type: "Nullable(DateTime64(3))",
+      description: "When the launcher read the usage figure, NULL when not reported.",
+      sourceColumns: ["AccountUsageReadAt"],
+    },
+    {
+      name: "AccountLimitedUntil",
+      type: "Nullable(DateTime64(3))",
+      description: "Set while the account is out of usage: when it can run again.",
+      sourceColumns: ["AccountLimitedUntil"],
+    },
   ],
 };
 
@@ -3468,14 +3519,14 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       RepositoryName: "inherit",
       Branch: "inherit",
       AiUnits: "omit",
-      AccountId: "omit",
-      AccountName: "omit",
-      AccountSource: "omit",
-      AccountUsagePercent: "omit",
-      AccountUsageWindow: "omit",
-      AccountUsageResetsAt: "omit",
-      AccountUsageReadAt: "omit",
-      AccountLimitedUntil: "omit",
+      AccountId: "inherit",
+      AccountName: "inherit",
+      AccountSource: "inherit",
+      AccountUsagePercent: "inherit",
+      AccountUsageWindow: "inherit",
+      AccountUsageResetsAt: "inherit",
+      AccountUsageReadAt: "inherit",
+      AccountLimitedUntil: "inherit",
     },
   }),
   coding_tool_results: defineTableCatalogue({

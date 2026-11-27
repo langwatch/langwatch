@@ -16,7 +16,7 @@
 --   AccountLimitedUntil   set while the account is out of usage.
 --
 -- Filled on model_call and rate_limit rows only. Rows from before these
--- columns read as no account ('' and NULL), which the account read skips.
+-- columns read as no account ('' and NULL); queries filter on AccountId != ''.
 -- No backfill: there is nothing to backfill from.
 -- ============================================================================
 

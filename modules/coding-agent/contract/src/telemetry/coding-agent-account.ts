@@ -1,7 +1,7 @@
 /**
  * The subscription account a coding agent ran on. A launcher (or the agent itself) stamps these
  * on each record, or once on the resource through `OTEL_RESOURCE_ATTRIBUTES`; the record wins.
- * @see specs/coding-agent/account-burndown.feature
+ * @see specs/coding-agent/account-usage.feature
  */
 
 /** An opaque id for the account; never an email address. */
