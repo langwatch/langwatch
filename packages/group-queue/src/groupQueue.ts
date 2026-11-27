@@ -82,6 +82,7 @@ import {
   gqJobsExhaustedTotal,
   gqJobsRetriedTotal,
   gqJobsStagedTotal,
+  gqJobsWaitedTotal,
   gqReadyScoreImplausibleTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
@@ -765,6 +766,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private failureDecision(error: unknown): {
     retryable: boolean;
     retryAfterMs?: number;
+    waiting?: boolean;
   } {
     return this.failureClassifier?.classify(error) ?? defaultFailureDecision(error);
   }
@@ -2272,7 +2274,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }: {
     job: ClaimedJob<Payload>;
     error: Error;
-    decision: { retryable: boolean; retryAfterMs?: number };
+    decision: { retryable: boolean; retryAfterMs?: number; waiting?: boolean };
     /** The attempt budget the caller enforced, logged as is. */
     budget: number;
     stopHeartbeat: () => void;
@@ -2289,8 +2291,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       routingLabels,
       batchPayloads,
     } = job;
-    // Re-stage with backoff — frees the worker slot immediately
-    gqJobsRetriedTotal.inc(routingLabels);
+    // Re-stage with backoff: frees the worker slot immediately. A planned wait is not a
+    // failure, so it counts apart and keeps out of the retry-rate alert.
+    const isWaiting = decision.waiting === true;
+    (isWaiting ? gqJobsWaitedTotal : gqJobsRetriedTotal).inc(routingLabels);
 
     // Honor the failure classifier's retry delay as a FLOOR over
     // exponential backoff. A caller can lengthen but never shorten
@@ -2405,23 +2409,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       ),
     );
 
-    this.logger.warn(
-      {
-        queueName: this.queueName,
-        groupId,
-        stagedJobId,
-        attempt,
-        maxAttempts: budget,
-        backoffMs,
-        // The whole Error, not `error.message`: the serializer emits
-        // the stack, and for a handler crash the stack IS the
-        // diagnosis — a bare "undefined is not a function" names no
-        // file and no line, and the queue is the only place that
-        // ever sees the throw.
-        error,
-      },
-      "Job attempt failed, re-staged with backoff",
-    );
+    const fields = {
+      queueName: this.queueName,
+      groupId,
+      stagedJobId,
+      attempt,
+      maxAttempts: budget,
+      backoffMs,
+      // The whole Error, not `error.message`: the serializer emits
+      // the stack, and for a handler crash the stack IS the
+      // diagnosis: a bare "undefined is not a function" names no
+      // file and no line, and the queue is the only place that
+      // ever sees the throw.
+      error,
+    };
+    if (isWaiting) {
+      this.logger.debug(fields, "Job waiting on a dependency, re-staged after its named delay");
+      return;
+    }
+    this.logger.warn(fields, "Job attempt failed, re-staged with backoff");
   }
 
   /**

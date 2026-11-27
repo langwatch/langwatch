@@ -13,6 +13,7 @@ import {
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
   gqJobsUnroutableTotal,
+  gqJobsWaitedTotal,
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
   gqRetryAttempt,
@@ -78,6 +79,7 @@ describe("GroupQueue metrics", () => {
     it.each([
       ["completed total", "gq_jobs_completed_total", gqJobsCompletedTotal],
       ["retried total", "gq_jobs_retried_total", gqJobsRetriedTotal],
+      ["waited total", "gq_jobs_waited_total", gqJobsWaitedTotal],
       ["exhausted total", "gq_jobs_exhausted_total", gqJobsExhaustedTotal],
       ["non-retryable total", "gq_jobs_non_retryable_total", gqJobsNonRetryableTotal],
       ["groups blocked total", "gq_groups_blocked_total", gqGroupsBlockedTotal],

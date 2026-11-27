@@ -30,6 +30,7 @@ Feature: Each evaluation's outcome is kept beside its trace's columns
     Given an evaluation whose trace is not stored
     When the trace subscriber handles it within the wait
     Then the delivery names a minute's wait while the evaluation is under a minute old
+    And the queue counts the delivery as a planned wait, not as a failed retry
     And a quarter hour's wait after that
     And the trace is looked for five times within the hour
 

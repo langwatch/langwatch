@@ -50,6 +50,25 @@ describe("defaultFailureDecision", () => {
     });
   });
 
+  describe("given a queue error marked as a planned wait", () => {
+    /** @scenario "A planned wait is counted apart from a failed retry" */
+    it("carries the wait and its delay into the decision", () => {
+      const wait = new GroupQueueError({
+        queueName: "q",
+        operation: "o",
+        message: "not stored yet",
+        retryAfterMs: 60_000,
+        waiting: true,
+      });
+
+      expect(defaultFailureDecision(wait)).toEqual({
+        retryable: true,
+        retryAfterMs: 60_000,
+        waiting: true,
+      });
+    });
+  });
+
   describe("given an error that says nothing about retrying", () => {
     it("retries it", () => {
       expect(defaultFailureDecision(new Error("connection reset"))).toEqual({ retryable: true });

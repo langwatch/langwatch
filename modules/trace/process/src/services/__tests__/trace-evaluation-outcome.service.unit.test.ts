@@ -257,6 +257,7 @@ describe("TraceEvaluationOutcomeService", () => {
           name: "EvaluatedTraceNotYetStoredError",
           retryable: true,
           retryAfterMs: 60_000,
+          waiting: true,
         });
       });
 

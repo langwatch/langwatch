@@ -3,6 +3,11 @@ export class GroupQueueError extends Error {
   readonly operation: string;
   readonly retryable: boolean;
   readonly retryAfterMs?: number;
+  /**
+   * A planned wait, not a failure: the handler waits on work still to land. The retry spends
+   * an attempt as any would, but counts as gq_jobs_waited_total and logs below warn.
+   */
+  readonly waiting: boolean;
 
   constructor({
     queueName,
@@ -11,6 +16,7 @@ export class GroupQueueError extends Error {
     cause,
     retryable = true,
     retryAfterMs,
+    waiting = false,
   }: {
     queueName: string;
     operation: string;
@@ -18,6 +24,7 @@ export class GroupQueueError extends Error {
     cause?: unknown;
     retryable?: boolean;
     retryAfterMs?: number;
+    waiting?: boolean;
   }) {
     super(message, { cause });
     this.name = "GroupQueueError";
@@ -25,6 +32,7 @@ export class GroupQueueError extends Error {
     this.operation = operation;
     this.retryable = retryable;
     this.retryAfterMs = retryAfterMs;
+    this.waiting = waiting;
   }
 }
 
@@ -115,6 +123,7 @@ export function refusesRetry(error: unknown): boolean {
 export function defaultFailureDecision(error: unknown): {
   retryable: boolean;
   retryAfterMs?: number;
+  waiting?: boolean;
 } {
   if (
     error instanceof NonRetryableGroupQueueError ||
@@ -123,10 +132,12 @@ export function defaultFailureDecision(error: unknown): {
   ) {
     return { retryable: false };
   }
-  if (error instanceof GroupQueueError && error.retryAfterMs !== undefined) {
-    return { retryable: true, retryAfterMs: error.retryAfterMs };
-  }
-  return { retryable: true };
+  if (!(error instanceof GroupQueueError)) return { retryable: true };
+  return {
+    retryable: true,
+    ...(error.retryAfterMs === undefined ? {} : { retryAfterMs: error.retryAfterMs }),
+    ...(error.waiting ? { waiting: true } : {}),
+  };
 }
 
 export function errorText(error: unknown): string {
