@@ -7,6 +7,7 @@ import { lintFrameworkModuleContracts } from "./boundaries/framework-module-cont
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
 import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
+import { lintProjectionReplaySoleCaller } from "./boundaries/projection-replay-sole-caller.ts";
 import { lintRestNamespaceOwners } from "./boundaries/rest-namespace-owners.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
@@ -207,6 +208,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "platform-operator-calls",
     spec: "specs/tooling/lint-platform-operator-calls.feature",
     run: lintPlatformOperatorCalls,
+  }),
+  definePolicy({
+    id: "projection-replay-sole-caller",
+    spec: "specs/tooling/lint-projection-replay-sole-caller.feature",
+    run: lintProjectionReplaySoleCaller,
   }),
   definePolicy({
     id: "rest-namespace-owners",

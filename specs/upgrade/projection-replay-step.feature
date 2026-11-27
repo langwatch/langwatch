@@ -362,8 +362,5 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     Then ops:fill-queue-tenant-claims is a background data step after old writers
     And each projection replay step lists it in its after
 
-  @unit
-  Scenario: Only the projection replay step drives the deploy-time lane replayer
-    Given the deploy-time replayer trusts the claimed-groups index because every caller runs after its fill
-    When the source tree is searched for calls to replayLane outside tests
-    Then the only caller is defineProjectionReplayStep
+  # That this step stays the replayer's only caller is the projection-replay-sole-caller
+  # architecture policy: specs/tooling/lint-projection-replay-sole-caller.feature.
