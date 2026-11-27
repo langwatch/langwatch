@@ -96,9 +96,8 @@ export async function cloneClickHouseDatabase({
     format: "JSONEachRow",
   });
   const objects = await result.json<TemplateObject>();
-  const qualifier = new RegExp(`(?<![\\w.])\`?${from}\`?\\.`, "g");
   const statementFor = (object: TemplateObject) =>
-    object.create_table_query.replace(qualifier, `${to}.`);
+    redirectDatabase({ statement: object.create_table_query, from, to });
 
   await client.command({ query: `DROP DATABASE IF EXISTS ${to} SYNC` });
   await client.command({ query: `CREATE DATABASE ${to}` });
@@ -115,6 +114,30 @@ export async function cloneClickHouseDatabase({
     },
   });
   await createAll({ client, statements: views.map(statementFor) });
+}
+
+/** One single-quoted SQL literal, escapes included. */
+const STRING_LITERAL = /'(?:[^'\\]|\\.|'')*'/g;
+
+/** Points every `from.` qualifier in a statement at `to`, leaving string literals as written. */
+export function redirectDatabase({
+  statement,
+  from,
+  to,
+}: {
+  statement: string;
+  from: string;
+  to: string;
+}): string {
+  const qualifier = new RegExp(`(?<![\\w.])\`?${from}\`?\\.`, "g");
+  const redirect = (code: string) => code.replace(qualifier, `${to}.`);
+  let result = "";
+  let last = 0;
+  for (const literal of statement.matchAll(STRING_LITERAL)) {
+    result += redirect(statement.slice(last, literal.index)) + literal[0];
+    last = literal.index + literal[0].length;
+  }
+  return result + redirect(statement.slice(last));
 }
 
 /** Statements in flight at once; DDL on an Atomic database runs concurrently. */

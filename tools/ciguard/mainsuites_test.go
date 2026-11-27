@@ -73,6 +73,10 @@ func TestMainSplitsThePackageSuitesLikeAPullRequest(t *testing.T) {
 			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}",
 			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8",
 		},
+		"a suite-result cache keyed by the event": {
+			"key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}",
+			"key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.event_name }}-${{ github.sha }}",
+		},
 		"a suite-result cache shared by every shard": {
 			"key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}",
 			"key: ${{ runner.os }}-nx-suites-all-${{ github.sha }}",

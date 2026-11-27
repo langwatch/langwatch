@@ -290,6 +290,12 @@ Feature: A package's integration suite runs in CI when it declares one
       Then the copy's own target gets them and the template and the other copies stay empty
 
     @unit
+    Scenario: A copied statement keeps its string literals
+      Given a template view whose query holds the template's name in a string literal
+      When it is copied into a file's database
+      Then its qualifiers name the copy and the literal reads as before
+
+    @unit
     Scenario: The template is named by the migrations it holds
       Given the shipped migration files
       When one file's content changes
