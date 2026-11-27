@@ -12,8 +12,12 @@ import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import { testClickHouseProfilePins } from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { ClickHouseSchemaLock } from "@langwatch/clickhouse-client";
+import {
+  cloneClickHouseTemplate,
+  testClickHouseProfilePins,
+} from "@langwatch/clickhouse-client/testing";
+import { ClickHouseMigrateTask, shippedMigrationsDigest } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { expect, vi } from "vitest";
@@ -442,7 +446,12 @@ export async function startLangWatchQLClickHouse({
       : LWQL_FACT_TABLES.map((table) => ({ ...table, database: factDatabase }));
 
   if (facts === "migrated") {
-    await runShippedMigrations({ container, database: factDatabase });
+    await cloneClickHouseTemplate({
+      client: admin,
+      template: `lwql_migrated_template_${shippedMigrationsDigest()}`,
+      target: factDatabase,
+      build: ({ database, lock }) => runShippedMigrations({ container, database, lock }),
+    });
   } else {
     await applyAsAdmin(
       Object.entries(FACT_TABLE_DDL).map(
@@ -617,16 +626,18 @@ export const REAL_FACT_TABLES = [
 ] as const;
 
 /**
- * Runs the shipped ClickHouse migrations into their own database. Its own, not the LangWatchQL
- * one: the migrations own every table in the database they run against, and the LangWatchQL
- * database holds the key map and the views. `CLICKHOUSE_CLUSTER` is unset for the duration.
+ * Runs the shipped ClickHouse migrations into the template each suite's facts database is copied
+ * from: the LangWatchQL database holds the key map and the views, the migrations own every table
+ * of theirs. `CLICKHOUSE_CLUSTER` is unset for the duration.
  */
 async function runShippedMigrations({
   container,
   database,
+  lock,
 }: {
   container: StartedClickHouseContainer;
   database: string;
+  lock: ClickHouseSchemaLock;
 }): Promise<void> {
   const url = new URL(container.getConnectionUrl());
   url.pathname = `/${database}`;
@@ -639,6 +650,7 @@ async function runShippedMigrations({
         sharedUrl: url.toString(),
         privateEndpoints: [],
       },
+      lock,
     }).execute();
   } finally {
     if (previousCluster !== undefined) {

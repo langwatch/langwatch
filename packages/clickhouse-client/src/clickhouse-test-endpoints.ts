@@ -20,6 +20,11 @@ export {
   type ScriptedStatements,
 } from "./idIndexedClientDouble.ts";
 export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts";
+export {
+  cloneClickHouseDatabase,
+  cloneClickHouseTemplate,
+  TEMPLATE_READY_TABLE,
+} from "./clickhouse-test-templates.ts";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in

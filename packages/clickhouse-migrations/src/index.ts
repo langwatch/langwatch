@@ -28,6 +28,8 @@ export {
 } from "./goose.migration-runner.ts";
 export type { ClickHouseConfig, GooseOptions } from "./goose.migration-runner.ts";
 
+export { shippedMigrationsDigest } from "./migrations-digest.ts";
+
 export {
   buildDesiredTTLExpression,
   buildRetentionTTLExpression,
