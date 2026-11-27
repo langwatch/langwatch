@@ -46,6 +46,7 @@ func main() {
 		{name: "pr-workflow", run: ciguard.PRWorkflow},
 		{name: "static-cloud-keys", run: ciguard.StaticCloudKeys},
 		{name: "lambda-workdir", run: ciguard.LambdaWorkdir},
+		{name: "lambda-extensions", run: ciguard.LambdaExtensions},
 		{name: "publish-shape", run: ciguard.PublishShape},
 		{name: "ecr-skip-gates", run: ciguard.ECRSkipGates},
 		{name: "ecr-dispatch-tags", run: ciguard.ECRDispatchTags},

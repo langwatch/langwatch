@@ -36,6 +36,7 @@ on:
       - ".github/actions/**"
       - "charts/*/Chart.yaml"
       - "infra/docker/Dockerfile.*.lambda"
+      - "infra/docker/Dockerfile.go-services"
       - "go.work"
       - "go.work.sum"
   # Evaluate against the queued merge commit too, so the generated-code drift
@@ -139,6 +140,8 @@ jobs:
               - 'charts/*/Chart.yaml'
               # The lambda-workdir guard reads the Lambda images' Dockerfiles.
               - 'infra/docker/Dockerfile.*.lambda'
+              # The lambda-extensions guard reads the go-services Dockerfile.
+              - 'infra/docker/Dockerfile.go-services'
       - name: Force the filter true on non-PR events
         if: github.event_name != 'pull_request'
         id: force

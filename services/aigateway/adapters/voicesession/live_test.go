@@ -223,7 +223,7 @@ func TestLiveSidebandDropIsReattached(t *testing.T) {
 // @scenario "A Live session that never attaches is ended and charged its creation time"
 func TestLiveNeverAttachedIsEndedAndCharged(t *testing.T) {
 	t.Parallel()
-	r := newRig(t, func(o *Options) { o.Timing.ReattachWindow = 60 * time.Millisecond })
+	r := newRig(t, func(o *Options) { o.Timing.ReattachWindow = 500 * time.Millisecond }) // room for a second attach under -race
 	r.vendor.refuseAttach = http.StatusInternalServerError
 	r.start(r.live())
 
