@@ -24,9 +24,10 @@ export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
 
 /**
  * Grace period after lease retirement before blob expires (non-eager reclaim, so
- * bytes stay readable if retaken). Redis holds every finished payload this long.
+ * bytes stay readable if retaken). Redis holds every finished payload this long, so
+ * it sets memory: one hour filled production Redis on 2026-11-27.
  */
-export const BLOB_RELEASE_GRACE_TTL_SECONDS = 60 * 60;
+export const BLOB_RELEASE_GRACE_TTL_SECONDS = 15 * 60;
 
 /**
  * Safety margin proving unreferenced blobs are safe to reclaim (distinguishes
