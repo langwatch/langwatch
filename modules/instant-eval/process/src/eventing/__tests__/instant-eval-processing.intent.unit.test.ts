@@ -1,13 +1,16 @@
 /**
- * The failure contract of a run's three steps: an attempt below the cap is
- * rethrown so the outbox retries it, the final attempt records the run as
- * failed and retires the message, and a lost outcome write never costs a page.
+ * A run's three steps fail like this: an attempt below the cap is rethrown for
+ * the outbox to retry; the last records the failure (a page's own, or the run's
+ * for a plan or finish) and retires the message; a lost write never costs a page.
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { IntentContext } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
-import { InstantEvalQueryInvalidError } from "@langwatch/instant-eval-contract";
+import {
+  InstantEvalGatewayBudgetExceededError,
+  InstantEvalQueryInvalidError,
+} from "@langwatch/instant-eval-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -43,6 +46,7 @@ class RecordingCommands implements InstantEvalOutcomeCommands {
   readonly pages: Record<string, unknown>[] = [];
   readonly finishes: Record<string, unknown>[] = [];
   readonly latePages: Record<string, unknown>[] = [];
+  readonly pageFailures: Record<string, unknown>[] = [];
 
   constructor(private readonly failsWith?: Error) {}
 
@@ -72,6 +76,20 @@ class RecordingCommands implements InstantEvalOutcomeCommands {
     this.latePages.push(args);
 
     return undefined;
+  }
+
+  async recordPageFailed(args: Record<string, unknown>): Promise<unknown> {
+    if (this.failsWith) throw this.failsWith;
+    this.pageFailures.push(args);
+
+    return undefined;
+  }
+}
+
+/** Every write lands except the page failure itself. */
+class PageFailureLostCommands extends RecordingCommands {
+  override async recordPageFailed(): Promise<unknown> {
+    throw new Error("bus is away");
   }
 }
 
@@ -255,31 +273,87 @@ describe("given a step that fails", () => {
   });
 
   describe("when the outbox will not retry the refusal", () => {
-    /** @scenario "A step failing with a refusal the outbox will not retry fails the run on that attempt" */
-    it("fails the run on the first attempt instead of rethrowing", async () => {
+    /** @scenario "A step failing with a refusal the outbox will not retry records the page's failure on that attempt" */
+    it("fails the page on the first attempt instead of rethrowing", async () => {
       const { deps: dispatch, commands } = deps({
         raises: new UnreachableRefusal(),
       });
 
       await createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(1));
 
-      expect(commands.finishes[0]).toMatchObject({
-        outcome: "failed",
-        errorCode: "connect_unreachable",
+      expect(commands.pageFailures[0]).toMatchObject({ errorCode: "connect_unreachable" });
+      expect(commands.finishes).toEqual([]);
+    });
+
+    /** @scenario "A run stopped by a budget between pages bills the pages judged before it" */
+    it("records the budget stop as the page's failure, never as an unbilled finish", async () => {
+      const { deps: dispatch, commands } = deps({
+        raises: new InstantEvalGatewayBudgetExceededError({
+          budgetId: "budget-1",
+          scope: "project",
+          window: "month",
+          limitUsd: 10,
+          spentUsd: 10,
+        }),
       });
+
+      await createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(1));
+
+      expect(commands.pageFailures).toEqual([
+        {
+          tenantId: PROJECT_ID,
+          occurredAt: NOW,
+          runId: RUN_ID,
+          page: 2,
+          errorCode: "instant_eval_gateway_budget_exceeded",
+        },
+      ]);
+      expect(commands.finishes).toEqual([]);
     });
   });
 
   describe("when it was the final attempt", () => {
-    it("fails the run rather than handing the message back", async () => {
+    /** @scenario "A run whose page fails on its last attempt bills the pages it judged" */
+    it("records the page's failure for the run to finish and bill, rather than handing the message back", async () => {
       const { deps: dispatch, commands } = deps({ raises: new Error("clickhouse is away") });
 
       await createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(3));
 
+      expect(commands.pageFailures).toEqual([
+        {
+          tenantId: PROJECT_ID,
+          occurredAt: NOW,
+          runId: RUN_ID,
+          page: 2,
+          errorCode: "internal_error",
+        },
+      ]);
+      // The page knows only itself; a finish written here would bill the judged pages at zero.
+      expect(commands.finishes).toEqual([]);
+    });
+
+    /** @scenario "A run whose page fails on its last attempt bills the pages it judged" */
+    it("leaves a failure it cannot record to the stall wake, rather than finishing the run unbilled", async () => {
+      const commands = new PageFailureLostCommands();
+      const { deps: dispatch } = deps({ raises: new Error("clickhouse is away"), commands });
+
+      await expect(
+        createInstantEvalJudgePageHandler(dispatch)(PAGE_PAYLOAD, intentContext(3)),
+      ).resolves.toBeUndefined();
+      expect(commands.finishes).toEqual([]);
+    });
+
+    it("still fails a plan that could not run straight away, as it judged nothing", async () => {
+      const { deps: dispatch, commands } = deps({ raises: new Error("clickhouse is away") });
+
+      await createInstantEvalPlanHandler(dispatch)(PLAN_PAYLOAD, intentContext(3));
+
       expect(commands.finishes[0]).toMatchObject({
         outcome: "failed",
         errorCode: "internal_error",
+        inputTokens: 0,
       });
+      expect(commands.pageFailures).toEqual([]);
     });
 
     it("carries a handled refusal's own code onto the run", async () => {

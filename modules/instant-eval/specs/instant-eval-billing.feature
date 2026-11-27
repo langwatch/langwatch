@@ -96,6 +96,42 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And a finish that lands after all bills the page no second time
       And a run row update that fails after the page's spend is written is retried, then logged at error
 
+  # ADR-174 decision 24. Rows that failed to judge are free unless a routed leg was already
+  # paid for them (ADR-190 decision 3): the finish bills what the run's judged pages summed.
+  Rule: A run that fails bills the pages it judged
+
+    @unit
+    Scenario: A run whose page fails on its last attempt bills the pages it judged
+      Given a run whose first two pages were judged and recorded
+      When its third page fails on its last attempt, or with an error the outbox will not retry
+      Then the page's failure is recorded, and the run is not marked finished by the page itself
+      And the run finishes as failed with the failure's code
+      And the finish records one spend record for the tokens and cost the two judged pages summed
+      And the run's free budget hold is released after that record
+      And a failure that cannot be recorded leaves the run to the stall wake, which bills the same totals
+
+    @unit
+    Scenario: A run stopped by a budget between pages bills the pages judged before it
+      Given a run whose judged pages took a blocking gateway budget to its limit
+      When the next page is refused with instant_eval_gateway_budget_exceeded
+      Then the run finishes as failed with instant_eval_gateway_budget_exceeded
+      And the finish bills the tokens and cost of the pages judged before the stop
+
+    @unit
+    Scenario: A run that judged nothing before it failed costs nothing
+      Given a run whose first page fails on its last attempt
+      When the run finishes as failed
+      Then the finish carries no tokens and no cost
+      And no spend record is written, and the run's free budget hold is still released
+
+    @unit
+    Scenario: A failure delivered again is still one spend record
+      Given a run whose page failure is recorded twice
+      When both records reach the run
+      Then both carry the same event key, so the second collapses
+      And the run asks for one failed finish, under the run's one finish key
+      And that finish records its spend under the run's own request id
+
   Rule: The spend page names the judged rows
 
     @unit

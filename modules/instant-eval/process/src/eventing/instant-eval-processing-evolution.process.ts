@@ -347,6 +347,38 @@ export const handleInstantEvalPageJudged: EventHandler<
   });
 };
 
+/**
+ * A page failed for good. The run ends as failed with what its judged pages summed, the same
+ * finish the stall wake asks for, so the finish bills them once and drops the hold (ADR-174
+ * decision 24). A page the run already counted, or a run already ended, changes nothing.
+ */
+export const handleInstantEvalPageFailed: EventHandler<
+  InstantEvalProcessState,
+  unknown,
+  InstantEvalIntents
+> = (state, payload, ctx) => {
+  const data = instantEvalProcessEventViewSchema.parse(payload);
+  if (state.phase === "terminal" || state.phase === "idle") return instantEvalUnchanged(state);
+  if (data.page <= state.page) return instantEvalUnchanged(state);
+
+  return instantEvalActive({
+    state: { ...state, phase: "terminal" },
+    refMs: instantEvalSchedulingRef(ctx),
+    intents: [
+      ctx.intent("finish", instantEvalFinishKey({ runId: data.runId, reason: "failed" }), {
+        runId: data.runId,
+        projectId: ctx.projectId,
+        outcome: "failed",
+        errorCode: data.errorCode ?? "internal_error",
+        inputTokens: state.inputTokens,
+        requests: state.requests,
+        costNanoUsd: state.costNanoUsd,
+        routedInputTokens: state.routedInputTokens,
+      }),
+    ],
+  });
+};
+
 export const handleInstantEvalCancelRequested: EventHandler<
   InstantEvalProcessState,
   unknown,
@@ -511,5 +543,6 @@ export function buildInstantEvalProcessEventView(
     cursor: typeof data.cursor === "string" ? data.cursor : null,
     cursorSpanId: typeof data.cursorSpanId === "string" ? data.cursorSpanId : null,
     hasNextPage: data.hasNextPage === true,
+    errorCode: typeof data.errorCode === "string" ? data.errorCode : null,
   };
 }
