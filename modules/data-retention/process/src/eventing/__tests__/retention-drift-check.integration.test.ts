@@ -10,6 +10,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { generate } from "@langwatch/ksuid";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -23,8 +24,10 @@ import {
   MemoryRetentionDirectory,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
+import type { DataRetentionDirectoryReader } from "../../app/data-retention.app.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
+import type { RetentionApplyStatusRepository } from "../../repositories/retention-apply-status.repository.ts";
 import { RetentionDriftCheckService } from "../../services/retention-drift-check.service.ts";
 import {
   RETENTION_DRIFT_AGGREGATE_TYPE,
@@ -124,7 +127,7 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
       stamps: ClickHouseRetroactiveRetentionRepository.create({
         clickhouse: clickhouse.queryClient,
       }),
-      applyStatus: {
+      applyStatus: createApiFixture<RetentionApplyStatusRepository>({
         findForOrganization: async () => [
           {
             scopeType: "PROJECT",
@@ -132,10 +135,11 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
             changedAt: NOW - 3 * DAY_MS,
             appliedAt: null,
             shortenedAt: NOW - 3 * DAY_MS,
+            shortenedAtByCategory: { traces: NOW - 3 * DAY_MS },
           },
         ],
-      },
-      directory: {
+      }),
+      directory: createApiFixture<DataRetentionDirectoryReader>({
         findOrganizationDirectory: async () => ({
           teams: [],
           projects: [drifting, settled, outside, deferring].map((id) => ({
@@ -145,7 +149,7 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
             archived: false,
           })),
         }),
-      },
+      }),
       logger,
       drifts,
     });

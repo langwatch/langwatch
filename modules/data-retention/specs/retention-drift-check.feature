@@ -8,8 +8,8 @@ Feature: A daily check flags stored rows on a period other than the setting
   whose rows differ is recorded as a retention_drift_detected fact, counted on
   the langwatch_data_retention_drift_projects_total metric and logged, so the
   team sees the gap before a customer does. A drift where the rows are kept
-  longer than the setting, under a shorter save that no exact apply has reached
-  yet, is one an admin chose to leave ("Not now"): it is recorded as deferred,
+  longer than the setting, under a shorter save of that category that no exact
+  apply has reached yet, is one an admin chose to leave ("Not now"): it is recorded as deferred,
   counted with kind deferred and logged as a warning. Every other drift is
   unexpected: counted with kind unexpected and logged as an error.
 
@@ -74,6 +74,14 @@ Feature: A daily check flags stored rows on a period other than the setting
     Then the drift is recorded as deferred
     And the metric counts it with kind deferred
     And it is logged as a warning, not an error
+
+  @unit
+  Scenario: Drift in a category that was not shortened stays unexpected
+    Given the organization saved a shorter period for traces only and did not apply it
+    And a project's sampled experiment runs are stamped for more days than it resolves to
+    When the drift check runs for the organization
+    Then the traces drift is recorded as deferred
+    And the experiment runs drift is recorded as unexpected
 
   @unit
   Scenario: Rows kept shorter than the setting are unexpected even under a deferred save

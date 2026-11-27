@@ -6,7 +6,10 @@
 import type { RetentionScopeType } from "@langwatch/data-retention-contract";
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
 
-import { retentionApplyStatusKey } from "../rules/stored-apply-status.rules.ts";
+import {
+  retentionApplyStatusKey,
+  type ShortenedAtByCategory,
+} from "../rules/stored-apply-status.rules.ts";
 import {
   RETENTION_APPLIED_EVENT_TYPE,
   RETENTION_POLICY_CHANGED_EVENT_TYPE,
@@ -28,6 +31,8 @@ export interface RetentionApplyStatusState {
   readonly raisedAt: number | null;
   /** A change that kept fewer days than before, so a raise cannot cover it. */
   readonly shortenedAt: number | null;
+  /** The same per category, so the drift check defers only the category that was shortened. */
+  readonly shortenedAtByCategory: ShortenedAtByCategory | null;
 }
 
 const latest = (current: number | null, next: number): number =>
@@ -63,6 +68,15 @@ export function applyRetentionApplyStatusEvent(
         shortenedAt: event.data.shortens
           ? latest(state.shortenedAt, event.data.changedAt)
           : state.shortenedAt,
+        shortenedAtByCategory: event.data.shortens
+          ? {
+              ...state.shortenedAtByCategory,
+              [event.data.category]: latest(
+                state.shortenedAtByCategory?.[event.data.category] ?? null,
+                event.data.changedAt,
+              ),
+            }
+          : state.shortenedAtByCategory,
       };
     case RETENTION_APPLIED_EVENT_TYPE:
       return event.data.mode === "apply"
@@ -88,6 +102,7 @@ export function createRetentionApplyStatusProjection(deps: {
       appliedAt: null,
       raisedAt: null,
       shortenedAt: null,
+      shortenedAtByCategory: null,
     }),
     apply: applyRetentionApplyStatusEvent,
     store: deps.store,

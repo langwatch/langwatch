@@ -4094,6 +4094,8 @@ model RetentionApplyStatus {
   appliedAt         Float?
   raisedAt          Float?
   shortenedAt       Float?
+  /// Per category, the latest change that kept fewer days; null on rows folded before it existed.
+  shortenedAtByCategory Json?
   createdAt         Float
   updatedAt         Float
   occurredAt        Float

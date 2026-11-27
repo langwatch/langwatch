@@ -3,7 +3,11 @@
  * every scope it holds (organization > team > project); a raise covers only its own scope, and
  * only when no shorter save since the last exact apply left stamps above it. Pure. Spec:
  * modules/data-retention/specs/retention-apply-record.feature */
-import type { RetentionScopeType, StoredApplyStatus } from "@langwatch/data-retention-contract";
+import type {
+  RetentionCategory,
+  RetentionScopeType,
+  StoredApplyStatus,
+} from "@langwatch/data-retention-contract";
 
 type ScopeRef = Readonly<{ scopeType: RetentionScopeType; scopeId: string }>;
 
@@ -17,7 +21,11 @@ export type ScopeApplyRecord = ScopeRef &
     appliedAt: number | null;
     raisedAt?: number | null;
     shortenedAt?: number | null;
+    shortenedAtByCategory?: ShortenedAtByCategory | null;
   }>;
+
+/** Per category, the latest change that kept fewer days (epoch ms). */
+export type ShortenedAtByCategory = Readonly<Partial<Record<RetentionCategory, number>>>;
 
 export function retentionApplyStatusKey({
   organizationId,
@@ -77,17 +85,20 @@ function coveringScopes({
 }
 
 /**
- * Whether a shorter save on the project's chain is still waiting for an exact apply at its scope
- * or a wider one: the admin chose not to apply it yet, so stamps above the period are expected.
+ * Whether a shorter save of `category` on the project's chain still waits for an exact apply at
+ * its scope or a wider one: the admin chose not to apply it, so stamps above the period are
+ * expected. A record folded before shortenings were kept per category defers nothing.
  */
 export function hasDeferredShortening({
   organizationId,
   projectId,
+  category,
   records,
   teamOfProject,
 }: {
   organizationId: string;
   projectId: string;
+  category: RetentionCategory;
   records: readonly ScopeApplyRecord[];
   teamOfProject: ReadonlyMap<string, string>;
 }): boolean {
@@ -98,7 +109,7 @@ export function hasDeferredShortening({
     teamOfProject,
   });
   return chain.some((scope, index) => {
-    const shortenedAt = byScope.get(refKey(scope))?.shortenedAt ?? null;
+    const shortenedAt = byScope.get(refKey(scope))?.shortenedAtByCategory?.[category] ?? null;
     if (shortenedAt === null) return false;
     return chain
       .slice(index)

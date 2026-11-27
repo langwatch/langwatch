@@ -3,7 +3,7 @@
  * kept longer under a shorter save the admin left unapplied are deferred (warned); every other
  * drift is unexpected (an error). Spec: modules/data-retention/specs/retention-drift-check.feature
  */
-import { retentionCategories } from "@langwatch/data-retention-contract";
+import { type RetentionCategory, retentionCategories } from "@langwatch/data-retention-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type CounterHandle, counter } from "@langwatch/observability/metrics";
 
@@ -34,8 +34,8 @@ type Options = Readonly<{
   drifts?: CounterHandle;
 }>;
 
-/** Whether a project sits under a shorter save still waiting for its apply. */
-type DeferredLookup = (projectId: string) => boolean;
+/** Whether a project's category sits under a shorter save still waiting for its apply. */
+type DeferredLookup = (input: { projectId: string; category: RetentionCategory }) => boolean;
 
 export class RetentionDriftCheckService {
   private readonly logger: Logger;
@@ -85,7 +85,7 @@ export class RetentionDriftCheckService {
           const kind = retentionDriftKind({
             expectedDays,
             found,
-            deferredShortening: deferred(projectId),
+            deferredShortening: deferred({ projectId, category }),
           });
           drifted.push({ projectId, category, expectedDays, found, kind });
         } catch (error) {
@@ -127,8 +127,8 @@ export class RetentionDriftCheckService {
       );
       return () => false;
     }
-    return (projectId) =>
-      hasDeferredShortening({ organizationId, projectId, records, teamOfProject });
+    return ({ projectId, category }) =>
+      hasDeferredShortening({ organizationId, projectId, category, records, teamOfProject });
   }
 
   private report({ organizationId, drift }: { organizationId: string; drift: RetentionDrift }) {

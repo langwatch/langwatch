@@ -1,12 +1,18 @@
+import { retentionCategorySchema } from "@langwatch/data-retention-contract";
 import type {
   ProjectionStoreContext,
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { RetentionApplyStatusState } from "../../eventing/retention-apply-status.projection.ts";
-import type { ScopeApplyRecord } from "../../rules/stored-apply-status.rules.ts";
+import type {
+  ScopeApplyRecord,
+  ShortenedAtByCategory,
+} from "../../rules/stored-apply-status.rules.ts";
 import type { RetentionApplyStatusRepository } from "../retention-apply-status.repository.ts";
 
 type Row = {
@@ -17,6 +23,7 @@ type Row = {
   appliedAt: number | null;
   raisedAt: number | null;
   shortenedAt: number | null;
+  shortenedAtByCategory: unknown;
   createdAt: number;
   updatedAt: number;
   occurredAt: number;
@@ -24,6 +31,14 @@ type Row = {
   lastEventId: string;
   projectionVersion: string;
 };
+
+const shortenedAtByCategorySchema = z.partialRecord(retentionCategorySchema, z.number()).nullable();
+
+/** The JSON column as the fold keeps it; an absent or malformed value reads as no shortening. */
+function readShortenedByCategory(value: unknown): ShortenedAtByCategory {
+  const parsed = shortenedAtByCategorySchema.safeParse(value ?? null);
+  return parsed.success && parsed.data ? parsed.data : {};
+}
 
 function fromRow(row: Row): StoredProjection<RetentionApplyStatusState> {
   return {
@@ -35,6 +50,7 @@ function fromRow(row: Row): StoredProjection<RetentionApplyStatusState> {
       appliedAt: row.appliedAt,
       raisedAt: row.raisedAt,
       shortenedAt: row.shortenedAt,
+      shortenedAtByCategory: readShortenedByCategory(row.shortenedAtByCategory),
     },
     cursor: { acceptedAt: row.acceptedAt, eventId: row.lastEventId },
     occurredAt: row.occurredAt,
@@ -65,11 +81,13 @@ export class PrismaRetentionApplyStatusRepository
     const id = context.key ?? context.aggregateId;
     const { organizationId, scopeType, scopeId, changedAt, appliedAt, raisedAt, shortenedAt } =
       projection.state;
+    const byCategory = projection.state.shortenedAtByCategory;
     const data = {
       changedAt,
       appliedAt,
       raisedAt,
       shortenedAt,
+      shortenedAtByCategory: byCategory ? { ...byCategory } : Prisma.DbNull,
       createdAt: projection.createdAt,
       updatedAt: projection.updatedAt,
       occurredAt: projection.occurredAt,
@@ -89,7 +107,7 @@ export class PrismaRetentionApplyStatusRepository
   }: {
     organizationId: string;
   }): Promise<ScopeApplyRecord[]> {
-    return this.prisma.retentionApplyStatus.findMany({
+    const rows = await this.prisma.retentionApplyStatus.findMany({
       where: { organizationId },
       select: {
         scopeType: true,
@@ -98,7 +116,12 @@ export class PrismaRetentionApplyStatusRepository
         appliedAt: true,
         raisedAt: true,
         shortenedAt: true,
+        shortenedAtByCategory: true,
       },
     });
+    return rows.map((row) => ({
+      ...row,
+      shortenedAtByCategory: readShortenedByCategory(row.shortenedAtByCategory),
+    }));
   }
 }

@@ -78,6 +78,7 @@ describe("given the Prisma apply-status repository behind the tenancy guard", ()
             appliedAt: null,
             raisedAt: null,
             shortenedAt: 1,
+            shortenedAtByCategory: { traces: 1 },
           },
           cursor: { acceptedAt: 1, eventId: "event_1" },
           occurredAt: 1,

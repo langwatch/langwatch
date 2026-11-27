@@ -1519,6 +1519,7 @@ export interface LwqlPrismaRows {
     readonly appliedAt: "Float?";
     readonly raisedAt: "Float?";
     readonly shortenedAt: "Float?";
+    readonly shortenedAtByCategory: "Json?";
     readonly createdAt: "Float";
     readonly updatedAt: "Float";
     readonly occurredAt: "Float";

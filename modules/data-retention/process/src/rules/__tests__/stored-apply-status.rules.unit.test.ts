@@ -93,6 +93,7 @@ describe("the apply status fold", () => {
         appliedAt: ELEVEN,
         raisedAt: null,
         shortenedAt: null,
+        shortenedAtByCategory: null,
       };
       expect(fold([changed(TEN), applied(ELEVEN)])).toEqual(expected);
       expect(fold([applied(ELEVEN), changed(TEN)])).toEqual(expected);
@@ -108,6 +109,7 @@ describe("the apply status fold", () => {
         appliedAt: null,
         raisedAt: ELEVEN,
         shortenedAt: null,
+        shortenedAtByCategory: null,
       });
     });
 
@@ -115,6 +117,13 @@ describe("the apply status fold", () => {
     it("stamps a shorter save and leaves an unchanged or longer one out", () => {
       expect(fold([changed(TEN, { shortens: true }), changed(ELEVEN)]).shortenedAt).toBe(TEN);
       expect(fold([changed(TEN), changed(ELEVEN)]).shortenedAt).toBeNull();
+    });
+
+    it("keeps each shorter save under the category it shortened", () => {
+      expect(
+        fold([changed(TEN, { shortens: true }), changed(ELEVEN)]).shortenedAtByCategory,
+      ).toEqual({ traces: TEN });
+      expect(fold([changed(TEN)]).shortenedAtByCategory).toBeNull();
     });
 
     it("keys both facts to the scope they name", () => {
@@ -367,22 +376,50 @@ describe("a scope's stored apply status", () => {
 describe("a deferred shorter save on a project's chain", () => {
   const records = (...rows: ScopeApplyRecord[]) => rows;
   const deferred = (rows: ScopeApplyRecord[]) =>
-    hasDeferredShortening({ organizationId, projectId: "project-1", records: rows, teamOfProject });
+    hasDeferredShortening({
+      organizationId,
+      projectId: "project-1",
+      category: "traces",
+      records: rows,
+      teamOfProject,
+    });
 
   it("holds while no exact apply at its scope or a wider one came after it", () => {
     expect(
-      deferred(records({ ...organization, changedAt: TEN, appliedAt: null, shortenedAt: TEN })),
+      deferred(
+        records({
+          ...organization,
+          changedAt: TEN,
+          appliedAt: null,
+          shortenedAt: TEN,
+          shortenedAtByCategory: { traces: TEN },
+        }),
+      ),
     ).toBe(true);
   });
 
   it("ends once an exact apply at its scope or a wider one came after it", () => {
     expect(
-      deferred(records({ ...organization, changedAt: TEN, appliedAt: ELEVEN, shortenedAt: TEN })),
+      deferred(
+        records({
+          ...organization,
+          changedAt: TEN,
+          appliedAt: ELEVEN,
+          shortenedAt: TEN,
+          shortenedAtByCategory: { traces: TEN },
+        }),
+      ),
     ).toBe(false);
     expect(
       deferred(
         records(
-          { ...team, changedAt: TEN, appliedAt: null, shortenedAt: TEN },
+          {
+            ...team,
+            changedAt: TEN,
+            appliedAt: null,
+            shortenedAt: TEN,
+            shortenedAtByCategory: { traces: TEN },
+          },
           { ...organization, changedAt: null, appliedAt: ELEVEN },
         ),
       ),
@@ -393,7 +430,13 @@ describe("a deferred shorter save on a project's chain", () => {
     expect(
       deferred(
         records(
-          { ...team, changedAt: ELEVEN, appliedAt: null, shortenedAt: ELEVEN },
+          {
+            ...team,
+            changedAt: ELEVEN,
+            appliedAt: null,
+            shortenedAt: ELEVEN,
+            shortenedAtByCategory: { traces: ELEVEN },
+          },
           { ...organization, changedAt: null, appliedAt: TEN },
         ),
       ),
@@ -404,11 +447,37 @@ describe("a deferred shorter save on a project's chain", () => {
     expect(
       deferred(
         records(
-          { ...organization, changedAt: TEN, appliedAt: null, shortenedAt: TEN },
+          {
+            ...organization,
+            changedAt: TEN,
+            appliedAt: null,
+            shortenedAt: TEN,
+            shortenedAtByCategory: { traces: TEN },
+          },
           { ...project, changedAt: null, appliedAt: ELEVEN },
         ),
       ),
     ).toBe(true);
+  });
+
+  it("holds only for the category that was shortened", () => {
+    expect(
+      deferred(
+        records({
+          ...organization,
+          changedAt: TEN,
+          appliedAt: null,
+          shortenedAt: TEN,
+          shortenedAtByCategory: { experiments: TEN },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("never holds on a record folded before shortenings were kept per category", () => {
+    expect(
+      deferred(records({ ...organization, changedAt: TEN, appliedAt: null, shortenedAt: TEN })),
+    ).toBe(false);
   });
 
   it("never holds without a shorter save", () => {

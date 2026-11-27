@@ -9,8 +9,10 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory, intentAccessorOf } from "@langwatch/eventing/testing";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { DataRetentionDirectoryReader } from "../../app/data-retention.app.ts";
 import { CheckRetentionDriftCommand } from "../../eventing/retention-drift.commands.ts";
 import type { CheckRetentionDriftCommandData } from "../../eventing/retention-drift.events.ts";
 import { buildRetentionDriftPipeline } from "../../eventing/retention-drift.pipeline.ts";
@@ -19,6 +21,7 @@ import {
   retentionDriftWake,
 } from "../../eventing/retention-drift.process.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
+import type { RetentionApplyStatusRepository } from "../../repositories/retention-apply-status.repository.ts";
 import {
   RETENTION_DRIFT_WINDOW_MS,
   retentionDriftWindows,
@@ -63,21 +66,27 @@ function harness({
         new Map(projectIds.map((projectId) => [projectId, resolved(91)])),
     },
     stamps,
-    applyStatus: {
-      findForOrganization: async () => {
-        if (records === "unreadable") throw new Error("projection store down");
-        return records;
+    applyStatus: createApiFixture<RetentionApplyStatusRepository>(
+      {
+        findForOrganization: async () => {
+          if (records === "unreadable") throw new Error("projection store down");
+          return records;
+        },
       },
-    },
-    directory: {
-      findOrganizationDirectory: async () => ({
-        teams: [{ id: "team-1", name: "Payments" }],
-        projects: [
-          { id: "project-1", name: "One", teamId: "team-1", archived: false },
-          { id: "project-2", name: "Two", teamId: "team-2", archived: false },
-        ],
-      }),
-    },
+      "applyStatus",
+    ),
+    directory: createApiFixture<DataRetentionDirectoryReader>(
+      {
+        findOrganizationDirectory: async () => ({
+          teams: [{ id: "team-1", name: "Payments" }],
+          projects: [
+            { id: "project-1", name: "One", teamId: "team-1", archived: false },
+            { id: "project-2", name: "Two", teamId: "team-2", archived: false },
+          ],
+        }),
+      },
+      "directory",
+    ),
     logger,
     drifts,
   });
@@ -202,6 +211,7 @@ describe("an organization's check", () => {
       changedAt: SAVED,
       appliedAt: BEFORE,
       shortenedAt: SAVED,
+      shortenedAtByCategory: { traces: SAVED },
     };
 
     /** @scenario "Rows kept longer after a shorter save that was not applied are deferred" */
@@ -237,12 +247,43 @@ describe("an organization's check", () => {
     });
   });
 
+  describe("when only traces were shortened and not applied", () => {
+    /** @scenario "Drift in a category that was not shortened stays unexpected" */
+    it("records experiments kept longer as unexpected beside deferred traces", async () => {
+      const { service, stamps } = harness({
+        records: [
+          {
+            ...ORGANIZATION,
+            changedAt: SAVED,
+            appliedAt: BEFORE,
+            shortenedAt: SAVED,
+            shortenedAtByCategory: { traces: SAVED },
+          },
+        ],
+      });
+      stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
+      stamps.sampledStamps.set("project-1/experiments", [{ retentionDays: 182, rows: 2 }]);
+
+      const drifted = await service.check({ organizationId: "organization-1", at: AT });
+      expect(drifted.map(({ category, kind }) => ({ category, kind }))).toEqual([
+        { category: "traces", kind: "deferred" },
+        { category: "experiments", kind: "unexpected" },
+      ]);
+    });
+  });
+
   describe("when the shorter save was applied afterwards", () => {
     /** @scenario "Rows kept longer after the shorter save was applied are unexpected" */
     it("records rows still kept longer as unexpected", async () => {
       const { service, stamps, lines } = harness({
         records: [
-          { ...ORGANIZATION, changedAt: SAVED, appliedAt: AT - DAY_MS, shortenedAt: SAVED },
+          {
+            ...ORGANIZATION,
+            changedAt: SAVED,
+            appliedAt: AT - DAY_MS,
+            shortenedAt: SAVED,
+            shortenedAtByCategory: { traces: SAVED },
+          },
         ],
       });
       stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
@@ -259,7 +300,13 @@ describe("an organization's check", () => {
     it("records the team's project as deferred and the other team's as unexpected", async () => {
       const { service, stamps } = harness({
         records: [
-          { ...TEAM, changedAt: SAVED, appliedAt: null, shortenedAt: SAVED },
+          {
+            ...TEAM,
+            changedAt: SAVED,
+            appliedAt: null,
+            shortenedAt: SAVED,
+            shortenedAtByCategory: { traces: SAVED },
+          },
           { ...ORGANIZATION, changedAt: null, appliedAt: BEFORE },
         ],
       });
