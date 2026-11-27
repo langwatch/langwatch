@@ -98,7 +98,11 @@ func TestPlaywrightJobBudgetCoversTheInstall(t *testing.T) {
 	noJobTimeout := strings.Replace(goodPlaywrightWorkflow, "    timeout-minutes: 35\n", "", 1)
 	jobTooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 35", "timeout-minutes: 23", 1)
 
+	subdir := strings.Replace(jobTooShort, "uses: ./.github/actions/playwright-chromium", "uses: ./head/.github/actions/playwright-chromium", 1)
+
 	assert.NotEqual(t, goodPlaywrightWorkflow, noJobTimeout)
+	assert.NotEqual(t, jobTooShort, subdir)
+	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, subdir), "\n"), "cannot cover")
 	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, noJobTimeout), "\n"), "no numeric timeout-minutes")
 	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, jobTooShort), "\n"), "cannot cover")
 }

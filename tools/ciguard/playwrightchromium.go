@@ -2,13 +2,11 @@ package ciguard
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
-
-	"gopkg.in/yaml.v3"
+	"strings"
 
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
@@ -17,7 +15,7 @@ import (
 
 const (
 	playwrightAction      = ".github/actions/playwright-chromium/action.yml"
-	playwrightActionUse   = "./.github/actions/playwright-chromium"
+	playwrightActionUse   = ".github/actions/playwright-chromium"
 	playwrightInstallStep = "playwright-install"
 	// playwrightMinInstallSeconds matches the ffmpeg install bound in docs-media-encoders.
 	playwrightMinInstallSeconds = 600
@@ -60,23 +58,15 @@ func PlaywrightChromiumProblems(root string) ([]string, error) {
 }
 
 func loadPlaywrightInstall(root string) (*ciscan.Step, error) {
-	raw, err := os.ReadFile(filepath.Join(root, playwrightAction))
+	steps, err := loadActionSteps(filepath.Join(root, playwrightAction))
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", playwrightAction, err)
+		return nil, err
 	}
-	var action struct {
-		Runs struct {
-			Steps []ciscan.Step `yaml:"steps"`
-		} `yaml:"runs"`
-	}
-	if err := yaml.Unmarshal(raw, &action); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", playwrightAction, err)
-	}
-	i := slices.IndexFunc(action.Runs.Steps, func(s ciscan.Step) bool { return s.ID == playwrightInstallStep })
+	i := slices.IndexFunc(steps, func(s ciscan.Step) bool { return s.ID == playwrightInstallStep })
 	if i == -1 {
 		return nil, nil
 	}
-	return &action.Runs.Steps[i], nil
+	return &steps[i], nil
 }
 
 // playwrightInstallProblems reads the install script's timeouts and retry, and reports what is missing.
@@ -112,7 +102,7 @@ func playwrightUseProblems(w *ciscan.Workflow, budget playwrightBudget) []string
 	for _, name := range w.JobNames() {
 		job := w.Jobs[name]
 		for i := range job.Steps {
-			if job.Steps[i].Uses != playwrightActionUse {
+			if !strings.HasSuffix(job.Steps[i].Uses, playwrightActionUse) {
 				continue
 			}
 			where := fmt.Sprintf("%s job %q", w.Path, name)
