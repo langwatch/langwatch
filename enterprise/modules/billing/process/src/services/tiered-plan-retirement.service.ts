@@ -57,7 +57,6 @@ export class TieredPlanRetirementService {
       throw new SupersededPlanRetirementError({ failures: [err] });
     });
     if (superseded.length === 0 && onSeatPricing) return;
-    // A row we cancelled can still bill: the old upgrade marked rows before asking Stripe.
 
     // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
     if (!onSeatPricing) {
@@ -74,6 +73,15 @@ export class TieredPlanRetirementService {
         await this.cancelAtStripe(old.stripeSubscriptionId);
         if (!old.cancelledInRecords) await this.deps.subscriptions.cancel({ id: old.id });
       } catch (err) {
+        // A row our records cancelled waits for the next Growth invoice, so a settled org never
+        // fails a payment; it is still read because the old upgrade cancelled rows before Stripe.
+        if (old.cancelledInRecords) {
+          logger.warn(
+            { stripeSubscriptionId: old.stripeSubscriptionId, err },
+            "[stripeWebhook] Could not confirm a cancelled tiered subscription ended at Stripe; the next Growth invoice checks again",
+          );
+          continue;
+        }
         logger.error(
           { stripeSubscriptionId: old.stripeSubscriptionId, err },
           "[stripeWebhook] Failed to cancel a superseded tiered subscription; the delivery will be retried",

@@ -436,4 +436,29 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     expect(stuck.stripe.cancellations).toEqual([]);
     expect(rowOf(stuck, TIERED_ROW)?.status).toBe("CANCELLED");
   });
+
+  /** @scenario "A Stripe failure on an old plan our records already cancelled does not fail the Growth payment" */
+  it("does not fail a Growth payment on a Stripe failure for a plan our records cancelled", async () => {
+    const settled = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "CANCELLED", stripeSubscriptionId: TIERED_STRIPE },
+      tieredAtStripe: "canceled",
+      pricingModel: "SEAT_EVENT",
+    });
+    // The payment reads the Growth subscription first, then the old plan.
+    settled.stripe.refuse({
+      operation: "getSubscription",
+      error: new Error("Stripe is unavailable"),
+      allowed: 1,
+      times: 1,
+    });
+
+    const [result] = await deliverTogether(settled, [paymentSucceeded("in_renewal")]);
+    const [next] = await deliverTogether(settled, [paymentSucceeded("in_next")]);
+
+    expect(result?.status).toBe("ok");
+    expect(next?.status).toBe("ok");
+    expect(settled.stripe.reads).toEqual([GROWTH_STRIPE, GROWTH_STRIPE, TIERED_STRIPE]);
+    expect(settled.stripe.cancellations).toEqual([]);
+  });
 });

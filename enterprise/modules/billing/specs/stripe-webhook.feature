@@ -248,3 +248,11 @@ Feature: Stripe webhook handling grants and removes plans correctly
     And whose old tiered subscription Stripe no longer holds
     When its next Growth invoice is paid
     Then the delivery succeeds and the old plan is cancelled in our records
+
+  @unit @regression
+  Scenario: A Stripe failure on an old plan our records already cancelled does not fail the Growth payment
+    Given an organization whose Growth seat subscription is active
+    And whose old tiered subscription our records already cancelled
+    When its next Growth invoice is paid while Stripe fails to answer for the old plan
+    Then the delivery succeeds
+    And the old plan is checked at Stripe again on the next Growth invoice
