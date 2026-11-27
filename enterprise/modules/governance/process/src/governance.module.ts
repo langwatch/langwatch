@@ -215,6 +215,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
           "Fills the cost drift check's charge map from pulled usage over the settling window.",
         lane: GOVERNANCE_COST_CHARGE_PROJECTION_NAME,
         since: nowInstant().subtract({ hours: COST_CHARGES_REPLAY_WINDOW_HOURS }).toString(),
+        needsOldWritersGone: true,
         replayer,
       }),
     ]);

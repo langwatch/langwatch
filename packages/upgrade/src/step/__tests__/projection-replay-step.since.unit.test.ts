@@ -50,6 +50,7 @@ function runOnce({
     description: "Refolds the trace analytics lane over the deploy overlap.",
     lane: LANE,
     replayer,
+    needsOldWritersGone: true,
     ...(since === undefined ? {} : { since }),
   });
   const report = step.run({

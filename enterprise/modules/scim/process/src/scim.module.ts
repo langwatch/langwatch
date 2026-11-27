@@ -76,6 +76,7 @@ export const scimProcessModule: PublishedProcessModule<"scim", ScimApi, ScimServ
         id: "scim:replay-sso-connection-view",
         description: "Fills SCIM's SSO connection view from identity's connection log at deploy.",
         lane: `${SCIM_SSO_CONNECTION_PIPELINE_NAME}.${SCIM_SSO_CONNECTION_PROJECTION_NAME}`,
+        needsOldWritersGone: true,
         trailingPass: true,
         replayer,
       }),

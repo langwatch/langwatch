@@ -83,6 +83,8 @@ export function defineProjectionReplayStep({
   replayer: LaneReplayer;
   /** The instant a first run replays from: aggregates with an event since then refold whole. */
   since?: string;
+  /** Always on (ADR-092); accepted so released declarations stay as they shipped. */
+  needsOldWritersGone?: true;
   /** After the first pass, replay again from the cursor it completed through. */
   trailingPass?: boolean;
   /** The background steps whose work must be in the log before this lane replays it. */

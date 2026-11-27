@@ -77,6 +77,7 @@ export function managedPromptVersionReplayStep({
       "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
     lane: TRACE_ANALYTICS_PROJECTION_NAME,
     since: nowInstant().subtract({ hours: MANAGED_VERSION_REPLAY_HOURS }).toString(),
+    needsOldWritersGone: true,
     after,
     replayer,
   });
@@ -143,6 +144,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
         lane: TRACE_ANALYTICS_PROJECTION_NAME,
         since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+        needsOldWritersGone: true,
         replayer,
       });
       // Done once every command is sent; the live trace fold writes those rows as it handles them.
@@ -172,6 +174,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
         lane: TRACE_ANALYTICS_PROJECTION_NAME,
         since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
+        needsOldWritersGone: true,
         after: [recordEvaluationOutcomes, replayTraceAnalytics],
         replayer,
       });
@@ -235,6 +238,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
           lane: SPAN_ANALYTICS_PROJECTION_NAME,
           since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+          needsOldWritersGone: true,
           replayer,
         }),
         defineMigrationStep({
@@ -264,6 +268,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
           lane: TRACE_ANALYTICS_PROJECTION_NAME,
           since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+          needsOldWritersGone: true,
           after: [replayTraceAnalytics, replayEvaluationAnalytics, managedPromptVersion],
           replayer,
         }),
