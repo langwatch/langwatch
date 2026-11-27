@@ -45,6 +45,13 @@ Feature: Subscription account usage in coding agent telemetry
     And an older full reading stays the newest one a query finds
 
   @unit
+  Scenario: a percent outside 0 to 100 is not stored
+    Given a usage percent of 150 or of -5, as a number or as text
+    When its row is written
+    Then the row stores no usage percent
+    And a percent sent as numeric text inside the range is stored as that number
+
+  @unit
   Scenario: instants are stored in milliseconds whatever unit they were sent in
     Given a reset time sent in epoch seconds and a limit sent in epoch nanoseconds
     When their row is written

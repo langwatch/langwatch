@@ -52,15 +52,18 @@ export function accountColumnsOf(facts: ContributionFacts): CodingAgentAccountCo
   };
 }
 
+/** A fact as text: a string trimmed, a finite number written out (numeric account ids), else ''. */
 function text(value: FactValue): string {
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** A usage percent, as a number or a numeric string; one outside 0 to 100 is not a reading. */
 function parsePercent(value: FactValue): number | undefined {
   const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
   if (typeof parsed !== "number" || !Number.isFinite(parsed)) return void 0;
 
-  return Math.min(100, Math.max(0, parsed));
+  return parsed >= 0 && parsed <= 100 ? parsed : void 0;
 }
 
 /** The instants a usage report may name, 2000-01-01 to 2100-01-01 UTC, so the column holds it. */

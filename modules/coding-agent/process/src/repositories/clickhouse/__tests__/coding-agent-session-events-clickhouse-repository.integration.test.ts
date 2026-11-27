@@ -408,4 +408,85 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
       });
     });
   });
+
+  describe("given a call with every account column set", () => {
+    const accountSession = `${tag}-account`;
+    const resetsAtMs = Date.parse("2026-11-28T09:00:00.000Z");
+    const readAtMs = Date.parse("2026-11-26T11:00:00.123Z");
+    const limitedUntilMs = Date.parse("2026-11-26T16:45:00.500Z");
+
+    /** @scenario the account attributes on a record become session facts */
+    it("stores each account column as written, the three instants to the millisecond", async () => {
+      await repository.ensure([
+        eventRecord({
+          sessionId: accountSession,
+          recordId: "9".repeat(64),
+          accountId: "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+          accountName: "ACME Max 1",
+          accountSource: "pool",
+          accountUsagePercent: 72.5,
+          accountUsageWindow: "seven_day",
+          accountUsageResetsAtMs: resetsAtMs,
+          accountUsageReadAtMs: readAtMs,
+          accountLimitedUntilMs: limitedUntilMs,
+        }),
+      ]);
+
+      const result = await ch.query({
+        query: `
+          SELECT AccountId, AccountName, AccountSource, AccountUsagePercent, AccountUsageWindow,
+            toUnixTimestamp64Milli(AccountUsageResetsAt) AS ResetsAtMs,
+            toUnixTimestamp64Milli(AccountUsageReadAt) AS ReadAtMs,
+            toUnixTimestamp64Milli(AccountLimitedUntil) AS LimitedUntilMs
+          FROM coding_agent_session_events
+          WHERE TenantId = {tenantId:String} AND SessionId = {sessionId:String}
+        `,
+        query_params: { tenantId, sessionId: accountSession },
+        format: "JSONEachRow",
+      });
+      const [stored] = await result.json<Record<string, unknown>>();
+      const row = {
+        ...stored,
+        ResetsAtMs: Number(stored?.ResetsAtMs),
+        ReadAtMs: Number(stored?.ReadAtMs),
+        LimitedUntilMs: Number(stored?.LimitedUntilMs),
+      };
+
+      expect(row).toEqual({
+        AccountId: "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+        AccountName: "ACME Max 1",
+        AccountSource: "pool",
+        AccountUsagePercent: 72.5,
+        AccountUsageWindow: "seven_day",
+        ResetsAtMs: resetsAtMs,
+        ReadAtMs: readAtMs,
+        LimitedUntilMs: limitedUntilMs,
+      });
+    });
+
+    it("stores a call with no account as empty strings and NULLs", async () => {
+      const blankSession = `${tag}-no-account`;
+      await repository.ensure([eventRecord({ sessionId: blankSession, recordId: "8".repeat(64) })]);
+
+      const result = await ch.query({
+        query: `
+          SELECT AccountId, AccountUsagePercent, AccountUsageResetsAt, AccountUsageReadAt,
+            AccountLimitedUntil
+          FROM coding_agent_session_events
+          WHERE TenantId = {tenantId:String} AND SessionId = {sessionId:String}
+        `,
+        query_params: { tenantId, sessionId: blankSession },
+        format: "JSONEachRow",
+      });
+      const [row] = await result.json<Record<string, unknown>>();
+
+      expect(row).toEqual({
+        AccountId: "",
+        AccountUsagePercent: null,
+        AccountUsageResetsAt: null,
+        AccountUsageReadAt: null,
+        AccountLimitedUntil: null,
+      });
+    });
+  });
 });

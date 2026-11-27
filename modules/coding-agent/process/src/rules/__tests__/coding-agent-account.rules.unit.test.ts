@@ -63,4 +63,35 @@ describe("accountColumnsOf", () => {
       expect(columns.accountUsagePercent).toBe(10);
     });
   });
+
+  describe("given an account id sent as a number", () => {
+    /** @scenario the account key falls back to the agent's own account id */
+    it("keeps it as the account id, written out", () => {
+      expect(accountColumnsOf({ "langwatch.account.id": 4242 }).accountId).toBe("4242");
+      expect(accountColumnsOf({ "user.account_id": 17 }).accountId).toBe("17");
+      expect(accountColumnsOf({ "user.account_uuid": 99 }).accountId).toBe("99");
+    });
+  });
+
+  describe("given usage percents in and out of range", () => {
+    /** @scenario a percent outside 0 to 100 is not stored */
+    it("keeps a numeric string inside the range", () => {
+      const columns = accountColumnsOf({
+        "langwatch.account.id": ACCOUNT,
+        "langwatch.account.usage.percent": " 72.5 ",
+      });
+      expect(columns.accountUsagePercent).toBe(72.5);
+    });
+
+    /** @scenario a percent outside 0 to 100 is not stored */
+    it("drops a percent above 100 or below 0, as a number or a string", () => {
+      for (const percent of [150, -5, "101", "-0.1"]) {
+        const columns = accountColumnsOf({
+          "langwatch.account.id": ACCOUNT,
+          "langwatch.account.usage.percent": percent,
+        });
+        expect(columns.accountUsagePercent, String(percent)).toBeNull();
+      }
+    });
+  });
 });

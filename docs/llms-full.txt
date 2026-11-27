@@ -29255,6 +29255,7 @@ Percent-encode spaces and commas in values, as `OTEL_RESOURCE_ATTRIBUTES` requir
 Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
 
 **Also check:** [Team projects](/coding-agents/team-projects) for pinning interactive machines to a shared project with a login.
+
 ---
 
 # FILE: ./coding-agents/openai-codex.mdx
@@ -31000,6 +31001,7 @@ See the [coding agents API reference](/api-reference/coding-agents/overview).
 The Teams page at `/governance/teams` lists every team's spend and requests over the last 30 days. **Governance > People** at `/governance/people` ranks each person by spend, and a person's row opens their page, personal AI use included. To count spend by cost center, assign people, teams and projects to departments on [People](/ai-governance/people).
 
 **Also check:** [Sessions](/coding-agents/sessions) for the per-session detail behind these rollups, and [Compare provider costs](/coding-agents/compare-provider-costs) to price your real usage mix against other providers.
+
 ---
 
 # FILE: ./concepts.mdx
