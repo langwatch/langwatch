@@ -76,23 +76,29 @@ const providerSubscription = ({
   items: items.map((item) => ({ ...item, unitAmount: null, interval: null })),
 });
 
+/** Throws by name until a test configures it, so an unexercised lookup fails loudly. */
+const unconfigured = <K extends keyof BillingSubscriptionRepository>(name: K) =>
+  vi.fn<BillingSubscriptionRepository[K]>(() => {
+    throw new Error(`BillingSubscriptionRepository.${name} was called but not configured`);
+  });
+
 const createMockRepository = (): {
   [K in keyof BillingSubscriptionRepository]: Mock<BillingSubscriptionRepository[K]>;
 } => ({
-  findActive: vi.fn(),
-  findLastNonCancelled: vi.fn(),
-  hasAnyForOrganization: vi.fn(),
-  createPending: vi.fn(),
-  updateStatus: vi.fn(),
-  updatePlan: vi.fn(),
-  findByStripeId: vi.fn(),
-  linkStripeId: vi.fn(),
-  activate: vi.fn(),
-  recordPaymentFailure: vi.fn(),
-  cancel: vi.fn(),
-  cancelTrialSubscriptions: vi.fn(),
-  migrateToSeatEvent: vi.fn(),
-  updateQuantities: vi.fn(),
+  findActive: unconfigured("findActive"),
+  findLastNonCancelled: unconfigured("findLastNonCancelled"),
+  hasAnyForOrganization: unconfigured("hasAnyForOrganization"),
+  createPending: unconfigured("createPending"),
+  updateStatus: unconfigured("updateStatus"),
+  updatePlan: unconfigured("updatePlan"),
+  findByStripeId: unconfigured("findByStripeId"),
+  linkStripeId: unconfigured("linkStripeId"),
+  activate: unconfigured("activate"),
+  recordPaymentFailure: unconfigured("recordPaymentFailure"),
+  cancel: unconfigured("cancel"),
+  cancelTrialSubscriptions: unconfigured("cancelTrialSubscriptions"),
+  findSupersededBySeatEvent: unconfigured("findSupersededBySeatEvent"),
+  updateQuantities: unconfigured("updateQuantities"),
 });
 
 const TEST_PRICES = BillingPriceCatalogue.create("test").prices;

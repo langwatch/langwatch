@@ -53,6 +53,12 @@ export type BillingSubscription = Readonly<{
   customerId?: string | null;
 }>;
 
+/** Stripe statuses after which a subscription bills nothing more and cannot come back. */
+export const ENDED_SUBSCRIPTION_STATUSES: ReadonlySet<BillingSubscriptionStatus> = new Set([
+  "canceled",
+  "incomplete_expired",
+]);
+
 /** A line change: an existing line by `id`, or a new one by `price`; these keys are the provider's. */
 export type SubscriptionItemUpdate = {
   id?: string;
