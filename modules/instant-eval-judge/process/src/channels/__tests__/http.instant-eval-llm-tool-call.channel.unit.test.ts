@@ -188,4 +188,34 @@ describe("HttpInstantEvalLlmJudgeChannel.call, given a backend's own output cap"
     expect(openAi.body?.max_output_tokens).toBe(1_100);
     expect(anthropic.body?.max_tokens).toBe(500);
   });
+
+  /** @scenario "The judge's own calls carry the backend's output cap" */
+  it("skips a call stopped at its cap before calling the tool, billing it and logging the stop", async () => {
+    capturing("https://api.openai.com", "/v1/responses", {
+      status: "incomplete",
+      incomplete_details: { reason: "max_output_tokens" },
+      output: [{ type: "reasoning", summary: [] }],
+      usage: { input_tokens: 500, output_tokens: 1_100 },
+    });
+    const warned: unknown[][] = [];
+
+    const answer = await HttpInstantEvalLlmJudgeChannel.create({
+      keys: { openai_responses: "lw-openai" },
+      dispatcher: agent,
+      logger: { warn: (...args: unknown[]) => void warned.push(args) },
+    }).call({ ...request("openai_responses"), reasoningEffort: "high", maxOutputTokens: 1_100 });
+
+    expect(answer).toEqual({
+      outcome: "skipped",
+      reason: "classifier_failed",
+      inputTokens: 500,
+      outputTokens: 1_100,
+    });
+    expect(warned).toEqual([
+      [
+        { wire: "openai_responses", stoppedBy: "max_output_tokens" },
+        "Instant Evals LLM leg stopped before calling an offered tool",
+      ],
+    ]);
+  });
 });

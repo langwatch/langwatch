@@ -157,6 +157,13 @@ Feature: LangWatch Judge (preview) as the scenario judge
     When the scenario judge posts its call
     Then the endpoint answers 403, no flag is read and the judge leaf is never asked
 
+  @unit @regression
+  Scenario: Where the judge preview is not available a malformed call is refused as not available
+    Given LangWatch Cloud with the judge preview flag off, or an installation that is not LangWatch Cloud
+    When the scenario judge posts a call that is not a judge call, or asks for a stream
+    Then the endpoint answers 403 as for any call, not 400 naming LangWatch Judge (preview)
+    And the judge leaf is never asked
+
   @unit
   Scenario: The endpoint needs a project key
     Given a request with no valid key

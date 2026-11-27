@@ -140,7 +140,12 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     const reading = readInstantEvalLlmToolCall({ wire, body: sent.body, tools: offered });
     const { inputTokens, outputTokens } = reading;
     if (reading.outcome === "none") {
-      this.logger.warn({ wire }, "Instant Evals LLM leg answered without calling an offered tool");
+      this.logger.warn(
+        { wire, stoppedBy: reading.stoppedBy },
+        reading.stoppedBy
+          ? "Instant Evals LLM leg stopped before calling an offered tool"
+          : "Instant Evals LLM leg answered without calling an offered tool",
+      );
       return { outcome: "skipped", reason: "classifier_failed", inputTokens, outputTokens };
     }
     const { tool, input } = reading;

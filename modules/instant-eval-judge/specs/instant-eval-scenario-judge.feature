@@ -229,6 +229,7 @@ Feature: A scenario judgement answered by the judge router
     Given an LLM backend whose table entry sets its own output cap
     When the judge's own verdict call or its turn decision call is sent on it
     Then the request carries that cap, not the wire's default
+    And a call stopped at that cap is skipped, billed and logged with its stop reason
 
   @unit
   Scenario: A Gemini backend answers the judge's own call as a forced function call

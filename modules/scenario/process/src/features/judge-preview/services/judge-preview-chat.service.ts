@@ -50,9 +50,10 @@ export class JudgePreviewChatService {
     request,
     signal,
   }: JudgePreviewChatInput): Promise<JudgePreviewChatCompletion> {
-    const call = judgePreviewLeafCallOf(request);
+    // Availability first: where the preview is off, a malformed call is the same 403 as any call.
     const availability = await this.deps.availability.availabilityFor({ projectId });
     if (!availability.isAvailable) throw new JudgePreviewNotAvailableError(availability.message);
+    const call = judgePreviewLeafCallOf(request);
     const id = `chatcmpl_${this.deps.ids.next()}`;
     const createdAtSeconds = Math.floor(this.deps.clock.now().epochMilliseconds / 1000);
     if (isJudgePreviewWaitOffered(request)) {

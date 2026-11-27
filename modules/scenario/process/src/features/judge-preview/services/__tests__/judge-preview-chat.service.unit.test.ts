@@ -219,22 +219,31 @@ describe("JudgePreviewChatService", () => {
     });
   });
 
-  it("refuses a request that is not a judge call before anything is asked", async () => {
-    const { asked, flagChecks } = chat();
-    const service = JudgePreviewChatService.create({
-      judges: createApiFixture<InstantEvalJudgeApi>(),
-      availability: judgePreviewAvailabilityFixture({ isSaas: true, isFlagOn: true, flagChecks }),
-      ids: { next: () => "id-1" },
-      clock: { now: () => Temporal.Instant.fromEpochMilliseconds(0) },
+  describe("given a request that is not a judge call", () => {
+    const notAJudgeCall = { messages: [{ role: "user" as const, content: "hello" }] };
+
+    /** @scenario "A request that is not a scenario judge call is refused" */
+    it("refuses it as invalid once availability is read, before the judge leaf is asked", async () => {
+      const { complete, asked, flagChecks } = chat();
+
+      await expect(complete(undefined, notAJudgeCall)).rejects.toBeInstanceOf(
+        JudgePreviewRequestInvalidError,
+      );
+      expect(flagChecks).toHaveLength(1);
+      expect(asked).toHaveLength(0);
     });
 
-    await expect(
-      service.complete({
-        projectId: PROJECT_ID,
-        request: { messages: [{ role: "user", content: "hello" }] },
-      }),
-    ).rejects.toBeInstanceOf(JudgePreviewRequestInvalidError);
-    expect(asked).toHaveLength(0);
-    expect(flagChecks).toHaveLength(0);
+    /** @scenario "Where the judge preview is not available a malformed call is refused as not available" */
+    it.each([
+      ["the flag is off", { isFlagOn: false }],
+      ["the install is not LangWatch Cloud", { isSaas: false }],
+    ])("answers 403, not 400, where %s, for a malformed or streamed call", async (_, setup) => {
+      const { complete, asked } = chat(setup);
+
+      for (const request of [notAJudgeCall, { ...verdictRequest(), stream: true }]) {
+        await expect(complete(undefined, request)).rejects.toMatchObject({ httpStatus: 403 });
+      }
+      expect(asked).toHaveLength(0);
+    });
   });
 });

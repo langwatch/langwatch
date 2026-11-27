@@ -107,6 +107,7 @@ const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = 
 const KINDS_TAKING_AN_OUTPUT_CAP: readonly InstantEvalJudgeBackendKind[] = [
   "anthropic_messages",
   "openai_responses",
+  "gemini_generate_content",
 ];
 
 /**

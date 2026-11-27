@@ -513,6 +513,23 @@ describe("given a backend that sets its own output cap", () => {
     );
     expect(parsed.backends["llm-b"]).toMatchObject({ timeoutMs: 30_000, maxOutputTokens: 500 });
   });
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it("takes it on a Gemini backend, as on the other LLM kinds", () => {
+    const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+      gatedTable({
+        backends: {
+          "llm-g": {
+            kind: "gemini_generate_content",
+            model: "gemini-2.5-pro",
+            maxOutputTokens: 500,
+          },
+        },
+      }),
+    );
+    expect(parsed.error?.issues).toBeUndefined();
+    expect(parsed.data?.backends["llm-g"]).toMatchObject({ maxOutputTokens: 500 });
+  });
 });
 
 describe("given a gated entry", () => {
