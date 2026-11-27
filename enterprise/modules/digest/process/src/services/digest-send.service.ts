@@ -7,8 +7,11 @@ import {
   type DigestMyTests,
   DigestNothingToSendError,
   DigestOperatorAddressMissingError,
+  DigestPersonNotFoundError,
   DigestPublicBaseUrlMissingError,
   type DigestTemplateId,
+  type DigestTestsFor,
+  type DigestTestTemplate,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -44,7 +47,7 @@ import {
 } from "../rules/digest-mail.rules.ts";
 import {
   type DigestTemplatePick,
-  eligibleDigestTemplates,
+  pickDigestTemplatesToTry,
 } from "../rules/digest-template.rules.ts";
 import { classifyDigestTestRefusal } from "../rules/digest-test.rules.ts";
 import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
@@ -97,8 +100,8 @@ type Deps = Readonly<{
   >;
   /** Which of the week's projects a member may view; the email shows no other. */
   access: Pick<AuthzApi, "canBatchByIds">;
-  /** The address an email goes to, read when it is sent and never stored. */
-  users: Pick<UserApi, "findById">;
+  /** The address an email goes to, read when sent and never stored; a test's person, by address. */
+  users: Pick<UserApi, "findById" | "findByEmail">;
   mail: DigestMailChannel;
   /** The digest templates' renders, injected so react-email stays at the app's composition. */
   renderer: DigestMailRender;
@@ -223,6 +226,7 @@ export class DigestSendService {
       week,
       member: { userId, admin: membership.admin },
       recipient: { userId, sendId: digestSendKey(sendKey) },
+      template: "auto",
     });
     if (!composed) return skip("no template has anything to show");
     // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
@@ -252,16 +256,18 @@ export class DigestSendService {
   /**
    * A member's last week in one organization, mailed to the operator alone, its signed unsubscribe
    * header naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
-   * arming, so a test can come first.
+   * arming, so a test can come first. A forced `template` is sent in place of the member's pick.
    */
   async sendTest({
     organizationId,
     userId,
     operatorId,
+    template = "auto",
   }: {
     organizationId: string;
     userId: string;
     operatorId: string;
+    template?: DigestTestTemplate;
   }): Promise<DigestTemplateId> {
     const membership = await this.#membership({ organizationId, userId });
     if (membership.kind === "gone") throw new DigestMemberNotFoundError(userId);
@@ -278,6 +284,7 @@ export class DigestSendService {
       week,
       member,
       recipient: { userId: operatorId, sendId: `test:${isoWeek}` },
+      template,
     });
     if (!composed) throw new DigestNothingToSendError(userId);
     await this.deps.mail.send(
@@ -303,39 +310,92 @@ export class DigestSendService {
   async sendMyTests({ operatorId }: { operatorId: string }): Promise<DigestMyTests> {
     const operator = await this.deps.users.findById({ id: operatorId });
     if (!operator?.email) throw new DigestOperatorAddressMissingError();
-    const organizationIds = await this.deps.organizations.organizationIdsForMember({
-      userId: operatorId,
-    });
-    if (organizationIds.length === 0) return { organizations: [] };
+    return {
+      organizations: await this.#testsOf({ userId: operatorId, operatorId, template: "auto" }),
+    };
+  }
+
+  /**
+   * The same tests of another person, found by address, mailed to the operator alone and never
+   * to them; `template` is what they would get ("auto") or one forced, skipped without its data.
+   */
+  async sendTestFor({
+    email,
+    template,
+    operatorId,
+  }: {
+    email: string;
+    template: DigestTestTemplate;
+    operatorId: string;
+  }): Promise<DigestTestsFor> {
+    const operator = await this.deps.users.findById({ id: operatorId });
+    if (!operator?.email) throw new DigestOperatorAddressMissingError();
+    const person = await this.deps.users.findByEmail({ email });
+    if (!person) throw new DigestPersonNotFoundError();
+    return {
+      person: { name: person.name, email },
+      organizations: await this.#testsOf({ userId: person.id, operatorId, template }),
+    };
+  }
+
+  /** One test per organization the person is an active member of, system one left out, by name. */
+  async #testsOf({
+    userId,
+    operatorId,
+    template,
+  }: {
+    userId: string;
+    operatorId: string;
+    template: DigestTestTemplate;
+  }): Promise<DigestMyTest[]> {
+    const organizationIds = await this.deps.organizations.organizationIdsForMember({ userId });
+    if (organizationIds.length === 0) return [];
     const named = await this.deps.organizations.findForOperators({ organizationIds });
     const organizations: DigestMyTest[] = [];
     for (const { id, name } of named.toSorted((a, b) => a.name.localeCompare(b.name))) {
       organizations.push(
-        await this.#myTest({ organizationId: id, organizationName: name, operatorId }),
+        await this.#test({
+          organizationId: id,
+          organizationName: name,
+          userId,
+          operatorId,
+          template,
+        }),
       );
     }
-    return { organizations };
+    return organizations;
   }
 
-  async #myTest({
+  async #test({
     organizationId,
     organizationName,
+    userId,
     operatorId,
+    template,
   }: {
     organizationId: string;
     organizationName: string;
+    userId: string;
     operatorId: string;
+    template: DigestTestTemplate;
   }): Promise<DigestMyTest> {
     const about = { organizationId, organizationName };
     try {
-      const templateId = await this.sendTest({ organizationId, userId: operatorId, operatorId });
+      const templateId = await this.sendTest({ organizationId, userId, operatorId, template });
       return { outcome: "sent", ...about, templateId };
     } catch (error) {
       const reason = classifyDigestTestRefusal(error);
+      // A forced template with nothing to show has no data here, not an empty week.
+      if (reason === "nothing_to_send" && template !== "auto") {
+        return { outcome: "skipped", ...about, reason: "no_data_for_template" };
+      }
       if (reason) return { outcome: "skipped", ...about, reason };
       // No public base URL fails every organization alike, before any mail: the call fails.
       if (error instanceof DigestPublicBaseUrlMissingError) throw error;
-      logger.error({ error, organizationId, operatorId }, "the digest could not send a test");
+      logger.error(
+        { error, organizationId, userId, operatorId },
+        "the digest could not send a test",
+      );
       return { outcome: "failed", ...about };
     }
   }
@@ -423,15 +483,17 @@ export class DigestSendService {
     return identities.filter(({ id }) => decided.projects.get(id) === true).map(({ id }) => id);
   }
 
-  /** The member's pick and its props, with an unsubscribe signed for whoever receives it. */
+  /** The member's pick (or a forced template) with props; the unsubscribe is the recipient's. */
   async #compose({
     week,
     member,
     recipient,
+    template,
   }: {
     week: OrganizationWeek;
     member: Member;
     recipient: Readonly<{ userId: string; sendId: string }>;
+    template: DigestTestTemplate;
   }): Promise<Composed | null> {
     const baseUrl = this.#baseUrl();
     const organizationName =
@@ -443,7 +505,8 @@ export class DigestSendService {
     const preferencesUrl = `${baseUrl}${DIGEST_EMAIL_PREFERENCES_PATH}`;
     // The first eligible template whose props build: one that cannot (a name not found) must
     // not cost the member the email a lower-ranked template could send.
-    for (const pick of eligibleDigestTemplates(digestTemplateInput({ week, ...member }))) {
+    const input = digestTemplateInput({ week, ...member });
+    for (const pick of pickDigestTemplatesToTry({ template, input })) {
       const template = buildDigestTemplateProps({
         pick,
         week,

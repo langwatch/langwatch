@@ -13,6 +13,19 @@ export const DIGEST_TEMPLATE_IDS = [
 export const digestTemplateIdSchema = z.enum(DIGEST_TEMPLATE_IDS);
 export type DigestTemplateId = z.infer<typeof digestTemplateIdSchema>;
 
+/** The templates a staff test can force; "what's new" never sends, so it is not one of them. */
+export const DIGEST_FORCEABLE_TEMPLATE_IDS = [
+  "digest-plan-pressure",
+  "digest-scenarios-trend",
+  "digest-coding-agent-week",
+  "digest-traces-week",
+] as const satisfies readonly DigestTemplateId[];
+
+/** A staff test's template: "auto" is what the person would get today; an id forces that one. */
+export const DIGEST_TEST_TEMPLATES = ["auto", ...DIGEST_FORCEABLE_TEMPLATE_IDS] as const;
+export const digestTestTemplateSchema = z.enum(DIGEST_TEST_TEMPLATES);
+export type DigestTestTemplate = z.infer<typeof digestTestTemplateSchema>;
+
 const digestSettingsSchemaDefinition = z.object({
   /** The weekly send's master switch; off until an operator arms it. */
   armed: z.boolean(),
@@ -57,6 +70,8 @@ export const DIGEST_MY_TEST_SKIP_REASONS = [
   "nothing_to_send",
   "opted_out",
   "not_a_member",
+  /** A forced template had no data to show for the person here. */
+  "no_data_for_template",
 ] as const;
 
 /**
@@ -91,6 +106,27 @@ const digestMyTestsSchemaDefinition = z.object({ organizations: z.array(digestMy
 export interface DigestMyTestsSchema extends Named<typeof digestMyTestsSchemaDefinition> {}
 export const digestMyTestsSchema: DigestMyTestsSchema = digestMyTestsSchemaDefinition;
 export type DigestMyTests = z.infer<typeof digestMyTestsSchema>;
+
+/** The person whose digests the operator is sent, by address, and which template to send. */
+const digestSendTestForInputSchemaDefinition = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email()),
+  template: digestTestTemplateSchema,
+});
+export interface DigestSendTestForInputSchema extends Named<
+  typeof digestSendTestForInputSchemaDefinition
+> {}
+export const digestSendTestForInputSchema: DigestSendTestForInputSchema =
+  digestSendTestForInputSchemaDefinition;
+export type DigestSendTestForInput = z.infer<typeof digestSendTestForInputSchema>;
+
+/** Whom the tests were of, and every organization they are an active member of, by name. */
+const digestTestsForSchemaDefinition = z.object({
+  person: z.object({ name: z.string().nullable(), email: z.string() }),
+  organizations: z.array(digestMyTestSchema),
+});
+export interface DigestTestsForSchema extends Named<typeof digestTestsForSchemaDefinition> {}
+export const digestTestsForSchema: DigestTestsForSchema = digestTestsForSchemaDefinition;
+export type DigestTestsFor = z.infer<typeof digestTestsForSchema>;
 
 const digestAcknowledgedSchemaDefinition = z.object({ ok: z.literal(true) });
 export interface DigestAcknowledgedSchema extends Named<

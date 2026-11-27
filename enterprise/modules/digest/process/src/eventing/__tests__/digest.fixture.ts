@@ -232,13 +232,7 @@ export function installDigest(
   const memoryMail = MemoryDigestMailChannel.create();
   const mail = new FailsAfterAcceptingMailChannel(memoryMail);
   const now = () => Date.now() + world.clockOffsetMs;
-  const users = createApiFixture<Pick<UserApi, "findById">>(
-    {
-      findById: async ({ id }) =>
-        world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null,
-    },
-    "UserApi",
-  );
+  const users = worldUsers({ world });
   const unsubscribes = DigestUnsubscribeService.create({
     secret,
     limits: repositories.callCounter,
@@ -532,6 +526,9 @@ export function installDigest(
       sends.sendTest(input),
     /** An operator's tests of their own week in every organization, once ops admitted them. */
     sendMyTests: (input: { operatorId: string }) => sends.sendMyTests(input),
+    /** An operator's tests of another person's week, found by address, once ops admitted them. */
+    sendTestFor: (input: Parameters<DigestSendService["sendTestFor"]>[0]) =>
+      sends.sendTestFor(input),
     /** One organization's plan, as the outbox retries it after a failure. */
     planOrganization: (input: { organizationId: string; isoWeek?: string }) =>
       sends.planOrganization({ isoWeek: SENT_WEEK, ...input }),
@@ -665,6 +662,22 @@ function projectIdentity(id: string, ownerUserId: string | undefined, aggregate:
     ownerUserId: ownerUserId ?? null,
     kind: aggregate ? "aggregate" : "project",
   };
+}
+
+/** The user module over the world's people, found by id or by address. */
+function worldUsers({ world }: { world: ReturnType<typeof digestWorld> }) {
+  const profileOf = (id: string | undefined) =>
+    id !== undefined && world.users.includes(id)
+      ? userProfile(id, world.deactivated.has(id))
+      : null;
+  return createApiFixture<Pick<UserApi, "findById" | "findByEmail">>(
+    {
+      findById: async ({ id }) => profileOf(id),
+      findByEmail: async ({ email }) =>
+        profileOf(world.users.find((known) => emailOf(known) === email)),
+    },
+    "UserApi",
+  );
 }
 
 /** A person as the user module answers them: digest reads only the address. */

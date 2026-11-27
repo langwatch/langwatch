@@ -3,7 +3,7 @@
  * @vitest-environment node
  * The weekly send where a person sits in several organizations (one email each), where a picked
  * template cannot be built, where the person is deactivated, and where one organization cannot
- * be read; and an operator sending themself, as tests, every digest they would get.
+ * be read; and an operator sending themself, as tests, the digests they or a person would get.
  * @see enterprise/modules/digest/specs/digest.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -448,6 +448,113 @@ describe("an operator sending themself their digests", () => {
       await expect(digest.sendMyTests({ operatorId: OPERATOR })).rejects.toMatchObject({
         code: "digest_operator_address_missing",
       });
+      expect(digest.mail).toEqual([]);
+    });
+  });
+});
+
+/** MEMBER sits in both organizations with a busy project each, on the Monday the week goes out. */
+async function memberInBothOrganizationsThisMonday() {
+  digest.world.clockOffsetMs = WAKE_AT - Date.now();
+  await memberInBothOrganizations({ traces: { first: 1_200, second: 5_000 } });
+}
+
+const testsFor = (input: {
+  email: string;
+  template: Parameters<InstalledDigest["sendTestFor"]>[0]["template"];
+}) => digest.sendTestFor({ ...input, operatorId: OPERATOR });
+
+describe("an operator sending themself another person's digests", () => {
+  describe("when they ask for what the person would get", () => {
+    /** @scenario "Staff send themselves a person's digests as that person would get them" */
+    it("mails the operator one test per organization and the person nothing", async () => {
+      await memberInBothOrganizationsThisMonday();
+
+      const answer = await testsFor({ email: emailOf(MEMBER), template: "auto" });
+
+      expect(answer).toEqual({
+        person: { name: null, email: emailOf(MEMBER) },
+        organizations: [
+          {
+            outcome: "sent",
+            organizationId: ORGANIZATION,
+            organizationName: "Acme",
+            templateId: "digest-traces-week",
+          },
+          {
+            outcome: "sent",
+            organizationId: OTHER_ORGANIZATION,
+            organizationName: `Org ${OTHER_ORGANIZATION}`,
+            templateId: "digest-traces-week",
+          },
+        ],
+      });
+      expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(OPERATOR), emailOf(OPERATOR)]);
+      expect(
+        digest.mail.every((mail) => mail.test && mail.email.subject.startsWith("[Test] ")),
+      ).toBe(true);
+    });
+  });
+
+  describe("when they force traces week for a quiet week below its threshold", () => {
+    /** @scenario "Staff force one digest for a person, past its threshold" */
+    it("sends traces week where there are traces and skips where there are none", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 40 });
+      digest.world.traceNumbers.delete(`${OTHER_PROJECT}:${SENT_WEEK}`);
+
+      const answer = await testsFor({ email: emailOf(MEMBER), template: "digest-traces-week" });
+
+      expect(answer.organizations).toEqual([
+        expect.objectContaining({
+          organizationId: ORGANIZATION,
+          outcome: "sent",
+          templateId: "digest-traces-week",
+        }),
+        {
+          outcome: "skipped",
+          organizationId: OTHER_ORGANIZATION,
+          organizationName: `Org ${OTHER_ORGANIZATION}`,
+          reason: "no_data_for_template",
+        },
+      ]);
+      expect(digest.mail.map((mail) => tracesOf(mail))).toEqual([40]);
+    });
+  });
+
+  describe("when they force plan usage for an admin and for a member who is not one", () => {
+    /** @scenario "A forced digest with no data for the person is skipped, not sent" */
+    it("sends the admin's and skips each of the member's with no data", async () => {
+      await memberInBothOrganizationsThisMonday();
+
+      const admin = await testsFor({ email: emailOf(ADMIN), template: "digest-plan-pressure" });
+      const member = await testsFor({ email: emailOf(MEMBER), template: "digest-plan-pressure" });
+
+      expect(admin.organizations).toEqual([
+        expect.objectContaining({
+          organizationId: ORGANIZATION,
+          outcome: "sent",
+          templateId: "digest-plan-pressure",
+        }),
+      ]);
+      expect(member.organizations).toEqual([
+        expect.objectContaining({ outcome: "skipped", reason: "no_data_for_template" }),
+        expect.objectContaining({ outcome: "skipped", reason: "no_data_for_template" }),
+      ]);
+      expect(digest.mail.map((mail) => [mail.to, mail.templateId])).toEqual([
+        [emailOf(OPERATOR), "digest-plan-pressure"],
+      ]);
+    });
+  });
+
+  describe("when no account has the address", () => {
+    /** @scenario "Sending a person's digests to an address no account has is refused" */
+    it("is refused as a person not found and mails no one", async () => {
+      await memberInBothOrganizationsThisMonday();
+
+      await expect(
+        testsFor({ email: "nobody@example.test", template: "auto" }),
+      ).rejects.toMatchObject({ code: "digest_person_not_found" });
       expect(digest.mail).toEqual([]);
     });
   });

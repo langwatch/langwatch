@@ -1,14 +1,27 @@
 /**
  * Email preferences: the weekly digest, on or off for you across every organization you are in;
  * the email's one-click unsubscribe writes the same choice. Staff holding ops:manage can also
- * send themselves this week's digests, marked [Test]. Spec: digest/specs/digest.feature
+ * send themselves their own or a person's digests, marked [Test]. Spec: digest.feature
  */
 
-import { Badge, Button, HStack, Skeleton, Stack, Text } from "@langwatch/design-system/primitives";
+import {
+  Badge,
+  Button,
+  HStack,
+  Input,
+  NativeSelect,
+  Skeleton,
+  Stack,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
 import { ToggleRow } from "@langwatch/design-system/toggle-row";
-import type { DigestMyTest, DigestTemplateId } from "@langwatch/enterprise-digest-contract";
+import type {
+  DigestMyTest,
+  DigestTemplateId,
+  DigestTestTemplate,
+} from "@langwatch/enterprise-digest-contract";
 import { Mail } from "lucide-react";
 import { useState } from "react";
 
@@ -32,10 +45,29 @@ const TEMPLATE_LABELS: Record<DigestTemplateId, string> = {
   "digest-whats-new": "What's new",
 };
 
-const SKIP_LABELS: Record<Extract<DigestMyTest, { outcome: "skipped" }>["reason"], string> = {
+/** The choices for a person's test, in the order offered; "auto" is the weekly send's own pick. */
+const TEST_TEMPLATE_LABELS: Record<DigestTestTemplate, string> = {
+  auto: "What they'd get",
+  "digest-plan-pressure": TEMPLATE_LABELS["digest-plan-pressure"],
+  "digest-scenarios-trend": TEMPLATE_LABELS["digest-scenarios-trend"],
+  "digest-coding-agent-week": TEMPLATE_LABELS["digest-coding-agent-week"],
+  "digest-traces-week": TEMPLATE_LABELS["digest-traces-week"],
+};
+
+type SkipLabels = Record<Extract<DigestMyTest, { outcome: "skipped" }>["reason"], string>;
+
+const MY_SKIP_LABELS: SkipLabels = {
   nothing_to_send: "Skipped: nothing to show you this week",
   opted_out: "Skipped: you turned the weekly digest off",
   not_a_member: "Skipped: you are no longer a member",
+  no_data_for_template: "Skipped: no data for this digest",
+};
+
+const THEIR_SKIP_LABELS: SkipLabels = {
+  nothing_to_send: "Skipped: nothing to show them this week",
+  opted_out: "Skipped: they turned the weekly digest off",
+  not_a_member: "Skipped: they are no longer a member",
+  no_data_for_template: "Skipped: no data for this digest",
 };
 
 export function EmailPreferencesSection() {
@@ -90,7 +122,12 @@ export function EmailPreferencesSection() {
           />
         </ToggleRow>
       )}
-      {host.hasPermission(OPS_MANAGE_PERMISSION) ? <SendMyDigests /> : null}
+      {host.hasPermission(OPS_MANAGE_PERMISSION) ? (
+        <>
+          <SendMyDigests />
+          <SendTestFor />
+        </>
+      ) : null}
     </SettingsSection>
   );
 }
@@ -142,22 +179,121 @@ function SendMyDigests() {
           Send me my digests
         </Button>
       </ToggleRow>
-      {send.data ? <MyDigestResults organizations={send.data.organizations} /> : null}
+      {send.data ? (
+        <DigestTestResults
+          organizations={send.data.organizations}
+          skipLabels={MY_SKIP_LABELS}
+          emptyText="You are not an active member of any organization."
+          testId="send-my-digests-results"
+        />
+      ) : null}
     </Stack>
   );
 }
 
-function MyDigestResults({ organizations }: { organizations: readonly DigestMyTest[] }) {
-  if (organizations.length === 0) {
-    return <Text textStyle="sm">You are not an active member of any organization.</Text>;
-  }
+/** Staff only: a person's digests, by their address, mailed to you as tests and never to them. */
+function SendTestFor() {
+  const host = usePersonalWorkspaceHost();
+  const send = api.digest.sendTestFor.useMutation();
+  const [email, setEmail] = useState("");
+  const [template, setTemplate] = useState<DigestTestTemplate>("auto");
+
+  const press = async () => {
+    try {
+      await send.mutateAsync({ email: email.trim(), template });
+    } catch (error) {
+      host.failed({ error, fallbackTitle: "Couldn't send their digests" });
+    }
+  };
+
   return (
-    <Stack as="ul" gap={1} listStyleType="none" data-testid="send-my-digests-results">
+    <Stack gap={2} data-testid="send-test-for">
+      <Stack gap={0.5}>
+        <HStack gap={2}>
+          <Text textStyle="label">Send me someone's digests</Text>
+          <Badge size="sm">Staff</Badge>
+        </HStack>
+        <Text textStyle="sm" color="fg.muted">
+          Emails you, marked [Test], a person's digest for each organization they are in: what
+          they'd get this week, or one digest forced. Nothing is sent to them.
+        </Text>
+      </Stack>
+      <HStack gap={2}>
+        <Input
+          size="sm"
+          type="email"
+          placeholder="person@example.com"
+          aria-label="Their email address"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          data-testid="send-test-for-email"
+        />
+        <NativeSelect.Root size="sm" width="auto" flexShrink={0}>
+          <NativeSelect.Field
+            aria-label="Which digest"
+            value={template}
+            onChange={(event) => setTemplate(event.target.value as DigestTestTemplate)}
+            data-testid="send-test-for-template"
+          >
+            {Object.entries(TEST_TEMPLATE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        <Button
+          size="xs"
+          variant="outline"
+          flexShrink={0}
+          disabled={email.trim() === ""}
+          loading={send.isPending}
+          onClick={() => void press()}
+          data-testid="send-test-for-button"
+        >
+          Send test to me
+        </Button>
+      </HStack>
+      {send.data ? (
+        <Stack gap={1}>
+          <Text textStyle="sm">
+            For{" "}
+            {send.data.person.name
+              ? `${send.data.person.name} (${send.data.person.email})`
+              : send.data.person.email}
+          </Text>
+          <DigestTestResults
+            organizations={send.data.organizations}
+            skipLabels={THEIR_SKIP_LABELS}
+            emptyText="They are not an active member of any organization."
+            testId="send-test-for-results"
+          />
+        </Stack>
+      ) : null}
+    </Stack>
+  );
+}
+
+function DigestTestResults({
+  organizations,
+  skipLabels,
+  emptyText,
+  testId,
+}: {
+  organizations: readonly DigestMyTest[];
+  skipLabels: SkipLabels;
+  emptyText: string;
+  testId: string;
+}) {
+  if (organizations.length === 0) return <Text textStyle="sm">{emptyText}</Text>;
+  return (
+    <Stack as="ul" gap={1} listStyleType="none" data-testid={testId}>
       {organizations.map((organization) => (
         <HStack as="li" key={organization.organizationId} justify="space-between" gap={3}>
           <Text textStyle="sm">{organization.organizationName}</Text>
           <Text textStyle="sm" color={organization.outcome === "failed" ? "fg.error" : "fg.muted"}>
-            {outcomeLabel(organization)}
+            {outcomeLabel({ organization, skipLabels })}
           </Text>
         </HStack>
       ))}
@@ -165,10 +301,16 @@ function MyDigestResults({ organizations }: { organizations: readonly DigestMyTe
   );
 }
 
-function outcomeLabel(organization: DigestMyTest): string {
+function outcomeLabel({
+  organization,
+  skipLabels,
+}: {
+  organization: DigestMyTest;
+  skipLabels: SkipLabels;
+}): string {
   if (organization.outcome === "sent") {
     return `Sent: ${TEMPLATE_LABELS[organization.templateId]}`;
   }
-  if (organization.outcome === "skipped") return SKIP_LABELS[organization.reason];
+  if (organization.outcome === "skipped") return skipLabels[organization.reason];
   return "Failed: couldn't be sent";
 }
