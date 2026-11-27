@@ -123,18 +123,21 @@ Feature: Managed model providers
     @unit
     Scenario: The gateway re-reads a managed row's keys before its session expires
       Given an organization whose Bedrock is managed through a private endpoint
-      When 45 minutes pass, inside the one-hour session a role hop mints
+      When five minutes pass, well inside the one-hour session a role hop mints
       Then the gateway's config version for its keys moves
       And the gateway fetches a fresh bundle with a newly minted session instead of confirming the old one
+      And a mint that failed and fell back to stored keys is retried within those five minutes
 
     # The role hop deadline lives in the credentials channel, so it bounds every
     # caller: the gateway's bundle and the LiteLLM parameters path alike. That is
-    # deliberate: a hop that takes over 1.5s is broken for either caller.
+    # deliberate: a hop that takes over 1.5s is broken for either caller. The
+    # gateway runs its background refreshes under 2s (authresolver/service.go)
+    # and its first fetch under a 10s HTTP timeout; 1.5s fits inside both.
     @unit
     Scenario: A stalled role hop gives up inside the gateway's config fetch
       Given assuming the proxy role does not answer
       When the managed Bedrock credentials are minted
-      Then the role hops give up at their shared deadline, inside the gateway's config fetch
+      Then the role hops give up at their shared deadline, inside the gateway's 2s background refresh
       And the customer role is never asked
 
     @unit
