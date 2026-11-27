@@ -2526,6 +2526,25 @@ const presentations = {
     title: "That request was already answered",
     describe: () => "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
   },
+  judge_preview_budget_exhausted: {
+    title: "Your free LangWatch Judge budget is used up",
+    describe: () =>
+      "This run was not judged. Upgrade your plan under Settings, Plan & billing, or pick another judge model.",
+  },
+  judge_preview_not_available: {
+    title: "LangWatch Judge (preview) isn't available for this project",
+    describe: () =>
+      "It is off for this organization, or this project cannot use it yet. Pick another judge model.",
+  },
+  judge_preview_request_invalid: {
+    title: "LangWatch Judge (preview) can't judge this run",
+    describe: () =>
+      "The run asked for a judgement this judge doesn't support. Pick another judge model for it.",
+  },
+  judge_preview_unavailable: {
+    title: "LangWatch Judge (preview) couldn't answer right now",
+    describe: () => "This run was not judged. Run it again, or pick another judge model.",
+  },
   join_request_already_pending: {
     title: "You have already asked",
     describe: () =>

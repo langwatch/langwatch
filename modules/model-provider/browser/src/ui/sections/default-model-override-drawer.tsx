@@ -20,8 +20,12 @@ import {
   isModelAllowedAsRoleDefault,
   canonicalModelId,
   isLangWatchDecisionModelId,
+  isLangWatchJudgeModelId,
   isModelAllowedForFeature,
   LANGWATCH_DECISION_MODEL_ID,
+  LANGWATCH_JUDGE_MODEL_ID,
+  judgeColumnModelIds,
+  langwatchJudgePickerOption,
   LATEST_ALIAS_PROVIDERS,
   MODEL_ROLES,
   modelDisplayLabel,
@@ -258,13 +262,32 @@ function modelOptionsForMode({
   return Array.from(new Set([...customModelIdsFor({ enabledEntries, mode }), ...registryModels]));
 }
 
+/** One model's picker row: LangWatch's own models from the catalogue, any other from its id. */
+function pickerOptionOf({
+  modelValue,
+  decisionOptions,
+  displayNames,
+}: {
+  modelValue: string;
+  decisionOptions: ModelPickerOption[];
+  displayNames: Record<string, string>;
+}): ModelPickerOption {
+  if (isLangWatchJudgeModelId(modelValue)) return langwatchJudgePickerOption();
+  return (
+    decisionOptions.find((option) => option.value === modelValue) ??
+    modelPickerOption({ displayNames, modelValue })
+  );
+}
+
 function modelOptionsByRoleFor({
   decisionOptions,
+  isJudgePreviewOffered,
   hasProviderLoadError,
   isLoading,
   providers,
 }: {
   decisionOptions: ModelPickerOption[];
+  isJudgePreviewOffered: boolean;
   hasProviderLoadError: boolean;
   isLoading: boolean;
   providers: ProviderRow[];
@@ -281,7 +304,8 @@ function modelOptionsByRoleFor({
     DEFAULT: llmModels,
     FAST: llmModels,
     LANGY: llmModels,
-    JUDGE: llmModels,
+    // The LangWatch models the catalogue lets fill Judge first, where the judge preview is on.
+    JUDGE: [...judgeColumnModelIds({ isJudgePreviewOffered }), ...llmModels],
     EMBEDDINGS: modelOptionsForMode({
       enabledEntries,
       hasProviderLoadError,
@@ -456,6 +480,11 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       enabled: !!projectId && open,
     },
   );
+  const { enabled: isJudgePreviewOffered } = useFeatureFlag(
+    FrontendFlags.release_langwatch_judge_preview,
+    // Asked of the organization only, as the server's save gate asks it.
+    { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
+  );
   const { enabled: isOwnModelEnabled } = useFeatureFlag(
     FrontendFlags.release_instant_evals_own_decision_model,
     // Asked of the organization only, as the server asks it (ADR-182 decision 4).
@@ -470,6 +499,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
+    isJudgePreviewOffered,
     hasProviderLoadError: projectProviders.isError,
     isLoading: projectProviders.isLoading,
     providers: projectProviders.data ?? [],
@@ -480,10 +510,10 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const displayNames = {
     ...buildCustomModelDisplayNames(projectProviders.data ?? []),
     ...DECISION_MODEL_DISPLAY_NAMES,
+    [LANGWATCH_JUDGE_MODEL_ID]: langwatchJudgePickerOption().label,
   };
   const pickerOptionFor = (modelValue: string): ModelPickerOption =>
-    decisionOptions.find((option) => option.value === modelValue) ??
-    modelPickerOption({ displayNames, modelValue });
+    pickerOptionOf({ modelValue, decisionOptions, displayNames });
 
   const setOverride = (key: string, model: string | null) => {
     setConfig((prev) => withOverride(prev, key, model));

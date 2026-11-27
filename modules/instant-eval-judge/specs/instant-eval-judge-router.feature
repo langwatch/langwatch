@@ -27,7 +27,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
 
   @unit
   Scenario: The route table refuses a slot without an instant entry
-    Given a route table whose slot names no instant entry, or an escalation without a threshold
+    Given a route table whose slot names no instant entry, or an escalation with neither a threshold nor a gate
     When the deployment boots
     Then the configuration is refused, naming the slot
 
@@ -126,6 +126,64 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And for a score or category the surer answer by its kind's sureness rule is kept
 
   @unit
+  Scenario: A gate names a hosted classifier backend and an escalation, nothing else
+    Given a route table whose entry carries a gate
+    When the deployment boots
+    Then the entry must name an escalation, and neither a threshold nor a pair
+    And the gate's backend must be a hosted classifier backend with no fallbacks
+    And the gate's question must be one the code names, and its threshold at most the question's top level
+    And the gate's backend needs a price and a key like any backend the entry can call
+    And an entry whose gate backend is switched off is unusable, so its mode falls back
+
+  @unit
+  Scenario: The gate reads a frozen framing of the case
+    Given a gated plan
+    When a question is routed
+    Then the gate's backend is asked one score question about how hard the case is to judge
+    And its levels are sent by name, easiest first, and the score read back is the weighted mean level index
+    And a level read back in another case or with surrounding space counts as that level
+    And a question that names its levels with any range other than 0 to the last level index is refused before any call
+    And it reads the job, the question's first 3,000 characters and the full text
+    And a text over 12,000 characters is shown as its first and last 6,000 with the cut length between
+    And the wording and the cut are fixed under the question's name, so a threshold keeps its meaning
+
+  @unit
+  Scenario: A gate sends an easy case to the primary alone and the rest to the escalation alone
+    Given a gated plan with a threshold
+    When the gate scores the case under the threshold
+    Then the primary answers alone, however unsure, and the escalation is not called
+    When the gate scores the case at or above the threshold
+    Then the escalation answers alone on the full text, and the primary is not called
+    And the judgement counts no escalation, flags the branch taken and sums the gate's cost and that one call's
+    And the gate's limiter wait counts toward the judgement's limiter wait, with that one call's
+    And a gated plan never shares its first send with another kind's plan
+
+  @unit
+  Scenario: A gate that gives no score sends the case to the escalation
+    Given a gated plan
+    When the gate fails, runs past its timeout or answers with no readable score or a level outside its question's
+    Then the escalation answers alone, the routing flags that no score was read
+    And whatever the gate billed is still billed
+
+  @unit
+  Scenario: A gated branch that cannot answer is answered by the other backend, flagged
+    Given a gated plan
+    When the gate picks the primary and the primary cannot answer
+    Then the escalation answers, flagged as a failed primary and counted as one escalation
+    When the gate picks the escalation and the escalation cannot answer
+    Then the primary answers, flagged as a failed hard branch
+    And when neither answers the judgement is skipped with the platform's skip reason, the gate still billed
+    And a branch whose backend lists the other as a fallback still asks each backend at most once
+
+  @unit
+  Scenario: A gate rates each question of a call on its own
+    Given a gated plan and a call that asks two yes-or-no questions
+    When the call is routed
+    Then the gate is asked once per question, since it reads the question as the task
+    And the easy question is answered by the primary and the other by the escalation, side by side
+    And the judgement's limiter wait is the longest gate send's and the longer branch's, never their sum
+
+  @unit
   Scenario: A kind the table does not route takes today's classifier call
     Given a route table with no routes for score or category questions, as the public one ships
     When a routed call asks a score or category question, alone or beside yes-or-no questions
@@ -220,6 +278,27 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And a refused key, a rate limit and an outage map to the platform's skip reasons
 
   @unit
+  Scenario: A reasoning effort is sent only when the backend sets one
+    Given an OpenAI Responses backend whose table entry sets a reasoning effort
+    When its leg is asked
+    Then the request names that effort, and the reasoning tokens it reports are billed as output
+    And an effort other than none raises the request's output cap from 8,000 to 32,000 tokens
+    And an answer the provider stopped before the evaluation call is no answer, its tokens billed and its stop reason logged
+    And a backend that sets none sends the request it sent before, with no effort named
+    And the table refuses an effort on any other backend kind, or one the provider does not name
+
+  @unit @regression
+  Scenario: A backend that reasons waits long enough to write its output cap
+    Given an OpenAI Responses backend whose table entry sets a reasoning effort other than none
+    When the table is read
+    Then its timeout defaults to 300,000 ms where the entry names none
+    And an entry that names a shorter timeout is refused, naming the backend and the floor
+    And a backend with no effort, or effort none, keeps the 30,000 ms default
+    And an LLM backend may set its own output cap, sent on every call and refused on any other kind
+    And a reasoning backend with its own cap needs only the time to write it at 50 tokens a second, its default timeout
+    And an answer cut at that cap is no answer, its tokens billed, so the backend's fallback answers
+
+  @unit
   Scenario: The LLM legs send one forced score or category tool call and read it back
     Given a score or category question on an Anthropic Messages or OpenAI Responses leg
     When it is asked
@@ -268,6 +347,66 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then it is off, so the LLM-judge caller sends no route
     And the judge picker names LangWatch's hosted model LangWatch Instant (preview), never LangWatch Evals (preview)
     And an operator can still switch it on for the install
+
+  @unit
+  Scenario: Routed search has its own rollout flag, off everywhere by default
+    Given the feature flag registry
+    When the search router flag is read with no targeting rule, on LangWatch Cloud or self-hosted
+    Then it is off, so no judged query sends the "search" route until a rule turns it on
+
+  # --- A judged query's cost ceiling (ADR-190 decision 13) ---
+
+  @unit
+  Scenario: Under a cost ceiling each send holds its worst case first
+    Given a routed call that carries a cost ceiling with room left
+    When the router sends a leg
+    Then it first holds that send's worst-case cost on the ceiling
+    And once the send answers the hold is swapped for what the send was billed
+    And a gate send holds its worst case on the gate's own framed text, settled like any send
+    And a gate the ceiling refuses is not sent, so its question goes the hard way, flagged "cost_ceiling"
+    And a long trace is held at what its channel can send, so it is not refused for bytes it never sends
+    And a send billed past its worst case, the unrouted classifier call included, is logged at error
+
+  @unit @regression
+  Scenario: A send that throws frees its hold on the ceiling
+    Given a routed call that carries a cost ceiling with room left
+    When an unrouted classifier call throws, or the caller's stop makes a routed send throw
+    Then the send's hold is let go with nothing billed for it
+    And no send waiting on the ceiling behind it waits forever
+
+  @unit @regression
+  Scenario: An LLM call that went out with no usage back keeps its hold on the ceiling
+    Given a routed call that carries a cost ceiling
+    When an LLM call times out or loses its socket after it was sent, so no usage comes back
+    Then the channel marks the skip as usage unread
+    And its send settles on the ceiling at its whole hold, so the room left for the next send shrinks
+    And the customer is billed nothing for that call
+
+  @unit
+  Scenario: A send whose worst case passes the ceiling is not sent
+    Given a routed call whose ceiling has room for the primary's worst case but not the escalation's
+    When the primary answers unsure
+    Then the LLM leg is never called
+    And the primary verdict is kept, flagged "escalation_failed" and "cost_ceiling"
+    And a ceiling without room for the primary sends nothing and skips the text as "query_cost_ceiling"
+
+  @unit
+  Scenario: A kind the table does not route holds the classifier's worst case too
+    Given a routed call with a cost ceiling that asks a question the table does not route
+    When the ceiling has no room for the classifier's worst case
+    Then the classifier is not called and the text is skipped as "query_cost_ceiling", never as rate limited
+    And the refusal is logged at warn on the router's logger, since it carries no routing flags
+
+  @unit
+  Scenario: A send's worst case bounds what it can bill
+    Given a backend's prices and a text with its questions
+    When its worst-case cost is read
+    Then it prices every UTF-8 byte of what is sent as a token, plus a fixed slack per send
+    And it counts the text as the backend's channel fits it: an LLM's content budget, or the budget the questions leave a decision model
+    And it takes the dearer of the base and long-context rates
+    And an LLM adds its output cap at its output rate: its own cap where the table sets one, else the reasoning cap where an effort is set
+    And an LLM or Decisions backend is counted once per question, Jev once for all
+    And a backend with no price can never be held
 
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 

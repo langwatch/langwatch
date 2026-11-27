@@ -87,6 +87,15 @@ describe("the sureness of a category", () => {
     expect(isUnsureAnswer({ sureness: 0.19, threshold: 0.2 })).toBe(true);
     expect(isUnsureAnswer({ sureness: 0.2, threshold: 0.2 })).toBe(false);
   });
+
+  /** @scenario "The threshold is compared on the router's sureness scale" */
+  it("compares in floats, so a table that keeps p of 0.95 names a threshold just under 0.9", () => {
+    const sureness = Math.abs(2 * 0.95 - 1);
+
+    expect(isUnsureAnswer({ sureness, threshold: 0.9 })).toBe(true);
+    expect(isUnsureAnswer({ sureness, threshold: 0.899999 })).toBe(false);
+    expect(isUnsureAnswer({ sureness: Math.abs(2 * 0.9499 - 1), threshold: 0.899999 })).toBe(true);
+  });
 });
 
 describe("an LLM's answer as a verdict", () => {

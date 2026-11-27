@@ -3,8 +3,10 @@
 import {
   INSTANT_EVAL_DECISION_FEATURE_KEY,
   isDecisionModelId,
+  isLangWatchJudgeModelId,
   isLangWatchModelFillingRole,
   isOwnDecisionModelId,
+  LANGWATCH_JUDGE_FEATURE_KEY,
 } from "./decision-models.ts";
 import { findModelById } from "./model-catalog.ts";
 import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
@@ -82,6 +84,7 @@ export function isModelAllowedForFeature({
   modelId: string;
   featureKey: string;
 }): boolean {
+  if (isLangWatchJudgeModelId(modelId)) return featureKey === LANGWATCH_JUDGE_FEATURE_KEY;
   if (featureKey === INSTANT_EVAL_DECISION_FEATURE_KEY) return isInstantEvalsColumnModel(modelId);
   if (isDecisionModelId(modelId)) return false;
   if (featureKey === LANGY_CHAT_FEATURE_KEY && !acceptsLangyReasoningEffort(modelId)) return false;
@@ -95,6 +98,8 @@ export function isModelAllowedForFeature({
  * DEFAULT, EMBEDDINGS and JUDGE carry general inference and stay closed.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
+  // LangWatch's scenario judge answers a judge's calls only, so no other column may hold it.
+  if (isLangWatchJudgeModelId(modelId)) return role === "JUDGE";
   // The Instant Evals column holds decision models only, and no other role holds one (ADR-182).
   if (role === "INSTANT_EVALS") return isInstantEvalsColumnModel(modelId);
   if (isDecisionModelId(modelId)) return false;

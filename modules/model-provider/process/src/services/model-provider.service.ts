@@ -97,6 +97,8 @@ interface ModelProviderServiceOptions {
   ids: ModelProviderIdService;
   /** The own-decision-model flag (ADR-182 decision 4). */
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
+  /** The judge preview flag for the organization. */
+  isJudgePreviewAllowed: OwnDecisionModelGate;
   /** Imports an OpenAI-compatible provider's listed models on save; absent imports nothing. */
   modelImport?: ModelProviderModelImportService;
 }
@@ -178,13 +180,7 @@ export class ModelProviderService {
       authorization,
       scopes,
     });
-    this.decisionModels = ModelProviderDecisionModelService.create({
-      resolution: this.resolution,
-      scopes,
-      findProviderForProject: (input) => this.query.findProviderForProject(input),
-      findProviderForScope: (input) => this.query.findProviderForScope(input),
-      isOwnModelAllowed: options.isOwnDecisionModelAllowed,
-    });
+    this.decisionModels = this.createDecisionModels(scopes);
     this.defaultWrites = ModelProviderDefaultsWriteService.create({
       defaults: options.defaults,
       catalog: options.catalog,
@@ -202,6 +198,19 @@ export class ModelProviderService {
 
   static create(options: ModelProviderServiceOptions): ModelProviderService {
     return new ModelProviderService(options);
+  }
+
+  private createDecisionModels(
+    scopes: ModelProviderScopeService,
+  ): ModelProviderDecisionModelService {
+    return ModelProviderDecisionModelService.create({
+      resolution: this.resolution,
+      scopes,
+      findProviderForProject: (input) => this.query.findProviderForProject(input),
+      findProviderForScope: (input) => this.query.findProviderForScope(input),
+      isOwnModelAllowed: this.options.isOwnDecisionModelAllowed,
+      isJudgePreviewAllowed: this.options.isJudgePreviewAllowed,
+    });
   }
 
   private createConnectionPing(): ModelProviderConnectionPingService {

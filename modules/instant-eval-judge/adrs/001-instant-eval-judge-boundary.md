@@ -32,7 +32,7 @@ reasons, the classifier limits and wire format, the token estimates, the pricing
 Evals request type the ledger rows carry, the $1 free budget, the two judge errors, the config
 slice and the priced event's schema. There is no transport.
 
-`InstantEvalJudgeApi` has three methods:
+`InstantEvalJudgeApi` has these methods:
 
 - `judge` is the metered call. In order, it refuses a project it has not learned
   (`instant_eval_project_unknown`), refuses off LangWatch cloud (`classifier_not_configured`),
@@ -44,8 +44,14 @@ slice and the priced event's schema. There is no transport.
   its cost and the input tokens that cost covers (`routedInputTokens`). A call without one takes
   the single hosted classifier call.
 - `queryHoldPricing` returns the rate a judged query is held at: the dearest input rate any backend
-  the route table can reach, never below the classifier rate, at the one markup. It is computed
-  once at boot. It is a best-effort hold, not a hard cap on a routed query (ADR-190 decision 7).
+  a search or LLM-judge route can reach (a scenario-only backend is left out), never below the
+  classifier rate, at the one markup. It is computed once at boot and holds an unrouted query
+  (ADR-190 decision 7). A routed query is held at its cost ceiling, which every routed send
+  holds its worst case against before it is sent (ADR-190 decision 13).
+- `judgeScenario` is the metered scenario judge call (ADR-002), behind the same checks as `judge`:
+  a verdict routes each criterion as its own `scenario_judge` question, and a turn decision is the
+  judge's own call on the table's `scenarioDecision` backend. Each paid verdict and turn decision
+  is one priced fact under `langwatch-judge-preview`; one that billed no tokens records none.
 - `classify` is the unmetered call Instant Evals uses for its own runs and queries, which keep their
   own spend rule in wave 1.
 - `isClassifierConfigured` tells Instant Evals whether LangWatch's key is set, so it can choose this
@@ -102,8 +108,8 @@ bucket per project and one for the deployment. The module owns and closes it.
 
 The router adds two outbound HTTP channels, each built only when its key is set: the hosted
 decisions endpoint (`http.instant-eval-hosted-decisions.channel.ts`) and an LLM judge channel for
-Anthropic and OpenAI (`http.instant-eval-llm-judge.channel.ts`). The module owns and closes them.
-The leaf now has four upstreams. It still calls no peer Api.
+Anthropic, OpenAI and Gemini (`http.instant-eval-llm-judge.channel.ts`). The module owns and closes
+them. The leaf now has five upstreams. It still calls no peer Api.
 
 Pricing has two rules. An unrouted judgement is priced from its input tokens at the classifier's
 rate, under the model `langwatch-instant-preview` (older rows carry `langwatch-evals-preview` or
@@ -132,9 +138,9 @@ Added by the router (ADR-190), all read on LangWatch cloud only:
 - `INSTANT_EVAL_JUDGE_PRICING` (JSON, optional): per-backend input and output prices, with an
   optional long-context tier and a version. A backend a route can reach with no price refuses boot.
   Unset, the hosted classifier is priced at its published rate.
-- `INSTANT_EVAL_DECISIONS_API_KEY`, `INSTANT_EVAL_ANTHROPIC_API_KEY` and
-  `INSTANT_EVAL_OPENAI_API_KEY` (secrets, optional): LangWatch's keys for the router's decision
-  model, Anthropic and OpenAI legs.
+- `INSTANT_EVAL_DECISIONS_API_KEY`, `INSTANT_EVAL_ANTHROPIC_API_KEY`,
+  `INSTANT_EVAL_OPENAI_API_KEY` and `INSTANT_EVAL_GEMINI_API_KEY` (secrets, optional):
+  LangWatch's keys for the router's decision model, Anthropic, OpenAI and Gemini legs.
 
 ## Errors
 
@@ -144,7 +150,9 @@ them (ADR-174 decision 7).
 
 ## Contracts and validation
 
-The question schemas are Zod. The scenarios under `specs/` are bound by the contract's unit tests.
+The question schemas are Zod. A score question may name its levels (`levels`, added for the
+router's gate, ADR-190 decision 11); its score is then a level index, so its range must be 0 to
+the last index, and the wire refuses any other range before a call. The scenarios under `specs/` are bound by the contract's unit tests.
 The process half binds the fold, judge call and spend scenarios of Instant Evals' judge model
 spec, and the classifier scenarios moved with the client. Its repository
 contract test runs every case against memory and Postgres.

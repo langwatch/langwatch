@@ -7,6 +7,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
@@ -37,6 +38,7 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      judges: createApiFixture<InstantEvalJudgeApi>(),
       evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(),

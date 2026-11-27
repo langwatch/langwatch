@@ -26,6 +26,8 @@ import { ScenarioRunKeyService } from "../../../services/scenario-run-key.servic
 import { ScenarioRunSecretsService } from "../../../services/scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
 import type { ScenarioService } from "../../../services/scenario.service.ts";
+import type { JudgePreviewAvailabilityService } from "../../judge-preview/services/judge-preview-availability.service.ts";
+import { JudgePreviewModelParametersService } from "../../judge-preview/services/judge-preview-model-parameters.service.ts";
 import { AgentTestPrefetchService } from "./agent-test-prefetch.service.ts";
 import {
   ScenarioPrefetchCompletionService,
@@ -62,6 +64,8 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   /** Mints the run's keys: the child's, and a code agent's sandbox key. */
   apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
   voiceTargets: VoiceTargetReader | null;
+  /** Whether LangWatch Judge (preview) may judge a project's run. */
+  judgePreviewAvailability: JudgePreviewAvailabilityService;
 };
 
 type DecryptedRunSecrets =
@@ -94,6 +98,10 @@ export class ScenarioExecutionPrefetcherService {
       config: options.config,
       lookups,
       modelParameters,
+      judgePreview: JudgePreviewModelParametersService.create({
+        availability: options.judgePreviewAvailability,
+        langwatchEndpoint: options.config.langwatchEndpoint,
+      }),
       traces: options.traces,
       runKeys,
       workflows: options.workflows,

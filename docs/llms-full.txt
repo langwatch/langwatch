@@ -7490,7 +7490,9 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge or a routed judged query, or `langwatch-judge-preview` for a scenario judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+
+A scenario judged by LangWatch Judge (preview) writes one `langwatch-judge-preview` event per turn decision that was paid for, with a request count of 1, and one for the final verdict, whose request count is the number of criteria. A call that billed no tokens writes no event.
 
 A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
 
@@ -39051,7 +39053,7 @@ The decision models on your own keys follow it, as in [Run Instant Evals on your
 - **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
 - **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
 - **What it costs on LangWatch's model.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
-- **What it costs on your own decision model.** Your provider bills the call and LangWatch does not, so the result's cost is zero. The billing events ledger still records its tokens, with **Instant Evals (own model)** in the **Virtual key** column. These calls do not count toward the 1 USD.
+- **What it costs on your own decision model.** Your provider bills the call and LangWatch does not, so the result's cost is zero. The billing events ledger still records its tokens, with **Own model** (an Instant Evals call on your own decision model) in the **Virtual key** column. These calls do not count toward the 1 USD.
 
 ## Calibrate the judge
 
@@ -41650,6 +41652,12 @@ Judging 1,000 conversations takes about nine seconds, and 10,000 about a minute.
 The rate is 0.0546 USD per million input tokens the judge reads, and output is free. You pay for each row's text, your questions and a small fixed part of every request, in one judge request per row: more for a long conversation than for a short one, and about the same for ten questions as for one.
 
 For example, the first run on the [overview](/features/instant-evals/overview) judged 100 conversations, read 107,000 tokens and cost 0.0058 USD, so 10,000 conversations of the same size come to about 0.58 USD.
+
+### Routed search
+
+LangWatch can turn on routed search for your organization; it is off until then. With it on, a judged LangWatchQL query is answered by the LangWatch Judge, which may check a question more than once. Its price is what those checks cost LangWatch, plus 30%, rather than the rate above. Runs keep the rate above.
+
+Each routed query is held at 0.78 USD before it starts, the most it can be charged: its 0.60 USD cost ceiling plus 30%, by default. No check is sent once what the query has spent leaves the ceiling no room for it. That text keeps the answer it already has, or is skipped as `query_cost_ceiling`. Without a paid plan, a routed query needs 0.78 USD of the free budget left to start, and is refused with `instant_eval_free_budget_exhausted` otherwise.
 
 ## Reading the cost before you start
 
@@ -69810,6 +69818,12 @@ Click **Add config**, pick the scopes and the models. A project config beats a t
 
 The **Instant Evals** column takes only decision models: LangWatch Instant (preview), the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
+The **Judge** column sets the model that judges scenario runs. Unset, it uses the **Default** model.
+
+Where LangWatch Judge (preview) is turned on for your organization on LangWatch Cloud, it is the first choice in this column and in the **Judge** picker of a scenario, a suite and a run. It is LangWatch's own scenario judge (`langwatch/judge-preview`) and needs no provider key. No other column takes it.
+
+LangWatch Judge (preview) is billed with Instant Evals: each turn decision that was paid for is one spend row, and the final verdict is one more. If it cannot reach a verdict, the run ends with an error, never with a made-up verdict. While a run's traces are still arriving, it waits for them once before it judges.
+
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
 </Frame>
@@ -71135,6 +71149,8 @@ Each plan includes a base volume of events stored for a default window. For exam
 ## Instant Evals
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
+
+Routed search is the exception, and LangWatch turns it on per organization. With it on, a judged query is answered by the LangWatch Judge and charged what its judge calls cost LangWatch, plus 30%, at most 0.78 USD per query by default. Runs keep the rate above. See [Limits and cost](/features/instant-evals/limits-and-cost#routed-search).
 
 Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 
@@ -77523,7 +77539,7 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 
 On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
 
-Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
+Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. Judging through Connect is never routed, so this rate always applies. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
 ## Managed models
 

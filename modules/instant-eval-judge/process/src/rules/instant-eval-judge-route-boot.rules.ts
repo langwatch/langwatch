@@ -13,11 +13,14 @@ import {
   instantEvalJudgeRouteSlotsOf,
   isInstantEvalJudgeEntryEnabled,
   type InstantEvalJudgeBackendKind,
+  type InstantEvalJudgeJob,
   type InstantEvalJudgeRouteEntry,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeRouteTable,
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
+
+import { instantEvalJudgeScenarioDecisionBackendsOf } from "./instant-eval-judge-route.rules.ts";
 
 export function instantEvalJudgeRouteBootIssues({
   table,
@@ -30,7 +33,11 @@ export function instantEvalJudgeRouteBootIssues({
   isHeld?: (kind: InstantEvalJudgeBackendKind) => boolean;
 }): string[] {
   const issues: string[] = [];
-  for (const name of reachableBackendsOf(table)) {
+  // The turn decision's backend is called outside every slot, so it is checked beside them.
+  for (const name of new Set([
+    ...reachableBackendsOf(table),
+    ...instantEvalJudgeScenarioDecisionBackendsOf(table),
+  ])) {
     const backend = table.backends[name];
     if (!backend) continue;
     if (!pricing.backends[name]) issues.push(`backend ${name}: no price in the route pricing`);
@@ -41,10 +48,13 @@ export function instantEvalJudgeRouteBootIssues({
   return issues;
 }
 
+/** The jobs a judged query or an evaluation routes; a scenario judgement holds no query budget. */
+const QUERY_HOLD_JOBS: readonly InstantEvalJudgeJob[] = ["search", "llm_judge"];
+
 /**
- * What a judged query's budget hold is priced at: the dearest base input rate of any backend a
- * route can reach, never below the classifier's, at the one markup. A best-effort hold, not a hard
- * cap: it ignores re-sends, output tokens and long-context rates (ADR-190 decision 7).
+ * An unrouted judged query's hold: the dearest base input rate a search or LLM-judge route can
+ * reach (a scenario route's backends are left out), never below the classifier's, at the one
+ * markup (ADR-190 decision 7). A routed query is held at its cost ceiling (decision 13).
  */
 export function instantEvalJudgeQueryHoldPricingOf({
   table,
@@ -55,18 +65,21 @@ export function instantEvalJudgeQueryHoldPricingOf({
   pricing: InstantEvalJudgeRoutePricing;
   classifierPricing?: InstantEvalPricing;
 }): InstantEvalPricing {
-  const rates = [...reachableBackendsOf(table)].map(
+  const rates = [...reachableBackendsOf(table, QUERY_HOLD_JOBS)].map(
     (name) => pricing.backends[name]?.usdPerMillionInputTokens ?? 0,
   );
   const usdPerMillionInputTokens = Math.max(classifierPricing.usdPerMillionInputTokens, ...rates);
   return { ...classifierPricing, usdPerMillionInputTokens };
 }
 
-/** Every enabled backend a usable entry may call, with its enabled fallbacks. */
-function reachableBackendsOf(table: InstantEvalJudgeRouteTable): Set<string> {
+/** Each enabled backend a usable entry of the jobs (all, unless named) may call, with fallbacks. */
+function reachableBackendsOf(
+  table: InstantEvalJudgeRouteTable,
+  jobs?: readonly InstantEvalJudgeJob[],
+): Set<string> {
   const reachable = new Set<string>();
   // Score and category slots too: an LLM only a score route names must be billable as well.
-  const entries = instantEvalJudgeRouteSlotsOf(table).flatMap((slot) =>
+  const entries = instantEvalJudgeRouteSlotsOf(table, jobs).flatMap((slot) =>
     INSTANT_EVAL_JUDGE_MODES.flatMap((mode) => slot[mode] ?? []),
   );
   for (const entry of entries) {

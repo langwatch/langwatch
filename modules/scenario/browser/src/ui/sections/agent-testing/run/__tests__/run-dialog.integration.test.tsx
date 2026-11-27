@@ -44,6 +44,11 @@ const emptyQuery = vi.hoisted(() => () => ({
   isLoading: false,
 }));
 
+// The judge picker asks the judge preview flag; off in this suite.
+vi.mock("@langwatch/feature-flag-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({

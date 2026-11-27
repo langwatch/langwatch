@@ -91,6 +91,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval-judge/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../gateway/contract/tsconfig.build.json"
     },
     {

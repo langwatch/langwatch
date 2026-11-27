@@ -16,6 +16,7 @@ import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import { DEFAULT_MODEL, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -68,6 +69,8 @@ import {
   type ScenarioIdInput,
   type ScenarioMoveInput,
   type ScenarioRunConfig,
+  type JudgePreviewChatCompletion,
+  type JudgePreviewChatInput,
   type ScenarioGenerateRequest,
   type ScenarioGenerateResponse,
   type ScenarioRunExportDownload,
@@ -154,6 +157,8 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
+import { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
+import { JudgePreviewChatService } from "../features/judge-preview/services/judge-preview-chat.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";
@@ -219,6 +224,8 @@ interface ScenarioAppDependencies {
   /** The author-assist door's tier-effective generation window. */
   generateBounds: ScenarioGenerateBoundsService;
   generation: ScenarioGenerationService;
+  /** The scenario judge's calls when its model is LangWatch Judge (preview). */
+  judgePreviewChat: JudgePreviewChatService;
   runExportDownloads: ScenarioRunExportDownloadService;
   events: ScenarioEventService;
   connectedTargets: ConnectedTargetService;
@@ -262,6 +269,8 @@ const scenarioAppDependencyTokens = {
   gateway: GatewayApi,
   /** The code-agent run's sandbox key, minted per project as main's prefetcher did. */
   apiKeys: ApiKeyApi,
+  /** LangWatch Judge (preview): the routed judge a scenario judge's calls are answered by. */
+  judges: InstantEvalJudgeApi,
 };
 
 export class ScenarioModule implements ScenarioApi {
@@ -351,6 +360,12 @@ export class ScenarioModule implements ScenarioApi {
     });
 
     const childHost = { voicePublicUrl: voice.acquire, nlpServiceUrl };
+    const judgePreviewAvailability = JudgePreviewAvailabilityService.create({
+      featureFlags: peers.featureFlags,
+      projects: peers.projects,
+      judges: peers.judges,
+      isSaas: config.isSaas,
+    });
 
     return new ScenarioModule({
       agentTesting: AgentTestService.create({
@@ -392,6 +407,7 @@ export class ScenarioModule implements ScenarioApi {
         secrets: peers.secrets,
         traces: peers.traces,
         apiKeys: peers.apiKeys,
+        judgePreviewAvailability,
         voiceTargets: ScenarioVoiceTargetService.create({
           agents: peers.agents,
           modelProviders: peers.modelProviders,
@@ -413,6 +429,12 @@ export class ScenarioModule implements ScenarioApi {
         bounds: generateBounds,
         modelProviders: setup.dependencies.modelProviders,
         timeoutMs: setup.config.generateTimeoutMs,
+      }),
+      judgePreviewChat: JudgePreviewChatService.create({
+        judges: peers.judges,
+        availability: judgePreviewAvailability,
+        ids,
+        clock,
       }),
       runExportDownloads: ScenarioRunExportDownloadService.create({
         auditLog: setup.dependencies.auditLog,
@@ -488,6 +510,7 @@ export class ScenarioModule implements ScenarioApi {
           cancellationSubscriptions: cancellations,
           config: setup.config,
           host: childHost,
+          judgePreviewAvailability,
         }),
       }),
     });
@@ -521,6 +544,10 @@ export class ScenarioModule implements ScenarioApi {
 
   generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse> {
     return this.#dependencies.generation.generate(input);
+  }
+
+  completeJudgePreviewChat(input: JudgePreviewChatInput): Promise<JudgePreviewChatCompletion> {
+    return this.#dependencies.judgePreviewChat.complete(input);
   }
 
   mintVoiceSession(input: VoiceSessionMintRequest): Promise<VoiceSessionMintResult> {

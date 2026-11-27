@@ -346,6 +346,61 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
+  @unit @integration
+  Scenario: With the search router flag off a judged query sends no route
+    Given the search router flag is off for the project's organization
+    When a statement with an eval function is executed
+    Then every classifier request carries no route and no cost ceiling
+    And the query is held at the query token budget priced at the judge's hold rate, as before
+
+  @unit @integration
+  Scenario: With the search router flag on a judged query is routed under its cost ceiling
+    Given the search router flag is on for the project's organization
+    When a statement with an eval function is executed
+    Then every classifier request carries the "search" route and the query's one cost ceiling
+    And the ceiling is the query token budget at the routed query ceiling rate in ADR-190
+    And the query is held at that ceiling times the markup, the most it can be charged
+    And its spend is recorded once, priced from the summed cost of its calls at the markup
+    And the flag is read for the project within its organization, so an organization rule applies
+    And a row the ceiling has no room for is a null cell skipped as "query_cost_ceiling"
+    And LangWatch's own decision model passes the route and ceiling on to the judge
+    And a project on its own decision model, or an install judging through Connect, sends neither
+    And the module reads the real search router flag, so the flag alone turns routing on or off
+
+  @unit @regression
+  Scenario: A project on its own decision model is not held at the routed ceiling
+    Given the search router flag is on for the project's organization
+    And the project judges on its own decision model
+    When a statement with an eval function is executed
+    Then every classifier request carries no route and no cost ceiling
+    And the query is held at the query token budget priced at the judge's hold rate, not the ceiling
+    And a free organization with less than the ceiling but more than that hold left still runs it
+
+  @unit
+  Scenario: A routed query's ceiling holds sends up to the ceiling and no further
+    Given a routed query's cost ceiling
+    When sends hold their worst cases
+    Then a send is held while what was billed plus what is held stays within the ceiling
+    And a send that would pass it even with nothing held is refused at once and holds nothing
+    And a settled send frees its hold and counts what it was billed
+    And a worst case that is not a finite cost is never held
+
+  @unit
+  Scenario: A send that fits only once sends in flight settle waits for them
+    Given a routed query whose rows are judged in parallel
+    When the worst cases held for sends in flight leave no room for the next send
+    Then that send waits, in the order asked, until enough holds settle and then is held
+    And it is refused only once what was billed leaves it no room with nothing held
+    And a later send that would fit now still waits behind an earlier one
+    And a caller's stop ends the wait with the stop, holding nothing, and wakes the sends behind it
+    And a large query whose real cost stays under the ceiling skips no row as "query_cost_ceiling"
+
+  @unit
+  Scenario: LangWatch's cloud judge passes a routed query's route and ceiling to the judge
+    Given a routed query's classifier request
+    When LangWatch's cloud judge sends it
+    Then the Instant Evals judge receives its route and its cost ceiling
+
   @unit
   Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
     Given an eval over a conversation far longer than the judge's budget
