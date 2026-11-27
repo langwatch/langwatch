@@ -41,10 +41,12 @@ export class StripeWebhookReceiptService {
 
     const secret = this.events.hasSigningSecret();
     if (!signature || !secret) {
-      logger.error(
-        { signature: !!signature, secret: !!secret },
-        "[stripeWebhook] Missing signature or secret",
-      );
+      // A missing secret is our configuration; a missing signature is the sender's (a probe,
+      // a replay without headers). Both get the same refusal; only ours is an error.
+      const fields = { signature: !!signature, secret: !!secret };
+      const message = "[stripeWebhook] Missing signature or secret";
+      if (secret) logger.warn(fields, message);
+      else logger.error(fields, message);
       throw new BadRequestError("Webhook Error: Missing signature or secret");
     }
 
