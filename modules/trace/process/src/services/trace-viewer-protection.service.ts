@@ -180,7 +180,7 @@ export class TraceViewerProtectionService {
           )
         : Promise.resolve([]),
       needsOwnerFact({ restrictions, isMember: held["traces:view"] })
-        ? this.isProjectOwner({ ...input, projectIds: policyProjectIds })
+        ? this.isProjectOwner({ userId: input.userId, projectIds: policyProjectIds })
         : Promise.resolve(false),
     ]);
     const categories = await this.categoriesFor({
@@ -251,7 +251,7 @@ export class TraceViewerProtectionService {
 
   /** Ownership read the one shared way, over every project whose policy governs the read. */
   private isProjectOwner(
-    input: Readonly<{ projectId: string; userId: string | undefined; projectIds: string[] }>,
+    input: Readonly<{ userId: string | undefined; projectIds: string[] }>,
   ): Promise<boolean> {
     return ownsEveryGovernedProject({
       userId: input.userId,
