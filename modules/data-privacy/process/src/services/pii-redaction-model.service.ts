@@ -19,6 +19,7 @@ import {
 import {
   clearSplitSpan,
   fitsSpanBudget,
+  isAnsweredAsAlone,
   isPlaceablePiece,
   pieceTextOf,
   planSpan,
@@ -31,6 +32,7 @@ import type {
   PiiRedactionModelFallbackReason,
 } from "./pii-analysis-metrics-otel.service.ts";
 import { PiiRedactionModelRoutingService } from "./pii-redaction-model-routing.service.ts";
+import { PiiRedactionRepeatsService } from "./pii-redaction-repeats.service.ts";
 import type { PiiRedactionSpendService } from "./pii-redaction-spend.service.ts";
 import { PiiRedactionSplitCallsService } from "./pii-redaction-split-calls.service.ts";
 import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
@@ -87,6 +89,8 @@ type ModelClearInput = {
   spareNamesAndPlaces?: readonly boolean[] | undefined;
   /** The record's trace and span, when it has them; its spend request id is derived from it. */
   recordKey?: string | undefined;
+  /** The whole batch, when only part of it is sent: price and request id stay the batch's. */
+  batchTexts?: readonly string[] | undefined;
 };
 
 /**
@@ -97,7 +101,7 @@ type ModelClearInput = {
 export class PiiRedactionModelService {
   static create(input: {
     model: PresidioRedactionService;
-    /** The process's split call slots; one per process, two by default (ADR-207 decision 9). */
+    /** The process's split call slots; one per process, six by default (ADR-207 decision 9, v4). */
     splitSlots?: ConcurrencyLimiter | undefined;
     featureFlags: FeatureFlagApi;
     /** Whether an organization admin accepted the model's price, which Cloud needs (ADR-201). */
@@ -132,6 +136,8 @@ export class PiiRedactionModelService {
   private readonly splitCalls: PiiRedactionSplitCallsService;
   /** Where each project's batches go: the model, priced or not, or Presidio. */
   private readonly routing: PiiRedactionModelRoutingService;
+  /** Long texts this process cleared lately, so a repeated one is not sent again. */
+  private readonly repeats: PiiRedactionRepeatsService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly spend: PiiRedactionSpendService;
   private readonly metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
@@ -157,6 +163,7 @@ export class PiiRedactionModelService {
       slots: input.splitSlots,
     });
     this.routing = PiiRedactionModelRoutingService.create(input);
+    this.repeats = PiiRedactionRepeatsService.create({ now: input.now });
     this.featureFlags = input.featureFlags;
     this.spend = input.spend;
     this.metrics = input.metrics;
@@ -191,6 +198,58 @@ export class PiiRedactionModelService {
       return null;
     }
     const { organizationId, priced } = routing;
+    const scope = {
+      organizationId,
+      piiRedactionLevel: input.piiRedactionLevel,
+      entities: input.entities ?? [],
+      spareNamesAndPlaces: input.spareNamesAndPlaces,
+    };
+    const recall = this.repeats.recall({ scope, texts: input.texts });
+    const sent = pendingInput({ input, pending: recall.pending });
+    if (sent.texts.length === 0) {
+      // Every text is held: priced as the batch, with no call of ours to cost.
+      await this.spend.record({
+        organizationId,
+        projectId,
+        texts: input.texts,
+        recordKey: input.recordKey,
+        callDurationsMs: [],
+        priced,
+      });
+      return recall.merge([]);
+    }
+    const cleared = await this.#clearRouted({
+      input: sent,
+      organizationId,
+      priced,
+      projectId,
+      call: { ...call, texts: sent.texts.length, characters: batchCharactersOf(sent.texts) },
+    });
+    if (!cleared || cleared.length !== sent.texts.length) return null;
+    const sentCharacters = batchCharactersOf(sent.texts);
+    this.repeats.remember({
+      scope: { ...scope, spareNamesAndPlaces: sent.spareNamesAndPlaces },
+      texts: sent.texts,
+      cleared,
+      held: sent.texts.map((text) => isAnsweredAsAlone({ text, batchCharacters: sentCharacters })),
+    });
+    return recall.merge(cleared);
+  }
+
+  /** A routed batch, less the texts the process already holds: one call, split, or Presidio. */
+  async #clearRouted({
+    input,
+    organizationId,
+    priced,
+    projectId,
+    call,
+  }: {
+    input: ModelClearInput;
+    organizationId: string;
+    priced: boolean;
+    projectId: string;
+    call: Omit<PiiRedactionModelUsage, "findings" | "outcome" | "durationMs">;
+  }): Promise<(string | null)[] | null> {
     // Only a batch too long for one call asks whether it may split.
     const splitting =
       call.characters > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS &&
@@ -248,7 +307,7 @@ export class PiiRedactionModelService {
       await this.spend.record({
         organizationId,
         projectId,
-        texts: input.texts,
+        texts: input.batchTexts ?? input.texts,
         recordKey: input.recordKey,
         callDurationsMs: [durationMs],
         priced,
@@ -355,7 +414,7 @@ export class PiiRedactionModelService {
     await this.spend.record({
       organizationId,
       projectId,
-      texts: input.texts,
+      texts: input.batchTexts ?? input.texts,
       recordKey: input.recordKey,
       callDurationsMs: outcome.callDurationsMs,
       priced,
@@ -424,4 +483,22 @@ export class PiiRedactionModelService {
 
 function elapsedSince(startedAt: number): number {
   return Math.round(performance.now() - startedAt);
+}
+
+/** The batch narrowed to the texts at `pending`, their spared flags kept beside them. */
+function pendingInput({
+  input,
+  pending,
+}: {
+  input: ModelClearInput;
+  pending: readonly number[];
+}): ModelClearInput {
+  if (pending.length === input.texts.length) return input;
+  const spared = input.spareNamesAndPlaces;
+  return {
+    ...input,
+    texts: pending.map((index) => input.texts[index] ?? ""),
+    spareNamesAndPlaces: spared && pending.map((index) => spared[index] ?? false),
+    batchTexts: input.texts,
+  };
 }

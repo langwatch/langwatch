@@ -2,10 +2,10 @@
 
 **Date:** 2026-11-25
 
-**Status:** Accepted (v3: one endpoint, call context)
+**Status:** Accepted (v4: escaped JSON splits, 6 slots, repeats held)
 
 > One line: a Strict span batch of **8,001 to 32,000 characters** is cut by data-privacy into
-> **pieces of about 4,000** that the model answers in **parallel calls, 2 at a time per
+> **pieces of about 4,000** that the model answers in **parallel calls, 6 at a time per
 > process**; findings are placed back **only on pieces the model cannot have reshaped**, merged
 > by widest union (the model's own name rule across pieces follows, decision 7), and the span
 > is **billed once**;
@@ -28,7 +28,7 @@ Facts the design rests on, read in code:
   points of that prepared text (saas `adapters/httpapi/presidio.go:316-378`).
 - Its name rule masks every word of a found name elsewhere in the text: cased scripts by word
   (3+ letters, capitalised, a stop list), uncased scripts by substring (saas `domain/namerule.go`).
-- Cloud's model Lambda has a reserved concurrency of 50 and 10 warm environments, shared by
+- Cloud's model Lambda has a reserved concurrency of 250 (50 until v4) and 10 warm environments, shared by
   every worker and app pod (saas `infrastructure/modules/workloads/pii_redaction_model_lambda.tf:70,74`).
   A Kubernetes or self-hosted pod answers one request at a time (`PII_MAX_CONCURRENT_REQUESTS=1`).
 - The model can split a text itself across instances, but not as configured: a Lambda as its own
@@ -54,12 +54,15 @@ and 12) so a split span stays one priced fact.
 4. **A whole text keeps today's handling.** For a text sent whole in a split call, the model's
    own masked text is used, as in a single call, so JSON texts and spared texts behave as today.
 5. **A piece is placed by offsets only when the model cannot have reshaped it.** The piece has
-   no backslash, is unchanged by the model's Python strip, and its surrogate pairs are converted
-   from code points with `codepointToCodeUnitConverter`. A second guard rebuilds the piece's
-   masked text from the findings and requires it to equal the model's own masked piece. A piece
-   that fails either sends the **whole span** to Presidio. Rejected: copying the model's JSON and
-   trim rules into the app (drifts with the model); a self-check alone (a constructed case passes
-   it and leaks IBAN digits, judge round 2).
+   no backslash unless it cannot read as JSON (v4: `JSON.parse` after `NaN` and `Infinity` become
+   `null`, any doubt counting as JSON), is unchanged by the model's Python strip, and its surrogate
+   pairs are converted from code points with `codepointToCodeUnitConverter`. A second guard
+   rebuilds the piece's masked text from the findings and requires it to equal the model's own
+   masked piece. A piece that fails either sends the **whole span** to Presidio. v4 reverses the
+   rejection of copying the model's JSON rule, for its JSON test only and erring wide: without it
+   no OpenTelemetry message list ever split. The rebuild guard narrows drift but cannot rule it
+   out alone (see below); a change to the model's JSON prep must update this check with it. Still rejected: a self-check alone (a constructed case passes it and leaks IBAN digits,
+   judge round 2).
 6. **Merge.** Per text: shift each piece's findings by its start; drop PERSON and LOCATION for a
    spared text **before** merging; merge overlapping findings into the widest range, labelled by
    the higher score (the existing `mergeOverlapping`); mask once with `formatPiiMarker`.
@@ -86,16 +89,17 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
    tests `context === "split"`. The Lambda channel names the context on each event, in the
    `x-langwatch-pii-call-context` header (`single` when a call names none); the model ignores it
    today, and it lets the model's own logs tell the two apart. **Slots are taken, never waited for.** Split
-   calls go through the existing `ConcurrencyLimiter` (`packages/limiter`) with 2 slots per
-   process and no queue. A span takes
-   the free slots, up to 2, at once; with none free it falls back at once with reason `busy`, as
+   calls go through the existing `ConcurrencyLimiter` (`packages/limiter`) with 6 slots per
+   process (2 until v4) and no queue. A span takes
+   the free slots, up to 6, at once; with none free it falls back at once with reason `busy`, as
    fast as `too_long` does today. It then runs its calls over the slots it holds and has 50 s for
    all of them (the cap one call has today); a span whose planned calls cannot fit falls back
    before the first call, and one that runs out falls back with `timeout`. A call our own abort
    rejects holds its slot until 60 s after it started (the model's 55 s deadline plus its 5 s
    stop grace). Single-call spans are not limited, as today. **Trade-off, accepted by the owner:** split and
-   single calls share the one function's reserve of 50 and its 10 warm environments, so a burst of
-   long spans can take slots short spans would use. It is bounded by the 2 split slots per process
+   single calls share the one function's reserve (250 since v4, 50 before) and its 10 warm
+   environments, so a burst of long spans can take slots short spans would use. It is bounded by
+   the 6 split slots per process
    and the split-only breaker (decision 11), and splitting stays on one organisation until R3's load
    test on the Cloud Lambda passes its bar (Gates). "On for one organisation" is the repo's own
    per-organisation flag: one new entry, `release_pii_redaction_model_split_enabled`, off by default,
@@ -104,7 +108,7 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
    the model's own flag is read today (`pii-redaction-model.service.ts:263`). No env var, column
    or allowlist. The chart forces only the model flag, so self-hosted never splits. Rejected: a second model function
    behind a new setting (v2; one more endpoint to configure, rejected by the owner on 2026-11-26);
-   8 split calls per process (25 pods x 8 = 200 against a shared reserve of 50).
+   8 split calls per process (25 pods x 8 = 200; at v3's reserve of 50 that starved short spans).
 10. **All or nothing.** If any call of a span fails, the span falls back at once and its other
     answers are discarded; nothing is stored unmasked and no partial result is used.
 11. **A breaker of its own**, one per `ModelCallContext` (kept by the service, not a row of
@@ -124,7 +128,7 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 | `PII_REDACTION_MODEL_PIECE_CHARACTERS`     | 4,000                                                                                             | most characters in one split call                          |
 | `PII_REDACTION_MODEL_PIECE_OVERLAP`        | 200                                                                                               | characters a piece repeats from the previous one           |
 | aborted call slot hold                     | 60,000 ms from start                                                                              | the model's 55 s deadline + 5 s stop grace                 |
-| `MODEL_CALL_RULES`                         | `single`: 50 s, unlimited; `split`: 50 s for all of a span's calls, 2 slots per process, no queue | the time and slots of each context, in one table           |
+| `MODEL_CALL_RULES`                         | `single`: 50 s, unlimited; `split`: 50 s for all of a span's calls, 6 slots per process, no queue | the time and slots of each context, in one table           |
 
 ## Invariants
 
@@ -144,24 +148,24 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 | assumption                                                                             | what breaks if false                                                                                                              |
 | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | a 4,000-character call takes about 9 to 10 s warm (interpolated from 2,000 and 20,000) | an estimate: an aarch64 dev box measured 18.5 s; if Cloud is that slow, 32,000 misses the 50 s budget and the cap drops (R3 gate) |
-| at most 25 pods call the model at once on Cloud                                        | the reserve of 50 is shared thinner; throttles rise (R3's load test)                                                              |
+| at most 25 pods call the model at once on Cloud                                        | the reserve of 250 is shared thinner; throttles rise (R3's load test)                                                             |
 | long texts with backslashes (escaped JSON) are a minority of long spans                | most long spans keep falling back (R3 counts it on real-shaped traces)                                                            |
 | the model's prep and name rule stay as read on 2026-11-25                              | the guard keeps offsets safe (it falls back), but parity of the name rule drifts; the parity fixture catches it on the next run   |
 
 ## Gates
 
-| path                                        | reversible?                            | blast radius                            | gate                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------- | -------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| masking of split spans (decisions 3-7, 10)  | no: a missed mask stores customer text | large                                   | human review of the PR, plus the seam fixture and the guard fixtures in CI; ships behind the existing model flag, so one org first                                                                                                                                                                                                                                          |
-| billing of split spans (ADR-201 rev)        | no: money                              | large                                   | human review; unit test of the fact; the Cloud price ADR stays as is                                                                                                                                                                                                                                                                                                        |
-| concurrency, budget, breaker (8, 9, 11)     | yes                                    | large (every Strict org on a pod)       | automated: unit tests with a fake clock; R3 load test on the dev Lambda before the flag widens                                                                                                                                                                                                                                                                              |
-| shared reserve of 50 (decision 9 trade-off) | yes                                    | large (short spans of every Strict org) | R3 load test on the Cloud dev Lambda, before the split flag leaves one organisation. Pass: short-span p95 unchanged with split on, and a 32,000-character span inside 50 s at 2 calls per process. If 32,000 does not fit, `PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS` drops to the largest size that does. The 9.5 s per piece is an estimate; the last one was off by half |
-| split on for one organisation               | yes                                    | small (one organisation)                | the existing per-organisation flag (`feature-flag.ts:55`, new key `release_pii_redaction_model_split_enabled`, off by default); no env var, column or allowlist                                                                                                                                                                                                             |
-| G1 one channel, no new setting              | yes                                    | small                                   | review: `PII_REDACTION_MODEL_ENDPOINT` is read once; no second channel; split calls use `detect(request, { context })`                                                                                                                                                                                                                                                      |
-| G2 context rules in one table               | yes                                    | small                                   | typecheck: `MODEL_CALL_RULES` is a `Record<ModelCallContext, ModelCallRules>`; grep: no `context === "split"` outside it                                                                                                                                                                                                                                                    |
-| G3 "can split" is the channel's             | yes                                    | small                                   | typecheck: only `SplittingPresidioChannel` (the Lambda channel) accepts `split`; a split call on the HTTP channel fails to compile                                                                                                                                                                                                                                          |
-| G4 the diff stays small                     | yes                                    | small                                   | review: nothing v2 added that v3 does not need (split setting, split target, second channel and its tests) is in the PR                                                                                                                                                                                                                                                     |
-| docs, picker note                           | yes                                    | small                                   | none beyond the PR                                                                                                                                                                                                                                                                                                                                                          |
+| path                                         | reversible?                            | blast radius                            | gate                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------- | -------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| masking of split spans (decisions 3-7, 10)   | no: a missed mask stores customer text | large                                   | human review of the PR, plus the seam fixture and the guard fixtures in CI; ships behind the existing model flag, so one org first                                                                                                                                                                                                                                          |
+| billing of split spans (ADR-201 rev)         | no: money                              | large                                   | human review; unit test of the fact; the Cloud price ADR stays as is                                                                                                                                                                                                                                                                                                        |
+| concurrency, budget, breaker (8, 9, 11)      | yes                                    | large (every Strict org on a pod)       | automated: unit tests with a fake clock; R3 load test on the dev Lambda before the flag widens                                                                                                                                                                                                                                                                              |
+| shared reserve of 250 (decision 9 trade-off) | yes                                    | large (short spans of every Strict org) | R3 load test on the Cloud dev Lambda, before the split flag leaves one organisation. Pass: short-span p95 unchanged with split on, and a 32,000-character span inside 50 s at 6 calls per process. If 32,000 does not fit, `PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS` drops to the largest size that does. The 9.5 s per piece is an estimate; the last one was off by half |
+| split on for one organisation                | yes                                    | small (one organisation)                | the existing per-organisation flag (`feature-flag.ts:55`, new key `release_pii_redaction_model_split_enabled`, off by default); no env var, column or allowlist                                                                                                                                                                                                             |
+| G1 one channel, no new setting               | yes                                    | small                                   | review: `PII_REDACTION_MODEL_ENDPOINT` is read once; no second channel; split calls use `detect(request, { context })`                                                                                                                                                                                                                                                      |
+| G2 context rules in one table                | yes                                    | small                                   | typecheck: `MODEL_CALL_RULES` is a `Record<ModelCallContext, ModelCallRules>`; grep: no `context === "split"` outside it                                                                                                                                                                                                                                                    |
+| G3 "can split" is the channel's              | yes                                    | small                                   | typecheck: only `SplittingPresidioChannel` (the Lambda channel) accepts `split`; a split call on the HTTP channel fails to compile                                                                                                                                                                                                                                          |
+| G4 the diff stays small                      | yes                                    | small                                   | review: nothing v2 added that v3 does not need (split setting, split target, second channel and its tests) is in the PR                                                                                                                                                                                                                                                     |
+| docs, picker note                            | yes                                    | small                                   | none beyond the PR                                                                                                                                                                                                                                                                                                                                                          |
 
 ## Rejected alternatives
 
@@ -170,14 +174,14 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 - Copy the model's JSON and trim rules: drifts; a guard that falls back is safer.
 - Self-check alone (decision 5): a constructed case passes and leaks.
 - Abort sibling calls early to save cost: an aborted Lambda keeps running; the slot would lie.
-- One shared breaker; 8 calls per process (sums to 104 to 200 against a reserve of 50).
+- One shared breaker; 8 calls per process (sums to 104 to 200 against v3's reserve of 50).
 
 ## Consequences
 
 - Positive: long spans up to 32,000 characters get the model; short spans are untouched.
 - Negative: spans of 8,001 to 32,000 characters that fell back for free are now **priced** at the
-  same rate per character (customers on Strict pay for them, and the docs say so); long texts with
-  backslashes still fall back; self-hosted and Kubernetes targets gain nothing yet (8,000 cap kept); more Lambda invocations and request
+  same rate per character (customers on Strict pay for them, and the docs say so); a piece of
+  escaped JSON that reads as JSON on its own still falls back (v4); self-hosted and Kubernetes targets gain nothing yet (8,000 cap kept); more Lambda invocations and request
   fees per long span, and long spans share the short spans' reserve and warm pool (decision 9's trade-off).
 - Neutral: one more fallback reason (`busy`), one more usage field (`calls`).
 
@@ -209,6 +213,20 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
   gate, with its pass bar). Split is on for one organisation through the existing flag mechanism.
   Gates G1 to G4 added; "can split" and the context table are types (p18), not flags. Captain: Sergio ("that a terrible desing ... use the same
   endpoint and pass context"; PR #9967 closed).
+- v4, 2026-11-27: the first high-volume organisation on the split showed three gaps. (a) Decision 5
+  refused every piece holding a backslash, so OpenTelemetry GenAI message lists (escaped JSON,
+  every long text sampled) never split; a piece with a backslash is now placed when it cannot
+  read as JSON (JSON.parse after NaN and Infinity become null, erring towards "may"), since the
+  model unfolds escapes only for an entry that parses; the rebuild guard stays. Checked against
+  the live model: a cut of an escaped message list came back with offsets on its raw characters
+  and passed the rebuild guard. (b) Split slots per process 2 to 6, with the model's reserve
+  raised from 50 to 250 in the same release (saas). (c) A process holds the model's clearing of
+  texts of 2,000 characters or more for ten minutes (256 entries, keyed by organisation, level,
+  entities, spared flag and the text's SHA-256) and sends only the rest; a system prompt repeated
+  on every span (11 distinct in 1,126 sampled) is analysed once per process. Only an answer the
+  text would get alone is held (not a text cut only because its span was long). Price and
+  request id stay the whole batch's, so a held text bills as before and a retry stays idempotent. Captain: Sergio ("update our implementation so
+  it can take this volume").
 
 ## References
 

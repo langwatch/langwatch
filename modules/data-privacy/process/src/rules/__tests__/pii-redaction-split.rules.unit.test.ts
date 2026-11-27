@@ -208,11 +208,35 @@ describe("fitsSpanBudget", () => {
 
 describe("isPlaceablePiece", () => {
   /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
-  it("refuses a piece with a backslash or a trimmed edge, and accepts an emoji", () => {
+  it("refuses a piece with a backslash that reads as JSON, or a trimmed edge, and accepts an emoji", () => {
     expect(isPlaceablePiece('{"log":"a\\nb","payee":"x"}')).toBe(false);
+    expect(isPlaceablePiece('"Maria\\nlives here"')).toBe(false);
+    expect(isPlaceablePiece('{"v":NaN,"log":"a\\nb"}')).toBe(false);
+    expect(isPlaceablePiece('[-Infinity,"a\\tb"]')).toBe(false);
     expect(isPlaceablePiece("\u0085Maria")).toBe(false);
     expect(isPlaceablePiece("Maria ")).toBe(false);
     expect(isPlaceablePiece("call 😀 Maria now")).toBe(true);
+  });
+
+  /** @scenario "A long escaped JSON message list splits and every piece is placed" */
+  it("places every cut piece of a long escaped JSON message list", () => {
+    const turn = (index: number) => ({
+      role: index % 2 ? "assistant" : "user",
+      content: `Turn ${index}: "Maria Lopez" moved to 742 Evergreen Terrace.\nShe asked about order ${index}.\t(${filler(120)})`,
+    });
+    const text = JSON.stringify(Array.from({ length: 80 }, (_, index) => turn(index))).slice(
+      0,
+      20_000,
+    );
+    const plan = planSpan({ texts: [text], splitting: true });
+
+    expect(text).toContain("\\n");
+    expect(plan.kind).toBe("split");
+    const pieces = plan.kind === "split" ? plan.calls.flatMap((call) => call.pieces) : [];
+    expect(pieces.length).toBeGreaterThan(4);
+    for (const piece of pieces) {
+      expect(isPlaceablePiece(text.slice(piece.start, piece.end))).toBe(true);
+    }
   });
 });
 
@@ -273,6 +297,23 @@ describe("clearSplitSpan", () => {
       ]);
     },
   );
+
+  /** @scenario "A long escaped JSON message list splits and every piece is placed" */
+  it("masks a name in a cut of escaped JSON and keeps the escapes as stored", () => {
+    const text = 'x","content":"Hi\\nMaria Lopez lives here\\tok"},{"role":"user';
+    const start = text.indexOf("Maria");
+    const answers: PieceAnswer[] = [
+      {
+        piece: { text: 0, start: 0, end: text.length, whole: false },
+        findings: [{ entity_type: "PERSON", start, end: start + 11, score: 0.9 }],
+        anonymized: `${text.slice(0, start)}<PERSON>${text.slice(start + 11)}`,
+      },
+    ];
+
+    expect(clearSplitSpan({ texts: [text], answers })).toEqual([
+      `x","content":"Hi\\n${PERSON} lives here\\tok"},{"role":"user`,
+    ]);
+  });
 
   /** @scenario "A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio" */
   it("refuses a piece whose findings do not rebuild the model's own masked piece", () => {

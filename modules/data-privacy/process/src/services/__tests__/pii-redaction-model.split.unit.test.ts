@@ -119,6 +119,19 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     expect(usage.map((line) => line.outcome)).toEqual(["ok", "too_long"]);
   });
 
+  /** @scenario "A text cut only because its span was long is not reused where it would go whole" */
+  it("sends a text cut beside another again in one call when it comes back alone", async () => {
+    const { clear, single, splitModel } = setup();
+    const text = filler(5_500);
+    await clear([text, filler(4_000, 9_000)]);
+    const cutCalls = splitModel.calls.filter((call) => call.some((piece) => text.includes(piece)));
+
+    await clear([text]);
+
+    expect(cutCalls.length).toBeGreaterThan(1);
+    expect(single.calls).toHaveLength(1);
+  });
+
   /** @scenario "A piece the model could reshape sends the whole span to Presidio" */
   it("sends a long escaped-JSON-lines text to Presidio, using no piece's findings", async () => {
     const line = `{"log":"${"step\\n".repeat(600)}","payee":"NL91ABNA0417164300"}`;

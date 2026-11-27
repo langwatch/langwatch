@@ -60,6 +60,25 @@ function isPythonSpace(char: string | undefined): boolean {
   return code !== undefined && PYTHON_WHITESPACE.some(([low, high]) => code >= low && code <= high);
 }
 
+/**
+ * Whether a text's answer in a batch of `batchCharacters` is the one it gets sent on its own: one
+ * call, a whole text packed into a split call, or a text long enough to be cut alone (cuts depend
+ * on the text only). A text cut only because its batch was long is answered differently alone.
+ */
+export function isAnsweredAsAlone({
+  text,
+  batchCharacters,
+}: {
+  text: string;
+  batchCharacters: number;
+}): boolean {
+  return (
+    batchCharacters <= PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS ||
+    text.length <= PII_REDACTION_MODEL_PIECE_CHARACTERS ||
+    text.length > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS
+  );
+}
+
 /** The plan for a span batch; `splitting` says whether this batch may split (decisions 8, 9). */
 export function planSpan({
   texts,
@@ -200,15 +219,29 @@ export function pieceTextOf({
 
 /**
  * Whether the model's offsets for this cut piece index its raw characters (decision 5): no
- * backslash it could unfold as JSON, nothing at either end it would trim.
+ * backslash it could unfold, as it only does for a piece that reads as JSON, nothing at either
+ * end it would trim.
  */
 export function isPlaceablePiece(piece: string): boolean {
   return (
     piece.length > 0 &&
-    !piece.includes("\\") &&
+    !(piece.includes("\\") && mayReadAsJson(piece)) &&
     !isPythonSpace(piece[0]) &&
     !isPythonSpace(piece.at(-1))
   );
+}
+
+/**
+ * Whether the model could take the piece as JSON, its NaN and Infinity included. Errs towards
+ * yes: a token inside a string is replaced too, and any failure but a syntax error counts.
+ */
+function mayReadAsJson(piece: string): boolean {
+  try {
+    JSON.parse(piece.replace(/-?Infinity|NaN/g, "null"));
+    return true;
+  } catch (error) {
+    return !(error instanceof SyntaxError);
+  }
 }
 
 /** Each text cleared from every piece's answer, or `unplaceable` when any piece cannot be. */

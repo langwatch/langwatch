@@ -473,9 +473,39 @@ Feature: Redacting personal data out of a span at ingestion
   @unit
   Scenario: A piece the model could reshape sends the whole span to Presidio
     Given a split batch
-    When one of its pieces holds a backslash inside it, such as an escaped JSON line
+    When one of its pieces holds a backslash and reads as JSON on its own, NaN and Infinity included
     Then Presidio answers the whole batch and no piece's findings are used
     And a piece is never cut to start or end on a character the model trims, U+0085 included
+
+  @unit
+  Scenario: A long text sent again is cleared from the first answer, not sent to the model again
+    Given an organization on the PII redaction model
+    And a span whose texts are a 3,000-character system prompt and a short user message
+    When a second span within ten minutes carries the same system prompt and a new message
+    Then the model is sent only the new message
+    And the system prompt is cleared as the model cleared it the first time
+    And each span is priced on all its characters, as it would be without the repeat
+
+  @unit
+  Scenario: A held text is reused only in the same scope and for ten minutes
+    Given a process holds the model's clearing of a 2,500-character text
+    When the same text comes from another organisation, at another level, with other entities or another spared flag
+    Then it is sent to the model again
+    And after ten minutes, or once 256 newer texts are held, it is sent again too
+    And a text under 2,000 characters is never held
+
+  @unit
+  Scenario: A text cut only because its span was long is not reused where it would go whole
+    Given a 5,500-character text that was cut into pieces beside another long text
+    When the same text comes back alone, short enough for one call
+    Then the model is sent it again in one call, never served the cut answer
+
+  @unit
+  Scenario: A long escaped JSON message list splits and every piece is placed
+    Given a span whose text is an OpenTelemetry message list of 20,000 characters with escaped quotes and newlines
+    When the batch splits
+    Then every cut piece is placed by its offsets, since a cut through the list never reads as JSON
+    And the model's escapes are left as they are in the stored text
 
   @unit
   Scenario: A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio

@@ -33,7 +33,7 @@ type ModelCallRules = Readonly<{ budgetMs: number; slots: number | null }>;
  */
 export const MODEL_CALL_RULES: Readonly<Record<ModelCallContext, ModelCallRules>> = {
   single: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: null },
-  split: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: 2 },
+  split: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: 6 },
 };
 
 /** A function ARN, optionally qualified by an alias or version; the region is the fourth field. */
