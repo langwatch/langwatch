@@ -1,5 +1,4 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ManagedBedrockCredentials } from "@langwatch/enterprise-managed-provider-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderCustomKeysMissingError,
@@ -45,11 +44,9 @@ import {
   type BuiltInModel,
   type DecisionModelResolution,
 } from "@langwatch/model-provider-contract";
-import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import { nowEpochMs } from "@langwatch/time";
 
 import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
@@ -72,6 +69,7 @@ import {
   type OwnDecisionModelGate,
 } from "./model-provider-decision-model.service.ts";
 import { ModelProviderExecutionService } from "./model-provider-execution.service.ts";
+import { ModelProviderGatewayKeysService } from "./model-provider-gateway-keys.service.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import { ModelProviderQueryService } from "./model-provider-query.service.ts";
 import { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
@@ -103,28 +101,6 @@ interface ModelProviderServiceOptions {
   modelImport?: ModelProviderModelImportService;
 }
 
-const logger = createLogger("langwatch:model-provider:gateway-keys");
-
-/** Shorter than the one-hour session a role hop mints, so the gateway re-reads keys in time. */
-const MANAGED_SESSION_RENEWAL_MS = 45 * 60 * 1000;
-
-/** A managed Bedrock session in the row's own field names, its private endpoint included. */
-function managedBedrockKeys(session: ManagedBedrockCredentials): Record<string, string> {
-  return {
-    AWS_ACCESS_KEY_ID: session.accessKeyId,
-    AWS_SECRET_ACCESS_KEY: session.secretAccessKey,
-    AWS_SESSION_TOKEN: session.sessionToken,
-    AWS_REGION_NAME: session.region,
-    AWS_BEDROCK_RUNTIME_ENDPOINT: session.runtimeEndpoint,
-  };
-}
-
-/** A row's stored keys minus the runtime endpoint, which only a minted managed session may set. */
-function storedGatewayKeys(customKeys: Record<string, unknown> | null): Record<string, unknown> {
-  const { AWS_BEDROCK_RUNTIME_ENDPOINT: _mintedOnly, ...stored } = customKeys ?? {};
-  return stored;
-}
-
 /**
  * The canonical contract delegates coherent read, write, defaults, and costs
  * lifecycles to private collaborators in this feature.
@@ -137,6 +113,7 @@ export class ModelProviderService {
   private readonly defaultWrites: ModelProviderDefaultsWriteService;
   private readonly decisionModels: ModelProviderDecisionModelService;
   private readonly execution: ModelProviderExecutionService;
+  private readonly gatewayKeys: ModelProviderGatewayKeysService;
   private readonly query: ModelProviderQueryService;
   private readonly resolution: ModelProviderResolutionService;
   private readonly writeAuthorization: ModelProviderWriteAuthorizationService;
@@ -164,6 +141,10 @@ export class ModelProviderService {
     });
     this.execution = ModelProviderExecutionService.create({
       query: this.query,
+      catalog: options.catalog,
+    });
+    this.gatewayKeys = ModelProviderGatewayKeysService.create({
+      repository: options.repository,
       catalog: options.catalog,
     });
     this.commands = ModelProviderCommandService.create({
@@ -266,44 +247,13 @@ export class ModelProviderService {
     };
   }
 
-  /**
-   * The keys the AI gateway runs a row with: its stored keys, and for a managed Bedrock
-   * organization the customer role's session and private endpoint. A failed role hop logs and
-   * leaves the stored keys, so only this row fails and the key's other providers keep serving.
-   */
-  async getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
-    const row = await this.options.repository.getById({ id: input.modelProviderId });
-    const owner = { id: row.id, provider: row.provider, organizationId: row.organizationId };
-    const managed = this.options.catalog.isManagedProvider({
-      organizationId: row.organizationId,
-      provider: row.provider,
-    });
-    if (managed) {
-      try {
-        const session = await this.options.catalog.getManagedBedrockCredentials({
-          organizationId: row.organizationId,
-        });
-        return {
-          ...owner,
-          customKeys: { ...storedGatewayKeys(row.customKeys), ...managedBedrockKeys(session) },
-        };
-      } catch (error) {
-        logger.warn(
-          { modelProviderId: row.id, error },
-          "Managed Bedrock credentials could not be minted; the row keeps its stored keys",
-        );
-      }
-    }
-    if (!row.customKeys) throw new ModelProviderCustomKeysMissingError();
-    return { ...owner, customKeys: storedGatewayKeys(row.customKeys) };
+  /** The keys the AI gateway runs a row with; see ModelProviderGatewayKeysService. */
+  getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
+    return this.gatewayKeys.getCustomKeys(input);
   }
 
   getGatewayKeysEpoch(input: { organizationId: string }): string {
-    const managed = this.options.catalog.isManagedProvider({
-      organizationId: input.organizationId,
-      provider: "bedrock",
-    });
-    return managed ? `managed-${Math.floor(nowEpochMs() / MANAGED_SESSION_RENEWAL_MS)}` : "";
+    return this.gatewayKeys.getEpoch(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {
