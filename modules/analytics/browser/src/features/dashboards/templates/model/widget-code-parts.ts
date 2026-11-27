@@ -53,6 +53,13 @@ function usd(raw) {
   if (abs < 1000) return sign + abs.toFixed(abs < 0.01 ? 4 : 2);
   return sign + compact.format(abs);
 }
+// A cost sum, "+" when some spans had no price ("$830+"). "$0.00+" would read as a known zero.
+function costText({ sum, priced, unpriced }) {
+  if (!unpriced) return usd(sum);
+  if (!priced) return "Not priced";
+  if (num(sum) === 0) return "$0.00, some requests not priced";
+  return usd(sum) + (known(sum) ? "+" : "");
+}
 function ms(raw) {
   const value = num(raw);
   if (value === null) return GAP;
@@ -256,6 +263,16 @@ const earliest = (points, key) => points.find((point) => known(point[key]))?.[ke
 export const COMPLETENESS = `// "+" on a sum that can only grow once the missing rows or prices arrive ("$830+").
 const plus = (query, field = "TotalCost") =>
   isLowerBound({ completeness: query.completeness, field }) ? "+" : "";
+// What the report says of a cost sum, for costText, read off the cost field itself: with no
+// row priced the report is "missing", not "partial", so isLowerBound would say nothing.
+function costParts(query, sum, field = "TotalCost") {
+  const report = query.completeness;
+  if (!report) return { sum, priced: true, unpriced: false };
+  const present = report.fields?.find((item) => item.field === field)?.present ?? report.total;
+  const unpriced = present < report.total || (report.unpriced?.count ?? 0) > 0;
+  return { sum, priced: present > 0, unpriced };
+}
+const costFigure = (query, sum, field = "TotalCost") => costText(costParts(query, sum, field));
 // The share of rows with a known price: an average cost divides by these rows only.
 function pricedShare(query) {
   const report = query.completeness;
@@ -267,6 +284,17 @@ const unpricedRows = (query, listed = []) => (query.completeness?.unpriced?.mode
   .filter((model) => !listed.includes(model))
   .map((model) => ({ label: model, value: null, note: "price unknown",
     title: model + " has no price, so its cost is unknown." }));`;
+
+/**
+ * What the cost figure says while nothing is resolved; reads `NUMBERS` and `COMPLETENESS`. A
+ * spend with no price at all is left out, and a zero sum names its gap: never "$0.00+".
+ */
+export const SPENT_HINT = `function spentHint(query, sum) {
+  const parts = costParts(query, sum);
+  if (parts.unpriced && !parts.priced) return "Nothing resolved yet";
+  if (parts.unpriced && num(sum) === 0) return "$0.00 spent, some requests not priced";
+  return costText(parts) + " spent, no conversation resolved yet";
+}`;
 
 /** The Recharts components `SERIES_CHART` draws with. */
 export const SERIES_CHART_IMPORTS = [
@@ -293,6 +321,20 @@ export const GAP_BRIDGE = `function bridge({ key, colour, yAxisId }) {
 }
 // An empty bucket of a measure has no value: the hover says so instead of showing 0.
 const tipValue = (format) => (value, name) => [known(value) ? format(value) : "No data", name];`;
+
+/** A change marker's label: no text on the plot, its readable names on hover and on focus. */
+export const MARK_HOVER = `// A thin band over the dashed line; hovering it names the change, so no label crowds the axes.
+// A keyboard reaches it too, and its focus outlines the band.
+const MARK_FOCUS = ".lw-mark:focus-visible { stroke: currentColor; stroke-width: 2; outline: none; }";
+const markHover = (name) => ({ viewBox }) => (
+  <g>
+    <style>{MARK_FOCUS}</style>
+    <rect className="lw-mark" x={viewBox.x - 4} y={viewBox.y} width={8} height={viewBox.height}
+      fill="transparent" tabIndex={0} role="img" aria-label={name}>
+      <title>{name}</title>
+    </rect>
+  </g>
+);`;
 
 /** A time series of bars and lines on one axis; reads `CHART_STYLE` and `GAP_BRIDGE`. */
 export const SERIES_CHART = `// series: { key, label, colour, dashed?, bars? }; format labels the axis and the tooltip.
@@ -325,7 +367,7 @@ function SeriesChart({ points, series, format, domain, legendKind }) {
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={48} domain={domain}
-              tickFormatter={format} />
+              tickFormatter={format} allowDecimals={format !== count} />
             <Tooltip contentStyle={TIP} formatter={tipValue(format)} filterNull={false} />
             {series.filter((item) => !item.bars).map(bridge)}
             {series.map((item) => item.bars ? (

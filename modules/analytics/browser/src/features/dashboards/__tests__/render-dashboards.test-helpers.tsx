@@ -78,6 +78,7 @@ export type FrameInit = { dashboardContext: ChartFrameDashboardContext };
 export function recordWidgetFrames() {
   const inits: FrameInit[] = [];
   const perFrame = new Map<HTMLIFrameElement, ChartFrameDashboardContext>();
+  const changes: ChartFrameDashboardContext[] = [];
   const prototype = HTMLIFrameElement.prototype;
   const real = Object.getOwnPropertyDescriptor(prototype, "contentWindow");
   const windows = new WeakMap<HTMLIFrameElement, Pick<Window, "postMessage">>();
@@ -96,6 +97,7 @@ export function recordWidgetFrames() {
         if (port) {
           port.onmessage = ({ data }: MessageEvent<Partial<FrameInit>>) => {
             if (!data.dashboardContext) return;
+            changes.push(data.dashboardContext);
             perFrame.set(frame, data.dashboardContext);
           };
         }
@@ -112,6 +114,8 @@ export function recordWidgetFrames() {
     },
     /** The context each widget frame was last handed, one per frame. */
     latestContexts: () => [...perFrame.values()],
+    /** Every context pushed after init (lw:dashboard-context-change), in the order received. */
+    contextChanges: () => [...changes],
     restore: () => {
       if (real) Object.defineProperty(prototype, "contentWindow", real);
     },

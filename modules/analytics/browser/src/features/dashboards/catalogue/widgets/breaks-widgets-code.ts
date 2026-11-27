@@ -11,6 +11,7 @@ import {
   DATES,
   GAP_BRIDGE,
   HEADLINE,
+  MARK_HOVER,
   NUMBERS,
   SERIES_CHART,
   SERIES_CHART_IMPORTS,
@@ -25,7 +26,7 @@ const MARKED_CHART_IMPORTS = [...SERIES_CHART_IMPORTS, "ReferenceLine"] as const
 
 /**
  * Stacked bars on the left axis, an optional line on its own axis, and a dashed
- * vertical line at each change; reads `CHART_STYLE`, `DATES` and `GAP_BRIDGE`.
+ * vertical line at each change; reads `CHART_STYLE`, `DATES`, `GAP_BRIDGE` and `MARK_HOVER`.
  */
 const MARKED_CHART = `// marks: the changes query's rows; one line per bucket, its labels joined.
 function changeMarks(rows) {
@@ -44,6 +45,7 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
     ...(marks.length > 0 ? [[C.faint, "prompt or model change", true]] : []),
   ];
   const lineAxis = bars.length > 0 ? "line" : "bars";
+  const barsFormat = bars.length > 0 ? barFormat : lineFormat;
   // A click asks about the bucket under the pointer and the bar hit; with one series, that one.
   const drawn = [...bars, ...(line ? [line] : [])];
   let pointed = null;
@@ -67,7 +69,7 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
             <YAxis yAxisId="bars" tick={AXIS} tickLine={false} axisLine={false} width={48}
-              tickFormatter={bars.length > 0 ? barFormat : lineFormat} />
+              tickFormatter={barsFormat} allowDecimals={barsFormat !== count} />
             {bars.length > 0 && line && (
               <YAxis yAxisId="line" orientation="right" tick={AXIS} tickLine={false}
                 axisLine={false} width={48} tickFormatter={lineFormat} />
@@ -86,8 +88,7 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
             )}
             {marks.map((mark) => (
               <ReferenceLine key={mark.x} yAxisId="bars" x={mark.x} stroke={C.faint}
-                strokeDasharray="4 3" label={{ value: mark.label, position: "insideTopLeft",
-                  fontSize: 10, fill: C.faint }} />
+                strokeDasharray="4 3" label={markHover(mark.label)} />
             ))}
           </ComposedChart>
         </ResponsiveContainer>
@@ -96,7 +97,16 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
   );
 }`;
 
-const MARKED_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE, MARKED_CHART];
+const MARKED_PARTS = [
+  NUMBERS,
+  DATES,
+  CHART_STYLE,
+  HEADLINE,
+  BUCKETS,
+  GAP_BRIDGE,
+  MARK_HOVER,
+  MARKED_CHART,
+];
 
 export const ERRORS_PER_DAY_CODE = widgetCode({
   summary: "Traces with an error per bucket by what failed first, the error rate, and changes.",
@@ -280,8 +290,9 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   }));
   const repeated = points.reduce((sum, point) => sum + point.looped + point.retried, 0);
   const repeatCost = daily.data.reduce((sum, row) => sum + num(row.cost), 0);
-  // A repeat with no cost on its spans leaves the sum short of the real cost.
-  const lowerBound = daily.data.some((row) => num(row.uncosted_spans) > 0);
+  // A repeat with no cost on its spans leaves the sum short of the real cost. The rows cannot
+  // tell none priced from priced at 0, so a sum of 0 names the gap instead of "Not priced".
+  const unpriced = daily.data.some((row) => num(row.uncosted_spans) > 0);
   const spend = num(totals.data[0]?.cost);
   const series = [
     { key: "looped", label: "Same tool, same input, 3 or more times", colour: C.teal,
@@ -295,7 +306,7 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
         <Stat label={"Went in circles or retried: " + pct(repeated / traffic) + " of requests"}
           value={count(repeated)} />
         <Stat label={"Cost of the repeats: " + pct(ratio(repeatCost, spend)) +
-          " of spend"} value={usd(repeatCost) + (lowerBound ? "+" : "")} />
+          " of spend"} value={costText({ sum: repeatCost, priced: true, unpriced })} />
         <div style={{ minWidth: 0, fontSize: 11 }}>
           <div style={{ fontSize: 10, color: C.faint }}>Most repeated steps</div>
           {steps.data.map((row) => (

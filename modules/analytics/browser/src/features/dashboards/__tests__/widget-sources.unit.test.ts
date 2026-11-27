@@ -121,13 +121,25 @@ describe("widgetCardFooter", () => {
   it("adds one (i) line of the limiting messages, and none when the run was not limited", () => {
     const message = "Some projects share data only from a date, so earlier rows are not included";
 
-    expect(
-      widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: message }),
-    ).toBe(`Sources: application \u00b7 \u24d8 ${message}`);
-    expect(
-      widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: "" }),
-    ).toBe("Sources: application");
+    const footer = { sourcesLine: "Sources: application", projectsLine: "", spanFloor: "" };
+
+    expect(widgetCardFooter({ ...footer, limits: message })).toBe(
+      `Sources: application \u00b7 \u24d8 ${message}`,
+    );
+    expect(widgetCardFooter({ ...footer, limits: "" })).toBe("Sources: application");
     expect(message).not.toMatch(/project-|\d/);
+  });
+
+  /** @scenario "AC216 Change markers" */
+  it("puts where span data starts in the footer, before the (i) line", () => {
+    expect(
+      widgetCardFooter({
+        sourcesLine: "Sources: application",
+        projectsLine: "",
+        spanFloor: "Span data from 10 Oct 2026",
+        limits: "",
+      }),
+    ).toBe("Sources: application \u00b7 Span data from 10 Oct 2026");
   });
 });
 
@@ -175,6 +187,7 @@ describe("cardLimitMessages", () => {
     const footer = widgetCardFooter({
       sourcesLine: widgetSourcesLine([query("a", ["application"], IGNORES)]),
       projectsLine: "Project: Alpha",
+      spanFloor: "",
       limits: cardLimitMessages([sourcesIgnored]).join(" "),
     });
 

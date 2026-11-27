@@ -14,7 +14,7 @@ import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import { catalogueWidgetActions } from "../../catalogue/index.ts";
 import { shownWidgetButtons } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
-import { widgetCardSourcesLine } from "../../model/widget-sources.ts";
+import { widgetCardFooter, widgetCardSourcesLine } from "../../model/widget-sources.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetActionRow } from "../blocks/widget-action-row.tsx";
@@ -68,6 +68,7 @@ export function CuratedWidgetCard({
 }) {
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
+  const [spanFloor, setSpanFloor] = useState("");
   const langyOnData = face === "no_access" ? undefined : langy;
   const declared = langyOnData ? catalogueWidgetActions(widget.key) : [];
   // The widget's code says whether its problem is on the card; a face over the chart hides it.
@@ -77,7 +78,12 @@ export function CuratedWidgetCard({
   const viewRef = useWidgetViewed({ widgetSource: "curated" });
   const isEditable = onEdit !== undefined || onDelete !== undefined;
   const [isViewOpen, setViewOpen] = useState(false);
-  const footer = widgetCardSourcesLine(definition.queries);
+  const footer = widgetCardFooter({
+    sourcesLine: widgetCardSourcesLine(definition.queries),
+    projectsLine: "",
+    spanFloor,
+    limits: "",
+  });
   const actionRow = langyOnData && actions.length > 0 && (
     <WidgetActionRow name={name} actions={actions} onAction={langyOnData.act} />
   );
@@ -102,6 +108,7 @@ export function CuratedWidgetCard({
       {...(onCard
         ? {
             onFaceChange: setFace,
+            onSpanFloorNoticeChange: setSpanFloor,
             onExportChange: csvExport.onExportChange,
             onEmptyChange,
             onLimitFailureChange,

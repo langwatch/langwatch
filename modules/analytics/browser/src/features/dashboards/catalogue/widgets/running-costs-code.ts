@@ -51,7 +51,7 @@ export const SPEND_CODE = widgetCode({
   return (
     <Panel>
       <Figures>
-        <Figure label="Spent" value={usd(cost) + plus(spend)}>
+        <Figure label="Spent" value={costFigure(spend, cost)}>
           <Change now={cost} before={num(s.cost_prev)} better="down" format={usd} />
         </Figure>
         <Figure label="Cost per resolved conversation"
@@ -115,10 +115,17 @@ const SOURCES = [
   ["other", "Other", C.faint, undefined],
 ];
 
-// A source with no traces says so; one with traces but no price shows a dash, never $0.00.
-function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
+// A source with no traces says so; one with traces but no price never shows $0.00.
+function SourceRow({ label, colour, cost, total, traces, unpriced, unpricedCounted, origin }) {
   const open = origin && traces > 0 ? () => openTraces({ origin }) : undefined;
-  const figure = traces === 0 ? "Nothing ran" : usd(cost) + (unpriced > 0 && known(cost) ? "+" : "");
+  // Zero-rate spans cost null but aren't unpriced (span-cost-metrics.ts); a null sum (inferred)
+  // is 0 where unpriced is counted (flight-deck-costs-queries.ts:447). Not evaluations: their
+  // evaluator runs add a constant 0 AS unpriced (flight-deck-costs-queries.ts:454). The figure,
+  // bar and share read this one sum; a row with no priced trace keeps its null.
+  const sum = unpricedCounted && unpriced < traces ? cost ?? 0 : cost;
+  const share = ratio(sum, total);
+  const figure = traces === 0 ? "Nothing ran"
+    : costText({ sum, priced: unpriced < traces, unpriced: unpriced > 0 });
   return (
     <div onClick={open} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
       padding: "3px 0", cursor: open ? "pointer" : "default",
@@ -128,12 +135,14 @@ function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
       <span style={{ width: 84, fontWeight: 500 }}>{label}</span>
       <span style={{ flex: 1, height: 6, borderRadius: 3, background: C.muted }}>
         <span style={{ display: "block", height: "100%", borderRadius: 3, background: colour,
-          width: (ratio(cost, total) ?? 0) * 100 + "%" }} />
+          width: (share ?? 0) * 100 + "%" }} />
       </span>
       <span style={{ width: 36, textAlign: "right", color: C.subtle }}>
-        {traces === 0 ? "" : pct(ratio(cost, total), 0)}
+        {traces === 0 ? "" : pct(share, 0)}
       </span>
-      <span style={{ width: 64, textAlign: "right", fontWeight: 500 }}>{figure}</span>
+      <span style={{ minWidth: 64, textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>
+        {figure}
+      </span>
     </div>
   );
 }
@@ -177,7 +186,8 @@ function UnpricedRow({ traces }) {
       <div style={{ marginTop: 8 }}>
         {shown.map(([key, label, colour, origin]) => (
           <SourceRow key={key} label={label} colour={colour} cost={costOf(key)} total={total}
-            traces={tracesOf(key)} unpriced={unpricedOf(key)} origin={origin} />
+            traces={tracesOf(key)} unpriced={unpricedOf(key)}
+            unpricedCounted={key !== "evaluations"} origin={origin} />
         ))}
         {unpriced > 0 ? <UnpricedRow traces={unpriced} /> : null}
       </div>

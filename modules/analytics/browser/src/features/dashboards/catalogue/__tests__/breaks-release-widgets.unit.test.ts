@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
+import { NUMBERS } from "../../templates/model/widget-code-parts.ts";
 import { CATALOGUE_WIDGET_BUILDS } from "../index.ts";
 
 function buildOf(id: string) {
@@ -90,7 +91,23 @@ describe("given the Where my agent breaks widgets", () => {
     // Main's LIMIT 10000 per kind kept an arbitrary 10000 repeats; every repeat now counts.
     expect(sql.daily).not.toContain("LIMIT 10000");
     expect(sql.daily).toContain("sum(uncosted) AS uncosted_spans");
-    expect(code).toContain('usd(repeatCost) + (lowerBound ? "+" : "")');
+  });
+
+  /** @scenario "AC215c Partial cost: the loops card cannot count priced spans" */
+  it("names the unpriced repeats when their cost sums to 0", () => {
+    const { code } = buildOf("up-loops");
+    expect(code).toContain("costText({ sum: repeatCost, priced: true, unpriced })");
+    // The stored snippet is what the card runs; evaluating it is the test.
+    // oxlint-disable-next-line no-implied-eval
+    const costText = new Function(`${NUMBERS}\nreturn costText;`)() as (parts: {
+      sum: number;
+      priced: boolean;
+      unpriced: boolean;
+    }) => string;
+    const figure = costText({ sum: 0, priced: true, unpriced: true });
+    expect(figure).toBe("$0.00, some requests not priced");
+    expect(figure).not.toBe("Not priced");
+    expect(figure).not.toContain("$0.00+");
   });
 
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */

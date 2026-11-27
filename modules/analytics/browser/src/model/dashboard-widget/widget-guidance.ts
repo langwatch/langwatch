@@ -32,6 +32,11 @@ const FIELD_GUIDANCE: Readonly<Record<string, string>> = {
     "LangWatch works out satisfaction scores from your traces; there is nothing to send.",
 };
 
+/** Evaluation fields with words of their own: the model is the evaluator's, set in its settings. */
+const EVALUATION_FIELD_GUIDANCE: Readonly<Record<string, string>> = {
+  Model: "Choose a model in the evaluator's settings.",
+};
+
 /** Units other than traces, keyed as the completeness report derives them from the view name. */
 const UNIT_GUIDANCE: Readonly<Record<string, string>> = {
   evaluations: "Evaluations come from the evaluators you run on your traces.",
@@ -48,7 +53,9 @@ export function missingFieldGuidance({
   label: string;
   unit: string;
 }): string | undefined {
-  const own = FIELD_GUIDANCE[field];
+  const own =
+    (unit === "evaluations" ? EVALUATION_FIELD_GUIDANCE[field] : undefined) ??
+    FIELD_GUIDANCE[field];
   if (own) return own;
   if (unit === "traces") return `Send ${label} on your traces ${SDK}.`;
   return undefined;

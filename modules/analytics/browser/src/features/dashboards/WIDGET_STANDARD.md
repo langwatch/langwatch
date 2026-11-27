@@ -152,9 +152,13 @@ bounds): the file is its query results.
 
 The chart kit is `@langwatch/charts` in widget code (`model/dashboard-widget/chartsLib`).
 
-- **Sums.** A sum that can only grow once the rest arrives is a lower bound. It gets a "+"
-  ("$830+"), and the hover says why. Ask `isLowerBound({ completeness, field })`. Averages and
-  rates never get a "+".
+- **Sums.** A sum that can only grow once the rest arrives is a lower bound. A sum above 0 with
+  some spans unpriced gets a "+" ("$830+"), and the hover says why. A cost sum that can reach 0
+  reads through `costFigure` (`costParts` underneath). A sum behind an early return on a falsy
+  total never shows 0, so it keeps `plus`, as does any other sum: both ask
+  `isLowerBound({ completeness, field })`. A 0 sum with some spans unpriced shows "$0.00, some requests not priced", never
+  "$0.00+". Nothing priced on a card means the cost setup view; on a per-source row it means
+  "Not priced". Averages and rates never get a "+".
 - **Unpriced cost.** Cost with no price is unknown, not $0. Pass `completeness.unpriced` to a
   `Leaderboard` (or `LwqlChart`): each model gets a "no price" row and "–" for its cost.
 - **Averages.** An average divides by the rows that carry the field, so unpriced traces never
@@ -170,10 +174,15 @@ The chart kit is `@langwatch/charts` in widget code (`model/dashboard-widget/cha
     has no bridge.
 - **Big numbers** never average in empty buckets: `averageOf({ rows, key, weight })` skips them.
 - **Formatting.** Nothing turns null, NaN or undefined into 0 on the way to the screen.
-  `toNumber` keeps null, and the kit prints "–" for a value it does not have.
-- **Nothing to show.** A source that sent nothing says so ("No runs"), not "$0.00".
+  `toNumber` keeps null, and the kit prints "–" for a value it does not have. One exception,
+  under Cost coverage.
+- **Nothing to show.** A source that sent nothing says so ("Nothing ran"), not "$0.00".
 - **Cost coverage.** A row's cost counts as present only when the row carries a cost and no
   unpriced span. A project that sends no cost reads `missing` ("Needs total cost"), never $0.
+  - Exception, until [tasks#1264](https://github.com/langwatch/tasks/issues/1264) is fixed: a
+    per-source row on the running-costs card reads a null cost sum as $0.00 when its unpriced
+    count is real and some trace is priced. Zero-rate spans store a null cost but are not
+    counted as unpriced. The evaluations row keeps "–": its unpriced count is a constant 0.
 - **Nothing to flag.** A widget whose job is to flag problems says so plainly when it finds
   none ("All costs priced", with a check), filling the card so it never reads as broken. The
   (i) says how much any whole-data widget checked: "Checked 1,880 traces in this period."

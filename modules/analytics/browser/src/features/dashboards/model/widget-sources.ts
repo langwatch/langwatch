@@ -175,20 +175,23 @@ export function widgetProjectsLine({
 }
 
 /**
- * The card's quiet line: its sources and projects, then one (i) line of what the server limited
- * in the run.
+ * The card's quiet line: its sources and projects, where its span history starts, then one (i)
+ * line of what the server limited in the run.
  */
 export function widgetCardFooter({
   sourcesLine,
   projectsLine,
+  spanFloor,
   limits,
 }: {
   sourcesLine: string;
   projectsLine: string;
+  /** Where span history starts, such as "Span data from 10 Oct 2026"; "" when whole. */
+  spanFloor: string;
   /** The limiting messages of the latest runs, joined; "" when the server limited none. */
   limits: string;
 }): string {
-  return [sourcesLine, projectsLine, limits === "" ? "" : `\u24D8 ${limits}`]
+  return [sourcesLine, projectsLine, spanFloor, limits === "" ? "" : `\u24D8 ${limits}`]
     .filter(Boolean)
     .join(" · ");
 }

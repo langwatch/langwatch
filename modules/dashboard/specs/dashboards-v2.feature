@@ -50,6 +50,44 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a cost of 12345 dollars shows as "$12.3K"
     # Evidence: unit test of the formatter and a board screenshot showing a cost
 
+  @unit
+  Scenario: AC214 Count axis whole numbers
+    Given a count chart whose largest value is 0, 1 or 2
+    Then every y-axis tick is a whole number
+    # Evidence: errors-by-day card, haven screenshot
+
+  @unit
+  Scenario: AC215 Partial cost: no span priced
+    Given a per-source cost row where no span has a cost
+    Then it shows "Not priced"
+    And never "$0.00+"
+    And a card whose figure has no priced span shows the cost setup view instead
+
+  @unit
+  Scenario: AC215b Partial cost: some spans priced at zero
+    Given at least one span is priced, every priced span is priced at 0, and some spans have no cost
+    Then the card figure or source row shows "$0.00, some requests not priced"
+    And never "$0.00+"
+
+  @unit
+  Scenario: AC215c Partial cost: the loops card cannot count priced spans
+    Given the "up-loops" card, whose sum is 0 and some of whose repeats have no cost
+    Then it shows "$0.00, some requests not priced"
+    And never "Not priced" or "$0.00+"
+
+  @unit
+  Scenario: AC215d Partial cost: a sum above 0 with some requests not priced
+    Given a cost card or a per-source cost row where at least one span is priced above 0 and some spans have no cost
+    Then it shows the sum marked "+"
+    And a sum with every span priced shows no "+"
+
+  @unit
+  Scenario: AC215e Partial cost: the evaluations source row keeps the dash for a null cost
+    Given the evaluations source row, whose unpriced count is a constant 0
+    When its cost sums to null, which may mean its spans are not priced
+    Then it shows "–"
+    And never "$0.00"
+
   @e2e @unimplemented
   Scenario: AC5 The board uses a wide screen
     Given a 1440px wide window
@@ -237,6 +275,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And with one empty widget, without Langy, or in a project that has received traces, the board offers no such button
     # A quiet period is not a setup step (AC13)
     # Evidence: a new project's board with the banner and Langy's drafted prompt
+
+  @unit
+  Scenario: AC217 Needs model
+    Given an evaluations widget whose query reads a model column no row carries
+    Then it reads "Choose a model in the evaluator's settings."
 
   @unit
   Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
@@ -480,6 +523,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it marks each prompt version and each newly used model in the period on the time axis
     # Decision: LangWatch records no deploys, so deploys are not marked
 
+  @integration
+  Scenario: AC216 Change markers
+    Given Errors per day, Wrong tool rate, Conversations resolved per day and Cost per document at 1280 px and at the narrowest card width, with markers 1 day apart
+    Then no marker label is drawn on the plot or past the right axis
+    And hovering a marker shows its readable name, never a raw id
+    And the "Span data from" note sits clear of the x-axis and the legend
+    # Evidence: haven screenshots at both widths
+
   @unit
   Scenario: AC61 Where my agent breaks: failing steps show the failures that reached the user
     Given the "up-where-fails" widget
@@ -579,7 +630,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then a trace has looped when it calls one tool 3 or more times with the same input
     And a trace has retried when a failed span is followed under the same parent by the same step, or by another model call
     And it shows those traces per bucket, their share of all traces, and the cost of the repeated calls
-    And that cost reads as a lower bound, marked "+", when a repeated span carries no cost
+    And that cost reads as a lower bound, marked "+", when its sum is above 0 and a repeated span carries no cost
 
   @unit
   Scenario: AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered
@@ -2990,3 +3041,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 243-247: "Per-widget Langy actions, problem-only Investigate, clicks that say what was clicked" (owner, 2026-11-24) → Scenario: AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value; Scenario: AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem; Scenario: AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts; Scenario: AC246 Chart asks: a table row is a button that asks Langy about that row; Scenario: AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context
   # AC 248: "No error is not success" (owner, 2026-11-24) → Scenario: AC248 Widget words: a card never calls requests without an error a success; Scenario: AC248b Widget words: a cost card with only errors to go on offers to score how conversations end
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board; Scenario: AC145b Template card: a board made under a template's former name still counts as added
+  # AC 214-217: "Widget UI fixes: whole-number count axes, partial cost words, change markers on hover, the Needs model line" (langwatch/tasks#1187, 2026-11-21) → Scenario: AC214 Count axis whole numbers; Scenario: AC215 Partial cost: no span priced; Scenario: AC215b Partial cost: some spans priced at zero; Scenario: AC215c Partial cost: the loops card cannot count priced spans; Scenario: AC215d Partial cost: a sum above 0 with some requests not priced; Scenario: AC215e Partial cost: the evaluations source row keeps the dash for a null cost; Scenario: AC216 Change markers; Scenario: AC217 Needs model

@@ -4,6 +4,8 @@
  * links to the traces behind a number, and the setup step for conversation outcomes.
  */
 
+import { MARK_HOVER } from "../../templates/model/widget-code-parts.ts";
+
 /** The Recharts components `MARKED_CHART` draws with. */
 export const MARKED_CHART_IMPORTS = [
   "ResponsiveContainer",
@@ -125,7 +127,9 @@ const labelled = (points) => points.map((point) => ({ ...point, x: bucketLabel(p
   at: bucketStart(point.bucket) }));`;
 
 /** A time series of bars and lines with change markers; reads `CHART_STYLE` and `GAP_BRIDGE`. */
-export const MARKED_CHART = `// series: { key, label, colour, dashed?, bars?, stack?, right? }; markers: { x, label }.
+export const MARKED_CHART = `${MARK_HOVER}
+
+// series: { key, label, colour, dashed?, bars?, stack?, right? }; markers: { x, label }.
 // legendKind names what a legend entry is ("model", "language"); a click asks about the bucket.
 function MarkedChart({ points, series, format, rightFormat, markers = [], domain, legendKind }) {
   const right = series.some((item) => item.right);
@@ -156,7 +160,7 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
             <YAxis yAxisId="left" tick={AXIS} tickLine={false} axisLine={false} width={48}
-              domain={domain} tickFormatter={format} />
+              domain={domain} tickFormatter={format} allowDecimals={format !== count} />
             {right && (
               <YAxis yAxisId="right" orientation="right" tick={AXIS} tickLine={false}
                 axisLine={false} width={40} domain={[0, 1]} tickFormatter={rightFormat} />
@@ -164,8 +168,7 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
             <Tooltip contentStyle={TIP} formatter={tip} filterNull={false} />
             {shown.map((marker) => (
               <ReferenceLine key={marker.x + marker.label} yAxisId="left" x={marker.x}
-                stroke={C.faint} strokeDasharray="3 3"
-                label={{ value: marker.label, position: "top", fontSize: 10, fill: C.faint }} />
+                stroke={C.faint} strokeDasharray="3 3" label={markHover(marker.label)} />
             ))}
             {series.filter((item) => !item.bars).map((item) =>
               bridge({ ...item, yAxisId: item.right ? "right" : "left" }))}
