@@ -141,6 +141,10 @@ export function useSavedDashboards() {
     /** Reads the list again now, for a board the address names that the held list lacks. */
     reread: () => list.refetch(),
     loadError: list.error,
+    /** Whether the boards' names are known, so a new name can be numbered past them. */
+    namesKnown: list.data !== void 0,
+    /** Asks the list again, after a read that failed. */
+    retry: () => void list.refetch(),
     isDeleting: remove.isPending,
     renameBoard,
     deleteBoard,

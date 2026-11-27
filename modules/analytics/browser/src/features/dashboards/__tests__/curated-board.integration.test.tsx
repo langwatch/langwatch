@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -55,6 +55,8 @@ function curatedServer({
   organizationArea = true,
   storedNames = [],
   boardsGate,
+  flagsGate,
+  boardsFailsOnce = false,
   createFails = false,
   pinnedTemplateId,
 }: {
@@ -62,14 +64,22 @@ function curatedServer({
   storedNames?: readonly string[];
   /** Holds the saved boards' answer until it resolves. */
   boardsGate?: Promise<void>;
+  /** Holds the organization's flags until it resolves. */
+  flagsGate?: Promise<void>;
+  /** The first saved-boards read is refused; later reads answer. */
+  boardsFailsOnce?: boolean;
   createFails?: boolean;
   /** A From LangWatch board the member pinned. */
   pinnedTemplateId?: string;
 } = {}) {
   const calls: UiProcedureCall[] = [];
+  let boardsReads = 0;
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.getAll") {
+      if (boardsFailsOnce && boardsReads++ === 0) {
+        return Promise.reject(new UiProcedureRefusal("forbidden", 403));
+      }
       return (boardsGate ?? Promise.resolve()).then(() =>
         storedNames.map((name, index) => storedBoard({ name, index })),
       );
@@ -80,7 +90,9 @@ function curatedServer({
     }
     switch (call.path) {
       case "featureFlag.isEnabledForEachOrganization":
-        return Promise.resolve({ enabledByOrganizationId: { "org-1": organizationArea } });
+        return (flagsGate ?? Promise.resolve()).then(() => ({
+          enabledByOrganizationId: { "org-1": organizationArea },
+        }));
       case "boards.create":
         if (createFails) return Promise.reject(new Error("boards.create failed"));
         return Promise.resolve({ id: "board-1", ...(call.input as object) });
@@ -106,6 +118,8 @@ function openCurated({
   permissions = MEMBER,
   storedNames = [],
   boardsGate,
+  flagsGate,
+  boardsFailsOnce,
   createFails,
   pinnedTemplateId,
   query = {},
@@ -117,6 +131,8 @@ function openCurated({
   permissions?: readonly string[];
   storedNames?: readonly string[];
   boardsGate?: Promise<void>;
+  flagsGate?: Promise<void>;
+  boardsFailsOnce?: boolean;
   createFails?: boolean;
   pinnedTemplateId?: string;
   /** The address's query, as when "Add a widget" is already open. */
@@ -126,6 +142,8 @@ function openCurated({
     organizationArea,
     storedNames,
     boardsGate,
+    flagsGate,
+    boardsFailsOnce,
     createFails,
     pinnedTemplateId,
   });
@@ -179,6 +197,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.getByText("From LangWatch")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Use this template" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Duplicate to edit" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
       expect(screen.getByTitle("Edit name")).toBeInTheDocument();
       expect(screen.getByTitle("Edit description")).toBeInTheDocument();
       expect(screen.getAllByTitle("Drag to move")).toHaveLength(RELEASE.widgets.length);
@@ -193,6 +212,27 @@ describe("given a member opens a From LangWatch board", () => {
     });
   });
 
+  /** @scenario "Make a copy and the quiet line wait for the organization's flags" */
+  it("shows neither Make a copy nor the quiet line while the flags load", async () => {
+    let answer = () => {};
+    const flagsGate = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    openCurated({ templateId: "release", flagsGate });
+
+    await screen.findByRole("heading", { name: "Ready to ship?" });
+    expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+    expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
+    // Past a later tick, so an early copy or hint would have shown by now.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+    expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
+    answer();
+    await screen.findByRole("button", { name: "Add a widget" });
+    expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+    expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
+  });
+
   describe("when the member may not create dashboards", () => {
     /** @scenario "From LangWatch: a member who may not create dashboards gets no edit control" */
     it("offers no edit control, and a widget's menu holds only Export CSV", async () => {
@@ -202,6 +242,8 @@ describe("given a member opens a From LangWatch board", () => {
       expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+      expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
       expect(screen.queryByTitle("Edit name")).toBeNull();
       expect(screen.queryByTitle("Edit description")).toBeNull();
       expect(screen.queryByTitle("Drag to move")).toBeNull();
@@ -213,7 +255,7 @@ describe("given a member opens a From LangWatch board", () => {
   });
 
   describe("when the organization's Dashboards area is off", () => {
-    /** @scenario "With the flag off, a From LangWatch board is read-only, as on main" */
+    /** @scenario "With the flag off, a From LangWatch board is read-only until Make a copy" */
     it("offers no edit control, though the member may create dashboards", async () => {
       const { server } = openCurated({ templateId: "release", organizationArea: false });
 
@@ -224,6 +266,67 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.queryByTitle("Edit description")).toBeNull();
       expect(screen.queryByTitle("Drag to move")).toBeNull();
       expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
+    });
+
+    /** @scenario "From LangWatch: Make a copy, with the organization's Dashboards area off" */
+    it("offers Make a copy, which makes the member's own copy and opens it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { host, server } = openCurated({ templateId: "release", organizationArea: false });
+
+      await user.click(await screen.findByRole("button", { name: "Make a copy" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
+      expect(inputsTo(server, "boards.create")).toEqual([
+        { projectId: "proj-1", name: "Ready to ship? (copy)" },
+      ]);
+      expect(inputsTo(server, "dashboardWidgets.create")).toHaveLength(RELEASE.widgets.length);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(host.langyAsks).toHaveLength(1);
+      expect(server.calls.filter(({ path }) => path === "boards.delete")).toEqual([]);
+      expect(inputsTo(server, "boards.update")).toEqual([
+        expect.objectContaining({ dashboardId: "board-1" }),
+      ]);
+    });
+
+    /** @scenario "Make a copy explains and retries when the saved boards fail to load" */
+    it("shows why Make a copy is off when the boards fail, and Retry", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      openCurated({ templateId: "release", organizationArea: false, boardsFailsOnce: true });
+
+      await screen.findByText("Couldn't load your dashboards, so a copy can't be named yet.");
+      expect(screen.getByRole("button", { name: "Make a copy" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Make a copy" })).toBeEnabled(),
+      );
+      expect(screen.queryByText(/Couldn't load your dashboards/)).toBeNull();
+    });
+
+    /** @scenario "Make a copy is not offered to a member who may create but not update" */
+    it("offers no Make a copy to a member who may create but not update, and says so", async () => {
+      const permissions = MEMBER.filter((permission) => permission !== "analytics:update");
+      openCurated({ templateId: "release", organizationArea: false, permissions });
+
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+      expect(
+        await screen.findByText(/can create and edit dashboards can make/),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "Make a copy waits for the saved boards to load" */
+    it("keeps Make a copy disabled until the saved boards have loaded", async () => {
+      let load = () => {};
+      const boardsGate = new Promise<void>((resolve) => {
+        load = resolve;
+      });
+      openCurated({ templateId: "release", organizationArea: false, boardsGate });
+
+      const button = await screen.findByRole("button", { name: "Make a copy" });
+      expect(button).toBeDisabled();
+      load();
+      await waitFor(() => expect(button).toBeEnabled());
     });
   });
 

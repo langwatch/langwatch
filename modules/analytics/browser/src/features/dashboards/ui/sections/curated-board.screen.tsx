@@ -5,8 +5,9 @@
  */
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import { Button, VStack } from "@langwatch/design-system/primitives";
-import { LayoutTemplate } from "lucide-react";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Copy, LayoutTemplate } from "lucide-react";
+import type { ReactNode } from "react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -20,6 +21,7 @@ import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
+import { useDuplicateCurated } from "../../behavior/use-duplicate-curated.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { useModifyCurated } from "../../behavior/use-modify-curated.ts";
@@ -62,6 +64,33 @@ function UseTemplateButton({ isCreating, onClick }: { isCreating: boolean; onCli
     >
       <LayoutTemplate size={14} aria-hidden />
       Use this template
+    </Button>
+  );
+}
+
+/** Makes the member's own copy of this board and opens it: the copy path where edits are off. */
+function MakeCopyButton({
+  isCopying,
+  disabled,
+  onClick,
+}: {
+  isCopying: boolean;
+  /** Until the saved boards load, so the copy's name is numbered past them. */
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant="solid"
+      colorPalette="accent"
+      disabled={disabled}
+      loading={isCopying}
+      loadingText="Copying…"
+      onClick={onClick}
+    >
+      <Copy size={14} aria-hidden />
+      Make a copy
     </Button>
   );
 }
@@ -109,8 +138,12 @@ function OpenCuratedBoard({
     ? store.storeProject !== void 0 && store.mayShare
     : reader.mayCreate;
   // Edits to a From LangWatch board belong to the organization area; off, the page is main's.
-  const organizationArea = useOrganizationLibraryOpen().isOpen;
-  const mayEdit = organizationArea && mayCreate;
+  const library = useOrganizationLibraryOpen();
+  const mayEdit = library.isOpen && mayCreate;
+  // A copy is saved and filled, which asks analytics:update in the project in view too.
+  // Offered on the project address only; the organization address shows no copy path.
+  const mayCopy = !mayEdit && !atOrganization && library.isOff && mayCreate && reader.mayEdit;
+  const showHint = !atOrganization && library.isOff && !mayCopy;
   const { createWithWidget } = useBoardFromTemplate({
     atOrganization,
     storeProject: store.storeProject,
@@ -118,12 +151,51 @@ function OpenCuratedBoard({
   const existingNames = atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name);
   const storedAt = { atOrganization, storeProject: store.storeProject, existingNames };
   const template = useAddTemplate(storedAt);
+  const copy = useDuplicateCurated();
   const modify = useModifyCurated({ board, ...storedAt });
   const picker = useBlockPickerAddress();
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
   };
   const addWidget = () => modify.request({ kind: "addWidget" });
+  let headerAction: ReactNode = null;
+  if (mayEdit) {
+    headerAction = (
+      <>
+        <AddWidgetButton onClick={addWidget} />
+        <UseTemplateButton
+          isCreating={template.creatingId !== void 0}
+          onClick={() => void template.add(board.card.board)}
+        />
+      </>
+    );
+  } else if (mayCopy) {
+    headerAction = (
+      <HStack gap={2}>
+        {saved.loadError && !saved.namesKnown && (
+          <>
+            <Text textStyle="bodySm" color="fg.muted">
+              Couldn't load your dashboards, so a copy can't be named yet.
+            </Text>
+            <Button
+              size="xs"
+              variant="outline"
+              loading={saved.isRefreshing}
+              disabled={saved.isRefreshing}
+              onClick={saved.retry}
+            >
+              Retry
+            </Button>
+          </>
+        )}
+        <MakeCopyButton
+          isCopying={copy.creatingId === board.templateId}
+          disabled={!saved.namesKnown}
+          onClick={() => void copy.duplicate(board)}
+        />
+      </HStack>
+    );
+  }
 
   return (
     <BoardPage
@@ -144,17 +216,7 @@ function OpenCuratedBoard({
             boardId: board.templateId,
             widgetCount: board.widgets.length,
           }}
-          action={
-            mayEdit ? (
-              <>
-                <AddWidgetButton onClick={addWidget} />
-                <UseTemplateButton
-                  isCreating={template.creatingId !== void 0}
-                  onClick={() => void template.add(board.card.board)}
-                />
-              </>
-            ) : null
-          }
+          action={headerAction}
           periodControl={
             <BoardPeriodControl
               range={range}
@@ -181,6 +243,11 @@ function OpenCuratedBoard({
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
           <VStack align="stretch" gap={4}>
+            {showHint && (
+              <Text textStyle="bodySm" color="fg.muted">
+                Members who can create and edit dashboards can make their own copy to edit it.
+              </Text>
+            )}
             <EmptyWidgetsBanner
               emptyWidgetNames={emptyWidgetNames}
               onAskLangy={
