@@ -408,6 +408,35 @@ function scenarios(backend: Backend): void {
         });
       });
 
+      /** @scenario "An approval that ends between the last item's prompt versions still stops the copy" */
+      it("reports the stop and writes the stopped rows when the prompt was the last item", async () => {
+        const w = world();
+        const project = w.copy.addProject({ organizationId: ACME.id, name: "prompts-only" });
+        w.copy.addPrompt({
+          projectId: project.id,
+          organizationId: ACME.id,
+          handle: "last-reply",
+          texts: ["first", "second"],
+        });
+        const { source, target } = await pairedApprovals(w);
+        w.copy.hooks.afterPromptCreate = async () => {
+          await w.app.revokeSession({ ...w.operator(OLIVIA), requestId: source.requestId });
+        };
+
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [project.id] },
+        });
+
+        expect(report.items.map((item) => [item.kind, item.outcome, item.reason])).toEqual([
+          ["project", "copied", null],
+          ["prompt", "failed", "prompt_versions_incomplete"],
+        ]);
+        expect(report.stoppedBecause).toBe("source_approval_ended");
+        const stopped = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyStopped");
+        expect(stopped.map((row) => row.organizationId)).toEqual([ACME.id, GLOBEX.id]);
+      });
+
       /** @scenario "A rerun copies only what is new" */
       it("copies only the prompt added since the first copy", async () => {
         const w = world();

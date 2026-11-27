@@ -231,6 +231,14 @@ Feature: Copying an organization's setup into another organization
     And the prompt is reported as failed with "prompt_versions_incomplete"
     And the stopped audit rows name the prompt
 
+  @integration
+  Scenario: An approval that ends between the last item's prompt versions still stops the copy
+    Given a copy whose last item is a prompt with two versions
+    When Olivia revokes the source session right after the prompt was created in Globex
+    Then the prompt is reported as failed with "prompt_versions_incomplete"
+    And the report says the copy stopped because the source approval ended
+    And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row
+
   @unit
   Scenario: A stopped copy's audit rows name every target the run made
     Given a stopped run that copied a project and made a dataset whose copy then failed
@@ -355,6 +363,14 @@ Feature: Copying an organization's setup into another organization
   Scenario: The CLI stops when an approval expires before it is decided
     When the target approval expires before anyone decides it
     Then the CLI names the expired request, copies nothing, ends the approved session and exits non-zero
+
+  @integration
+  Scenario: The CLI names a session it could not end even when the copy failed first
+    Given the target approval expires before anyone decides it
+    And the server refuses to end the approved source session
+    When the agent runs "langwatch ops copy --from acme --to globex --format json"
+    Then it exits non-zero with "copy_sessions_still_live" naming the source request
+    And nothing is copied
 
   @integration
   Scenario: The CLI stops when a redeemed approval carries no ops token

@@ -290,6 +290,30 @@ describe("langwatch ops copy", () => {
     expect(ended).toEqual(["req_source"]);
   }, 30_000);
 
+  /** @scenario "The CLI names a session it could not end even when the copy failed first" */
+  it("reports the live source session when the target expired and ending the source failed", async () => {
+    decisions = { req_target: "expired" };
+    endRefused = new Set(["req_source"]);
+
+    const result = await run([
+      "ops",
+      "copy",
+      "--from",
+      "acme",
+      "--to",
+      "globex",
+      "--format",
+      "json",
+    ]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: "copy_sessions_still_live", meta: { requestIds: ["req_source"] } },
+    });
+    expect(copyCall).toBeNull();
+  }, 30_000);
+
   /** @scenario "The CLI stops when a redeemed approval carries no ops token" */
   it("refuses a redeem answer without an ops token and copies nothing", async () => {
     redeemWithoutToken = true;

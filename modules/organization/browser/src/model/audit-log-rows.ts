@@ -89,7 +89,7 @@ const NAMED_ACTIONS: Readonly<Record<string, string>> = {
   "staffAccess.write": "Made a change as LangWatch staff",
   "staffAccess.revoked": "Revoked LangWatch staff access",
   "staffAccess.expired": "LangWatch staff access ended",
-  "staffAccess.orgCopy": "LangWatch staff copied organization setup",
+  "staffAccess.orgCopy": "LangWatch staff started an organization setup copy",
   "staffAccess.orgCopyPlanned": "LangWatch staff planned an organization setup copy",
   "staffAccess.orgCopyStopped": "LangWatch staff organization setup copy stopped",
   "admin/impersonate": "Started impersonating a member",

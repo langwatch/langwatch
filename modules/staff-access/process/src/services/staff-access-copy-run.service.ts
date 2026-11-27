@@ -163,6 +163,12 @@ export class StaffAccessCopyRunService {
     grant: readonly string[];
     stillLive: CopyLiveness;
   }): Promise<{ items: StaffAccessCopyItem[]; stoppedBecause: string | null }> {
+    let stoppedBecause: string | null = null;
+    // A stop an item saw inside its own work (between a prompt's versions) latches for the run.
+    const latched: CopyLiveness = async () => {
+      stoppedBecause ??= await stillLive();
+      return stoppedBecause;
+    };
     const run: Run = {
       requestId,
       source,
@@ -170,15 +176,12 @@ export class StaffAccessCopyRunService {
       placed: new Map(plan.placed),
       teams: { teamId: undefined, looked: false },
       grant,
-      stillLive,
+      stillLive: latched,
     };
     const items: StaffAccessCopyItem[] = [];
-    let stoppedBecause: string | null = null;
     for (const step of plan.steps) {
       const due = step.item.outcome === "planned" && step.work !== null;
-      if (due && stoppedBecause === null) {
-        stoppedBecause = await stillLive();
-      }
+      if (due) await latched();
       if (due && stoppedBecause !== null) {
         items.push({ ...step.item, outcome: "stopped", reason: stoppedBecause });
         continue;

@@ -95,7 +95,14 @@ The copy is an ops operation of the `staff-access` module:
   `incomplete: dataset_copy_incomplete`. A
   prompt whose later version the owner refuses keeps its row with
   `incomplete: prompt_versions_incomplete`, and every rerun reports it as
-  `already_copied` with that reason: the missing versions are not appended. A rerun reports earlier items as
+  `already_copied` with that reason: the missing versions are not appended.
+  Later versions are written with `PromptApi.updatePrompt`, which merges the
+  fields it is given into the previous version. A source version that drops an
+  optional setting its predecessor had (inline demonstrations, a temperature)
+  therefore keeps the predecessor's value in the copy, since that write has no
+  way to clear a field. Copying each version exactly needs a prompt write that
+  sets a version's whole configuration; that is a new `PromptApi` operation for
+  the prompt module to rule on, and the copy uses it once it exists. A rerun reports earlier items as
   `already_copied` and makes only new ones. A dry run plans and creates nothing.
 
 ## Consequences

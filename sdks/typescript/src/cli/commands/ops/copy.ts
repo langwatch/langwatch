@@ -159,9 +159,10 @@ const endSides = async ({
 };
 
 /** Copy sessions this run could not end: they stay live until they lapse. */
-const sessionsStillLiveError = (requestIds: readonly string[]): Error => {
+/** Names the sessions left live; the failure that ended the copy first, if any, is its cause. */
+const sessionsStillLiveError = (requestIds: readonly string[], cause?: unknown): Error => {
   const message = `Could not end copy session ${requestIds.join(", ")}; it stays live until it lapses. The approver can revoke it on its approval page.`;
-  return Object.assign(new Error(message), {
+  return Object.assign(new Error(message, cause === undefined ? {} : { cause }), {
     ...commandValidationError(message, { requestIds }),
     code: "copy_sessions_still_live",
     kind: "copy_sessions_still_live",
@@ -217,15 +218,35 @@ export const opsCopyCommand = async ({
       scopes: ["copy:target"],
     },
   ];
-  const asked = [];
+  const asked: Asked[] = [];
   for (const side of sides) {
     asked.push(await requestSide({ side, reason: why, requesterKey, endpoint }));
   }
   console.error(chalk.gray("Waiting for both approvals..."));
+  return copyThenEnd({ asked, named, dryRun, requesterKey, endpoint });
+};
+
+type Asked = Awaited<ReturnType<typeof requestSide>>;
+
+/**
+ * Waits for both approvals and runs the copy, then ends every approved session whatever happened.
+ * A session left live is the error the caller sees, with any copy failure as its cause.
+ */
+const copyThenEnd = async ({
+  asked,
+  named,
+  dryRun,
+  requesterKey,
+  endpoint,
+}: {
+  asked: readonly Asked[];
+  named: readonly string[];
+  dryRun: boolean | undefined;
+  requesterKey: string;
+  endpoint: string;
+}): Promise<CommandResult> => {
   const approved: Approved[] = [];
-  const stillLive: string[] = [];
-  let result: CommandResult;
-  try {
+  const runCopy = async (): Promise<CommandResult> => {
     for (const side of asked) {
       approved.push(await approveSide({ ...side, requesterKey, endpoint }));
     }
@@ -241,15 +262,18 @@ export const opsCopyCommand = async ({
       },
       endpoint,
     });
-    result = {
-      data: report,
-      table: () => printReport(report),
-    };
-  } finally {
-    stillLive.push(...(await endSides({ approved, requesterKey, endpoint })));
+    return { data: report, table: () => printReport(report) };
+  };
+  const outcome = await runCopy().then(
+    (value) => ({ value }),
+    (error: unknown) => ({ error }),
+  );
+  const stillLive = await endSides({ approved, requesterKey, endpoint });
+  if (stillLive.length > 0) {
+    throw sessionsStillLiveError(stillLive, "error" in outcome ? outcome.error : undefined);
   }
-  if (stillLive.length > 0) throw sessionsStillLiveError(stillLive);
-  return result;
+  if ("error" in outcome) throw outcome.error;
+  return outcome.value;
 };
 
 const printReport = (report: CopyReport): void => {
