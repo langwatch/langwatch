@@ -184,6 +184,7 @@ jobs:
               # edit to that action will silently not re-run the suite it
               # feeds. These entries cover every action this file uses
               # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
+              - '.github/actions/apt-ubuntu-sources/**'
               - '.github/actions/detect-changes/**'
               - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
