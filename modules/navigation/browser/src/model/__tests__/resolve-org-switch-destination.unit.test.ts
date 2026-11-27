@@ -43,15 +43,17 @@ describe("resolveOrgSwitchDestination", () => {
       ).toBe("/dashboards");
     });
 
-    it("falls through when the product has no home to offer", () => {
-      // LLM Ops without a project resolves no home; the next candidate wins.
+    /** @scenario Switching organization falls through a product with no project */
+    it("lands on the root when the product has no home to offer", () => {
+      // The root re-resolves server side, where a Billing-only override can
+      // answer the plan page; picking a product here would skip that answer.
       expect(
         resolveOrgSwitchDestination({
           currentProduct: "llm-ops",
           reachableProducts: ["llm-ops", "me"],
           projectSlug: null,
         }),
-      ).toBe("/coding-agents");
+      ).toBe("/");
     });
   });
 
@@ -67,14 +69,15 @@ describe("resolveOrgSwitchDestination", () => {
       ).toBe("/acme-app");
     });
 
-    it("lands on Me when there is no project and Me is reachable", () => {
+    /** @scenario Switching organization with no project lands on root */
+    it("lands on the root when there is no project and Me is reachable", () => {
       expect(
         resolveOrgSwitchDestination({
           currentProduct: "governance",
           reachableProducts: ["me"],
           projectSlug: null,
         }),
-      ).toBe("/coding-agents");
+      ).toBe("/");
     });
   });
 

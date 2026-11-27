@@ -151,3 +151,17 @@ Feature: Landing
     When I switch to an organization where Governance is not reachable
     And that organization has a project "beta"
     Then I land on "/beta"
+
+  @unit
+  Scenario: Switching organization falls through a product with no project
+    Given I am in the LLM Ops product
+    When I switch to an organization where LLM Ops is reachable
+    And that organization has no project
+    Then I land on "/"
+
+  @unit
+  Scenario: Switching organization with no project lands on root
+    Given I am in the Governance product
+    When I switch to an organization where Governance is not reachable
+    And that organization has no project
+    Then I land on "/"
