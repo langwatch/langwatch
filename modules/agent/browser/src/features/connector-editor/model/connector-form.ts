@@ -33,11 +33,11 @@ export const EMPTY_CONNECTOR_FORM: ConnectorForm = {
   kept: {},
 };
 
-/** The form a saved agent seeds; a config that no longer parses seeds the defaults. */
+/** The form a saved agent seeds; a config that no longer parses seeds what it still holds. */
 export function formFromAgent(agent: { name?: string | null; config?: unknown }): ConnectorForm {
   const name = agent.name ?? "";
   const parsed = connectorAgentConfigSchema.safeParse(agent.config ?? {});
-  if (!parsed.success) return { ...EMPTY_CONNECTOR_FORM, name };
+  if (!parsed.success) return { ...formFromRawConfig({ config: agent.config }), name };
   const { call, setup, teardown, secretNames, fixturesDatasetId, timeoutMs, ...kept } = parsed.data;
   return {
     name,
@@ -115,4 +115,32 @@ export function checkConnectorForm(form: ConnectorForm): ConnectorFormCheck {
   }
   if (!parsed.success || Object.keys(errors).length > 0) return { ok: false, errors };
   return { ok: true, config: parsed.data };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function blockCode({ block }: { block: unknown }): string | null {
+  return isRecord(block) && typeof block.code === "string" ? block.code : null;
+}
+
+/**
+ * A stored config the schema now refuses (for example one saved before a cap) keeps its blocks and
+ * picks in the form, so a save shows what to fix instead of replacing them with the starter code.
+ */
+function formFromRawConfig({ config }: { config: unknown }): Omit<ConnectorForm, "name"> {
+  if (!isRecord(config)) return EMPTY_CONNECTOR_FORM;
+  const { call, setup, teardown, secretNames, fixturesDatasetId, timeoutMs, ...kept } = config;
+  return {
+    callCode: blockCode({ block: call }) ?? "",
+    setupCode: blockCode({ block: setup }),
+    teardownCode: blockCode({ block: teardown }),
+    secretNames: Array.isArray(secretNames)
+      ? secretNames.filter((secret): secret is string => typeof secret === "string")
+      : [],
+    fixturesDatasetId: typeof fixturesDatasetId === "string" ? fixturesDatasetId : "",
+    timeoutSeconds: typeof timeoutMs === "number" ? String(timeoutMs / 1000) : "",
+    kept,
+  };
 }

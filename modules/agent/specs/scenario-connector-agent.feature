@@ -74,6 +74,12 @@ Feature: Scenario Connector agent
       Then the editor shows each block's code, the picked secret, the dataset and the timeout
       And saving it unchanged updates the agent with the same config
 
+    @unit
+    Scenario: Reopening a connector whose saved config no longer parses keeps its blocks
+      Given a saved connector config the schema now refuses, for example one naming 51 secrets
+      When its editor form is seeded from it
+      Then the form holds its call, setup and teardown code and its picks, not the starter code
+
     @integration
     Scenario: A connector agent's card opens its editor
       Given the Agents page lists a connector agent
