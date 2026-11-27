@@ -76,6 +76,7 @@ import type {
   FacetValuesResult,
   TraceListPage,
 } from "./features/list/trace-list-view.ts";
+import type { TraceIngestionCount, TracePresence } from "./features/ops/trace-ops.schemas.ts";
 import type { AiActionResult, AiQueryResult } from "./features/query/trace-ai-query.ts";
 import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
 import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
@@ -1118,6 +1119,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /**
+   * A staff investigation's ingestion figures (ADR-202): one row per asked project, zeros when
+   * nothing arrived in `[since, until)` (epoch ms). Refusals are counted per UTC day, so a range
+   * takes every day it touches.
+   */
+  countIngestionByProject(input: {
+    projectIds: string[];
+    since: number;
+    until: number;
+  }): Promise<TraceIngestionCount[]>;
+  /** Whether a trace id is stored in the project, with counts and arrival times only (ADR-202). */
+  findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {
     projectId: string;

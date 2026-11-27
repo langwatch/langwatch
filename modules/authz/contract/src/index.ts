@@ -22,5 +22,6 @@ export * from "./engine.ts";
 export { seatCapsBinding } from "./matchers.ts";
 export * from "./roles.ts";
 export * from "./scope.ts";
+export * from "./staff-roles.ts";
 export * from "./vocabulary.ts";
 export * from "./authz.config.ts";

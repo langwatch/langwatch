@@ -1,4 +1,4 @@
-import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
+import type { TraceCost, TracePresence, TraceUsageCount } from "@langwatch/trace-contract";
 
 /**
  * Which of a set of candidate ids the project actually holds a trace for.
@@ -29,4 +29,24 @@ export abstract class TraceExistenceRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<TraceUsageCount>;
+
+  /** Each asked project's distinct traces that occurred in `[since, until)`, and the latest one. */
+  abstract countTracesByProject(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<TraceProjectCount[]>;
+
+  /** The trace's stored spans in one project: counts and arrival times, empty when absent. */
+  abstract findTracePresence(input: {
+    projectId: string;
+    traceId: string;
+  }): Promise<TracePresence[]>;
 }
+
+/** One project's traces over a range; `lastTraceAt` is null when none occurred. */
+export type TraceProjectCount = Readonly<{
+  projectId: string;
+  traces: number;
+  lastTraceAt: number | null;
+}>;

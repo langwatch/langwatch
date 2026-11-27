@@ -89,6 +89,16 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       orderBy: { createdAt: "desc" },
     });
   }
+  findEveryKeyInOrganization(input: {
+    organizationId: string;
+    limit: number;
+  }): Promise<ApiKeyRow[]> {
+    return this.database.apiKey.findMany({
+      where: { organizationId: input.organizationId },
+      orderBy: [{ revokedAt: { sort: "desc", nulls: "first" } }, { createdAt: "desc" }],
+      take: input.limit,
+    });
+  }
   update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const { id, grants: _grants, revokedAt, lastUsedAt, ...data } = input;
     return this.database.apiKey.update({

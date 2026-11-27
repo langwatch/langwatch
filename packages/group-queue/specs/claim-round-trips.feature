@@ -105,3 +105,42 @@ Feature: A claim's bookkeeping in few round trips
     When they are drained into the claim
     Then each sibling's body is read once
     And the staged jobs, their bodies, the counter and the claimed record each take one write
+
+  @unit
+  Scenario: A claim that fills every free slot is followed at once by the next
+    Given a consumer with fewer free slots than a large claim and a backlog of ready groups
+    When each claim returns a job for every free slot
+    Then the dispatcher claims again on its next turn without pausing
+
+  @unit
+  Scenario: A claim that finds fewer jobs than free slots pauses before the next
+    Given a consumer whose claim returns fewer jobs than it has free slots
+    When the claim is handed over
+    Then the dispatcher waits 25 ms before claiming again, so an idle queue does not spin Redis
+
+  @unit
+  Scenario: A full consumer claims again as soon as one of its slots frees
+    Given a consumer with every slot taken and a backlog of ready groups
+    And no queue signal arrives after its jobs complete
+    When one of its jobs finishes, or its slot count grows
+    Then the dispatcher claims for the free slots without waiting for a signal
+
+  @unit
+  Scenario: Slots freed one at a time gather into one claim per gap
+    Given a consumer with every slot taken and a backlog of ready groups
+    When its jobs finish one at a time, fewer than a full claim of 32 between claims
+    Then the dispatcher waits until 10 ms have passed since its last claim
+    And claims once for every slot freed meanwhile
+
+  @integration
+  Scenario: A backlog of short jobs keeps the claim rate bounded
+    Given a consumer with 100 slots and a backlog of 20 ms jobs across many tenants
+    When it drains the backlog
+    Then it claims at most 100 times a second for small claims, plus once per 32 jobs it runs
+
+  @unit
+  Scenario: A slot waiting on its next claim during a backlog counts as busy
+    Given a consumer whose last claim found a job for every slot it asked for
+    When the adaptive slot count measures how many slots are taken
+    Then the slots between claims count as taken, since work is waiting for them
+    And a claim that found fewer jobs than it asked for, or a paused dispatcher, clears the backlog
