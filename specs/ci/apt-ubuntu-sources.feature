@@ -16,5 +16,6 @@ Feature: Hosted runner jobs reach apt only through Ubuntu's own archives
 
   @unit
   Scenario: Every apt use runs after the shared action
-    Given a workflow job or a local action runs apt-get, installs Playwright with --with-deps or caches the Playwright browser
+    Given a workflow job or a local action runs apt-get, installs Playwright with --with-deps, caches the Playwright browser,
+      runs run-package-suites.ts, or runs a package script whose command installs Playwright with --with-deps
     Then an earlier step in it uses the apt-ubuntu-sources action

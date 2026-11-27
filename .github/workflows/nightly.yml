@@ -321,6 +321,8 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
+      - uses: ./.github/actions/apt-ubuntu-sources
+
       - name: Generate a throwaway CREDENTIALS_SECRET
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 

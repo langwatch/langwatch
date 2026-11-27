@@ -64,7 +64,8 @@ func aptWorkflowProblems(t *testing.T, workflow string) []string {
 	t.Helper()
 	root := t.TempDir()
 	action := "runs:\n  using: composite\n  steps:\n    - id: apt-ubuntu-sources\n      shell: bash\n      run: echo\n"
-	files := map[string]string{aptSourcesAction: action, ".github/workflows/ci.yml": workflow}
+	browser := `{"scripts": {"test:browser": "playwright install --with-deps chromium && vitest run", "test": "vitest run"}}`
+	files := map[string]string{aptSourcesAction: action, ".github/workflows/ci.yml": workflow, "modules/x/browser/package.json": browser}
 	for rel, body := range files {
 		path := filepath.Join(root, rel)
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
@@ -94,8 +95,13 @@ jobs:
         with:
           path: ~/.cache/ms-playwright`, 1)
 
+	packageSuites := strings.Replace(aptFirst, "sudo apt-get update && sudo apt-get install -y lsof", "node --experimental-strip-types .github/scripts/run-package-suites.ts", 1)
+	browserScript := strings.Replace(aptFirst, "sudo apt-get update && sudo apt-get install -y lsof", "pnpm --filter @langwatch/x-browser test:browser", 1)
+	plainTest := strings.Replace(aptFirst, "sudo apt-get update && sudo apt-get install -y lsof", "pnpm --filter @langwatch/x-browser test", 1)
+
 	assert.Empty(t, aptWorkflowProblems(t, good))
-	for _, workflow := range []string{aptFirst, playwright, browserCache} {
+	assert.Empty(t, aptWorkflowProblems(t, plainTest))
+	for _, workflow := range []string{aptFirst, playwright, browserCache, packageSuites, browserScript} {
 		assert.NotEqual(t, good, workflow)
 		assert.Contains(t, strings.Join(aptWorkflowProblems(t, workflow), "\n"), "before ./.github/actions/apt-ubuntu-sources")
 	}
