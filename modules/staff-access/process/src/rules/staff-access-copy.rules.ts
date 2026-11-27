@@ -87,21 +87,28 @@ export function copyTotals(items: readonly StaffAccessCopyItem[]): StaffAccessCo
   return totals;
 }
 
-/** What the audit rows say a copy is about to make, or made before it stopped: kind and name. */
+/**
+ * What the audit rows say a copy is about to make (`planned`), or made before it stopped
+ * (`made`): every target this run created, a failed item that still holds its target included.
+ */
 export function auditedPlan({
   items,
-  outcome = "planned",
+  select = "planned",
 }: {
   items: readonly StaffAccessCopyItem[];
-  outcome?: StaffAccessCopyOutcome;
+  select?: "planned" | "made";
 }): {
   counts: Record<string, number>;
   names: string[];
 } {
-  const planned = items.filter((item) => item.outcome === outcome);
+  const chosen = items.filter((item) =>
+    select === "planned"
+      ? item.outcome === "planned"
+      : item.outcome === "copied" || (item.outcome === "failed" && item.targetId !== null),
+  );
   const counts: Record<string, number> = {};
-  for (const item of planned) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
-  const names = planned.slice(0, COPY_AUDIT_NAMES_MAX).map((item) => `${item.kind}: ${item.name}`);
+  for (const item of chosen) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
+  const names = chosen.slice(0, COPY_AUDIT_NAMES_MAX).map((item) => `${item.kind}: ${item.name}`);
   return { counts, names };
 }
 

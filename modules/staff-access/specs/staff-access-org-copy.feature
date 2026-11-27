@@ -125,6 +125,21 @@ Feature: Copying an organization's setup into another organization
     And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row with the reason and what was made, each written on its own in up to three attempts
 
   @integration
+  Scenario: An approval that ends between a prompt's versions stops the next version
+    Given a copy is running
+    When Olivia revokes the source session right after the prompt was created in Globex
+    Then no later version of that prompt is written
+    And the prompt is reported as failed with "prompt_versions_incomplete"
+    And the stopped audit rows name the prompt
+
+  @unit
+  Scenario: A stopped copy's audit rows name every target the run made
+    Given a stopped run that copied a project and made a dataset whose copy then failed
+    When the stopped audit rows are written
+    Then they name the project and the dataset
+    And they never name an item an earlier run copied
+
+  @integration
   Scenario: A stop row that fails every attempt does not lose the stopped report
     Given a copy is running and Globex's audit log refuses every stop row
     When Olivia revokes the source session after the evaluator was made

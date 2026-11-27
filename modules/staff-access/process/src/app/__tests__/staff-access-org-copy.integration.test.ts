@@ -341,6 +341,31 @@ function scenarios(backend: Backend): void {
         expect(stopped.map((row) => row.organizationId)).toEqual([ACME.id]);
       });
 
+      /** @scenario "An approval that ends between a prompt's versions stops the next version" */
+      it("writes no later prompt version once the source session is revoked", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        w.copy.hooks.afterPromptCreate = async () => {
+          await w.app.revokeSession({ ...w.operator(OLIVIA), requestId: source.requestId });
+        };
+
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+        });
+
+        const prompt = report.items.find((item) => item.kind === "prompt");
+        expect(prompt).toMatchObject({ outcome: "failed", reason: "prompt_versions_incomplete" });
+        expect(w.copy.data.prompts.filter((row) => row.id === prompt?.targetId)).toHaveLength(1);
+        expect(report.stoppedBecause).toBe("source_approval_ended");
+        expect(report.items.find((item) => item.kind === "dataset")?.outcome).toBe("stopped");
+        const stopped = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyStopped");
+        expect(stopped[0]?.metadata).toMatchObject({
+          items: expect.arrayContaining(["prompt: support-reply"]),
+        });
+      });
+
       /** @scenario "A rerun copies only what is new" */
       it("copies only the prompt added since the first copy", async () => {
         const w = world();

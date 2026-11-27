@@ -1,3 +1,6 @@
+-- IRREVERSIBLE: creates "StaffAccessCopyLedger". A rollback leaves it in place: it is the ledger
+-- that keeps a rerun from making a second target, so removing it would let reruns duplicate
+-- copies. Dropping it is an operator step confirmed in Ops.
 -- The organization copy ledger (staff-access module ADR-002). A row is reserved before its
 -- target is made, so the target columns stay null until the copy names them.
 CREATE TABLE IF NOT EXISTS "StaffAccessCopyLedger" (

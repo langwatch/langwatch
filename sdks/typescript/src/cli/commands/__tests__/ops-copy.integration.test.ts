@@ -201,10 +201,15 @@ describe("langwatch ops copy", () => {
       "globex",
       "--projects",
       " , ",
+      "--format",
+      "json",
     ]);
 
     expect(result.exitCode).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("leave it out to copy every project");
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: "validation_error" },
+    });
     expect(requests).toEqual([]);
   }, 30_000);
 });

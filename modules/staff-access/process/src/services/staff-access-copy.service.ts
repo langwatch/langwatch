@@ -297,7 +297,7 @@ export class StaffAccessCopyService {
   }): Promise<void> {
     const plan = auditedPlan({
       items,
-      outcome: action === AUDIT_ACTION.stopped ? "copied" : "planned",
+      select: action === AUDIT_ACTION.stopped ? "made" : "planned",
     });
     const sides = [
       [source, "source"],

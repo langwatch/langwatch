@@ -85,6 +85,21 @@ describe("copyTotals and auditedPlan", () => {
       names: ["project: support-bot", "prompt: reply"],
     });
   });
+
+  /** @scenario "A stopped copy's audit rows name every target the run made" */
+  it("lists copied items and failed items that hold a target, never earlier copies", () => {
+    const items = [
+      item({ kind: "project", name: "support-bot", outcome: "copied", targetId: "project_9" }),
+      item({ kind: "dataset", name: "golden", outcome: "failed", targetId: "dataset_9" }),
+      item({ kind: "evaluator", name: "judge", outcome: "failed" }),
+      item({ outcome: "already_copied", targetId: "prompt_9" }),
+      item({ outcome: "stopped", reason: "source_approval_ended" }),
+    ];
+    expect(auditedPlan({ items, select: "made" })).toEqual({
+      counts: { project: 1, dataset: 1 },
+      names: ["project: support-bot", "dataset: golden"],
+    });
+  });
 });
 
 describe("failureReason", () => {

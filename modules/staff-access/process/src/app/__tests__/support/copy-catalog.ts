@@ -253,6 +253,7 @@ export function copyCatalog() {
   const hooks = {
     beforeEvaluatorCreate: async () => {},
     afterDatasetCreate: async (_made: { targetDatasetId: string }) => {},
+    afterPromptCreate: async () => {},
   };
 
   const evaluators = createApiFixture<EvaluatorApi>({
@@ -309,6 +310,7 @@ export function copyCatalog() {
         commitMessage: input.commitMessage ?? null,
       });
       data.prompts.push(version);
+      await hooks.afterPromptCreate();
       return version;
     },
     updatePrompt: async (input) => {

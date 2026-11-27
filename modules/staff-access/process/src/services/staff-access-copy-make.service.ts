@@ -57,6 +57,8 @@ export type CopyRun = {
   teams: Teams;
   /** What the target approval lets the copy create there, as signed. */
   grant: readonly string[];
+  /** Why the copy must stop now, or null while both approvals are live. */
+  stillLive: () => Promise<string | null>;
 };
 
 /**
@@ -100,12 +102,7 @@ export class StaffAccessCopyMakeService {
       case "monitor":
         return this.copyMonitor({ monitor: work.source, projectId, placed: run.placed });
       case "prompt": {
-        const copied = await this.copyPrompt({
-          prompt: work.source,
-          source: run.source,
-          target: run.target,
-          projectId,
-        });
+        const copied = await this.copyPrompt({ prompt: work.source, run, projectId });
         return {
           ...into(copied.id),
           ...(copied.incomplete ? { incomplete: copied.incomplete } : {}),
@@ -196,19 +193,19 @@ export class StaffAccessCopyMakeService {
 
   /**
    * Every version, oldest first, as new versions of one new prompt. Once the prompt exists a
-   * refused version is reported, not thrown, so the ledger records the prompt it made.
+   * refused version, or an approval that ended between versions, is reported, not thrown, so the
+   * ledger records the prompt it made.
    */
   private async copyPrompt({
     prompt,
-    source,
-    target,
+    run,
     projectId,
   }: {
     prompt: VersionedPrompt;
-    source: Organization;
-    target: Organization;
+    run: CopyRun;
     projectId: string;
   }): Promise<{ id: string; incomplete?: string }> {
+    const { source, target } = run;
     const versions = (
       await this.deps.prompts.getAllVersions({
         idOrHandle: prompt.id,
@@ -227,6 +224,9 @@ export class StaffAccessCopyMakeService {
     });
     try {
       for (const version of later) {
+        if ((await run.stillLive()) !== null) {
+          return { id: created.id, incomplete: "prompt_versions_incomplete" };
+        }
         await this.deps.prompts.updatePrompt({
           idOrHandle: created.id,
           projectId,

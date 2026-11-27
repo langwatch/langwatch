@@ -50,8 +50,11 @@ The copy is an ops operation of the `staff-access` module:
   is never written to a trail row, an audit row or an answer.
 - **A revoke stops a running copy.** Before each item the run rereads both
   approvals. Once either is revoked, lapsed or ended, nothing more is made,
-  the remaining items are reported `stopped` and the report says why. Each
-  audit log is then sent a `staffAccess.orgCopyStopped` row with what was made,
+  the remaining items are reported `stopped` and the report says why. A prompt
+  checks both approvals again before each later version, and one that stops
+  between versions keeps what it wrote as `prompt_versions_incomplete`. Each
+  audit log is then sent a `staffAccess.orgCopyStopped` row naming every target
+  the run made, failed items that hold a target included,
   written on its own in up to three attempts; a side whose row still fails is
   logged, and the other organization keeps its row. This last row is best
   effort: the trail rows and the `staffAccess.orgCopy` rows written before the

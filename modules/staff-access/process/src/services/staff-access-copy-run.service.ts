@@ -151,6 +151,7 @@ export class StaffAccessCopyRunService {
       placed: new Map(plan.placed),
       teams: { teamId: undefined, looked: false },
       grant,
+      stillLive,
     };
     const items: StaffAccessCopyItem[] = [];
     let stoppedBecause: string | null = null;
