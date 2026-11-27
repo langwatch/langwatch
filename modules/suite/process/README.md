@@ -489,11 +489,11 @@ Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:28
 Answers at `/api/v1/test-suites/templates/:templateId/apply`.
 
 ```typescript
-// Params: suiteTemplateIdParamsSchema, ../contract/src/suite.ts:460
+// Params: suiteTemplateIdParamsSchema, ../contract/src/suite.ts:463
 interface Params {
   templateId: string;
 }
-// Body: applySuiteTemplateBodySchema, ../contract/src/suite.ts:470
+// Body: applySuiteTemplateBodySchema, ../contract/src/suite.ts:473
 interface Body {
   fit: {
     agentName: string;
@@ -502,7 +502,7 @@ interface Body {
   };
   name?: string;
 }
-// Response: appliedSuiteTemplateSchema, ../contract/src/suite.ts:449
+// Response: appliedSuiteTemplateSchema, ../contract/src/suite.ts:452
 interface Response {
   suiteId: string;
   slug: string;
@@ -595,7 +595,7 @@ Contract `../contract/src/suite.trpc.ts:40`, router `src/transport/suite.trpc.ts
 ```typescript
 // suites.create
 type Input = z.infer<typeof createSuiteTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:84
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:143
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:146
 
 // suites.getAll
 // Input: listSuitesTrpcInputSchema, ../contract/src/suite-trpc.schemas.ts:170
@@ -619,11 +619,11 @@ type Output = z.infer<typeof suiteOrTestSuiteSchema>; // ../contract/src/suite-t
 
 // suites.duplicate
 type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:34
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:143
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:146
 
 // suites.archive
 type Input = z.infer<typeof suiteTrpcIdInputSchema>; // ../contract/src/suite-trpc.schemas.ts:34
-type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:143
+type Output = z.infer<typeof suiteSchema>; // ../contract/src/suite.ts:146
 
 // suites.resolveArchivedNames
 type Input = z.infer<typeof suiteArchivedNamesTrpcInputSchema>; // ../contract/src/suite-trpc.schemas.ts:181
@@ -724,7 +724,7 @@ type Input = z.infer<typeof suiteProjectInputSchema>; // ../contract/src/suite-t
 // Output: suiteTemplateSchema.array() (inline, ../contract/src/suite.trpc.ts:135)
 
 // suites.testSuites.applyTemplate
-// Input: applySuiteTemplateTrpcInputSchema, ../contract/src/suite.ts:433
+// Input: applySuiteTemplateTrpcInputSchema, ../contract/src/suite.ts:436
 interface Input {
   templateId: string;
   fit: {
@@ -735,7 +735,7 @@ interface Input {
   name?: string;
   projectId: string;
 }
-type Output = z.infer<typeof appliedSuiteTemplateSchema>; // ../contract/src/suite.ts:449
+type Output = z.infer<typeof appliedSuiteTemplateSchema>; // ../contract/src/suite.ts:452
 ```
 
 ## Sockets
