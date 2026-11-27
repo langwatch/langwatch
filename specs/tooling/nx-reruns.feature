@@ -38,5 +38,5 @@ Feature: test:affected and lint:changed rerun only what an edit can change
   Scenario: The root typecheck and the lint runs replay from the cache
     Given the workspace project's typecheck and lint:tree targets
     Then both are cached
-    And typecheck hashes every file tsc reads and the generated files it depends on
+    And typecheck hashes the sources of every file tsc reads, never the contents of a dist directory
     And typecheck declares the declarations it writes as outputs, never a whole dist directory

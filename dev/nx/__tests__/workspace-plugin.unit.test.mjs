@@ -19,10 +19,11 @@ void describe("workspace targets", () => {
   });
 
   /** @scenario "The root typecheck and the lint runs replay from the cache" */
-  void it("hashes what tsc reads and the generated files typecheck depends on", () => {
+  void it("hashes the sources of what tsc reads and of the files its dependencies generate", () => {
     const { inputs, dependsOn } = targets.typecheck;
     assert.ok(inputs.includes("{workspaceRoot}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}"));
-    assert.ok(inputs.some((input) => input.dependentTasksOutputFiles === "**/*"));
+    assert.ok(inputs.includes("{workspaceRoot}/**/*.prisma"));
+    assert.ok(inputs.every((input) => input.dependentTasksOutputFiles === undefined));
     assert.ok(dependsOn.includes("@langwatch/prisma-client:prisma:generate"));
   });
 

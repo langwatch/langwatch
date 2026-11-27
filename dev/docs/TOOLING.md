@@ -81,7 +81,7 @@ there, as it always has.
 `--types` scope that reaches more than half the projects widens to all of them.
 Every run but `--changed` resolves its scope and then runs through the cached
 `workspace:lint:tree` target with that scope as its arguments, so the same tree
-and scope replay the result (inputs: the whole tree and the generated files).
+and scope replay the result (inputs: the whole tree).
 The per-project `lint` and `lint:types` targets (`dev/nx/lint-plugin.mjs`)
 stay for `nx affected -t lint:types`. `pnpm lint:changed` can miss a finding in an untouched file when
 the cause is something no Nx input names, and it never runs the enforcer, so

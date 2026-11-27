@@ -99,10 +99,10 @@ export const createNodes = [
         "!{workspaceRoot}/.claude/**/*",
         "!{workspaceRoot}/.nx/**/*",
       ];
-      // The one root `tsc -b` (`pnpm typecheck`, bare `nx typecheck`), cached on every
-      // file tsc can read plus the generated files it depends on; its tsbuildinfo stays the
-      // incremental cache on a miss. `nx sync` writes every project reference first
-      // (ADR-150, 2026-10-10 and 2026-11-27).
+      // The one root `tsc -b` (`pnpm typecheck`, bare `nx typecheck`), cached on the sources
+      // of what it reads and of the files its dependencies generate, never on dist contents
+      // (CI restores older ones); its tsbuildinfo stays the incremental cache on a miss.
+      // `nx sync` writes every project reference first (ADR-150, 2026-10-10, 2026-11-27).
       const solution = referenced(workspaceRoot, "tsconfig.json", new Set());
       const solutionDirs = [...new Set([...solution].map(dirname))].filter((dir) => dir !== ".");
       const typecheck = {
@@ -116,8 +116,11 @@ export const createNodes = [
           "{workspaceRoot}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}",
           "!{workspaceRoot}/.claude/**/*",
           "!{workspaceRoot}/.nx/**/*",
+          "{workspaceRoot}/**/*.prisma",
+          "{workspaceRoot}/skills/**/*",
           "{workspaceRoot}/pnpm-lock.yaml",
-          { dependentTasksOutputFiles: "**/*", transitive: true },
+          { env: "LANGWATCH_SKILLS_RENDER" },
+          { runtime: "node --version" },
         ],
         outputs: [
           ...solutionDirs.flatMap((dir) => declarationOutputs(workspaceRoot, dir)),
@@ -142,11 +145,7 @@ export const createNodes = [
         executor: "nx:run-commands",
         options: { cwd: "{workspaceRoot}", command: "node dev/nx/lint.mjs" },
         cache: true,
-        inputs: [
-          ...everything,
-          { runtime: "node --version" },
-          { dependentTasksOutputFiles: "**/*", transitive: true },
-        ],
+        inputs: [...everything, { env: "LANGWATCH_SKILLS_RENDER" }, { runtime: "node --version" }],
         outputs: [],
         dependsOn: typecheck.dependsOn,
       };
