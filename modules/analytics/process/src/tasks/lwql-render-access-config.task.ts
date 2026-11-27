@@ -11,6 +11,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { createLogger } from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { Task } from "@langwatch/task";
 
 import { LangWatchQLCollectionBindingService } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
@@ -123,7 +124,7 @@ function privateReaderPasswordSha256Of({
   }
   const resolved = resolvePrivateReader({
     organizationId,
-    passwords: parsePrivateReaderPasswords(source),
+    passwords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
     keyPepper: findKeyPeppers(source)[0],
   });
   switch (resolved.kind) {

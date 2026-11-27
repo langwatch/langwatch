@@ -9,6 +9,7 @@ import {
   TenantScopeError,
 } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -24,6 +25,10 @@ import {
 } from "../../langwatch-ql-executor.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-routed-executor.repository.ts";
+
+/** The rules' parse with the private families' own name split, as every caller passes. */
+const readerPasswordsOf = (source: Record<string, string | undefined>) =>
+  parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf });
 
 const TEST_READER = ({ organizationId }: { organizationId: string }) =>
   privateReaderOf({ keyPepper: "test-pepper", organizationId });
@@ -489,7 +494,7 @@ describe("given an organization with its own reader password and no key pepper",
   const OWN_PASSWORD = "fake-own-reader-password-0123456789";
   const lookup = () =>
     privateReaderLookupOf({
-      passwords: parsePrivateReaderPasswords({
+      passwords: readerPasswordsOf({
         "LWQL_PRIVATE_READER_PASSWORD__acme__org-private": OWN_PASSWORD,
       }),
       keyPepper: undefined,

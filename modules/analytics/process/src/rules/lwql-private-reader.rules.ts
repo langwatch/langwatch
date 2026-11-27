@@ -6,8 +6,6 @@
  */
 import { createHash } from "node:crypto";
 
-import { privateRouteNameOf } from "@langwatch/process-stores";
-
 import {
   derive,
   LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
@@ -79,15 +77,27 @@ interface ReaderPasswordEntry {
   readonly value: string;
 }
 
+/**
+ * The private families' one name split (`privateRouteNameOf`), handed in by the caller so these
+ * rules stay framework-free: the organisation follows the variable's last `__`.
+ */
+export type LwqlFamilyNameSplit = (input: { prefix: string; variable: string }) => {
+  organizationId: string;
+};
+
 /** The family's entries naming an organisation; an id starting `_` is a mistyped separator. */
-function readerPasswordEntriesOf(
-  source: Readonly<Record<string, string | undefined>>,
-): ReaderPasswordEntry[] {
+function readerPasswordEntriesOf({
+  source,
+  nameOf,
+}: {
+  source: Readonly<Record<string, string | undefined>>;
+  nameOf: LwqlFamilyNameSplit;
+}): ReaderPasswordEntry[] {
   return Object.entries(source).flatMap(([variable, value]) => {
     if (!variable.startsWith(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX) || value === undefined) {
       return [];
     }
-    const { organizationId } = privateRouteNameOf({
+    const { organizationId } = nameOf({
       prefix: LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
       variable,
     });
@@ -118,12 +128,16 @@ function refuseShared({
 }
 
 /** Pure and total: the label is for humans; the organisation follows the last `__`. */
-export function parsePrivateReaderPasswords(
-  source: Readonly<Record<string, string | undefined>>,
-): LwqlPrivateReaderPasswords {
+export function parsePrivateReaderPasswords({
+  source,
+  nameOf,
+}: {
+  source: Readonly<Record<string, string | undefined>>;
+  nameOf: LwqlFamilyNameSplit;
+}): LwqlPrivateReaderPasswords {
   const accepted = new Map<string, ReaderPasswordEntry>();
   const refused = new Map<string, string>();
-  for (const entry of readerPasswordEntriesOf(source)) {
+  for (const entry of readerPasswordEntriesOf({ source, nameOf })) {
     const { organizationId, variable, value } = entry;
     // Short, or a second one for the organisation: using either would be a guess, so refuse.
     const doubled = accepted.has(organizationId) || refused.has(organizationId);

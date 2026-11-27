@@ -521,12 +521,12 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                                       | Declared at                              |
 | ------ | --------------------------------- | ---------------------------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                                 | `src/app/analytics.app.ts:607`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`                            | `src/app/analytics.app.ts:608`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                                           | `src/app/analytics.app.ts:609`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                                       | `src/app/analytics.app.ts:610`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                                          | `src/app/analytics.app.ts:611`           |
-| secret | `lwqlPrivateReaderPasswords`      | ≈ `Secret.family(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX)` | `src/app/analytics.app.ts:613`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                                 | `src/app/analytics.app.ts:614`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`                            | `src/app/analytics.app.ts:615`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                                           | `src/app/analytics.app.ts:616`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                                       | `src/app/analytics.app.ts:617`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                                          | `src/app/analytics.app.ts:618`           |
+| secret | `lwqlPrivateReaderPasswords`      | ≈ `Secret.family(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX)` | `src/app/analytics.app.ts:620`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                                      | `../contract/src/analytics.config.ts:17` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                                     | `../contract/src/analytics.config.ts:18` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                                            | `../contract/src/analytics.config.ts:19` |

@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 
 import type * as Observability from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,6 +23,10 @@ import {
   provisionLwqlPrivateTargets,
 } from "../lwql-private-targets.task.ts";
 import { convergeLwqlPrivateRepository, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
+
+/** The rules' parse with the private families' own name split, as every caller passes. */
+const readerPasswordsOf = (source: Record<string, string | undefined>) =>
+  parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf });
 
 const { logCalls, policyRows, policyChecks, readerByUrl, readerStorage } = vi.hoisted(() => ({
   logCalls: [] as { level: string; fields: unknown; message: unknown }[],
@@ -139,7 +144,7 @@ function run({
       endpoints,
       sharedUrl: SHARED_URL,
       keyPepper: keyPepper ?? undefined,
-      readerPasswords: parsePrivateReaderPasswords(readerPasswords ?? ownPasswords),
+      readerPasswords: readerPasswordsOf(readerPasswords ?? ownPasswords),
       shared,
       converge: converged,
     }),

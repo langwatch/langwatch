@@ -9,6 +9,7 @@ import {
   resolveClickHouseMigrationTaskConfig,
 } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
@@ -976,7 +977,7 @@ async function runLwqlProvisioningTask({
     endpoints: privateEndpointsOf({ source }),
     sharedUrl: source.CLICKHOUSE_URL,
     keyPepper: findKeyPeppers(source)[0],
-    readerPasswords: parsePrivateReaderPasswords(source),
+    readerPasswords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
     shared: plan,
     converge: (privatePlan) => convergeLwqlPrivateClickHouse({ database, plan: privatePlan }),
   });

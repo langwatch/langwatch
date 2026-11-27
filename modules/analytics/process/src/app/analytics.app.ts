@@ -65,7 +65,11 @@ import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
+import {
+  OverloadedRefusal,
+  privateRouteNameOf,
+  StatementBoundTelemetry,
+} from "@langwatch/process-stores";
 import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract";
 import {
   apiKeyPepper,
@@ -518,7 +522,10 @@ function lwqlPrivateReaders(secrets: ScopedSecrets): Promise<LwqlPrivateReaderOf
   return secrets.into(AnalyticsModule.secrets.lwqlPrivateReaderPasswords, (family) =>
     intoKeyPepper(secrets, (keyPepper) =>
       privateReaderLookupOf({
-        passwords: parsePrivateReaderPasswords(Object.fromEntries(family)),
+        passwords: parsePrivateReaderPasswords({
+          source: Object.fromEntries(family),
+          nameOf: privateRouteNameOf,
+        }),
         keyPepper,
         onFallback: ({ organizationId, fallback }) => {
           if (fallback.kind === "derived") {

@@ -1,3 +1,4 @@
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import { withChainedSecrets } from "../lwql-default-credentials.rules.ts";
@@ -9,13 +10,17 @@ import {
   resolvePrivateReader,
 } from "../lwql-private-reader.rules.ts";
 
+/** The rules' parse with the private families' own name split, as every caller passes. */
+const readerPasswordsOf = (source: Record<string, string | undefined>) =>
+  parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf });
+
 const PEPPER = "fake-test-pepper";
 const OWN = "fake-own-reader-password-0123456789";
 
 describe("parsePrivateReaderPasswords", () => {
   /** @scenario "A private ClickHouse's reader signs in with the instance's own password where one is set" */
   it("keys each password by the organisation after the last double underscore", () => {
-    const parsed = parsePrivateReaderPasswords({
+    const parsed = readerPasswordsOf({
       "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": OWN,
       "LWQL_PRIVATE_READER_PASSWORD__org-bare": "fake-bare-reader-password-0123456789",
       LWQL_CLICKHOUSE_PASSWORD: "fake-unrelated",
@@ -31,7 +36,7 @@ describe("parsePrivateReaderPasswords", () => {
 
   /** @scenario "A blank or doubled private reader password is refused, never derived" */
   it("refuses a blank value, naming its variable", () => {
-    const parsed = parsePrivateReaderPasswords({
+    const parsed = readerPasswordsOf({
       "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": "  \n",
       "LWQL_PRIVATE_READER_PASSWORD__other__org-empty": "",
     });
@@ -45,7 +50,7 @@ describe("parsePrivateReaderPasswords", () => {
 
   /** @scenario "A blank or doubled private reader password is refused, never derived" */
   it("refuses an organisation two variables name, keeping neither password", () => {
-    const parsed = parsePrivateReaderPasswords({
+    const parsed = readerPasswordsOf({
       "LWQL_PRIVATE_READER_PASSWORD__one__org-acme": OWN,
       "LWQL_PRIVATE_READER_PASSWORD__two__org-acme": "fake-second-reader-password-01234567",
     });
@@ -58,7 +63,7 @@ describe("parsePrivateReaderPasswords", () => {
 describe("parsePrivateReaderPasswords, given a short or shared password", () => {
   /** @scenario "A short or shared private reader password is refused, never derived" */
   it("refuses a password shorter than 32 characters once trimmed, and keeps one of 32", () => {
-    const parsed = parsePrivateReaderPasswords({
+    const parsed = readerPasswordsOf({
       "LWQL_PRIVATE_READER_PASSWORD__short__org-short": "x".repeat(31),
       "LWQL_PRIVATE_READER_PASSWORD__padded__org-padded": ` ${"y".repeat(31)}\n`,
       "LWQL_PRIVATE_READER_PASSWORD__exact__org-exact": "z".repeat(32),
@@ -73,7 +78,7 @@ describe("parsePrivateReaderPasswords, given a short or shared password", () => 
 
   /** @scenario "A short or shared private reader password is refused, never derived" */
   it("refuses every organisation sharing one value, keeping the others", () => {
-    const parsed = parsePrivateReaderPasswords({
+    const parsed = readerPasswordsOf({
       "LWQL_PRIVATE_READER_PASSWORD__a__org-a": OWN,
       "LWQL_PRIVATE_READER_PASSWORD__b__org-b": OWN,
       "LWQL_PRIVATE_READER_PASSWORD__c__org-c": "fake-third-reader-password-0123456789",
@@ -97,7 +102,7 @@ describe("parsePrivateReaderPasswords, given a variable naming no organisation",
     ["an empty id after the label", "LWQL_PRIVATE_READER_PASSWORD__acme__"],
     ["an id starting with an underscore", "LWQL_PRIVATE_READER_PASSWORD___org-acme"],
   ])("ignores a variable with %s", (_kind, variable) => {
-    const parsed = parsePrivateReaderPasswords({ [variable]: OWN });
+    const parsed = readerPasswordsOf({ [variable]: OWN });
 
     expect(parsed.passwords.size).toBe(0);
     expect(parsed.refused.size).toBe(0);
@@ -105,7 +110,7 @@ describe("parsePrivateReaderPasswords, given a variable naming no organisation",
 });
 
 describe("resolvePrivateReader", () => {
-  const passwords = parsePrivateReaderPasswords({
+  const passwords = readerPasswordsOf({
     "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": OWN,
     "LWQL_PRIVATE_READER_PASSWORD__blank__org-blank": " ",
   });
@@ -173,7 +178,7 @@ describe("privateReaderLookupOf", () => {
   it("answers null for every organisation with no key pepper and no reader password variable", () => {
     const onFallback = vi.fn();
     const lookup = privateReaderLookupOf({
-      passwords: parsePrivateReaderPasswords({}),
+      passwords: readerPasswordsOf({}),
       keyPepper: undefined,
       onFallback,
     });
@@ -189,7 +194,7 @@ describe("privateReaderLookupOf", () => {
   it("answers the own password with no key pepper, and null for an organisation without one", () => {
     const onFallback = vi.fn();
     const lookup = privateReaderLookupOf({
-      passwords: parsePrivateReaderPasswords({
+      passwords: readerPasswordsOf({
         "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": OWN,
       }),
       keyPepper: undefined,
@@ -209,7 +214,7 @@ describe("privateReaderLookupOf", () => {
   it("answers null for a refused variable though a key pepper is set, telling which variable", () => {
     const onFallback = vi.fn();
     const lookup = privateReaderLookupOf({
-      passwords: parsePrivateReaderPasswords({
+      passwords: readerPasswordsOf({
         "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": " ",
       }),
       keyPepper: PEPPER,
@@ -227,7 +232,7 @@ describe("privateReaderLookupOf", () => {
   it("tells each derived fallback once per organisation", () => {
     const onFallback = vi.fn();
     const lookup = privateReaderLookupOf({
-      passwords: parsePrivateReaderPasswords({}),
+      passwords: readerPasswordsOf({}),
       keyPepper: PEPPER,
       onFallback,
     });
@@ -259,7 +264,7 @@ describe("withChainedSecrets, given the reader password family", () => {
     });
 
     expect(resolved["LWQL_PRIVATE_READER_PASSWORD__acme__org-acme"]).toBe(chained);
-    expect(parsePrivateReaderPasswords(resolved).refused.has("org-blank")).toBe(true);
+    expect(readerPasswordsOf(resolved).refused.has("org-blank")).toBe(true);
   });
 
   /** @scenario "The upgrade and render tasks read private reader passwords through the secrets chain" */
