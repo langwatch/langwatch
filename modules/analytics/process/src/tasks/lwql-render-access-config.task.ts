@@ -104,7 +104,7 @@ export interface LwqlRenderedPrivateReader {
   readonly database: string;
 }
 
-/** The given hash wins; else the instance's own password's, else the key pepper's HMAC's. */
+/** A refused own password fails first; then the given hash wins, else the own or pepper's. */
 function privateReaderPasswordSha256Of({
   organizationId,
   source,
@@ -112,6 +112,16 @@ function privateReaderPasswordSha256Of({
   organizationId: string;
   source: Record<string, string | undefined>;
 }): string {
+  const resolved = resolvePrivateReader({
+    organizationId,
+    passwords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
+    keyPepper: findKeyPeppers(source)[0],
+  });
+  if (resolved.kind === "refused") {
+    throw new Error(
+      `lwql-render-access-config: ${resolved.variable} is blank, shorter than 32 characters, shared with another organisation or names an organisation another variable names too`,
+    );
+  }
   const given = source[LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256];
   if (given !== undefined) {
     const hash = given.trim();
@@ -122,11 +132,6 @@ function privateReaderPasswordSha256Of({
     }
     return hash;
   }
-  const resolved = resolvePrivateReader({
-    organizationId,
-    passwords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
-    keyPepper: findKeyPeppers(source)[0],
-  });
   switch (resolved.kind) {
     case "own":
       return sha256Hex(resolved.reader.password);
@@ -136,10 +141,6 @@ function privateReaderPasswordSha256Of({
         `rendering the private reader with a password derived from the key pepper, as neither ${LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256} nor LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId> is set`,
       );
       return sha256Hex(resolved.reader.password);
-    case "refused":
-      throw new Error(
-        `lwql-render-access-config: ${resolved.variable} is blank, shorter than 32 characters, shared with another organisation or names an organisation another variable names too`,
-      );
     case "absent":
       throw new Error(
         `lwql-render-access-config: missing required input API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET (the key pepper the private reader is derived from), or ${LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256}`,

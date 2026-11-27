@@ -517,6 +517,41 @@ describe("renderLwqlAccessConfig", () => {
       expect(await readdir(outDir, { recursive: true })).toEqual([]);
     });
 
+    /** @scenario "A given password hash never stands in for a refused private reader password" */
+    it.each([
+      ["empty", { [`LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`]: "" }, "one"],
+      ["whitespace", { [`LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`]: "  " }, "one"],
+      [
+        "doubled",
+        {
+          [`LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`]: OWN_PASSWORD,
+          [`LWQL_PRIVATE_READER_PASSWORD__two__${ORGANIZATION_ID}`]:
+            "fake-second-reader-password-0123456789",
+        },
+        "two",
+      ],
+    ])(
+      "fails naming the %s own-password variable though the hash is given, writing no file",
+      async (_kind, variables, label) => {
+        const source = { ...HASH_ENV, API_KEY_PEPPER: "fake-test-pepper", ...variables };
+
+        await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
+          `LWQL_PRIVATE_READER_PASSWORD__${label}__${ORGANIZATION_ID} is blank`,
+        );
+        expect(await readdir(outDir, { recursive: true })).toEqual([]);
+      },
+    );
+
+    /** @scenario "A given password hash never stands in for a refused private reader password" */
+    it("fails though the hash is given when only the secrets chain holds the empty password", async () => {
+      const variable = `LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`;
+      const lookupFamily = async () => new Map([[variable, ""]]);
+
+      await expect(
+        writeLwqlAccessConfig({ outDir, source: HASH_ENV, lookupFamily }),
+      ).rejects.toThrow(`${variable} is blank`);
+    });
+
     /** @scenario "A blank or doubled private reader password is refused, never derived" */
     it("fails naming a blank own-password variable rather than derive from the key pepper", async () => {
       const { LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256, ...env } = HASH_ENV;

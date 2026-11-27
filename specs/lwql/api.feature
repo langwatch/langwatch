@@ -831,7 +831,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
   @unit
   Scenario: A blank or doubled private reader password is refused, never derived
-    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> holds only whitespace, or two such variables name it
+    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is empty or holds only whitespace, or two such variables name it
+    And the empty value may come from the environment or the .env file the secrets chain reads
     When a LangWatchQL query reads its projects, the upgrade provisions its server, or the render task renders its reader
     Then the organization gets no reader: its queries are refused, its server is not converged and the render fails naming the variable
     And no password derived from the key pepper stands in for it
@@ -1007,6 +1008,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When lwql-render-access-config runs
     Then it fails naming LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 and writes no file
     And it never falls back to the key pepper or to the shared target
+
+  @unit
+  Scenario: A given password hash never stands in for a refused private reader password
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID names an organization and LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 holds a well-formed hash
+    And that organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is refused: empty, blank, short or shared, or two such variables name it
+    When lwql-render-access-config runs
+    Then it fails naming the refused variable and writes no file
+    And the given hash does not stand in for it, as the api and the upgrade refuse that organization too
 
   @unit
   Scenario: A private ClickHouse whose rendered reader is not loaded yet stays refused as not provisioned
