@@ -1,3 +1,4 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import {
@@ -36,6 +37,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
+      "api-key": createApiFixture<ApiKeyApi>(),
     });
 }
 

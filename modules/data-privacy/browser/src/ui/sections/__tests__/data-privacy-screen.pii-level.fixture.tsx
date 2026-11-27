@@ -92,7 +92,7 @@ export function snapshotWith({
       teams: [{ id: "team-1", name: "Platform" }],
       projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
     },
-    audienceOptions: { groups: [] },
+    audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
     effective: resolved(level, entities),
     effectiveTeam: resolved(level, entities),
     effectiveOrganization: resolved(level, entities),

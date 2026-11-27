@@ -4451,6 +4451,12 @@ const presentations = {
       return `${need} Ask an administrator, or set the rule on a scope you manage.`.trim();
     },
   },
+  data_privacy_api_key_add_forbidden: {
+    // ADR-208: the caller may edit this rule and keep its keys; only adding one is refused.
+    title: "Only an organization admin can add an API key",
+    describe: () =>
+      "You can still change this rule and keep the keys it names. Ask an organization admin to add the key.",
+  },
   data_privacy_config_invalid: {
     // `meta.reason` is the service's own line naming the offending pattern.
     // It is the only part the reader can act on, so it is what they read.

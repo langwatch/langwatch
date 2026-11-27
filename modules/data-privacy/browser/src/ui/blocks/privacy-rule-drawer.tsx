@@ -15,7 +15,9 @@ import {
   configToFormState,
   inheritedBaselineForScope,
   inheritFormState,
+  restrictsContentCategory,
   type RuleFormState,
+  withDispositions,
 } from "../../model/data-privacy-rule-config.ts";
 import {
   formHasInvalidPatterns,
@@ -171,7 +173,7 @@ export function PrivacyRuleDrawer({
         <ContentDispositionFields
           dispositions={form.dispositions}
           inheritedBaseline={inheritedBaseline}
-          onChange={(dispositions) => update({ dispositions })}
+          onChange={(dispositions) => setForm((current) => withDispositions(current, dispositions))}
         />
 
         <CustomAttributeRules
@@ -187,6 +189,7 @@ export function PrivacyRuleDrawer({
             <AudiencePicker
               audience={form.audience}
               options={audienceOptions}
+              offerApiKeys={restrictsContentCategory(form.dispositions)}
               onChange={(audience) => update({ audience })}
             />
             <Text fontSize="xs" color="fg.muted">

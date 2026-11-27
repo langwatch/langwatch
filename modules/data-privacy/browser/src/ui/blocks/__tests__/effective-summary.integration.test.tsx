@@ -49,7 +49,7 @@ const snapshot: DataPrivacySnapshot = {
     teams: [],
     projects: [],
   },
-  audienceOptions: { groups: [] },
+  audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
 };
 
 describe("EffectiveSummary", () => {

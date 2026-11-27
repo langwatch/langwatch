@@ -5,6 +5,7 @@ import {
   type CustomAttributeDisposition,
   type DataPrivacyConfig,
   type Disposition,
+  namedApiKeyIds,
   type PiiLevel,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedAudience,
@@ -21,9 +22,8 @@ export type PiiChoice = "inherit" | PiiLevel;
 export type SecretsChoice = "inherit" | "on" | "off";
 
 /**
- * The drawer's audience selection: all members, the standard role groups,
- * personal-project owners, or the organization's custom RBAC groups.
- * Everything off/empty means "no one" (fully hidden).
+ * The drawer's audience: all members, role groups, project owners, custom RBAC
+ * groups, or named API keys reading as Admins do (ADR-208). Empty means no one.
  */
 export interface AudienceFormState {
   admins: boolean;
@@ -32,6 +32,7 @@ export interface AudienceFormState {
   viewers: boolean;
   projectOwner: boolean;
   groupIds: string[];
+  apiKeyIds: string[];
 }
 
 export const EMPTY_AUDIENCE_FORM: AudienceFormState = {
@@ -41,13 +42,15 @@ export const EMPTY_AUDIENCE_FORM: AudienceFormState = {
   viewers: false,
   projectOwner: false,
   groupIds: [],
+  apiKeyIds: [],
 };
 
 /**
  * The audience as picker values, one entry per selected group:
- * `allMembers`, `projectOwner`, `role:admins|members|viewers`, `group:<id>`.
+ * `allMembers`, `projectOwner`, `role:admins|members|viewers`, `group:<id>`, `apiKey:<id>`.
  */
 export const ALL_MEMBERS_VALUE = "allMembers";
+export const API_KEY_VALUE_PREFIX = "apiKey:";
 export const PROJECT_OWNER_VALUE = "projectOwner";
 export const ROLE_VALUES = {
   admins: "role:admins",
@@ -63,6 +66,7 @@ export function audienceToSelection(audience: AudienceFormState): string[] {
   if (audience.members) values.push(ROLE_VALUES.members);
   if (audience.viewers) values.push(ROLE_VALUES.viewers);
   for (const id of audience.groupIds) values.push(`group:${id}`);
+  for (const id of audience.apiKeyIds) values.push(`${API_KEY_VALUE_PREFIX}${id}`);
   return values;
 }
 
@@ -74,21 +78,58 @@ export function selectionToAudience(values: string[]): AudienceFormState {
     members: values.includes(ROLE_VALUES.members),
     viewers: values.includes(ROLE_VALUES.viewers),
     groupIds: values.filter((v) => v.startsWith("group:")).map((v) => v.slice("group:".length)),
+    apiKeyIds: values
+      .filter((v) => v.startsWith(API_KEY_VALUE_PREFIX))
+      .map((v) => v.slice(API_KEY_VALUE_PREFIX.length)),
   };
 }
 
 /**
  * Collapse rule for the audience picker: "All members" already covers every
  * other group, so picking it replaces the whole selection, and picking
- * anything narrower drops it.
+ * anything narrower drops it. A key is not a member, so keys stay either way.
  */
 export function applyAudienceSelection(previous: string[], next: string[]): string[] {
+  const isKey = (v: string) => v.startsWith(API_KEY_VALUE_PREFIX);
+  const keys = next.filter(isKey);
   const pickedAllMembers =
     next.includes(ALL_MEMBERS_VALUE) && !previous.includes(ALL_MEMBERS_VALUE);
-  if (pickedAllMembers) return [ALL_MEMBERS_VALUE];
-  const addedNarrower = next.some((v) => v !== ALL_MEMBERS_VALUE && !previous.includes(v));
-  if (addedNarrower) return next.filter((v) => v !== ALL_MEMBERS_VALUE);
-  return next;
+  if (pickedAllMembers) return [ALL_MEMBERS_VALUE, ...keys];
+  const addedNarrower = next.some(
+    (v) => v !== ALL_MEMBERS_VALUE && !isKey(v) && !previous.includes(v),
+  );
+  const removedAdmins = [ROLE_VALUES.admins, ALL_MEMBERS_VALUE].some(
+    (v) => previous.includes(v) && !next.includes(v),
+  );
+  return keysReadAsAdmins(
+    addedNarrower ? next.filter((v) => v !== ALL_MEMBERS_VALUE) : next,
+    removedAdmins,
+  );
+}
+
+/**
+ * A key reads as Admins do (ADR-208): picking one keeps Admins; removing Admins, or All
+ * members which holds them, drops the keys.
+ */
+function keysReadAsAdmins(next: string[], removedAdmins: boolean): string[] {
+  const adminsSee = next.includes(ROLE_VALUES.admins) || next.includes(ALL_MEMBERS_VALUE);
+  if (adminsSee || !next.some((v) => v.startsWith(API_KEY_VALUE_PREFIX))) return next;
+  if (removedAdmins) return next.filter((v) => !v.startsWith(API_KEY_VALUE_PREFIX));
+  return [...next, ROLE_VALUES.admins];
+}
+
+/** Whether a content category is Restricted: only those may name keys (ADR-208). */
+export function restrictsContentCategory(dispositions: RuleFormState["dispositions"]): boolean {
+  return Object.values(dispositions).includes("restrict");
+}
+
+/** New content choices; only a restricted content category may name keys, so they go with it. */
+export function withDispositions(
+  form: RuleFormState,
+  dispositions: RuleFormState["dispositions"],
+): RuleFormState {
+  if (restrictsContentCategory(dispositions)) return { ...form, dispositions };
+  return { ...form, dispositions, audience: { ...form.audience, apiKeyIds: [] } };
 }
 
 /** A custom attribute rule row as edited in the drawer. */
@@ -105,6 +146,7 @@ export function audienceConfig(audience: AudienceFormState): Audience {
   if (audience.viewers) out.viewers = true;
   if (audience.projectOwner) out.projectOwner = true;
   if (audience.groupIds.length > 0) out.groupIds = [...audience.groupIds];
+  if (audience.apiKeyIds.length > 0) out.apiKeyIds = [...audience.apiKeyIds];
   return out;
 }
 
@@ -116,6 +158,7 @@ function audienceToFormState(audience: Audience | ResolvedAudience | undefined):
     viewers: audience?.viewers ?? false,
     projectOwner: audience?.projectOwner ?? false,
     groupIds: [...(audience?.groupIds ?? [])],
+    apiKeyIds: [...(audience?.apiKeyIds ?? [])],
   };
 }
 
@@ -205,7 +248,8 @@ function customAttributeRule({
     ? {
         pattern: row.pattern,
         disposition: "restrict" as const,
-        audience: audienceConfig(audience),
+        // No key reads an attribute rule, so only the content categories name keys.
+        audience: audienceConfig({ ...audience, apiKeyIds: [] }),
       }
     : { pattern: row.pattern, disposition: "drop" as const };
 }
@@ -350,6 +394,14 @@ export function ruleSummary(config: DataPrivacyConfig): string {
     if (disposition) {
       parts.push(`${CATEGORY_SUMMARY_LABELS[category]} ${DISPOSITION_SUMMARY_LABELS[disposition]}`);
     }
+  }
+  const keys = namedApiKeyIds(config).length;
+  if (keys > 0) {
+    parts.push(
+      keys === 1
+        ? "1 API key reads restricted content"
+        : `${keys} API keys read restricted content`,
+    );
   }
   const attributeRules = config.customAttributes?.length ?? 0;
   if (attributeRules > 0) {

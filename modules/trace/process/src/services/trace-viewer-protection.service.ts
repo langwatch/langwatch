@@ -5,6 +5,7 @@ import {
   askViewerRolePermissions,
   describeAudience,
   isContentVisible,
+  isContentVisibleToKey,
   isContentVisibleToPublic,
   needsOwnerFact,
   needsRoleEverywhere,
@@ -82,7 +83,8 @@ export class TraceViewerProtectionService {
   }
 
   /** Credential redactions: an access token (a `user` principal) reads content as its person,
-   * a key as the public; costs are the credential's own grant. A legacy key sees costs. */
+   * a key as the public unless a rule's audience names it (ADR-208); costs are the credential's
+   * own grant. A legacy key sees costs. */
   async resolveForApiKey(
     input: Readonly<{
       projectId: string;
@@ -97,14 +99,18 @@ export class TraceViewerProtectionService {
         ? input.principal.id
         : void 0;
     const proof = input.authorization;
+    const keyId = input.principal?.type === "apiKey" ? input.principal.id : void 0;
+    // The proof's other projects fold their policies in, for a person and a named key alike.
     const ownProof =
-      personId && proof?.principal.type === "user" && proof.principal.id === personId;
+      (personId && proof?.principal.type === "user" && proof.principal.id === personId) ||
+      (keyId && proof?.principal.type === "apiKey" && proof.principal.id === keyId);
     const [protections, canSeeCosts] = await Promise.all([
       this.resolve({
         projectId: input.projectId,
         userId: personId,
         publiclyShared: false,
         ...(ownProof ? { authorization: proof } : {}),
+        ...(keyId ? { apiKeyId: keyId } : {}),
       }),
       this.keyPermitted(input),
     ]);
@@ -138,6 +144,8 @@ export class TraceViewerProtectionService {
       publiclyShared: boolean;
       /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
       authorization?: Authorization;
+      /** The reading key, when an API key reads: a rule's audience may name it (ADR-208). */
+      apiKeyId?: string;
     }>,
   ): Promise<Protections> {
     const policyProjectIds = policyProjectIdsOf(input);
@@ -188,6 +196,7 @@ export class TraceViewerProtectionService {
       projectId: input.projectId,
       userId: input.userId,
       anonymous: input.publiclyShared || input.userId === undefined,
+      apiKeyId: input.publiclyShared ? undefined : input.apiKeyId,
       held,
       heldElsewhere,
       isProjectOwner,
@@ -218,6 +227,7 @@ export class TraceViewerProtectionService {
     projectId,
     userId,
     anonymous,
+    apiKeyId,
     held,
     heldElsewhere,
     isProjectOwner,
@@ -226,6 +236,7 @@ export class TraceViewerProtectionService {
     projectId: string;
     userId: string | undefined;
     anonymous: boolean;
+    apiKeyId: string | undefined;
     held: HeldRolePermissions;
     heldElsewhere: readonly HeldRolePermissions[];
     isProjectOwner: boolean;
@@ -240,7 +251,7 @@ export class TraceViewerProtectionService {
           category,
           {
             canSee: anonymous
-              ? isContentVisibleToPublic(resolved)
+              ? anonymousCanSee(resolved, apiKeyId)
               : isContentVisible(resolved, viewer),
             restrictVisibleTo: formatRestrictLabel(resolved),
           },
@@ -340,4 +351,11 @@ function formatRestrictLabel(category: ResolvedCategory): string | null {
   return category.disposition === "restrict"
     ? describeAudience(category.audience, { groups: {} })
     : null;
+}
+
+/** No person reads: a key sees what a rule names it for (ADR-208), anyone else as the public. */
+function anonymousCanSee(restriction: ResolvedCategory, apiKeyId: string | undefined): boolean {
+  return apiKeyId === undefined
+    ? isContentVisibleToPublic(restriction)
+    : isContentVisibleToKey(restriction, { apiKeyId });
 }

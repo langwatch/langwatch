@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { type Disposition, EMPTY_AUDIENCE, type ResolvedAudience } from "../data-privacy.ts";
+import {
+  type Disposition,
+  EMPTY_AUDIENCE,
+  namedApiKeyIds,
+  type ResolvedAudience,
+} from "../data-privacy.ts";
 import {
   describeAudience,
   type EffectiveRestriction,
   isContentVisible,
+  isContentVisibleToKey,
   isContentVisibleToPublic,
   needsAudienceFacts,
   needsOwnerFact,
@@ -327,5 +333,66 @@ describe("ownsEveryGovernedProject", () => {
       }),
     ).resolves.toBe(false);
     expect(failures).toHaveLength(1);
+  });
+});
+
+describe("isContentVisibleToKey", () => {
+  describe("given content restricted to the project owner or a group, naming a key", () => {
+    /** @scenario A named key never sees more than Admins */
+    it("hides it from the key, as from Admins", () => {
+      for (const partial of [{ projectOwner: true }, { groupIds: ["security"] }]) {
+        const restricted = eff("restrict", { ...partial, apiKeyIds: ["key-named"] });
+        expect(isContentVisible(restricted, viewer({ isAdmin: true }))).toBe(false);
+        expect(isContentVisibleToKey(restricted, { apiKeyId: "key-named" })).toBe(false);
+      }
+    });
+
+    it("shows it when the audience is All members, which Admins are part of", () => {
+      const restricted = eff("restrict", { allMembers: true, apiKeyIds: ["key-named"] });
+      expect(isContentVisibleToKey(restricted, { apiKeyId: "key-named" })).toBe(true);
+    });
+  });
+
+  describe("given content restricted to admins and one named key", () => {
+    const restricted = eff("restrict", { admins: true, apiKeyIds: ["key-named"] });
+
+    /** @scenario A key named in the audience sees restricted content */
+    it("shows the named key the content", () => {
+      expect(isContentVisibleToKey(restricted, { apiKeyId: "key-named" })).toBe(true);
+    });
+
+    /** @scenario A key not named in the audience keeps reading restricted content as the public */
+    it("hides it from any other key", () => {
+      expect(isContentVisibleToKey(restricted, { apiKeyId: "key-other" })).toBe(false);
+    });
+  });
+
+  describe("given content dropped by a rule that names the key", () => {
+    /** @scenario A named key never sees dropped content */
+    it("hides it, since there is nothing stored to show", () => {
+      expect(
+        isContentVisibleToKey(eff("drop", { apiKeyIds: ["key-named"] }), { apiKeyId: "key-named" }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given captured content", () => {
+    it("shows it to any key, as to the public", () => {
+      expect(isContentVisibleToKey(eff("capture"), { apiKeyId: "key-other" })).toBe(true);
+    });
+  });
+});
+
+describe("namedApiKeyIds", () => {
+  it("collects every key the content categories name, once", () => {
+    expect(
+      namedApiKeyIds({
+        categories: {
+          input: { disposition: "restrict", audience: { admins: true, apiKeyIds: ["key-a"] } },
+          output: { disposition: "restrict", audience: { apiKeyIds: ["key-a", "key-b"] } },
+          system: { disposition: "capture" },
+        },
+      }),
+    ).toEqual(["key-a", "key-b"]);
   });
 });

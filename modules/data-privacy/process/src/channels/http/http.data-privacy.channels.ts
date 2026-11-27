@@ -1,6 +1,8 @@
 import { LambdaClient } from "@aws-sdk/client-lambda";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { DataPrivacyServerConfig } from "@langwatch/data-privacy-contract";
 import { createLogger } from "@langwatch/observability";
+import type { BoundApis } from "@langwatch/process";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
 import { piiRedactionModelTargetOf } from "../../rules/pii-redaction-model.rules.ts";
@@ -16,13 +18,16 @@ const logger = createLogger("langwatch:data-privacy:pii-redaction-model");
 /** PII detection goes to the langevals Presidio endpoint, the redaction model and Google DLP. */
 export class HttpDataPrivacyChannels {
   static readonly requires = [] as const;
+  static readonly binds = { apiKeys: ApiKeyApi } as const;
 
   static async create({
     config,
     secrets,
+    bound,
   }: {
     config: DataPrivacyServerConfig;
     secrets: ScopedSecrets;
+    bound: BoundApis<typeof HttpDataPrivacyChannels.binds>;
   }): Promise<DataPrivacyChannels> {
     const dlp = await secrets.into(googleApplicationCredentials, (credential) =>
       HttpGoogleDlpChannel.create({ credential }),
@@ -31,6 +36,7 @@ export class HttpDataPrivacyChannels {
       presidio: HttpPresidioChannel.create({ endpoint: config.langevalsEndpoint }),
       piiRedactionModel: piiRedactionModelChannel({ config }),
       dlp,
+      apiKeys: bound.apiKeys,
     };
   }
 }

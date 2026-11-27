@@ -3,6 +3,7 @@
  * change at all: an organization without the flag, and a deployment that names no model; and for
  * the metrics a model call must keep apart from Presidio's.
  */
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -216,6 +217,7 @@ describe("given the PII redaction model wired into the module", () => {
           ...(await HttpDataPrivacyChannels.create({
             config,
             secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+            bound: { apiKeys: createApiFixture<ApiKeyApi>() },
           })),
           presidio,
           dlp: MemoryGoogleDlpChannel.create(),
