@@ -37,6 +37,8 @@ from .call_connected_agent_response_200_instance import CallConnectedAgentRespon
 from .call_connected_agent_response_200_output_type_1 import CallConnectedAgentResponse200OutputType1
 from .call_connected_agent_response_200_output_type_2_item import CallConnectedAgentResponse200OutputType2Item
 from .call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
+from .call_staff_access_function_body import CallStaffAccessFunctionBody
+from .call_staff_access_function_response_200 import CallStaffAccessFunctionResponse200
 from .cancel_instant_eval_run_response_200 import CancelInstantEvalRunResponse200
 from .cancel_instant_eval_run_response_200_matched_by_question import CancelInstantEvalRunResponse200MatchedByQuestion
 from .cancel_instant_eval_run_response_200_parameters import CancelInstantEvalRunResponse200Parameters
@@ -263,6 +265,9 @@ from .create_role_body import CreateRoleBody
 from .create_role_response_201 import CreateRoleResponse201
 from .create_scim_token_body import CreateScimTokenBody
 from .create_scim_token_response_201 import CreateScimTokenResponse201
+from .create_staff_access_request_body import CreateStaffAccessRequestBody
+from .create_staff_access_request_body_scopes_item import CreateStaffAccessRequestBodyScopesItem
+from .create_staff_access_request_response_200 import CreateStaffAccessRequestResponse200
 from .create_stored_object_upload_body import CreateStoredObjectUploadBody
 from .create_stored_object_upload_response_200 import CreateStoredObjectUploadResponse200
 from .create_stored_object_upload_response_200_headers import CreateStoredObjectUploadResponse200Headers
@@ -733,6 +738,7 @@ from .delete_role_binding_response_200 import DeleteRoleBindingResponse200
 from .delete_role_response_200 import DeleteRoleResponse200
 from .delete_stored_object_body import DeleteStoredObjectBody
 from .delete_stored_object_response_200 import DeleteStoredObjectResponse200
+from .end_staff_access_session_response_200 import EndStaffAccessSessionResponse200
 from .estimate_instant_eval_run_body import EstimateInstantEvalRunBody
 from .estimate_instant_eval_run_body_parameters import EstimateInstantEvalRunBodyParameters
 from .estimate_instant_eval_run_body_questions_item import EstimateInstantEvalRunBodyQuestionsItem
@@ -4125,6 +4131,21 @@ from .get_run_plan_response_200_targets_item_scenario_mappings_additional_proper
 )
 from .get_run_plan_response_200_targets_item_type import GetRunPlanResponse200TargetsItemType
 from .get_run_plan_response_404 import GetRunPlanResponse404
+from .get_staff_access_organization_usage_response_200 import GetStaffAccessOrganizationUsageResponse200
+from .get_staff_access_organization_usage_response_200_api_keys_item import (
+    GetStaffAccessOrganizationUsageResponse200ApiKeysItem,
+)
+from .get_staff_access_organization_usage_response_200_coding_agent_sessions import (
+    GetStaffAccessOrganizationUsageResponse200CodingAgentSessions,
+)
+from .get_staff_access_organization_usage_response_200_gateway import GetStaffAccessOrganizationUsageResponse200Gateway
+from .get_staff_access_organization_usage_response_200_organization import (
+    GetStaffAccessOrganizationUsageResponse200Organization,
+)
+from .get_staff_access_queue_summary_response_200 import GetStaffAccessQueueSummaryResponse200
+from .get_staff_access_queue_summary_response_200_queues_item import GetStaffAccessQueueSummaryResponse200QueuesItem
+from .get_staff_access_request_response_200 import GetStaffAccessRequestResponse200
+from .get_staff_access_request_response_200_status import GetStaffAccessRequestResponse200Status
 from .get_stored_object_audience import GetStoredObjectAudience
 from .get_stored_object_response_200 import GetStoredObjectResponse200
 from .get_stored_object_response_200_capability import GetStoredObjectResponse200Capability
@@ -4354,6 +4375,14 @@ from .list_run_plans_response_200_item_targets_item_scenario_mappings_additional
 from .list_run_plans_response_200_item_targets_item_type import ListRunPlansResponse200ItemTargetsItemType
 from .list_scim_tokens_response_200 import ListScimTokensResponse200
 from .list_scim_tokens_response_200_tokens_item import ListScimTokensResponse200TokensItem
+from .list_staff_access_functions_response_200 import ListStaffAccessFunctionsResponse200
+from .list_staff_access_functions_response_200_items_item import ListStaffAccessFunctionsResponse200ItemsItem
+from .list_staff_access_functions_response_200_items_item_input_schema import (
+    ListStaffAccessFunctionsResponse200ItemsItemInputSchema,
+)
+from .list_staff_access_functions_response_200_items_item_scope import ListStaffAccessFunctionsResponse200ItemsItemScope
+from .list_staff_access_organizations_response_200 import ListStaffAccessOrganizationsResponse200
+from .list_staff_access_organizations_response_200_items_item import ListStaffAccessOrganizationsResponse200ItemsItem
 from .list_suite_templates_response_200_item import ListSuiteTemplatesResponse200Item
 from .list_suite_templates_response_200_item_kind import ListSuiteTemplatesResponse200ItemKind
 from .list_suite_templates_response_200_item_scenarios_item import ListSuiteTemplatesResponse200ItemScenariosItem
@@ -10462,6 +10491,10 @@ from .read_cli_project_key_response_410 import ReadCliProjectKeyResponse410
 from .read_cli_project_key_response_412 import ReadCliProjectKeyResponse412
 from .read_cli_project_key_response_500 import ReadCliProjectKeyResponse500
 from .receive_stripe_webhook_response_200 import ReceiveStripeWebhookResponse200
+from .redeem_staff_access_request_body import RedeemStaffAccessRequestBody
+from .redeem_staff_access_request_response_200 import RedeemStaffAccessRequestResponse200
+from .redeem_staff_access_request_response_200_projects_item import RedeemStaffAccessRequestResponse200ProjectsItem
+from .redeem_staff_access_request_response_200_scopes_item import RedeemStaffAccessRequestResponse200ScopesItem
 from .regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
 from .register_connected_agent_instance_body import RegisterConnectedAgentInstanceBody
 from .register_connected_agent_instance_body_agents_item import RegisterConnectedAgentInstanceBodyAgentsItem
@@ -11194,6 +11227,7 @@ from .update_test_suite_response_200_fields_item import UpdateTestSuiteResponse2
 from .update_test_suite_response_200_fields_item_type import UpdateTestSuiteResponse200FieldsItemType
 from .update_test_suite_response_404 import UpdateTestSuiteResponse404
 from .validate_project_auth_token_response_200 import ValidateProjectAuthTokenResponse200
+from .withdraw_staff_access_request_response_200 import WithdrawStaffAccessRequestResponse200
 
 __all__ = (
     "AgUiToolCall",
@@ -11233,6 +11267,8 @@ __all__ = (
     "CallConnectedAgentResponse200OutputType1",
     "CallConnectedAgentResponse200OutputType2Item",
     "CallConnectedAgentResponse200StateType0",
+    "CallStaffAccessFunctionBody",
+    "CallStaffAccessFunctionResponse200",
     "CancelInstantEvalRunResponse200",
     "CancelInstantEvalRunResponse200MatchedByQuestion",
     "CancelInstantEvalRunResponse200Parameters",
@@ -11417,6 +11453,9 @@ __all__ = (
     "CreateRoleResponse201",
     "CreateScimTokenBody",
     "CreateScimTokenResponse201",
+    "CreateStaffAccessRequestBody",
+    "CreateStaffAccessRequestBodyScopesItem",
+    "CreateStaffAccessRequestResponse200",
     "CreateStoredObjectUploadBody",
     "CreateStoredObjectUploadResponse200",
     "CreateStoredObjectUploadResponse200Headers",
@@ -11683,6 +11722,7 @@ __all__ = (
     "DeleteRoleResponse200",
     "DeleteStoredObjectBody",
     "DeleteStoredObjectResponse200",
+    "EndStaffAccessSessionResponse200",
     "EstimateInstantEvalRunBody",
     "EstimateInstantEvalRunBodyParameters",
     "EstimateInstantEvalRunBodyQuestionsItem",
@@ -13431,6 +13471,15 @@ __all__ = (
     "GetRunPlanResponse200TargetsItemScenarioMappingsAdditionalPropertyType1",
     "GetRunPlanResponse200TargetsItemType",
     "GetRunPlanResponse404",
+    "GetStaffAccessOrganizationUsageResponse200",
+    "GetStaffAccessOrganizationUsageResponse200ApiKeysItem",
+    "GetStaffAccessOrganizationUsageResponse200CodingAgentSessions",
+    "GetStaffAccessOrganizationUsageResponse200Gateway",
+    "GetStaffAccessOrganizationUsageResponse200Organization",
+    "GetStaffAccessQueueSummaryResponse200",
+    "GetStaffAccessQueueSummaryResponse200QueuesItem",
+    "GetStaffAccessRequestResponse200",
+    "GetStaffAccessRequestResponse200Status",
     "GetStoredObjectAudience",
     "GetStoredObjectResponse200",
     "GetStoredObjectResponse200Capability",
@@ -13618,6 +13667,12 @@ __all__ = (
     "ListRunPlansResponse200ItemTargetsItemType",
     "ListScimTokensResponse200",
     "ListScimTokensResponse200TokensItem",
+    "ListStaffAccessFunctionsResponse200",
+    "ListStaffAccessFunctionsResponse200ItemsItem",
+    "ListStaffAccessFunctionsResponse200ItemsItemInputSchema",
+    "ListStaffAccessFunctionsResponse200ItemsItemScope",
+    "ListStaffAccessOrganizationsResponse200",
+    "ListStaffAccessOrganizationsResponse200ItemsItem",
     "ListSuiteTemplatesResponse200Item",
     "ListSuiteTemplatesResponse200ItemKind",
     "ListSuiteTemplatesResponse200ItemScenariosItem",
@@ -16562,6 +16617,10 @@ __all__ = (
     "ReadCliProjectKeyResponse412",
     "ReadCliProjectKeyResponse500",
     "ReceiveStripeWebhookResponse200",
+    "RedeemStaffAccessRequestBody",
+    "RedeemStaffAccessRequestResponse200",
+    "RedeemStaffAccessRequestResponse200ProjectsItem",
+    "RedeemStaffAccessRequestResponse200ScopesItem",
     "RegenerateProjectApiKeyResponse200",
     "RegisterConnectedAgentInstanceBody",
     "RegisterConnectedAgentInstanceBodyAgentsItem",
@@ -17066,4 +17125,5 @@ __all__ = (
     "UpdateTestSuiteResponse200FieldsItemType",
     "UpdateTestSuiteResponse404",
     "ValidateProjectAuthTokenResponse200",
+    "WithdrawStaffAccessRequestResponse200",
 )

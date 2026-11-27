@@ -131,6 +131,10 @@ const GLOBAL_MODELS = [
   // Identity's sign-in switch (sign-in-switch.feature): keyed by userId alone, read on the
   // sign-in path before any tenant is known, like AccountCredential; written in raw SQL only.
   "IdentitySignInSwitch",
+  // Staff access (ADR-202): an operator's enrolled agents and their passkey challenges, keyed by
+  // the operator, never a tenant, like Passkey.
+  "StaffAccessRequester",
+  "StaffAccessChallenge",
   // A person's opt-out of the weekly digest, keyed by userId alone and honoured in every
   // organization they belong to, like WebPushSubscription.
   "DigestSubscription",

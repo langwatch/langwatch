@@ -8,6 +8,7 @@ import type {
 
 import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import type { RestKeyCredential, RestKeyKind } from "../rest/key-credential.ts";
+import type { RestStaffAccessIdentity } from "../rest/staff-access.ts";
 import type { SessionVerification } from "./session-reader.ts";
 import type { MiddlewareBinding, TransportPeers } from "./transport-hosts.ts";
 
@@ -182,6 +183,8 @@ export type RestAuditRow = Readonly<{
   errorCode?: string;
   /** The operator behind an impersonated call. */
   impersonatorId?: string;
+  /** The approved staff access a staff key's call ran under (ADR-202). */
+  staffAccess?: RestStaffAccessIdentity;
   /** The API key the call presented, whether it acts as its person or as nobody (E11). */
   apiKeyId?: string;
   /** Where the call came from, as the door resolved it, and the caller's user agent. */

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable audit write capability.
 
-Peers call these through the token, declared at `../contract/src/audit-log.ts:151`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/audit-log.ts:153`; nothing else in this package is public.
 
 #### `record`
 

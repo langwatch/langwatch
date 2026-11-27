@@ -14,6 +14,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { InsightApi } from "@langwatch/insight-contract";
 import type { OpsOperatorPermission } from "@langwatch/ops-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -156,6 +157,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       shares: createApiFixture<ShareApi>(),
       automations: createApiFixture<AutomationApi>(),
       insights: createApiFixture<InsightApi>(),
+      organizations: createApiFixture<OrganizationApi>(),
     },
     repositories,
     ...(options.checkup === undefined ? {} : { checkup: options.checkup }),

@@ -64,6 +64,11 @@ export abstract class ApiKeyRepository {
   }): Promise<ApiKeyRow | null>;
   abstract findForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]>;
   abstract findForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]>;
+  /** Every key of the organization, system and revoked ones included: live first, then newest. */
+  abstract findEveryKeyInOrganization(input: {
+    organizationId: string;
+    limit: number;
+  }): Promise<ApiKeyRow[]>;
   abstract update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow>;
   /**
    * Marks a key revoked, keeping the FIRST cause ever recorded: the fence

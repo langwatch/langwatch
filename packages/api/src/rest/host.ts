@@ -13,6 +13,7 @@ import type {
   FeatureRestMountOptions,
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
+import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter } from "../ports.ts";
 import { allRegisteredRoutes } from "../route-registry.ts";
 import {
@@ -42,6 +43,7 @@ import {
 } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "./runtime.ts";
+import type { RestStaffAccessGate } from "./staff-access.ts";
 
 const restErrorLogger = createLogger("langwatch:api:rest");
 
@@ -63,6 +65,7 @@ export type RestIdentities = Readonly<
       | "cli_token"
       | "otlp_ingest"
       | "licence_token"
+      | "staff_access"
     >,
     RestIdentity
   >
@@ -114,6 +117,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     authz: Authorize;
     /** Where a Langy key's confirmation clicks are kept; absent, marked routes refuse it. */
     confirmations?: RestConfirmationGate | undefined;
+    /** Where a staff key's requests are recorded (ADR-202); absent, every staff key is refused. */
+    staffAccess?: RestStaffAccessGate | undefined;
   }): RestHost {
     return new RestHost(options);
   }
@@ -155,7 +160,10 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       const url = new URL(context.req.raw.url);
       url.pathname = pinned;
 
-      return this.app.fetch(new Request(url, context.req.raw), context.env);
+      return this.app.fetch(
+        ClientAddress.carried({ from: context.req.raw, to: new Request(url, context.req.raw) }),
+        context.env,
+      );
     });
   }
 
@@ -214,6 +222,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
       ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
       ...(this.options.confirmations ? { confirmations: this.options.confirmations } : {}),
+      ...(this.options.staffAccess ? { staffAccess: this.options.staffAccess } : {}),
       authorization: { forRequest: () => authz },
       servedDoors: true,
       audit: this.options.audit,

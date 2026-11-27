@@ -63,6 +63,13 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   "ingest list": "wires telemetry on this machine",
   "ingest tail": "wires telemetry on this machine",
   "evaluator types": "lists the evaluator catalog built into this CLI",
+  "ops setup": "stores the ops requester key on this machine",
+  "ops access status": "reads this machine's ops session file",
+  "ops access end": "ends the ops session this machine holds",
+
+  // Platform operators, across organizations.
+  "ops orgs": "answers across every organization, for platform operators",
+  "ops usage": "answers for one organization, for platform operators",
 
   // The person, and the organization they belong to.
   whoami: "answers for the logged-in person",
@@ -185,6 +192,8 @@ export const COMMANDS_WITH_OWN_PROJECT_FLAG: Record<string, string> = {
   "gateway-budgets create": "the project the budget is scoped to",
   "spend-events list": "a filter inside an organization-wide listing",
   "spend-events summary": "a filter inside an organization-wide listing",
+  "ops access request": "the default project the ops session stores",
+  "ops access redeem": "the default project the ops session stores",
 };
 
 /**

@@ -73,6 +73,19 @@ describe("PrismaAuthzManagedGrantRepository", () => {
     );
   });
 
+  it("never answers a system-managed key as one a grant may name", async () => {
+    const { database, repository } = setup();
+    database.apiKey.findFirst.mockResolvedValue({ id: "staff-key" });
+
+    await repository.isApiKeyInOrganization({ organizationId: "org-1", apiKeyId: "staff-key" });
+
+    expect(database.apiKey.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "staff-key", organizationId: "org-1", isSystemManaged: false },
+      }),
+    );
+  });
+
   it("counts legacy access only through shared teams in the organization", async () => {
     const { database, repository } = setup();
 

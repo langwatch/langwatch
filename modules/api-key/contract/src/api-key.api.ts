@@ -10,9 +10,15 @@ import type {
   MintDocsSessionKeyInput,
   RevokeDocsSessionKeysInput,
 } from "./api-key.docs-session.ts";
+import type { ApiKeyFacts, ApiKeyFactsInput } from "./api-key.facts.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
+import type {
+  MintStaffAccessKeyInput,
+  RevokeStaffAccessKeyInput,
+  StaffAccessKeyMinted,
+} from "./api-key.staff-access.ts";
 import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
@@ -156,6 +162,13 @@ export interface ApiKeyApi {
    * Idempotent, and silent about any key that is not a live docs session key.
    */
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
+  /**
+   * An approved staff agent's key (ADR-202): ownerless, system-managed, restricted to the staff
+   * bags at organization scope, expiring within the hour. Refuses any other permission.
+   */
+  mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted>;
+  /** Revokes a staff access key and forgets its cached answer. Idempotent; silent on other keys. */
+  revokeStaffAccessKey(input: RevokeStaffAccessKeyInput): Promise<void>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -164,6 +177,11 @@ export interface ApiKeyApi {
   markUsed(input: ApiKeyIdInput): void;
   list(input: ApiKeyListInput): Promise<ApiKey[]>;
   listAll(input: ApiKeyListAllInput): Promise<ApiKey[]>;
+  /**
+   * Every key of the organization, system, revoked and staff keys included, as ids, kinds, reach
+   * and times only (ADR-202 ops functions). Live keys first, capped at `API_KEY_FACTS_LIMIT`.
+   */
+  findKeyFactsForOrganization(input: ApiKeyFactsInput): Promise<ApiKeyFacts[]>;
   /**
    * The keys a credential may list: a member's own, or every key in the
    * organization for a service key that holds `organization:manage`.

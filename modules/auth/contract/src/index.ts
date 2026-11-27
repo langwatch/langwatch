@@ -11,6 +11,7 @@ export {
 } from "./auth.api.ts";
 export * from "./auth.errors.ts";
 export * from "./account-lockout.ts";
+export * from "./sign-in-facts.ts";
 export * from "./auth-cli-device-flow.schemas.ts";
 export * from "./browser-session.ts";
 export * from "./front-door.responses.ts";
@@ -26,3 +27,4 @@ export * from "./sso-path-gate.ts";
 export * from "./account-ceremonies.ts";
 export * from "./auth.config.ts";
 export * from "./auth-lifecycle.events.ts";
+export * from "./passkey-assertion.ts";

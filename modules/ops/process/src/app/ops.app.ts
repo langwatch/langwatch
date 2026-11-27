@@ -266,6 +266,9 @@ import {
   type OpsFeatureFlagTarget,
   type OpsFindFeatureFlagTargetsInput,
   type OpsSearchFeatureFlagTargetsInput,
+  tenantQueueCountInputSchema,
+  type TenantQueueCount,
+  type TenantQueueCountInput,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -353,6 +356,7 @@ import { GroupQueueReaperService } from "../services/group-queue-reaper.service.
 import {
   type AdminAuditSink,
   ImpersonationService,
+  type ImpersonationMemberships,
   type ImpersonationSessions,
 } from "../services/impersonation.service.ts";
 import { InsightScheduleOpsService } from "../services/insight-schedule-ops.service.ts";
@@ -585,6 +589,8 @@ export interface OpsAppDependencies {
   retention: DataRetentionApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
+  /** The organizations a person belongs to, so an impersonation is audited in each. */
+  organizations: Pick<OrganizationApi, "organizationIdsForMember">;
   /** The report schedules the operator scheduler lists and controls. */
   automations: Pick<
     AutomationApi,
@@ -1465,6 +1471,11 @@ export class OpsModule implements OpsApi {
   }
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]> {
     return this.#dependencies.ops.listAllQueueDlqGroups();
+  }
+  countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]> {
+    return this.#dependencies.ops.countQueueGroupsForTenants(
+      tenantQueueCountInputSchema.parse(input),
+    );
   }
   pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void> {
     return this.#dependencies.ops.pauseQueuePipeline(input);
@@ -2603,6 +2614,7 @@ function buildOpsInfrastructure(input: {
         ssoRouting: organizationSsoRouting(dependencies.identity),
         audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
         sessions: dependencies.auth,
+        memberships: dependencies.organizations,
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         accounts: dependencies.auth,
@@ -2717,6 +2729,8 @@ interface OpsOperationsOptions {
   audit: AdminAuditSink;
   /** Auth's session claims, which an impersonation starts, reads and stops. */
   sessions: ImpersonationSessions;
+  /** The organizations an impersonated person belongs to, each audited on start. */
+  memberships: ImpersonationMemberships;
   /** The shared audit log every operator act is recorded on. */
   auditLog: AuditLogApi;
   access?: AdminAccess | undefined;
@@ -2774,6 +2788,7 @@ export class OpsOperations {
       impersonation: ImpersonationService.create({
         repository: repositories.impersonation,
         sessions: this.options.sessions,
+        memberships: this.options.memberships,
         access,
         audit: this.options.audit,
         now: this.options.now,

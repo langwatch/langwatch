@@ -28,6 +28,8 @@ export class TestApiKeyService implements ApiKeyApi {
   mintAgentSandboxKey = unsupported<ApiKeyApi["mintAgentSandboxKey"]>();
   mintDocsSessionKey = unsupported<ApiKeyApi["mintDocsSessionKey"]>();
   revokeDocsSessionKeys = unsupported<ApiKeyApi["revokeDocsSessionKeys"]>();
+  mintStaffAccessKey = unsupported<ApiKeyApi["mintStaffAccessKey"]>();
+  revokeStaffAccessKey = unsupported<ApiKeyApi["revokeStaffAccessKey"]>();
   getDocsSessionAvailability = unsupported<ApiKeyApi["getDocsSessionAvailability"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
@@ -37,6 +39,7 @@ export class TestApiKeyService implements ApiKeyApi {
   isOrgAdminApiKey = unsupported<ApiKeyApi["isOrgAdminApiKey"]>();
   list = unsupported<ApiKeyApi["list"]>();
   listAll = unsupported<ApiKeyApi["listAll"]>();
+  findKeyFactsForOrganization = unsupported<ApiKeyApi["findKeyFactsForOrganization"]>();
   listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
   listGrantablePermissions = unsupported<ApiKeyApi["listGrantablePermissions"]>();

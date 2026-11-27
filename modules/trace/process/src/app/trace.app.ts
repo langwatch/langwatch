@@ -160,6 +160,8 @@ import {
   type TraceModelSpend,
   type TraceModelSpendWindow,
   type TraceSpendSummary,
+  type TraceIngestionCount,
+  type TracePresence,
   type TraceUsageCount,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
@@ -296,6 +298,7 @@ import { TraceEdgeSpoolService } from "../features/ingestion/services/trace-edge
 import { TraceIngestAllowanceService } from "../features/ingestion/services/trace-ingest-allowance.service.ts";
 import { TraceIngestCredentialService } from "../features/ingestion/services/trace-ingest-credential.service.ts";
 import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
+import { TraceIngestionCountService } from "../features/ingestion/services/trace-ingestion-count.service.ts";
 import {
   TraceIngestionService,
   type CodingAgentIngestFilter,
@@ -1069,7 +1072,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         braidPlans: dependencies.plans,
         braidSettings: dependencies.authz,
         braidDirectory: { authz: dependencies.authz, projects: dependencies.projects },
-        ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
+        ingestAllowance: TraceIngestAllowanceService.create({
+          entitlement: dependencies.plans,
+          refusals: repositories.planLimitRefusals,
+        }),
         exportBounds: TraceExportBoundsService.create({
           entitlement: dependencies.plans,
           projects: dependencies.projects,
@@ -1094,6 +1100,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
+    app.#ingestionCounts = TraceIngestionCountService.create({
+      existence: setup.repositories.existence,
+      refusals: setup.repositories.planLimitRefusals,
+    });
     app.#agentTraffic = setup.repositories.agentTraffic;
     app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
     app.#managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({
@@ -1502,6 +1512,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
+  #ingestionCounts: TraceIngestionCountService | null = null;
   #agentTraffic: TraceAgentTrafficRepository | null = null;
   #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
   #managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({ ledger: null });
@@ -3880,6 +3891,21 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the trace spend read");
     }
     return this.#modelSpend;
+  }
+
+  countIngestionByProject(input: {
+    projectIds: string[];
+    since: number;
+    until: number;
+  }): Promise<TraceIngestionCount[]> {
+    if (!this.#ingestionCounts) {
+      throw new TraceCapabilityUnavailableError("this process", "the ingestion count read");
+    }
+    return this.#ingestionCounts.countIngestionByProject(input);
+  }
+
+  findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]> {
+    return this.#dependencies.traces.existence.findTracePresence(input);
   }
 
   #usageCountRead(): TraceUsageCountRepository {

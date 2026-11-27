@@ -788,7 +788,7 @@ Authenticated: the service bridges the session key to its owner and proves the c
 Answers at `/api/langy/local/calls`, `/api/v1/langy/local/calls`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/langy-local.rest.ts:106)
+// Rawbody: "text" (inline, src/transport/langy-local.rest.ts:107)
 // Response: startCallResponseSchema, ../contract/src/features/local-control/langy.local-control-http.ts:110
 interface Response {
   callId: string;
@@ -799,7 +799,7 @@ interface Response {
 
 The call's answer, or not found while it is still running.
 
-Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:118`.
+Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:119`.
 
 Answers at `/api/langy/local/calls/:callId`, `/api/v1/langy/local/calls/:callId`.
 
@@ -815,7 +815,7 @@ type Response = z.infer<typeof pollCallResponseSchema>; // ../contract/src/featu
 
 The cancelled call's own id.
 
-Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:132`.
+Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:133`.
 
 Answers at `/api/langy/local/calls/:callId/cancel`, `/api/v1/langy/local/calls/:callId/cancel`.
 
@@ -833,7 +833,7 @@ interface Response {
 
 The started wait's own id.
 
-Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:150`.
+Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:152`.
 
 Answers at `/api/langy/waits`, `/api/v1/langy/waits`.
 
@@ -849,7 +849,7 @@ interface Response {
 
 The answered question, or not found while it is still waiting.
 
-Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:162`.
+Authenticated: the service bridges the session key to its owner and proves the conversation is theirs. Declared at `src/transport/langy-local.rest.ts:165`.
 
 Answers at `/api/langy/waits/:waitId`, `/api/v1/langy/waits/:waitId`.
 
@@ -900,7 +900,7 @@ interface Body {
   adoptConversationId?: boolean;
 }
 type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
-// Response: inline, src/transport/langy-turns.rest.ts:171
+// Response: inline, src/transport/langy-turns.rest.ts:172
 type Response = unknown;
 ```
 
@@ -908,7 +908,7 @@ type Response = unknown;
 
 Continue one Langy conversation with a turn. The turn surface answers 202 with the accepted turn, 200 with the settled reply under Prefer: wait, and a plain 404 when the rollout is dark for the project.
 
-Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:185`.
+Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:186`.
 
 Answers at `/api/langy/conversations/:conversationId/messages`, `/api/v1/langy/conversations/:conversationId/messages`.
 
@@ -929,7 +929,7 @@ interface Body {
   adoptConversationId?: boolean;
 }
 type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
-// Response: inline, src/transport/langy-turns.rest.ts:191
+// Response: inline, src/transport/langy-turns.rest.ts:193
 type Response = unknown;
 ```
 
