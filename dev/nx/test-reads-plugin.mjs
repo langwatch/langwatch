@@ -222,6 +222,7 @@ export const reads = {
     "dev/dogfood/langy/package.json",
     "dev/dogfood/acme-support/typescript/package.json",
     "dev/scripts/**/*",
+    "dev/nx/executors/package.json",
     "dev/tests/*/package.json",
     "dev/tsconfig*.json",
     "package.json",

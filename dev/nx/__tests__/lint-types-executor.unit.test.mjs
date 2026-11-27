@@ -55,6 +55,13 @@ void describe("lint:types batch report", () => {
   });
 
   /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("fails every project when the findings it read fall short of the reported count", () => {
+    const cut = "packages/time/src/calendar.ts:1:1: Floating promise [y]\n\n3 problem(s)\n";
+    const results = taskResults({ tasks, roots, status: 1, out: cut, err: "" });
+    assert.ok(Object.values(results).every((result) => !result.success));
+  });
+
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
   void it("fails every project when an oxlint process could not run", () => {
     const err = "oxlint -c .oxlintrc.types.jsonc exited 2:\nthread panicked\n";
     const results = taskResults({ tasks, roots, status: 1, out: "", err });

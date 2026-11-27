@@ -42,11 +42,13 @@ export function splitReport({ out, roots }) {
 
 const countOf = (lines) => lines.filter((line) => DIAGNOSTIC.test(line)).length;
 
-/** One result per task; a failed oxlint process, or a failing run no project owns, fails all. */
+/** One result per task; a failed process, or a report the projects do not add up to, fails all. */
 export function taskResults({ tasks, roots, status, out, err }) {
   const byRoot = splitReport({ out, roots });
   const attributed = [...byRoot.values()].reduce((sum, lines) => sum + countOf(lines), 0);
-  const failed = PROCESS_FAILED.test(err) || (status !== 0 && attributed === 0);
+  const reported = Number(/^(\d+) problem\(s\)$/m.exec(out)?.[1] ?? Number.NaN);
+  const failed =
+    PROCESS_FAILED.test(err) || (status !== 0 && (attributed === 0 || attributed !== reported));
 
   return Object.fromEntries(
     tasks.map((task, i) => {

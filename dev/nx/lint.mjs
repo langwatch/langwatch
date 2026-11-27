@@ -269,7 +269,8 @@ async function main() {
   );
   process.stdout.write(`\n${diagnostics.length} problem(s)\n`);
 
-  process.exit(diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1);
+  // exitCode, not exit(): a piped stdout flushes before the process ends.
+  process.exitCode = diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1;
 }
 
 const runDirectly = process.argv[1] === fileURLToPath(import.meta.url);
