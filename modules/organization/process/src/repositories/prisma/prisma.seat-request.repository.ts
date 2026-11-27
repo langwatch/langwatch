@@ -17,7 +17,10 @@ type PrismaSeatRequestDatabase = Pick<PrismaClient, "seatRequest" | "$transactio
 
 type StoredSeatRequest = Prisma.SeatRequestGetPayload<Record<string, never>>;
 
-/** Reopening, resolving and the sales claim read then write, so each runs SERIALIZABLE. */
+/**
+ * Reopening reads then writes, so it runs SERIALIZABLE and runs again when it lost a race.
+ * Resolving and the sales claim are single conditional writes, which never lose one.
+ */
 export class PrismaSeatRequestRepository
   extends PrismaRepository.transactionalFor("SeatRequest")
   implements SeatRequestRepository
@@ -126,28 +129,23 @@ export class PrismaSeatRequestRepository
   }
 
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
-    return this.serializableTransaction(async (transaction) => {
-      const open = await transaction.seatRequest.findFirst({
+    // One conditional write: of two racing answers the second matches no OPEN row.
+    return claimed(
+      this.prisma.seatRequest.update({
         where: {
           id: input.id,
           organizationId: input.organizationId,
           status: "OPEN",
           ...(input.openedAt === undefined ? {} : { openedAt: new Date(input.openedAt) }),
         },
-        select: { id: true },
-      });
-      if (!open) return false;
-      await transaction.seatRequest.update({
-        where: { id: input.id },
         data: {
           status: input.status,
           resolvedAt: new Date(input.at),
           resolvedByUserId: input.resolvedByUserId,
           seatPendingSince: input.status === "APPROVED" ? new Date(input.at) : null,
         },
-      });
-      return true;
-    });
+      }),
+    );
   }
 
   async release(input: Parameters<SeatRequestRepository["release"]>[0]): Promise<void> {
@@ -189,18 +187,12 @@ export class PrismaSeatRequestRepository
   }
 
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {
-    return this.serializableTransaction(async (transaction) => {
-      const unclaimed = await transaction.seatRequest.findFirst({
+    return claimed(
+      this.prisma.seatRequest.update({
         where: { id, status: "OPEN", salesNotifiedAt: null },
-        select: { id: true },
-      });
-      if (!unclaimed) return false;
-      await transaction.seatRequest.update({
-        where: { id },
         data: { salesNotifiedAt: new Date(at) },
-      });
-      return true;
-    });
+      }),
+    );
   }
 
   async releaseSalesNotice({ id, at }: { id: string; at: number }): Promise<void> {
@@ -213,6 +205,19 @@ export class PrismaSeatRequestRepository
   async findForUser({ userId }: { userId: string }): Promise<SeatRequestRow[]> {
     const rows = await this.prisma.seatRequest.findMany({ where: { userId } });
     return rows.map(rowOf);
+  }
+}
+
+/** True when the one conditional write matched its row; false when nothing matched (P2025). */
+async function claimed(write: Promise<unknown>): Promise<boolean> {
+  try {
+    await write;
+    return true;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return false;
+    }
+    throw error;
   }
 }
 

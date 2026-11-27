@@ -7,13 +7,13 @@ import type {
   OrganizationAccessNoticeRepository,
 } from "../organization-access-notice.repository.ts";
 
-type PrismaAccessNoticeDatabase = Pick<PrismaClient, "organizationAccessNotice" | "$transaction">;
+type PrismaAccessNoticeDatabase = Pick<PrismaClient, "organizationAccessNotice">;
 
 type StoredNotice = Prisma.OrganizationAccessNoticeGetPayload<Record<string, never>>;
 
-/** Claiming a notice for mail reads then writes, so it runs SERIALIZABLE: one claimer wins. */
+/** Claiming a notice for mail is one conditional write: of two claimers only one matches. */
 export class PrismaOrganizationAccessNoticeRepository
-  extends PrismaRepository.transactionalFor("OrganizationAccessNotice")
+  extends PrismaRepository.for("OrganizationAccessNotice")
   implements OrganizationAccessNoticeRepository
 {
   private constructor(prisma: PrismaAccessNoticeDatabase) {
@@ -64,19 +64,18 @@ export class PrismaOrganizationAccessNoticeRepository
   ): Promise<string[]> {
     const marked: string[] = [];
     for (const id of input.ids) {
-      const claimed = await this.serializableTransaction(async (transaction) => {
-        const unmailed = await transaction.organizationAccessNotice.findFirst({
+      try {
+        await this.prisma.organizationAccessNotice.update({
           where: { id, mailedAt: null },
-          select: { id: true },
-        });
-        if (!unmailed) return false;
-        await transaction.organizationAccessNotice.update({
-          where: { id },
           data: { mailedAt: new Date(input.at) },
         });
-        return true;
-      });
-      if (claimed) marked.push(id);
+        marked.push(id);
+      } catch (error) {
+        // Another claimer marked it first: nothing matched.
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2025") {
+          throw error;
+        }
+      }
     }
     return marked;
   }
