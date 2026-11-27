@@ -34,7 +34,6 @@ Feature: LangWatch Judge (preview) as the scenario judge
     When it is read
     Then it is a decision call with no criteria and those two tools
 
-  @unit
   @unit @regression
   Scenario: A criterion's text falls back to its description without the Criterion number, then to its key
     Given a verdict request whose criteria block does not list one criterion per key
