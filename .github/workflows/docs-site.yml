@@ -190,7 +190,6 @@ jobs:
             docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - uses: ./.github/actions/docs-media-encoders
       - uses: ./.github/actions/playwright-chromium
-        timeout-minutes: 24
       - name: Build the documentation
         env:
           # Signs the star count read, which GitHub refuses from shared runner addresses.
@@ -289,7 +288,6 @@ jobs:
           path: apps/docs/dist
       - uses: ./.github/actions/playwright-chromium
         if: matrix.browser
-        timeout-minutes: 24
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.haven
         with:
@@ -337,7 +335,6 @@ jobs:
           name: docs-site-mounted
           path: apps/docs/dist
       - uses: ./.github/actions/playwright-chromium
-        timeout-minutes: 24
       # Three runs per page, judged on the median, at two at a time on the
       # runner's four cores: one slow run neither passes nor fails a page.
       - name: Audit performance, accessibility, search and agent readiness

@@ -4,31 +4,21 @@ import { chromium } from "playwright";
 
 import { startPreview } from "../src/site/preview-server.ts";
 
-// A copy lands asynchronously, and waitForFunction resolves at once on a returned promise,
-// so poll the clipboard from the test until accept passes; after 30s throw with the last
-// text read and the last read rejection, so a permission or focus failure shows its cause.
-export async function readClipboardUntil(page, accept) {
-  let text = "";
-  let rejection;
-  for (const deadline = Date.now() + 30_000; Date.now() < deadline;) {
-    const read = await page.evaluate(() =>
-      navigator.clipboard.readText().then(
-        (value) => ({ value }),
-        (error) => ({ error: String(error) }),
-      ),
-    );
-    if ("error" in read) rejection = read.error;
-    else if (accept((text = read.value))) return text;
-    await page.waitForTimeout(100);
-  }
-  throw new Error(
-    `the clipboard never held the expected text in 30s; last read ${JSON.stringify(text.slice(0, 200))}` +
-      (rejection ? `, last read rejection: ${rejection}` : ""),
+// A copy control sets data-copied once its clipboard write resolves, so wait for a fresh
+// one after act (a click by default), then read once and report a rejected read's cause.
+export async function copyAndRead(page, button, act = () => button.click()) {
+  const node = await button.elementHandle();
+  await page.waitForFunction((element) => element.dataset.copied === undefined, node);
+  await act();
+  await page.waitForFunction((element) => element.dataset.copied === "true", node);
+  const read = await page.evaluate(() =>
+    navigator.clipboard.readText().then(
+      (value) => ({ value }),
+      (error) => ({ error: String(error) }),
+    ),
   );
-}
-
-export async function clipboardEquals(page, expected) {
-  assert.equal(await readClipboardUntil(page, (text) => text === expected), expected);
+  if ("error" in read) throw new Error(`the clipboard read failed after the copy: ${read.error}`);
+  return read.value;
 }
 
 export async function withPreviewBrowser({ outDir, run }) {

@@ -30,7 +30,7 @@ Feature: The docs jobs install Playwright Chromium through a stale or syncing ap
     And a second failure fails the step
 
   @unit
-  Scenario: Every use bounds the install inside its job's budget
-    Given a workflow step uses the playwright-chromium action
-    Then the step sets timeout-minutes that cover both attempts and the pause
-    And the job's timeout-minutes is above the step's, so the step bound can fire
+  Scenario: Every job using the action has a budget that covers the install's worst case
+    Given a workflow job uses the playwright-chromium action
+    Then the job sets timeout-minutes above both install attempts and the pause
+    And the shell timeouts inside the action are what bound each attempt

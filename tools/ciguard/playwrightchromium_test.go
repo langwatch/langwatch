@@ -34,7 +34,6 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: ./.github/actions/playwright-chromium
-        timeout-minutes: 24
 `
 
 func playwrightProblems(t *testing.T, action, workflow string) []string {
@@ -94,13 +93,12 @@ func TestPlaywrightFailedInstallRetriesOnce(t *testing.T) {
 	assert.Contains(t, strings.Join(playwrightProblems(t, noPause, goodPlaywrightWorkflow), "\n"), "retried")
 }
 
-// @scenario "Every use bounds the install inside its job's budget"
-func TestPlaywrightUseBoundsInsideItsJob(t *testing.T) {
-	noStepTimeout := strings.Replace(goodPlaywrightWorkflow, "        timeout-minutes: 24\n", "", 1)
-	tooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 24", "timeout-minutes: 20", 1)
-	jobTooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 35", "timeout-minutes: 24", 1)
+// @scenario "Every job using the action has a budget that covers the install's worst case"
+func TestPlaywrightJobBudgetCoversTheInstall(t *testing.T) {
+	noJobTimeout := strings.Replace(goodPlaywrightWorkflow, "    timeout-minutes: 35\n", "", 1)
+	jobTooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 35", "timeout-minutes: 23", 1)
 
-	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, noStepTimeout), "\n"), "no numeric timeout-minutes")
-	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, tooShort), "\n"), "cannot cover")
-	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, jobTooShort), "\n"), "never fires")
+	assert.NotEqual(t, goodPlaywrightWorkflow, noJobTimeout)
+	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, noJobTimeout), "\n"), "no numeric timeout-minutes")
+	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, jobTooShort), "\n"), "cannot cover")
 }

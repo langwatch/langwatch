@@ -36,7 +36,7 @@ type playwrightBudget struct{ seconds int }
 
 // PlaywrightChromiumProblems checks that the playwright-chromium action refreshes the
 // apt index and installs under timeouts, survives a failed refresh, retries once, and
-// that every step using it carries a timeout its job can enforce.
+// that every job using it has a budget that covers both attempts and the pause.
 func PlaywrightChromiumProblems(root string) ([]string, error) {
 	install, err := loadPlaywrightInstall(root)
 	if err != nil {
@@ -106,7 +106,7 @@ func playwrightInstallProblems(run string) (playwrightBudget, []string) {
 	return playwrightBudget{seconds: 2*(atoi(apt[1])+atoi(inst[1])) + atoi(retry[1])}, nil
 }
 
-// playwrightUseProblems reports steps using the action whose timeout cannot hold both attempts or cannot fire.
+// playwrightUseProblems reports jobs using the action whose timeout cannot hold both attempts and the pause.
 func playwrightUseProblems(w *ciscan.Workflow, budget playwrightBudget) []string {
 	var problems []string
 	for _, name := range w.JobNames() {
@@ -115,38 +115,23 @@ func playwrightUseProblems(w *ciscan.Workflow, budget playwrightBudget) []string
 			if job.Steps[i].Uses != playwrightActionUse {
 				continue
 			}
-			use := playwrightUse{
-				where:       fmt.Sprintf("%s job %q", w.Path, name),
-				stepTimeout: job.Steps[i].TimeoutMinutes,
-				jobTimeout:  job.TimeoutMinutes,
-			}
-			problems = append(problems, use.timeoutProblems(budget)...)
+			where := fmt.Sprintf("%s job %q", w.Path, name)
+			problems = append(problems, playwrightJobProblems(where, job.TimeoutMinutes, budget)...)
 		}
 	}
 	return problems
 }
 
-// playwrightUse is one workflow step using the action, with its own and its job's timeout.
-type playwrightUse struct {
-	where       string
-	stepTimeout any
-	jobTimeout  any
-}
-
-func (u playwrightUse) timeoutProblems(budget playwrightBudget) []string {
-	where := u.where
-	stepMinutes, ok := minutes(u.stepTimeout)
+// playwrightJobProblems reports a job whose own timeout cannot hold the action's worst case.
+func playwrightJobProblems(where string, jobTimeout any, budget playwrightBudget) []string {
+	jobMinutes, ok := minutes(jobTimeout)
 	if !ok {
-		return []string{where + ": the playwright-chromium step sets no numeric timeout-minutes"}
+		return []string{where + ": the job using playwright-chromium sets no numeric timeout-minutes"}
 	}
-	var problems []string
-	if stepMinutes*60 < budget.seconds {
-		problems = append(problems, fmt.Sprintf("%s: the playwright-chromium step's %d minutes cannot cover both attempts and the pause (%ds)", where, stepMinutes, budget.seconds))
+	if jobMinutes*60 <= budget.seconds {
+		return []string{fmt.Sprintf("%s: the job's %d minutes cannot cover both install attempts and the pause (%ds)", where, jobMinutes, budget.seconds)}
 	}
-	if jobMinutes, ok := minutes(u.jobTimeout); ok && jobMinutes <= stepMinutes {
-		problems = append(problems, fmt.Sprintf("%s: the job's %d minutes is not above the playwright-chromium step's %d, so the step bound never fires", where, jobMinutes, stepMinutes))
-	}
-	return problems
+	return nil
 }
 
 func atoi(s string) int {

@@ -4,7 +4,7 @@ import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
 
-import { clipboardEquals, withPreviewBrowser } from "./browser-fixture.mjs";
+import { copyAndRead, withPreviewBrowser } from "./browser-fixture.mjs";
 
 const { values } = parseArgs({
   options: { "out-dir": { type: "string" }, screenshots: { type: "string" } },
@@ -105,9 +105,10 @@ await it("copies supported agent commands on Observability and Coding Agents pag
           const launcher = page.locator(".docs-layout .docs-agent-launcher");
           for (const agent of ["claude", "codex", "copilot", "gemini", "opencode"]) {
             await launcher.getByLabel("Coding agent").selectOption(agent);
-            const button = launcher.getByRole("button");
-            await button.click();
-            await clipboardEquals(page, `npx langwatch ${agent}`);
+            assert.equal(
+              await copyAndRead(page, launcher.getByRole("button")),
+              `npx langwatch ${agent}`,
+            );
           }
           const report = page.getByRole("link", { name: "Report a problem" });
           const issue = new URL(await report.getAttribute("href"));
@@ -137,10 +138,12 @@ await it("copies Markdown with Alt Shift C and leaves editable controls alone", 
         await page.waitForFunction(() =>
           Boolean(document.querySelector("script[data-island=toc][data-loaded]")),
         );
-        await page.locator("[data-docs-page-copy]:not([disabled])").first().waitFor();
-        await page.keyboard.press("Alt+Shift+c");
         const markdown = await readFile(path.join(outDir, "coding-agents/overview.md"), "utf8");
-        await clipboardEquals(page, markdown);
+        const pageCopy = page.locator("[data-docs-page-copy]").first();
+        assert.equal(
+          await copyAndRead(page, pageCopy, () => page.keyboard.press("Alt+Shift+c")),
+          markdown,
+        );
         await page.locator(".docs-layout .docs-agent-launcher select").focus();
         await page.evaluate(() => navigator.clipboard.writeText("keep me"));
         await page.keyboard.press("Alt+Shift+c");
