@@ -61,6 +61,7 @@ const { snapshot, invalidate, removeForScope, setForScope } = vi.hoisted(() => {
       effective: baseline,
       effectiveTeam: baseline,
       effectiveOrganization: baseline,
+      piiRedactionModelAccepted: false,
       rules: [
         {
           scopeType: "TEAM" as const,
@@ -84,6 +85,9 @@ vi.mock("../../../behavior/data-privacy-api.ts", () => ({
       },
       setForScope: {
         useMutation: () => ({ mutateAsync: setForScope, isPending: false }),
+      },
+      acceptPiiRedactionModel: {
+        useMutation: () => ({ mutateAsync: vi.fn(async () => undefined), isPending: false }),
       },
     },
   },

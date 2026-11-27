@@ -184,6 +184,7 @@ jobs:
               # edit to that action will silently not re-run the suite it
               # feeds. These entries cover every action this file uses
               # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
+              - '.github/actions/apt-ubuntu-sources/**'
               - '.github/actions/detect-changes/**'
               - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
@@ -1117,6 +1118,8 @@ jobs:
           account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       - uses: ./.github/actions/prepare-generated-files
+
+      - uses: ./.github/actions/apt-ubuntu-sources
 
       # Each browser lane runs `playwright install --with-deps chromium` in its own
       # script (browser-test-lane.md), and the first one on a shard spent ~17s

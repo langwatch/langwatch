@@ -53,7 +53,7 @@ export const DigestPlanPressure = (props: DigestPlanPressureProps) => {
       }}
       whatsNew={props.whatsNew}
       reason={`You are an admin of ${organizationName}.`}
-      unsubscribeUrl={props.unsubscribeUrl}
+      preferencesUrl={props.preferencesUrl}
     >
       <Meter percent={props.usagePercentage} />
       <DetailTable
@@ -86,7 +86,7 @@ const whatsNew = {
 } as const;
 
 const links = {
-  unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+  preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
   samplingUrl: "https://app.langwatch.ai/api/digest/c/tk_sampl8Ld3",
   redactionUrl: "https://app.langwatch.ai/api/digest/c/tk_redac2Qp6",
   upgradeUrl: "https://app.langwatch.ai/api/digest/c/tk_upgra5Vm0",

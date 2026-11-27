@@ -29,11 +29,6 @@ let digest: InstalledDigest;
 
 beforeEach(async () => {
   digest = installDigest();
-  await digest.repositories.audience.setEnrolled({
-    organizationId: ORGANIZATION,
-    enrolled: true,
-    by: "operator-1",
-  });
   await digest.repositories.audience.setArmed({ armed: true });
 });
 
@@ -43,12 +38,7 @@ afterEach(async () => {
 
 /** One member's send of the sent week. */
 const sendFor = ({ userId }: { userId: string }) =>
-  digest.carryOut({
-    userId,
-    organizationId: ORGANIZATION,
-    isoWeek: SENT_WEEK,
-    homeOrganizationId: null,
-  });
+  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek: SENT_WEEK });
 
 /** The organization at 90% of its plan, so an admin's pick is plan-pressure. */
 function nearTheLimit() {

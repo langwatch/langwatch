@@ -38,7 +38,9 @@ export type PiiRedactionModelFallbackReason =
   | "routing_error"
   | "not_licensed"
   | "busy"
-  | "unplaceable";
+  | "unplaceable"
+  /** Cloud, priced, and no organization admin accepted the model's price yet. */
+  | "not_accepted";
 
 /** External PII analysis counts and durations, pushed over OTLP. */
 export class PiiAnalysisMetricsOtelService {

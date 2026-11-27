@@ -11,9 +11,9 @@ import type {
 import type { DigestTemplateInput, DigestTemplatePick } from "./digest-template.rules.ts";
 import {
   BASELINE_WEEKS,
-  latencyPercentile,
   nextMonthLabel,
   type OutcomeCounts,
+  type ProjectWeek,
   type ProjectWeekState,
   userWeekTotals,
   type UserWeekState,
@@ -47,14 +47,19 @@ export type OrganizationWeek = Readonly<{
   isoWeek: string;
   planUsage: PlanUsage | null;
   /** Each project's fold for the week. */
-  projects: readonly ProjectWeekState[];
+  projects: readonly ProjectWeek[];
   /** Each project's folds for the weeks before it, as far back as the baseline reads. */
   history: readonly ProjectWeekState[];
+  /**
+   * Each project's traces the week before; a project absent from it has none to compare, either
+   * because the read failed or because there were none.
+   */
+  previousTraces: ReadonlyMap<string, number>;
   users: ReadonlyMap<string, UserWeekState>;
 }>;
 
 /** What every template's props open with. */
-type CommonProps = Readonly<{ weekLabel: string; unsubscribeUrl: string }>;
+type CommonProps = Readonly<{ weekLabel: string; preferencesUrl: string }>;
 
 const TOP_ROWS = 3;
 
@@ -63,15 +68,24 @@ const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
   whole > 0 ? (part * 100) / whole : 0;
 
 /**
- * A person's week: the `DigestSend` row's id, so only the first claim of a week lands, the send
- * aggregate's id, and the send an unsubscribe records it came from.
+ * A person's week in one organization: the `DigestSend` row's id, so only the first claim of it
+ * lands, the send aggregate's id, and the send an unsubscribe records it came from. The
+ * organization is part of it, so a person in three organizations has three distinct sends.
  */
-export function digestSendKey({ userId, isoWeek }: { userId: string; isoWeek: string }): string {
-  return `${userId}:${isoWeek}`;
+export function digestSendKey({
+  userId,
+  organizationId,
+  isoWeek,
+}: {
+  userId: string;
+  organizationId: string;
+  isoWeek: string;
+}): string {
+  return `${userId}:${organizationId}:${isoWeek}`;
 }
 
 /** The idempotency key a member's week is sent under: a retry is not a second email. */
-export function digestMessageId(week: { userId: string; isoWeek: string }): string {
+export function digestMessageId(week: Parameters<typeof digestSendKey>[0]): string {
   return `digest:${digestSendKey(week)}`;
 }
 
@@ -87,48 +101,10 @@ export function derivePlanUsage(
 }
 
 /** The project the email is about: the busiest by traces, then by scenario runs. */
-export function pickFocusProject(week: OrganizationWeek): ProjectWeekState | undefined {
+export function pickFocusProject(week: OrganizationWeek): ProjectWeek | undefined {
   return week.projects.toSorted(
     (left, right) => right.traces - left.traces || right.scenarios.runs - left.scenarios.runs,
   )[0];
-}
-
-/** What a member's week in one organization amounts to: traces of the projects shown plus their own sessions. */
-export function weekActivity({ week, userId }: { week: OrganizationWeek; userId: string }): number {
-  const user = week.users.get(userId);
-  return (
-    week.projects.reduce((total, { traces }) => total + traces, 0) +
-    (user ? userWeekTotals(user).sessions : 0)
-  );
-}
-
-/**
- * Which organization's week a person in several enrolled ones is sent: the one with the most
- * activity, the lowest organization id on a tie, so every attempt at the week agrees. None when
- * there are no candidates.
- */
-export function pickHomeOrganization(
-  candidates: readonly Readonly<{ organizationId: string; activity: number }>[],
-): string | undefined {
-  return candidates.toSorted(
-    (left, right) =>
-      right.activity - left.activity || left.organizationId.localeCompare(right.organizationId),
-  )[0]?.organizationId;
-}
-
-/** The week with only the projects a member may view, in this week's folds and its history. */
-export function weekVisibleTo({
-  week,
-  visibleProjectIds,
-}: {
-  week: OrganizationWeek;
-  visibleProjectIds: ReadonlySet<string>;
-}): OrganizationWeek {
-  return {
-    ...week,
-    projects: week.projects.filter(({ projectId }) => visibleProjectIds.has(projectId)),
-    history: week.history.filter(({ projectId }) => visibleProjectIds.has(projectId)),
-  };
 }
 
 function baselineOf({
@@ -190,7 +166,7 @@ export function buildDigestTemplateProps({
   userId,
   names,
   baseUrl,
-  unsubscribeUrl,
+  preferencesUrl,
   now,
 }: {
   pick: DigestTemplatePick;
@@ -198,11 +174,11 @@ export function buildDigestTemplateProps({
   userId: string;
   names: DigestNames;
   baseUrl: string;
-  /** The page behind the email's own unsubscribe link. */
-  unsubscribeUrl: string;
+  /** The email-preferences page the footer link opens. */
+  preferencesUrl: string;
   now: number;
 }): DigestTemplateProps | undefined {
-  const common = { weekLabel: weekLabel(week.isoWeek), unsubscribeUrl };
+  const common = { weekLabel: weekLabel(week.isoWeek), preferencesUrl };
   switch (pick.template) {
     case "digest-plan-pressure": {
       const props = buildPlanPressureProps({ week, names, baseUrl, now, common });
@@ -352,27 +328,24 @@ function tracesWeekNumbers({
   focus,
 }: {
   week: OrganizationWeek;
-  focus: ProjectWeekState;
+  focus: ProjectWeek;
 }): Omit<DigestTracesWeekProps, keyof CommonProps | "whatsNew" | "projectName" | "tracesUrl"> {
-  const [lastWeek] = weeksBefore({ isoWeek: week.isoWeek, count: 1 });
-  const previous = week.history.find(
-    (fold) => fold.projectId === focus.projectId && fold.isoWeek === lastWeek,
-  );
+  const previous = week.previousTraces.get(focus.projectId);
   return {
     traces: focus.traces,
-    ...(previous && previous.traces > 0
+    ...(previous !== undefined && previous > 0
       ? {
           changePercent: percentOf({
-            part: focus.traces - previous.traces,
-            whole: previous.traces,
+            part: focus.traces - previous,
+            whole: previous,
           }),
         }
       : {}),
     errors: focus.errors,
     costUsd: focus.costUsd,
     tokens: Math.round(focus.tokens),
-    p50Milliseconds: latencyPercentile({ latency: focus.latency, percentile: 50 }),
-    p95Milliseconds: latencyPercentile({ latency: focus.latency, percentile: 95 }),
+    p50Milliseconds: Math.round(focus.p50Ms),
+    p95Milliseconds: Math.round(focus.p95Ms),
     topModels: Object.entries(focus.models)
       .toSorted(([, left], [, right]) => right - left)
       .slice(0, TOP_ROWS)

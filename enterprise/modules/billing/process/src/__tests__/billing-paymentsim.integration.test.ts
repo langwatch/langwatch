@@ -24,6 +24,7 @@ import { createTenantId, type Event, type EventSubscriberDefinition } from "@lan
 import { GATEWAY_SPEND_CONFIRMED_EVENT_TYPE } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -438,6 +439,8 @@ describe.skipIf(!goPresent)(
         selfHostedCustomer: false,
         teamIds: [],
         signupData: {},
+        // An admin accepted the PII Redaction Model's price before any month reported here.
+        piiRedactionModelAcceptedAt: Temporal.Instant.from("2020-01-01T00:00:00Z"),
       });
       const pending = await subscriptions.createPending({
         organizationId,
@@ -470,9 +473,12 @@ describe.skipIf(!goPresent)(
       const ledgerReads: { requestType: string }[] = [];
       const windowStarts: (number | undefined)[] = [];
       const ledger = { nanoUsd };
+      const reportOrganizations = MemoryBillingReportOrganizationRepository.create(store);
       const piiRedactionSpend = PiiRedactionSpendQueryService.create({
         isSpendSourceAvailable: () => true,
         listProjectIds: async () => [`${organizationId}-project-1`, `${organizationId}-project-2`],
+        findPiiRedactionModelAcceptedAtMs: (input) =>
+          reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
         sumSpendNanoUsdByRequestType: async (input) => {
           ledgerReads.push({ requestType: input.requestType });
           windowStarts.push(input.fromMs);
@@ -480,7 +486,7 @@ describe.skipIf(!goPresent)(
         },
       });
       const reportDeps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch"> = {
-        organizations: MemoryBillingReportOrganizationRepository.create(store),
+        organizations: reportOrganizations,
         billingCheckpoints: repositories.checkpoints,
         organizationCache: repositories.organizationCache,
         getUsageReportingService: () =>

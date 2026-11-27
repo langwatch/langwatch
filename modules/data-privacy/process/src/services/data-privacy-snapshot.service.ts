@@ -19,6 +19,7 @@ import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
 import type { OrganizationApiKeys } from "../channels/data-privacy.channels.ts";
 import { offerableApiKeys } from "../rules/audience-api-keys.rules.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
+import type { PiiRedactionModelAcceptanceService } from "./pii-redaction-model-acceptance.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:snapshot");
 
@@ -42,14 +43,17 @@ type ScopeLens = {
   nameOf(scopeType: DataPrivacyScopeType, scopeId: string): string;
 };
 
+type DataPrivacySnapshotDependencies = {
+  policies: DataPrivacySnapshotPolicies;
+  directory: DataPrivacyDirectoryReader;
+  permissions: DataPrivacyPermissionsService;
+  apiKeys: OrganizationApiKeys;
+  acceptance: Pick<PiiRedactionModelAcceptanceService, "isAccepted">;
+  clock?: () => Instant;
+};
+
 export class DataPrivacySnapshotService {
-  static create(options: {
-    policies: DataPrivacySnapshotPolicies;
-    directory: DataPrivacyDirectoryReader;
-    permissions: DataPrivacyPermissionsService;
-    apiKeys: OrganizationApiKeys;
-    clock?: () => Instant;
-  }): DataPrivacySnapshotService {
+  static create(options: DataPrivacySnapshotDependencies): DataPrivacySnapshotService {
     return new DataPrivacySnapshotService({ clock: nowInstant, ...options });
   }
 
@@ -57,19 +61,15 @@ export class DataPrivacySnapshotService {
   private readonly directory: DataPrivacyDirectoryReader;
   private readonly permissions: DataPrivacyPermissionsService;
   private readonly apiKeys: OrganizationApiKeys;
+  private readonly acceptance: DataPrivacySnapshotDependencies["acceptance"];
   private readonly clock: () => Instant;
 
-  private constructor(options: {
-    policies: DataPrivacySnapshotPolicies;
-    directory: DataPrivacyDirectoryReader;
-    permissions: DataPrivacyPermissionsService;
-    apiKeys: OrganizationApiKeys;
-    clock: () => Instant;
-  }) {
+  private constructor(options: DataPrivacySnapshotDependencies & { clock: () => Instant }) {
     this.policies = options.policies;
     this.directory = options.directory;
     this.permissions = options.permissions;
     this.apiKeys = options.apiKeys;
+    this.acceptance = options.acceptance;
     this.clock = options.clock;
   }
 
@@ -105,10 +105,11 @@ export class DataPrivacySnapshotService {
     organizationName: string | null;
   }): Promise<DataPrivacySnapshot> {
     const { userId, projectId, organizationId, organizationName } = input;
-    const [directory, rows, canManageOrganization] = await Promise.all([
+    const [directory, rows, canManageOrganization, piiRedactionModelAccepted] = await Promise.all([
       this.directory.findOrganizationDirectory({ organizationId }),
       this.policies.listOrganizationRules({ organizationId }),
       this.permissions.canManageOrganization({ userId, organizationId }),
+      this.acceptance.isAccepted({ organizationId }),
     ]);
 
     const [teamManage, projectManage] = await Promise.all([
@@ -164,6 +165,7 @@ export class DataPrivacySnapshotService {
         })),
         canAddApiKeys: canManageOrganization,
       },
+      piiRedactionModelAccepted,
     };
   }
 
@@ -376,6 +378,8 @@ export class DataPrivacySnapshotService {
           : [],
       },
       audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
+      // No organization, so nobody can accept the model's price for it.
+      piiRedactionModelAccepted: false,
     };
   }
 }

@@ -22,6 +22,7 @@ import {
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createTenantId, type EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { FeatureSetup } from "@langwatch/process";
 import {
@@ -52,6 +53,7 @@ import { OtlpSpanContentDropService } from "../services/otlp-span-content-drop.s
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
 import { PiiAnalysisMetricsOtelService } from "../services/pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../services/pii-analysis.service.ts";
+import { PiiRedactionModelAcceptanceService } from "../services/pii-redaction-model-acceptance.service.ts";
 import { PiiRedactionModelService } from "../services/pii-redaction-model.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../services/pii-redaction-policy.service.ts";
 import { PiiRedactionSpendService } from "../services/pii-redaction-spend.service.ts";
@@ -135,6 +137,8 @@ export class DataPrivacyModule implements DataPrivacyApi {
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
     entitlements: EntitlementApi,
+    /** Keeps an organization admin's acceptance of the PII Redaction Model's price (ADR-201). */
+    organizations: OrganizationApi,
   };
   static readonly config = dataPrivacyConfig;
   static readonly secrets = {
@@ -153,6 +157,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #permissions: DataPrivacyPermissionsService;
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
+  #acceptance: PiiRedactionModelAcceptanceService;
   #googleCredentials: GoogleCredentialsUse;
   readonly #spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined };
 
@@ -164,6 +169,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     permissions: DataPrivacyPermissionsService;
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
+    acceptance: PiiRedactionModelAcceptanceService;
     googleCredentials: GoogleCredentialsUse;
     spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined };
   }) {
@@ -174,6 +180,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#permissions = services.permissions;
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
+    this.#acceptance = services.acceptance;
     this.#googleCredentials = services.googleCredentials;
     this.#spendCommands = services.spendCommands;
   }
@@ -206,9 +213,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     };
     const requestIdKey = await getRequestIdKey({ secrets, config });
     const spend = PiiRedactionSpendService.create({
-      selfHosted: !config.isSaas,
       requestIdKey: requestIdKey.kind === "keyed" ? requestIdKey.key : void 0,
-      featureFlags: dependencies.featureFlags,
       recordSpendPriced: async (fact) => {
         if (!spendCommands.current) {
           throw new Error("the PII redaction spend pipeline is not connected");
@@ -228,6 +233,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
           method: "pii_redaction_model",
         }),
         featureFlags: dependencies.featureFlags,
+        organizations: dependencies.organizations,
         scopes: projectScopes,
         selfHosted: !config.isSaas,
         entitlements: dependencies.entitlements,
@@ -248,6 +254,9 @@ export class DataPrivacyModule implements DataPrivacyApi {
       apiKeys: channels.apiKeys,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
+    const acceptance = PiiRedactionModelAcceptanceService.create({
+      organizations: dependencies.organizations,
+    });
 
     return new DataPrivacyModule({
       privacy,
@@ -265,6 +274,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
         directory: repositories.directory,
         permissions,
         apiKeys: channels.apiKeys,
+        acceptance,
       }),
       scopeAuthorization: DataPrivacyScopeAuthorizationService.create({
         directory: repositories.directory,
@@ -276,6 +286,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
         dataPrivacy: privacy,
         nativePolicyEnforced: config.enforcement !== "off",
       }),
+      acceptance,
       googleCredentials,
       spendCommands,
     });
@@ -369,6 +380,12 @@ export class DataPrivacyModule implements DataPrivacyApi {
       scope: input.scope,
       personalOnly: input.personalOnly,
     });
+  }
+
+  acceptPiiRedactionModel(
+    input: { organizationId: string } & DataPrivacyCallerInput,
+  ): Promise<void> {
+    return this.#acceptance.accept({ organizationId: input.organizationId, userId: input.userId });
   }
 
   async dropsAnyContent(input: { projectId: string }): Promise<boolean> {

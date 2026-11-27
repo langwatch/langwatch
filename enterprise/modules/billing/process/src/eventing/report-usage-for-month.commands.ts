@@ -113,7 +113,7 @@ function toError(value: unknown): Error {
 }
 
 export interface ReportUsageForMonthCommandDeps {
-  organizations: BillingReportOrganizationRepository;
+  organizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
   billingCheckpoints: BillingCheckpointRepository;
   getUsageReportingService: () => UsageReportingService | undefined;
   /** The Instant Evals meter's total, read off the gateway spend ledger. */
@@ -236,9 +236,9 @@ function totalWithinContractCeiling({
 }
 
 /**
- * A month the subscription or line window narrows never reports below what it already reported:
- * the window keeps use before an upgrade or a line off what is still to send, never takes back
- * what was sent (ADR-174 decisions 23 and 26). A whole-month read keeps its lower corrections.
+ * A month a seat, line or PII acceptance narrows never reports below what it reported: use before
+ * it is kept off what is still to send, never taken back once sent (ADR-174 decisions 23 and 26,
+ * ADR-201 decision 15). A whole-month read keeps its lower corrections.
  */
 function notBelowReportedInNarrowedWindow({
   measured,
@@ -362,19 +362,23 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
           billingMonth,
           usageBilledSinceMs,
           lastReportedTotal,
-        }) =>
-          notBelowReportedInNarrowedWindow({
-            measured: await deps.queryPiiRedactionSpendTotal({
-              organizationId,
-              billingMonth,
-              usageBilledSinceMs,
-            }),
-            meter: PII_REDACTION_USD_EVENT_NAME,
+        }) => {
+          const measured = await deps.queryPiiRedactionSpendTotal({
             organizationId,
             billingMonth,
             usageBilledSinceMs,
+          });
+          return notBelowReportedInNarrowedWindow({
+            measured,
+            meter: PII_REDACTION_USD_EVENT_NAME,
+            organizationId,
+            billingMonth,
+            // The acceptance narrows the month as the line does; only the spend read knows it.
+            usageBilledSinceMs:
+              measured.outcome === "counted" ? measured.fromMs : usageBilledSinceMs,
             lastReportedTotal,
-          }),
+          });
+        },
         toValue: instantEvalMeterUnitsToUsd,
         identifier: piiRedactionMeterIdentifier,
       },

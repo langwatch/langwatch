@@ -98,6 +98,12 @@ const dataPrivacySnapshotSchemaDefinition = z
     available: dataPrivacyScopeAvailableSchema,
     /** Choices for the restrict-audience picker. */
     audienceOptions: dataPrivacyAudienceOptionsSchema,
+    /**
+     * Whether an organization admin accepted the PII Redaction Model's price. Until then a priced
+     * Cloud organization's Strict runs the rule-based detector, unbilled (ADR-201 decision 15).
+     * False for a personal-account project, which has no organization to accept it.
+     */
+    piiRedactionModelAccepted: z.boolean(),
   })
   .strict();
 export interface DataPrivacySnapshotSchema extends Named<

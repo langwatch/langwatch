@@ -1,47 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * What an owner's event contributes to a week: the model a span counts under, the repository a
+ * What an owner's event contributes to a week: the repository a
  * coding-agent fact names, and which metric series the digest sums.
  * @see enterprise/modules/digest/specs/digest.feature
  */
 import type { MetricFactsContribution } from "@langwatch/coding-agent-contract";
-import {
-  type NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { extractRepository, metricSeries, spanFact } from "../digest-activity.rules.ts";
-
-/** A root span carrying `spanAttributes`; every other field is a fixed, valid row. */
-const spanWith = (spanAttributes: NormalizedSpan["spanAttributes"]): NormalizedSpan => ({
-  id: "row-1",
-  traceId: "trace-1",
-  spanId: "span-1",
-  tenantId: "project-1",
-  parentSpanId: null,
-  parentTraceId: null,
-  parentIsRemote: null,
-  sampled: true,
-  startTimeUnixMs: 1_000,
-  endTimeUnixMs: 1_080,
-  durationMs: 80,
-  name: "chat",
-  kind: NormalizedSpanKind.INTERNAL,
-  resourceAttributes: {},
-  spanAttributes,
-  events: [],
-  links: [],
-  statusMessage: null,
-  statusCode: NormalizedStatusCode.OK,
-  instrumentationScope: { name: "sdk", version: null },
-  droppedAttributesCount: 0,
-  droppedEventsCount: 0,
-  droppedLinksCount: 0,
-  cost: 0.1,
-  nonBilledCost: null,
-});
+import { extractRepository, metricSeries } from "../digest-activity.rules.ts";
 
 /** One converged series of a session, under the wire name `metricName`. */
 const seriesNamed = (metricName: string): MetricFactsContribution => ({
@@ -57,42 +23,6 @@ const seriesNamed = (metricName: string): MetricFactsContribution => ({
   value: 42,
   dataPointCount: 1,
   asOfUnixMs: 1_000,
-});
-
-describe("spanFact()", () => {
-  describe("when a span names both the model it asked for and the one that answered", () => {
-    /** @scenario "A span counts under the model that answered it" */
-    it("counts under the model that answered", () => {
-      const fact = spanFact(
-        spanWith({
-          "gen_ai.request.model": "gpt-5",
-          "gen_ai.response.model": "gpt-5-2026-08-01",
-        }),
-      );
-
-      expect(fact).toMatchObject({ kind: "span", model: "gpt-5-2026-08-01" });
-    });
-  });
-
-  describe("when the answering model is blank", () => {
-    /** @scenario "A span counts under the model that answered it" */
-    it("counts under the model it asked for", () => {
-      const fact = spanFact(
-        spanWith({ "gen_ai.request.model": "gpt-5", "gen_ai.response.model": "  " }),
-      );
-
-      expect(fact).toMatchObject({ kind: "span", model: "gpt-5" });
-    });
-  });
-
-  describe("when neither model is named with text", () => {
-    /** @scenario "A span counts under the model that answered it" */
-    it("counts under no model", () => {
-      const fact = spanFact(spanWith({ "gen_ai.request.model": "", "gen_ai.response.model": " " }));
-
-      expect(fact).toMatchObject({ kind: "span", model: null });
-    });
-  });
 });
 
 describe("extractRepository()", () => {

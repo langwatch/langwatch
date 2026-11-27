@@ -59,15 +59,19 @@ export function pickEffectiveForScope(
 function piiLevelLabel({
   pii,
   piiRedactionModelOffered,
+  strictAwaitsAcceptance,
 }: {
   pii: ResolvedDataPrivacy["pii"];
   piiRedactionModelOffered: boolean;
+  strictAwaitsAcceptance: boolean;
 }): string {
   if (pii.level === "custom") {
     return `Custom (${pii.entities.length} ${pii.entities.length === 1 ? "type" : "types"})`;
   }
   if (piiRedactionModelOffered && pii.level === "strict") {
-    return `Strict · ${PII_REDACTION_MODEL_NAME}`;
+    return strictAwaitsAcceptance
+      ? "Strict · rule-based (Presidio)"
+      : `Strict · ${PII_REDACTION_MODEL_NAME}`;
   }
   if (piiRedactionModelOffered && pii.level === "essential") {
     return "Essential · standard detection";
@@ -80,17 +84,21 @@ export function EffectiveSummary({
   scopeFilter,
   currentTeamId,
   piiRedactionModelOffer = null,
+  strictAwaitsAcceptance = false,
 }: {
   snapshot: DataPrivacySnapshot;
   scopeFilter: EffectiveScopeSelection;
   currentTeamId: string | null;
   /** The Strict offer; null names levels as before. */
   piiRedactionModelOffer?: PiiRedactionModelOffer;
+  /** Until an organization admin accepts the price, Strict runs rule-based. */
+  strictAwaitsAcceptance?: boolean;
 }) {
   const { effective, scopeLabel } = pickEffectiveForScope(snapshot, scopeFilter, currentTeamId);
   const piiValue = piiLevelLabel({
     pii: effective.pii,
     piiRedactionModelOffered: piiRedactionModelOffer?.kind === "model",
+    strictAwaitsAcceptance,
   });
   const secretsValue = `${effective.secrets.enabled ? "On" : "Off"}${
     effective.secrets.customPatterns.length > 0

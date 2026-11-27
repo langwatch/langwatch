@@ -2,7 +2,10 @@
 import type { EventingCommands } from "@langwatch/eventing";
 
 import type { ProjectActivity, UserActivity } from "../eventing/digest-activity.events.ts";
-import type { DigestSendRequest } from "../eventing/digest-send.events.ts";
+import type {
+  DigestOrganizationPlanRequest,
+  DigestSendRequest,
+} from "../eventing/digest-send.events.ts";
 import type { DigestSendPipeline } from "../eventing/digest-send.pipeline.ts";
 import type { DigestPipeline } from "../eventing/digest.pipeline.ts";
 
@@ -40,6 +43,19 @@ export class DigestCommandsService {
   }: DigestSendRequest & { occurredAt: number }): Promise<void> {
     if (!this.#send) throw new Error("digest_send registered no senders in this process");
     await this.#send.requestSend.send({ tenantId: request.organizationId, occurredAt, ...request });
+  }
+
+  /** One organization's week to plan, as its own intent; `occurredAt` is the plan's instant. */
+  async requestOrganizationPlan({
+    occurredAt,
+    ...request
+  }: DigestOrganizationPlanRequest & { occurredAt: number }): Promise<void> {
+    if (!this.#send) throw new Error("digest_send registered no senders in this process");
+    await this.#send.requestOrganizationPlan.send({
+      tenantId: request.organizationId,
+      occurredAt,
+      ...request,
+    });
   }
 
   #activityCommands(): EventingCommands<DigestPipeline> {

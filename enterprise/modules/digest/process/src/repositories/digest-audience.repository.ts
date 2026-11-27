@@ -2,10 +2,8 @@
 
 export type DigestSettingsRecord = Readonly<{ armed: boolean; lastPlannedWeek: string | null }>;
 
-/** Who is sent to: the enrolled cohort, the members who opted out, and the switch. */
+/** Who is sent to: everyone but the people who opted out, behind the operator's switch. */
 export interface DigestAudienceRepository {
-  findEnrolled(): Promise<string[]>;
-  setEnrolled(input: { organizationId: string; enrolled: boolean; by: string }): Promise<void>;
   /** The subset of these people who opted out of the digest. */
   findUnsubscribed(input: { userIds: readonly string[] }): Promise<string[]>;
   /** Opts the person out, recording the send whose link they used. */

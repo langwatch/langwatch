@@ -7,7 +7,6 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
-import { type NormalizedSpan, NormalizedStatusCode } from "@langwatch/trace-contract";
 
 import type { ProjectFact, UserActivity } from "../eventing/digest-activity.events.ts";
 
@@ -18,32 +17,11 @@ const numberOf = (value: unknown): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 };
 
-const extractText = (value: unknown): string | undefined =>
-  typeof value === "string" && value.trim() !== "" ? value : undefined;
-
 const outcomeOf = ({ passed, failed }: { passed: boolean; failed: boolean }): Outcome => {
   if (passed) return "passed";
   if (failed) return "failed";
   return "other";
 };
-
-export function spanFact(span: NormalizedSpan): ProjectFact {
-  const attributes = span.spanAttributes;
-  return {
-    kind: "span",
-    root: span.parentSpanId === null,
-    error: span.statusCode === NormalizedStatusCode.ERROR,
-    tokens:
-      numberOf(attributes["gen_ai.usage.input_tokens"]) +
-      numberOf(attributes["gen_ai.usage.output_tokens"]),
-    costUsd: numberOf(span.cost),
-    durationMs: numberOf(span.durationMs),
-    model:
-      extractText(attributes["gen_ai.response.model"]) ??
-      extractText(attributes["gen_ai.request.model"]) ??
-      null,
-  };
-}
 
 export function evaluationFact(data: EvaluationLifecycleCompletedEventData): ProjectFact {
   const outcome = outcomeOf({ passed: data.passed === true, failed: data.passed === false });
