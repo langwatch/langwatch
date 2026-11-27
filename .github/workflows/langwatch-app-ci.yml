@@ -1177,8 +1177,8 @@ jobs:
           cache-dependency-path: "*/go.sum"
 
       - name: Wait for Postgres and Redis
-        timeout-minutes: 3
-        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 150s postgres redis
+        timeout-minutes: 5
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 270s postgres redis
 
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.

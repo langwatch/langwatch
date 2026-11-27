@@ -64,9 +64,12 @@ func (w *Waiter) Wait(ctx context.Context) error {
 // waitOne polls one container until it is healthy or the context ends.
 func (w *Waiter) waitOne(ctx context.Context, name string) error {
 	for {
-		status, _ := w.Docker.Health(ctx, name)
+		status, err := w.Docker.Health(ctx, name)
 		if status == "healthy" {
 			return nil
+		}
+		if err != nil && status == "" {
+			status = "not created yet: the image may still be pulling"
 		}
 		select {
 		case <-ctx.Done():

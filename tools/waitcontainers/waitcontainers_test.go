@@ -3,6 +3,7 @@ package waitcontainers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -20,9 +21,9 @@ type fakeDocker struct {
 }
 
 func (f *fakeDocker) Health(_ context.Context, name string) (string, error) {
-	seq := f.statuses[name]
-	if len(seq) == 0 {
-		return "", nil
+	seq, ok := f.statuses[name]
+	if !ok {
+		return "", errors.New("no such container: " + name)
 	}
 	status := seq[0]
 	if len(seq) > 1 {
@@ -67,6 +68,15 @@ func TestWaitFailsWithTheLogsOfAContainerThatNeverBecomesHealthy(t *testing.T) {
 	assert.Contains(t, log.String(), "pull access denied for postgres")
 	assert.Contains(t, log.String(), "logs of postgres")
 	assert.Equal(t, []string{"postgres"}, docker.diagnosed)
+}
+
+func TestWaitNamesAContainerThatWasNeverCreated(t *testing.T) {
+	w := Waiter{Names: []string{"clickhouse"}, Docker: &fakeDocker{}, Interval: time.Millisecond, Timeout: 10 * time.Millisecond, Log: io.Discard}
+
+	err := w.Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not created yet: the image may still be pulling")
 }
 
 func TestValidateRefusesAWaitThatCouldNeverPass(t *testing.T) {

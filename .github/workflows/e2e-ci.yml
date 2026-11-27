@@ -125,8 +125,8 @@ jobs:
     steps:
       # Plain containers started in the background, not a `services:` block: the
       # image pulls overlap the checkout and install, and the wait steps hold the
-      # first step that reads each (specs/ci/app-ci-datastores.feature). No nlpgo
-      # runs here, so a scenario run is only queued; the scenario specs assert that.
+      # first step that reads each (specs/ci/app-ci-datastores.feature). The upgrade's
+      # datastores pull first. No nlpgo runs here, so a scenario run is only queued.
       - name: Start the datastores and langevals in the background
         timeout-minutes: 1
         run: |
@@ -143,6 +143,7 @@ jobs:
               --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1" \
               --health-interval 2s --health-timeout 5s --health-retries 60 \
               clickhouse/clickhouse-server:26.8.36.3 &
+            wait
             docker run -d --name opensearch -p 9201:9200 \
               -e discovery.type=single-node -e DISABLE_SECURITY_PLUGIN=true -e "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m" \
               -e cluster.routing.allocation.disk.threshold_enabled=false -e bootstrap.memory_lock=false -e node.store.allow_mmap=false \
@@ -233,8 +234,8 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Wait for Postgres, Redis and ClickHouse
-        timeout-minutes: 3
-        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 150s postgres redis clickhouse
+        timeout-minutes: 5
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 270s postgres redis clickhouse
 
       # The api and the worker never migrate and refuse to serve until the
       # upgrade has run: the preparation script, `upgrade` then the
@@ -255,8 +256,8 @@ jobs:
         run: pnpm --filter langwatch-e2e-tests test:unit
 
       - name: Wait for OpenSearch and langevals
-        timeout-minutes: 4
-        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 210s opensearch langevals
+        timeout-minutes: 6
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 330s opensearch langevals
 
       - name: Run E2E tests
         env:
