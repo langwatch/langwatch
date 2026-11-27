@@ -16,7 +16,6 @@ import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-annou
 
 const logger = createLogger("langwatch:billing:tieredPlanRetirement");
 
-/** Retiring a superseded plan failed; the caller fails the delivery after its other steps. */
 /** Stripe's refusal for an object it does not hold; the subscriptions channel passes it through. */
 function isResourceMissing(err: unknown): boolean {
   return (
@@ -24,6 +23,7 @@ function isResourceMissing(err: unknown): boolean {
   );
 }
 
+/** Retiring a superseded plan failed; the caller fails the delivery after its other steps. */
 export class SupersededPlanRetirementError extends Error {
   constructor({ failures }: { failures: unknown[] }) {
     super("Failed to retire the tiered plans a Growth seat subscription supersedes", {
