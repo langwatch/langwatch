@@ -1,5 +1,6 @@
 import type { ClickHouseServerHealth } from "@langwatch/ops-contract";
 
+import { querySourceOf } from "../../rules/clickhouse-query-source.rules.ts";
 import type {
   ClickHouseQueryErrorRow,
   ClickHouseServerRepository,
@@ -41,7 +42,7 @@ export class MemoryClickHouseServerRepository implements ClickHouseServerReposit
         row.lastAt >= sinceMs &&
         row.lastAt < untilMs &&
         (code === undefined || row.code === code) &&
-        (source === undefined || row.source === source),
+        (source === undefined || querySourceOf(row.source) === source),
     );
   }
 

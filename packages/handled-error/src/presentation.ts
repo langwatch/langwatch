@@ -3478,8 +3478,10 @@ const presentations = {
   billing_facts_unavailable: {
     // An ops read of billing on a deployment that runs no subscriptions or holds no Stripe key.
     title: "Billing facts are not available here",
-    describe: () =>
-      "This deployment does not bill through LangWatch Cloud, so it holds no subscriptions or prices to read.",
+    describe: (error) =>
+      strEq(error, "reason", "no_payment_provider")
+        ? "This deployment has no payment provider configured, so it has no Stripe prices to read."
+        : "This deployment does not bill through LangWatch Cloud, so it holds no subscriptions or prices to read.",
   },
   billing_only_keeps_billing: {
     // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.

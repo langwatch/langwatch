@@ -933,7 +933,7 @@ export class MemorySimulationRepository extends SimulationRepository {
         {
           projectId,
           runs: runs.length,
-          suites: new Set(runs.map((run) => run.state.ScenarioSetId)).size,
+          suites: new Set(runs.map((run) => run.state.ScenarioSetId || DEFAULT_SET_ID)).size,
           failedRuns: runs.filter((run) => COUNTED_FAILED_STATUSES.has(run.state.Status)).length,
         },
       ];

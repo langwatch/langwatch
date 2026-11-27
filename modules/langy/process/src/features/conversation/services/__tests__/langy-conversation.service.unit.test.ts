@@ -40,8 +40,10 @@ function makeRepo(
     getResumeState: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     hasAdmittedTurn: vi.fn(async () => false),
     turnExists: vi.fn(async () => false),
-    findTurnFactRows: vi.fn(async () => []),
-    findConversationTurnFactRows: vi.fn(async () => []),
+    findTurnFactRows: vi.fn().mockRejectedValue(new Error("findTurnFactRows is not configured")),
+    findConversationTurnFactRows: vi
+      .fn()
+      .mockRejectedValue(new Error("findConversationTurnFactRows is not configured")),
     conversationExists: vi.fn(async () => false),
   };
   return Object.assign(defaults, overrides);

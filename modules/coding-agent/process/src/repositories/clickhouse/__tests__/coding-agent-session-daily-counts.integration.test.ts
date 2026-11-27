@@ -2,7 +2,8 @@
 
 /**
  * The staff investigation read of coding agent sessions per day: a session folded twice counts
- * once, its user is counted, and a session outside the window is left out.
+ * once, even when the refold moved its start across midnight, its user is counted, and a session
+ * outside the window is left out.
  * @see modules/staff-access/specs/staff-access-functions-activity.feature
  */
 import { randomUUID } from "node:crypto";
@@ -56,6 +57,7 @@ async function foldSession({
   startedAtMs: number;
   version: number;
 }) {
+  const updatedAtMs = day + version * 1_000;
   await ch.insert({
     table: "coding_agent_sessions",
     values: [
@@ -66,7 +68,7 @@ async function foldSession({
         Version: "2026-07-24",
         StartedAt: clock(startedAtMs),
         CreatedAt: clock(startedAtMs),
-        UpdatedAt: clock(startedAtMs + version * 1_000),
+        UpdatedAt: clock(Math.max(updatedAtMs, startedAtMs + version * 1_000)),
         Agent: "claude_code",
         UserId: "user_1",
       },
@@ -91,6 +93,8 @@ describe.skipIf(!clickHouseUrl)("coding agent sessions per day (real ClickHouse)
     });
     await foldSession({ sessionId: `${tag}-a`, startedAtMs: day + 3_600_000, version: 1 });
     await foldSession({ sessionId: `${tag}-a`, startedAtMs: day + 3_600_000, version: 2 });
+    await foldSession({ sessionId: `${tag}-moved`, startedAtMs: day - 1_800_000, version: 1 });
+    await foldSession({ sessionId: `${tag}-moved`, startedAtMs: day + 1_800_000, version: 3 });
     await foldSession({ sessionId: `${tag}-old`, startedAtMs: day - 20 * DAY_MS, version: 1 });
   }, 120_000);
 
@@ -104,7 +108,7 @@ describe.skipIf(!clickHouseUrl)("coding agent sessions per day (real ClickHouse)
   });
 
   /** @scenario "Coding agent sessions per day count a refolded session once" */
-  it("counts the refolded session once with its user and leaves the old one out", async () => {
+  it("counts each refolded session once on its latest day and leaves the old one out", async () => {
     const counts = await repository.findDailySessionCounts({
       projectIds: [tenantId],
       since: day - 7 * DAY_MS,
@@ -112,7 +116,7 @@ describe.skipIf(!clickHouseUrl)("coding agent sessions per day (real ClickHouse)
     });
 
     expect(counts).toEqual([
-      { projectId: tenantId, day, agent: "claude_code", sessions: 1, users: 1 },
+      { projectId: tenantId, day, agent: "claude_code", sessions: 2, users: 1 },
     ]);
   });
 });

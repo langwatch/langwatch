@@ -21,7 +21,8 @@ export type SessionIdIndexRead =
   | "recent_list"
   | "recent_list_fenced"
   | "branch_list"
-  | "usage_count";
+  | "usage_count"
+  | "daily_count";
 
 /** Observes the bounded session-list storage read without coupling the feature to app metrics. */
 export interface CodingAgentReadMetrics {

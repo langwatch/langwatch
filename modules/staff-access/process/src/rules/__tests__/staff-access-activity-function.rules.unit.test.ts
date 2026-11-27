@@ -20,6 +20,7 @@ describe("the activity function rules", () => {
         { code: "Some text", count: 3 },
       ]),
     ).toEqual({ other: 4, budget_exhausted: 2 });
+    expect(mergeCodeCounts({}, [{ code: "constructor", count: 1 }])).toEqual({ constructor: 1 });
   });
 
   /** @scenario "Weeks are UTC Monday weeks counted back from the current one" */

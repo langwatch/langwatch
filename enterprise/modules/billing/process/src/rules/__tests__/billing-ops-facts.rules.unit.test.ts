@@ -18,6 +18,7 @@ describe("billing ops facts", () => {
       expect(factPlanOf("PLATINUM")).toBe("other");
       expect(factStateOf("ACTIVE")).toBe("active");
       expect(factStateOf("PAUSED")).toBe("other");
+      expect(factStateOf("constructor")).toBe("other");
       expect(taxBehaviorOf("exclusive")).toBe("exclusive");
       expect(taxBehaviorOf("reverse_charge")).toBe("other");
       expect(catalogueNameOf("GROWTH_SEAT_EUR_MONTHLY")).toBe("GROWTH_SEAT_EUR_MONTHLY");
@@ -36,6 +37,8 @@ describe("billing ops facts", () => {
       expect(billingOrderOf([cancelled, pending])[0]).toBe(pending);
       expect(billingOrderOf([cancelled])[0]).toBe(cancelled);
       expect(billingOrderOf([])).toEqual([]);
+      const inherited = { id: "x", status: "constructor" };
+      expect(billingOrderOf([cancelled, inherited])).toEqual([inherited, cancelled]);
     });
   });
 });

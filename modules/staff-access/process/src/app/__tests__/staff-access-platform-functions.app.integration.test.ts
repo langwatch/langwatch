@@ -149,6 +149,7 @@ describe("the platform ops functions", () => {
             failedTenants: 0,
             tenantIds: [],
             lastAttemptAt: "2026-11-02T09:10:00.000Z",
+            tenantScanComplete: true,
           },
           {
             stepId: "dataset:move-records",
@@ -159,6 +160,7 @@ describe("the platform ops functions", () => {
             failedTenants: 3,
             tenantIds: ["project_parked_00", "project_parked_01", "project_parked_02"],
             lastAttemptAt: "2026-11-02T09:20:00.000Z",
+            tenantScanComplete: true,
           },
         ]),
         total: 2,

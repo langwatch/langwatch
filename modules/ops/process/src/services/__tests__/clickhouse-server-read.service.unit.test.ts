@@ -33,6 +33,8 @@ describe("ClickHouseServerReadService", () => {
       ]);
       expect(found[0]?.projectIds).toEqual(["project_a", "project_b"]);
       await expect(reads.findQueryErrors({ sinceMs: 2_000, untilMs: 2_000 })).resolves.toEqual([]);
+      const asOther = await reads.findQueryErrors({ sinceMs: 0, untilMs: 2_000, source: "other" });
+      expect(asOther.map((row) => row.queryShapeId)).toEqual(["43"]);
     });
   });
 });

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
@@ -108,11 +110,11 @@ export class StaffAccessPlatformFunctionReadsService {
     const steps = new Map<string, OpsUpgradeStep | null>(
       failedSteps.items.map((step) => [step.id, step]),
     );
-    for (const stepId of parked.keys()) if (!steps.has(stepId)) steps.set(stepId, null);
+    for (const stepId of parked.byStep.keys()) if (!steps.has(stepId)) steps.set(stepId, null);
     const rows = [...steps.entries()]
       .filter(([stepId]) => input.stepId === undefined || stepId === input.stepId)
       .map(([stepId, step]) => {
-        const tenants = parked.get(stepId) ?? [];
+        const tenants = parked.byStep.get(stepId) ?? [];
         const lastTenantAt = Math.max(0, ...tenants.map((tenant) => tenant.updatedAt));
         const stamp = step?.finishedAt ?? step?.updatedAt;
         const lastStepAt = stamp ? Temporal.Instant.from(stamp).epochMilliseconds : 0;
@@ -126,6 +128,7 @@ export class StaffAccessPlatformFunctionReadsService {
           failedTenants: tenants.length,
           tenantIds: tenants.slice(0, TENANT_IDS_PER_STEP).map((tenant) => tenant.tenantId),
           lastAttemptAt: lastAttemptAt > 0 ? isoOfMs(lastAttemptAt) : null,
+          tenantScanComplete: parked.complete,
         };
       });
     return pageOf({
@@ -136,12 +139,11 @@ export class StaffAccessPlatformFunctionReadsService {
     });
   }
 
-  /** Parked tenant rows by step, newest first, over at most 10,000 rows. */
-  private async parkedTenants({
-    stepId,
-  }: {
-    stepId: string | undefined;
-  }): Promise<Map<string, { tenantId: string; updatedAt: number }[]>> {
+  /** Parked tenant rows by step, newest first, over at most 10,000 rows; incomplete past that. */
+  private async parkedTenants({ stepId }: { stepId: string | undefined }): Promise<{
+    byStep: Map<string, { tenantId: string; updatedAt: number }[]>;
+    complete: boolean;
+  }> {
     const byStep = new Map<string, { tenantId: string; updatedAt: number }[]>();
     let cursor: string | null = null;
     for (let page = 0; page < MAX_TENANT_PAGES; page += 1) {
@@ -159,7 +161,7 @@ export class StaffAccessPlatformFunctionReadsService {
       cursor = answer.cursor;
       if (cursor === null) break;
     }
-    return byStep;
+    return { byStep, complete: cursor === null };
   }
 
   private async retention({
@@ -231,20 +233,24 @@ export class StaffAccessPlatformFunctionReadsService {
       since: range.since.epochMilliseconds,
       until: range.until.epochMilliseconds,
     });
-    const rows = usage.map((type) => ({
-      evaluatorType: evaluatorTypeOf(type.evaluatorType),
-      projects: type.projects,
-      runs: type.runs,
-      errors: type.errors,
-      skipped: type.skipped,
-      errorsByCode: Object.fromEntries(type.errorsByCode.map(({ code, count }) => [code, count])),
+    const keyed = usage.map((type) => ({
+      key: evaluatorUsageKeyOf(type.evaluatorType),
+      row: {
+        evaluatorType: evaluatorTypeOf(type.evaluatorType),
+        projects: type.projects,
+        runs: type.runs,
+        errors: type.errors,
+        skipped: type.skipped,
+        errorsByCode: Object.fromEntries(type.errorsByCode.map(({ code, count }) => [code, count])),
+      },
     }));
-    return pageOf({
-      rows,
-      keyOf: (row) => row.evaluatorType,
+    const page = pageOf({
+      rows: keyed,
+      keyOf: (entry) => entry.key,
       name: "evaluators.platform_usage",
       ...pageInputOf(input),
     });
+    return { ...page, items: page.items.map((entry) => entry.row) };
   }
 }
 
@@ -254,6 +260,13 @@ const COMMIT = /^[0-9a-f]{7,40}$/i;
 /** A stored evaluator type as a plain path of words, else "other"; never a free name. */
 function evaluatorTypeOf(value: string): string {
   return value.length <= 100 && EVALUATOR_TYPE.test(value) ? value : "other";
+}
+
+/** A page key per stored type: the type itself, or for each "other" one a digest of it. */
+function evaluatorUsageKeyOf(value: string): string {
+  const type = evaluatorTypeOf(value);
+  if (type !== "other") return type;
+  return `other:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
 }
 
 function commitOf(value: string): string {

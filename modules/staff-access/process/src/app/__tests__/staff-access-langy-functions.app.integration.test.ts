@@ -51,6 +51,7 @@ async function sessionFor({ functions }: { functions: string[] }) {
   );
   const session = caller?.session as StaffAccessDoorSession;
   return {
+    platform: w.state.platform,
     call: (name: string, input: unknown) => w.app.callFunction({ session, name, input }),
   };
 }
@@ -60,7 +61,7 @@ describe("given ACME's people use Langy", () => {
     /** @scenario "org.langy answers turns per day, model, state and failure code" */
     /** @scenario "org.langy reads only the approved organization" */
     it("answers ACME's turn groups as a page with codes and counts and no text", async () => {
-      const { call } = await sessionFor({ functions: ["org.langy"] });
+      const { call, platform } = await sessionFor({ functions: ["org.langy"] });
 
       const answered = await call("org.langy", { since: "2026-10-27T10:00:00Z" });
 
@@ -90,6 +91,7 @@ describe("given ACME's people use Langy", () => {
         nextCursor: null,
       });
       expect(JSON.stringify(answered.output)).not.toContain(GLOBEX.id);
+      expect(platform.langyProjectAsks).toEqual([[PROJECT]]);
     });
 
     /** @scenario "org.langy refuses a range over 31 days" */

@@ -1,3 +1,4 @@
+import { APP_ERROR_CODES, goErrorCodes } from "@langwatch/handled-error";
 /**
  * Langy turns reduced to ids, codes, counts and times for the staff ops functions (ADR-202):
  * message text, commands, tool arguments, results and error text never leave these functions.
@@ -26,12 +27,16 @@ export type LangyTurnFactRow = Readonly<{
   toolCalls: readonly LangyTurnToolCall[];
 }>;
 
-const CODE = /^[a-z][a-z0-9_]{1,63}$/;
+/** The registry's codes: a stored error leaves only as one of these, never as its own text. */
+const KNOWN_CODES: ReadonlySet<string> = new Set([
+  ...APP_ERROR_CODES,
+  ...Object.keys(goErrorCodes),
+]);
 const TOOL = /^[a-z][a-z0-9_]{0,39}$/;
 const MODEL = /^[a-z0-9][a-z0-9._:/-]{0,79}$/i;
 const ID_VALUE = /^[A-Za-z0-9_-]{4,64}$/;
 const ID_FIELD = /^([a-z][a-zA-Z]{0,30})(?:Id|_id)$/;
-const ID_FLAG = /--([a-z][a-z-]{0,30})-id(?:=|\s+)([A-Za-z0-9_-]{4,64})(?=\s|$)/;
+const ID_FLAG = /--([a-z][a-z-]{0,30})-id(?:=|\s+)(["']?)([A-Za-z0-9_-]{4,64})\2(?=\s|$)/;
 const CLI_CALL = /(?:^|[\s;&|(])langwatch\s+([a-z][a-z-]{0,30})(?=\s|$)/;
 const TURN_STATES = new Set(["pending", "running", "completed", "failed", "stopped"]);
 const CALL_STATES = new Set(["initiated", "succeeded", "failed"]);
@@ -100,16 +105,16 @@ const CLI_GROUPS = new Set([
 ]);
 
 /**
- * A failed turn's stored error as its code: a serialized handled error's code, a bare code,
- * else `other`.
+ * A failed turn's stored error as its code: a serialized handled error's code or a bare code the
+ * error registry knows, else `other`.
  */
 export function failureCodeOf(error: string): string {
   const trimmed = error.trim();
-  if (CODE.test(trimmed)) return trimmed;
+  if (KNOWN_CODES.has(trimmed)) return trimmed;
   try {
     const parsed: unknown = JSON.parse(trimmed);
     const code = (parsed as { code?: unknown } | null)?.code;
-    if (typeof code === "string" && CODE.test(code)) return code;
+    if (typeof code === "string" && KNOWN_CODES.has(code)) return code;
   } catch {
     // Free text reads as `other` below.
   }
@@ -140,8 +145,8 @@ export function targetOf(call: LangyTurnToolCall): LangyToolCallTarget {
     }
   }
   const flag = typeof call.command === "string" ? ID_FLAG.exec(call.command) : null;
-  if (flag?.[1] !== undefined && flag[2] !== undefined) {
-    return { kind: flag[1].replaceAll("-", "_"), id: flag[2] };
+  if (flag?.[1] !== undefined && flag[3] !== undefined) {
+    return { kind: flag[1].replaceAll("-", "_"), id: flag[3] };
   }
   return NO_TARGET;
 }

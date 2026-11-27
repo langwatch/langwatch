@@ -76,6 +76,8 @@ export const STAFF_ACCESS_PLATFORM_FUNCTIONS = {
           /** At most 20; `failedTenants` is the full count. */
           tenantIds: z.array(z.string()),
           lastAttemptAt: isoTime.nullable(),
+          /** False when the scan stopped at 10,000 parked tenants: counts are floors. */
+          tenantScanComplete: z.boolean(),
         })
         .strict(),
     ),

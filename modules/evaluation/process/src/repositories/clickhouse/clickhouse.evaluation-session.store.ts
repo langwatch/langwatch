@@ -21,6 +21,8 @@ export type EvaluationClickHouseQuery = {
   tenantIds?: readonly string[];
   /** A statement over every tenant; the caller's comment says why (lint-checked). */
   SKIP_TENANT_CHECK?: true;
+  /** Routes the statement to this organization's placement instead of the tenant's. */
+  organizationId?: string;
 };
 
 export type EvaluationClickHouseClient = {
@@ -46,6 +48,7 @@ export class ClickHouseEvaluationSession implements EvaluationClickHouseClient {
     const request = {
       tenantId: this.tenantId,
       ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
+      ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
       ...(input.SKIP_TENANT_CHECK ? { SKIP_TENANT_CHECK: true as const } : {}),
       sql: input.query,
       params: input.query_params,

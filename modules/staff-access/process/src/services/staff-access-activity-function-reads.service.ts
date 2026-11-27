@@ -3,7 +3,7 @@ import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi, InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -16,12 +16,11 @@ import type { Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import {
+  foldInstantEvalWeeks,
   isoOfMs,
-  mergeCodeCounts,
   plainCode,
   sumByWeek,
   WEEK_MS,
-  weekStartOf,
   weekStartsBack,
 } from "../rules/staff-access-activity-function.rules.ts";
 import { pageOf, rangeOf } from "../rules/staff-access-function.rules.ts";
@@ -293,35 +292,6 @@ function windowOf({
 }): Window {
   const range = rangeOf({ since: input.since, ...(input.until ? { until: input.until } : {}), at });
   return { since: range.since.epochMilliseconds, until: range.until.epochMilliseconds };
-}
-
-/** Instant Eval days folded per project into UTC Monday weeks, failure codes collapsed. */
-function foldInstantEvalWeeks(
-  days: readonly InstantEvalDailyRunCount[],
-): StaffAccessFunctionOutput<"org.instant_evals">["items"] {
-  const weeks = new Map<
-    string,
-    StaffAccessFunctionOutput<"org.instant_evals">["items"][number] & { lastMs: number }
-  >();
-  for (const day of days) {
-    const week = isoOfMs(weekStartOf(day.day));
-    const key = `${week}/${day.projectId}`;
-    const known = weeks.get(key);
-    const lastMs = Math.max(known?.lastMs ?? 0, day.lastRunAt);
-    weeks.set(key, {
-      week,
-      projectId: day.projectId,
-      runs: (known?.runs ?? 0) + day.runs,
-      judgedRows: (known?.judgedRows ?? 0) + day.judgedRows,
-      largestRun: Math.max(known?.largestRun ?? 0, day.largestRun),
-      failedRuns: (known?.failedRuns ?? 0) + day.failedRuns,
-      failedByCode: mergeCodeCounts(known?.failedByCode ?? {}, day.failedByCode),
-      priceUsd: (known?.priceUsd ?? 0) + day.priceUsd,
-      lastRunAt: isoOfMs(lastMs),
-      lastMs,
-    });
-  }
-  return [...weeks.values()].map(({ lastMs: _lastMs, ...row }) => row);
 }
 
 function pageInputOf(input: { limit?: number; cursor?: string }): {

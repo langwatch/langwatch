@@ -81,8 +81,10 @@ const createMockRepository = (): {
 } => ({
   findActive: vi.fn(),
   findLastNonCancelled: vi.fn(),
-  findForOrganization: vi.fn(),
-  findCreatedBetween: vi.fn(),
+  findForOrganization: vi
+    .fn()
+    .mockRejectedValue(new Error("findForOrganization is not configured")),
+  findCreatedBetween: vi.fn().mockRejectedValue(new Error("findCreatedBetween is not configured")),
   hasAnyForOrganization: vi.fn(),
   createPending: vi.fn(),
   updateStatus: vi.fn(),

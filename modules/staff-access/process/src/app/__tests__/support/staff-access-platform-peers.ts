@@ -23,10 +23,17 @@ export type PlatformPeerState = {
   mirrorProjectId: string | null;
   parkedTenants: number;
   usageAsks: { since: number; until: number }[];
+  /** The project ids each Langy turn-outcome read asked for. */
+  langyProjectAsks: string[][];
 };
 
 export function platformPeerState(): PlatformPeerState {
-  return { mirrorProjectId: "project_langy_mirror", parkedTenants: 3, usageAsks: [] };
+  return {
+    mirrorProjectId: "project_langy_mirror",
+    parkedTenants: 3,
+    usageAsks: [],
+    langyProjectAsks: [],
+  };
 }
 
 function failedStep(): OpsUpgradeStep {

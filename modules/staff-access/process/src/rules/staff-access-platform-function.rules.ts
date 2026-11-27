@@ -20,12 +20,12 @@ export function releaseOf(value: string): string {
   return RELEASE.test(value) ? value : OTHER;
 }
 
-/** The tag of an image reference, without registry, repository or digest. */
+/** An image reference's tag, without registry, repository or digest; digest-only is "other". */
 export function imageTagOf(image: string): string {
-  const [reference = ""] = image.split("@");
+  const [reference = "", digest] = image.split("@");
   const name = reference.slice(reference.lastIndexOf("/") + 1);
   const colon = name.lastIndexOf(":");
-  if (colon < 0) return name === "" ? OTHER : "latest";
+  if (colon < 0) return name === "" || digest !== undefined ? OTHER : "latest";
   const tag = name.slice(colon + 1);
   return IMAGE_TAG.test(tag) ? tag : OTHER;
 }

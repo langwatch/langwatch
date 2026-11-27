@@ -33,7 +33,7 @@ export function factPlanOf(plan: string): BillingFactPlan {
 }
 
 export function factStateOf(status: string): BillingFactState {
-  return STATES[status] ?? "other";
+  return Object.hasOwn(STATES, status) ? (STATES[status] ?? "other") : "other";
 }
 
 export function taxBehaviorOf(value: string): BillingPriceTaxBehavior {
@@ -57,6 +57,7 @@ export function catalogueNameOf(lookupKey: string | null): StripePriceName | "ot
  * then cancelled. The first is the subscription the organization is billed under now.
  */
 export function billingOrderOf<Row extends { status: string }>(newestFirst: readonly Row[]): Row[] {
-  const rank = (row: Row) => BILLING_RANK[row.status] ?? 1;
+  const rank = (row: Row) =>
+    Object.hasOwn(BILLING_RANK, row.status) ? (BILLING_RANK[row.status] ?? 1) : 1;
   return newestFirst.toSorted((a, b) => rank(a) - rank(b));
 }

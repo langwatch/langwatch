@@ -2,6 +2,8 @@
  * The activity ops functions' pure decisions (ADR-202): UTC day and week buckets, and the
  * collapse of stored codes to one plain word so free text never leaves through a code field.
  */
+import type { InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
+import type { StaffAccessFunctionOutput } from "@langwatch/staff-access-contract";
 import { Temporal } from "@langwatch/time";
 
 import { isoText } from "./staff-access.rules.ts";
@@ -37,12 +39,12 @@ export function mergeCodeCounts(
   into: Record<string, number>,
   counts: readonly { code: string; count: number }[],
 ): Record<string, number> {
-  const merged = { ...into };
+  const merged = new Map(Object.entries(into));
   for (const { code, count } of counts) {
     const plain = plainCode(code);
-    merged[plain] = (merged[plain] ?? 0) + count;
+    merged.set(plain, (merged.get(plain) ?? 0) + count);
   }
-  return merged;
+  return Object.fromEntries(merged);
 }
 
 /** Sums of `valueOf` per week start over rows dated by `dayOf`. */
@@ -61,4 +63,32 @@ export function sumByWeek<Row>({
     sums.set(week, (sums.get(week) ?? 0) + valueOf(row));
   }
   return sums;
+}
+/** Instant Eval days folded per project into UTC Monday weeks, failure codes collapsed. */
+export function foldInstantEvalWeeks(
+  days: readonly InstantEvalDailyRunCount[],
+): StaffAccessFunctionOutput<"org.instant_evals">["items"] {
+  const weeks = new Map<
+    string,
+    StaffAccessFunctionOutput<"org.instant_evals">["items"][number] & { lastMs: number }
+  >();
+  for (const day of days) {
+    const week = isoOfMs(weekStartOf(day.day));
+    const key = `${week}/${day.projectId}`;
+    const known = weeks.get(key);
+    const lastMs = Math.max(known?.lastMs ?? 0, day.lastRunAt);
+    weeks.set(key, {
+      week,
+      projectId: day.projectId,
+      runs: (known?.runs ?? 0) + day.runs,
+      judgedRows: (known?.judgedRows ?? 0) + day.judgedRows,
+      largestRun: Math.max(known?.largestRun ?? 0, day.largestRun),
+      failedRuns: (known?.failedRuns ?? 0) + day.failedRuns,
+      failedByCode: mergeCodeCounts(known?.failedByCode ?? {}, day.failedByCode),
+      priceUsd: (known?.priceUsd ?? 0) + day.priceUsd,
+      lastRunAt: isoOfMs(lastMs),
+      lastMs,
+    });
+  }
+  return [...weeks.values()].map(({ lastMs: _lastMs, ...row }) => row);
 }

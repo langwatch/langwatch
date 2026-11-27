@@ -17,6 +17,7 @@ describe("the platform ops function rules", () => {
     expect(plainWordOf("api/ACME")).toBe("other");
     expect(imageTagOf("ghcr.io/langwatch/langwatch:3.24.0@sha256:feed")).toBe("3.24.0");
     expect(imageTagOf("langwatch")).toBe("latest");
+    expect(imageTagOf("ghcr.io/langwatch/langwatch@sha256:feed")).toBe("other");
     expect(imageTagOf("langwatch:ACME build")).toBe("other");
     expect(imageTagOf("")).toBe("other");
   });

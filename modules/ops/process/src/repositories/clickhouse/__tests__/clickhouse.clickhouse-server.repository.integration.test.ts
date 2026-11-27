@@ -10,12 +10,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseClickHouseServerRepository } from "../clickhouse.clickhouse-server.repository.ts";
 
-const enabled = Boolean(
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL,
-);
-
 function queryClientOver(client: ClickHouseClient): ClickHouseQueryClient {
   const driver: QueryDriver = {
     async execute(request) {
@@ -42,7 +36,7 @@ async function failing(promise: Promise<unknown>): Promise<void> {
   );
 }
 
-describe.skipIf(!enabled)("ClickHouseClickHouseServerRepository against ClickHouse", () => {
+describe("ClickHouseClickHouseServerRepository against ClickHouse", () => {
   let client: ClickHouseClient;
   let repository: ClickHouseClickHouseServerRepository;
   const project = `project_${Date.now()}`;

@@ -17,6 +17,8 @@ describe("given a failed turn's stored error", () => {
     expect(failureCodeOf("langy_agent_at_capacity")).toBe("langy_agent_at_capacity");
     expect(failureCodeOf("The ACME key leaked: sk-123")).toBe("other");
     expect(failureCodeOf(JSON.stringify({ code: "Not A Code" }))).toBe("other");
+    expect(failureCodeOf("sk_live_example123")).toBe("other");
+    expect(failureCodeOf(JSON.stringify({ code: "sk_live_example123" }))).toBe("other");
   });
 });
 
@@ -49,6 +51,21 @@ describe("given tool calls", () => {
         }),
       ),
     ).toEqual({ kind: "dashboard", id: "dash_9" });
+    expect(
+      targetOf(
+        call({ toolName: "bash", command: "langwatch dashboards show --dashboard-id 'dash_10'" }),
+      ),
+    ).toEqual({ kind: "dashboard", id: "dash_10" });
+    expect(
+      targetOf(
+        call({ toolName: "bash", command: 'langwatch dashboards show --dashboard-id="dash_11"' }),
+      ),
+    ).toEqual({ kind: "dashboard", id: "dash_11" });
+    expect(
+      targetOf(
+        call({ toolName: "bash", command: "langwatch dashboards show --dashboard-id 'dash 12'" }),
+      ),
+    ).toEqual({ kind: null, id: null });
     expect(
       targetOf(call({ toolName: "ui_action", input: { dashboardId: "my open board" } })),
     ).toEqual({ kind: null, id: null });

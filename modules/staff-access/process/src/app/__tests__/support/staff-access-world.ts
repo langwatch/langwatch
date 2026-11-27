@@ -492,8 +492,9 @@ export function requestBody({
 export function langyStandIn(platform: PlatformPeerState = platformPeerState()) {
   return createApiFixture<LangyApi>({
     ...platformPeers.mirror(platform),
-    findTurnOutcomeCounts: async ({ projectIds }): Promise<LangyTurnOutcomeCount[]> =>
-      projectIds.includes(`${ACME.id}_project`)
+    findTurnOutcomeCounts: async ({ projectIds }): Promise<LangyTurnOutcomeCount[]> => {
+      platform.langyProjectAsks.push([...projectIds]);
+      return projectIds.includes(`${ACME.id}_project`)
         ? [
             {
               day: "2026-11-01",
@@ -514,7 +515,8 @@ export function langyStandIn(platform: PlatformPeerState = platformPeerState()) 
               users: 4,
             },
           ]
-        : [],
+        : [];
+    },
     getTurnFacts: async ({ projectId, conversationId }) => {
       if (projectId !== `${ACME.id}_project` || conversationId !== "conv_acme") {
         throw new LangyConversationNotFoundError(conversationId);

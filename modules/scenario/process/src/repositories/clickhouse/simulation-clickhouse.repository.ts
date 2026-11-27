@@ -1545,7 +1545,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     const client = await this.getClient(projectId);
     const result = await client.query({
       query: `SELECT toString(count()) AS Runs,
-              toString(uniqExact(t.ScenarioSetId)) AS Suites,
+              toString(uniqExact(if(t.ScenarioSetId = '', {defaultSetId:String}, t.ScenarioSetId))) AS Suites,
               toString(countIf(t.Status IN ('FAILED', 'ERROR'))) AS Failed
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
@@ -1558,7 +1558,12 @@ export class SimulationClickHouseRepository extends SimulationRepository {
              AND ${window}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )`,
-      query_params: { tenantId: projectId, since: String(since), until: String(until) },
+      query_params: {
+        tenantId: projectId,
+        since: String(since),
+        until: String(until),
+        defaultSetId: DEFAULT_SET_ID,
+      },
       format: "JSONEachRow",
     });
     const [row] = await result.json<{ Runs: string; Suites: string; Failed: string }>();

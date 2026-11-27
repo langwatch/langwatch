@@ -2,7 +2,8 @@
 
 /**
  * The staff investigation read of Instant Eval runs per day: each run once at its latest version,
- * the rows judged, and a failed run counted under its code.
+ * the rows judged, a failed run counted under its code, one row per UTC day, a run at `since`
+ * counted and one at `until` or in another project left out.
  * @see modules/staff-access/specs/staff-access-functions-activity.feature
  */
 import { randomUUID } from "node:crypto";
@@ -21,7 +22,10 @@ const clickHouseUrl = testClickHouseUrl();
 const DAY_MS = 24 * 60 * 60 * 1000;
 const tag = randomUUID();
 const projectId = `${tag}-daily`;
+const otherProjectId = `${tag}-other`;
 const day = Math.floor(Date.now() / DAY_MS) * DAY_MS - 2 * DAY_MS;
+const since = day - 3 * DAY_MS;
+const until = day + DAY_MS;
 
 let ch: ClickHouseClient;
 let runs: ClickHouseInstantEvalRunRepository;
@@ -31,18 +35,20 @@ async function runEndingAs({
   atMs,
   status,
   error,
+  project = projectId,
 }: {
   id: string;
   atMs: number;
   status: "FINISHED" | "FAILED";
   error: string | null;
+  project?: string;
 }) {
   const created = await ClickHouseInstantEvalRunRepository.create({
     resolveClient: async () => ch,
     now: () => Temporal.Instant.fromEpochMilliseconds(atMs),
   }).create({
     id,
-    projectId,
+    projectId: project,
     name: null,
     sql: "SELECT 1",
     parameters: {},
@@ -77,26 +83,42 @@ describe.skipIf(!clickHouseUrl)("Instant Eval runs per day (real ClickHouse)", (
       status: "FAILED",
       error: "provider_rate_limited",
     });
+    await runEndingAs({ id: `${tag}-since`, atMs: since, status: "FINISHED", error: null });
+    await runEndingAs({ id: `${tag}-until`, atMs: until, status: "FINISHED", error: null });
+    await runEndingAs({
+      id: `${tag}-elsewhere`,
+      atMs: day + 3_600_000,
+      status: "FINISHED",
+      error: null,
+      project: otherProjectId,
+    });
   }, 120_000);
 
   afterAll(async () => {
     if (!ch) return;
     await ch.exec({
-      query: "ALTER TABLE instant_eval_runs DELETE WHERE TenantId = {projectId:String}",
-      query_params: { projectId },
+      query: "ALTER TABLE instant_eval_runs DELETE WHERE TenantId IN ({projectIds:Array(String)})",
+      query_params: { projectIds: [projectId, otherProjectId] },
     });
     await ch.close();
   });
 
   /** @scenario "Instant Eval runs per day carry failures by code at their latest version" */
-  it("carries both runs, the rows judged and the failure under its code", async () => {
-    const days = await runs.findDailyRunCounts({
-      projectIds: [projectId],
-      since: day - 7 * DAY_MS,
-      until: day + DAY_MS,
-    });
+  it("carries each day's runs, the rows judged and the failure under its code", async () => {
+    const days = await runs.findDailyRunCounts({ projectIds: [projectId], since, until });
 
-    expect(days).toEqual([
+    expect(days.toSorted((a, b) => a.day - b.day)).toEqual([
+      {
+        projectId,
+        day: since,
+        runs: 1,
+        judgedRows: 10,
+        largestRun: 10,
+        failedRuns: 0,
+        failedByCode: [],
+        priceUsd: 0.5,
+        lastRunAt: since,
+      },
       {
         projectId,
         day,

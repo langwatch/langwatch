@@ -24,6 +24,8 @@ import { type ListedFunction, suggestOpsCall } from "./call-hint";
 
 /** How often a waiting request asks whether it was decided. */
 export const OPS_POLL_INTERVAL_MS = 2_000;
+/** How long the optional first-call hint may wait for the function listing. */
+const SUGGESTION_TIMEOUT_MS = 3_000;
 
 interface CreatedRequest {
   requestId: string;
@@ -115,6 +117,7 @@ const suggestFirstCall = async ({ session }: { session: OpsSession }): Promise<s
       path: "/api/staff-access/functions",
       bearer: session.opsToken,
       endpoint: session.endpoint,
+      signal: AbortSignal.timeout(SUGGESTION_TIMEOUT_MS),
     });
     return suggestOpsCall({ approved, listing: page.items, now: new Date() }) ?? null;
   } catch {

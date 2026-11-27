@@ -1280,7 +1280,10 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     };
   }
 
-  /** Per project, on the `StartedAt` partition key; a session folded twice counts once. */
+  /**
+   * Per project, each session at its latest version, then dated by that version's `StartedAt`:
+   * a refold counts once, even one that moved `StartedAt` across midnight or out of the window.
+   */
   async findDailySessionCounts({
     projectIds,
     since,
@@ -1292,6 +1295,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }): Promise<CodingAgentDailySessionCount[]> {
     const perProject = await Promise.all(
       [...new Set(projectIds)].map(async (tenantId) => {
+        const dedup = await this.spanBound({
+          read: "daily_count",
+          tenants: { tenantId },
+          overlapping: { fromMs: since, toMs: until },
+          whenNotReady: "unbounded",
+        });
+        if (dedup === null) return [];
         const rows = dailyRowsSchema.parse(
           (
             await this.clickhouse.query<unknown>({
@@ -1307,8 +1317,15 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
                 WHERE TenantId = {tenantId:String}
                   AND StartedAt >= fromUnixTimestamp64Milli({since:Int64})
                   AND StartedAt < fromUnixTimestamp64Milli({until:Int64})
+                  AND (TenantId, SessionId, UpdatedAt) IN (
+                    SELECT TenantId, SessionId, max(UpdatedAt)
+                    FROM ${TABLE_NAME}
+                    WHERE TenantId = {tenantId:String}
+                      ${dedup.sql}
+                    GROUP BY TenantId, SessionId
+                  )
                 GROUP BY DayMs, Agent`,
-              params: { tenantId, since, until },
+              params: { tenantId, since, until, ...dedup.params },
             })
           ).rows,
         );

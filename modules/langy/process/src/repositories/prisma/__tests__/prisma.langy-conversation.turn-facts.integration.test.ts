@@ -5,13 +5,13 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
   type PrismaConnection,
 } from "@langwatch/prisma-client";
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { countTurnOutcomes, turnFactsOf } from "../../../rules/langy-turn-facts.rules.ts";
@@ -110,7 +110,7 @@ describe.skipIf(!databaseUrl)("given Langy turns in two projects", () => {
     if (!databaseUrl) throw new Error("Test database URL is required");
     connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
-      logger: createLogger("langwatch:langy-turn-facts:test"),
+      logger: createTestLogger().logger,
     }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }));
     repository = PrismaLangyConversationRepository.create(connection.client);
 
