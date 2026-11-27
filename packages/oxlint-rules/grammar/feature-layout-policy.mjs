@@ -34,6 +34,8 @@ const ARTIFACT_TABLE = {
   service: { side: "contract", canonical: true, subject: true },
   store: { side: "process", canonical: true, subject: true, qualified: true },
   subscriber: { side: "process", canonical: true, subject: true },
+  // A typed ClickHouse table descriptor the builder reads through (ADR-202), by its repositories.
+  table: { side: "process", qualified: true },
   task: { side: "process", canonical: true },
 };
 
@@ -139,7 +141,7 @@ const REPOSITORY_HOMES = [
   new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:-repositories)?\\.registry\\.ts$`),
   new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repositories\\.ts$`),
   new RegExp(
-    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store)\\.ts$`,
+    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store|table)\\.ts$`,
   ),
 ];
 
@@ -262,7 +264,7 @@ export const FRAMEWORK_PATTERNS = [
   new RegExp(`^${CONCERN_PREFIX}services/${NAME}\\.service\\.ts$`),
   new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
   new RegExp(
-    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|store)\\.ts$`,
+    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|store|table)\\.ts$`,
   ),
   // Plain Lua strings beside the Redis repository that runs them, one script per method.
   new RegExp(`^${FEATURE_PREFIX}repositories/redis/redis\\.${NAME}\\.script\\.ts$`),
