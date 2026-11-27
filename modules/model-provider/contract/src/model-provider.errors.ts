@@ -461,7 +461,7 @@ export class ModelProviderCredentialsRequiredError extends HandledError {
   constructor({ provider }: { provider: string }) {
     super(
       "model_provider_credentials_required",
-      "This provider can't be switched on without credentials. Add its API key and save again.",
+      "This provider can't be switched on without credentials. Add them and save again.",
       {
         meta: { provider },
         httpStatus: 400,

@@ -196,6 +196,7 @@ describe("useProviderFormSubmit()", () => {
   });
 
   describe("given the save is refused because the provider would be switched on with no key", () => {
+    /** @scenario "A save refused for a missing key asks for it in the form" */
     it("asks for the key beside the credential fields instead of in a toast", async () => {
       mockUpdateMutateAsync.mockRejectedValueOnce({
         data: {

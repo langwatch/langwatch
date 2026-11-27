@@ -404,6 +404,20 @@ Feature: Credential Validation
     And the provider form stays open
 
   @unit
+  Scenario: A provider cannot be switched on with no credential it can reach
+    Given a provider that stores no API key and that the deployment supplies none for
+    When it is created switched on, or switched on later
+    Then the save is refused and nothing is stored
+    And a deployment-wide setting, a managed provider or a stored key still lets it save
+
+  @integration
+  Scenario: A save refused for a missing key asks for it in the form
+    Given the save of a provider is refused because it has no API key
+    When the refusal comes back
+    Then the form asks for the API key beside the credential fields
+    And no toast is shown
+
+  @unit
   Scenario: The API key is never sent in a URL
     Given a key to check
     When validation runs

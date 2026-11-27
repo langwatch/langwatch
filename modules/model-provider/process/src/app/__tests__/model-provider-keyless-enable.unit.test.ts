@@ -110,6 +110,7 @@ function write(overrides: Partial<ModelProviderWriteRequest>): ModelProviderWrit
 describe("ModelProviderModule.upsert, switching on a provider", () => {
   describe("given a deployment that supplies no OpenAI setting", () => {
     describe("when the provider is created enabled with no keys", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("refuses with model_provider_credentials_required and stores nothing", async () => {
         const { app, repositories } = await appWith({});
 
@@ -121,6 +122,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
     });
 
     describe("when a disabled keyless row is switched on", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("refuses with model_provider_credentials_required", async () => {
         const { app } = await appWith({ row: keyedRow({ enabled: false, customKeys: null }) });
 
@@ -131,6 +133,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
     });
 
     describe("when the provider is created enabled with its key", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves it enabled", async () => {
         const { app } = await appWith({});
 
@@ -144,6 +147,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
     });
 
     describe("when the provider is created disabled with no keys", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves it disabled", async () => {
         const { app } = await appWith({});
 
@@ -154,6 +158,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
     });
 
     describe("when a keyed row is edited without its key being sent again", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves the edit and keeps the stored key", async () => {
         const { app, repositories } = await appWith({ row: keyedRow({ enabled: false }) });
 
@@ -171,6 +176,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
 
   describe("given a deployment that supplies the provider's setting itself", () => {
     describe("when the provider is created enabled with no keys", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves it enabled, served by the deployment's value", async () => {
         const { app } = await appWith({
           environment: { OPENAI_BASE_URL: "https://inference.acme.internal/v1" },
@@ -183,6 +189,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
     });
 
     describe("when the deployment holds the provider's key", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves it enabled", async () => {
         const { app } = await appWith({ environment: { OPENAI_API_KEY: "sk-deployment" } });
 
@@ -195,6 +202,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
 
   describe("given an organization whose Bedrock credentials LangWatch manages", () => {
     describe("when Bedrock is created enabled with no keys", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves it enabled", async () => {
         const { app } = await appWith({ managedOrganizationIds: ["organization-1"] });
 
@@ -207,6 +215,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
 
   describe("given a provider keyed with the managed marker", () => {
     describe("when it is created enabled", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("saves it enabled", async () => {
         const { app } = await appWith({});
 
@@ -219,6 +228,7 @@ describe("ModelProviderModule.upsert, switching on a provider", () => {
 
   describe("given Codex, which signs in rather than takes a key", () => {
     describe("when it is created enabled before any sign-in", () => {
+      /** @scenario "A provider cannot be switched on with no credential it can reach" */
       it("refuses with model_provider_credentials_required", async () => {
         const { app } = await appWith({});
 

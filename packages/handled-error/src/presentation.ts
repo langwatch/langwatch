@@ -1747,9 +1747,12 @@ const presentations = {
     },
   },
   model_provider_credentials_required: {
-    title: "This provider needs its API key",
-    describe: () =>
-      "It can't be switched on without credentials, so nothing was saved. Add the API key, then save again.",
+    // Codex signs in with an OpenAI account rather than taking a key, so it is told to sign in.
+    title: "This provider needs its credentials first",
+    describe: (error) =>
+      strEq(error, "provider", "openai_codex")
+        ? "Codex can't be switched on before you sign in with your OpenAI account, so nothing was saved. Sign in, then save again."
+        : "It can't be switched on without credentials, so nothing was saved. Add the API key, then save again.",
   },
   model_provider_credentials_unreadable: {
     title: "This provider needs its credentials again",

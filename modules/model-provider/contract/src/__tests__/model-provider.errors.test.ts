@@ -151,8 +151,7 @@ describe("model provider handled errors", () => {
       });
       expectHandledWire(new ModelProviderCredentialsRequiredError({ provider: "openai" }), {
         code: "model_provider_credentials_required",
-        message:
-          "This provider can't be switched on without credentials. Add its API key and save again.",
+        message: "This provider can't be switched on without credentials. Add them and save again.",
         httpStatus: 400,
         meta: { provider: "openai" },
       });
