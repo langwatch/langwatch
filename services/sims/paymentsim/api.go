@@ -529,7 +529,11 @@ func (s *Server) createInvoice(_ *http.Request, p params) (any, error) {
 	if currency == "" {
 		currency = "usd"
 	}
-	return s.draftInvoice(cus, currency, collection, days, p.metadata()), nil
+	inv := s.draftInvoice(cus, currency, collection, days, p.metadata())
+	if p.has("auto_advance") {
+		inv.AutoAdvance = p.boolean("auto_advance")
+	}
+	return inv, nil
 }
 
 func (s *Server) createInvoiceItem(_ *http.Request, p params) (any, error) {
@@ -671,13 +675,16 @@ func (s *Server) getInvoice(r *http.Request, _ params) (any, error) {
 	return s.findInvoice(r.PathValue("id"))
 }
 
-func (s *Server) finalizeInvoice(r *http.Request, _ params) (any, error) {
+func (s *Server) finalizeInvoice(r *http.Request, p params) (any, error) {
 	inv, err := s.findInvoice(r.PathValue("id"))
 	if err != nil {
 		return nil, err
 	}
 	if deref(inv.Status) != "draft" {
 		return nil, invalid("", "This invoice is already finalized, you can't re-finalize a non-draft invoice.")
+	}
+	if p.has("auto_advance") {
+		inv.AutoAdvance = p.boolean("auto_advance")
 	}
 	s.finalize(inv)
 	return inv, nil

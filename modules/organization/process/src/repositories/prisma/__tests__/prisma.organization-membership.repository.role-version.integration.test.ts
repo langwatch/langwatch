@@ -70,7 +70,11 @@ describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository role version", 
     await prisma.$disconnect();
   });
 
-  const changeSam = (role: OrganizationUserRole, expectedRoleVersion?: number) =>
+  const changeSam = (
+    role: OrganizationUserRole,
+    expectedRoleVersion?: number,
+    roleChangeId?: string,
+  ) =>
     repository.updateMemberRole({
       caller: { type: "system" },
       organizationId,
@@ -79,6 +83,7 @@ describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository role version", 
       effectiveTeamRoleUpdates: [],
       currentUserId: null,
       ...(expectedRoleVersion === undefined ? {} : { expectedRoleVersion }),
+      ...(roleChangeId === undefined ? {} : { roleChangeId }),
     });
 
   describe("when a paid change expects the version it was asked at", () => {
@@ -105,6 +110,88 @@ describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository role version", 
         select: { role: true, roleVersion: true },
       });
       expect(row).toEqual({ role: OrganizationUserRole.MEMBER, roleVersion: asked + 1 });
+    });
+  });
+
+  describe("when two paid writes expect the same role version at once", () => {
+    /** @scenario "Two role writes expecting one role version at once: exactly one writes" */
+    it("lets exactly one write and refuses the other with the version moved", async () => {
+      const asked = await repository.getRoleVersion({ organizationId, userId: samId });
+
+      const outcomes = await Promise.allSettled([
+        changeSam(OrganizationUserRole.ADMIN, asked, "change_a"),
+        changeSam(OrganizationUserRole.MEMBER, asked, "change_b"),
+      ]);
+
+      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+      const refused = outcomes.flatMap((outcome) =>
+        outcome.status === "rejected" ? [outcome.reason] : [],
+      );
+      expect(refused).toEqual([expect.objectContaining({ name: "RoleVersionMovedError" })]);
+      expect(await repository.getRoleVersion({ organizationId, userId: samId })).toBe(asked + 1);
+    });
+  });
+
+  describe("when a waiting member is admitted to a full seat", () => {
+    /** @scenario "Admitting a waiting member moves the role version" */
+    it("moves the role version, so a paid change asked before it is refused", async () => {
+      const { id: waitingId } = await prisma.user.create({
+        data: { name: "Kim", email: `kim-${testNamespace}@example.com` },
+      });
+      userIds.push(waitingId);
+      await prisma.organizationUser.create({
+        data: {
+          userId: waitingId,
+          organizationId,
+          role: OrganizationUserRole.EXTERNAL,
+          disabledAt: new Date(),
+          seatPendingSince: new Date(),
+        },
+      });
+      const asked = await repository.getRoleVersion({ organizationId, userId: waitingId });
+
+      const admit = () =>
+        repository.admitWaitingMember({
+          organizationId,
+          userId: waitingId,
+          pendingAdmissionId: "admission-kim",
+          seat: { kind: "unchanged" },
+        });
+      const admissions = await Promise.all([admit(), admit()]);
+
+      expect(admissions.filter(Boolean)).toHaveLength(1);
+      expect(await repository.getRoleVersion({ organizationId, userId: waitingId })).toBe(
+        asked + 1,
+      );
+    });
+  });
+
+  describe("when a paid change's own role write committed and it is applied again", () => {
+    /** @scenario "A paid change whose role write landed but whose settling failed ends as applied" */
+    it("refuses with the change's own id as the applied one, writing nothing", async () => {
+      const asked = await repository.getRoleVersion({ organizationId, userId: samId });
+      await changeSam(OrganizationUserRole.ADMIN, asked, "change_paid");
+
+      await expect(
+        changeSam(OrganizationUserRole.ADMIN, asked, "change_paid"),
+      ).rejects.toMatchObject({ name: "RoleVersionMovedError", appliedChangeId: "change_paid" });
+
+      const row = await prisma.organizationUser.findUniqueOrThrow({
+        where: { userId_organizationId: { userId: samId, organizationId } },
+        select: { roleVersion: true, lastRoleChangeId: true },
+      });
+      expect(row).toEqual({ roleVersion: asked + 1, lastRoleChangeId: "change_paid" });
+    });
+
+    /** @scenario "A paid change whose role write landed but whose settling failed ends as applied" */
+    it("names no applied change once a direct role write came after it", async () => {
+      const asked = await repository.getRoleVersion({ organizationId, userId: samId });
+      await changeSam(OrganizationUserRole.ADMIN, asked, "change_later");
+      await changeSam(OrganizationUserRole.MEMBER);
+
+      await expect(
+        changeSam(OrganizationUserRole.ADMIN, asked, "change_later"),
+      ).rejects.toMatchObject({ name: "RoleVersionMovedError", appliedChangeId: null });
     });
   });
 });

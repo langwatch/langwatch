@@ -19,6 +19,7 @@ import { OrganizationModule } from "../../organization.app.ts";
 import { organizationModuleSetup } from "./organization-module-setup.ts";
 
 export const ORGANIZATION_ID = "org-acme";
+export const PROJECT_ID = "project-acme";
 export const ADA: OrganizationCaller = {
   id: "user-ada",
   name: "Ada Admin",
@@ -87,6 +88,8 @@ export async function application(
     salesDown?: boolean;
     /** The seat an arrival joins on; a full Member seat unless named. */
     joinerRole?: "MEMBER" | "DEVELOPER";
+    /** Whether the organization has its one project, the tenant pushes are recorded on. */
+    withProject?: boolean;
   } = {},
 ) {
   const memory = MemoryOrganizationDatabase.create();
@@ -169,6 +172,22 @@ export async function application(
     teamSlug: "engineering",
     pricingModel: "SEAT_EVENT",
   });
+  if (options.withProject ?? true) {
+    memory.projects.set(PROJECT_ID, {
+      id: PROJECT_ID,
+      name: "Support agent",
+      slug: "support-agent",
+      apiKey: "",
+      teamId: "team-acme",
+      isPersonal: false,
+      ownerUserId: null,
+      organizationId: ORGANIZATION_ID,
+      archivedAt: null,
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
+      personalFeatures: null,
+    });
+  }
   memory.organizationUsers.push({
     userId: BILL.id,
     organizationId: ORGANIZATION_ID,
@@ -193,6 +212,7 @@ export async function application(
   app.connectLifecycle(
     createApiFixture<OrganizationLifecycleSenders>({
       recordMemberEnabled: { send: async () => {} },
+      recordMemberRemoved: { send: async () => {} },
     }),
   );
   const mail = setup.channels.accessNoticeMail as MemoryAccessNoticeMailChannel;

@@ -3,6 +3,7 @@ import type {
   SeatApprovalCompletion,
   SeatApprovalWithSeat,
   SeatRequest,
+  SeatRequestResolved,
 } from "@langwatch/organization-contract";
 import { useEffect, useRef, useState } from "react";
 
@@ -86,6 +87,17 @@ function unsettledTitle({ settled, name }: { settled: SeatApprovalSettled; name:
     : "The seat payment was not completed";
 }
 
+/** What an approval did, in the words its toast says. */
+function approvedTitle({
+  outcome,
+  name,
+}: {
+  outcome: SeatRequestResolved["outcome"];
+  name: string;
+}) {
+  return outcome === "invited" ? `${name} was invited as a full member` : `${name} has a full seat`;
+}
+
 /** Approve buys the seat only with none free on a live Stripe seat subscription. */
 function buysSeat(open: OpenSeatRequests | undefined): boolean {
   return !open?.seatFree && open?.approvalPath?.kind === "stripe_seats";
@@ -152,9 +164,17 @@ export function useSeatRequests({
 
   const nameOf = (request: SeatRequest) => request.name ?? request.email;
 
-  const approved = ({ request, seatAdded }: { request: SeatRequest; seatAdded: boolean }) => {
+  const approved = ({
+    request,
+    outcome,
+    seatAdded,
+  }: {
+    request: SeatRequest;
+    outcome: SeatRequestResolved["outcome"];
+    seatAdded: boolean;
+  }) => {
     toaster.create({
-      title: `${nameOf(request)} has a full seat`,
+      title: approvedTitle({ outcome, name: nameOf(request) }),
       ...(seatAdded ? { description: "1 seat added." } : {}),
       type: "success",
       duration: 5000,
@@ -169,7 +189,7 @@ export function useSeatRequests({
     onSettled: (settled, settledWaiting) => {
       setWaiting(undefined);
       if (settled.status === "approved") {
-        approved({ request: settledWaiting.request, seatAdded: true });
+        approved({ request: settledWaiting.request, outcome: settled.outcome, seatAdded: true });
         return;
       }
       toaster.create({
@@ -187,14 +207,14 @@ export function useSeatRequests({
     fallbackTitle,
   }: {
     request: SeatRequest;
-    act: () => Promise<unknown>;
-    title: string;
+    act: () => Promise<SeatRequestResolved>;
+    title: (resolved: SeatRequestResolved) => string;
     fallbackTitle: string;
   }) => {
     setAnsweringId(request.id);
     try {
-      await act();
-      toaster.create({ title, type: "success", duration: 5000 });
+      const resolved = await act();
+      toaster.create({ title: title(resolved), type: "success", duration: 5000 });
       refresh();
     } catch (error) {
       showErrorToast({ error, fallbackTitle });
@@ -207,7 +227,7 @@ export function useSeatRequests({
     run({
       request,
       act: () => approveMutation.mutateAsync({ organizationId, seatRequestId: request.id }),
-      title: `${nameOf(request)} has a full seat`,
+      title: ({ outcome }) => approvedTitle({ outcome, name: nameOf(request) }),
       fallbackTitle: "Couldn't approve the seat request",
     });
 
@@ -238,7 +258,7 @@ export function useSeatRequests({
       setAnsweringId(null);
     }
     if (answer.status === "approved") {
-      approved({ request, seatAdded: answer.seatAdded });
+      approved({ request, outcome: answer.outcome, seatAdded: answer.seatAdded });
       return;
     }
     setWaiting({ organizationId, request, paymentRef: answer.paymentRef, url: answer.url });
@@ -252,7 +272,7 @@ export function useSeatRequests({
     void run({
       request,
       act: () => declineMutation.mutateAsync({ organizationId, seatRequestId: request.id }),
-      title: "Seat request declined",
+      title: () => "Seat request declined",
       fallbackTitle: "Couldn't decline the seat request",
     });
 

@@ -5,6 +5,7 @@
 
 import { HandledError, remediation } from "@langwatch/handled-error";
 
+import type { LivePlanConflict } from "./one-live-plan.ts";
 import type { BilledSeatKind } from "./stripe-prices.ts";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
@@ -291,15 +292,18 @@ export class SubscriptionCreationFailedError extends HandledError {
   }
 }
 
-/** A checkout asked for on a live subscription: changing that one is the billing portal's. */
+/**
+ * A checkout asked for on a live subscription: changing that one is the billing portal's. A
+ * refused write another module asked about carries the organization and its live rows in meta.
+ */
 export class SubscriptionAlreadyActiveError extends HandledError {
   declare readonly code: "subscription_already_active";
 
-  constructor() {
+  constructor(conflict?: LivePlanConflict) {
     super(
       "subscription_already_active",
       "This organization already has an active subscription; nothing was charged",
-      { httpStatus: 409, fault: "customer" },
+      { httpStatus: 409, fault: "customer", ...(conflict ? { meta: { ...conflict } } : {}) },
     );
     this.name = "SubscriptionAlreadyActiveError";
   }

@@ -996,7 +996,7 @@ function auditLogFilterConditions({
 /**
  * Writes the member's role and moves its role version. With an expected version the update
  * matches only while the version holds, re-read under the row lock, so a role write committed
- * meanwhile refuses this one with `RoleVersionMovedError`.
+ * meanwhile refuses this one with `RoleVersionMovedError`, naming the paid change it applied.
  */
 async function writeMembershipRole({
   tx,
@@ -1009,18 +1009,51 @@ async function writeMembershipRole({
 }): Promise<{ updatedAt: Date; departmentId: string | null }> {
   const { organizationId, userId, role, expectedRoleVersion } = input;
   // Any role change ends Billing only; the new role is metered (ADR-205).
-  const data = { role, billingOnly: false, ...columns, roleVersion: { increment: 1 } };
+  const data = {
+    role,
+    billingOnly: false,
+    ...columns,
+    roleVersion: { increment: 1 },
+    lastRoleChangeId: input.roleChangeId ?? null,
+  };
   const where = { userId_organizationId: { userId, organizationId } };
   const select = { updatedAt: true, departmentId: true } as const;
   if (expectedRoleVersion === undefined) {
     return tx.organizationUser.update({ where, data, select });
   }
-  const moved = await tx.organizationUser.updateMany({
-    where: { userId, organizationId, roleVersion: expectedRoleVersion },
-    data,
-  });
-  if (moved.count === 0) throw new RoleVersionMovedError(userId);
-  return tx.organizationUser.findUniqueOrThrow({ where, select });
+  // One conditional update: updateMany reads the ids first and drops the version predicate.
+  try {
+    return await tx.organizationUser.update({
+      where: {
+        userId_organizationId: { userId, organizationId },
+        roleVersion: expectedRoleVersion,
+      },
+      data,
+      select,
+    });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2025") {
+      throw error;
+    }
+    const current = await tx.organizationUser.findUnique({
+      where,
+      select: { lastRoleChangeId: true },
+    });
+    throw new RoleVersionMovedError(userId, current?.lastRoleChangeId ?? null);
+  }
+}
+
+/** True when the conditional update matched its row; false when nothing matched (P2025). */
+async function admittingUpdate(write: Promise<unknown>): Promise<boolean> {
+  try {
+    await write;
+    return true;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 export class PrismaOrganizationMembershipRepository implements OrganizationMembershipRepository {
@@ -2279,22 +2312,28 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         cause: "enabled",
         actorUserId: input.actorUserId ?? null,
         write: async () => {
-          const admitted = await tx.organizationUser.updateMany({
-            where: {
-              organizationId,
-              userId,
-              disabledAt: { not: null },
-              seatPendingSince: { not: null },
-            },
-            data: {
-              role: OrganizationUserRole.MEMBER,
-              billingOnly: false,
-              disabledAt: null,
-              seatPendingSince: null,
-              pendingSsoGrantId: pendingAdmissionId,
-            },
-          });
-          if (admitted.count === 0) return false;
+          // A role write like any other: it moves the role version, so a paid change asked
+          // before it is replaced. One conditional update, so of two admissions one admits.
+          const admitted = await admittingUpdate(
+            tx.organizationUser.update({
+              where: {
+                userId_organizationId: { userId, organizationId },
+                disabledAt: { not: null },
+                seatPendingSince: { not: null },
+              },
+              data: {
+                role: OrganizationUserRole.MEMBER,
+                billingOnly: false,
+                disabledAt: null,
+                seatPendingSince: null,
+                pendingSsoGrantId: pendingAdmissionId,
+                roleVersion: { increment: 1 },
+                lastRoleChangeId: null,
+              },
+              select: { userId: true },
+            }),
+          );
+          if (!admitted) return false;
           const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
           if ("fullSeatSince" in seatColumns) {
             await tx.organizationUser.update({

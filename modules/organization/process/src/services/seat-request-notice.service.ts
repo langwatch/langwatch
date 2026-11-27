@@ -7,6 +7,7 @@ import type {
   SeatRequestRow,
 } from "../repositories/seat-request.repository.ts";
 import { seatApprovalPath } from "../rules/seat-approval-path.rules.ts";
+import { seatRequestReasonWords } from "../rules/seat-request-reason.rules.ts";
 import type {
   AccessNoticeApproval,
   OrganizationAccessNoticeService,
@@ -64,7 +65,10 @@ export class SeatRequestNoticeService {
         idpRefused: input.idpRefused,
         heldWithoutAccess: input.source !== "lite" && input.source !== "requested",
         ...(input.source === "requested"
-          ? { askedFor: { reason: input.reason ?? null }, seatRequestId: opened.request.id }
+          ? {
+              askedFor: { reason: input.reason ? seatRequestReasonWords(input.reason) : null },
+              seatRequestId: opened.request.id,
+            }
           : {}),
       })
       .catch((error: unknown) => {

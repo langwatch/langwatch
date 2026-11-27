@@ -279,6 +279,7 @@ func (s *Server) draftInvoice(customer, currency, collection string, daysUntilDu
 	inv := &Invoice{
 		ID: s.st.id("in"), Object: "invoice", BillingReason: "manual", CollectionMethod: collection, Created: now,
 		Currency: currency, Customer: customer, Metadata: orEmpty(meta), PeriodStart: now, PeriodEnd: now, Status: ptr("draft"),
+		AutoAdvance: true,
 	}
 	inv.Lines = listOf([]*Line{}, false, "/v1/invoices/"+inv.ID+"/lines")
 	if collection == "send_invoice" && daysUntilDue != nil {
@@ -295,10 +296,11 @@ func (s *Server) addLine(inv *Invoice, line *Line) {
 	inv.Total, inv.AmountDue, inv.AmountRemaining = inv.Subtotal, inv.Subtotal, inv.Subtotal
 }
 
-// finalize opens a draft; a charge_automatically invoice is attempted at once.
+// finalize opens a draft; a charge_automatically invoice that advances on its
+// own is attempted at once, one with auto_advance off waits for a pay call.
 func (s *Server) finalize(inv *Invoice) {
 	s.open(inv)
-	if inv.CollectionMethod == "charge_automatically" {
+	if inv.CollectionMethod == "charge_automatically" && inv.AutoAdvance {
 		s.charge(inv)
 	}
 }
@@ -459,7 +461,7 @@ func (s *Server) advance(d time.Duration) {
 		}
 		before := fields(due)
 		start, end := due.CurrentPeriodEnd, addInterval(due.CurrentPeriodEnd, due.Items.Data[0].Price.Recurring)
-		usedFrom := due.CurrentPeriodStart
+		usedFrom := max(due.CurrentPeriodStart, due.usageFrom)
 		due.CurrentPeriodStart, due.CurrentPeriodEnd = start, end
 		s.emit("customer.subscription.updated", due, changed(before, fields(due)))
 		s.billPeriod(due, "subscription_cycle", start, end, usedFrom, start)

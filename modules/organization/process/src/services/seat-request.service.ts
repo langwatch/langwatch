@@ -19,16 +19,15 @@ import {
   SeatRequestFullMemberError,
   SeatRequestNoEmailError,
   SeatRequestNotFoundError,
+  type SeatRequestReason,
   type SeatRequestResolved,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
 import type { SeatApprovalPaymentRepository } from "../repositories/seat-approval-payment.repository.ts";
-import type {
-  SeatRequestRepository,
-  SeatRequestRow,
-} from "../repositories/seat-request.repository.ts";
+import type { SeatRequestRepository } from "../repositories/seat-request.repository.ts";
 import type { SeatApprovalPlan } from "../rules/seat-approval-path.rules.ts";
+import { seatRequestReasonWords } from "../rules/seat-request-reason.rules.ts";
 import type {
   AccessNoticeApproval,
   AccessNoticeRecipient,
@@ -41,6 +40,7 @@ import type {
 import { SeatRequestApprovalService } from "./seat-request-approval.service.ts";
 import { SeatRequestContactService } from "./seat-request-contact.service.ts";
 import { SeatRequestNoticeService } from "./seat-request-notice.service.ts";
+import { SeatRequestStandingService } from "./seat-request-standing.service.ts";
 
 /** The membership operations an approval performs, all organization's own. */
 export interface SeatRequestMemberships {
@@ -131,11 +131,13 @@ export class SeatRequestService {
     this.approval = SeatRequestApprovalService.create(dependencies);
     this.notice = SeatRequestNoticeService.create(dependencies);
     this.contacts = SeatRequestContactService.create(dependencies);
+    this.standing = SeatRequestStandingService.create(dependencies);
   }
 
   private readonly approval: SeatRequestApprovalService;
   private readonly notice: SeatRequestNoticeService;
   private readonly contacts: SeatRequestContactService;
+  private readonly standing: SeatRequestStandingService;
 
   /**
    * Opens a request when an admission asked for a full seat and was left Lite or held (ruling
@@ -251,7 +253,7 @@ export class SeatRequestService {
         source: row.source,
         idpRefused: row.idpRefused,
         idpKind: row.idpKind,
-        reason: row.reason,
+        reason: row.reason === null ? null : seatRequestReasonWords(row.reason),
         openedAt: row.openedAt,
       })),
       seatFree: approval.seatFree,
@@ -363,7 +365,7 @@ export class SeatRequestService {
   }: {
     organizationId: string;
     userId: string;
-    reason?: string;
+    reason?: SeatRequestReason;
   }): Promise<MyAccessRequest> {
     const membership = await this.dependencies.members.getMembership({ organizationId, userId });
     const isFull =
@@ -380,27 +382,17 @@ export class SeatRequestService {
       source: "requested",
       idpRefused: false,
       idpKind: null,
-      reason: reason?.trim() || null,
+      reason: reason ?? null,
     });
     return this.myAccessRequest({ organizationId, userId });
   }
 
   /** The caller's own latest seat request in the organization. */
-  async myAccessRequest({
-    organizationId,
-    userId,
-  }: {
+  async myAccessRequest(input: {
     organizationId: string;
     userId: string;
   }): Promise<MyAccessRequest> {
-    const rows = await this.dependencies.requests.findForUser({ userId });
-    const row = rows.find((candidate) => candidate.organizationId === organizationId);
-    if (!row) return { status: "none", openedAt: null, resolvedAt: null };
-    return {
-      status: ACCESS_STATUS[row.status],
-      openedAt: row.openedAt,
-      resolvedAt: row.resolvedAt,
-    };
+    return this.standing.myAccessRequest(input);
   }
 
   async decline({
@@ -464,13 +456,6 @@ export class SeatRequestService {
     return row ? { name: row.user.name, email: row.user.email?.toLowerCase() ?? null } : undefined;
   }
 }
-
-/** How a stored request reads to the person who asked. */
-const ACCESS_STATUS: Record<SeatRequestRow["status"], MyAccessRequest["status"]> = {
-  OPEN: "open",
-  APPROVED: "approved",
-  DECLINED: "declined",
-};
 
 const UNKNOWN_PAYMENT_REF = "The seat payment reference is not one this approval handed out";
 

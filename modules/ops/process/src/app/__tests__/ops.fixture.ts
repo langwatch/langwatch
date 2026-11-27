@@ -9,6 +9,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
@@ -158,6 +159,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       automations: createApiFixture<AutomationApi>(),
       insights: createApiFixture<InsightApi>(),
       organizations: createApiFixture<OrganizationApi>(),
+      billing: createApiFixture<BillingApi>(),
     },
     repositories,
     ...(options.checkup === undefined ? {} : { checkup: options.checkup }),

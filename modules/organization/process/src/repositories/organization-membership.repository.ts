@@ -203,11 +203,19 @@ export interface UpdateMemberRoleInput {
   seat?: SeatTransition;
   /** Writes only while the member's role version still reads this; else `RoleVersionMovedError`. */
   expectedRoleVersion?: number;
+  /** The paid role change this write applies, stored with it; any other role write clears it. */
+  roleChangeId?: string;
 }
 
-/** A role write that expected a role version a later role write already moved; nothing written. */
+/**
+ * A role write that expected a role version another role write already moved; nothing written.
+ * `appliedChangeId` names the paid role change the newest write applied, null for a direct one.
+ */
 export class RoleVersionMovedError extends Error {
-  constructor(userId: string) {
+  constructor(
+    userId: string,
+    readonly appliedChangeId: string | null,
+  ) {
     super(`The role of member ${userId} changed since the expected role version`);
     this.name = "RoleVersionMovedError";
   }

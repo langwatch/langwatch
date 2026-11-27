@@ -1223,7 +1223,7 @@ const registry = {
     ],
   },
 
-  // ---- ops back office ----
+  // ---- ops Cloud admin ----
   ops_subscription_already_active: {
     tips: [
       "Keep the row linked to the live Stripe subscription; seat changes refuse while two are active",

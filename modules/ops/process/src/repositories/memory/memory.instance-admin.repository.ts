@@ -1,14 +1,13 @@
+import { findLivePlanConflicts, type PlanSlotRow } from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
-import {
-  AdminSubscriptionAlreadyActiveError,
-  type AdminDataResult,
-  type AdminListResult,
-  type AdminOperationInput,
-  type AdminOperationParams,
-  type AdminOperationResult,
+import type {
+  AdminDataResult,
+  AdminListResult,
+  AdminOperationInput,
+  AdminOperationParams,
+  AdminOperationResult,
 } from "@langwatch/ops-contract";
 
-import { holdsLivePlanSlot } from "../../rules/subscription-live-plan.rules.ts";
 import { InstanceAdminRepository } from "../instance-admin.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
@@ -83,30 +82,6 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
     }
   }
 
-  async findActiveSubscriptionIds({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string[]> {
-    return [...this.rowsOf("subscription").values()]
-      .filter((row) => row.organizationId === organizationId && row.status === "ACTIVE")
-      .map((row) => String(row.id));
-  }
-
-  async findSubscriptionStates({
-    ids,
-  }: {
-    ids: string[];
-  }): Promise<{ id: string; organizationId: string; status: string }[]> {
-    const rows = this.rowsOf("subscription");
-    return ids.flatMap((id) => {
-      const row = rows.get(id);
-      return row
-        ? [{ id, organizationId: String(row.organizationId), status: String(row.status) }]
-        : [];
-    });
-  }
-
   async findUserById(id: string): Promise<AdminDataResult> {
     return { data: this.rowsOf("user").get(id) ?? null };
   }
@@ -135,7 +110,10 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
     });
   }
 
-  /** The one-live-plan index the Prisma twin's table holds, refused before anything is written. */
+  /**
+   * The table's one-live-plan index, which billing owns and declares in its contract: a write it
+   * refuses fails as the database's unique violation would, before anything is written.
+   */
   private refuseSecondLivePlan({
     resource,
     rows,
@@ -146,22 +124,11 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
     written: AdminRow[];
   }): void {
     if (resource !== "subscription") return;
-    const writtenIds = new Set(written.map((row) => String(row.id)));
-    const slots = [
-      ...[...rows.values()].filter((row) => !writtenIds.has(String(row.id))),
-      ...written,
-    ].filter(holdsLivePlanSlot);
-    for (const row of written.filter(holdsLivePlanSlot)) {
-      const organizationId = String(row.organizationId);
-      const holders = slots.filter((each) => each.organizationId === row.organizationId);
-      if (holders.length < 2) continue;
-      throw new AdminSubscriptionAlreadyActiveError({
-        organizationId,
-        activeSubscriptionIds: holders
-          .map((each) => String(each.id))
-          .filter((id) => !writtenIds.has(id)),
-      });
-    }
+    const conflicts = findLivePlanConflicts({
+      rows: [...rows.values()].map(planSlotOf),
+      written: written.map(planSlotOf),
+    });
+    if (conflicts.length > 0) throw new Error("Unique constraint failed on the live plan index");
   }
 
   private merge({
@@ -198,4 +165,15 @@ function page({
     .filter((row) => Object.entries(filter).every(([key, value]) => row[key] === value))
     .toSorted((left, right) => direction * String(left[field]).localeCompare(String(right[field])));
   return { data: matching.slice(start, start + perPage), total: matching.length };
+}
+
+function planSlotOf(row: AdminRow): PlanSlotRow {
+  return {
+    id: String(row.id),
+    organizationId: String(row.organizationId),
+    status: String(row.status),
+    plan: String(row.plan),
+    stripeSubscriptionId:
+      typeof row.stripeSubscriptionId === "string" ? row.stripeSubscriptionId : null,
+  };
 }

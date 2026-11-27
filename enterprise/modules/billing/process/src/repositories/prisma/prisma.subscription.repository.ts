@@ -1,4 +1,5 @@
 import {
+  type PlanSlotRow,
   SubscriptionAlreadyActiveError,
   SubscriptionStatus,
   TIERED_PLAN_TYPES,
@@ -48,6 +49,14 @@ type SubscriptionRow = {
   paymentRecoveryStartedAt?: Date | null;
   paymentRecoveryNoticeDay?: number | null;
 };
+
+const PLAN_SLOT_FIELDS = {
+  id: true,
+  organizationId: true,
+  status: true,
+  plan: true,
+  stripeSubscriptionId: true,
+} as const;
 
 const RECOVERY_CLEARED = {
   paymentRecoveryInvoiceId: null,
@@ -330,6 +339,29 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
     return rows.map(subscriptionRecordOf);
+  }
+
+  findPlanSlots({ ids }: { ids: readonly string[] }): Promise<PlanSlotRow[]> {
+    return this.prisma.subscription.findMany({
+      where: { id: { in: [...ids] } },
+      select: PLAN_SLOT_FIELDS,
+    });
+  }
+
+  findLivePlanHolders({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<PlanSlotRow[]> {
+    return this.prisma.subscription.findMany({
+      where: {
+        organizationId: { in: [...organizationIds] },
+        status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
+        stripeSubscriptionId: { not: null },
+        plan: { notIn: [...TIERED_PLAN_TYPES] as PrismaPlanTypes[] },
+      },
+      select: PLAN_SLOT_FIELDS,
+    });
   }
 
   async cancelPendingCheckout({ id }: { id: string }): Promise<BillingSubscriptionRecord[]> {

@@ -41,6 +41,7 @@ function notices() {
       },
       organizationName: async () => "ACME",
       approval: async () => ({ kind: "contact_sales" }),
+      findPushTenants: async () => ["project-acme"],
     },
     appUrl: null,
     requestsUrl: "https://app.langwatch.test/settings/members?tab=requests",

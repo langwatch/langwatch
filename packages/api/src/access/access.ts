@@ -407,8 +407,8 @@ function refusedPlatform({
 export interface AccessDenial {
   /** The membership exists but an admin disabled it, so it grants nothing. */
   membershipDisabled(): Error;
-  /** The organization role does not reach this feature at all. */
-  liteMemberRestricted(resource: string): Error;
+  /** The organization role does not reach this feature at all; `permission` is the one asked. */
+  liteMemberRestricted(resource: string, permission?: string): Error;
   /** A Developer seat (ADR-171) reached outside its personal project. */
   developerSeatRestricted?(resource: string): Error;
 }
@@ -1268,7 +1268,7 @@ function denied({
   // would put the generated Prisma client on this module's graph for one
   // constant.
   if (denials && decision.organizationRole === "EXTERNAL") {
-    return denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown");
+    return denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown", permission);
   }
 
   if (denials?.developerSeatRestricted && decision.organizationRole === "DEVELOPER") {

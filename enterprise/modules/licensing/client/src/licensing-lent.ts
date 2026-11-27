@@ -25,7 +25,7 @@ export type UpgradeModalSeatsRequest = {
 export type UpgradeModalActions = {
   open(limitType: LimitType, current: number, max: number): void;
   openSeats(request: UpgradeModalSeatsRequest): void;
-  openLiteMemberRestriction(request: { resource?: string }): void;
+  openLiteMemberRestriction(request: { resource?: string; permission?: string }): void;
 };
 
 export const UpgradeModalToken = uiTokens("licensing").hooks<UpgradeModalActions>("upgradeModal");

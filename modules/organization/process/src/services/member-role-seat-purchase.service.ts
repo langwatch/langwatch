@@ -40,6 +40,7 @@ type RoleChange = (
     role: OrganizationUserRole;
     planUser?: { id: string; name?: string | null; email?: string | null };
     expectedRoleVersion?: number;
+    roleChangeId?: string;
   }>,
   by: OrganizationCaller,
 ) => Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
@@ -95,6 +96,16 @@ export class MemberRoleSeatPurchaseService {
   private readonly claims: SeatRoleChangeClaimService;
 
   async changeWithSeat(
+    input: ChangeInput,
+    by: OrganizationCaller,
+  ): Promise<MemberRoleWithSeatResult> {
+    const { organizationId, userId } = input;
+    return this.claims.onePurchasePerMember({ organizationId, userId }, () =>
+      this.changeWithSeatHeld(input, by),
+    );
+  }
+
+  private async changeWithSeatHeld(
     input: ChangeInput,
     by: OrganizationCaller,
   ): Promise<MemberRoleWithSeatResult> {
@@ -406,25 +417,43 @@ export class MemberRoleSeatPurchaseService {
             planUser: by,
             ...(record.roleVersion === undefined
               ? {}
-              : { expectedRoleVersion: record.roleVersion }),
+              : { expectedRoleVersion: record.roleVersion, roleChangeId: id }),
           },
           by,
         ),
       );
     } catch (error) {
-      if (error instanceof RoleVersionMovedError) {
-        logger.info(
-          { organizationId, changeId: id },
-          "a later role write replaced the paid change",
-        );
-        return settle("superseded", REPLACED);
-      }
-      logger.warn({ organizationId, changeId: id, error }, "seat paid, then the role was refused");
-      return settle("seat_only", refusalReason(error));
+      const failed = failedWriteOutcome({ error, organizationId, id });
+      return settle(failed.status, failed.reason);
     }
     logger.info({ organizationId, changeId: id }, "role change applied after its seat was paid");
     return settle("applied");
   }
+}
+
+/**
+ * How a paid role write that threw settles: applied when the version moved by this change's own
+ * earlier write, superseded by any later one, else seat only with the refusal.
+ */
+function failedWriteOutcome({
+  error,
+  organizationId,
+  id,
+}: {
+  error: unknown;
+  organizationId: string;
+  id: string;
+}): { status: "applied" | "superseded" | "seat_only"; reason?: string } {
+  if (error instanceof RoleVersionMovedError && error.appliedChangeId === id) {
+    logger.info({ organizationId, changeId: id }, "the paid change's role write had landed");
+    return { status: "applied" };
+  }
+  if (error instanceof RoleVersionMovedError) {
+    logger.info({ organizationId, changeId: id }, "a later role write replaced the paid change");
+    return { status: "superseded", reason: REPLACED };
+  }
+  logger.warn({ organizationId, changeId: id, error }, "seat paid, then the role was refused");
+  return { status: "seat_only", reason: refusalReason(error) };
 }
 
 function outcomeOf(record: PendingSeatRoleChangeRecord): SeatRoleChangeOutcome {

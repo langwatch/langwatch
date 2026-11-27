@@ -1110,6 +1110,11 @@ model OrganizationUser {
   /// write always wins. See role-change-seat.feature.
   roleVersion Int @default(0)
 
+  /// The paid role change the newest role write applied, written with the version bump; null
+  /// after a direct role write. A retry that finds the version moved by its own change
+  /// settles it applied. See role-change-seat.feature.
+  lastRoleChangeId String?
+
   /// Stable grant intent for an unfinished automatic SSO admission.
   /// Cleared after the authoritative grant is observed; never inferred from missing access.
   pendingSsoGrantId String?

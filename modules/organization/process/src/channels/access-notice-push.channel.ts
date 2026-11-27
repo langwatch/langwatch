@@ -2,6 +2,8 @@
 export type AccessNoticePush = Readonly<{
   userId: string;
   organizationId: string;
+  /** A live project of the organization, the tenant notification records the push on. */
+  projectId: string;
   idempotencyKey: string;
   /** Groups the pushes about one seat request, so a newer one replaces the older. */
   topic: string;

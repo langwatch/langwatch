@@ -10,6 +10,7 @@ export * from "./connected-billing.schemas.ts";
 export * from "./connected-billing.trpc.ts";
 export * from "./currency.trpc.ts";
 export * from "./growth-seat-event.ts";
+export * from "./one-live-plan.ts";
 export * from "./payment-recovery.ts";
 export * from "./plan-limits.ts";
 export * from "./plan-types.ts";

@@ -148,7 +148,7 @@ import {
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { projectKindsHiddenFrom } from "@langwatch/project-contract";
+import { PROJECT_KIND, projectKindsHiddenFrom } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
@@ -631,6 +631,16 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         recipients: (input) => contextOf().recipients(input),
         organizationName,
         approval: (input) => contextOf().noticeApproval(input),
+        // Oldest first, so the organization's pushes stay on one project while it lives.
+        findPushTenants: async ({ organizationId }) =>
+          (
+            await organizations.listProjects({
+              organizationId,
+              hiddenKinds: [PROJECT_KIND.AGGREGATE],
+            })
+          )
+            .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+            .map((project) => project.id),
       },
       requestsUrl: setup.config.publicBaseUrl
         ? `${setup.config.publicBaseUrl}/settings/directory?tab=people`
@@ -1488,6 +1498,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       planUser?: { id: string; name?: string | null; email?: string | null };
       /** Writes only while the member's role version still reads this. */
       expectedRoleVersion?: number;
+      /** The paid role change this write applies. */
+      roleChangeId?: string;
     }>,
     by: OrganizationCaller | null,
   ): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }> {

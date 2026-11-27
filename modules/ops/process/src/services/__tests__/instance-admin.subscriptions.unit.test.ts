@@ -1,5 +1,5 @@
 /**
- * An organization holds one active subscription; the Back office cannot write a second one.
+ * An organization holds one live Stripe-backed plan; Cloud admin asks billing before it writes one.
  * @see ../../../../specs/admin.feature
  */
 import type { AdminOperationInput } from "@langwatch/ops-contract";
@@ -9,6 +9,7 @@ import { MemoryInstanceAdminRepository } from "../../repositories/memory/memory.
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { InstanceAdminService } from "../instance-admin.service.ts";
 import { AuditStub, noOperators } from "./support/admin-doubles.ts";
+import { billingLivePlanRule, planSlotOf } from "./support/billing-live-plan-rule.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 function subscriptionWrite(
@@ -18,8 +19,22 @@ function subscriptionWrite(
   return { resource: "subscription", method, params, actorId: "olive", req: { headers: {} } };
 }
 
-async function instanceAdmin() {
-  const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
+const linked = (id: string, status: string, plan = "GROWTH_SEAT_EUR_MONTHLY") => ({
+  id,
+  organizationId: "org_acme",
+  status,
+  plan,
+  stripeSubscriptionId: `${id}_stripe`,
+});
+
+type Seed = (data: Record<string, unknown>) => Promise<unknown>;
+
+async function cloudAdmin({
+  landsAfterCheck,
+}: { landsAfterCheck?: (seed: Seed) => Promise<void> } = {}) {
+  const store = MemoryOpsStore.create();
+  const repository = MemoryInstanceAdminRepository.create({ store });
+  const seed: Seed = (data) => repository.execute(subscriptionWrite("create", { data }));
   const audit = new AuditStub();
   const service = InstanceAdminService.create({
     operators: noOperators,
@@ -29,42 +44,39 @@ async function instanceAdmin() {
       deactivateUser: () => Promise.reject(new Error("unreached")),
       changeUserEmail: () => Promise.reject(new Error("unreached")),
     },
+    billing: billingLivePlanRule({
+      rows: async () => [...(store.adminRows.get("subscription")?.values() ?? [])].map(planSlotOf),
+      ...(landsAfterCheck ? { landsAfterCheck: () => landsAfterCheck(seed) } : {}),
+    }),
     audit,
   });
-  const seed = (data: Record<string, unknown>) =>
-    repository.execute(subscriptionWrite("create", { data }));
-  await seed({
-    id: "sub_live",
-    organizationId: "org_acme",
-    status: "ACTIVE",
-    plan: "GROWTH_SEAT_EUR_MONTHLY",
-  });
-  await seed({ id: "sub_old", organizationId: "org_acme", status: "CANCELLED", plan: "LAUNCH" });
-  await seed({
-    id: "sub_pending",
-    organizationId: "org_acme",
-    status: "PENDING",
-    plan: "GROWTH_SEAT_EUR_MONTHLY",
-  });
-  const statusOf = async (id: string) =>
-    (
-      (await repository.execute(subscriptionWrite("update", { id, data: {} }))).data as {
-        status: string;
-      }
-    ).status;
-  return { service, audit, statusOf };
+  await seed(linked("sub_live", "ACTIVE"));
+  await seed(linked("sub_tiered", "ACTIVE", "LAUNCH"));
+  await seed(linked("sub_old", "CANCELLED"));
+  await seed(linked("sub_pending", "PENDING"));
+  const rowOf = async (id: string) =>
+    (await repository.execute(subscriptionWrite("update", { id, data: {} }))).data as {
+      status: string;
+      maxMembers?: number;
+    };
+  return { service, audit, rowOf, store };
 }
 
-describe("given an organization with an active subscription", () => {
-  describe("when an operator creates another one for it as active", () => {
-    /** @scenario "The Back office refuses a second active subscription for an organization" */
+describe("given an organization with a live seat plan linked to Stripe", () => {
+  describe("when an operator creates another linked one for it as active", () => {
+    /** @scenario "Cloud admin refuses a second live Stripe-backed plan for an organization" */
     it("refuses with ops_subscription_already_active naming the live one and writes nothing", async () => {
-      const { service, audit } = await instanceAdmin();
+      const { service, audit } = await cloudAdmin();
 
       await expect(
         service.execute(
           subscriptionWrite("create", {
-            data: { organizationId: "org_acme", status: "ACTIVE", plan: "ENTERPRISE" },
+            data: {
+              organizationId: "org_acme",
+              status: "ACTIVE",
+              plan: "ENTERPRISE",
+              stripeSubscriptionId: "sub_new_stripe",
+            },
           }),
         ),
       ).rejects.toMatchObject({
@@ -76,20 +88,23 @@ describe("given an organization with an active subscription", () => {
   });
 
   describe("when an operator reactivates the cancelled one or activates the pending one", () => {
-    /** @scenario "The Back office refuses a second active subscription for an organization" */
+    /** @scenario "Cloud admin refuses a second live Stripe-backed plan for an organization" */
     it.each(["sub_old", "sub_pending"])("refuses %s and leaves it as it was", async (id) => {
-      const { service, statusOf } = await instanceAdmin();
-      const before = await statusOf(id);
+      const { service, rowOf } = await cloudAdmin();
+      const before = (await rowOf(id)).status;
 
       await expect(
         service.execute(subscriptionWrite("update", { id, data: { status: "ACTIVE" } })),
-      ).rejects.toMatchObject({ code: "ops_subscription_already_active" });
-      expect(await statusOf(id)).toBe(before);
+      ).rejects.toMatchObject({
+        code: "ops_subscription_already_active",
+        meta: { organizationId: "org_acme", activeSubscriptionIds: ["sub_live"] },
+      });
+      expect((await rowOf(id)).status).toBe(before);
     });
 
-    /** @scenario "The Back office refuses a second active subscription for an organization" */
+    /** @scenario "Cloud admin refuses a second live Stripe-backed plan for an organization" */
     it("refuses a bulk activation too", async () => {
-      const { service } = await instanceAdmin();
+      const { service } = await cloudAdmin();
 
       await expect(
         service.execute(
@@ -99,19 +114,21 @@ describe("given an organization with an active subscription", () => {
     });
   });
 
-  describe("when an operator writes status or organization as an operator object", () => {
-    /** @scenario "The Back office refuses a second active subscription for an organization" */
+  describe("when an operator writes a field the check reads as an operator object", () => {
+    /** @scenario "Cloud admin refuses a second live Stripe-backed plan for an organization" */
     it.each([
       { id: "sub_live", data: { organizationId: "org_other", status: { set: "ACTIVE" } } },
       { id: "sub_pending", data: { organizationId: { set: "org_acme" }, status: "ACTIVE" } },
+      { id: "sub_tiered", data: { plan: { set: "ENTERPRISE" } } },
+      { id: "sub_pending", data: { stripeSubscriptionId: { set: "sub_x" } } },
     ])("refuses %o with validation_error and writes nothing", async ({ id, data }) => {
-      const { service, statusOf } = await instanceAdmin();
-      const before = await statusOf(id);
+      const { service, rowOf } = await cloudAdmin();
+      const before = await rowOf(id);
 
       await expect(
         service.execute(subscriptionWrite("update", { id, data })),
       ).rejects.toMatchObject({ code: "validation_error" });
-      expect(await statusOf(id)).toBe(before);
+      expect(await rowOf(id)).toEqual(before);
     });
   });
 
@@ -120,22 +137,22 @@ describe("given an organization with an active subscription", () => {
     it.each([{}, { ids: [] }, { ids: "sub_pending" }, { where: { organizationId: "org_acme" } }])(
       "refuses %o as malformed and writes nothing",
       async (selector) => {
-        const { service, statusOf } = await instanceAdmin();
+        const { service, rowOf } = await cloudAdmin();
 
         await expect(
           service.execute(
             subscriptionWrite("updateMany", { ...selector, data: { status: "ACTIVE" } }),
           ),
         ).rejects.toMatchObject({ code: "malformed_request", meta: { field: "ids" } });
-        expect(await statusOf("sub_pending")).toBe("PENDING");
+        expect((await rowOf("sub_pending")).status).toBe("PENDING");
       },
     );
   });
 
-  describe("when an operator edits the active one's limits", () => {
-    /** @scenario "The Back office still edits an organization's one active subscription" */
+  describe("when an operator edits the live one's limits", () => {
+    /** @scenario "Cloud admin still edits an organization's live plan" */
     it("saves the edit", async () => {
-      const { service } = await instanceAdmin();
+      const { service } = await cloudAdmin();
 
       const { data } = await service.execute(
         subscriptionWrite("update", {
@@ -149,9 +166,9 @@ describe("given an organization with an active subscription", () => {
   });
 
   describe("when an operator cancels the live one, then activates the pending one", () => {
-    /** @scenario "The Back office still edits an organization's one active subscription" */
+    /** @scenario "Cloud admin still edits an organization's live plan" */
     it("saves both", async () => {
-      const { service, statusOf } = await instanceAdmin();
+      const { service, rowOf } = await cloudAdmin();
 
       await service.execute(
         subscriptionWrite("update", { id: "sub_live", data: { status: "CANCELLED" } }),
@@ -160,45 +177,49 @@ describe("given an organization with an active subscription", () => {
         subscriptionWrite("update", { id: "sub_pending", data: { status: "ACTIVE" } }),
       );
 
-      expect(await statusOf("sub_pending")).toBe("ACTIVE");
-      expect(await statusOf("sub_live")).toBe("CANCELLED");
+      expect((await rowOf("sub_pending")).status).toBe("ACTIVE");
+      expect((await rowOf("sub_live")).status).toBe("CANCELLED");
+    });
+  });
+
+  describe("when an operator edits the active tiered plan the seat plan replaces", () => {
+    /** @scenario "Cloud admin edits the tiered plan while the seat plan replacing it is live" */
+    it("saves the edit, as billing and the index allow both live", async () => {
+      const { service, rowOf } = await cloudAdmin();
+
+      await service.execute(
+        subscriptionWrite("update", {
+          id: "sub_tiered",
+          data: { organizationId: "org_acme", status: "ACTIVE", maxMembers: 4 },
+        }),
+      );
+
+      expect(await rowOf("sub_tiered")).toMatchObject({ status: "ACTIVE", maxMembers: 4 });
     });
   });
 });
 
-describe("given an organization with an active subscription linked to Stripe", () => {
-  describe("when a second linked active write reaches the store past the service's check", () => {
-    /** @scenario "The database refuses a second linked active subscription the Back office check missed" */
-    it("refuses with ops_subscription_already_active naming the live one and writes nothing", async () => {
-      const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
-      const linked = (id: string, status: string) =>
-        subscriptionWrite("create", {
-          data: {
-            id,
-            organizationId: "org_acme",
-            status,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-            stripeSubscriptionId: `${id}_stripe`,
-          },
-        });
-      await repository.execute(linked("sub_live", "ACTIVE"));
-      await repository.execute(linked("sub_second", "PENDING"));
+describe("given an organization whose linked plan lands between the check and the write", () => {
+  describe("when an operator creates a second linked active plan for it", () => {
+    /** @scenario "The database refuses a second linked live plan the Cloud admin check missed" */
+    it("refuses with ops_subscription_already_active naming the plan that landed", async () => {
+      const world = await cloudAdmin({
+        landsAfterCheck: async (seed) => {
+          await seed({ ...linked("sub_raced", "ACTIVE"), organizationId: "org_other" });
+        },
+      });
 
       await expect(
-        repository.execute(
-          subscriptionWrite("update", { id: "sub_second", data: { status: "ACTIVE" } }),
+        world.service.execute(
+          subscriptionWrite("create", {
+            data: { ...linked("sub_second", "ACTIVE"), organizationId: "org_other" },
+          }),
         ),
       ).rejects.toMatchObject({
         code: "ops_subscription_already_active",
-        meta: { organizationId: "org_acme", activeSubscriptionIds: ["sub_live"] },
+        meta: { organizationId: "org_other", activeSubscriptionIds: ["sub_raced"] },
       });
-      await expect(repository.execute(linked("sub_third", "ACTIVE"))).rejects.toMatchObject({
-        code: "ops_subscription_already_active",
-      });
-      const second = await repository.execute(
-        subscriptionWrite("update", { id: "sub_second", data: {} }),
-      );
-      expect((second.data as { status: string }).status).toBe("PENDING");
+      expect(world.store.adminRows.get("subscription")?.has("sub_second")).toBe(false);
     });
   });
 });

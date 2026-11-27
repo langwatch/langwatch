@@ -375,7 +375,7 @@ const requestAbort = async ({
 };
 
 /** Opens licensing's restriction modal for a refused Lite Member seat, naming the resource. */
-type OpenLiteMemberRestriction = (request: { resource?: string }) => void;
+type OpenLiteMemberRestriction = (request: { resource?: string; permission?: string }) => void;
 
 /**
  * A run refused because the reader holds a Lite Member seat: licensing's restriction modal
@@ -390,8 +390,11 @@ const reportLiteMemberRestriction = ({
 }): boolean => {
   const handled = readHandledError(err);
   if (handled?.code !== "lite_member_restricted" || !openLiteMemberRestriction) return false;
-  const resource = handled.meta.resource;
-  openLiteMemberRestriction(typeof resource === "string" ? { resource } : {});
+  const { resource, permission } = handled.meta;
+  openLiteMemberRestriction({
+    ...(typeof resource === "string" ? { resource } : {}),
+    ...(typeof permission === "string" ? { permission } : {}),
+  });
   return true;
 };
 

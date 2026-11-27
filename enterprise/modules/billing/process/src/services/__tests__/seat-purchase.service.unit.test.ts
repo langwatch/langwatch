@@ -6,6 +6,7 @@
  */
 import { type StripePriceMap, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
@@ -13,6 +14,7 @@ import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../../repositories/seat-event-subscription.repository.ts";
 import type { BillingSubscription } from "../../rules/billing-stripe-shapes.rules.ts";
+import { SEAT_INVOICE_LIFETIME_SECONDS } from "../../rules/seat-invoice.rules.ts";
 import { SeatEventSubscriptionService } from "../seat-event-subscription.service.ts";
 import { SeatPurchaseService, type SeatCheckoutOpener } from "../seat-purchase.service.ts";
 import { StripeCustomerCurrencyService } from "../stripe-customer-currency.service.ts";
@@ -31,6 +33,7 @@ const prices = {
 } as StripePriceMap;
 /** 14 Dec 2099, when the next period starts. */
 const PERIOD_END_SECONDS = Math.floor(Date.UTC(2099, 11, 14) / 1000);
+const nowSeconds = () => Math.floor(nowInstant().epochMilliseconds / 1000);
 const NO_KEPT = { seatsKept: null, seatsKeptUntil: null };
 const linkedActive = {
   id: "sub_db_1",
@@ -154,20 +157,27 @@ describe("SeatPurchaseService", () => {
     });
   });
 
-  /** An invoice at Stripe for ACME's held seat change, in `status`. */
-  const seedInvoice = (status: "open" | "paid" | "void") =>
+  /** ACME's invoice at Stripe in `status`: a seat invoice for 3 seats, or a held change's. */
+  const seedInvoice = (
+    status: "open" | "paid" | "void",
+    {
+      seatInvoice = true,
+      created = nowSeconds(),
+    }: { seatInvoice?: boolean; created?: number } = {},
+  ) =>
     stripeInvoices.seed({
       invoice: {
         id: "in_seat",
         customerId: "cus_acme",
         number: null,
-        created: 0,
+        created,
         amountDue: 519,
         currency: "usd",
         status,
         pdfUrl: null,
         hostedUrl: "https://invoice.example/in_seat",
       },
+      seatPurchase: seatInvoice ? { subscriptionId: "sub_stripe_1", seats: 3 } : null,
     });
 
   describe("offer()", () => {
@@ -230,18 +240,21 @@ describe("SeatPurchaseService", () => {
 
   describe("addFullSeat()", () => {
     /** @scenario "One click charges the seat and makes the member an Admin" */
-    it("raises the line by one, invoiced now, and records the seat", async () => {
+    it("bills the proration on its own invoice, then raises the line with no proration", async () => {
       const result = await service.addFullSeat({ organizationId: ORG, ...START });
 
       expect(result).toEqual({ status: "added" });
+      expect(stripeInvoices.seatCharges).toEqual([
+        {
+          customerId: "cus_acme",
+          purpose: { subscriptionId: "sub_stripe_1", seats: 3 },
+          amountCents: 519,
+        },
+      ]);
       expect(stripeSubscriptions.updates).toEqual([
         {
           subscriptionId: "sub_stripe_1",
-          change: expect.objectContaining({
-            items: [{ id: "si_seat", quantity: 3 }],
-            prorationBehavior: "always_invoice",
-            paymentBehavior: "pending_if_incomplete",
-          }),
+          change: { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
         },
       ]);
       expect(subscriptions.reactivateWithSeats).toHaveBeenCalledWith(
@@ -250,20 +263,43 @@ describe("SeatPurchaseService", () => {
     });
 
     /** @scenario "A charge needing the customer opens the seat invoice and changes nothing yet" */
-    it("answers the invoice's payment page and records no seat", async () => {
-      stripeSubscriptions.holdNextChangeForPayment({
-        id: "in_seat",
-        hostedUrl: "https://invoice.example/in_seat",
+    it("answers the invoice's payment page and leaves the seat line alone", async () => {
+      stripeInvoices.chargeNextSeatInvoice({
+        status: "open",
+        hostedUrl: "https://invoice.example/in_seat_1",
       });
 
       const result = await service.addFullSeat({ organizationId: ORG, ...START });
 
       expect(result).toEqual({
         status: "payment_required",
-        payment: { kind: "invoice", invoiceId: "in_seat", seats: 3 },
-        url: "https://invoice.example/in_seat",
+        payment: { kind: "invoice", invoiceId: "in_seat_1", seats: 3 },
+        url: "https://invoice.example/in_seat_1",
       });
+      expect(stripeSubscriptions.updates).toEqual([]);
       expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A charge needing the customer opens the seat invoice and changes nothing yet" */
+    it("bills the proration lines alone, leaving any usage in the preview to the cycle", async () => {
+      stripeSubscriptions.seedPreview({
+        preview: { currency: "usd", total: 2519, amountDue: 2519, prorations: 519 },
+      });
+
+      await service.addFullSeat({ organizationId: ORG, ...START });
+
+      expect(stripeInvoices.seatCharges).toEqual([expect.objectContaining({ amountCents: 519 })]);
+    });
+
+    it("keeps the seat as paid and waiting when the paid seat fails to land on the line", async () => {
+      stripeSubscriptions.refuse({ operation: "updateSubscription", error: new Error("timeout") });
+
+      const result = await service.addFullSeat({ organizationId: ORG, ...START });
+
+      expect(result).toMatchObject({
+        status: "payment_required",
+        payment: { kind: "invoice", invoiceId: "in_seat_1", seats: 3 },
+      });
     });
 
     /** @scenario "Two seat purchases at once buy two seats" */
@@ -288,6 +324,31 @@ describe("SeatPurchaseService", () => {
     });
 
     /** @scenario "A purchase while a seat payment waits reopens that payment" */
+    it("answers the open seat invoice and bills no second one", async () => {
+      seedInvoice("open");
+
+      const result = await service.addFullSeat({ organizationId: ORG, ...START });
+
+      expect(result).toEqual({
+        status: "payment_required",
+        payment: { kind: "invoice", invoiceId: "in_seat", seats: 3 },
+        url: "https://invoice.example/in_seat",
+      });
+      expect(stripeInvoices.seatCharges).toEqual([]);
+      expect(stripeSubscriptions.updates).toEqual([]);
+    });
+
+    /** @scenario "A seat invoice left unpaid for a day is voided" */
+    it("voids an open seat invoice past its day and bills a fresh one", async () => {
+      seedInvoice("open", { created: nowSeconds() - SEAT_INVOICE_LIFETIME_SECONDS });
+
+      await service.addFullSeat({ organizationId: ORG, ...START });
+
+      expect(stripeInvoices.voided).toEqual(["in_seat"]);
+      expect(stripeInvoices.seatCharges).toHaveLength(1);
+    });
+
+    /** @scenario "A purchase while a seat payment waits reopens that payment" */
     it("answers the invoice Stripe already holds and sends no second change", async () => {
       stripeSubscriptions.seed({
         subscription: {
@@ -308,14 +369,15 @@ describe("SeatPurchaseService", () => {
       expect(stripeSubscriptions.updates).toEqual([]);
     });
 
-    /** @scenario "A held change with no payment page is voided and refused" */
-    it("voids a held change that names no payment page and refuses by name", async () => {
-      stripeSubscriptions.holdNextChangeForPayment({ id: "in_seat", hostedUrl: "" });
+    /** @scenario "A seat invoice with no payment page is voided and refused" */
+    it("voids a seat invoice that names no payment page and refuses by name", async () => {
+      stripeInvoices.chargeNextSeatInvoice({ status: "open", hostedUrl: null });
 
       await expect(service.addFullSeat({ organizationId: ORG, ...START })).rejects.toMatchObject({
         code: "seat_payment_unavailable",
       });
-      expect(stripeInvoices.voided).toEqual(["in_seat"]);
+      expect(stripeInvoices.voided).toEqual(["in_seat_1"]);
+      expect(stripeSubscriptions.updates).toEqual([]);
       expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
     });
 
@@ -359,8 +421,18 @@ describe("SeatPurchaseService", () => {
     const invoice = { kind: "invoice", invoiceId: "in_seat", seats: 3 } as const;
 
     /** @scenario "An unpaid seat invoice keeps the change waiting" */
-    it("keeps an open invoice waiting while Stripe holds its change", async () => {
+    it("keeps an open seat invoice waiting within its day", async () => {
       seedInvoice("open");
+
+      expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
+        status: "open",
+      });
+      expect(stripeInvoices.voided).toEqual([]);
+    });
+
+    /** @scenario "A seat change Stripe held before seat invoices settles once Stripe applies it" */
+    it("keeps an open held-change invoice waiting while Stripe holds its change", async () => {
+      seedInvoice("open", { seatInvoice: false });
       stripeSubscriptions.seed({ subscription: { ...seatSubscription(2), pendingUpdate: true } });
 
       expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
@@ -391,9 +463,9 @@ describe("SeatPurchaseService", () => {
       );
     });
 
-    /** @scenario "A seat payment whose held change expired is voided" */
-    it("voids an open invoice whose held change Stripe dropped, and fails it", async () => {
-      seedInvoice("open");
+    /** @scenario "A seat invoice left unpaid for a day is voided" */
+    it("voids an open seat invoice past its day, and fails it", async () => {
+      seedInvoice("open", { created: nowSeconds() - SEAT_INVOICE_LIFETIME_SECONDS });
 
       expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
         status: "failed",
@@ -401,14 +473,73 @@ describe("SeatPurchaseService", () => {
       expect(stripeInvoices.voided).toEqual(["in_seat"]);
     });
 
-    /** @scenario "A paid seat invoice that never raised the seat line changes no role" */
-    it("fails a paid invoice whose seat never reached the line", async () => {
-      seedInvoice("paid");
+    it("voids an open held-change invoice whose change Stripe dropped, and fails it", async () => {
+      seedInvoice("open", { seatInvoice: false });
 
       expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
         status: "failed",
       });
-      expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
+      expect(stripeInvoices.voided).toEqual(["in_seat"]);
+    });
+
+    /** @scenario "A paid seat invoice raises the seat line it was bought for" */
+    it("raises the line with no proration once its seat invoice is paid", async () => {
+      seedInvoice("paid");
+
+      expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
+        status: "paid",
+      });
+      expect(stripeSubscriptions.updates).toEqual([
+        {
+          subscriptionId: "sub_stripe_1",
+          change: { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
+        },
+      ]);
+      expect(subscriptions.reactivateWithSeats).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "sub_db_1", maxMembers: 3 }),
+      );
+    });
+
+    /** @scenario "A seat change Stripe held before seat invoices settles once Stripe applies it" */
+    it("keeps a paid held-change invoice waiting until Stripe applies its change", async () => {
+      seedInvoice("paid", { seatInvoice: false });
+      stripeSubscriptions.seed({ subscription: { ...seatSubscription(2), pendingUpdate: true } });
+
+      expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
+        status: "open",
+      });
+      expect(stripeSubscriptions.updates).toEqual([]);
+    });
+
+    it("fails a paid held-change invoice whose change Stripe dropped", async () => {
+      seedInvoice("paid", { seatInvoice: false });
+
+      expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
+        status: "failed",
+      });
+      expect(stripeSubscriptions.updates).toEqual([]);
+    });
+
+    it("settles nothing for a seat invoice bought for another subscription", async () => {
+      stripeInvoices.seed({
+        invoice: {
+          id: "in_seat",
+          customerId: "cus_acme",
+          number: null,
+          created: nowSeconds(),
+          amountDue: 519,
+          currency: "usd",
+          status: "paid",
+          pdfUrl: null,
+          hostedUrl: null,
+        },
+        seatPurchase: { subscriptionId: "sub_stripe_other", seats: 3 },
+      });
+
+      expect(await service.settle({ organizationId: ORG, payment: invoice })).toEqual({
+        status: "failed",
+      });
+      expect(stripeSubscriptions.updates).toEqual([]);
     });
 
     it("settles nothing for another customer's invoice", async () => {

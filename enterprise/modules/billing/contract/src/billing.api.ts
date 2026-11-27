@@ -19,6 +19,7 @@ import type {
 } from "./connected-billing.schemas.ts";
 import type { RenewalCompletion } from "./connected-billing.ts";
 import type { RetentionStorageOutcome, RetentionStorageReport } from "./growth-seat-event.ts";
+import type { SubscriptionWrite } from "./one-live-plan.ts";
 import type { Currency } from "./pricing.ts";
 import type { SeatPayment, SeatPaymentStatus, SeatPurchase } from "./seat-purchase.ts";
 import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
@@ -140,6 +141,12 @@ export interface BillingApi {
     successPath: string;
     customerEmail: string | null;
   }): Promise<SeatPurchase>;
+  /**
+   * Refuses, with subscription_already_active naming the organization and its live rows, writes
+   * that would leave an organization a second live Stripe-backed plan; the tiered plan a seat
+   * plan replaces never counts. Holds on and off Cloud, as the database index does.
+   */
+  assertSubscriptionWriteAllowed(input: { writes: readonly SubscriptionWrite[] }): Promise<void>;
   /** Whether a seat payment is paid, still open, or over; a paid one has its seat recorded. */
   settleSeatPayment(input: {
     organizationId: string;

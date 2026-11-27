@@ -109,6 +109,8 @@ const createMockRepository = (): {
   findLiveLinkedBeside: unconfigured("findLiveLinkedBeside"),
   adoptCheckout: unconfigured("adoptCheckout"),
   cancelPendingCheckout: unconfigured("cancelPendingCheckout"),
+  findPlanSlots: unconfigured("findPlanSlots"),
+  findLivePlanHolders: unconfigured("findLivePlanHolders"),
 });
 
 const TEST_PRICES = BillingPriceCatalogue.create("test").prices;

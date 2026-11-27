@@ -243,8 +243,12 @@ describe("<GlobalUpgradeModal/>", () => {
 
   describe("when organization lends Request access and a Lite Member is refused", () => {
     /** Organization's button as its declaration lends it, naming only the reason it was handed. */
-    function LentRequestAccess({ reason }: RequestAccessProps) {
-      return <button type="button">Request access to {reason}</button>;
+    function LentRequestAccess({ reason, permission }: RequestAccessProps) {
+      return (
+        <button type="button" data-permission={permission}>
+          Request access to {reason}
+        </button>
+      );
     }
 
     const organizationLendsRequestAccess = {
@@ -265,14 +269,14 @@ describe("<GlobalUpgradeModal/>", () => {
       ]),
     };
 
-    const renderRefused = (resource?: string) => {
+    const renderRefused = (resource?: string, permission?: string) => {
       renderWithDesignSystem(
         <UiHostServicesContextProvider value={organizationLendsRequestAccess}>
           <GlobalUpgradeModal isSaaS />
         </UiHostServicesContextProvider>,
       );
       act(() => {
-        useUpgradeModalStore.getState().openLiteMemberRestriction({ resource });
+        useUpgradeModalStore.getState().openLiteMemberRestriction({ resource, permission });
       });
     };
 
@@ -281,7 +285,7 @@ describe("<GlobalUpgradeModal/>", () => {
       renderRefused("evaluations");
 
       const request = await screen.findByRole("button", {
-        name: "Request access to run and save experiments",
+        name: "Request access to run_experiments",
       });
       const buttons = screen.getAllByRole("button");
       expect(buttons.indexOf(request)).toBeLessThan(
@@ -289,11 +293,21 @@ describe("<GlobalUpgradeModal/>", () => {
       );
     });
 
+    /** @scenario "An admin-only refusal offers no Request access" */
+    it("hands Request access the refused permission, which decides whether it is offered", async () => {
+      renderRefused("project", "project:manage");
+
+      const request = await screen.findByRole("button", {
+        name: "Request access to change_project_settings",
+      });
+      expect(request).toHaveAttribute("data-permission", "project:manage");
+    });
+
     it("asks to use the feature when the refused resource has no words of its own", async () => {
       renderRefused("somethingNew");
 
       expect(
-        await screen.findByRole("button", { name: "Request access to use this feature" }),
+        await screen.findByRole("button", { name: "Request access to use_feature" }),
       ).toBeInTheDocument();
     });
   });

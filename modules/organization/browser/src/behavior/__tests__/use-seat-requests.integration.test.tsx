@@ -151,6 +151,21 @@ describe("useSeatRequests approve", () => {
       expect(named("seatRequest.approveWithSeat")).toHaveLength(0);
       expect(openSeats).not.toHaveBeenCalled();
     });
+
+    /** @scenario "The approval toast says what the approval did" */
+    it("says the address was invited when the approval invited it", async () => {
+      state.open = { ...openRequests({}), seatFree: true };
+      state.answers["seatRequest.approve"] = [{ outcome: "invited" }];
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+
+      await waitFor(() =>
+        expect(host.successes).toEqual([
+          expect.objectContaining({ title: "Lena was invited as a full member" }),
+        ]),
+      );
+    });
   });
 
   describe("when no seat is free on a live Stripe seat subscription", () => {

@@ -28,6 +28,8 @@ export interface AccessNoticeContext {
   recipients(input: { organizationId: string }): Promise<AccessNoticeRecipient[]>;
   organizationName(input: { organizationId: string }): Promise<string>;
   approval(input: { organizationId: string }): Promise<AccessNoticeApproval>;
+  /** The live project a push is recorded on; none when the organization has no project yet. */
+  findPushTenants(input: { organizationId: string }): Promise<string[]>;
 }
 
 type Dependencies = Readonly<{
@@ -167,10 +169,13 @@ export class OrganizationAccessNoticeService {
     const { context, push, logger } = this.dependencies;
     const { organizationId, seatRequestId, openedAt, outcome } = input;
     try {
+      const projectId = await this.pushTenantOf({ organizationId });
+      if (!projectId) return;
       const organizationName = await context.organizationName({ organizationId });
       await push.push({
         userId: input.userId,
         organizationId,
+        projectId,
         idempotencyKey: `seat-request-answer-push:${seatRequestId}:${openedAt}:${outcome}`,
         topic: `seat-request:${seatRequestId}`,
         title: `Your seat request was ${outcome}`,
@@ -200,6 +205,11 @@ export class OrganizationAccessNoticeService {
     reason: string | null;
   }): Promise<void> {
     const { context, push, logger } = this.dependencies;
+    const projectId = await this.pushTenantOf({ organizationId }).catch((error: unknown) => {
+      logger.warn({ organizationId, error }, "seat request push found no project to record on");
+      return undefined;
+    });
+    if (!projectId) return;
     const recipients = await context.recipients({ organizationId }).catch((error: unknown) => {
       logger.warn({ organizationId, error }, "seat request push found no recipients");
       return [];
@@ -209,6 +219,7 @@ export class OrganizationAccessNoticeService {
         push.push({
           userId: recipient.userId,
           organizationId,
+          projectId,
           idempotencyKey: `seat-request-push:${seatRequestId}:${recipient.userId}:${dayKey}`,
           topic: `seat-request:${seatRequestId}`,
           title: `${who} asked for a full seat`,
@@ -224,6 +235,25 @@ export class OrganizationAccessNoticeService {
         "some seat request pushes failed",
       );
     }
+  }
+
+  /**
+   * Notification records a push on a project, whose retention and purge then cover it. With
+   * no project yet there is nothing to record it on, so no push goes.
+   */
+  private async pushTenantOf({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string | undefined> {
+    const [projectId] = await this.dependencies.context.findPushTenants({ organizationId });
+    if (!projectId) {
+      this.dependencies.logger.warn(
+        { organizationId },
+        "no project to record a seat request push on",
+      );
+    }
+    return projectId;
   }
 
   private async mailOne({

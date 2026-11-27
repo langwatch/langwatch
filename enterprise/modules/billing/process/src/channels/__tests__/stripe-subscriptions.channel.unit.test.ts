@@ -542,8 +542,14 @@ describe("Billing's subscription shapes over the provider", () => {
       },
     });
 
-    // The tax is what the invoice adds on top of its pre-tax total.
-    expect(preview).toEqual({ total: 1500, amountDue: 1500, tax: 260, currency: "usd" });
+    // The tax is what the invoice adds on top of its pre-tax total; prorations sum the proration lines.
+    expect(preview).toEqual({
+      total: 1500,
+      amountDue: 1500,
+      tax: 260,
+      prorations: 100,
+      currency: "usd",
+    });
     expect(calls).toEqual([
       {
         operation: "invoices.createPreview",

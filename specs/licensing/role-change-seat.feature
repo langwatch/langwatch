@@ -33,7 +33,8 @@ Feature: Adding a seat with a role change
     @unit
     Scenario: One click charges the seat and makes the member an Admin
       When I add a seat and make "Sam" an Admin
-      Then one full seat is added to the subscription, invoiced now and prorated
+      Then the new seat is billed now, prorated, on an invoice of its own
+      And once that invoice is paid one full seat is added to the subscription with no second charge
       And "Sam" is an Admin
       And the answer says the role changed and a seat was added
 
@@ -59,6 +60,15 @@ Feature: Adding a seat with a role change
       Then the answer is the seat invoice's payment page
       And "Sam" is still a Lite Member
       And the subscription still bills 2 full seats
+      And the seat invoice bills the seat alone, none of the period's usage
+
+    @integration
+    Scenario: An unpaid seat invoice never takes the period's usage
+      Given a subscription with two seats and metered usage this period
+      And the charge for the new seat needs 3D Secure
+      When I add a seat and the seat invoice is left unpaid until it lapses
+      Then the subscription still bills 2 full seats
+      And the renewal invoice bills the period's usage in full
 
     @unit
     Scenario: The paid invoice applies the change, then the return changes nothing
@@ -103,6 +113,12 @@ Feature: Adding a seat with a role change
   Rule: concurrent and repeated purchases buy exactly what was asked
 
     @unit
+    Scenario: Two promotions of one member at once buy one seat
+      Given ACME uses every full seat it pays for
+      When an admin double-clicks "Make Admin" for "Sam", or asks from two tabs at once
+      Then one seat is bought, "Sam" becomes an Admin, and the second request finds the seat taken by "Sam"
+
+    @unit
     Scenario: Two seat purchases at once buy two seats
       Given another seat purchase for "ACME" lands while mine waits for the seat line
       When I add a seat and make "Sam" an Admin
@@ -124,25 +140,32 @@ Feature: Adding a seat with a role change
       And nothing is charged
 
     @unit
-    Scenario: A paid seat invoice that never raised the seat line changes no role
-      Given the seat invoice was paid after Stripe dropped the change it held
+    Scenario: A paid seat invoice raises the seat line it was bought for
+      Given the seat invoice was paid before the seat line rose
       When I come back to the member drawer
-      Then the change has failed and ops are alerted to refund it
-      And "Sam" is still a Lite Member
+      Then the subscription bills 3 full seats, with no second charge
+      And the change is paid
 
     @unit
-    Scenario: A seat payment whose held change expired is voided
-      Given the seat invoice is still open but Stripe no longer holds its change
+    Scenario: A seat invoice left unpaid for a day is voided
+      Given the seat invoice is still open 23 hours after it was issued
       When I come back to the member drawer
       Then the invoice is voided so it can no longer be paid
       And the change has failed
 
     @unit
-    Scenario: A held change with no payment page is voided and refused
-      Given Stripe holds the seat change for payment but names no page to pay it on
+    Scenario: A seat invoice with no payment page is voided and refused
+      Given the seat invoice is left open but names no page to pay it on
       When I add a seat and make "Sam" an Admin
       Then the change is refused with "seat_payment_unavailable"
-      And the invoice is voided so the held change is dropped
+      And the invoice is voided so it can never be paid
+
+    @unit
+    Scenario: A seat change Stripe held before seat invoices settles once Stripe applies it
+      Given Stripe holds a seat change for payment from before seat invoices
+      When its invoice is paid but Stripe has not applied the change yet
+      Then the change still waits
+      And once the seat line rises the change is paid
 
   Rule: a paid seat stays paid even when the role change is then refused
 
@@ -175,6 +198,26 @@ Feature: Adding a seat with a role change
       When billing records that the seat invoice was paid
       Then "Sam" keeps the later role and the waiting change ends as replaced
       And a paid change with no later role write still applies when delivered again
+
+    @integration
+    Scenario: Two role writes expecting one role version at once: exactly one writes
+      Given "Sam"'s role version is read for two paid changes
+      When both role writes run at once
+      Then exactly one writes and the other is refused because the version moved
+
+    @integration
+    Scenario: Admitting a waiting member moves the role version
+      Given "Kim" waits for a full seat
+      When "Kim" is admitted, twice at once
+      Then "Kim" is admitted once and the role version moves, so an older paid change is replaced
+
+    @unit @integration
+    Scenario: A paid change whose role write landed but whose settling failed ends as applied
+      Given "Sam" waits to become an Admin on a seat invoice
+      And billing records that the seat invoice was paid
+      And "Sam" becomes an Admin, but marking the change applied fails
+      When billing delivers the paid fact again
+      Then the waiting change ends as applied, not replaced, and the role is written once
 
     @unit
     Scenario: A paid fact that cannot apply yet is delivered again

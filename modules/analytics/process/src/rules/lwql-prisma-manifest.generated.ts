@@ -330,6 +330,7 @@ export interface LwqlPrismaRows {
     readonly billingOnly: "Boolean";
     readonly disabledAt: "DateTime?";
     readonly roleVersion: "Int";
+    readonly lastRoleChangeId: "String?";
     readonly pendingSsoGrantId: "String?";
     readonly membershipStamp: "String";
     readonly fullSeatSince: "DateTime?";

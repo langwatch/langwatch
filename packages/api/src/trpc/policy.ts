@@ -180,8 +180,8 @@ export interface TrpcAuthorization<TContext> {
 export interface TrpcAuthorizationDenial {
   /** The membership exists but an admin disabled it, so it grants nothing. */
   membershipDisabled(): Error;
-  /** The organization role does not reach this feature at all. */
-  liteMemberRestricted(resource: string): Error;
+  /** The organization role does not reach this feature at all; `permission` is the one asked. */
+  liteMemberRestricted(resource: string, permission?: string): Error;
   /** A Developer seat (ADR-171) reached outside its personal project. */
   developerSeatRestricted?(resource: string): Error;
 }
@@ -613,7 +613,7 @@ function deniedError({
     return new TRPCError({
       code: "UNAUTHORIZED",
       message: "This feature is not available for your account",
-      cause: denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown"),
+      cause: denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown", permission),
     });
   }
 

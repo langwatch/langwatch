@@ -18,7 +18,7 @@ describe("given a Lite Member refused for want of a full seat", () => {
       const lena = liteMember({ email: "lena@acme.example", name: "Lena Lite" });
 
       const answer = await app.requestSeatAccess(
-        { ...scope, reason: "run the workbench" },
+        { ...scope, reason: "run_experiments" },
         lena.caller,
       );
 
@@ -27,7 +27,7 @@ describe("given a Lite Member refused for want of a full seat", () => {
       expect(request).toMatchObject({
         email: "lena@acme.example",
         source: "requested",
-        reason: "run the workbench",
+        reason: "run and save experiments",
       });
       expect(mail.seatRequests.map((sent) => sent.recipientEmail).toSorted()).toEqual([
         "ada@acme.example",
@@ -36,7 +36,7 @@ describe("given a Lite Member refused for want of a full seat", () => {
       expect(mail.seatRequests[0]).toMatchObject({
         personEmail: "lena@acme.example",
         heldWithoutAccess: false,
-        askedFor: { reason: "run the workbench" },
+        askedFor: { reason: "run and save experiments" },
       });
     });
   });
@@ -50,7 +50,7 @@ describe("given a Lite Member refused for want of a full seat", () => {
       const mailed = mail.seatRequests.length;
       const [first] = await openRequests();
 
-      const again = await app.requestSeatAccess({ ...scope, reason: "save a prompt" }, lena.caller);
+      const again = await app.requestSeatAccess({ ...scope, reason: "save_prompts" }, lena.caller);
 
       expect(again.status).toBe("open");
       expect((await openRequests()).map((open) => open.id)).toEqual([first!.id]);

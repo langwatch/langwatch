@@ -62,6 +62,8 @@ function repositoryDouble(
     findLiveLinkedBeside: vi.fn(() => Promise.resolve([])),
     adoptCheckout: vi.fn(() => Promise.resolve()),
     cancelPendingCheckout: vi.fn(() => Promise.resolve([])),
+    findPlanSlots: vi.fn(() => Promise.resolve([])),
+    findLivePlanHolders: vi.fn(() => Promise.resolve([])),
     ...overrides,
   };
 }

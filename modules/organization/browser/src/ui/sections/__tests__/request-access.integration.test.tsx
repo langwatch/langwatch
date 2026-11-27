@@ -66,11 +66,11 @@ describe("Request access", () => {
   describe("given a Lite Member refused for want of a full seat", () => {
     /** @scenario "The Lite Member refusal offers Request access" */
     it("sends the request with what they were doing and says the admins were told", async () => {
-      renderWithOrganizationHost(<RequestAccessAction reason="run the workbench" />, liteMember());
+      renderWithOrganizationHost(<RequestAccessAction reason="run_experiments" />, liteMember());
 
       await userEvent.click(screen.getByRole("button", { name: "Request access" }));
 
-      expect(state.sent).toEqual([{ organizationId: "org-1", reason: "run the workbench" }]);
+      expect(state.sent).toEqual([{ organizationId: "org-1", reason: "run_experiments" }]);
       expect(await screen.findByRole("button", { name: "Access requested" })).toBeDisabled();
       expect(screen.getByText(/admins were told/)).toBeInTheDocument();
     });
@@ -133,10 +133,29 @@ describe("Request access", () => {
     it("mounts its own host and still offers Request access", () => {
       render(
         <DesignSystemTestProvider>
-          <RequestAccessAction reason="run the workbench" />
+          <RequestAccessAction reason="run_experiments" />
         </DesignSystemTestProvider>,
       );
 
+      expect(screen.getByRole("button", { name: "Request access" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given a Lite Member refused for an admin-only permission", () => {
+    /** @scenario "An admin-only refusal offers no Request access" */
+    it("draws nothing for project:manage and still offers it for a member's permission", () => {
+      const { container } = renderWithOrganizationHost(
+        <RequestAccessAction reason="change_project_settings" permission="project:manage" />,
+        liteMember(),
+      );
+      expect(screen.queryByRole("button", { name: "Request access" })).toBeNull();
+      expect(container.querySelector("[data-testid='request-access']")).toBeNull();
+      cleanup();
+
+      renderWithOrganizationHost(
+        <RequestAccessAction reason="run_experiments" permission="evaluations:manage" />,
+        liteMember(),
+      );
       expect(screen.getByRole("button", { name: "Request access" })).toBeInTheDocument();
     });
   });
@@ -145,7 +164,7 @@ describe("Request access", () => {
     /** @scenario "A full member is not offered Request access" */
     it("draws nothing and asks nothing", () => {
       const { container } = renderWithOrganizationHost(
-        <RequestAccessAction reason="run the workbench" />,
+        <RequestAccessAction reason="run_experiments" />,
         new FakeOrganizationHost({ isLiteMember: false }),
       );
 

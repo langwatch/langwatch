@@ -231,6 +231,7 @@ export class OrganizationMemberRoleService {
     planUser?: OrganizationPlanUser;
     /** Writes only while the member's role version still reads this (role-change-seat.feature). */
     expectedRoleVersion?: number;
+    roleChangeId?: string;
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId, caller } = params;
 
@@ -267,6 +268,7 @@ export class OrganizationMemberRoleService {
             currentUserId,
             caller,
             expectedRoleVersion: params.expectedRoleVersion,
+            roleChangeId: params.roleChangeId,
           },
           currentMember,
           oldPermissions: userPermissions,

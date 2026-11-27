@@ -17,6 +17,7 @@ import type { StripeInvoicesChannel } from "../channels/stripe-invoices.channel.
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import { resolveProrationDate, seatChange } from "../rules/seat-event-quote.rules.ts";
+import { isStaleSeatInvoice } from "../rules/seat-invoice.rules.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import {
   SEAT_LINE_WRITE_TIMEOUT_MS,
@@ -45,8 +46,11 @@ export type SeatCheckoutOpener = (input: {
 
 type SeatPurchaseDependencies = {
   seats: SeatChanges;
-  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "updateSubscription">;
-  stripeInvoices: Pick<StripeInvoicesChannel, "getInvoice" | "voidInvoice">;
+  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "updateSubscription" | "previewInvoice">;
+  stripeInvoices: Pick<
+    StripeInvoicesChannel,
+    "getInvoice" | "voidInvoice" | "chargeSeatInvoice" | "findOpenSeatInvoices"
+  >;
   subscriptions: SeatEventSubscriptionRepository;
   pricingModel: (organizationId: string) => Promise<string | null>;
   openCheckout: SeatCheckoutOpener;
@@ -58,9 +62,9 @@ function isRefusal(error: unknown, code: string): boolean {
 }
 
 /**
- * One full seat bought for a role change (specs/licensing/role-change-seat.feature). The charge
- * goes to the subscription's payment method and waits for payment when the customer must act;
- * Stripe keeps the line unchanged until that invoice is paid, so an unpaid one changes nothing.
+ * One full seat bought for a role change (specs/licensing/role-change-seat.feature). The seat's
+ * proration is billed on an invoice of its own and waits for payment when the customer must act;
+ * the line rises only once that invoice is paid, so an unpaid one changes nothing.
  */
 export class SeatPurchaseService {
   private readonly lease: SeatLineLeaseService;
@@ -138,7 +142,7 @@ export class SeatPurchaseService {
       if (!isRefusal(error, "seat_checkout_required")) throw error;
       return this.buyThroughCheckout(input);
     }
-    if (target.stripeSubscription.pendingUpdate) return this.waitingPayment(target);
+    if (target.stripeSubscription.pendingUpdate) return this.heldChange(target);
 
     const requested = billedSeats(target) + 1;
     const plan = this.dependencies.seats.seatChangePlan({ target, requested });
@@ -157,7 +161,8 @@ export class SeatPurchaseService {
   }
 
   /**
-   * Raises the line by one, invoiced now; Stripe holds it until paid when the customer must act.
+   * Bills the new seat's proration on an invoice of its own, then raises the line with no
+   * proration once that invoice is paid; an unpaid one changes nothing and carries no usage.
    * The target is read again under the seat line lease, so two purchases at once buy two seats.
    */
   private async charge({
@@ -192,52 +197,119 @@ export class SeatPurchaseService {
   }): Promise<SeatPurchase> {
     const target = await this.dependencies.seats.seatChangeTarget(organizationId, { heal: true });
     if (target.subscription.id !== leased) throw new SeatChangeBusyError();
-    if (target.stripeSubscription.pendingUpdate) return this.waitingPayment(target);
-    const { subscription, stripeSubscription, seatItem } = target;
+    if (target.stripeSubscription.pendingUpdate) return this.heldChange(target);
+    const waiting = await this.openSeatInvoice(target);
+    if (waiting) return waiting;
+    const { stripeSubscription, seatItem } = target;
+    const customerId = stripeSubscription.customerId;
+    if (!customerId) throw new SeatPaymentUnavailableError();
     const requested = billedSeats(target) + 1;
-    const updated = await guard.write({
-      quantity: requested,
+    const preview = await this.dependencies.stripeSubscriptions.previewInvoice({
+      subscriptionId: stripeSubscription.id,
+      change: seatChange({
+        subscription: stripeSubscription,
+        seatItem,
+        quantity: requested,
+        prorationDate,
+      }),
+    });
+    const amountCents = preview.prorations ?? preview.total - (preview.tax ?? 0);
+    if (amountCents <= 0) {
+      await this.raiseLine({ target, seats: requested, guard });
+      return { status: "added" };
+    }
+    const invoice = await this.dependencies.stripeInvoices.chargeSeatInvoice({
+      customerId,
+      purpose: { subscriptionId: stripeSubscription.id, seats: requested },
+      amountCents,
+      currency: preview.currency ?? stripeSubscription.currency ?? "usd",
+      description: `One more full seat, ${requested} in total, for the rest of this period`,
+    });
+    const payment = { kind: "invoice", invoiceId: invoice.id, seats: requested } as const;
+    if (invoice.status === "paid") {
+      try {
+        await this.raiseLine({ target, seats: requested, guard });
+      } catch (error) {
+        // Paid but not landed: the change waits on this invoice, which settling raises.
+        logger.error({ organizationId, invoiceId: invoice.id, error }, "paid seat not landed yet");
+        return { status: "payment_required", payment, url: invoice.hostedUrl ?? "" };
+      }
+      return { status: "added" };
+    }
+    if (invoice.status !== "open" || !invoice.hostedUrl) {
+      // Nothing to pay it on: voided, it can never be paid later.
+      if (invoice.status === "open") {
+        await this.dependencies.stripeInvoices.voidInvoice({ invoiceId: invoice.id });
+      }
+      throw new SeatPaymentUnavailableError();
+    }
+    logger.info({ organizationId, invoiceId: invoice.id }, "seat purchase waits for payment");
+    return { status: "payment_required", payment, url: invoice.hostedUrl };
+  }
+
+  /** Moves the seat line to `seats` with no proration: the seat invoice already billed it. */
+  private async raiseLine({
+    target,
+    seats,
+    guard,
+  }: {
+    target: SeatChangeTarget;
+    seats: number;
+    guard: SeatLineGuard;
+  }): Promise<void> {
+    const { subscription, stripeSubscription, seatItem } = target;
+    await guard.write({
+      quantity: seats,
       send: () =>
         this.dependencies.stripeSubscriptions.updateSubscription({
           subscriptionId: stripeSubscription.id,
-          change: {
-            ...seatChange({
-              subscription: stripeSubscription,
-              seatItem,
-              quantity: requested,
-              prorationDate,
-            }),
-            paymentBehavior: "pending_if_incomplete",
-          },
+          change: seatChange({
+            subscription: stripeSubscription,
+            seatItem,
+            quantity: seats,
+            prorationDate: resolveProrationDate(undefined),
+            prorationBehavior: "none",
+          }),
           timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
         }),
     });
-
-    const invoice = updated.latestInvoice;
-    if (updated.pendingUpdate) {
-      if (!invoice?.hostedUrl) {
-        // Nothing to pay it on: voiding the invoice drops the held change with it.
-        if (invoice) await this.dependencies.stripeInvoices.voidInvoice({ invoiceId: invoice.id });
-        throw new SeatPaymentUnavailableError();
-      }
-      logger.info({ organizationId, invoiceId: invoice.id }, "seat purchase waits for payment");
-      return {
-        status: "payment_required",
-        payment: { kind: "invoice", invoiceId: invoice.id, seats: requested },
-        url: invoice.hostedUrl,
-      };
-    }
     await this.dependencies.subscriptions.reactivateWithSeats({
       id: subscription.id,
-      maxMembers: requested,
+      maxMembers: seats,
       kept: null,
       repairsUpTo: nowInstant(),
     });
-    return { status: "added" };
   }
 
-  /** A seat change Stripe already holds for payment: its invoice, never a second one. */
-  private async waitingPayment(target: SeatChangeTarget): Promise<SeatPurchase> {
+  /** An open seat invoice for this line, never a second one; one past its lifetime is voided. */
+  private async openSeatInvoice(target: SeatChangeTarget): Promise<SeatPurchase | null> {
+    const customerId = target.stripeSubscription.customerId;
+    if (!customerId) return null;
+    const open = await this.dependencies.stripeInvoices.findOpenSeatInvoices({
+      customerId,
+      subscriptionId: target.stripeSubscription.id,
+    });
+    const now = epochSeconds();
+    for (const invoice of open) {
+      if (isStaleSeatInvoice({ created: invoice.created, now }) || !invoice.hostedUrl) {
+        await this.dependencies.stripeInvoices.voidInvoice({ invoiceId: invoice.id });
+        continue;
+      }
+      return {
+        status: "payment_required",
+        payment: {
+          kind: "invoice",
+          invoiceId: invoice.id,
+          seats: invoice.seatPurchase?.seats ?? billedSeats(target) + 1,
+        },
+        url: invoice.hostedUrl,
+      };
+    }
+    return null;
+  }
+
+  /** A seat change Stripe holds for payment from before seat invoices: its invoice, never a second. */
+  private async heldChange(target: SeatChangeTarget): Promise<SeatPurchase> {
     const invoiceId = target.stripeSubscription.latestInvoice?.id;
     if (!invoiceId) throw new SeatPaymentUnavailableError();
     const invoice = await this.dependencies.stripeInvoices.getInvoice({ invoiceId });
@@ -284,8 +356,8 @@ export class SeatPurchaseService {
   }
 
   /**
-   * Paid only once the seat line bills the seats the invoice was for. An open invoice whose held
-   * change Stripe dropped (expired) can no longer add the seat, so it is voided and failed.
+   * A paid seat invoice raises the seat line to the seats it bought, once: a line already there
+   * only syncs the row. An unpaid one stays open until its lifetime ends, then is voided.
    */
   private async settleInvoice({
     organizationId,
@@ -297,8 +369,8 @@ export class SeatPurchaseService {
     seats: number;
   }): Promise<{ status: SeatPaymentStatus }> {
     const invoice = await this.dependencies.stripeInvoices.getInvoice({ invoiceId });
-    const { subscription, stripeSubscription, seatItem } =
-      await this.dependencies.seats.seatChangeTarget(organizationId);
+    const target = await this.dependencies.seats.seatChangeTarget(organizationId);
+    const { stripeSubscription } = target;
     // Another customer's invoice settles nothing here.
     if (!invoice.customerId || invoice.customerId !== stripeSubscription.customerId) {
       return { status: "failed" };
@@ -306,20 +378,48 @@ export class SeatPurchaseService {
     if (invoice.status === "void" || invoice.status === "uncollectible") {
       return { status: "failed" };
     }
-    const billed = seatItem.quantity ?? 0;
+    const purpose = invoice.seatPurchase;
+    if (purpose && purpose.subscriptionId !== stripeSubscription.id) return { status: "failed" };
     if (invoice.status !== "paid") {
-      if (stripeSubscription.pendingUpdate) return { status: "open" };
+      const payable = purpose
+        ? !isStaleSeatInvoice({ created: invoice.created, now: epochSeconds() })
+        : stripeSubscription.pendingUpdate;
+      if (payable) return { status: "open" };
       await this.dependencies.stripeInvoices.voidInvoice({ invoiceId });
       return { status: "failed" };
     }
-    if (billed < seats) {
-      logger.error(
-        { organizationId, invoiceId, seats, billed },
-        "a seat invoice was paid but the seat line never rose; it needs a refund",
-      );
-      return { status: "failed" };
-    }
+    return this.settlePaid({ organizationId, target, seats, isSeatInvoice: purpose !== null });
+  }
 
+  /** A paid invoice: the line already bills its seats, or this raises it (seat invoices only). */
+  private async settlePaid({
+    organizationId,
+    target,
+    seats,
+    isSeatInvoice,
+  }: {
+    organizationId: string;
+    target: SeatChangeTarget;
+    seats: number;
+    isSeatInvoice: boolean;
+  }): Promise<{ status: SeatPaymentStatus }> {
+    const { subscription, stripeSubscription, seatItem } = target;
+    const billed = seatItem.quantity ?? 0;
+    if (billed < seats) {
+      // A held change from before seat invoices: Stripe applies it, then this settles.
+      if (!isSeatInvoice) return { status: stripeSubscription.pendingUpdate ? "open" : "failed" };
+      const raised = await this.lease.hold({
+        id: subscription.id,
+        waitMs: SEAT_PURCHASE_WAIT_MS,
+        work: async (guard) => {
+          const current = await this.dependencies.seats.seatChangeTarget(organizationId);
+          if ((current.seatItem.quantity ?? 0) < seats) {
+            await this.raiseLine({ target: current, seats, guard });
+          }
+        },
+      });
+      return { status: raised.held ? "paid" : "open" };
+    }
     if (billed > (subscription.maxMembers ?? 0)) {
       await this.dependencies.subscriptions.reactivateWithSeats({
         id: subscription.id,
@@ -346,6 +446,10 @@ export class SeatPurchaseService {
     const row = rows.find((each) => each.id === subscriptionId);
     return { status: row?.status === "ACTIVE" ? "paid" : "open" };
   }
+}
+
+function epochSeconds(): number {
+  return Math.floor(nowInstant().epochMilliseconds / 1000);
 }
 
 type SeatChangeTarget = Awaited<ReturnType<SeatChanges["seatChangeTarget"]>>;

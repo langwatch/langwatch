@@ -43,6 +43,7 @@
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",

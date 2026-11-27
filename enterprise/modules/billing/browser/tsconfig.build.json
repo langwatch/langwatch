@@ -24,10 +24,13 @@
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/handled-error/tsconfig.build.json"
+      "path": "../../../../packages/plans/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/plans/tsconfig.build.json"
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"

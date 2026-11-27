@@ -411,6 +411,20 @@ Feature: Enterprise billing compatibility
       And duplicates that existed before the index stay outside it, so the index builds on existing data
 
     @unit
+    Scenario: A duplicate plan the index exempts still blocks a second plan
+      Given an older duplicate live plan the index exempts, beside a newer one that was cancelled
+      When a new seat checkout is paid for the organization
+      Then the new plan is refused, cancelled and refunded, and the older one stays the only live plan
+
+    @unit @integration
+    Scenario: Billing refuses another module's write that would start a second live plan
+      Given the organization holds an active seat plan linked to Stripe beside the tiered plan it replaces
+      When another module asks whether a write may create, activate, link or move in a second linked plan
+      Then billing refuses with subscription_already_active naming the organization and its live plan
+      And an edit to the tiered plan, to the live plan itself or to an unlinked row is allowed
+      And the answer is the same off LangWatch Cloud, as the database index holds everywhere
+
+    @unit
     Scenario: A checkout paid in a race with another is refused as a second plan
       Given two seat checkouts for the organization are paid at the same moment
       And the first one's plan went live after the second passed its check

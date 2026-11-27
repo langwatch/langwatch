@@ -2,6 +2,7 @@ package paymentsim
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -91,10 +92,31 @@ const pendingLifetime = 23 * time.Hour
 // pendingLifetime, or at the period end when that comes first, as Stripe does.
 func (s *Server) holdPending(sub *Subscription, items []*Item, lines []*Line) {
 	inv := s.draftProrations(sub, lines)
+	s.billOutstandingUsage(sub, inv)
 	expires := min(s.now().Add(pendingLifetime).Unix(), sub.CurrentPeriodEnd)
 	sub.PendingUpdate = &PendingUpdate{ExpiresAt: expires, SubscriptionItems: items}
 	sub.pendingInvoice = inv.ID
 	s.finalize(inv)
+}
+
+// billOutstandingUsage moves the metered usage to date onto inv, as Stripe bills it
+// on a pending update invoice: the next invoice starts after it, so usage the
+// invoice took is lost when the update expires or is voided unpaid.
+func (s *Server) billOutstandingUsage(sub *Subscription, inv *Invoice) {
+	now := s.now().Unix()
+	from := max(sub.CurrentPeriodStart, sub.usageFrom)
+	for _, it := range sub.Items.Data {
+		if !isMetered(it.Price) {
+			continue
+		}
+		full := s.st.price(it.Price.ID)
+		used := s.meteredUsage(full, usageWindow{customer: sub.Customer, from: from, to: now + 1})
+		s.addLine(inv, &Line{
+			Amount: meteredAmount(full, used), Price: it.Price, Quantity: ptr(int64(math.Round(used))),
+			Period: Period{Start: from, End: now + 1}, Subscription: ptr(sub.ID), Type: "subscription",
+		})
+	}
+	sub.usageFrom = now + 1
 }
 
 // willHold is whether an update keeps its items pending: it asks for

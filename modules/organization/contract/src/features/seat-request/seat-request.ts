@@ -18,7 +18,7 @@ const seatRequestSchemaDefinition = z.object({
   source: z.enum(["pending", "lite", "idp_refused", "requested"]),
   idpRefused: z.boolean(),
   idpKind: signInIdpKindSchema.nullable(),
-  /** What a member who asked from a refusal was trying to do; null for arrivals. */
+  /** What a member who asked was trying to do, in the server's words; null for arrivals. */
   reason: z.string().nullable(),
   /** Epoch milliseconds. */
   openedAt: z.number(),
@@ -75,14 +75,29 @@ export const seatRequestResolvedSchema: SeatRequestResolvedSchema =
   seatRequestResolvedSchemaDefinition;
 export type SeatRequestResolved = z.infer<typeof seatRequestResolvedSchema>;
 
-/** The longest "what were you trying to do" a member's request keeps. */
-export const SEAT_REQUEST_REASON_MAX = 200;
+/**
+ * What a member was trying to do when refused, one of the refusals' fixed reasons. The server
+ * renders each one's words for admins, so a member never puts their own text in a mail.
+ */
+export const seatRequestReasonSchema = z.enum([
+  "run_experiments",
+  "save_prompts",
+  "edit_datasets",
+  "build_workflows",
+  "run_scenarios",
+  "annotate_traces",
+  "set_up_automations",
+  "change_project_settings",
+  "edit_dashboards",
+  "add_to_workspace",
+  "use_feature",
+]);
+export type SeatRequestReason = z.infer<typeof seatRequestReasonSchema>;
 
 /** A member refused for want of a full seat asks for one (seat-requests.feature, member asks). */
 const requestSeatAccessInputSchemaDefinition = z.object({
   organizationId: z.string().min(1),
-  /** What they were doing when refused, in words an admin reads: "run the workbench". */
-  reason: z.string().trim().max(SEAT_REQUEST_REASON_MAX).optional(),
+  reason: seatRequestReasonSchema.optional(),
 });
 export interface RequestSeatAccessInputSchema extends Named<
   typeof requestSeatAccessInputSchemaDefinition

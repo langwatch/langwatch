@@ -74,8 +74,8 @@ type OrganizationMembershipDependencies = {
   ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   /** The 30-day seat hold (seat-rotation.feature). */
   seatHolds: SeatHoldService;
-  /** Seat requests, closed when a waiting person is admitted (seat-requests.feature). */
-  seatRequests: Pick<SeatRequestRepository, "findForUser" | "resolve">;
+  /** Seat requests, closed once the person holds a full seat or leaves (seat-requests.feature). */
+  seatRequests: Pick<SeatRequestRepository, "findForUser" | "resolve" | "settleSeat">;
 };
 
 /**
@@ -377,7 +377,7 @@ export class OrganizationMembershipService {
   deleteMember(
     params: Parameters<OrganizationMemberAdmissionService["deleteMember"]>[0],
   ): ReturnType<OrganizationMemberAdmissionService["deleteMember"]> {
-    return this.admission.deleteMember(params);
+    return this.memberSeats.deleteMember({ ...params, actingUserId: params.actingUserId ?? null });
   }
 
   removeMember(
@@ -451,6 +451,7 @@ export class OrganizationMembershipService {
           ...(actingUser ? { planUser: actingUser } : {}),
         });
         teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];
+        await this.memberSeats.closeOnFullSeat({ ...params, role });
       } else {
         await this.roles.setMemberDisabled({
           organizationId,
@@ -473,7 +474,9 @@ export class OrganizationMembershipService {
   async changeMemberRole(
     params: Parameters<OrganizationMemberRoleService["changeMemberRole"]>[0],
   ): ReturnType<OrganizationMemberRoleService["changeMemberRole"]> {
-    return this.roles.changeMemberRole(params);
+    const result = await this.roles.changeMemberRole(params);
+    await this.memberSeats.closeOnFullSeat(params);
+    return result;
   }
 
   async updateMemberRole(

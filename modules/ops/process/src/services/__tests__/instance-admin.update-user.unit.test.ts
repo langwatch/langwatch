@@ -8,16 +8,6 @@ import { adminOperator, noOperators } from "./support/admin-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 class RecordingRepository extends InstanceAdminRepository {
-  async findActiveSubscriptionIds(): Promise<string[]> {
-    return [];
-  }
-
-  async findSubscriptionStates(): Promise<
-    { id: string; organizationId: string; status: string }[]
-  > {
-    return [];
-  }
-
   constructor(private readonly log: unknown[]) {
     super();
   }

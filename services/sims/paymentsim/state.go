@@ -129,6 +129,9 @@ type Subscription struct {
 	PendingUpdate      *PendingUpdate    `json:"pending_update"`
 
 	pendingInvoice string
+	// usageFrom is where the next invoice's metered usage starts when it is later
+	// than the period start: a pending update invoice took the usage before it.
+	usageFrom int64
 }
 
 // PendingUpdate is Stripe's pending_update: item changes that wait for their
@@ -179,6 +182,7 @@ type Invoice struct {
 	AmountRemaining   int64             `json:"amount_remaining"`
 	AttemptCount      int64             `json:"attempt_count"`
 	Attempted         bool              `json:"attempted"`
+	AutoAdvance       bool              `json:"auto_advance"`
 	BillingReason     string            `json:"billing_reason"`
 	CollectionMethod  string            `json:"collection_method"`
 	Created           int64             `json:"created"`

@@ -5,7 +5,13 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ADA, application, BILL, ORGANIZATION_ID } from "./support/seat-requests-application.ts";
+import {
+  ADA,
+  application,
+  BILL,
+  ORGANIZATION_ID,
+  PROJECT_ID,
+} from "./support/seat-requests-application.ts";
 
 const scope = { organizationId: ORGANIZATION_ID };
 
@@ -16,8 +22,8 @@ describe("given a Lite Member who asks for a full seat", () => {
       const { app, liteMember, openRequests, push } = await application();
       const lena = liteMember({ email: "lena@acme.example", name: "Lena Lite" });
 
-      await app.requestSeatAccess({ ...scope, reason: "run the workbench" }, lena.caller);
-      await app.requestSeatAccess({ ...scope, reason: "save a prompt" }, lena.caller);
+      await app.requestSeatAccess({ ...scope, reason: "run_experiments" }, lena.caller);
+      await app.requestSeatAccess({ ...scope, reason: "save_prompts" }, lena.caller);
 
       const [request] = await openRequests();
       expect(push.pushes.map((sent) => sent.userId).toSorted()).toEqual(
@@ -26,8 +32,9 @@ describe("given a Lite Member who asks for a full seat", () => {
       for (const sent of push.pushes) {
         expect(sent).toMatchObject({
           organizationId: ORGANIZATION_ID,
+          projectId: PROJECT_ID,
           title: "Lena Lite asked for a full seat",
-          body: "To run the workbench",
+          body: "To run and save experiments",
           url: "/settings/directory?tab=people",
           topic: `seat-request:${request!.id}`,
         });
@@ -49,6 +56,24 @@ describe("given a Lite Member who asks for a full seat", () => {
 
       expect(answer.status).toBe("open");
       expect(await openRequests()).toHaveLength(1);
+      expect(mail.seatRequests.map((sent) => sent.recipientEmail).toSorted()).toEqual([
+        "ada@acme.example",
+        "bill@acme.example",
+      ]);
+    });
+  });
+});
+
+describe("given an organization with no project yet", () => {
+  describe("when a Lite Member asks for access", () => {
+    /** @scenario "An organization with no project yet gets no push and is still mailed" */
+    it("pushes nobody and still mails the administrators", async () => {
+      const { app, liteMember, push, mail } = await application({ withProject: false });
+      const lena = liteMember({ email: "lena@acme.example" });
+
+      await app.requestSeatAccess(scope, lena.caller);
+
+      expect(push.pushes).toEqual([]);
       expect(mail.seatRequests.map((sent) => sent.recipientEmail).toSorted()).toEqual([
         "ada@acme.example",
         "bill@acme.example",
@@ -144,7 +169,7 @@ describe("given a Lite Member whose arrival already opened a seat request", () =
       vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000);
     }
     const caller = { id: userId, name: null, email: "lena@acme.example" };
-    await context.app.requestSeatAccess({ ...scope, reason: "run the workbench" }, caller);
+    await context.app.requestSeatAccess({ ...scope, reason: "run_experiments" }, caller);
     return { ...context, userId, arrival: arrival! };
   }
 
@@ -168,7 +193,7 @@ describe("given a Lite Member whose arrival already opened a seat request", () =
 
       const asked = push.pushes.filter((sent) => sent.topic === `seat-request:${arrival.id}`);
       expect(asked.map((sent) => sent.userId).toSorted()).toEqual([ADA.id, BILL.id].toSorted());
-      expect(asked[0]?.body).toBe("To run the workbench");
+      expect(asked[0]?.body).toBe("To run and save experiments");
     });
   });
 

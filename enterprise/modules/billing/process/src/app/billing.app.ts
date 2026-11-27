@@ -43,6 +43,7 @@ import {
   type SeatPaymentStatus,
   type SeatPurchase,
   type SubscriptionPlanInput,
+  type SubscriptionWrite,
   type BillingPricingModel,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
@@ -113,6 +114,7 @@ import {
   NO_DUPLICATE_SUBSCRIPTION_ALERTS,
 } from "../services/duplicate-subscription-alert.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { LivePlanSlotService } from "../services/live-plan-slot.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { OverPlanService } from "../services/over-plan.service.ts";
 import {
@@ -518,6 +520,7 @@ export class BillingModule
       isSaas,
       resourceLimitAlerts,
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
+      livePlans: LivePlanSlotService.create({ subscriptions: repositories.subscriptions }),
       reporting: BillingModule.#composeReporting({
         repositories,
         peers,
@@ -928,6 +931,10 @@ export class BillingModule
     return this.#subscriptionDoor.seatPurchases.settle(input);
   }
 
+  assertSubscriptionWriteAllowed(input: { writes: readonly SubscriptionWrite[] }): Promise<void> {
+    return this.#livePlans.assertWriteAllowed(input);
+  }
+
   /** Off Cloud, or where no payment provider is composed, nothing is billed for storage. */
   async recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome> {
     if (!this.#subscriptions) return { line: "skipped", reportedGbMonths: null };
@@ -1036,6 +1043,7 @@ export class BillingModule
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
   readonly #pricing: OrganizationPricingService;
+  readonly #livePlans: LivePlanSlotService;
   readonly #reporting: BillingReportingPipeline;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
@@ -1053,6 +1061,7 @@ export class BillingModule
     subscriptionPlans,
     isSaas,
     pricing,
+    livePlans,
     reporting,
     resourceLimitAlerts,
     lifecycle,
@@ -1069,6 +1078,7 @@ export class BillingModule
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
     pricing: OrganizationPricingService;
+    livePlans: LivePlanSlotService;
     reporting: BillingReportingPipeline;
     resourceLimitAlerts: ResourceLimitAlertService;
   }) {
@@ -1080,6 +1090,7 @@ export class BillingModule
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
     this.#pricing = pricing;
+    this.#livePlans = livePlans;
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;

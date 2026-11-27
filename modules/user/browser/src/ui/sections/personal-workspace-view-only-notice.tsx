@@ -19,7 +19,7 @@ export function PersonalWorkspaceViewOnlyNotice() {
       status="info"
       icon={<Eye size={16} aria-hidden />}
       data-testid="personal-workspace-view-only-notice"
-      action={<Lent of={RequestAccessToken} props={{ reason: "add to their workspace" }} />}
+      action={<Lent of={RequestAccessToken} props={{ reason: "add_to_workspace" }} />}
     >
       Your organization gives you view-only access, so you can read your workspace but not add to
       it. Request access to ask an organization admin for a full seat.

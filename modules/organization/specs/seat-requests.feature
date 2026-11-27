@@ -223,6 +223,28 @@ Feature: Seat requests when an organization is over its seat limit
       But when reopening keeps failing, the approval fails with an infrastructure error naming both failures
 
     @unit
+    Scenario: Approving the request of a member who has since left invites nobody and buys no seat
+      Given "lena@acme.example" asked for access as a Lite Member and has since left the organization
+      And the organization pays per seat through a live Stripe subscription with every full seat in use
+      When an administrator approves with a seat
+      Then the approval refuses with seat_request_not_found
+      And no invitation is created, no seat is bought and the request is closed
+
+    @unit
+    Scenario: Removing a member closes their open seat request
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      When an administrator removes her from the organization
+      Then no open seat request names "lena@acme.example"
+
+    @unit
+    Scenario: Promoting a member to a full seat from the role editor closes their seat request
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And a full member seat is free
+      When an administrator changes her role to Member in the role editor
+      Then no open seat request names "lena@acme.example"
+      And her request reads "approved"
+
+    @unit
     Scenario: Approving a seat request that is not open is refused
       When an administrator approves a seat request that does not exist
       Then the approval refuses with seat_request_not_found
@@ -428,17 +450,32 @@ Feature: Seat requests when an organization is over its seat limit
     @unit
     Scenario: A Lite Member asks for a full seat from a refusal
       Given "lena@acme.example" is a Lite Member
-      When she asks for access to "run the workbench"
-      Then an open seat request names "lena@acme.example" as requested, for "run the workbench"
+      When she asks for access to run experiments
+      Then an open seat request names "lena@acme.example" as requested, for "run and save experiments"
       And "Ada Admin" and "Bill Payer" are mailed that "lena@acme.example" asked for a full seat
+
+    @unit
+    Scenario: A member names one of the fixed reasons, never their own words
+      Given "lena@acme.example" is a Lite Member
+      When she asks for access with a reason of her own wording
+      Then the request refuses with validation_error and no seat request is opened
+      And a request stored with free text before the reasons were fixed still lists, in the fixed words
 
     @unit
     Scenario: Administrators and Billing members get an in-app push when a member asks
       Given "lena@acme.example" is a Lite Member named "Lena Lite"
-      When she asks for access to "run the workbench"
+      When she asks for access to run experiments
       Then "Ada Admin" and "Bill Payer" each get a push "Lena Lite asked for a full seat"
-      And the push says "To run the workbench" and opens the People tab of the directory
+      And the push says "To run and save experiments" and opens the People tab of the directory
+      And it is recorded on the organization's oldest project, never on the organization id
       And asking again the same day pushes nobody again
+
+    @unit
+    Scenario: An organization with no project yet gets no push and is still mailed
+      Given the organization has no project
+      When "lena@acme.example" asks for access
+      Then nobody gets a push
+      And "Ada Admin" and "Bill Payer" are still mailed
 
     @unit
     Scenario: A push that cannot be sent leaves the request standing
@@ -458,6 +495,14 @@ Feature: Seat requests when an organization is over its seat limit
     @unit
     Scenario: A member can ask again after a decline
       Given "lena@acme.example" is a Lite Member whose seat request was declined
+      When she asks for access again
+      Then her seat request is open again
+
+    @unit
+    Scenario: A member approved earlier and moved back to Lite can ask again
+      Given "lena@acme.example" was approved for a full seat
+      And an administrator later moved her back to Lite Member
+      Then her request reads "none"
       When she asks for access again
       Then her seat request is open again
 
@@ -509,6 +554,13 @@ Feature: Seat requests when an organization is over its seat limit
       Given I hold a full member seat
       When a page refuses me for a missing permission
       Then no "Request access" button is shown
+
+    @integration
+    Scenario: An admin-only refusal offers no Request access
+      Given I am on a Lite Member seat
+      When a call I make is refused for "project:manage", which a full member does not hold either
+      Then no "Request access" button is shown
+      But a refusal for a permission a full member holds still offers it
 
     @integration
     Scenario: Request access says what was answered
@@ -664,6 +716,12 @@ Feature: Seat requests when an organization is over its seat limit
       Given the organization is on the free plan with every full seat in use
       When an administrator approves with a seat
       Then the approval refuses with member_seat_limit_reached and nothing is bought
+
+    @integration
+    Scenario: The approval toast says what the approval did
+      Given a seat request from a refused sign-in with no membership and a full seat free
+      When an administrator presses Approve
+      Then the toast says the address was invited as a full member, not that it has a full seat
 
     @integration
     Scenario: Approve in one click with no seat free adds the seat without a confirmation dialog

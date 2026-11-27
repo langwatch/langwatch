@@ -101,6 +101,18 @@ export class SeatRequestApprovalService {
     const { requests } = this.dependencies;
     const request = await requests.getOpen({ organizationId, id: seatRequestId });
     const membership = await this.membershipOf({ organizationId, request });
+    // A person who had a membership and left asked as a member, not as an address to invite:
+    // their request closes, so Approve never invites them back or buys a seat for them.
+    if (request.userId !== null && membership === null) {
+      await requests.resolve({
+        organizationId,
+        id: request.id,
+        status: "DECLINED",
+        resolvedByUserId: by.id,
+        at: this.now(),
+      });
+      throw new SeatRequestNotFoundError(request.id);
+    }
     const isFull =
       membership !== null &&
       (membership.role === OrganizationUserRole.MEMBER ||

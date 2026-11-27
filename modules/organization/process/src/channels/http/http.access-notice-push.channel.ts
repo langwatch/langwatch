@@ -11,7 +11,7 @@ type Notifications = Pick<NotificationService, "requestWebPushDelivery">;
 const clipped = (text: string, max: number) =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
-/** Seat request pushes queued through notification, recorded on the organization's tenant. */
+/** Seat request pushes queued through notification, recorded on an organization's project. */
 export class HttpAccessNoticePushChannel extends AccessNoticePushChannel {
   static create(input: { notifications: Notifications }): HttpAccessNoticePushChannel {
     return new HttpAccessNoticePushChannel(input.notifications);
@@ -24,7 +24,7 @@ export class HttpAccessNoticePushChannel extends AccessNoticePushChannel {
   async push(input: AccessNoticePush): Promise<void> {
     await this.notifications.requestWebPushDelivery({
       userId: input.userId,
-      projectId: input.organizationId,
+      projectId: input.projectId,
       idempotencyKey: input.idempotencyKey,
       topic: input.topic,
       urgency: "normal",

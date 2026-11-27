@@ -3,8 +3,6 @@ import type { LedgerActor } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
-  AdminSubscriptionAlreadyActiveError,
-  AdminSubscriptionIdsRequiredError,
   ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL,
   adminOperationInputSchema,
   adminUserSortFieldSchema,
@@ -19,6 +17,10 @@ import type { InstanceAdminRepository } from "../repositories/instance-admin.rep
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import { isOrganizationDatasetLimitWriteAllowed } from "../rules/organization-dataset-limit.rules.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
+import {
+  type AdminSubscriptionRule,
+  AdminSubscriptionWriteService,
+} from "./admin-subscription-write.service.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
@@ -41,6 +43,8 @@ interface InstanceAdminServiceOptions {
   /** Absent only where no sharing switch is edited; a switch then refuses by name. */
   projects?: InstanceAdminProjects | undefined;
   shares?: InstanceAdminShares | undefined;
+  /** Billing's one-live-plan rule; absent where no subscription is edited, a write then fails. */
+  billing?: AdminSubscriptionRule | undefined;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
@@ -64,6 +68,11 @@ const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
   connectionDecides: async () => false,
 };
 
+const NO_BILLING: AdminSubscriptionRule = {
+  assertSubscriptionWriteAllowed: () =>
+    Promise.reject(new Error("instance admin composed without billing")),
+};
+
 const NO_SHARING_DOOR: InstanceAdminProjects & InstanceAdminShares = {
   setTraceSharing: () => Promise.reject(new Error("instance admin composed without project")),
   countTraceShares: () => Promise.reject(new Error("instance admin composed without share")),
@@ -79,6 +88,7 @@ export class InstanceAdminService {
   private readonly operators: InstanceAdminOperators;
   private readonly projects: InstanceAdminProjects;
   private readonly shares: InstanceAdminShares;
+  private readonly subscriptions: AdminSubscriptionWriteService;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
   private readonly operatorAddressesFixed: boolean;
@@ -90,6 +100,7 @@ export class InstanceAdminService {
     operators: InstanceAdminOperators;
     projects: InstanceAdminProjects;
     shares: InstanceAdminShares;
+    subscriptions: AdminSubscriptionWriteService;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
     operatorAddressesFixed: boolean;
@@ -100,6 +111,7 @@ export class InstanceAdminService {
     this.operators = deps.operators;
     this.projects = deps.projects;
     this.shares = deps.shares;
+    this.subscriptions = deps.subscriptions;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
     this.operatorAddressesFixed = deps.operatorAddressesFixed;
@@ -113,6 +125,9 @@ export class InstanceAdminService {
       operators: options.operators,
       projects: options.projects ?? NO_SHARING_DOOR,
       shares: options.shares ?? NO_SHARING_DOOR,
+      subscriptions: AdminSubscriptionWriteService.create({
+        billing: options.billing ?? NO_BILLING,
+      }),
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
       operatorAddressesFixed: options.operatorAddressesFixed ?? true,
@@ -155,7 +170,7 @@ export class InstanceAdminService {
     }
 
     this.refuseOutOfRangeDatasetLimit(parsed);
-    await this.refuseSecondActiveSubscription(parsed);
+    const subscriptionWrites = await this.subscriptions.check(parsed);
     const normalized = await this.normalizeOrganizationDomain(parsed);
     await this.auditMutation(normalized);
 
@@ -166,67 +181,10 @@ export class InstanceAdminService {
       return this.projectWithTraceShareCount(normalized);
     }
 
-    return this.repository.execute(normalized);
-  }
-
-  /**
-   * An organization holds one ACTIVE subscription. A write that would make a second one live
-   * (a new row, a reactivated one, or one moved to another organization) is refused, naming the
-   * live row to edit instead.
-   */
-  private async refuseSecondActiveSubscription(input: AdminOperationInput): Promise<void> {
-    if (input.resource !== "subscription") return;
-    if (!["create", "update", "updateMany"].includes(input.method)) return;
-    const data = input.params.data ?? {};
-    // The check must see what persists: an operator object (`{ set: "ACTIVE" }`) is dropped.
-    const nonScalar = (["status", "organizationId"] as const).filter(
-      (field) => data[field] !== undefined && typeof data[field] !== "string",
-    );
-    if (nonScalar.length > 0) {
-      throw new ValidationError("A subscription's status and organization are plain values", {
-        meta: {
-          fieldErrors: Object.fromEntries(
-            nonScalar.map((field) => [field, ["Send a plain value."]]),
-          ),
-        },
-      });
-    }
-    const ids = this.subscriptionWriteIds(input);
-    const stored = await this.repository.findSubscriptionStates({ ids });
-    const written =
-      input.method === "create"
-        ? [{ id: "", organizationId: data.organizationId, status: data.status }]
-        : stored.map((row) => ({
-            id: row.id,
-            organizationId: data.organizationId ?? row.organizationId,
-            status: data.status ?? row.status,
-          }));
-    const seen = new Set<string>();
-    for (const row of written) {
-      if (row.status !== "ACTIVE" || typeof row.organizationId !== "string") continue;
-      const others = (
-        await this.repository.findActiveSubscriptionIds({ organizationId: row.organizationId })
-      ).filter((id) => id !== row.id);
-      if (others.length > 0 || seen.has(row.organizationId)) {
-        throw new AdminSubscriptionAlreadyActiveError({
-          organizationId: row.organizationId,
-          activeSubscriptionIds: others,
-        });
-      }
-      seen.add(row.organizationId);
-    }
-  }
-
-  /**
-   * The stored rows a subscription write touches; a create touches none yet. A bulk edit
-   * without explicit ids is refused, so no write can reach rows the check did not read.
-   */
-  private subscriptionWriteIds(input: AdminOperationInput): string[] {
-    if (input.method === "create") return [];
-    if (input.method === "update") return [String(input.params.id ?? "")];
-    const ids: unknown = input.params.ids;
-    if (!Array.isArray(ids) || ids.length === 0) throw new AdminSubscriptionIdsRequiredError();
-    return ids.map(String);
+    return this.subscriptions.written({
+      writes: subscriptionWrites,
+      write: () => this.repository.execute(normalized),
+    });
   }
 
   /** The sharing switch goes through project's door; every other field stays a generic write. */

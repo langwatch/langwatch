@@ -52,28 +52,39 @@ function world({
     roleWrites: 0,
     /** Moved by every role write, as the membership row's role version is. */
     roleVersion: 0,
+    /** The paid change the newest role write applied, as the membership row stores it. */
+    lastRoleChangeId: null as string | null,
     purchase: { status: "added" } as SeatPurchase | Error,
     payments: new Map<string, SeatPaymentStatus>(),
   };
   const changeMemberRole = vi.fn(
     async (
-      input: { userId: string; role: OrganizationUserRole; expectedRoleVersion?: number },
+      input: {
+        userId: string;
+        role: OrganizationUserRole;
+        expectedRoleVersion?: number;
+        roleChangeId?: string;
+      },
       _by: OrganizationCaller,
     ) => {
       const expected = input.expectedRoleVersion;
       if (expected !== undefined && expected !== state.roleVersion) {
-        throw new RoleVersionMovedError(input.userId);
+        throw new RoleVersionMovedError(input.userId, state.lastRoleChangeId);
       }
       if (state.refuseOtherwise) throw new CannotDisableLastAdminError();
       if (state.refuseAfterSeat && state.used < state.paid) throw new CannotDisableLastAdminError();
-      if (state.used >= state.paid) {
+      // A member already on a full seat keeps it through any full role.
+      const current = state.roles.get(input.userId);
+      const needsSeat = current !== "ADMIN" && current !== "MEMBER";
+      if (needsSeat && state.used >= state.paid) {
         throw new MemberSeatLimitReachedError({
           meta: { limitType: "members", current: state.used, max: state.paid },
         });
       }
-      state.used += 1;
+      if (needsSeat) state.used += 1;
       state.roleWrites += 1;
       state.roleVersion += 1;
+      state.lastRoleChangeId = input.roleChangeId ?? null;
       state.roles.set(input.userId, input.role);
       return { teamsLeftWithoutAdmin: [] };
     },
@@ -267,6 +278,28 @@ describe("MemberRoleSeatPurchaseService", () => {
       recordBlockedSeatChange.mockResolvedValueOnce({ recorded: false });
 
       expect(await service.recordBlocked(MAKE_ADMIN, ADMIN)).toEqual({ recorded: false });
+    });
+  });
+
+  describe("given two promotions of one member at once", () => {
+    /** @scenario "Two promotions of one member at once buy one seat" */
+    it("buys one seat, and the second finds the member already on it", async () => {
+      const { state, service, addFullSeat } = world();
+      addFullSeat.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        state.paid += 1;
+        return { status: "added" };
+      });
+
+      const answers = await Promise.all([
+        service.changeWithSeat(MAKE_ADMIN, ADMIN),
+        service.changeWithSeat(MAKE_ADMIN, ADMIN),
+      ]);
+
+      expect(addFullSeat).toHaveBeenCalledTimes(1);
+      expect(state.paid).toBe(3);
+      expect(answers.map((answer) => answer.status)).toEqual(["changed", "changed"]);
+      expect(state.roles.get(SAM)).toBe("ADMIN");
     });
   });
 
@@ -791,6 +824,28 @@ describe("MemberRoleSeatPurchaseService", () => {
       expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
         status: "applied",
       });
+    });
+
+    /** @scenario "A paid change whose role write landed but whose settling failed ends as applied" */
+    it("settles applied on retry when its own role write moved the version", async () => {
+      const { state, service, pay, pending } = await waiting();
+      pay("in_seat");
+      const settle = pending.settle.bind(pending);
+      vi.spyOn(pending, "settle").mockImplementationOnce(async (input) => {
+        if (input.status === "applied") throw new Error("database down");
+        return settle(input);
+      });
+
+      await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
+        "database down",
+      );
+      await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
+
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "applied",
+      });
+      expect(state.roles.get(SAM)).toBe("ADMIN");
+      expect(state.roleWrites).toBe(1);
     });
 
     it("refuses a change another organization asks about", async () => {

@@ -127,11 +127,6 @@ export class RepositoryStub extends InstanceAdminRepository {
     data: {},
   }));
   findUserById = vi.fn(async () => ({ data: adminOperator }));
-  findActiveSubscriptionIds = vi.fn(async (_input: { organizationId: string }) => [] as string[]);
-  findSubscriptionStates = vi.fn(
-    async (_input: { ids: string[] }) =>
-      [] as { id: string; organizationId: string; status: string }[],
-  );
 }
 
 export class AuditStub extends AdminAuditSink {

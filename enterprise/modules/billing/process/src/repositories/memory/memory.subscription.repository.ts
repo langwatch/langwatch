@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { SubscriptionAlreadyActiveError } from "@langwatch/enterprise-billing-contract";
+import {
+  holdsLivePlanSlot,
+  isTieredPlan,
+  type PlanSlotRow,
+  SubscriptionAlreadyActiveError,
+} from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
@@ -19,16 +24,6 @@ const ACTIVE = "ACTIVE";
 const CANCELLED = "CANCELLED";
 const FAILED = "FAILED";
 const PENDING = "PENDING";
-
-/** The tiered plans a seat-event migration cancels, as the Prisma twin lists them. */
-const TIERED_PLANS: readonly string[] = [
-  "LAUNCH",
-  "ACCELERATE",
-  "LAUNCH_ANNUAL",
-  "ACCELERATE_ANNUAL",
-  "PRO",
-  "GROWTH",
-];
 
 /**
  * The subscription aggregate, held in the shared store. Ordering matches the
@@ -176,7 +171,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       ({ id, organizationId, status, plan, stripeSubscriptionId }) => {
         if (organizationId !== input.organizationId || id === input.excludeSubscriptionId)
           return [];
-        if (!TIERED_PLANS.includes(plan) || stripeSubscriptionId === null) return [];
+        if (!isTieredPlan(plan) || stripeSubscriptionId === null) return [];
         return [{ id, stripeSubscriptionId, cancelledInRecords: status === CANCELLED }];
       },
     );
@@ -216,11 +211,24 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
         (subscription) =>
           subscription.organizationId === pending.organizationId &&
           subscription.id !== pendingId &&
-          subscription.status === ACTIVE &&
-          subscription.stripeSubscriptionId !== null &&
-          !TIERED_PLANS.includes(subscription.plan),
+          holdsLivePlanSlot(subscription),
       )
       .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
+  }
+
+  async findPlanSlots({ ids }: { ids: readonly string[] }): Promise<PlanSlotRow[]> {
+    return this.store.subscriptions.filter((subscription) => ids.includes(subscription.id));
+  }
+
+  async findLivePlanHolders({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<PlanSlotRow[]> {
+    return this.store.subscriptions.filter(
+      (subscription) =>
+        organizationIds.includes(subscription.organizationId) && holdsLivePlanSlot(subscription),
+    );
   }
 
   async adoptCheckout({

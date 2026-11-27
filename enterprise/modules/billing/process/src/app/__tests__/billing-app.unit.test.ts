@@ -694,3 +694,37 @@ describe("a seat change refused for two live subscriptions", () => {
     });
   });
 });
+
+describe("given a deployment off LangWatch Cloud whose organization holds a live linked plan", () => {
+  describe("when another module asks to activate a second linked plan for it", () => {
+    /** @scenario "Billing refuses another module's write that would start a second live plan" */
+    it("refuses with subscription_already_active naming the live plan, as the index does", async () => {
+      const { app, repositories } = billingApp({ isSaas: false, withStripe: false });
+      const live = await repositories.subscriptions.createPending({
+        organizationId: ACME,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      await repositories.subscriptions.linkStripeId({ id: live.id, stripeSubscriptionId: "s_1" });
+      await repositories.subscriptions.updateStatus({ id: live.id, status: "ACTIVE" });
+
+      await expect(
+        app.assertSubscriptionWriteAllowed({
+          writes: [
+            {
+              organizationId: ACME,
+              status: "ACTIVE",
+              plan: "ENTERPRISE",
+              stripeSubscriptionId: "s_2",
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "subscription_already_active",
+        meta: { organizationId: ACME, liveSubscriptionIds: [live.id] },
+      });
+      await expect(
+        app.assertSubscriptionWriteAllowed({ writes: [{ id: live.id, status: "ACTIVE" }] }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});

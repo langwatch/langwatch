@@ -1,22 +1,26 @@
 /**
- * What a Lite Member was trying to do, in the words an admin reads on their seat request,
- * from the permission resource the server refused (`evaluations:manage` names `evaluations`).
+ * What a Lite Member was trying to do, as the fixed seat request reason the server words for
+ * admins, from the permission resource refused (`evaluations:manage` names `evaluations`).
  */
-const REASON_BY_RESOURCE: Readonly<Record<string, string>> = {
-  evaluations: "run and save experiments",
-  experiments: "run and save experiments",
-  prompts: "save prompts",
-  datasets: "edit datasets",
-  workflows: "build workflows",
-  scenarios: "run scenarios",
-  annotations: "annotate traces",
-  triggers: "set up automations",
-  project: "change project settings",
-  analytics: "edit dashboards",
+import type { RequestAccessProps } from "@langwatch/organization-client";
+
+type SeatRequestReason = NonNullable<RequestAccessProps["reason"]>;
+
+const REASON_BY_RESOURCE: Readonly<Record<string, SeatRequestReason>> = {
+  evaluations: "run_experiments",
+  experiments: "run_experiments",
+  prompts: "save_prompts",
+  datasets: "edit_datasets",
+  workflows: "build_workflows",
+  scenarios: "run_scenarios",
+  annotations: "annotate_traces",
+  triggers: "set_up_automations",
+  project: "change_project_settings",
+  analytics: "edit_dashboards",
 };
 
-export const GENERIC_REQUEST_REASON = "use this feature";
+export const GENERIC_REQUEST_REASON: SeatRequestReason = "use_feature";
 
-export function liteMemberRequestReason(resource: string | undefined): string {
+export function liteMemberRequestReason(resource: string | undefined): SeatRequestReason {
   return (resource && REASON_BY_RESOURCE[resource]) || GENERIC_REQUEST_REASON;
 }

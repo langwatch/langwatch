@@ -349,6 +349,45 @@ describe("given the organization already holds an active Growth seat plan linked
   });
 });
 
+describe("given an older duplicate live plan the one-live-plan index exempts", () => {
+  describe("when the newer plan kept beside it was cancelled and a new seat checkout is paid", () => {
+    /** @scenario "A duplicate plan the index exempts still blocks a second plan" */
+    it("refuses the new plan, cancels and refunds it, and keeps the older one", async () => {
+      const w = world();
+      w.store.subscriptions.push(
+        growthRow({
+          id: "sub_db_exempt",
+          status: SubscriptionStatus.ACTIVE,
+          stripeSubscriptionId: "sub_stripe_exempt",
+        }),
+        growthRow({
+          id: "sub_db_kept",
+          status: SubscriptionStatus.CANCELLED,
+          stripeSubscriptionId: "sub_stripe_kept",
+        }),
+        growthRow({ id: "sub_db_new" }),
+      );
+      w.stripeSubscriptions.seed({
+        subscription: {
+          id: "sub_stripe_paid",
+          status: "active",
+          canceledAt: null,
+          billingThreshold: null,
+          items: [],
+          latestInvoice: { id: "in_new", status: "paid", hostedUrl: null },
+        },
+      });
+
+      await w.complete("sub_db_new");
+
+      expect(w.active().map((row) => row.id)).toEqual(["sub_db_exempt"]);
+      expect(w.stripeSubscriptions.cancellations).toEqual([
+        { subscriptionId: "sub_stripe_paid", prorate: false },
+      ]);
+    });
+  });
+});
+
 describe("given two seat checkouts for the organization are paid at the same moment", () => {
   describe("when the second one's plan is activated after the first went live past its check", () => {
     const raced = async () => {

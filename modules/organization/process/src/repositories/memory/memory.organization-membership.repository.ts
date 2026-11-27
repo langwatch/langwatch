@@ -823,6 +823,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     row.disabledAt = null;
     row.seatPendingSince = null;
     row.pendingSsoGrantId = input.pendingAdmissionId;
+    row.roleVersion = (row.roleVersion ?? 0) + 1;
+    row.lastRoleChangeId = null;
     this.applySeatTransition({ row, seat: input.seat });
     row.updatedAt = nowInstant();
     return true;
@@ -930,7 +932,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (row.disabledAt) throw new BindingMissingError();
     const roleVersion = row.roleVersion ?? 0;
     if (input.expectedRoleVersion !== undefined && input.expectedRoleVersion !== roleVersion) {
-      throw new RoleVersionMovedError(userId);
+      throw new RoleVersionMovedError(userId, row.lastRoleChangeId ?? null);
     }
 
     if (isAdminDemotion({ currentRole: row.role, role })) {
@@ -946,6 +948,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     row.role = role;
     row.billingOnly = false;
     row.roleVersion = roleVersion + 1;
+    row.lastRoleChangeId = input.roleChangeId ?? null;
     row.updatedAt = nowInstant();
     this.applySeatTransition({ row, seat: input.seat });
     this.applyDeveloperSeat({ organizationId, userId, role });

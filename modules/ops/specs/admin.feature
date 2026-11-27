@@ -202,26 +202,32 @@ Feature: Platform administration package boundary
     Then the write is refused with validation_error
     And no user row is written and nothing is audited
 
-  # An organization holds one active subscription; seat changes refuse two live in Stripe.
-  @unit
-  Scenario: The Back office refuses a second active subscription for an organization
-    Given an organization with an active subscription
-    When an operator creates another subscription for it as active, or reactivates a cancelled one
-    Then the write is refused with ops_subscription_already_active naming the active subscription
+  # An organization holds one live Stripe-backed plan; billing owns the rule and Cloud admin asks it.
+  @unit @integration
+  Scenario: Cloud admin refuses a second live Stripe-backed plan for an organization
+    Given an organization with an active seat plan linked to Stripe
+    When an operator creates another linked plan for it as active, or reactivates a cancelled one
+    Then billing refuses the write and it is answered with ops_subscription_already_active naming the live plan
     And nothing is written
 
   @unit @integration
-  Scenario: The database refuses a second linked active subscription the Back office check missed
-    Given an organization with an active subscription linked to Stripe
-    When a second linked active write for it reaches the database past the service's check
-    Then the write is refused with ops_subscription_already_active naming the active subscription
+  Scenario: The database refuses a second linked live plan the Cloud admin check missed
+    Given an organization whose linked plan goes live after billing answered the check
+    When the operator's second linked active plan for it reaches the database
+    Then billing is asked again and the write is refused with ops_subscription_already_active naming the plan that landed
     And nothing is written
 
-  @unit
-  Scenario: The Back office still edits an organization's one active subscription
-    Given an organization with an active subscription and a PENDING one
+  @unit @integration
+  Scenario: Cloud admin still edits an organization's live plan
+    Given an organization with an active seat plan linked to Stripe and a PENDING one
     When an operator edits the active one's limits, or activates the PENDING one after cancelling the other
     Then the write is saved
+
+  @unit @integration
+  Scenario: Cloud admin edits the tiered plan while the seat plan replacing it is live
+    Given an organization with an active seat plan and the active tiered plan it replaces, both linked to Stripe
+    When an operator edits the tiered plan
+    Then the write is saved, as billing and the database allow both live until the tiered plan is retired
 
   @unit
   Scenario: A bulk subscription edit that names no rows is refused

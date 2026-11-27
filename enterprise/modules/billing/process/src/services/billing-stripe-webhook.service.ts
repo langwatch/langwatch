@@ -10,6 +10,7 @@ import type { BillingWebhookHost } from "../channels/billing-webhook-host.channe
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
+import { readSeatInvoice } from "../rules/seat-invoice.rules.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
 import {
@@ -271,9 +272,12 @@ export class EEWebhookService implements WebhookService {
     return null;
   }
 
-  /** A paid mid-period change invoice may carry a seat a role change waits on (§9). */
+  /** A paid seat or mid-period change invoice may carry a seat a role change waits on (§9). */
   private async announceSeatInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
-    if (!this.seatInvoices || invoice.billing_reason !== "subscription_update") return;
+    const forSeats =
+      invoice.billing_reason === "subscription_update" ||
+      readSeatInvoice(invoice.metadata).seatInvoice;
+    if (!this.seatInvoices || !forSeats) return;
     const customerId =
       typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
     const organization = customerId

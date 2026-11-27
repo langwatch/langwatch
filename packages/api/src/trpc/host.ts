@@ -105,7 +105,8 @@ export type TrpcNamespace = unknown;
 /** This transport's own refusal copy: the answers the declared check gives. */
 const DENIALS: TrpcAuthorizationDenial = {
   membershipDisabled: () => new MembershipDisabledError(),
-  liteMemberRestricted: (resource: string) => new LiteMemberRestrictedError(resource),
+  liteMemberRestricted: (resource: string, permission?: string) =>
+    new LiteMemberRestrictedError(resource, permission),
   developerSeatRestricted: (resource: string) => new DeveloperSeatRestrictedError(resource),
 };
 

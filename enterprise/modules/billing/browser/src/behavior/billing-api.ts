@@ -21,6 +21,7 @@ import type {
   SeatLimitInfo,
   usageLimitsTrpc,
 } from "@langwatch/entitlement-contract";
+import type { inviteTrpc } from "@langwatch/organization-contract";
 
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
@@ -138,12 +139,7 @@ type BorrowedProcedures = {
       };
     };
     /** Refuses, writing nothing, invitations a seat is about to be bought for. */
-    checkInvites: {
-      mutation: {
-        input: OrganizationScope & { invites: { email: string; role: OrganizationUserRole }[] };
-        output: unknown;
-      };
-    };
+    checkInvites: ContractApiMap<typeof inviteTrpc>["invite"]["checkInvites"];
     createInvites: {
       mutation: {
         input: OrganizationScope & {

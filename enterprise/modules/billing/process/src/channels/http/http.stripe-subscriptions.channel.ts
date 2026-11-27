@@ -223,6 +223,13 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
       total: invoice.total,
       amountDue: invoice.amount_due,
       tax: invoice.total - (invoice.total_excluding_tax ?? invoice.total),
+      ...(invoice.lines?.data
+        ? {
+            prorations: invoice.lines.data
+              .filter((line) => line.proration)
+              .reduce((sum, line) => sum + line.amount, 0),
+          }
+        : {}),
       currency: invoice.currency ?? null,
     };
   }

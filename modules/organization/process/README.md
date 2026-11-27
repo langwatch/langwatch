@@ -2538,7 +2538,7 @@ interface Output {
 
 // seatRequest.approveWithSeat
 type Input = z.infer<typeof seatRequestScopeSchema>; // ../contract/src/features/seat-request/seat-request.ts:65
-// Output: seatApprovalWithSeatSchema, ../contract/src/features/seat-request/seat-request.ts:125
+// Output: seatApprovalWithSeatSchema, ../contract/src/features/seat-request/seat-request.ts:140
 type Output =
   | {
       status: "approved";
@@ -2552,13 +2552,13 @@ type Output =
     };
 
 // seatRequest.completeSeatApproval
-// Input: completeSeatApprovalInputSchema, ../contract/src/features/seat-request/seat-request.ts:136
+// Input: completeSeatApprovalInputSchema, ../contract/src/features/seat-request/seat-request.ts:151
 interface Input {
   organizationId: string;
   seatRequestId: string;
   paymentRef: string;
 }
-// Output: seatApprovalCompletionSchema, ../contract/src/features/seat-request/seat-request.ts:152
+// Output: seatApprovalCompletionSchema, ../contract/src/features/seat-request/seat-request.ts:167
 type Output =
   | {
       status: "approved";
@@ -2576,12 +2576,8 @@ type Input = z.infer<typeof seatRequestScopeSchema>; // ../contract/src/features
 type Output = z.infer<typeof seatRequestResolvedSchema>; // ../contract/src/features/seat-request/seat-request.ts:75
 
 // seatRequest.requestAccess
-// Input: requestSeatAccessInputSchema, ../contract/src/features/seat-request/seat-request.ts:91
-interface Input {
-  organizationId: string;
-  reason?: string;
-}
-// Output: myAccessRequestSchema, ../contract/src/features/seat-request/seat-request.ts:102
+type Input = z.infer<typeof requestSeatAccessInputSchema>; // ../contract/src/features/seat-request/seat-request.ts:106
+// Output: myAccessRequestSchema, ../contract/src/features/seat-request/seat-request.ts:117
 interface Output {
   status: "none" | "open" | "approved" | "declined";
   openedAt: number | null;
@@ -2590,12 +2586,12 @@ interface Output {
 
 // seatRequest.myAccessRequest
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-type Output = z.infer<typeof myAccessRequestSchema>; // ../contract/src/features/seat-request/seat-request.ts:102
+type Output = z.infer<typeof myAccessRequestSchema>; // ../contract/src/features/seat-request/seat-request.ts:117
 
 // seatRequest.myHeldMemberships
 // Input: inline, ../contract/src/features/seat-request/seat-request.trpc.ts:49
 type Input = Record<string, unknown>;
-// Output: heldMembershipsSchema, ../contract/src/features/seat-request/seat-request.ts:175
+// Output: heldMembershipsSchema, ../contract/src/features/seat-request/seat-request.ts:190
 interface Output {
   hasActiveMembership: boolean;
   held: {

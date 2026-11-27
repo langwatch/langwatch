@@ -98,6 +98,8 @@ export type BillingInvoicePreview = Readonly<{
   amountDue: number;
   /** The tax inside `total`, added on top or included; absent when there is none. */
   tax?: number;
+  /** The proration lines alone, before tax: no usage or other items; absent where not read. */
+  prorations?: number;
   currency: string | null;
 }>;
 

@@ -2662,6 +2662,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -12760,6 +12763,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract

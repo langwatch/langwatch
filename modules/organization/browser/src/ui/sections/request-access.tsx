@@ -7,6 +7,7 @@ import type { RequestAccessProps } from "@langwatch/organization-client";
 
 import OrganizationHostMount from "../../behavior/organization-host-mount.tsx";
 import { useAccessRequest } from "../../behavior/use-access-request.ts";
+import { fullSeatLifts } from "../../model/full-seat-lifts.ts";
 import { useHasOrganizationHost } from "../../model/organization-host.ts";
 
 /**
@@ -14,7 +15,9 @@ import { useHasOrganizationHost } from "../../model/organization-host.ts";
  * organization's host mount: without a host above, it mounts its own.
  */
 export default function RequestAccessAction(props: RequestAccessProps) {
-  if (useHasOrganizationHost()) return <RequestAccessButton {...props} />;
+  const hasHost = useHasOrganizationHost();
+  if (!fullSeatLifts(props.permission)) return null;
+  if (hasHost) return <RequestAccessButton {...props} />;
   return (
     <OrganizationHostMount>
       <RequestAccessButton {...props} />

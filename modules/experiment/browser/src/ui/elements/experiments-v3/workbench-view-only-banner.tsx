@@ -19,7 +19,7 @@ export function WorkbenchViewOnlyBanner({ access }: { access: WorkbenchAccess })
       status="info"
       placement="top"
       data-testid="workbench-view-only-banner"
-      action={<Lent of={RequestAccessToken} props={{ reason: "run and save experiments" }} />}
+      action={<Lent of={RequestAccessToken} props={{ reason: "run_experiments" }} />}
     >
       {viewOnlyNotice(access)}
     </Banner>

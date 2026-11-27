@@ -87,8 +87,8 @@ export class AdminSessionExpiredError extends HandledError {
 }
 
 /**
- * A Back office write would leave an organization with two ACTIVE subscriptions, which no seat
- * change can act on. The operator cancels or edits the live one first.
+ * A Cloud admin write would leave an organization a second live Stripe-backed plan, which billing
+ * refuses. The operator cancels or edits the live one first.
  */
 export class AdminSubscriptionAlreadyActiveError extends HandledError {
   declare readonly code: "ops_subscription_already_active";
@@ -109,7 +109,7 @@ export class AdminSubscriptionAlreadyActiveError extends HandledError {
 }
 
 /**
- * A subscription bulk edit named no rows. The one-active check reads the rows a write touches,
+ * A subscription bulk edit named no rows. The one-live-plan check reads the rows a write touches,
  * so a bulk edit must list its ids.
  */
 export class AdminSubscriptionIdsRequiredError extends HandledError {

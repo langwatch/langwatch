@@ -1,3 +1,4 @@
+import type { PlanSlotRow } from "@langwatch/enterprise-billing-contract";
 import type { Instant } from "@langwatch/time";
 export type BillingSubscriptionRecord = {
   id: string;
@@ -88,6 +89,12 @@ export abstract class BillingSubscriptionRepository {
   }): Promise<LiveUnlinkedSubscription[]>;
   /** The checkout row's organization's other ACTIVE non-tiered rows linked to Stripe. */
   abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
+  /** The rows with these ids, as the one-live-plan rule reads them; a missing id answers none. */
+  abstract findPlanSlots(input: { ids: readonly string[] }): Promise<PlanSlotRow[]>;
+  /** The rows taking the one live plan slot of each of these organizations. */
+  abstract findLivePlanHolders(input: {
+    organizationIds: readonly string[];
+  }): Promise<PlanSlotRow[]>;
   /**
    * The live row takes the checkout's plan, seats, retention and Stripe link, and the checkout
    * row is cancelled, in one step: a paid checkout lands on the plan the organization already

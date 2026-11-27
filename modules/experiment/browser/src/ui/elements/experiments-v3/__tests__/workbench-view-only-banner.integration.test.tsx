@@ -99,7 +99,7 @@ describe("the workbench for a role that cannot change it", () => {
       );
 
       const request = await screen.findByRole("button", {
-        name: "Request access to run and save experiments",
+        name: "Request access to run_experiments",
       });
       expect(screen.getByTestId("workbench-view-only-banner")).toContainElement(request);
     });

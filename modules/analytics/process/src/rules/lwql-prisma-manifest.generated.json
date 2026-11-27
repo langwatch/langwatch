@@ -3582,6 +3582,15 @@
           "documentation": "Moved by one on every role write. A role change waiting on a seat payment keeps the\nversion it was asked at and applies only while it still holds, so a later role\nwrite always wins. See role-change-seat.feature."
         },
         {
+          "name": "lastRoleChangeId",
+          "columnName": "lastRoleChangeId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The paid role change the newest role write applied, written with the version bump; null\nafter a direct role write. A retry that finds the version moved by its own change\nsettles it applied. See role-change-seat.feature."
+        },
+        {
           "name": "pendingSsoGrantId",
           "columnName": "pendingSsoGrantId",
           "type": "String",

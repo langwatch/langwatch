@@ -3,7 +3,7 @@
  * one action that sends it. Spec: modules/organization/specs/seat-requests.feature
  */
 
-import type { MyAccessRequest } from "@langwatch/organization-contract";
+import type { MyAccessRequest, SeatRequestReason } from "@langwatch/organization-contract";
 import { useState } from "react";
 
 import { useOrganizationHost } from "../model/organization-host.ts";
@@ -26,7 +26,7 @@ function currentStatus({
   return caughtUp ? read.status : sent.status;
 }
 
-export function useAccessRequest({ reason }: { reason?: string }) {
+export function useAccessRequest({ reason }: { reason?: SeatRequestReason }) {
   const host = useOrganizationHost();
   const showErrorToast = useShowErrorToast();
   const utils = api.useUtils();

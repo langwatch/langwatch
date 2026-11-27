@@ -205,6 +205,22 @@ Feature: paymentsim, a local stand-in for Stripe
       Then the subscription keeps two seats with no pending_update and the invoice is void
       And paying the void invoice is refused
 
+    @unit
+    Scenario: A pending update that expires unpaid takes the usage it billed with it
+      Given a subscription with two seats and 1500 metered events this period
+      And the customer's next charge needs their action
+      When a pending_if_incomplete change to three seats is held
+      Then the pending update invoice bills the events used so far
+      And after it expires unpaid the renewal bills the seats and no events
+
+    @unit
+    Scenario: An invoice of its own with auto_advance off waits for pay and keeps the cycle's usage
+      Given a subscription with two seats and 1500 metered events this period
+      And the customer's next charge needs their action
+      When an invoice with auto_advance off and one invoice item is finalized
+      Then it stays open with no charge attempted, and pay answers that the customer must act
+      And after it is voided the renewal still bills the seats and the events
+
   Rule: Usage metering
 
     @unit
