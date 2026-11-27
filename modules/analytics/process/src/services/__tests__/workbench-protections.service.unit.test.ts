@@ -3,6 +3,7 @@
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import { builtinRoleGrants, type AuthzApi } from "@langwatch/authz-contract";
 import {
+  EMPTY_AUDIENCE,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
@@ -78,6 +79,17 @@ function bothRestrictedToAdmins(): dataPrivacyContractModule.ResolvedDataPrivacy
       ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
       input: adminsOnly,
       output: adminsOnly,
+    },
+  };
+}
+
+/** Input restricted to the project owner; everything else as the platform default. */
+function inputRestrictedToProjectOwner(): dataPrivacyContractModule.ResolvedDataPrivacy {
+  return {
+    ...PLATFORM_DEFAULT_DATA_PRIVACY,
+    categories: {
+      ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+      input: { disposition: "restrict", audience: { ...EMPTY_AUDIENCE, projectOwner: true } },
     },
   };
 }
@@ -296,18 +308,7 @@ describe("resolveMemberProtections", () => {
     });
 
     it("shows captured content restricted to the owner to the member who owns the project", async () => {
-      const ownerOnly = {
-        disposition: "restrict" as const,
-        audience: {
-          ...bothRestrictedToAdmins().categories.input.audience,
-          admins: false,
-          projectOwner: true,
-        },
-      };
-      const { dataPrivacy } = dataPrivacyResolving(async () => ({
-        ...PLATFORM_DEFAULT_DATA_PRIVACY,
-        categories: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories, input: ownerOnly },
-      }));
+      const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedToProjectOwner());
       const { projects } = projectsWith({
         ...projectWith({ id: "project-1", lwqlKey: "lwql-secret" }),
         ownerUserId: "user-1",
@@ -324,20 +325,9 @@ describe("resolveMemberProtections", () => {
 
     /** @scenario "Owner-only content stays hidden when a read spans a project the viewer does not own" */
     it("hides owner-only content when the read also spans a project the member does not own", async () => {
-      const ownerOnly = {
-        disposition: "restrict" as const,
-        audience: {
-          ...bothRestrictedToAdmins().categories.input.audience,
-          admins: false,
-          projectOwner: true,
-        },
-      };
       const dataPrivacy = createApiFixture<DataPrivacyApi>(
         {
-          getResolvedForProjects: async () => ({
-            ...PLATFORM_DEFAULT_DATA_PRIVACY,
-            categories: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories, input: ownerOnly },
-          }),
+          getResolvedForProjects: async () => inputRestrictedToProjectOwner(),
         },
         "workbench data privacy",
       );
@@ -368,18 +358,7 @@ describe("resolveMemberProtections", () => {
     });
 
     it("hides owner-only content when the project owner read throws", async () => {
-      const ownerOnly = {
-        disposition: "restrict" as const,
-        audience: {
-          ...bothRestrictedToAdmins().categories.input.audience,
-          admins: false,
-          projectOwner: true,
-        },
-      };
-      const { dataPrivacy } = dataPrivacyResolving(async () => ({
-        ...PLATFORM_DEFAULT_DATA_PRIVACY,
-        categories: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories, input: ownerOnly },
-      }));
+      const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedToProjectOwner());
       const projects = createApiFixture<ProjectApi>(
         { findById: () => Promise.reject(new Error("projects unreadable")) },
         "workbench projects",
@@ -595,21 +574,7 @@ describe("resolveRunCaller", () => {
 
   describe("given input restricted to the project owner and a caller who owns the project", () => {
     it("shows the owner the input, read off the project it already loaded", async () => {
-      const ownerOnlyInput = {
-        ...PLATFORM_DEFAULT_DATA_PRIVACY,
-        categories: {
-          ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
-          input: {
-            disposition: "restrict" as const,
-            audience: {
-              ...bothRestrictedToAdmins().categories.input.audience,
-              admins: false,
-              projectOwner: true,
-            },
-          },
-        },
-      };
-      const { dataPrivacy } = dataPrivacyResolving(async () => ownerOnlyInput);
+      const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedToProjectOwner());
       const { projects, findById } = projectsWith({
         ...projectWith({ id: "project-1", lwqlKey: "lwql-secret" }),
         ownerUserId: "user-1",

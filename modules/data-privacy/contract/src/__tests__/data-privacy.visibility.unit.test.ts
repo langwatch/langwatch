@@ -37,6 +37,15 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
   };
 }
 
+/** The three role permissions a viewer holds at one project, named so a call reads plainly. */
+function permissions(held: { view: boolean; update: boolean; manage: boolean }) {
+  return {
+    "traces:view": held.view,
+    "traces:update": held.update,
+    "project:manage": held.manage,
+  };
+}
+
 describe("isContentVisible", () => {
   describe("given content restricted to admins", () => {
     /**
@@ -164,11 +173,6 @@ describe("needsAudienceFacts and isContentVisibleToPublic", () => {
 });
 
 describe("viewerFactsFrom", () => {
-  const permissions = (held: { view: boolean; update: boolean; manage: boolean }) => ({
-    "traces:view": held.view,
-    "traces:update": held.update,
-    "project:manage": held.manage,
-  });
   const facts = (held: { view: boolean; update: boolean; manage: boolean }) =>
     viewerFactsFrom({
       held: permissions(held),
@@ -214,17 +218,11 @@ describe("viewerFactsFrom", () => {
 });
 
 describe("viewerFactsFrom across the projects a read spans", () => {
-  const permissions = (manage: boolean, update: boolean, view = true) => ({
-    "traces:view": view,
-    "traces:update": update,
-    "project:manage": manage,
-  });
-
   /** @scenario "Admins-only content stays hidden when a read spans a project where the viewer is no admin" */
   it("counts an admin only where they are admin at every project", () => {
     const viewer = viewerFactsFrom({
-      held: permissions(true, true),
-      heldElsewhere: [permissions(false, true)],
+      held: permissions({ view: true, update: true, manage: true }),
+      heldElsewhere: [permissions({ view: true, update: true, manage: false })],
       isProjectOwner: false,
       groupIds: [],
     });
@@ -235,8 +233,8 @@ describe("viewerFactsFrom across the projects a read spans", () => {
 
   it("keeps the read's own membership when they hold no role at the other project", () => {
     const viewer = viewerFactsFrom({
-      held: permissions(true, true),
-      heldElsewhere: [permissions(false, false, false)],
+      held: permissions({ view: true, update: true, manage: true }),
+      heldElsewhere: [permissions({ view: false, update: false, manage: false })],
       isProjectOwner: false,
       groupIds: [],
     });
