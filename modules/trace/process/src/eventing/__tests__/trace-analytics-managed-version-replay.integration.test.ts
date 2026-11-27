@@ -1,8 +1,3 @@
-/**
- * The managed-version replay step over the real replay engine, fold and store (log and table in
- * memory): a pre-00133 row inside its 122 days gains its trace's managed prompt version, an older
- * row is left as it was, and a live write the replay defers still ends as the latest version.
- */
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import {
   type Event,
@@ -17,6 +12,12 @@ import {
   createTenantId,
   sealFoldProjection,
 } from "@langwatch/eventing";
+/**
+ * The managed-version replay step over the real replay engine, fold and store (log and table in
+ * memory): a pre-00133 row inside its 122 days gains its trace's managed prompt version, an older
+ * row is left as it was, and a live write the replay defers still ends as the latest version.
+ */
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 import type { LaneReplayer, MigrationStep } from "@langwatch/upgrade/step";
@@ -324,6 +325,7 @@ function deployment({
   const log = events.map(logged);
   const hooks: { beforeStream: () => Promise<void> } = { beforeStream: async () => {} };
   const service = new ReplayService({
+    claims: IDLE_REPLAY_CLAIMS_INDEX,
     eventSource: eventLog({ events: log, beforeStream: () => hooks.beforeStream() }),
     redis,
   });

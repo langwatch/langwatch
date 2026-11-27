@@ -62,6 +62,7 @@ describe("PERMISSION_CATEGORIES", () => {
       "braids:manage",
       "spans:braided",
       "opsRead:view",
+      "opsCopy:create",
     ]);
 
     const neverOnAKeyInCategory = neverOnAKey.filter((permission) => owners.has(permission));

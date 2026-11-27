@@ -126,7 +126,7 @@ async function bundleForLicenseServices(connectServices: string[]) {
     budgetDecisions: memoryGatewayService({ store: MemoryGatewayStore.create({}), projects })
       .service,
     modelProviders: createApiFixture<ModelProviderApi>({
-      getCustomKeys: async () => {
+      getGatewayCustomKeys: async () => {
         throw new Error("a managed key's bundle never reads a customer row");
       },
     }),

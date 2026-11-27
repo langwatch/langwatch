@@ -1,3 +1,10 @@
+import {
+  type ReplayEvent,
+  ReplayService,
+  projectionLaneReplayer,
+  replayProjectionsOf,
+  sealPipelineDefinition,
+} from "@langwatch/eventing";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -6,13 +13,7 @@
  * repositories. The per-fact memory twin is the oracle, and no channel is ever reachable.
  * Spec: enterprise/modules/nurturing/specs/project-facts-copies.feature
  */
-import {
-  type ReplayEvent,
-  ReplayService,
-  projectionLaneReplayer,
-  replayProjectionsOf,
-  sealPipelineDefinition,
-} from "@langwatch/eventing";
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import {
   PERSONAL_TEAM_CREATED_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
@@ -260,6 +261,7 @@ function deploy({
   });
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: log,
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

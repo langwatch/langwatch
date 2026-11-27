@@ -3036,6 +3036,34 @@ const presentations = {
     describe: () =>
       "The development secrets source could not be read. Sign in to it and try again.",
   },
+  staff_copy_source_invalid: {
+    title: "The copy's source session is not valid",
+    describe: () =>
+      "An organization copy names its source session by that session's own ops token, and this one was not recognised.",
+  },
+  staff_copy_scope_missing: {
+    title: "This approval does not cover a copy",
+    describe: () =>
+      "A copy needs one approval for copy:source on the source organization and one for copy:target on the target, each naming the other organization.",
+  },
+  staff_copy_same_organization: {
+    title: "The source and target are the same organization",
+    describe: () => "A copy goes from one organization into a different one.",
+  },
+  staff_copy_approvals_mismatch: {
+    title: "The two approvals do not belong together",
+    describe: () => "Both approvals of a copy must come from the same agent and the same operator.",
+  },
+  staff_copy_direction_mismatch: {
+    title: "The two approvals name different copies",
+    describe: () =>
+      "Each approval of a copy names the other organization, and these two do not name each other.",
+  },
+  staff_copy_window_closed: {
+    title: "The source approval is no longer live",
+    describe: () =>
+      "Both approvals of a copy must be live at the same time, and the source one expired, ended or was revoked.",
+  },
   staff_access_unavailable: {
     title: "Staff access is not available here",
     describe: () =>
@@ -4470,6 +4498,12 @@ const presentations = {
       return `${need} Ask an administrator, or set the rule on a scope you manage.`.trim();
     },
   },
+  data_privacy_api_key_add_forbidden: {
+    // ADR-208: the caller may edit this rule and keep its keys; only adding one is refused.
+    title: "Only an organization admin can add an API key",
+    describe: () =>
+      "You can still change this rule and keep the keys it names. Ask an organization admin to add the key.",
+  },
   data_privacy_config_invalid: {
     // `meta.reason` is the service's own line naming the offending pattern.
     // It is the only part the reader can act on, so it is what they read.
@@ -4968,6 +5002,10 @@ const presentations = {
     describe: () =>
       "Only active members of this organization can get a test digest. Pick someone else.",
   },
+  digest_impersonation_refused: {
+    title: "Can't change this while impersonating",
+    describe: () => "Email preferences belong to the person. Stop impersonating to change them.",
+  },
   digest_link_invalid: {
     title: "This link isn't valid",
     describe: () => "It may have expired or been changed. Use the link from the latest email.",
@@ -4984,10 +5022,6 @@ const presentations = {
   digest_operator_address_missing: {
     title: "Your account has no email address",
     describe: () => "Add an email address to your account, then send the test again.",
-  },
-  digest_organization_not_enrolled: {
-    title: "Organization not enrolled",
-    describe: () => "Enrol this organization in the digest before sending a test.",
   },
   digest_member_unsubscribed: {
     title: "Member opted out",

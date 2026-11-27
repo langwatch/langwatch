@@ -59,6 +59,15 @@ export class StaffAccessApprovalAuditService {
           scopes: row.scopes,
           spendApproved,
           machine: row.machine,
+          ...(row.counterpartOrganizationId
+            ? {
+                copy: {
+                  counterpartOrganizationId: row.counterpartOrganizationId,
+                  counterpartOrganizationName: row.counterpartOrganizationName,
+                  grant: row.copyGrant,
+                },
+              }
+            : {}),
         },
       });
     } catch (error) {

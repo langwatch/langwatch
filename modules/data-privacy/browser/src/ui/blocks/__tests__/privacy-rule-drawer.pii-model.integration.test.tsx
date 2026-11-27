@@ -39,13 +39,15 @@ function renderDrawer({ piiRedactionModelOffered }: { piiRedactionModelOffered: 
       editingRule={null}
       onClose={vi.fn()}
       available={available}
-      audienceOptions={{ groups: [] }}
+      audienceOptions={{ groups: [], apiKeys: [], canAddApiKeys: false }}
       effectiveTeam={baseline}
       effectiveOrganization={baseline}
       projectId="proj-1"
       isSaving={false}
       piiRedactionModelOffer={
-        piiRedactionModelOffered ? { kind: "model", free: false, split: false } : null
+        piiRedactionModelOffered
+          ? { kind: "model", free: false, split: false, currency: "USD" }
+          : null
       }
       onSave={vi.fn()}
       scopePicker={() => <div data-testid="scope-picker" />}

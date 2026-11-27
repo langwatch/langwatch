@@ -1,4 +1,6 @@
+import { EVENT_SOURCING_QUEUE_KEY_NAME } from "@langwatch/eventing";
 import {
+  backfillTenantClaims,
   CachedLuaScript,
   DISCARD_FROM_DLQ_LUA,
   DLQ_INDEX_PRUNE_LUA,
@@ -488,6 +490,23 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /** Each queue's total-pending counter, floored by its ready groups, as the drain audit reads. */
+  async fillTenantClaims({
+    cursor,
+    maxScanCalls,
+  }: {
+    cursor: string;
+    maxScanCalls: number;
+  }): Promise<{ cursor: string; listed: number }> {
+    // Replay refuses a Cluster, the index's only reader, so a Cluster has nothing to fill.
+    if (isClusterClient(this.redis)) return { cursor: "0", listed: 0 };
+    return backfillTenantClaims({
+      redis: this.redis,
+      queueName: EVENT_SOURCING_QUEUE_KEY_NAME,
+      cursor,
+      maxScanCalls,
+    });
+  }
+
   async countWaitingJobs(): Promise<number> {
     const queueNames = await this.discoverQueueNames();
     const counts = await Promise.all(

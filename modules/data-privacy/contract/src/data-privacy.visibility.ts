@@ -126,6 +126,16 @@ export function isContentVisible(eff: EffectiveRestriction, viewer: ViewerFacts)
 export function isContentVisibleToPublic(eff: EffectiveRestriction): boolean {
   return eff.disposition === "capture";
 }
+/** ADR-208: a key sees restricted content as Admins do, and only where the audience names it. */
+export function isContentVisibleToKey(
+  eff: EffectiveRestriction,
+  key: { apiKeyId: string },
+): boolean {
+  if (eff.disposition !== "restrict") return isContentVisibleToPublic(eff);
+  const { audience } = eff;
+  const adminsSee = audience.admins || audience.allMembers;
+  return adminsSee && audience.apiKeyIds.includes(key.apiKeyId);
+}
 export function needsAudienceFacts(eff: EffectiveRestriction): boolean {
   return eff.disposition === "restrict" && eff.audience.groupIds.length > 0;
 }

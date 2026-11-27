@@ -126,6 +126,11 @@ const RESOURCE_COPY = {
     blurb: "The cross-organization reads an approved staff agent may make.",
     area: "Platform operations",
   },
+  opsCopy: {
+    label: "Staff organization copy",
+    blurb: "Copying projects from one organization to another by an approved staff agent.",
+    area: "Platform operations",
+  },
   auditLog: {
     label: "Audit log",
     blurb: "The record of what was done, and by whom.",

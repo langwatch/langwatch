@@ -70,7 +70,7 @@ export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
       }}
       whatsNew={props.whatsNew}
       reason="You use coding agents with LangWatch."
-      unsubscribeUrl={props.unsubscribeUrl}
+      preferencesUrl={props.preferencesUrl}
     >
       <DetailTable
         rows={[
@@ -94,7 +94,7 @@ export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
 };
 
 const links = {
-  unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+  preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
   weekUrl: "https://app.langwatch.ai/api/digest/c/tk_agent3Wf8",
 } as const;
 

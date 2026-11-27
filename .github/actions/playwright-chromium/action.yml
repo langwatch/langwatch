@@ -1,0 +1,36 @@
+# The Playwright Chromium the docs build, browser checks and audit drive, with its cache.
+#
+# Usage:
+#   - uses: ./.github/actions/playwright-chromium
+name: playwright-chromium
+description: Restore the cached Playwright Chromium and install it with its system packages.
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/apt-ubuntu-sources
+    - name: Read the Playwright version
+      id: playwright
+      shell: bash
+      run: |
+        version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: Cache the Playwright browser
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+    # --with-deps installs from the runner image's apt index, which goes stale when Ubuntu
+    # publishes a security update: the old package version then 404s. A fresh index first,
+    # and one retry on a new index, covers a mirror that is still syncing.
+    # Spec: specs/ci/docs-playwright-chromium.feature
+    - name: Install Chromium and its system packages
+      id: playwright-install
+      shell: bash
+      run: |
+        install() {
+          sudo timeout 90 apt-get -o Acquire::Retries=3 update \
+            || echo "::warning::apt-get update failed, installing from the current index"
+          timeout 600 pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+        }
+        install || { echo "::warning::Playwright install failed, retrying once in 30s"; sleep 30; install; }

@@ -1,0 +1,119 @@
+# ADR-002: Staff copy an organization's setup through two approvals
+
+**Status:** Accepted
+
+**Behaviour:** [Organization copy](../specs/staff-access-org-copy.feature).
+Builds on [ADR-001](./001-package-boundary.md) and
+[ADR-202](../../../dev/docs/adr/202-ops-agent-access.md).
+
+## Context
+
+Staff set up demo organizations for prospects by copying projects from an
+existing organization. Without a server operation this needs database access or
+scripts, which leave no trail in either organization and skip every owner's
+rules.
+
+## Decision
+
+The copy is an ops operation of the `staff-access` module:
+`POST /api/staff-access/ops/copies`, asked as the platform permission
+`opsCopy:create` and answered only for a session approved with the
+`copy:target` scope.
+
+- **Two approvals, one per organization, each naming the other.** A copy side
+  is its own scope, approved alone: `copy:source` on the source organization
+  and `copy:target` on the target. Each request names its organization and the
+  other organization of the copy (`counterpartOrganization`). The approval page
+  shows the direction ("From ACME into Globex") and the passkey signs the other
+  organization, so a live session pairs only with the copy it was approved
+  for. The bearer is the target session; the body carries the source session's
+  ops token. Both must be live, redeemed by the same enrolled agent of the same
+  operator, pinned to the same address, and name each other. Each approval
+  needs the organization's name typed.
+- **The target grant is signed.** `copy:target` grants exactly what a copy
+  creates (`STAFF_COPY_TARGET_PERMISSIONS`: `project:create`,
+  `evaluations:create`, `prompts:create`,
+  `prompts:update`, `datasets:create`). The list is stored on the request row
+  (`copyGrant`) when the request is made. The approval page shows that stored
+  list, the passkey signs it, and the run checks each item against it before
+  making it, so a deploy that changes the constant never widens a request
+  already made. An item outside the grant is skipped with `outside_copy_grant`
+  when the copy is planned, so a dry run reports what a real run would make.
+- **No organization key.** Copy scopes are platform scopes: redeeming either
+  side answers only an ops token. The server reads the source itself through
+  the owners' APIs, so the agent never holds a key that reads the source's
+  traces.
+- **Trail and audit first.** Before anything is made, each session gets a trail
+  row and each organization's audit log gets a row with the approver, the
+  reason and the planned items: `staffAccess.orgCopyPlanned` on a dry run,
+  `staffAccess.orgCopy` before a real run (which also records that copied
+  monitors start paused). A failed write copies nothing. The source ops token
+  is never written to a trail row, an audit row or an answer.
+- **A revoke stops a running copy.** Before each item the run rereads both
+  approvals. Once either is revoked, lapsed or ended, nothing more is made,
+  the remaining items are reported `stopped` and the report says why. A prompt
+  checks both approvals again before each later version, and one that stops
+  between versions keeps what it wrote as `prompt_versions_incomplete`. Each
+  audit log is then sent a `staffAccess.orgCopyStopped` row naming every target
+  the run made, failed items that hold a target included,
+  written on its own in up to three attempts; a side whose row still fails is
+  logged, and the other organization keeps its row. This last row is best
+  effort: the trail rows and the `staffAccess.orgCopy` rows written before the
+  run already name the copy in both organizations.
+- **An allowlist.** A copy carries projects, evaluators, monitors (created
+  paused, in the same write),
+  prompts with every version (demonstrations keep their inline rows; a dataset
+  they name in the source organization is left behind), and ready datasets.
+  It never carries secrets,
+  API keys, model providers, members, roles, SSO, billing, licence or usage.
+  A kind not on the list is not read at all. Projects are listed through
+  `ProjectApi.listByOrganization`, whose rows hold the project's own keys; the
+  copy keeps them in memory for the request, passes only the name, language
+  and framework on, and writes no project field beyond id and name to a report,
+  trail or audit row. Copies start on the target's defaults: project
+  settings (default and embeddings models, PII level) are the target
+  project's, an evaluator resolves the target project's models, and a monitor
+  pinned to an evaluator label runs its copied evaluator's only version,
+  since the source's labelled versions are not copied.
+- **Owners' APIs only.** Each kind is read and created through its owner's
+  `*Api` (`ProjectApi`, `EvaluatorApi`, `MonitorApi`, `PromptApi`,
+  `DatasetApi`, `OrganizationApi`). The copy uses plain create operations, not
+  the owners' lineage copy operations, so no row in the target points back at
+  the source organization.
+- **Idempotent by a ledger.** `StaffAccessCopyLedger` records each source item
+  and the target item made from it, unique on target organization, kind and
+  source id. The row is reserved before the owner creates the target and
+  completed with its id after, so a source item never gets two targets: a
+  concurrent run loses the reservation and makes nothing, a make that fails
+  releases it, and a reservation left unfinished by a crash or a failed write
+  is reported `copy_interrupted` on every rerun instead of made again. Only an
+  owner's refusal by name (a handled error below 500) releases the
+  reservation, since any other failure may come after the target exists. An
+  owner that can fail after it created the target never throws such a refusal
+  then: `DatasetApi.copyDataset` throws `DatasetCopyInterruptedError` naming
+  the new dataset, and the copy completes the row with it and
+  `incomplete: dataset_copy_incomplete`. A
+  prompt whose later version the owner refuses keeps its row with
+  `incomplete: prompt_versions_incomplete`, and every rerun reports it as
+  `already_copied` with that reason: the missing versions are not appended.
+  Later versions are written with `PromptApi.updatePrompt`, which merges the
+  fields it is given into the previous version. A source version that drops an
+  optional setting its predecessor had (inline demonstrations, a temperature)
+  therefore keeps the predecessor's value in the copy, since that write has no
+  way to clear a field. Copying each version exactly needs a prompt write that
+  sets a version's whole configuration; that is a new `PromptApi` operation for
+  the prompt module to rule on, and the copy uses it once it exists. A rerun reports earlier items as
+  `already_copied` and makes only new ones. A dry run plans and creates nothing.
+
+## Consequences
+
+The copy runs inside the request. A very large source organization can outrun
+the request timeout; a rerun continues where the ledger stopped, except for
+items reported `copy_interrupted` or incomplete, which need a look by hand: no
+operation clears a `copy_interrupted` reservation yet, and one would be its own
+ops function with its own approval. A transient failure (an owner timeout, a
+dropped connection) keeps its reservation on purpose: the owner may have
+committed the target before the failure reached the copy, and releasing it
+would let the rerun make a second target, which the ledger exists to prevent. Workflows,
+scenarios, agents, dashboards, triggers and ClickHouse data (traces, runs) are
+specified as `@unimplemented` and need their owners' APIs first.

@@ -635,6 +635,77 @@ async function readClusterReplicas({
   return replicas;
 }
 
+export interface RetryWhileReplicasMissingDeps<T> {
+  /** One attempt: a goose pass or a write that waits for every replica. */
+  run: () => Promise<T>;
+  waitSeconds: number;
+  /** The phase a failure past `waitSeconds` reports. */
+  phase: MigrationError["phase"];
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+  log?: (message: string) => void;
+}
+
+const TOO_FEW_REPLICAS =
+  /Number of alive replicas \((\d+)\) is less than requested quorum \((\d+)(?:\/(\d+))?\)/;
+const REPLICA_RETRY_MAX_MS = 10_000;
+
+/** What a TOO_FEW_LIVE_REPLICAS (Code 285) refusal says about the replicas, else null. */
+export function describeTooFewReplicas(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = TOO_FEW_REPLICAS.exec(message);
+  if (match) {
+    const [alive, required] = [Number(match[1]), Number(match[2])];
+    return `${alive} of ${required} replicas are alive, ${required - alive} missing`;
+  }
+  return /TOO_FEW_LIVE_REPLICAS|Code: 285\b/.test(message)
+    ? "too few replicas are alive (counts unknown)"
+    : null;
+}
+
+/**
+ * Runs `run` again while ClickHouse refuses a write for a replica still bringing a table up
+ * (TOO_FEW_LIVE_REPLICAS); goose skips the versions it already applied. Logs each wait; past
+ * `waitSeconds` fails naming how many replicas are missing. Any other failure is thrown.
+ */
+export async function retryWhileReplicasMissing<T>({
+  run,
+  waitSeconds,
+  phase,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = Date.now,
+  log = (message) => logger.info(message),
+}: RetryWhileReplicasMissingDeps<T>): Promise<T> {
+  const startedAt = now();
+  const deadline = startedAt + waitSeconds * 1000;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      const counts = describeTooFewReplicas(error);
+      if (counts === null) throw error;
+      const current = now();
+      if (current >= deadline) {
+        throw new MigrationError(
+          `ClickHouse refused a write that waits for every replica after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): ${counts}`,
+          phase,
+          error instanceof Error ? error : undefined,
+        );
+      }
+      const waitMs = Math.min(
+        WAIT_RETRY_INTERVAL_MS * 2 ** (attempt - 1),
+        REPLICA_RETRY_MAX_MS,
+        deadline - current,
+      );
+      const elapsed = Math.round((current - startedAt) / 1000);
+      log(
+        `ClickHouse refused a write that waits for every replica (${counts}); retrying in ${Math.round(waitMs / 1000)}s (${elapsed}s of ${waitSeconds}s)`,
+      );
+      await sleep(waitMs);
+    }
+  }
+}
+
 /** On a cluster: counts the replicas goose's writes wait for and catches each one up. */
 async function syncClusterVersionTable({
   client,
@@ -674,7 +745,11 @@ async function insertInitialVersion({
 }
 
 // Must run BEFORE goose so goose_db_version is created with correct engine for replication
-async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): Promise<void> {
+async function bootstrapDatabase(
+  config: ClickHouseConfig,
+  verbose: boolean | undefined,
+  waitSeconds: number,
+): Promise<void> {
   logger.debug(
     { database: config.database, clusterName: config.clusterName },
     "Bootstrapping ClickHouse database",
@@ -733,7 +808,11 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
     );
 
     await syncClusterVersionTable({ client, config, verbose });
-    await insertInitialVersion({ client, config, verbose });
+    await retryWhileReplicasMissing({
+      run: () => insertInitialVersion({ client, config, verbose }),
+      waitSeconds,
+      phase: "bootstrap",
+    });
   });
 
   // Check if 'local_primary' storage policy exists on this CH instance.
@@ -977,7 +1056,11 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   await preflight(config, options);
 
   // Bootstrap creates the database and goose_db_version table with correct engines
-  await bootstrapDatabase(config, options.verbose);
+  await bootstrapDatabase(
+    config,
+    options.verbose,
+    options.waitSeconds ?? DEFAULT_CLICKHOUSE_WAIT_SECONDS,
+  );
 
   // On a server that enforces the AggregatingMergeTree dimension check, the
   // merged history runs first with the compatibility setting relaxed.
@@ -992,11 +1075,16 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
     requiresDimensionCompat: config.requiresDimensionCompat === true,
     upTo: options.upTo,
   })) {
-    result = await executeGoose({
-      command: pass.command,
-      config,
-      options,
-      allowDimensionsOutsideSortingKey: pass.allowDimensionsOutsideSortingKey,
+    result = await retryWhileReplicasMissing({
+      run: () =>
+        executeGoose({
+          command: pass.command,
+          config,
+          options,
+          allowDimensionsOutsideSortingKey: pass.allowDimensionsOutsideSortingKey,
+        }),
+      waitSeconds: options.waitSeconds ?? DEFAULT_CLICKHOUSE_WAIT_SECONDS,
+      phase: "migrate",
     });
   }
   logger.info("ClickHouse migrations completed.");

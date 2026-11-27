@@ -22,7 +22,8 @@ Feature: Coding agent transcript over REST and CLI
 
   # An API key carries no user session, so the data-privacy policy resolves the
   # caller as a public viewer: it may read a category the policy captures, and
-  # nothing it restricts or drops. The transcript is derived from log records
+  # nothing it restricts or drops, unless a rule's audience names the key, where
+  # it reads that restricted content as Admins do (ADR-208). The transcript is derived from log records
   # whose event names each agent spells its own way, so these hold for every
   # agent, not only the one whose spelling the gate was first written against.
 

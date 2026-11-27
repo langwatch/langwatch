@@ -386,6 +386,22 @@ One row's decrypted custom keys, for a peer with no session to authorize with (t
 getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
 ```
 
+#### `getGatewayCustomKeys`
+
+The keys the AI gateway runs a row with: its stored keys, plus for a managed Bedrock organization the customer role's session and private endpoint (as the runtime endpoint key).
+
+```typescript
+getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+```
+
+#### `getGatewayKeysEpoch`
+
+Names the window the organization's minted managed sessions belong to, so the gateway's config version moves before a session expires. Empty for an organization with none.
+
+```typescript
+getGatewayKeysEpoch(input: { organizationId: string }): string;
+```
+
 ## REST transport
 
 ### `modelDefaultsRest`

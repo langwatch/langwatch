@@ -353,7 +353,7 @@ jobs:
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
-      - uses: langwatch/langwatch-pr-review-bot@87e7c462dfe93e9144b890053542870dc8291782 # main 2026-11-25
+      - uses: langwatch/langwatch-pr-review-bot@fbe577791f28fcb071ca68bbe904afc39e06164a # main 2026-11-26
         with:
           slack_notify: "false"
           # Bounds each of the bot's two claude calls (review and brief); the

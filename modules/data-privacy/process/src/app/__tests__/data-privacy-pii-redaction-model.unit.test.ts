@@ -3,12 +3,14 @@
  * change at all: an organization without the flag, and a deployment that names no model; and for
  * the metrics a model call must keep apart from Presidio's.
  */
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -171,6 +173,10 @@ describe("given the PII redaction model wired into the module", () => {
           }),
           permissions,
           entitlements,
+          // An admin accepted the price, so the batch is routed to the model it refuses.
+          organizations: createApiFixture<OrganizationApi>({
+            isPiiRedactionModelAccepted: async () => true,
+          }),
         },
         settings: { langevalsEndpoint: LANGEVALS },
         channels: async () => ({
@@ -216,6 +222,7 @@ describe("given the PII redaction model wired into the module", () => {
           ...(await HttpDataPrivacyChannels.create({
             config,
             secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+            bound: { apiKeys: createApiFixture<ApiKeyApi>() },
           })),
           presidio,
           dlp: MemoryGoogleDlpChannel.create(),

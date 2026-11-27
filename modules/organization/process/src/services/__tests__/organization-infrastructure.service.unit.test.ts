@@ -123,6 +123,12 @@ class StubRepository extends OrganizationRepository {
 
   async recordInstantEvalsOptIn(): Promise<void> {}
 
+  async isPiiRedactionModelAccepted(): Promise<boolean> {
+    return false;
+  }
+
+  async recordPiiRedactionModelAcceptance(): Promise<void> {}
+
   async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
     return this.guidedOnboarding;
   }

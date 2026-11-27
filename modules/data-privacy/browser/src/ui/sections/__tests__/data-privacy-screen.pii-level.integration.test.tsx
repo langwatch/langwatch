@@ -75,6 +75,25 @@ describe("given the Data Privacy page", () => {
     });
   });
 
+  describe("when the flag is on and the organization is on a euro Growth subscription", () => {
+    /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
+    it("shows Strict's euro price and asks at it", async () => {
+      page({ flagOn: true, billingCurrency: "EUR" });
+
+      expect(screen.getByTestId("pii-redaction-model-price").textContent).toContain(
+        "€0.425per 1M characters excl. VAT, pay as you go",
+      );
+      expect(screen.queryByText(/\$0\.50/)).toBeNull();
+
+      await userEvent.setup().click(levelRadio("Strict"));
+
+      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(dialog.textContent).toContain(
+        "Strict uses the LangWatch PII Redaction Model at €0.425 per 1M characters excl. VAT, pay as you go. Turn it on?",
+      );
+    });
+  });
+
   describe("when an admin picks Strict over an organization rule that drops input", () => {
     /** @scenario Picking Strict writes the organization rule and shows Strict's example */
     it("saves the organization rule at strict, keeps the drop and shows Strict's example", async () => {

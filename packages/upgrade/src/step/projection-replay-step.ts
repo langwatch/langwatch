@@ -1,3 +1,4 @@
+import type { CodeStepId } from "./code-step-ids.generated.ts";
 import {
   type MigrationStep,
   type MigrationStepDefinition,
@@ -29,6 +30,9 @@ export const PROJECTION_REPLAY_PAGED = "pagedAggregates";
 
 /** The cursor a lane's first replay starts from: the whole log. */
 export const PROJECTION_REPLAY_FROM_START = "1970-01-01T00:00:00Z";
+
+/** Lists the queue claims older images made; every replay drains on that index (ADR-092). */
+export const QUEUE_TENANT_CLAIMS_FILL_STEP = "ops:fill-queue-tenant-claims" satisfies CodeStepId;
 
 /**
  * The replay a step drives, injected (record: a framework package takes module values by
@@ -70,7 +74,6 @@ export function defineProjectionReplayStep({
   lane,
   replayer,
   since = PROJECTION_REPLAY_FROM_START,
-  needsOldWritersGone,
   trailingPass = false,
   after,
 }: {
@@ -80,7 +83,8 @@ export function defineProjectionReplayStep({
   replayer: LaneReplayer;
   /** The instant a first run replays from: aggregates with an event since then refold whole. */
   since?: string;
-  needsOldWritersGone?: boolean;
+  /** Always on (ADR-092); accepted so released declarations stay as they shipped. */
+  needsOldWritersGone?: true;
   /** After the first pass, replay again from the cursor it completed through. */
   trailingPass?: boolean;
   /** The background steps whose work must be in the log before this lane replays it. */
@@ -91,7 +95,7 @@ export function defineProjectionReplayStep({
     kind: "data",
     mode: "background",
     description,
-    ...declaredOrdering({ needsOldWritersGone, after }),
+    ...declaredOrdering({ after }),
     run: async ({ checkpoint, dryRun, signal }) => {
       let cursor = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane, since });
       const firstSince = resumeSince({ resumeFrom: checkpoint.resumeFrom, lane, since });
@@ -172,18 +176,16 @@ export function defineProjectionReplayStep({
   });
 }
 
-/** The ordering fields a replay step declares, each only when given. */
+/**
+ * Every replay drains on the queue's claimed-groups index, complete only once older images are
+ * gone and their claims are listed (ADR-092), so each step waits for both, whatever it declares.
+ */
 function declaredOrdering({
-  needsOldWritersGone,
-  after,
+  after = [],
 }: {
-  needsOldWritersGone: boolean | undefined;
   after: MigrationStepDefinition["after"] | undefined;
 }): Pick<MigrationStepDefinition, "needsOldWritersGone" | "after"> {
-  return {
-    ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
-    ...(after === undefined ? {} : { after }),
-  };
+  return { needsOldWritersGone: true, after: [...after, QUEUE_TENANT_CLAIMS_FILL_STEP] };
 }
 
 /** The cursor this lane last completed through, or the step's first-run instant. */

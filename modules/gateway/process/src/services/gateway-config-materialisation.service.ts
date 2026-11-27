@@ -55,7 +55,10 @@ const logger = createLogger("langwatch:gateway:config-materialiser");
 export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 /** The one model-provider read the bundle needs. */
-export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
+export type GatewayCustomKeys = Pick<
+  ModelProviderApi,
+  "getGatewayCustomKeys" | "getGatewayKeysEpoch"
+>;
 
 const NO_KEYS: GatewayModelProviderCredentials = { readCustomKeys: () => ({}) };
 const PLAIN_KEYS: GatewayModelProviderCredentials = {
@@ -198,7 +201,10 @@ export class GatewayConfigMaterialiserService {
     const a2a = this.a2aTargets
       ? await this.a2aTargets.bundleFingerprint(this.a2aScopeOf(vk, traceProject))
       : "";
-    return [token, ...keyIds, ...(a2a ? [a2a] : [])].join(".");
+    const keysEpoch = this.modelProviders.getGatewayKeysEpoch({
+      organizationId: vk.organizationId,
+    });
+    return [token, ...keyIds, ...(a2a ? [a2a] : []), ...(keysEpoch ? [keysEpoch] : [])].join(".");
   }
 
   /** The key's trace project as materialise resolves it; versionToken reads the same one. */
@@ -370,7 +376,9 @@ export class GatewayConfigMaterialiserService {
   private async credentialReaderFor(mp: ModelProvider): Promise<GatewayModelProviderCredentials> {
     if (mp.id.startsWith(PLATFORM_PROVIDER_ID_PREFIX)) return PLAIN_KEYS;
     try {
-      const { customKeys } = await this.modelProviders.getCustomKeys({ modelProviderId: mp.id });
+      const { customKeys } = await this.modelProviders.getGatewayCustomKeys({
+        modelProviderId: mp.id,
+      });
       return { readCustomKeys: () => customKeys };
     } catch (error) {
       if (error instanceof ModelProviderCustomKeysMissingError) return NO_KEYS;

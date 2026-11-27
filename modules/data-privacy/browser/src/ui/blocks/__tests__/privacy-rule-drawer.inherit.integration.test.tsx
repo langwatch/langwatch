@@ -65,7 +65,7 @@ function renderDrawer({
       editingRule={editingRule}
       onClose={vi.fn()}
       available={available}
-      audienceOptions={{ groups: [] }}
+      audienceOptions={{ groups: [], apiKeys: [], canAddApiKeys: false }}
       effectiveTeam={effectiveTeam}
       effectiveOrganization={baseline()}
       projectId={PROJECT_ID}

@@ -153,7 +153,7 @@ const projectWeekKind: WeekKind<ProjectWeekState> = {
     projectId: `project-of-${organizationId}`,
     organizationId,
     isoWeek,
-    traces: count,
+    scenarios: { runs: count, passed: 0, failed: 0 },
   }),
 };
 
@@ -275,28 +275,6 @@ function weekCases<State extends { organizationId: string; isoWeek: string }>(
 }
 
 describe.each(backends)("given the $name digest repositories", (backend) => {
-  describe("given the enrolled cohort", () => {
-    describe("when an organization is enrolled twice, then unenrolled twice", () => {
-      it("lists it once while enrolled, and not after", async () => {
-        const audience = backend.audience();
-        const organizationId = organization();
-        const enrol = (enrolled: boolean) =>
-          audience.setEnrolled({ organizationId, enrolled, by: "operator-1" });
-        const listings = async () =>
-          (await audience.findEnrolled()).filter((id) => id === organizationId);
-
-        await enrol(true);
-        await enrol(true);
-        const whileEnrolled = await listings();
-        await enrol(false);
-        await enrol(false);
-
-        expect(whileEnrolled).toEqual([organizationId]);
-        expect(await listings()).toEqual([]);
-      });
-    });
-  });
-
   describe("given opt-outs", () => {
     describe("when a person opts out twice, then resubscribes", () => {
       it("answers them as opted out, then not, and leaves the other person alone", async () => {
@@ -349,26 +327,36 @@ describe.each(backends)("given the $name digest repositories", (backend) => {
   });
 
   describe("given sends", () => {
-    describe("when a person's week is claimed twice", () => {
-      it("lets only the first claim through, even from another organization", async () => {
+    describe("when a person's week in one organization is claimed twice", () => {
+      it("lets only the first claim through, and another organization's week is its own", async () => {
         const sends = backend.sends();
         const userId = person();
+        const [first, second] = [organization(), organization()];
         const claim = { userId, isoWeek: "2001-W30", sentAt: AT } as const;
 
-        const first = await sends.claim({
-          ...claim,
-          organizationId: organization(),
-          templateId: "digest-coding-agent-week",
-        });
-        const second = await sends.claim({
-          ...claim,
-          organizationId: organization(),
-          templateId: "digest-traces-week",
-        });
+        const results = [
+          await sends.claim({
+            ...claim,
+            organizationId: first,
+            templateId: "digest-coding-agent-week",
+          }),
+          await sends.claim({ ...claim, organizationId: first, templateId: "digest-traces-week" }),
+          await sends.claim({ ...claim, organizationId: second, templateId: "digest-traces-week" }),
+        ];
 
-        expect([first, second]).toEqual([true, false]);
-        expect(await sends.isSent({ userId, isoWeek: "2001-W30" })).toBe(true);
-        expect(await sends.isSent({ userId, isoWeek: "2001-W31" })).toBe(false);
+        expect(results).toEqual([true, false, true]);
+        expect(await sends.isSent({ userId, organizationId: first, isoWeek: "2001-W30" })).toBe(
+          true,
+        );
+        expect(await sends.isSent({ userId, organizationId: second, isoWeek: "2001-W30" })).toBe(
+          true,
+        );
+        expect(await sends.isSent({ userId, organizationId: first, isoWeek: "2001-W31" })).toBe(
+          false,
+        );
+        expect(
+          await sends.isSent({ userId, organizationId: organization(), isoWeek: "2001-W30" }),
+        ).toBe(false);
       });
     });
 
@@ -376,25 +364,28 @@ describe.each(backends)("given the $name digest repositories", (backend) => {
       it("drops their weeks in every organization and keeps another person's", async () => {
         const sends = backend.sends();
         const [forgotten, kept] = [person(), person()];
-        const claimFor = (userId: string, isoWeek: string) =>
+        const [first, second] = [organization(), organization()];
+        const claimFor = (userId: string, organizationId: string, isoWeek: string) =>
           sends.claim({
             userId,
-            organizationId: organization(),
+            organizationId,
             isoWeek,
             templateId: "digest-coding-agent-week",
             sentAt: AT,
           });
-        await claimFor(forgotten, "2001-W30");
-        await claimFor(forgotten, "2001-W31");
-        await claimFor(kept, "2001-W30");
+        await claimFor(forgotten, first, "2001-W30");
+        await claimFor(forgotten, second, "2001-W30");
+        await claimFor(kept, first, "2001-W30");
 
         await sends.forgetUser({ userId: forgotten });
         await sends.forgetUser({ userId: forgotten });
 
-        expect(await sends.isSent({ userId: forgotten, isoWeek: "2001-W30" })).toBe(false);
-        expect(await sends.isSent({ userId: forgotten, isoWeek: "2001-W31" })).toBe(false);
-        expect(await sends.isSent({ userId: kept, isoWeek: "2001-W30" })).toBe(true);
-        expect(await claimFor(forgotten, "2001-W30")).toBe(true);
+        const isSent = (userId: string, organizationId: string) =>
+          sends.isSent({ userId, organizationId, isoWeek: "2001-W30" });
+        expect(await isSent(forgotten, first)).toBe(false);
+        expect(await isSent(forgotten, second)).toBe(false);
+        expect(await isSent(kept, first)).toBe(true);
+        expect(await claimFor(forgotten, first, "2001-W30")).toBe(true);
       });
     });
   });

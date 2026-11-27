@@ -139,7 +139,7 @@ describe("seatEventSubscription", () => {
       id,
       status: "active",
       canceledAt,
-      items: [{ id: "si_seat", priceId, unitAmount, interval, quantity }],
+      items: [{ id: "si_seat", priceId, unitAmount, interval, quantity, createdAt: 1_700_000_000 }],
     });
 
   describe("previewProration()", () => {
@@ -722,6 +722,7 @@ describe("seatEventSubscription", () => {
             items: [
               {
                 id: "si_events",
+                createdAt: 1_700_000_000,
                 priceId: "price_events_usd_monthly",
                 unitAmount: null,
                 interval: null,
@@ -926,6 +927,7 @@ describe("seatEventSubscription", () => {
             items: [
               {
                 id: "si_events",
+                createdAt: 1_700_000_000,
                 priceId: "price_events_usd_monthly",
                 unitAmount: null,
                 interval: null,
@@ -948,6 +950,79 @@ describe("seatEventSubscription", () => {
   // ── createSeatEventCheckout ───────────────────────────────────────────────
 
   describe("createSeatEventCheckout()", () => {
+    describe("when the organization's currency and the Stripe customer's disagree", () => {
+      const usagePricedService = () =>
+        SeatEventSubscriptionService.create({
+          stripeSubscriptions,
+          subscriptions,
+          abandoned,
+          prices: {
+            ...prices,
+            GROWTH_INSTANT_EVAL_USD: "price_instant_eval_usd",
+            GROWTH_INSTANT_EVAL_EUR: "price_instant_eval_eur",
+            GROWTH_PII_REDACTION_USD: "price_pii_redaction_usd",
+            GROWTH_PII_REDACTION_EUR: "price_pii_redaction_eur",
+          },
+          customerCurrency: StripeCustomerCurrencyService.create({
+            customers,
+            stripeErrors: StripeErrorTranslatorService.create(),
+          }),
+        });
+
+      /** @scenario "The checkout's usage prices follow the Stripe customer's currency, not the organization's" */
+      it("builds a customer held in dollars in dollars, with the dollar usage prices", async () => {
+        customers.seed({ id: "cus_usd", currency: "usd" });
+
+        // The organization's own currency field says euros; the request carries it.
+        await usagePricedService().createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_usd",
+          baseUrl: "https://app.test",
+          currency: Currency.EUR,
+          billingInterval: "monthly",
+          membersToAdd: 2,
+        });
+
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
+          expect.objectContaining({
+            currency: "usd",
+            lineItems: [
+              { price: "price_seat_usd_monthly", quantity: 2 },
+              { price: "price_events_usd_monthly" },
+              { price: "price_instant_eval_usd" },
+              { price: "price_pii_redaction_usd" },
+            ],
+          }),
+        );
+      });
+
+      /** @scenario "The checkout's usage prices follow the Stripe customer's currency, not the organization's" */
+      it("builds a customer held in euros in euros, with the euro usage prices", async () => {
+        customers.seed({ id: "cus_eur", currency: "eur" });
+
+        await usagePricedService().createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_eur",
+          baseUrl: "https://app.test",
+          currency: Currency.USD,
+          billingInterval: "monthly",
+          membersToAdd: 2,
+        });
+
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
+          expect.objectContaining({
+            currency: "eur",
+            lineItems: [
+              { price: "price_seat_eur_monthly", quantity: 2 },
+              { price: "price_events_eur_monthly" },
+              { price: "price_instant_eval_eur" },
+              { price: "price_pii_redaction_eur" },
+            ],
+          }),
+        );
+      });
+    });
+
     describe("when stale PENDING subscriptions exist", () => {
       beforeEach(() => {
         subscriptions.cancelPendingSeatCheckouts.mockResolvedValue(["stale_sub_1", "stale_sub_2"]);

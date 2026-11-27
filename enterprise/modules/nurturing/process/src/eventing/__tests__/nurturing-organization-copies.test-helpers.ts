@@ -12,7 +12,7 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
+import { testEventSchema, IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import {
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   recordVkLifecycleCommandDataSchema,
@@ -350,6 +350,7 @@ export function copiesDeploy({
   ]);
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: log,
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

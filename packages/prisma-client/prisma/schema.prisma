@@ -1417,6 +1417,13 @@ model Organization {
   /// The member who switched them on, so the audit trail names a person and
   /// not just a moment.
   instantEvalsEnabledByUserId String?
+  /// When an organization admin accepted the PII Redaction Model's price, the
+  /// organization's consent to be billed for it on LangWatch Cloud (ADR-201
+  /// decision 15). Null until then: Strict stays on the rule-based detector,
+  /// unbilled, and billing counts no PII redaction spend from before it.
+  piiRedactionModelAcceptedAt DateTime?
+  /// The admin who accepted it, so the record names a person.
+  piiRedactionModelAcceptedByUserId String?
   /// When the last license sync succeeded.
   connectLastSyncAt       DateTime?
   /// The code of the failure the last sync ended on, cleared on the next
@@ -8296,6 +8303,11 @@ model StaffAccessRequest {
   functions            String[]  @default([])
   organizationId       String?
   organizationName     String?
+  /// A copy side's other organization, signed with the approval (staff-access module ADR-002).
+  counterpartOrganizationId   String?
+  counterpartOrganizationName String?
+  /// What a copy target may create, fixed when asked; shown, signed and enforced as stored.
+  copyGrant            String[]  @default([])
   reason               String
   codeChallenge        String
   machine              String
@@ -8363,7 +8375,8 @@ model DigestCohortOrganization {
 model DigestSubscription {
   userId                 String    @id
   unsubscribedAt         DateTime?
-  /// The send whose unsubscribe link or one-click header the person used.
+  /// The send whose unsubscribe link or one-click header the person used; the Profile switch writes
+  /// `settings` here.
   unsubscribedFromSendId String?
   updatedAt              DateTime  @updatedAt
 }
@@ -8374,7 +8387,7 @@ model DigestProjectWeek {
   projectId         String
   organizationId    String
   isoWeek           String
-  /// The fold state: counts, sums, a fixed-bucket latency histogram, capped model and evaluator maps.
+  /// The fold state: evaluator and scenario outcome counts only; trace numbers are read from analytics.
   state             Json
   occurredAt        DateTime
   lastEventId       String
@@ -8407,7 +8420,8 @@ model DigestUserWeek {
   @@index([userId])
 }
 
-/// One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.
+/// One person's digest for one organisation for one ISO week, accepted by our own mailer. The id is
+/// `{userId}:{organizationId}:{isoWeek}`.
 model DigestSend {
   id             String   @id
   userId         String
@@ -8426,4 +8440,25 @@ model DigestSettings {
   armed           Boolean  @default(false)
   lastPlannedWeek String?
   updatedAt       DateTime @updatedAt
+}
+
+/// The organization copy ledger (staff-access module ADR-002): which source object a copy made
+/// which target object from, so a rerun into the same organization adds only what is new.
+model StaffAccessCopyLedger {
+  id                   String   @id
+  requestId            String
+  sourceOrganizationId String
+  targetOrganizationId String
+  kind                 String
+  sourceId             String
+  /// Null while the source is reserved and its target is not made yet.
+  targetId             String?
+  sourceProjectId      String
+  targetProjectId      String?
+  /// Why the made target is short of its source, e.g. a prompt missing later versions.
+  incomplete           String?
+  createdAt            DateTime @default(now())
+
+  @@unique([targetOrganizationId, kind, sourceId])
+  @@index([sourceOrganizationId, targetOrganizationId], map: "StaffAccessCopyLedger_pair_idx")
 }

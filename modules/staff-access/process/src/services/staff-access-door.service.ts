@@ -36,7 +36,7 @@ type DoorDeps = Readonly<{
 /**
  * The `staff_access` door (ADR-202). It reads the bearer itself: an `lwsr_` requester key stands
  * for an enrolled agent, an `lwsa_` ops token for one live redeemed session pinned to its
- * address. It answers `opsRead:view` from that session's scopes and nothing else.
+ * address. It answers `opsRead:view` and `opsCopy:create` from that session's scopes, nothing else.
  */
 export class StaffAccessDoorService implements RestIdentity {
   private constructor(private readonly deps: DoorDeps) {}
@@ -68,12 +68,9 @@ export class StaffAccessDoorService implements RestIdentity {
     permission: PlatformTierPermission;
   }): PlatformDecision {
     const parsed = staffAccessDoorSessionSchema.safeParse(caller.session);
-    const permitted =
-      permission === "opsRead:view" &&
-      parsed.success &&
-      parsed.data.kind === "ops" &&
-      parsed.data.scopes.includes("ops:read");
-    return { permitted };
+    if (!parsed.success || parsed.data.kind !== "ops") return { permitted: false };
+    const answeredBy = DOOR_PERMISSION_SCOPES[permission];
+    return { permitted: answeredBy !== undefined && parsed.data.scopes.includes(answeredBy) };
   }
 
   private async requesterSessionOf({
@@ -138,6 +135,12 @@ export class StaffAccessDoorService implements RestIdentity {
     };
   }
 }
+
+/** The only platform permissions this door answers, each from one approved scope. */
+const DOOR_PERMISSION_SCOPES: Partial<Record<PlatformTierPermission, StaffAccessScope>> = {
+  "opsRead:view": "ops:read",
+  "opsCopy:create": "copy:target",
+};
 
 /** RFC 6750: the Bearer scheme in any case, then the token; anything else presents "". */
 function presentedBearer(header: string | null): string {

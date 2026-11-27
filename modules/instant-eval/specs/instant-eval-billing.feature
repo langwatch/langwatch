@@ -244,13 +244,14 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And a warning names the organization, the meter and the amount held
 
     @unit
-    Scenario: A Growth subscription in euros holds its Instant Eval usage
-      Given an organization whose active Growth subscription is in euros
+    Scenario: A Growth subscription in euros without the euro Instant Evals price holds its usage
+      Given an organization whose active Growth subscription is in euros with no Instant Evals price
       And Instant Eval spend this month
       When the month is reported
       Then no Instant Eval meter event is sent and its checkpoint is not advanced
       And the billable events meter is reported as usual
-      # The price is in dollars and no euro price exists, so the month is held until one does.
+      # One bought before GROWTH_INSTANT_EVAL_EUR existed; with that line it is reported
+      # (enterprise/modules/billing/specs/euro-usage-prices.feature).
 
     @unit
     Scenario: Usage is reported once the subscription carries the Instant Evals price
@@ -260,10 +261,13 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then the Instant Eval meter event's value is 5.0428
 
     @unit
-    Scenario: The first report after the Instant Evals price is added carries the month from zero
+    Scenario: The first report after the Instant Evals price is added bills only from the line
       Given an organization whose usage was held for want of the Instant Evals price
+      And it has no cancelled subscription whose line hands it an earlier start
       When the price is added to its subscription and the month is reported
-      Then the Instant Eval meter event carries the month's total from zero
+      Then the spend is read from the moment the line was added, never the month's first day
+      # Charges start from the moment the line is added; a cancelled line that ended with no gap
+      # before it hands on its earlier start instead (ADR-174 decision 26).
 
     # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23, proposed in v22).
     @unit
@@ -359,7 +363,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
     Scenario: Only a subscription with the Instant Evals price reaches the Stripe simulator
       Given three usage-billed organizations with Instant Eval spend this month
       And one has a Growth subscription in dollars with no Instant Evals price
-      And one has a Growth subscription in euros
+      And one has a Growth subscription in euros with no Instant Evals price
       And one has a Growth subscription in dollars with the Instant Evals price
       When the month is reported against the payment simulator
       Then the simulator holds no Instant Eval usage for the first two

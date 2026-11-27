@@ -1,5 +1,7 @@
 import {
   BILLING_REPORT_COMMAND_TYPES,
+  GROWTH_INSTANT_EVAL_PRICE_NAMES,
+  GROWTH_PII_REDACTION_PRICE_NAMES,
   reportUsageForMonthCommandDataSchema,
   type ReportUsageForMonthCommandData,
   type StripePriceName,
@@ -33,6 +35,7 @@ import {
   PII_REDACTION_USD_EVENT_NAME,
   piiRedactionMeterIdentifier,
 } from "../rules/pii-redaction-meter.rules.ts";
+import { meterBilledSince, type PriceLine } from "../rules/price-line.rules.ts";
 import { type NotUsageBilledReason, usageBilledOf } from "../rules/usage-billed.rules.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
@@ -40,6 +43,10 @@ import type { PiiRedactionSpendQueryService } from "../services/pii-redaction-sp
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
+
+/** Either currency's price prices a usage meter; a subscription has one currency. */
+const INSTANT_EVAL_PRICES = Object.values(GROWTH_INSTANT_EVAL_PRICE_NAMES);
+const PII_REDACTION_PRICES = Object.values(GROWTH_PII_REDACTION_PRICE_NAMES);
 
 const NOT_USAGE_BILLED_LOG: Record<Exclude<NotUsageBilledReason, "not_found">, string> = {
   not_usage_priced: "organization is not on usage-based pricing, skipping usage reporting",
@@ -59,11 +66,12 @@ interface BillingMeter {
   readonly eventName: string;
   /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
   readonly isProvisioned: () => boolean;
-  /** Whether the customer's subscription prices this meter, so an event sent is invoiced. */
-  readonly isPriced: (input: {
+  /** Whether, and since when, the subscription prices this meter, so an event sent is invoiced. */
+  readonly priceLine: (input: {
     stripeCustomerId: string;
     contract: UsageBillingContract;
-  }) => Promise<boolean>;
+    billingMonth: string;
+  }) => Promise<PriceLine>;
   /** Whether the total is usage's month_counted snapshot, ordered by that event's id. */
   readonly followsCountedEvent: boolean;
   /** The most this month may report for a capped contract, or null for no cap. */
@@ -92,6 +100,9 @@ interface BillingMeter {
   }) => string;
 }
 
+/** A meter whose line is not checked: priced, with no line start to narrow its month. */
+const WHOLE_MONTH_LINE: PriceLine = { carried: true, addedAtMs: null };
+
 /** Maximum consecutive failures before circuit-breaker trips. */
 const MAX_CONSECUTIVE_FAILURES = 5;
 
@@ -102,7 +113,7 @@ function toError(value: unknown): Error {
 }
 
 export interface ReportUsageForMonthCommandDeps {
-  organizations: BillingReportOrganizationRepository;
+  organizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
   billingCheckpoints: BillingCheckpointRepository;
   getUsageReportingService: () => UsageReportingService | undefined;
   /** The Instant Evals meter's total, read off the gateway spend ledger. */
@@ -118,14 +129,15 @@ export interface ReportUsageForMonthCommandDeps {
   /** Whether Stripe holds the PII redaction meter in this mode; creating it starts charging. */
   isPiiRedactionMeterProvisioned: () => boolean;
   /**
-   * Whether the customer's subscription has a line on the price. Stripe bills a meter event no
-   * line prices at nothing, so a priced meter's month waits until one does (ADR-201 decision
-   * 10, ADR-174 decision 18). A throw holds the month and counts toward the breaker.
+   * Whether the customer's subscriptions have a line on any of the prices (one per currency), and
+   * since when: Stripe bills an unpriced meter event at nothing, and usage bills only from the line
+   * (ADR-201 decisions 10 and 11, ADR-174 decisions 18 and 26). A throw holds the month.
    */
-  subscriptionCarriesPrice: (input: {
+  subscriptionPriceLine: (input: {
     stripeCustomerId: string;
-    price: StripePriceName;
-  }) => Promise<boolean>;
+    prices: readonly StripePriceName[];
+    billingMonth: string;
+  }) => Promise<PriceLine>;
   /** Queues a report: a convergence re-run, or a spend report's one follow-up. */
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
@@ -224,18 +236,20 @@ function totalWithinContractCeiling({
 }
 
 /**
- * A month the subscription window narrows never reports below what it already reported: the
- * window keeps free use before an upgrade off what is still to send, never takes back what was
- * sent (ADR-174 decision 23, proposed in v22). A whole-month read keeps its lower corrections.
+ * A month a seat, line or PII acceptance narrows never reports below what it reported: use before
+ * it is kept off what is still to send, never taken back once sent (ADR-174 decisions 23 and 26,
+ * ADR-201 decision 15). A whole-month read keeps its lower corrections.
  */
 function notBelowReportedInNarrowedWindow({
   measured,
+  meter,
   organizationId,
   billingMonth,
   usageBilledSinceMs,
   lastReportedTotal,
 }: {
   measured: BillableEventsTotalResult;
+  meter: string;
   organizationId: string;
   billingMonth: string;
   usageBilledSinceMs: number | null;
@@ -251,7 +265,7 @@ function notBelowReportedInNarrowedWindow({
     {
       organizationId,
       billingMonth,
-      meter: INSTANT_EVAL_USD_EVENT_NAME,
+      meter,
       measured: measured.total,
       reported: lastReportedTotal,
     },
@@ -284,7 +298,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         // Every mode maps the events meter; the catalogue refuses to load without it.
         isProvisioned: () => true,
         // Every Growth subscription carries the events price; checkout cannot leave it out.
-        isPriced: async () => true,
+        priceLine: async () => WHOLE_MONTH_LINE,
         followsCountedEvent: true,
         ceiling: async () => null,
         // Usage's month_counted total; a command without one leaves this meter untouched.
@@ -300,10 +314,14 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         isProvisioned: deps.isInstantEvalMeterProvisioned,
         // Connected hosted usage is reported as before: which meter its quarterly price bills is
         // unchecked against Stripe (ADR-174 decision 18).
-        isPriced: ({ stripeCustomerId, contract }) =>
+        priceLine: ({ stripeCustomerId, contract, billingMonth }) =>
           contract === "connected"
-            ? Promise.resolve(true)
-            : deps.subscriptionCarriesPrice({ stripeCustomerId, price: "GROWTH_INSTANT_EVAL_USD" }),
+            ? Promise.resolve(WHOLE_MONTH_LINE)
+            : deps.subscriptionPriceLine({
+                stripeCustomerId,
+                prices: INSTANT_EVAL_PRICES,
+                billingMonth,
+              }),
         followsCountedEvent: false,
         ceiling: ({ contract, ...args }) =>
           contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
@@ -319,6 +337,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
               billingMonth,
               usageBilledSinceMs,
             }),
+            meter: INSTANT_EVAL_USD_EVENT_NAME,
             organizationId,
             billingMonth,
             usageBilledSinceMs,
@@ -330,12 +349,36 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       {
         eventName: PII_REDACTION_USD_EVENT_NAME,
         isProvisioned: deps.isPiiRedactionMeterProvisioned,
-        isPriced: ({ stripeCustomerId }) =>
-          deps.subscriptionCarriesPrice({ stripeCustomerId, price: "GROWTH_PII_REDACTION_USD" }),
+        priceLine: ({ stripeCustomerId, billingMonth }) =>
+          deps.subscriptionPriceLine({
+            stripeCustomerId,
+            prices: PII_REDACTION_PRICES,
+            billingMonth,
+          }),
         followsCountedEvent: false,
         ceiling: async () => null,
-        queryTotal: ({ organizationId, billingMonth }) =>
-          deps.queryPiiRedactionSpendTotal({ organizationId, billingMonth }),
+        queryTotal: async ({
+          organizationId,
+          billingMonth,
+          usageBilledSinceMs,
+          lastReportedTotal,
+        }) => {
+          const measured = await deps.queryPiiRedactionSpendTotal({
+            organizationId,
+            billingMonth,
+            usageBilledSinceMs,
+          });
+          return notBelowReportedInNarrowedWindow({
+            measured,
+            meter: PII_REDACTION_USD_EVENT_NAME,
+            organizationId,
+            billingMonth,
+            // The acceptance narrows the month as the line does; only the spend read knows it.
+            usageBilledSinceMs:
+              measured.outcome === "counted" ? measured.fromMs : usageBilledSinceMs,
+            lastReportedTotal,
+          });
+        },
         toValue: instantEvalMeterUnitsToUsd,
         identifier: piiRedactionMeterIdentifier,
       },
@@ -490,9 +533,9 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
   }
 
   /**
-   * Whether the meter may report: held without a line on its price, failed when the read threw.
-   * A failed read counts on the checkpoint like a failed send, so the breaker stops one that
-   * keeps failing. The first report after the price is added carries the month from zero.
+   * Whether the meter may report, and the start its month bills from: the later of the seat start
+   * and its line's (ADR-174 decision 26). Held without a line, failed when the read threw; a failed
+   * read counts on the checkpoint like a failed send, so the breaker stops one that keeps failing.
    */
   private async priceGate(input: {
     meter: BillingMeter;
@@ -504,16 +547,27 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billableEvents: number | undefined;
     lastReportedTotal: number;
     consecutiveFailures: number;
-  }): Promise<"priced" | "held" | "failed"> {
+  }): Promise<
+    { outcome: "priced"; usageBilledSinceMs: number | null } | { outcome: "held" | "failed" }
+  > {
     const { meter, organizationId, billingMonth, stripeCustomerId, contract } = input;
-    let priced: boolean;
+    let line: PriceLine;
     try {
-      priced = await meter.isPriced({ stripeCustomerId, contract });
+      line = await meter.priceLine({ stripeCustomerId, contract, billingMonth });
     } catch (error) {
       await this.recordPriceReadFailure({ ...input, error: toError(error) });
-      return "failed";
+      return { outcome: "failed" };
     }
-    if (priced) return "priced";
+    if (line.carried) {
+      const since = meterBilledSince({
+        usageBilledSinceMs: input.usageBilledSinceMs,
+        lineAddedAtMs: line.addedAtMs,
+      });
+      return {
+        outcome: "priced",
+        usageBilledSinceMs: since.outcome === "since" ? since.startMs : null,
+      };
+    }
 
     const measured = await meter.queryTotal({
       organizationId,
@@ -527,13 +581,13 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     if (held > 0) {
       logger.warn(
         { ...fields, heldValue: meter.toValue(held) },
-        "subscription has no price for this meter; holding the month's usage until it does",
+        "subscription has no price for this meter; holding its usage, billed only from when the line is added",
       );
     } else {
       logger.debug(fields, "subscription has no price for this meter and nothing to hold");
     }
     await this.clearReadFailures(input);
-    return "held";
+    return { outcome: "held" };
   }
 
   /** A read that worked and sent nothing ends a run of failed reads, so they stay consecutive. */
@@ -650,6 +704,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       return false;
     }
 
+    let billedSinceMs = usageBilledSinceMs;
     // A pending total is replayed whatever the price says, before Stripe forgets its identifier.
     if (checkpoint?.pendingReportedTotal == null) {
       const gate = await this.priceGate({
@@ -663,7 +718,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         lastReportedTotal,
         consecutiveFailures,
       });
-      if (gate !== "priced") return gate === "failed";
+      if (gate.outcome !== "priced") return gate.outcome === "failed";
+      billedSinceMs = gate.usageBilledSinceMs;
     }
 
     let targetTotal: number;
@@ -681,7 +737,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         organizationId,
         billingMonth,
         contract,
-        usageBilledSinceMs,
+        usageBilledSinceMs: billedSinceMs,
         billableEvents,
         countedEventId,
         checkpoint,

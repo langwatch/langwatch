@@ -76,8 +76,8 @@ import { LicensePurchaseService } from "../features/license-purchase/services/li
 import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import { priceLineOf } from "../rules/price-line.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
-import { carriesPrice } from "../rules/subscription-price.rules.ts";
 import {
   planLimitCooldown,
   planLimitInFlight,
@@ -1065,6 +1065,8 @@ export class BillingModule
     const piiRedactionSpend = PiiRedactionSpendQueryService.create({
       isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
       listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      findPiiRedactionModelAcceptedAtMs: (input) =>
+        repositories.reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
@@ -1087,15 +1089,19 @@ export class BillingModule
       isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
       queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
       isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
-      subscriptionCarriesPrice: async ({ stripeCustomerId, price }) =>
-        stripeSubscriptions !== void 0 &&
-        carriesPrice({
-          subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
-            customerId: stripeCustomerId,
-          }),
-          priceName: price,
-          priceId: catalogue().prices[price],
-        }),
+      subscriptionPriceLine: async ({ stripeCustomerId, prices, billingMonth }) =>
+        stripeSubscriptions === void 0
+          ? { carried: false }
+          : priceLineOf({
+              subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
+                customerId: stripeCustomerId,
+              }),
+              prices: prices.map((priceName) => ({
+                priceName,
+                priceId: catalogue().prices[priceName],
+              })),
+              billingMonth,
+            }),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

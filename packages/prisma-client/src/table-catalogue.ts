@@ -240,7 +240,8 @@ export const prismaTableCatalogue = {
   "DigestProjectWeek": "DigestProjectWeek",
   "DigestUserWeek": "DigestUserWeek",
   "DigestSend": "DigestSend",
-  "DigestSettings": "DigestSettings"
+  "DigestSettings": "DigestSettings",
+  "StaffAccessCopyLedger": "StaffAccessCopyLedger"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -762,6 +763,8 @@ export const prismaModelFieldCatalogue = {
     "connectServicesDisabled",
     "instantEvalsEnabledAt",
     "instantEvalsEnabledByUserId",
+    "piiRedactionModelAcceptedAt",
+    "piiRedactionModelAcceptedByUserId",
     "connectLastSyncAt",
     "connectLastSyncError",
     "issuedLicenses",
@@ -3642,6 +3645,9 @@ export const prismaModelFieldCatalogue = {
     "functions",
     "organizationId",
     "organizationName",
+    "counterpartOrganizationId",
+    "counterpartOrganizationName",
+    "copyGrant",
     "reason",
     "codeChallenge",
     "machine",
@@ -3735,6 +3741,19 @@ export const prismaModelFieldCatalogue = {
     "armed",
     "lastPlannedWeek",
     "updatedAt"
+  ],
+  "StaffAccessCopyLedger": [
+    "id",
+    "requestId",
+    "sourceOrganizationId",
+    "targetOrganizationId",
+    "kind",
+    "sourceId",
+    "targetId",
+    "sourceProjectId",
+    "targetProjectId",
+    "incomplete",
+    "createdAt"
   ]
 } as const;
 
@@ -4393,7 +4412,8 @@ export const prismaRelationCatalogue = {
   "DigestProjectWeek": {},
   "DigestUserWeek": {},
   "DigestSend": {},
-  "DigestSettings": {}
+  "DigestSettings": {},
+  "StaffAccessCopyLedger": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

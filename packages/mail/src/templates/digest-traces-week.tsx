@@ -25,7 +25,7 @@ export const digestTracesWeekProps = z.object({
   topModels: z
     .array(z.object({ name: z.string().min(1), calls: z.number().int().nonnegative() }))
     .max(3)
-    .describe("Spans that named the model, so a trace's several calls each count"),
+    .describe("Traces that used the model"),
   evaluations: z
     .array(z.object({ name: z.string().min(1), passRatePercent: z.number().min(0).max(100) }))
     .max(3)
@@ -56,7 +56,7 @@ export const DigestTracesWeek = (props: DigestTracesWeekProps) => {
       hero={{ value: formatCount(traces), caption: changeCaption(props.changePercent) }}
       whatsNew={props.whatsNew}
       reason={`You are a member of ${projectName}.`}
-      unsubscribeUrl={props.unsubscribeUrl}
+      preferencesUrl={props.preferencesUrl}
     >
       <DetailTable
         rows={[
@@ -70,7 +70,7 @@ export const DigestTracesWeek = (props: DigestTracesWeekProps) => {
       <DataTable
         columns={[
           { key: "model", label: "Top models", width: "70%" },
-          { key: "calls", label: "LLM calls", align: "right", width: "30%" },
+          { key: "calls", label: "Traces", align: "right", width: "30%" },
         ]}
         rows={topModels.map((model) => ({
           key: model.name,
@@ -94,7 +94,7 @@ export const DigestTracesWeek = (props: DigestTracesWeekProps) => {
 };
 
 const links = {
-  unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+  preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
   tracesUrl: "https://app.langwatch.ai/api/digest/c/tk_trace1Jd5",
 } as const;
 

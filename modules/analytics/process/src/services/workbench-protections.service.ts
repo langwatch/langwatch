@@ -18,6 +18,7 @@ import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 import {
   askViewerRolePermissions,
   isContentVisible,
+  isContentVisibleToKey,
   isContentVisibleToPublic,
   needsOwnerFact,
   needsRoleEverywhere,
@@ -153,9 +154,9 @@ export class WorkbenchProtectionsService {
   }
 
   /**
-   * What a REST credential may see. A project-bound access token is its person, so it reads as
-   * that member. A key is not a member: content resolves as for a no-session caller and the
-   * catalogue is the KEY's own grants, bounded by its owner's. A legacy key reads it all.
+   * What a REST credential may see. A project-bound access token reads as its person. A key
+   * reads content as the public unless a rule's audience names it (ADR-208); its catalogue is
+   * the KEY's own grants, bounded by its owner's. A legacy key reads it all.
    */
   async resolveApiKeyProtections(input: {
     projectId: string;
@@ -183,7 +184,11 @@ export class WorkbenchProtectionsService {
             principal: { type: "project" },
             scope: await this.projectScope(input.projectId),
           });
-    return this.publicProtections({ projectId: input.projectId, catalogue });
+    return this.publicProtections({
+      projectId: input.projectId,
+      catalogue,
+      ...(credential.kind === "apiKey" ? { apiKeyId: credential.apiKeyId } : {}),
+    });
   }
 
   /**
@@ -230,9 +235,12 @@ export class WorkbenchProtectionsService {
   private async publicProtections({
     projectId,
     catalogue,
+    apiKeyId,
   }: {
     projectId: string;
     catalogue: LangWatchQLCatalogueAccess;
+    /** The reading key: a rule's audience may name it (ADR-208). */
+    apiKeyId?: string;
   }): Promise<LangWatchQLProtections> {
     const canSeeCosts = holdsCostView(catalogue);
     const policy = await this.policyFor([projectId]);
@@ -240,10 +248,14 @@ export class WorkbenchProtectionsService {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
 
+    const canSee = (category: "input" | "output") =>
+      apiKeyId === undefined
+        ? isContentVisibleToPublic(policy.categories[category])
+        : isContentVisibleToKey(policy.categories[category], { apiKeyId });
     return {
       canSeeCosts,
-      canSeeCapturedInput: isContentVisibleToPublic(policy.categories.input),
-      canSeeCapturedOutput: isContentVisibleToPublic(policy.categories.output),
+      canSeeCapturedInput: canSee("input"),
+      canSeeCapturedOutput: canSee("output"),
       catalogue,
     };
   }

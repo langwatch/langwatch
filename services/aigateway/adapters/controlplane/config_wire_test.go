@@ -176,6 +176,30 @@ func TestProviderSlotToCredential_BaseURL(t *testing.T) {
 	})
 }
 
+// A managed Bedrock row names its private runtime endpoint as a Bedrock
+// credential field, never base_url: hosted gateways refuse a plain-http or
+// private base_url, while the Bedrock field has its own amazonaws.com check.
+//
+// Spec: specs/ai-gateway/managed-bedrock-vpce-endpoint.feature
+/** @scenario "The config bundle keeps a Bedrock row's runtime endpoint on the credential" */
+func TestProviderSlotToCredential_BedrockRuntimeEndpoint(t *testing.T) {
+	cred := providerSlotToCredential(providerSlotWire{
+		ID:   "mp-bedrock",
+		Type: "bedrock",
+		Credentials: map[string]interface{}{
+			"access_key":               "temporary-key",
+			"secret_key":               "temporary-secret",
+			"session_token":            "temporary-token",
+			"region":                   "eu-west-1",
+			"bedrock_runtime_endpoint": "http://vpce-0abc.vpce.amazonaws.com",
+		},
+	})
+	assert.Equal(t, domain.ProviderBedrock, cred.ProviderID)
+	assert.Equal(t, "http://vpce-0abc.vpce.amazonaws.com", cred.Extra["bedrock_runtime_endpoint"])
+	assert.Equal(t, "temporary-token", cred.Extra["session_token"])
+	assert.Empty(t, cred.Extra["base_url"])
+}
+
 // The control-plane writes aliases in "provider/model" form, which is a
 // routing instruction rather than a model ID. Keeping the prefix on Model
 // sends the provider a model name it has never heard of, and drops the

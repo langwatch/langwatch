@@ -82,9 +82,14 @@ function rollUp({
     getUsageReportingService: () => reporter,
     queryInstantEvalSpendTotal: async () => ({ outcome: "counted", total: ledger.instantEval }),
     isInstantEvalMeterProvisioned: () => true,
-    queryPiiRedactionSpendTotal: async () => ({ outcome: "counted", total: ledger.piiRedaction }),
+    // The whole month, read from its first day: no line or acceptance narrows it here.
+    queryPiiRedactionSpendTotal: async ({ billingMonth }) => ({
+      outcome: "counted",
+      total: ledger.piiRedaction,
+      fromMs: Date.parse(`${billingMonth}-01T00:00:00Z`),
+    }),
     isPiiRedactionMeterProvisioned: () => true,
-    subscriptionCarriesPrice: async () => true,
+    subscriptionPriceLine: async () => ({ carried: true, addedAtMs: null }),
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,

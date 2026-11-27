@@ -334,3 +334,95 @@ describe("copying a dataset kept in the Postgres records table", () => {
     ]);
   });
 });
+
+describe("copying a dataset in object storage that is not ready", () => {
+  /** @scenario "A dataset that is not ready is refused before its copy exists" */
+  it("refuses the copy and creates no dataset in the target project", async () => {
+    const repositories = MemoryDatasetRepositories.create();
+    const app = createDatasetTestApp({ repositories });
+    const source = await app.upsertDataset({ projectId, name: "Still Processing", columnTypes });
+    await repositories.content.update({
+      id: source.id,
+      projectId,
+      data: { contentLayout: "s3_jsonl", status: "processing" },
+    });
+
+    await expect(
+      app.copyDataset({
+        sourceDatasetId: source.id,
+        sourceProjectId: projectId,
+        targetProjectId: "project-target",
+      }),
+    ).rejects.toMatchObject({ name: "DatasetNotReadyError" });
+
+    expect(
+      await repositories.datasets.findAll({ projectId: "project-target", page: 1, limit: 10 }),
+    ).toEqual([]);
+  });
+
+  /** @scenario "A dataset in object storage with no chunk count fails before its copy exists" */
+  it("fails the copy as a platform error and creates no dataset in the target project", async () => {
+    const repositories = MemoryDatasetRepositories.create();
+    const app = createDatasetTestApp({ repositories });
+    const source = await app.upsertDataset({ projectId, name: "Drifted", columnTypes });
+    await repositories.content.update({
+      id: source.id,
+      projectId,
+      data: { contentLayout: "s3_jsonl", status: "ready", chunkCount: null },
+    });
+
+    const failure = await app
+      .copyDataset({
+        sourceDatasetId: source.id,
+        sourceProjectId: projectId,
+        targetProjectId: "project-target",
+      })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ name: "DatasetChunkCountMissingError" });
+    expect(failure).not.toHaveProperty("httpStatus");
+    expect(
+      await repositories.datasets.findAll({ projectId: "project-target", page: 1, limit: 10 }),
+    ).toEqual([]);
+  });
+});
+
+describe("copying a dataset in object storage when the copy fails after its dataset exists", () => {
+  /** @scenario "A copy that fails after its dataset exists names the dataset it made" */
+  it("fails as interrupted, names the new dataset and carries no refusal status", async () => {
+    const repositories = MemoryDatasetRepositories.create();
+    const app = createDatasetTestApp({ repositories });
+    const source = await app.upsertDataset({
+      projectId,
+      name: "Stored Questions",
+      columnTypes,
+      datasetRecords: [{ question: "What is 2+2?" }],
+    });
+    vi.spyOn(repositories.chunks, "readChunk").mockRejectedValue(
+      new Error("object storage is unavailable"),
+    );
+
+    const failure = await app
+      .copyDataset({
+        sourceDatasetId: source.id,
+        sourceProjectId: projectId,
+        targetProjectId: "project-target",
+      })
+      .then(
+        () => undefined,
+        (error: unknown) => error as Record<string, unknown>,
+      );
+
+    const made = await repositories.datasets.findAll({
+      projectId: "project-target",
+      page: 1,
+      limit: 10,
+    });
+    expect(made).toHaveLength(1);
+    expect(failure).toMatchObject({
+      name: "DatasetCopyInterruptedError",
+      targetDatasetId: made[0]?.id,
+    });
+    expect(failure?.httpStatus).toBeUndefined();
+  });
+});

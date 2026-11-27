@@ -75,6 +75,19 @@ function contractCases(backend: Backend): void {
       ).resolves.toBeUndefined();
     });
 
+    /** @scenario "A monitor can be created paused in one write" */
+    it("stores enabled false when asked and enabled true when the field is left out", async () => {
+      const paused = await backend.repository().create({ ...creation(), enabled: false });
+      const live = await backend.repository().create(creation());
+
+      await expect(
+        backend.repository().findById({ id: paused.id, projectId: backend.projectId() }),
+      ).resolves.toMatchObject({ enabled: false });
+      await expect(
+        backend.repository().findById({ id: live.id, projectId: backend.projectId() }),
+      ).resolves.toMatchObject({ enabled: true });
+    });
+
     /** @scenario "Monitor mappings are canonicalised" */
     it("canonicalises the mappings it stores", async () => {
       const written = await backend.repository().create(creation());

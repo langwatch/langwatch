@@ -19,10 +19,12 @@ const SPEND_KEYS = [
   "gateway_spend_processing:command:settleSpend",
 ] as const;
 
-/** Governance's three: its two signal commands and webhook's governance delivery process. */
+/** Governance's five: its four signal commands and webhook's governance delivery process. */
 const GOVERNANCE_KEYS = [
   "governance_events_processing:command:recordVkLifecycle",
   "governance_events_processing:command:recordBudgetCrossing",
+  "governance_events_processing:command:recordUnbudgetedSpend",
+  "governance_events_processing:command:recordVkFirstRequest",
   "webhook_delivery:subscriber:pm:governanceEventsDelivery",
 ] as const;
 
@@ -36,7 +38,7 @@ afterEach(async () => {
 describe("given the worker's installed list booted over memory stores", () => {
   describe("when the gateway spend and governance pipelines are mounted", () => {
     /** @scenario "The worker mounts every gateway spend and governance routing key" */
-    it("claims exactly the seven spend keys and the three governance keys", async () => {
+    it("claims exactly the seven spend keys and the five governance keys", async () => {
       booted = await bootMemoryWorker();
       const claimed = [...booted.eventing.globalJobRegistry.keys()];
 

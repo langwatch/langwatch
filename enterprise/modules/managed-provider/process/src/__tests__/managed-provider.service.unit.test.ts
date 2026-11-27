@@ -128,4 +128,39 @@ describe("ManagedProviderService", () => {
       expect(credentials.configs).toEqual([]);
     });
   });
+
+  describe("given an organization whose Bedrock is managed through a private endpoint", () => {
+    /** @scenario "Mint the managed Bedrock credentials for an organization" */
+    it("mints the customer role's credentials with the region and the private endpoint", async () => {
+      const credentials = new CredentialVendorTestDouble();
+      const service = ManagedProviderService.create({
+        configuration: configurationForConfiguredOrganization(),
+        credentials,
+      });
+
+      await expect(service.getBedrockCredentials({ organizationId: "org_1" })).resolves.toEqual({
+        accessKeyId: "temporary-key",
+        secretAccessKey: "temporary-secret",
+        sessionToken: "temporary-token",
+        region: "eu-west-1",
+        runtimeEndpoint: "http://private.internal",
+      });
+      expect(credentials.configs).toHaveLength(1);
+    });
+
+    it("refuses an organization with no managed deployment without assuming a role", async () => {
+      const credentials = new CredentialVendorTestDouble();
+      const service = ManagedProviderService.create({
+        configuration: configurationForConfiguredOrganization(),
+        credentials,
+      });
+
+      await expect(
+        service.getBedrockCredentials({ organizationId: "org_2" }),
+      ).rejects.toMatchObject({
+        code: "managed_bedrock_not_configured",
+      });
+      expect(credentials.configs).toEqual([]);
+    });
+  });
 });

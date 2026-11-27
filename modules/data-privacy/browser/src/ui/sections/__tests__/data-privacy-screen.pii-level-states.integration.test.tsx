@@ -256,4 +256,173 @@ describe("given the Data Privacy page", () => {
       );
     });
   });
+
+  describe("when a rule is saved at Strict before the subscription's currency is read", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("saves nothing and quotes no price, reads the plan again, then asks at the euro price", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "essential" } })] });
+      const { answerPlan, mounted } = page({
+        flagOn: true,
+        billingCurrency: "unknown",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+      const user = userEvent.setup();
+
+      await saveRuleAtStrict(user);
+
+      const waiting = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(waiting.textContent).toContain("hasn't loaded yet");
+      expect(waiting.textContent).not.toMatch(/[$€]/);
+      expect(mounted().refreshes).toBe(1);
+      await user.click(within(waiting).getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(mounted().refreshes).toBe(2));
+      expect(api.setForScope).not.toHaveBeenCalled();
+
+      answerPlan("EUR");
+
+      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      await waitFor(() => expect(dialog.textContent).toContain("€0.425 per 1M characters"));
+      expect(api.setForScope).not.toHaveBeenCalled();
+      await user.click(within(dialog).getByRole("button", { name: "Turn on Strict" }));
+
+      await waitFor(() =>
+        expect(api.setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({ config: { pii: { level: "strict" } } }),
+        ),
+      );
+    });
+  });
+
+  describe("when the page opens while the plan's first read is in flight", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("waits quietly, showing no failure and no Try again", () => {
+      page({ flagOn: true, billingCurrency: "loading" });
+
+      const price = screen.getByTestId("pii-redaction-model-price");
+      expect(price.textContent).toBe("Loading price");
+      expect(within(price).queryByRole("button", { name: "Try again" })).toBeNull();
+    });
+  });
+  describe("when the page opens before the subscription's currency is read", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("offers the picker with no price, reads the plan on Try again, and asks once it answers", async () => {
+      const { answerPlan, mounted } = page({ flagOn: true, billingCurrency: "unknown" });
+      const user = userEvent.setup();
+
+      const price = screen.getByTestId("pii-redaction-model-price");
+      expect(price.textContent).toContain("Price not loaded");
+      expect(price.textContent).not.toMatch(/[$€]/);
+      await user.click(within(price).getByRole("button", { name: "Try again" }));
+      expect(mounted().refreshes).toBe(1);
+
+      await user.click(levelRadio("Strict"));
+      const waiting = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(waiting.textContent).toContain("hasn't loaded yet");
+      expect(mounted().refreshes).toBe(2);
+      expect(api.setForScope).not.toHaveBeenCalled();
+
+      answerPlan("EUR");
+      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      await waitFor(() => expect(dialog.textContent).toContain("€0.425 per 1M characters"));
+      await user.click(within(dialog).getByRole("button", { name: "Turn on Strict" }));
+
+      await waitFor(() => expect(api.setForScope).toHaveBeenCalledTimes(1));
+    });
+
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("shows the model in the drawer at Strict with no price", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
+      page({ flagOn: true, billingCurrency: "unknown", query: { rule: "PROJECT:proj-1:false" } });
+
+      const drawer = await screen.findByRole("dialog");
+      expect(within(drawer).getByText("LangWatch PII Redaction Model")).toBeInTheDocument();
+      const price = within(drawer).getByTestId("pii-redaction-model-price");
+      expect(price.textContent).toContain("Price not loaded");
+      expect(price.textContent).not.toMatch(/[$€]/);
+    });
+  });
+
+  describe("when the model flag turns off while a Strict save waits for the price", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("saves the rule without asking, as a save with the flag off does", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "essential" } })] });
+      const { setFlag } = page({
+        flagOn: true,
+        billingCurrency: "unknown",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+      const user = userEvent.setup();
+
+      await saveRuleAtStrict(user);
+      await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(api.setForScope).not.toHaveBeenCalled();
+
+      setFlag({ name: "release_pii_redaction_model_enabled", on: false });
+
+      await waitFor(() =>
+        expect(api.setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({ config: { pii: { level: "strict" } } }),
+        ),
+      );
+      expect(api.setForScope).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the organization turns free while a Strict pick waits for the price", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("applies the pick at once, as a free organization's pick does", async () => {
+      const { setFlag } = page({ flagOn: true, billingCurrency: "unknown" });
+      const user = userEvent.setup();
+
+      await user.click(levelRadio("Strict"));
+      await screen.findByRole("dialog", { name: "Turn on Strict?" });
+      expect(api.setForScope).not.toHaveBeenCalled();
+
+      setFlag({ name: "release_pii_redaction_model_free", on: true });
+
+      await waitFor(() =>
+        expect(api.setForScope).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
+            config: expect.objectContaining({ pii: { level: "strict" } }),
+          }),
+        ),
+      );
+      expect(api.setForScope).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+  });
+
+  describe("when the drawer closes while a Strict save waits for the price", () => {
+    /** @scenario "A Strict rule save waits for the subscription's currency" */
+    it("drops the save, so turning the flag off later saves nothing", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "essential" } })] });
+      const { setFlag, navigate } = page({
+        flagOn: true,
+        billingCurrency: "unknown",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+      const user = userEvent.setup();
+
+      await saveRuleAtStrict(user);
+      await screen.findByRole("dialog", { name: "Turn on Strict?" });
+
+      navigate({});
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Turn on Strict?", hidden: true })).toBeNull(),
+      );
+      setFlag({ name: "release_pii_redaction_model_enabled", on: false });
+
+      // A save that still fired would land within the wait: none may arrive.
+      await expect(
+        waitFor(() => expect(api.setForScope).toHaveBeenCalled(), { timeout: 500 }),
+      ).rejects.toThrow("to be called at least once");
+    });
+  });
 });
+
+async function saveRuleAtStrict(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByLabelText("PII redaction"));
+  await user.click(await screen.findByRole("option", { name: /^Strict/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+}

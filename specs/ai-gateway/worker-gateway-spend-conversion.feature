@@ -27,7 +27,7 @@ Feature: The worker mounts the gateway spend and governance signal pipelines
 
     @unit
     Scenario: The worker mounts every gateway spend and governance routing key
-      Given the byte-frozen job registry's seven spend keys and three governance keys
+      Given the byte-frozen job registry's seven spend keys and five governance keys
       When the worker builds both pipelines
       Then every key is claimed
       And no key is registered that the registry does not list

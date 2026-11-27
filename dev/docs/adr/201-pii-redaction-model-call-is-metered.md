@@ -11,6 +11,21 @@ one), and the free list stays with no end date (decisions 12 to 14).
 **Revised 2026-11-25:** a span of 8,001 to 32,000 characters is split across model calls by the
 caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 
+**Revised 2026-11-26:** usage is billed only from the moment the PII redaction price line was
+added to the Stripe subscription, never from the month's first day (decision 15).
+
+**Revised 2026-11-26:** euro Growth subscriptions are charged through a euro price on the same
+dollar meter, at 0.85 euros per dollar of usage, picked from the Stripe subscription's currency
+(decision 11, tasks#1305).
+
+**Revised 2026-11-26:** no organization is priced until an organization admin accepts the price
+(decision 15). An organization on Strict without a recorded acceptance, including one that confirmed
+the price before this change, keeps rule-based detection (Presidio) at no charge until an
+organization admin accepts again; billing counts PII spend only from the later of the price line and
+the acceptance (decision 15). The free list is now read when the batch is routed, and an unreadable
+one sends the batch to Presidio (decision 7, which recorded nothing and logged the full price
+before).
+
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
 > `gateway_spend` as request type `pii_redaction`; billing reports the month's dollars on a
@@ -73,9 +88,12 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
    overlap and the extra request fees show in our cost, never in the price.
 7. **A free list records at price zero.** Organizations on `release_pii_redaction_model_free` get a
    priced fact with a price of zero and the cost kept. The release flag still says who may use
-   the model; the free list says who pays nothing. A free list that cannot be read records
-   nothing and logs the full price at error: a recorded fact fixes its request id's price for
-   good, so a guessed zero would stay, and a guessed full price could charge a free org.
+   the model; the free list says who pays nothing. Routing reads the free list once a minute per
+   organization and hands the recorder whether the call is priced; the recorder reads no flag, so
+   a change to the list during a call never prices that call. A free list that cannot be read
+   sends the batch to Presidio as `routing_error`, priced for nobody: a recorded fact fixes its
+   request id's price for good, so a guessed zero would stay, and a guessed full price could charge
+   a free org.
 8. **The spend is outside gateway budgets.** The debits process skips `pii_redaction`
    outcomes, so a spent AI budget never turns redaction off.
 9. **A meter of its own, reported only once Stripe holds it.** `langwatch_pii_redaction_usd`,
@@ -87,16 +105,31 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
     subscription line prices and bills it at nothing, so a report would advance the checkpoint
     and lose the charge. The PII meter first lists the customer's subscriptions at Stripe and
     reports only when an active, past-due or trialing one has a line on
-    `GROWTH_PII_REDACTION_USD`, by price id, lookup key or `langwatch_key` metadata. The check
+    `GROWTH_PII_REDACTION_USD` or `GROWTH_PII_REDACTION_EUR`, by price id, lookup key or
+    `langwatch_key` metadata, in one subscriptions read. The check
     is shared with Instant Evals and behaves as ADR-174 decision 18 says: a held month sends
     nothing, writes no total and warns with the amount held; a failed read counts toward the
     circuit breaker; a pending total is replayed. The other meters do not wait on it.
-11. **Checkout adds the price.** A Growth checkout in dollars carries the metered
-    `GROWTH_PII_REDACTION_USD` line, like Instant Evals, wherever the mode maps it. Euros carry
-    none: the meter counts dollars. The price is $1.00 per meter unit (one dollar redacted),
-    monthly, mapped in test mode only until live is provisioned.
+11. **Checkout adds the price in the subscription's currency (revised 2026-11-26).** A Growth
+    checkout in dollars carries the metered `GROWTH_PII_REDACTION_USD` line, like Instant Evals,
+    wherever the mode maps it: $1.00 per dollar of redaction usage, monthly, mapped in test mode
+    only until live is provisioned. A checkout in euros carries `GROWTH_PII_REDACTION_EUR` on the
+    same dollar meter at 85 euro cents per dollar of redaction usage: the dollar price's unit
+    amount times 0.85, the seat ratio of EUR 29 to USD 34. The currency is
+    the one Stripe holds the customer in, never `Organization.currency`, which can disagree.
+    Neither mode maps a euro id yet; until an operator creates the price under that lookup key
+    and the price sync maps it, a euro checkout carries no PII line. Live ids, dollar and euro
+    alike, wait until annual checkout is settled: Checkout refuses these monthly lines on an
+    annual plan (ADR-174 decision 18 and its open question). The settings page quotes Strict at
+    0.425 euros per 1M characters to a euro Growth subscription, read off its plan type
+    (`GROWTH_SEAT_EUR_*`). That is display only; the charge follows the Stripe subscription. The
+    page quotes dollars when the reader may not read the plan, or the plan is no
+    `GROWTH_SEAT_EUR_*` one (a plan set in Ops, Enterprise, or a custom seat price with no
+    lookup key). It quotes no price at all until a plan answers; a refresh that fails keeps the
+    last answer. A rule saved at Strict meanwhile waits, reading the plan again, then asks.
 12. **No free monthly amount.** Every character the model is sent is priced from the first one
-    of the month; the meter reports the month's whole total, nothing taken off. The characters
+    of the month, or of its price line when that was added later (decision 15); the meter reports
+    that whole total, nothing taken off. The characters
     are counted as sent, after the in-process standard detection has masked what it finds (a
     phone number is counted as its marker), so the customer pays for the text the model read. The
     length caps (8,000 characters for one call, 32,000 for a split span, ADR-207) are measured on
@@ -108,13 +141,55 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 14. **The free list has no end date.** Organizations on `release_pii_redaction_model_free` stay
     free for as long as LangWatch keeps them on it. Ending it is an operator change to the flag,
     not a deploy; calls recorded while it was on stay at zero (decision 7).
+15. **Usage is billed only from the moment the price line was added and an organization admin
+    accepted the price (revised 2026-11-26).** All charges start from the day the line is added to
+    the subscription (Sergio, 2026-11-26). The month the meter reports starts at the latest of the
+    month's start, the growth-seat subscription's start, the creation of the
+    `GROWTH_PII_REDACTION_USD` line, read off the same subscriptions list decision 10 already makes,
+    and the organization's acceptance below. The first report after the line is added carries only
+    usage since then, never the month from its first day, and a month the line narrows never reports
+    below what it already sent. Usage while no line existed on any subscription is never billed, and
+    a line with no creation time is refused as a failed read. The rule, its replacement handling and
+    its trade-offs are ADR-174 decision 26, shared by both usage meters.
+
+    **Only an organization whose admin accepted the price is priced.** On Cloud, a Strict batch of
+    an organization with the flag reaches the model when the organization is on the free list
+    (unpriced) or an organization admin accepted the price (priced); otherwise it stays on Presidio,
+    counted and logged as `not_accepted`, and nothing is recorded: an organization on Strict without
+    a recorded acceptance, including one that confirmed the price before this change, keeps
+    rule-based detection (Presidio) at no charge until an organization admin accepts again. The
+    acceptance is the organization's own record (`Organization.piiRedactionModelAcceptedAt` and
+    `piiRedactionModelAcceptedByUserId`, as Instant Evals' consent), written by data-privacy's
+    `acceptPiiRedactionModel` under `organization:manage` through `OrganizationApi`; the first
+    acceptance is kept and the product never withdraws it. The settings page records it when an
+    admin confirms the price: picking Strict, switching a rule-based Strict to the model (offered
+    wherever the page shows Strict, a team or project rule under an organization on Essential
+    included), or saving a Strict rule. Routing reads it once a minute per organization, so an
+    acceptance reaches the model within a minute. Billing counts an organization's PII spend only
+    from the moment of the acceptance: none without one, none in a month that ended before it. The
+    spend read answers the moment it read from, so a month the acceptance narrows never reports
+    below what it already sent, as one the line narrows. A pending meter total (a send cut off
+    before Stripe confirmed it) is replayed under its own identifier by the next report, without
+    waiting for the price or the spend read, and kept as reported, even above the spend from the
+    acceptance on. The replay is not bounded in time: that limit is the shared meter reporter's, as
+    the trade-offs state. Self-hosted is unchanged: the licence decides and no call is priced.
 
 ## Rationale / Trade-offs
 
 Pricing in code (Instant Evals) over a count priced in Stripe (billable events) was the
 product's call: it reuses the ledger, the spend page and the monthly report as they are. The
-cost is a USD-only price and a deploy for every price change. A meter of its own keeps the
-invoice line honest and lets charging start independently of Instant Evals.
+cost is a price set in dollars and a deploy for every price change.
+
+Euro customers pay through a second price on the same meter at a fixed 0.85 euros per dollar
+(decision 11). A fixed ratio keeps an invoice the same every month, as seats are; the cost is
+that euro and dollar customers drift apart in real terms as the exchange rate moves, until a
+re-price, and a live rate was rejected because the invoice would change month to month. One
+meter keeps usage in one place with one checkpoint, so a currency never splits or double counts
+it; the cost is a meter named in dollars that invoices euros. A separate euro meter was rejected
+as two meters to keep in step. The price sync refuses a euro price that drifts from the ratio.
+
+A meter of its own keeps the invoice line honest and lets charging start independently of
+Instant Evals.
 
 No free monthly amount (decision 12) keeps the price one number a customer can check against
 the ledger, and keeps a free tier from being farmed by many small organizations. The cost: no
@@ -137,12 +212,45 @@ at the same rate per character: the customer on Strict pays for the model on the
 
 The model's routing reads the flag and the level, never the subscription. A Strict project of an
 organization with the flag is priced whatever its plan, and the meter holds the usage until the
-subscription carries the price (decision 10). What stops a customer who does not want to pay is
-the settings page, which asks before it turns Strict on at a price and keeps the level it had when
-it is cancelled; Essential never reaches the model or Presidio. The cost: an organization, team or
-project already on Strict (then Presidio) when the flag goes on is priced from its next span with
-no question asked. Before turning the flag on for an organization, the operator checks its
-levels, or puts it on the free list first.
+subscription carries the price (decision 10). What stops a customer who does not want to pay is the
+acceptance (decision 15): the settings page asks an admin before it turns Strict on at a price and
+keeps the level it had when it is cancelled; Essential never reaches the model or Presidio. An
+organization, team or project on Strict without a recorded acceptance, including one that confirmed
+the price before this change, keeps rule-based detection (Presidio) at no charge until an
+organization admin accepts again, and the page shows it rule-based. The switch to the model sits on
+the organization card only, because one acceptance covers every Strict rule in the organization, and
+shows there whenever the page shows a Strict rule, the organization on Essential included; a team or
+project rule on Strict moves once an organization admin accepts there. The cost: such an
+organization keeps the rule-based detection until an admin acts, and nothing but the page tells it
+(the owner, 2026-11-26: no prompt, no email). A team or project admin cannot accept for the
+organization, so a Strict rule they save waits on an organization admin.
+
+Billing reads the acceptance from `Organization` through its own repository rather than asking
+`OrganizationApi`: organization depends on billing, so the reverse edge would close a peer cycle,
+and billing is already a named reader of the table. The read is separate from billing's cached
+organization lookup, so that cache's shape and key stay as they are.
+
+A pending PII total above the spend the acceptance covers is replayed and kept, never dropped. Only
+the replay under its own identifier tells whether Stripe already took the cut-off send: Stripe
+answers a repeat it holds as already existing, and counts one it never got, so dropping it
+double-counts a send Stripe took. The cost: PII spend from before the acceptance that was already
+reported, by a release before this rule or in a pending send, is never corrected down; the floor
+keeps it as it keeps what a line's later start would take back (ADR-174 decision 26). It is accepted
+because no PII total is live: decision 11 maps the meter in test mode only, and the price-line rule
+means nothing is reported before a line exists.
+
+One limit is the shared meter reporter's, the same for the events, Instant Evals and PII meters, and
+this ADR leaves it as it is: a pending total is replayed whenever the next report runs, with no
+bound on its age. Stripe keeps an identifier for 24 hours, so a replay after that counts the send
+twice if Stripe had taken it. That needs a day with no report after the cut-off send, or an operator
+clearing a tripped breaker more than a day later: five failures in a row stop every report of that
+meter until one succeeds. It is accepted here because it is not new, a PII total reaches Stripe only
+for a subscription that carries the PII price (decision 10; a pending total is only written after
+that check), and decision 11 maps the meter in test mode only. The follow-up, before the meter is
+mapped live: reconcile a pending total older than the window against Stripe's meter summaries before
+replaying it. The floor retired two other limits for this meter: a month the line or the acceptance
+narrows sends no negative PII delta, so none lands on an invoice Stripe already finalised, and no
+delta's identifier repeats.
 
 ## Consequences
 

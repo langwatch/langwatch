@@ -226,6 +226,17 @@ export class OrganizationService {
     return this.repository.recordInstantEvalsOptIn({ ...input, at: nowInstant() });
   }
 
+  isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean> {
+    return this.repository.isPiiRedactionModelAccepted(input);
+  }
+
+  recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    return this.repository.recordPiiRedactionModelAcceptance({ ...input, at: nowInstant() });
+  }
+
   /** The guided-onboarding record, where the organization keeps it. */
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.repository.getGuidedOnboarding(input);

@@ -495,6 +495,14 @@
     "description": "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it."
   },
   {
+    "id": "ops:fill-queue-tenant-claims",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Lists the queue groups claimed before each tenant's claimed-groups index existed, so a projection replay can wait on the index instead of walking Redis.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:fill-event-log-id-index",
     "kind": "data",
     "mode": "background",
