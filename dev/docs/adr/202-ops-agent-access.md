@@ -100,10 +100,13 @@ cannot reach any customer route.
   let through.
 - Customer-facing creator fields on evaluators, monitors, datasets and triggers do not exist, so
   "LangWatch Support" shows in the audit log rather than on every object.
-- The standing database paths are a gap: an agent running on a machine that holds production
-  database credentials can skip this flow. Until agents run without those credentials,
-  `org:content` and `org:support` stay off in production and only `ops:read` and `org:metadata`
-  are used. Closing that path has its own follow-up issue.
+- The standing database paths are closed. AWS root keys were removed on 2026-11-10; production
+  AWS access now goes through SSO or the Laze vault, and each use needs an approval. Production
+  reads go through the staff access API or the audited ops functions. The
+  `ops_agent_access_enabled` flag is on in production, and `org:content` and `org:support` are in
+  use there since 2026-11-27.
+- Break-glass access still needs only one approver. A second-person approval has its own
+  follow-up issue.
 
 ## References
 
