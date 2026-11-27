@@ -7,7 +7,11 @@ import {
 import { EVENT_LOG_ID_INDEX } from "@langwatch/eventing/server";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
-import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
+import {
+  type CodeStepId,
+  defineMigrationStep,
+  QUEUE_TENANT_CLAIMS_FILL_STEP,
+} from "@langwatch/upgrade/step";
 
 import { OpsModule } from "#app/ops.app";
 import { opsChannels } from "#channels/ops-channels.registry";
@@ -194,6 +198,24 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         run: async ({ dryRun }) => {
           const granted = await app.seedPlatformOperatorsFromAdminEmails({ dryRun });
           return dryRun ? { wouldGrant: granted } : { granted };
+        },
+      }),
+      // Old images claim without listing the claim, so the walk waits until they are gone.
+      defineMigrationStep({
+        id: QUEUE_TENANT_CLAIMS_FILL_STEP,
+        kind: "data",
+        mode: "background",
+        description:
+          "Lists the queue groups claimed before each tenant's claimed-groups index existed, so a projection replay can wait on the index instead of walking Redis.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          if (dryRun) return { dryRun, wouldWalk: true };
+          const resumed = checkpoint.resumeFrom?.cursor;
+          return app.fillQueueTenantClaims({
+            resumeCursor: typeof resumed === "string" ? resumed : "0",
+            signal,
+            onSlice: (progress) => checkpoint.save({ report: progress }),
+          });
         },
       }),
     ])

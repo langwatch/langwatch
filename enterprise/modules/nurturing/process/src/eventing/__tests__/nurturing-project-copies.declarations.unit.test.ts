@@ -16,7 +16,7 @@ import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
-import { isMigrationStep } from "@langwatch/upgrade/step";
+import { isMigrationStep, QUEUE_TENANT_CLAIMS_FILL_STEP } from "@langwatch/upgrade/step";
 import { describe, expect, it, vi } from "vitest";
 
 import { nurturingProcessModule } from "../../nurturing.module.ts";
@@ -185,11 +185,15 @@ describe("the replay steps nurturing declares for these copies", () => {
 
     expect(steps.map(({ id }) => id)).toEqual(COPY_STEPS);
     expect(Object.fromEntries(steps.map(({ id, after }) => [id, after]))).toEqual({
-      [PERSONAL_OWNERS_OF_ORGANIZATION_STEP]: [...MARKS_STEPS],
-      [PERSONAL_OWNERS_OF_PROJECT_STEP]: [...MARKS_STEPS, PROJECT_LISTING_STEP],
-      [TRACED_PROJECTS_OF_TRACE_STEP]: undefined,
-      [TRACED_PROJECTS_OF_PROJECT_STEP]: [PROJECT_LISTING_STEP],
-      [LAST_TRACES_STEP]: undefined,
+      [PERSONAL_OWNERS_OF_ORGANIZATION_STEP]: [...MARKS_STEPS, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [PERSONAL_OWNERS_OF_PROJECT_STEP]: [
+        ...MARKS_STEPS,
+        PROJECT_LISTING_STEP,
+        QUEUE_TENANT_CLAIMS_FILL_STEP,
+      ],
+      [TRACED_PROJECTS_OF_TRACE_STEP]: [QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [TRACED_PROJECTS_OF_PROJECT_STEP]: [PROJECT_LISTING_STEP, QUEUE_TENANT_CLAIMS_FILL_STEP],
+      [LAST_TRACES_STEP]: [QUEUE_TENANT_CLAIMS_FILL_STEP],
     });
     for (const [index, step] of steps.entries()) {
       expect(step).toMatchObject({

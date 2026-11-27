@@ -63,6 +63,7 @@ export type CodeStepId =
   | "ops:recopy-identity-authz-migration-state-after-rollout"
   | "ops:checkup-canary-project"
   | "ops:seed-platform-operators"
+  | "ops:fill-queue-tenant-claims"
   | "ops:fill-event-log-id-index"
   | "organization:record-presence-settings"
   | "organization:record-seat-peak-opening-snapshots"

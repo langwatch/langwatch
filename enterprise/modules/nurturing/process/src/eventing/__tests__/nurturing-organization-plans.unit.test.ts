@@ -30,7 +30,11 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { EventStoreMemory, testEventSchema } from "@langwatch/eventing/testing";
+import {
+  EventStoreMemory,
+  testEventSchema,
+  IDLE_REPLAY_CLAIMS_INDEX,
+} from "@langwatch/eventing/testing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -374,6 +378,7 @@ function deploy(events: ReplayEvent[]) {
   });
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: new NurturingSeededLog(events),
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

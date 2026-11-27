@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   type EventSourcing,
+  eventSourcingClaimsIndex,
   ReplayService as EventingReplayService,
   pipelineUpcastsOf,
   replayLeanOf,
@@ -47,7 +48,13 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
     return new LiveReplayRuntimeRepository(members);
   }
 
-  create({ retention }: { retention: RetentionPolicyResolver }): OpsReplayRuntime {
+  create({
+    retention,
+    claimsIndexReady,
+  }: {
+    retention: RetentionPolicyResolver;
+    claimsIndexReady: () => Promise<boolean>;
+  }): OpsReplayRuntime {
     const { redis, clickhouse, eventing, privateTenants, eventLogIndexReadiness } = this.members;
     if (redis.isCluster) {
       throw new Error(
@@ -73,6 +80,7 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
           : unionReplayTenants({ source: logSource, listTenants: privateTenants }),
       redis: connection,
       retentionPolicyResolver: retention,
+      claims: eventSourcingClaimsIndex({ redis: connection, isReady: claimsIndexReady }),
     });
     return {
       service,

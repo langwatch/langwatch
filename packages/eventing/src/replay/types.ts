@@ -5,6 +5,7 @@ import type {
   SealedStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import type { ReplayClaimsIndex } from "./replayClaimsIndex.ts";
 import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource.ts";
 import type { ReplayRedis } from "./replayRedis.ts";
 
@@ -166,6 +167,8 @@ export interface DiscoveryResult {
  */
 export interface ReplayContext {
   redis: ReplayRedis;
+  /** The queue's claimed-groups index the map/state drain reads (ADR-092). */
+  claims: ReplayClaimsIndex;
   eventSource: ReplayEventSource;
   /** Accumulator options carrying the retention resolver (if wired). */
   accumulatorOpts: { retentionResolver?: RetentionPolicyResolver };

@@ -1,12 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- * Every nurturing replay step run over seeded owner logs, on a worker whose Customer.io and
- * PostHog channels are reachable and record what they are asked: the rows are written and the
- * channels hear nothing. The real module supplies the usage sync and the plan send, so a replay
- * that reached either would land in the recordings.
- * Spec: enterprise/modules/nurturing/specs/project-usage.feature
- */
 import { SSO_AUTO_ADDED_EVENT_TYPE } from "@langwatch/auth-contract";
 import {
   BILLING_LIFECYCLE_AGGREGATE_TYPE,
@@ -26,6 +17,16 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * Every nurturing replay step run over seeded owner logs, on a worker whose Customer.io and
+ * PostHog channels are reachable and record what they are asked: the rows are written and the
+ * channels hear nothing. The real module supplies the usage sync and the plan send, so a replay
+ * that reached either would land in the recordings.
+ * Spec: enterprise/modules/nurturing/specs/project-usage.feature
+ */
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import {
   GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
@@ -343,6 +344,7 @@ async function deploy(events: ReplayEvent[]) {
   });
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: new NurturingSeededLog(events),
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

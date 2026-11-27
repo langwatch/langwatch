@@ -97,6 +97,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   join_request: "indefinite",
   langy_guided_onboarding: "indefinite",
   licensing_customer: "indefinite",
+  nurturing_project_usage_view: "indefinite",
   nurturing_signal: "indefinite",
   organization: "indefinite",
   organization_audit: "indefinite",

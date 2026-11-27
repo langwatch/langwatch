@@ -1,8 +1,3 @@
-/**
- * The trace_analytics row the widget-columns replay writes for a trace is the same whether its
- * events came from the bulk read or, that read over ClickHouse's per-query memory limit, in pages.
- * Spec: specs/upgrade/projection-replay-step.feature
- */
 import {
   type Event,
   type RegisteredFoldProjection,
@@ -12,6 +7,12 @@ import {
   aggregateKey,
   sealFoldProjection,
 } from "@langwatch/eventing";
+/**
+ * The trace_analytics row the widget-columns replay writes for a trace is the same whether its
+ * events came from the bulk read or, that read over ClickHouse's per-query memory limit, in pages.
+ * Spec: specs/upgrade/projection-replay-step.feature
+ */
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
@@ -191,6 +192,7 @@ async function replayTrace({ bulkOverMemory }: { bulkOverMemory: boolean }) {
   const storage = new WrittenRows();
   const { source, reads } = eventLog(traceEvents(), { bulkOverMemory });
   const service = new ReplayService({
+    claims: IDLE_REPLAY_CLAIMS_INDEX,
     eventSource: source,
     redis: memoryRedisDouble({
       script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
