@@ -102,6 +102,7 @@ Feature: The transactional messages LangWatch sends
     Given the studio's Weekly digests tab
     Then it lists plan pressure, scenarios trend, coding-agent week and traces week, in that order
     And each says who gets it and has a version A that sends today and a slot for a version B
+    And What's new follows them with its fixtures, marked "Not sent yet: nothing feeds it news"
 
   @unit
   Scenario: Digest review shows each digest as it would arrive today

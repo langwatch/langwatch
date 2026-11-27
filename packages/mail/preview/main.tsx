@@ -75,7 +75,13 @@ const Studio = (): JSX.Element => {
         });
         if (picked) {
           setSelected({ id: picked.template.id, fixture: picked.fixture.name });
-          setCurrentProps(propsOrFixture({ override: initialPropsOverride, picked }));
+          setCurrentProps(
+            propsOrFixture({
+              override: initialPropsOverride,
+              requestedId: initialUrl.templateId,
+              picked,
+            }),
+          );
         }
       })
       .catch((error: unknown) => setFailure(String(error)));
@@ -119,7 +125,7 @@ const Studio = (): JSX.Element => {
       });
       if (picked) {
         setSelected({ id: picked.template.id, fixture: picked.fixture.name });
-        setCurrentProps(propsOrFixture({ override: props, picked }));
+        setCurrentProps(propsOrFixture({ override: props, requestedId: state.templateId, picked }));
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -188,8 +194,19 @@ function pickFixture({
 }
 
 /** A link's edited props when it carries any, else the picked fixture's own. */
-function propsOrFixture({ override, picked }: { override: unknown; picked: Picked }): unknown {
-  return override !== undefined ? override : picked.fixture.props;
+/** A link's props belong to the template it names; a fallback template keeps its own fixture. */
+function propsOrFixture({
+  override,
+  requestedId,
+  picked,
+}: {
+  override: unknown;
+  requestedId: string | null;
+  picked: Picked;
+}): unknown {
+  return override !== undefined && picked.template.id === requestedId
+    ? override
+    : picked.fixture.props;
 }
 
 /**

@@ -39,6 +39,7 @@ const digestReviewSectionSchema = z.object({
   title: z.string(),
   whoGetsThis: z.string(),
   notFilledToday: z.array(z.string()),
+  notSentBecause: z.string().nullable(),
   versionA: digestReviewVersionSchema,
   versionB: digestReviewVersionSchema.nullable(),
 });

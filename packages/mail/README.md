@@ -15,7 +15,8 @@ Every message, every fixture, rendered live, on two tabs.
 tries them (`preview/digest-review.ts`, kept in step with the digest module's
 `digest-template.rules.ts`): who gets each, its subject with the organisation first, and
 every fixture without the props the sender does not fill yet, as version A, with a slot
-for a version B.
+for a version B. What's new follows them, marked as not sent yet, so its fixtures can be
+reviewed too.
 
 **All other emails** lists every other message under plain headings
 (`preview/studio-groups.ts` maps each id; an unmapped one lands under Other). A search box

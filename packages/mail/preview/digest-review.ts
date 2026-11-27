@@ -15,6 +15,8 @@ export interface DigestReviewEntry {
   notFilledToday: readonly string[];
   versionA: DigestVersion;
   versionB: DigestVersion | null;
+  /** Set only for a registered digest the sender never picks, shown after those that send. */
+  notSentBecause?: string;
 }
 
 const whatSendsToday = (templateId: string): DigestVersion => ({
@@ -57,6 +59,18 @@ export const DIGEST_REVIEW: readonly DigestReviewEntry[] = [
     notFilledToday: ["whatsNew"],
     versionA: whatSendsToday("digest-traces-week"),
     versionB: null,
+  },
+];
+
+/** Registered digests the sender never picks, listed after the sending ones for review. */
+export const DIGEST_NOT_SENT: readonly DigestReviewEntry[] = [
+  {
+    templateId: "digest-whats-new",
+    whoGetsThis: "Nobody yet.",
+    notFilledToday: [],
+    versionA: { label: "Its fixtures", templateId: "digest-whats-new" },
+    versionB: null,
+    notSentBecause: "Not sent yet: nothing feeds it news",
   },
 ];
 
@@ -134,7 +148,7 @@ export const buildDigestReview = async ({
   };
 
   return Promise.all(
-    DIGEST_REVIEW.map(async (entry) => {
+    [...DIGEST_REVIEW, ...DIGEST_NOT_SENT].map(async (entry) => {
       const versionA = await renderVersion({
         version: entry.versionA,
         notFilledToday: entry.notFilledToday,
@@ -144,6 +158,7 @@ export const buildDigestReview = async ({
         title: versionA.cards[0]?.title ?? entry.templateId,
         whoGetsThis: entry.whoGetsThis,
         notFilledToday: entry.notFilledToday.map(describeNotFilled),
+        notSentBecause: entry.notSentBecause ?? null,
         versionA,
         versionB: entry.versionB
           ? await renderVersion({ version: entry.versionB, notFilledToday: entry.notFilledToday })

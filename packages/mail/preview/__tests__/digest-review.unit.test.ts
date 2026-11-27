@@ -1,10 +1,11 @@
-import { mailTemplates, type MailTemplate, type renderMailTemplate } from "@langwatch/mail";
 import { describe, expect, it } from "vitest";
 
+import { mailTemplates, type MailTemplate, type renderMailTemplate } from "../../src/index.ts";
 import {
   arrivingSubject,
   asSentToday,
   buildDigestReview,
+  DIGEST_NOT_SENT,
   DIGEST_REVIEW,
   SAMPLE_ORGANIZATION,
 } from "../digest-review.ts";
@@ -83,9 +84,9 @@ describe("buildDigestReview", () => {
       const sections = await buildDigestReview({ templates: mailTemplates, render });
 
       expect(sections.map((section) => section.templateId)).toEqual(
-        DIGEST_REVIEW.map((entry) => entry.templateId),
+        [...DIGEST_REVIEW, ...DIGEST_NOT_SENT].map((entry) => entry.templateId),
       );
-      for (const entry of DIGEST_REVIEW) {
+      for (const entry of [...DIGEST_REVIEW, ...DIGEST_NOT_SENT]) {
         const template = mailTemplates.find((candidate) => candidate.id === entry.templateId);
         const rendered = seen.filter((call) => call.id === entry.templateId);
         expect(rendered).toHaveLength(template?.fixtures.length ?? -1);
@@ -94,6 +95,19 @@ describe("buildDigestReview", () => {
         }
       }
       expect(sections.every((section) => section.versionB === null)).toBe(true);
+    });
+
+    /** @scenario "Digest review lists the digests that send, in the order the sender tries them" */
+    it("ends with What's new, marked as not sent, after the four that send", async () => {
+      const render: typeof renderMailTemplate = () =>
+        Promise.resolve({ subject: "Subject", html: "<p></p>", text: "" });
+
+      const sections = await buildDigestReview({ templates: mailTemplates, render });
+
+      expect(sections.slice(0, 4).every((section) => section.notSentBecause === null)).toBe(true);
+      expect(
+        sections.slice(4).map((section) => [section.templateId, section.notSentBecause]),
+      ).toEqual([["digest-whats-new", "Not sent yet: nothing feeds it news"]]);
     });
   });
 });

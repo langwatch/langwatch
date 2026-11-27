@@ -35,14 +35,26 @@ export const DigestReviewView = ({ nav, previewDark }: DigestReviewViewProps): J
           </Callout>
         )}
         {!failure && !sections && <Text tone="secondary">Rendering the digests…</Text>}
-        {sections?.map((section, index) => (
-          <ReviewSection
-            key={section.templateId}
-            section={section}
-            rank={index + 1}
-            previewDark={previewDark}
-          />
-        ))}
+        {sections
+          ?.filter((section) => section.notSentBecause === null)
+          .map((section, index) => (
+            <ReviewSection
+              key={section.templateId}
+              section={section}
+              heading={`${index + 1}. ${section.title}`}
+              previewDark={previewDark}
+            />
+          ))}
+        {sections
+          ?.filter((section) => section.notSentBecause !== null)
+          .map((section) => (
+            <ReviewSection
+              key={section.templateId}
+              section={section}
+              heading={`${section.title}. ${section.notSentBecause}`}
+              previewDark={previewDark}
+            />
+          ))}
       </Stack>
     </Page>
   );
@@ -50,29 +62,31 @@ export const DigestReviewView = ({ nav, previewDark }: DigestReviewViewProps): J
 
 function ReviewSection({
   section,
-  rank,
+  heading,
   previewDark,
 }: {
   section: DigestReviewSection;
-  rank: number;
+  heading: string;
   previewDark: boolean;
 }): JSX.Element {
+  const sends = section.notSentBecause === null;
   return (
     <section className="mailroom-review" aria-labelledby={`review-${section.templateId}`}>
       <Stack gap={3}>
         <h2 id={`review-${section.templateId}`} className="mailroom-review-heading">
-          {rank}. {section.title}
+          {heading}
         </h2>
         <Text as="p">
           <strong>Who gets this:</strong> {section.whoGetsThis}
         </Text>
-        <Text as="p" tone="secondary">
-          Shown without what the sender leaves out today: {section.notFilledToday.join(", ")}.
-        </Text>
+        {section.notFilledToday.length > 0 && (
+          <Text as="p" tone="secondary">
+            Shown without what the sender leaves out today: {section.notFilledToday.join(", ")}.
+          </Text>
+        )}
         <ReviewVersion version={section.versionA} previewDark={previewDark} />
-        {section.versionB ? (
-          <ReviewVersion version={section.versionB} previewDark={previewDark} />
-        ) : (
+        {section.versionB && <ReviewVersion version={section.versionB} previewDark={previewDark} />}
+        {sends && !section.versionB && (
           <div className="mailroom-review-empty">
             <Badge>Version B</Badge> <Text tone="secondary">No B version yet</Text>
           </div>
