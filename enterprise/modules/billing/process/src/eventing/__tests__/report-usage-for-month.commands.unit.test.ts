@@ -1883,13 +1883,17 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
     const replayed = { identifier: `org-1:2026-02:${meter}:from:0:to:5000`, value: 0.5 };
 
     /** @scenario "A pending PII redaction total is replayed even while the price is missing" */
-    it("replays it under its own identifier while the acceptance's spend covers it", async () => {
+    it("replays it under its own identifier while the subscription has no PII price", async () => {
+      missingPrices = ["GROWTH_PII_REDACTION_USD"];
       const { sent, checkpoint } = await replayPending({
         eligible: { outcome: "counted", total: 7_000 },
       });
 
       expect(sent).toEqual([replayed]);
       expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
+      expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
+        expect.objectContaining({ price: "GROWTH_PII_REDACTION_USD" }),
+      );
     });
 
     /** @scenario "A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down" */
