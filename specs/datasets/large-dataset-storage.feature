@@ -74,6 +74,13 @@ Feature: Large dataset storage
     And the copy's rows are not stored in the Postgres records table
 
   @unit
+  Scenario: A dataset that is not ready is refused before its copy exists
+    Given a dataset in object storage that is still processing
+    When I copy it to another project
+    Then the copy is refused because the dataset is not ready
+    And no dataset is created in the other project
+
+  @unit
   Scenario: Copying a legacy single-file dataset
     Given a dataset the previous release kept as one stored file
     When I copy it to another project

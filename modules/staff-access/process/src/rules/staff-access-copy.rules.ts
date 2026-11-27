@@ -115,8 +115,9 @@ export function failureReason(error: unknown): string {
 }
 
 /**
- * Whether the owner refused by name before making anything: a handled refusal below 500. Any
- * other failure may come after the target was created, so its reservation is kept.
+ * Whether the owner refused by name before making anything: a handled refusal below 500. Each
+ * owner's copy runs its refusals before it creates the target; any other failure may come after
+ * the target exists, so its reservation is kept.
  */
 export function refusedBeforeMaking(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;

@@ -334,3 +334,29 @@ describe("copying a dataset kept in the Postgres records table", () => {
     ]);
   });
 });
+
+describe("copying a dataset in object storage that is not ready", () => {
+  /** @scenario "A dataset that is not ready is refused before its copy exists" */
+  it("refuses the copy and creates no dataset in the target project", async () => {
+    const repositories = MemoryDatasetRepositories.create();
+    const app = createDatasetTestApp({ repositories });
+    const source = await app.upsertDataset({ projectId, name: "Still Processing", columnTypes });
+    await repositories.content.update({
+      id: source.id,
+      projectId,
+      data: { contentLayout: "s3_jsonl", status: "processing" },
+    });
+
+    await expect(
+      app.copyDataset({
+        sourceDatasetId: source.id,
+        sourceProjectId: projectId,
+        targetProjectId: "project-target",
+      }),
+    ).rejects.toMatchObject({ name: "DatasetNotReadyError" });
+
+    expect(
+      await repositories.datasets.findAll({ projectId: "project-target", page: 1, limit: 10 }),
+    ).toEqual([]);
+  });
+});
