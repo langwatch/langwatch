@@ -7,9 +7,13 @@ import type {
 } from "@langwatch/staff-access-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
-import { pageOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
+import {
+  pageOf,
+  isoOfMs,
+  pageInputOf,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
-import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
 type PeopleReadsDeps = Readonly<{
   organizations: Pick<

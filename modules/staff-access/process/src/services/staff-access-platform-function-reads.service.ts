@@ -13,7 +13,13 @@ import type {
 import { type Instant, Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
+import {
+  pageOf,
+  rangeOf,
+  isoOfMs,
+  pageInputOf,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 import {
   imageTagOf,
   countsByPlainWord,
@@ -23,7 +29,6 @@ import {
   utcMonthsUntil,
 } from "../rules/staff-access-platform-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
-import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
 type PlatformReadsDeps = Readonly<{
   ops: Pick<

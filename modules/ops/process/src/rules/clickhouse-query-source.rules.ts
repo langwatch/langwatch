@@ -2,7 +2,7 @@
  * Where a failed ClickHouse statement came from: the `log_comment` prefix each product read
  * tags its statements with, and the collapse of anything else to `other` (ADR-202).
  */
-import type { ClickHouseQuerySource } from "@langwatch/ops-contract";
+import { clickHouseQuerySourceSchema, type ClickHouseQuerySource } from "@langwatch/ops-contract";
 
 /** Each tagged source and the `log_comment` prefix that names it, in match order. */
 export const CLICKHOUSE_QUERY_SOURCE_PREFIXES: readonly Readonly<{
@@ -26,8 +26,7 @@ export function querySourceExpression(): string {
 
 /** A source as storage answered it; a value this release does not know is `other`. */
 export function querySourceOf(stored: string): ClickHouseQuerySource {
-  const known = CLICKHOUSE_QUERY_SOURCE_PREFIXES.find(({ source }) => source === stored);
-  return known ? known.source : "other";
+  return clickHouseQuerySourceSchema.safeParse(stored).data ?? "other";
 }
 
 /** The project ids a LangWatchQL group named, without blanks, at most `max`. */

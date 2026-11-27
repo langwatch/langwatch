@@ -28,6 +28,12 @@ Feature: Activity ops functions
     And an agent kind that is not a plain word reads "other"
     And no session title, branch or user id
 
+  @unit
+  Scenario: org.coding_agents keeps two agent kinds that both read as other in their own rows
+    Given ACME's project ran two agent kinds that are not plain words on the same day
+    When the agent calls "org.coding_agents"
+    Then each kind is its own "other" row with its own session and user counts, never summed
+
   @integration
   Scenario: org.coding_agents reads only the approved organization's projects
     Given a redeemed "org:metadata" session on ACME naming "org.coding_agents"
@@ -53,6 +59,12 @@ Feature: Activity ops functions
     Given ACME had traces, evaluations, Instant Evals, scenario runs, coding agent sessions and gateway requests
     When the agent calls "org.activity_weekly" for 4 weeks
     Then it answers 4 weeks, oldest first, each with those counts and the members active since the week began
+
+  @unit
+  Scenario: org.activity_weekly reads its daily figures in spans within the range limit
+    Given a redeemed "org:metadata" session on ACME naming "org.activity_weekly"
+    When the agent calls it for 9 weeks
+    Then it answers 9 weeks, and no coding agent, gateway or Instant Eval read spans more than 31 days
 
   @integration
   Scenario: org.activity_weekly reads at most 26 weeks

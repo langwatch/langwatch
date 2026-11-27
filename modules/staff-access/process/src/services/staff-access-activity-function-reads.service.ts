@@ -18,12 +18,19 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import {
   foldInstantEvalWeeks,
   plainCode,
+  storedWordKeyOf,
   sumByWeek,
   WEEK_MS,
+  weekBatchesOf,
   weekStartsBack,
 } from "../rules/staff-access-activity-function.rules.ts";
-import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
-import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
+import {
+  pageOf,
+  rangeOf,
+  isoOfMs,
+  pageInputOf,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 
 type ActivityReadsDeps = Readonly<{
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "getAllMembers">;
@@ -75,29 +82,23 @@ export class StaffAccessActivityFunctionReadsService {
     const window = windowOf({ input, at });
     const projectIds = await this.projectIdsOf({ organizationId });
     const counts = await this.deps.codingAgents.findDailySessionCounts({ projectIds, ...window });
-    const merged = new Map<
-      string,
-      { day: number; projectId: string; agent: string; sessions: number; users: number }
-    >();
-    for (const count of counts) {
-      const agent = plainCode(count.agent);
-      const key = `${count.day}/${count.projectId}/${agent}`;
-      const known = merged.get(key);
-      merged.set(key, {
-        day: count.day,
+    const keyed = counts.map((count) => ({
+      key: `${isoOfMs(count.day)}/${count.projectId}/${storedWordKeyOf(count.agent)}`,
+      row: {
+        day: isoOfMs(count.day),
         projectId: count.projectId,
-        agent,
-        sessions: (known?.sessions ?? 0) + count.sessions,
-        users: (known?.users ?? 0) + count.users,
-      });
-    }
-    const rows = [...merged.values()].map((row) => ({ ...row, day: isoOfMs(row.day) }));
-    return pageOf({
-      rows,
-      keyOf: (row) => `${row.day}/${row.projectId}/${row.agent}`,
+        agent: plainCode(count.agent),
+        sessions: count.sessions,
+        users: count.users,
+      },
+    }));
+    const page = pageOf({
+      rows: keyed,
+      keyOf: (entry) => entry.key,
       name: "org.coding_agents",
       ...pageInputOf(input),
     });
+    return { ...page, items: page.items.map((entry) => entry.row) };
   }
 
   private async gatewaySpend({
@@ -148,11 +149,34 @@ export class StaffAccessActivityFunctionReadsService {
     at,
   }: Call<"org.activity_weekly">): Promise<StaffAccessFunctionOutput<"org.activity_weekly">> {
     const starts = weekStartsBack({ weeks: input.weeks, at: at.epochMilliseconds });
-    const span = { since: starts[0] ?? 0, until: (starts.at(-1) ?? 0) + WEEK_MS };
     const [projectIds, members] = await Promise.all([
       this.projectIdsOf({ organizationId }),
       this.deps.organizations.getAllMembers({ organizationId }),
     ]);
+    const memberUserIds = members.map((member) => member.id);
+    const rows: StaffAccessFunctionOutput<"org.activity_weekly">["items"] = [];
+    for (const batch of weekBatchesOf(starts)) {
+      rows.push(...(await this.weeksOf({ starts: batch, projectIds, memberUserIds })));
+    }
+    return pageOf({
+      rows,
+      keyOf: (row) => row.week,
+      name: "org.activity_weekly",
+      ...pageInputOf(input),
+    });
+  }
+
+  /** A run of consecutive weeks within the range cap: the daily reads span only these weeks. */
+  private async weeksOf({
+    starts,
+    projectIds,
+    memberUserIds,
+  }: {
+    starts: readonly number[];
+    projectIds: string[];
+    memberUserIds: string[];
+  }): Promise<StaffAccessFunctionOutput<"org.activity_weekly">["items"]> {
+    const span = { since: starts[0] ?? 0, until: (starts.at(-1) ?? 0) + WEEK_MS };
     const [agentDays, gatewayDays, instantDays] = await Promise.all([
       this.deps.codingAgents.findDailySessionCounts({ projectIds, ...span }),
       this.deps.gateway.findDailyKeySpend({ projectIds, ...span }),
@@ -173,8 +197,7 @@ export class StaffAccessActivityFunctionReadsService {
       dayOf: (row) => row.day,
       valueOf: (row) => row.runs,
     });
-    const memberUserIds = members.map((member) => member.id);
-    const rows = await Promise.all(
+    return Promise.all(
       starts.map(async (start) => ({
         week: isoOfMs(start),
         ...(await this.weekCounts({
@@ -188,12 +211,6 @@ export class StaffAccessActivityFunctionReadsService {
         gatewayRequests: requests.get(start) ?? 0,
       })),
     );
-    return pageOf({
-      rows,
-      keyOf: (row) => row.week,
-      name: "org.activity_weekly",
-      ...pageInputOf(input),
-    });
   }
 
   /** The per-week reads that take a window rather than answering per day. */

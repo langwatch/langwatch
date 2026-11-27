@@ -16,7 +16,14 @@ import {
 import type { Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
+import {
+  pageOf,
+  rangeOf,
+  isoOfMs,
+  pageInputOf,
+  type StaffAccessFunctionRun,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
 import type { StaffAccessActivityFunctionReadsService } from "./staff-access-activity-function-reads.service.ts";
 import type { StaffAccessBillingFunctionReadsService } from "./staff-access-billing-function-reads.service.ts";
@@ -44,15 +51,6 @@ type ReadsDeps = Readonly<{
   billing: Pick<StaffAccessBillingFunctionReadsService, "reads">;
 }>;
 
-/** One function's read: `organizationId` is the approved organization, empty off `org` scope. */
-export type StaffAccessFunctionRun<Name extends StaffAccessFunctionName> = (input: {
-  input: StaffAccessFunctionInput<Name>;
-  organizationId: string;
-  at: Instant;
-}) => Promise<StaffAccessFunctionOutput<Name>>;
-export type StaffAccessFunctionRuns<Names extends StaffAccessFunctionName> = {
-  [Name in Names]: StaffAccessFunctionRun<Name>;
-};
 type Run<Name extends StaffAccessFunctionName> = StaffAccessFunctionRun<Name>;
 
 /**

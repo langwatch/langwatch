@@ -18,8 +18,8 @@ import {
   type StaffAccessPage,
   isoOfMs,
   pageInputOf,
+  type StaffAccessFunctionRuns,
 } from "../rules/staff-access-function.rules.ts";
-import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
 /** How many tool calls one turn of `org.langy_turn` answers; `truncated` says when it ran more. */
 const TOOL_CALLS_PER_TURN = 100;

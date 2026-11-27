@@ -7,9 +7,14 @@ import {
 } from "@langwatch/staff-access-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 
-import { DAY_MS, pageOf, rangeOf, pageInputOf } from "../rules/staff-access-function.rules.ts";
+import {
+  DAY_MS,
+  pageOf,
+  rangeOf,
+  pageInputOf,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
-import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
 /** The query log is kept days, not weeks: `ch.query_errors` reads at most this many. */
 const CH_QUERY_ERRORS_MAX_RANGE_DAYS = 7;

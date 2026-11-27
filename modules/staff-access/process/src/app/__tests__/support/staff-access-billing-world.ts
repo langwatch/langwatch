@@ -14,9 +14,14 @@ import { Temporal } from "@langwatch/time";
 
 import { MemoryStaffAccessRepositories } from "../../../repositories/memory/memory.staff-access.repositories.ts";
 import type { StaffAccessRequestRow } from "../../../repositories/staff-access.repository.ts";
+import { StaffAccessActivityFunctionReadsService } from "../../../services/staff-access-activity-function-reads.service.ts";
 import { StaffAccessBillingFunctionReadsService } from "../../../services/staff-access-billing-function-reads.service.ts";
 import { StaffAccessFunctionReadsService } from "../../../services/staff-access-function-reads.service.ts";
 import { StaffAccessFunctionService } from "../../../services/staff-access-function.service.ts";
+import { StaffAccessLangyFunctionReadsService } from "../../../services/staff-access-langy-function-reads.service.ts";
+import { StaffAccessPeopleFunctionReadsService } from "../../../services/staff-access-people-function-reads.service.ts";
+import { StaffAccessPlatformFunctionReadsService } from "../../../services/staff-access-platform-function-reads.service.ts";
+import { StaffAccessTelemetryFunctionReadsService } from "../../../services/staff-access-telemetry-function-reads.service.ts";
 
 export const ACME = "org_acme";
 export const NOW = Temporal.Instant.from("2026-11-20T10:00:00Z");
@@ -163,8 +168,6 @@ function requestRow(overrides: Partial<StaffAccessRequestRow>): StaffAccessReque
   };
 }
 
-const absent = { reads: {} } as never;
-
 export async function caller({
   billing,
   scopes,
@@ -192,11 +195,36 @@ export async function caller({
       apiKeys: createApiFixture(),
       ops: createApiFixture(),
       auth: createApiFixture(),
-      telemetry: absent,
-      langy: absent,
-      people: absent,
-      activity: absent,
-      platform: absent,
+      telemetry: StaffAccessTelemetryFunctionReadsService.create({ ops: createApiFixture() }),
+      langy: StaffAccessLangyFunctionReadsService.create({
+        langy: createApiFixture(),
+        projects: createApiFixture(),
+      }),
+      people: StaffAccessPeopleFunctionReadsService.create({
+        organizations: createApiFixture(),
+        users: createApiFixture(),
+        entitlements: createApiFixture(),
+      }),
+      activity: StaffAccessActivityFunctionReadsService.create({
+        organizations: createApiFixture(),
+        projects: createApiFixture(),
+        codingAgents: createApiFixture(),
+        gateway: createApiFixture(),
+        instantEvals: createApiFixture(),
+        traces: createApiFixture(),
+        evaluations: createApiFixture(),
+        scenarios: createApiFixture(),
+        auth: createApiFixture(),
+        entitlements: createApiFixture(),
+      }),
+      platform: StaffAccessPlatformFunctionReadsService.create({
+        ops: createApiFixture(),
+        langy: createApiFixture(),
+        projects: createApiFixture(),
+        dataRetention: createApiFixture(),
+        traces: createApiFixture(),
+        evaluations: createApiFixture(),
+      }),
       billing: StaffAccessBillingFunctionReadsService.create({ billing }),
     } as Parameters<typeof StaffAccessFunctionReadsService.create>[0]),
     now: () => NOW,

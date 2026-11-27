@@ -6,8 +6,13 @@ import type {
 } from "@langwatch/staff-access-contract";
 import type { Instant } from "@langwatch/time";
 
-import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
-import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
+import {
+  pageOf,
+  rangeOf,
+  isoOfMs,
+  pageInputOf,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 
 type BillingReadsDeps = Readonly<{
   billing: Pick<

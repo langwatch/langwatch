@@ -12,7 +12,9 @@ import {
   StaffFunctionBadInputError,
   StaffFunctionScopeMismatchError,
   StaffFunctionUnknownError,
+  type StaffAccessFunctionInput,
   type StaffAccessFunctionName,
+  type StaffAccessFunctionOutput,
 } from "@langwatch/staff-access-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
@@ -20,6 +22,17 @@ import { z } from "zod";
 import { isoText } from "./staff-access.rules.ts";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** One function's read: `organizationId` is the approved organization, empty off `org` scope. */
+export type StaffAccessFunctionRun<Name extends StaffAccessFunctionName> = (input: {
+  input: StaffAccessFunctionInput<Name>;
+  organizationId: string;
+  at: Instant;
+}) => Promise<StaffAccessFunctionOutput<Name>>;
+export type StaffAccessFunctionRuns<Names extends StaffAccessFunctionName> = {
+  [Name in Names]: StaffAccessFunctionRun<Name>;
+};
+
 const cursorShape = z.object({ f: z.string(), k: z.string() });
 
 /** `lookup` and `platform` functions need `ops:read`; `org` functions an organization scope. */
