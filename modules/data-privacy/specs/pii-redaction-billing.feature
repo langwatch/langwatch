@@ -154,7 +154,9 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
     ADR-201 decision 15. Spend recorded before an organization admin accepted the price (by a
     release that routed Strict organizations to the model without asking) is never billed: the
-    monthly report counts only spend at or after the acceptance, and nothing without one.
+    month starts at the latest of its first day, the growth seat's start, the price line's creation
+    (ADR-174 decision 26) and the acceptance, and counts nothing without one. A month the acceptance
+    narrows never reports below what it already sent, so no PII redaction delta goes negative.
 
     @unit
     Scenario: An organization that accepted the price is billed only from the moment it accepted
@@ -162,6 +164,20 @@ Feature: A PII redaction model call is priced per character, written to the spen
       And PII redaction spend recorded before and after that moment
       When the month is reported
       Then the meter's total counts only the spend from the moment of acceptance on
+
+    @unit
+    Scenario: The PII redaction month starts at the later of its price line and the acceptance
+      Given a PII redaction price line added on the 3rd and an acceptance on the 10th, or the other way round
+      And PII redaction spend on the 5th and the 20th
+      When the month is reported
+      Then only the spend from the 10th on is billed
+
+    @unit
+    Scenario: A month the acceptance narrows never reports below what it already sent
+      Given PII redaction spend already reported for the whole month
+      And an acceptance on the 10th, or none
+      When the month is reported
+      Then no negative PII redaction event is sent and the reported total is kept
 
     @unit
     Scenario: An organization that never accepted the price reports no PII redaction spend
@@ -361,13 +377,12 @@ Feature: A PII redaction model call is priced per character, written to the spen
       # Stripe forgets an identifier after a day; waiting for the price could count it twice.
 
     @unit
-    Scenario: A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down
+    Scenario: A pending PII redaction total above the spend the acceptance covers is replayed and kept
       Given a PII redaction meter event whose send was cut off before it was confirmed
-      And its total is above the spend recorded from the organization's acceptance on
+      And its total is above the spend recorded from the organization's acceptance on, or there is no acceptance
       When the month is reported twice
       Then the pending total is sent again under its own identifier and kept as reported
-      And the next report sends the negative difference down to the spend from the acceptance on
-      And an organization that never accepted ends the month at zero
+      And no later report sends a negative PII redaction event
       # Stripe may already hold the cut-off send; only its own identifier tells Stripe not to count it twice.
 
     @unit

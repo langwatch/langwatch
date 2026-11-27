@@ -8,9 +8,7 @@
 import { PII_REDACTION_REQUEST_TYPE } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { createLogger } from "@langwatch/observability";
 
-import type { BillableEventsTotalResult } from "../rules/billing-month.rules.ts";
 import {
-  billingMonthWindowMs,
   instantEvalWindowMs,
   nanoUsdToInstantEvalMeterUnits,
 } from "../rules/instant-eval-meter.rules.ts";
@@ -34,6 +32,11 @@ interface PiiRedactionSpendQueryPeers {
   }): Promise<number>;
 }
 
+/** The month's total, and the moment it was read from: the reporter floors a narrowed month. */
+type PiiRedactionSpendTotal =
+  | { outcome: "counted"; total: number; fromMs: number }
+  | { outcome: "unavailable" };
+
 export class PiiRedactionSpendQueryService {
   private constructor(private readonly peers: PiiRedactionSpendQueryPeers) {}
 
@@ -42,8 +45,9 @@ export class PiiRedactionSpendQueryService {
   }
 
   /**
-   * `unavailable` where there is no ledger: "not now", never a zero to checkpoint against.
-   * The month starts no earlier than `usageBilledSinceMs`, the price line's (ADR-174 decision 26).
+   * `unavailable` where there is no ledger: "not now", never a zero to checkpoint against. The
+   * month starts at the latest of `usageBilledSinceMs` (the seat's or price line's, ADR-174
+   * decision 26) and the acceptance (ADR-201 decision 15); without an acceptance it is empty.
    */
   async queryPiiRedactionSpendTotal({
     organizationId,
@@ -53,7 +57,7 @@ export class PiiRedactionSpendQueryService {
     organizationId: string;
     billingMonth: string;
     usageBilledSinceMs: number | null;
-  }): Promise<BillableEventsTotalResult> {
+  }): Promise<PiiRedactionSpendTotal> {
     if (!this.peers.isSpendSourceAvailable()) {
       logger.warn({ organizationId }, "no spend ledger, skipping the PII redaction spend query");
 
@@ -63,19 +67,26 @@ export class PiiRedactionSpendQueryService {
     // Spend from before an admin accepted the price, which an earlier release recorded without
     // asking, is never billed; with no acceptance there is nothing to count.
     const acceptedAtMs = await this.peers.findPiiRedactionModelAcceptedAtMs({ organizationId });
-    const month = billingMonthWindowMs(billingMonth);
-    if (acceptedAtMs === null || acceptedAtMs >= month.toMs)
-      return { outcome: "counted", total: 0 };
+    const window = instantEvalWindowMs({
+      billingMonth,
+      usageBilledSinceMs:
+        acceptedAtMs === null
+          ? Number.POSITIVE_INFINITY
+          : Math.max(usageBilledSinceMs ?? acceptedAtMs, acceptedAtMs),
+    });
+    if (window.fromMs >= window.toMs)
+      return { outcome: "counted", total: 0, fromMs: window.fromMs };
 
     const nanoUsd = await this.peers.sumSpendNanoUsdByRequestType({
       tenantIds: await this.peers.listProjectIds({ organizationId }),
       requestType: PII_REDACTION_REQUEST_TYPE,
-      ...instantEvalWindowMs({
-        billingMonth,
-        usageBilledSinceMs: Math.max(usageBilledSinceMs ?? acceptedAtMs, acceptedAtMs),
-      }),
+      ...window,
     });
 
-    return { outcome: "counted", total: nanoUsdToInstantEvalMeterUnits(nanoUsd) };
+    return {
+      outcome: "counted",
+      total: nanoUsdToInstantEvalMeterUnits(nanoUsd),
+      fromMs: window.fromMs,
+    };
   }
 }

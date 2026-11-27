@@ -17,9 +17,10 @@ added to the Stripe subscription, never from the month's first day (decision 15)
 **Revised 2026-11-26:** no organization is priced until an organization admin accepts the price
 (decision 15). An organization on Strict without a recorded acceptance, including one that confirmed
 the price before this change, keeps rule-based detection (Presidio) at no charge until an
-organization admin accepts again; billing counts only spend from the acceptance on. The free list is
-now read when the batch is routed, and an unreadable one sends the batch to Presidio (decision 7,
-which recorded nothing and logged the full price before).
+organization admin accepts again; billing counts PII spend only from the later of the price line and
+the acceptance (decision 15). The free list is now read when the batch is routed, and an unreadable
+one sends the batch to Presidio (decision 7, which recorded nothing and logged the full price
+before).
 
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
@@ -122,16 +123,16 @@ which recorded nothing and logged the full price before).
 14. **The free list has no end date.** Organizations on `release_pii_redaction_model_free` stay
     free for as long as LangWatch keeps them on it. Ending it is an operator change to the flag,
     not a deploy; calls recorded while it was on stay at zero (decision 7).
-15. **Usage is billed only from the moment the price line was added (revised 2026-11-26).** All
-    charges start from the day the line is added to the subscription (Sergio, 2026-11-26). The
-    month the meter reports starts at the latest of the month's start, the growth-seat
-    subscription's start and the creation of the `GROWTH_PII_REDACTION_USD` line, read off the
-    same subscriptions list decision 10 already makes. The first report after the line is added
-    carries only usage since then, never the month from its first day, and a month the line
-    narrows never reports below what it already sent. Usage while no line existed on any
-    subscription is never billed, and a line with no creation time is refused as a failed read.
-    The rule, its replacement handling and its trade-offs are ADR-174 decision 26, shared by
-    both usage meters.
+15. **Usage is billed only from the moment the price line was added and an organization admin
+    accepted the price (revised 2026-11-26).** All charges start from the day the line is added to
+    the subscription (Sergio, 2026-11-26). The month the meter reports starts at the latest of the
+    month's start, the growth-seat subscription's start, the creation of the
+    `GROWTH_PII_REDACTION_USD` line, read off the same subscriptions list decision 10 already makes,
+    and the organization's acceptance below. The first report after the line is added carries only
+    usage since then, never the month from its first day, and a month the line narrows never reports
+    below what it already sent. Usage while no line existed on any subscription is never billed, and
+    a line with no creation time is refused as a failed read. The rule, its replacement handling and
+    its trade-offs are ADR-174 decision 26, shared by both usage meters.
 
     **Only an organization whose admin accepted the price is priced.** On Cloud, a Strict batch of
     an organization with the flag reaches the model when the organization is on the free list
@@ -147,13 +148,13 @@ which recorded nothing and logged the full price before).
     wherever the page shows Strict, a team or project rule under an organization on Essential
     included), or saving a Strict rule. Routing reads it once a minute per organization, so an
     acceptance reaches the model within a minute. Billing counts an organization's PII spend only
-    from the moment of the acceptance: none without one, none in a month that ended before it. A
-    pending meter total (a send cut off before Stripe confirmed it) is replayed under its own
-    identifier by the next report, without waiting for the price or the spend read, and kept as
-    reported; when it is above the spend from the acceptance on, the report after sends the negative
-    difference, so the month ends at the accepted spend. Neither the replay nor the correction is
-    bounded in time: both are the shared meter reporter's, with the two limits the trade-offs state.
-    Self-hosted is unchanged: the licence decides and no call is priced.
+    from the moment of the acceptance: none without one, none in a month that ended before it. The
+    spend read answers the moment it read from, so a month the acceptance narrows never reports
+    below what it already sent, as one the line narrows. A pending meter total (a send cut off
+    before Stripe confirmed it) is replayed under its own identifier by the next report, without
+    waiting for the price or the spend read, and kept as reported, even above the spend from the
+    acceptance on. The replay is not bounded in time: that limit is the shared meter reporter's, as
+    the trade-offs state. Self-hosted is unchanged: the licence decides and no call is priced.
 
 ## Rationale / Trade-offs
 
@@ -201,33 +202,27 @@ Billing reads the acceptance from `Organization` through its own repository rath
 and billing is already a named reader of the table. The read is separate from billing's cached
 organization lookup, so that cache's shape and key stay as they are.
 
-A pending PII total above the spend the acceptance covers is replayed and then corrected, never
-dropped or kept as reported unsent. Only the replay under its own identifier tells whether Stripe
-already took the cut-off send: Stripe answers a repeat it holds as already existing, and counts one
-it never got. Dropping it double-counts a send Stripe took; keeping it unsent under-counts, or goes
-negative, for one Stripe never got. The cost: until the next report's negative difference lands,
-Stripe holds spend no admin accepted, and a held price or a tripped breaker can delay that
-correction. A pending total can sit above that spend only when it was written before this rule
-shipped or the ledger was corrected down, and decision 11 maps the meter in test mode only.
+A pending PII total above the spend the acceptance covers is replayed and kept, never dropped. Only
+the replay under its own identifier tells whether Stripe already took the cut-off send: Stripe
+answers a repeat it holds as already existing, and counts one it never got, so dropping it
+double-counts a send Stripe took. The cost: PII spend from before the acceptance that was already
+reported, by a release before this rule or in a pending send, is never corrected down; the floor
+keeps it as it keeps what a line's later start would take back (ADR-174 decision 26). It is accepted
+because no PII total is live: decision 11 maps the meter in test mode only, and the price-line rule
+means nothing is reported before a line exists.
 
-Three limits are the shared meter reporter's, the same for the events, Instant Evals and PII meters,
-and this ADR leaves them as they are. First, a pending total is replayed whenever the next report
-runs, with no bound on its age. Stripe keeps an identifier for 24 hours, so a replay after that
-counts the send twice if Stripe had taken it. That needs a day with no report after the cut-off
-send, or an operator clearing a tripped breaker more than a day later: five failures in a row stop
-every report of that meter until one succeeds. Second, a negative correction is sent whenever its
-report runs, with no check on the invoice. One held back by a missing price or a tripped breaker
-past the end of the billing period lands after Stripe finalised the invoice, which keeps the
-excess. Third, a delta's identifier is built from the organisation, the month and its two totals,
-so a delta corrected away and then reached again within Stripe's 24 hours (0 to 5,000, 5,000 to 0,
-0 to 5,000) is refused as a repeat and read as sent: the month is under-reported, never
-over-charged. All three are accepted here because none is new, a PII total reaches Stripe only for a
-subscription that carries the PII price (decision 10; a pending total is only written after that
-check), and decision 11 maps the meter in test mode only, so no live PII total exists yet. The
-follow-up, before the meter is mapped live: reconcile a pending total older than the window against
-Stripe's meter summaries before replaying it, credit a correction that lands after the invoice
-was finalised, and give each new delta an identifier of its own (a stored sequence) while a retry
-keeps its original one.
+One limit is the shared meter reporter's, the same for the events, Instant Evals and PII meters, and
+this ADR leaves it as it is: a pending total is replayed whenever the next report runs, with no
+bound on its age. Stripe keeps an identifier for 24 hours, so a replay after that counts the send
+twice if Stripe had taken it. That needs a day with no report after the cut-off send, or an operator
+clearing a tripped breaker more than a day later: five failures in a row stop every report of that
+meter until one succeeds. It is accepted here because it is not new, a PII total reaches Stripe only
+for a subscription that carries the PII price (decision 10; a pending total is only written after
+that check), and decision 11 maps the meter in test mode only. The follow-up, before the meter is
+mapped live: reconcile a pending total older than the window against Stripe's meter summaries before
+replaying it. The floor retired two other limits for this meter: a month the line or the acceptance
+narrows sends no negative PII delta, so none lands on an invoice Stripe already finalised, and no
+delta's identifier repeats.
 
 ## Consequences
 

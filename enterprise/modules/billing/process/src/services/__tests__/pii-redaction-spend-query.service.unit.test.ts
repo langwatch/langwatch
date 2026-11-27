@@ -49,7 +49,7 @@ describe("given an organization whose two projects spent 1.10 dollars on PII red
       usageBilledSinceMs: null,
     });
 
-    expect(result).toEqual({ outcome: "counted", total: 11_000 });
+    expect(result).toEqual({ outcome: "counted", total: 11_000, fromMs: utcMs("2026-02-01") });
     expect(sumSpendNanoUsdByRequestType).toHaveBeenCalledWith({
       tenantIds: ["proj_1", "proj_2"],
       requestType: "pii_redaction",
@@ -87,9 +87,10 @@ describe("given an organization whose admin accepted the price during the month"
     const result = await service.queryPiiRedactionSpendTotal({
       organizationId: "org_1",
       billingMonth: "2026-02",
+      usageBilledSinceMs: null,
     });
 
-    expect(result).toEqual({ outcome: "counted", total: 5_000 });
+    expect(result).toEqual({ outcome: "counted", total: 5_000, fromMs: acceptedAtMs });
     expect(acceptanceReads).toEqual(["org_1"]);
     expect(sumSpendNanoUsdByRequestType).toHaveBeenCalledWith({
       tenantIds: ["proj_1", "proj_2"],
@@ -97,6 +98,30 @@ describe("given an organization whose admin accepted the price during the month"
       fromMs: acceptedAtMs,
       toMs: utcMs("2026-03-01"),
     });
+  });
+});
+
+describe("given a PII redaction line and an acceptance on different days of the month", () => {
+  /** @scenario "The PII redaction month starts at the later of its price line and the acceptance" */
+  it.each([
+    { order: "line on the 3rd, acceptance on the 10th", lineAt: 3, acceptedAt: 10 },
+    { order: "acceptance on the 3rd, line on the 10th", lineAt: 10, acceptedAt: 3 },
+  ])("reads the ledger from the 10th, $order", async ({ lineAt, acceptedAt }) => {
+    const { service, sumSpendNanoUsdByRequestType } = serviceWith({
+      nanoUsd: 200_000_000,
+      acceptedAtMs: Date.UTC(2026, 1, acceptedAt, 9),
+    });
+
+    const result = await service.queryPiiRedactionSpendTotal({
+      organizationId: "org_1",
+      billingMonth: "2026-02",
+      usageBilledSinceMs: Date.UTC(2026, 1, lineAt, 9),
+    });
+
+    expect(result).toEqual({ outcome: "counted", total: 2_000, fromMs: Date.UTC(2026, 1, 10, 9) });
+    expect(sumSpendNanoUsdByRequestType).toHaveBeenCalledWith(
+      expect.objectContaining({ fromMs: Date.UTC(2026, 1, 10, 9), toMs: utcMs("2026-03-01") }),
+    );
   });
 });
 
@@ -112,8 +137,9 @@ describe("given an organization whose admin never accepted the price", () => {
       await service.queryPiiRedactionSpendTotal({
         organizationId: "org_1",
         billingMonth: "2026-02",
+        usageBilledSinceMs: null,
       }),
-    ).toEqual({ outcome: "counted", total: 0 });
+    ).toEqual({ outcome: "counted", total: 0, fromMs: utcMs("2026-03-01") });
     expect(sumSpendNanoUsdByRequestType).not.toHaveBeenCalled();
   });
 });
@@ -135,8 +161,9 @@ describe("given an organization whose admin accepted the price after the month e
         await service.queryPiiRedactionSpendTotal({
           organizationId: "org_1",
           billingMonth: "2026-02",
+          usageBilledSinceMs: null,
         }),
-      ).toEqual({ outcome: "counted", total: 0 });
+      ).toEqual({ outcome: "counted", total: 0, fromMs: utcMs("2026-03-01") });
       expect(sumSpendNanoUsdByRequestType).not.toHaveBeenCalled();
     },
   );

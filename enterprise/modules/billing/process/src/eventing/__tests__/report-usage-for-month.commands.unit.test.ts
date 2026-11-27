@@ -13,8 +13,12 @@ import type { BillingCheckpointRepository } from "../../repositories/billing-che
 import { MemoryBillingCheckpointRepository } from "../../repositories/memory/memory.billing-checkpoint.repository.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import type { PriceLine } from "../../rules/price-line.rules.ts";
-import type { BillableEventsTotalResult } from "../../rules/billing-month.rules.ts";
 import { PiiRedactionSpendQueryService } from "../../services/pii-redaction-spend-query.service.ts";
+
+/** What the PII redaction spend read answers: the month's total and the moment it was read from. */
+type PiiRedactionSpendTotal = Awaited<
+  ReturnType<PiiRedactionSpendQueryService["queryPiiRedactionSpendTotal"]>
+>;
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -1853,7 +1857,7 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
       eligible,
       runs = 1,
     }: {
-      eligible: BillableEventsTotalResult | Error;
+      eligible: PiiRedactionSpendTotal | Error;
       runs?: number;
     }) {
       const checkpoints = MemoryBillingCheckpointRepository.create(MemoryBillingStore.create());
@@ -1881,47 +1885,35 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
     }
 
     const replayed = { identifier: `org-1:2026-02:${meter}:from:0:to:5000`, value: 0.5 };
+    const acceptedOnThe10th = Date.UTC(2026, 1, 10, 9);
+    const monthEnd = Date.UTC(2026, 2, 1);
 
     /** @scenario "A pending PII redaction total is replayed even while the price is missing" */
     it("replays it under its own identifier while the subscription has no PII price", async () => {
       missingPrices = ["GROWTH_PII_REDACTION_USD"];
       const { sent, checkpoint } = await replayPending({
-        eligible: { outcome: "counted", total: 7_000 },
+        eligible: { outcome: "counted", total: 7_000, fromMs: acceptedOnThe10th },
       });
 
       expect(sent).toEqual([replayed]);
       expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
-      expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
+      expect(mockSubscriptionPriceLine).not.toHaveBeenCalledWith(
         expect.objectContaining({ price: "GROWTH_PII_REDACTION_USD" }),
       );
     });
 
-    /** @scenario "A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down" */
-    it("replays it under its own identifier, then corrects the month down to the accepted spend", async () => {
+    /** @scenario "A pending PII redaction total above the spend the acceptance covers is replayed and kept" */
+    it.each([
+      { case: "accepted on the 10th", total: 2_000, fromMs: acceptedOnThe10th },
+      { case: "never accepted", total: 0, fromMs: monthEnd },
+    ])("replays it under its own identifier and never corrects it down, $case", async (spend) => {
       const { sent, checkpoint } = await replayPending({
-        eligible: { outcome: "counted", total: 2_000 },
+        eligible: { outcome: "counted", total: spend.total, fromMs: spend.fromMs },
         runs: 2,
       });
 
-      expect(sent).toEqual([
-        replayed,
-        { identifier: `org-1:2026-02:${meter}:from:5000:to:2000`, value: -0.3 },
-      ]);
-      expect(checkpoint).toMatchObject({ lastReportedTotal: 2_000, pendingReportedTotal: null });
-    });
-
-    /** @scenario "A pending PII redaction total above the spend the acceptance covers is replayed, then corrected down" */
-    it("replays it, then corrects the month to zero for an organization that never accepted", async () => {
-      const { sent, checkpoint } = await replayPending({
-        eligible: { outcome: "counted", total: 0 },
-        runs: 2,
-      });
-
-      expect(sent).toEqual([
-        replayed,
-        { identifier: `org-1:2026-02:${meter}:from:5000:to:0`, value: -0.5 },
-      ]);
-      expect(checkpoint).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null });
+      expect(sent).toEqual([replayed]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
     });
 
     /** @scenario "A pending PII redaction total is replayed without waiting for the spend to be read" */
