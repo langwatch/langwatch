@@ -19,12 +19,13 @@ afterEach(cleanup);
 describe("given a companion dialog is open", () => {
   it("leaves a drawer opened over it non-modal: the companion stays reachable and keeps focus", async () => {
     const user = userEvent.setup();
+    const onCloseTraffic = vi.fn();
     renderWithDesignSystem(
       <>
         <aside {...{ [DIALOG_COMPANION_ATTR]: "" }}>
           <button type="button">Ask</button>
         </aside>
-        <Dialog open companion onClose={vi.fn()} title="Traffic">
+        <Dialog open companion onClose={onCloseTraffic} title="Traffic">
           chart
         </Dialog>
         <Drawer onClose={vi.fn()} title="Trace">
@@ -42,5 +43,6 @@ describe("given a companion dialog is open", () => {
 
     expect(ask).toHaveFocus();
     expect(screen.getByRole("dialog", { name: "Traffic" })).toBeInTheDocument();
+    expect(onCloseTraffic).not.toHaveBeenCalled();
   });
 });
