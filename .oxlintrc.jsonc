@@ -22,5 +22,9 @@
     "plugins/langwatch/scripts/session-context.mjs",
     "plugins/langwatch/scripts/session-guidance.mjs",
     "tools/readmegen/extract/**",
+    // Copies of skills/recipes/*/templates that skills/_compiled/generate.sh writes.
+    "skills/_compiled/native/*/templates/**",
+    "skills/_compiled/cli/*/templates/**",
+    "services/langyagent/internal/assets/skills/*/templates/**",
   ],
 }

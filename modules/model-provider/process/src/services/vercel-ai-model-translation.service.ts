@@ -1,6 +1,7 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { generateText } from "ai";
 
+import { translationPrompt } from "../rules/translation-prompt.rules.ts";
 import {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleOptions,
@@ -50,10 +51,7 @@ export class VercelAiModelTranslationService extends ModelTranslation {
       model: input.model,
       featureKey: "translate.text",
     });
-    const result = await generateText({
-      model,
-      prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.text}`,
-    });
+    const result = await generateText({ model, ...translationPrompt({ text: input.text }) });
     return result.text;
   }
 }

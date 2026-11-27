@@ -18,6 +18,7 @@ import {
 import { resolveEndpoint } from "@/internal/endpoint";
 
 import { ConsoleLogger, type Logger } from "../../../logger";
+import { braidSpanProcessors } from "../../braids";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { setLangWatchLoggerProvider } from "../../logger";
@@ -351,6 +352,21 @@ function detachProcessors(provider: unknown, addedProcessors: SpanProcessor[]): 
   }
 }
 
+function addBraidProcessors({
+  options,
+  addedProcessors,
+  addProcessor,
+}: {
+  options: SetupObservabilityOptions;
+  addedProcessors: SpanProcessor[];
+  addProcessor: (processor: SpanProcessor) => void;
+}): void {
+  for (const p of braidSpanProcessors(options.braids)) {
+    addedProcessors.push(p);
+    addProcessor(p);
+  }
+}
+
 function setupDedicatedProvider(
   provider: apiModule.TracerProvider,
   options: SetupObservabilityOptions,
@@ -376,6 +392,8 @@ function setupDedicatedProvider(
       internalArray.push(processor);
     }
   };
+
+  addBraidProcessors({ options, addedProcessors, addProcessor });
 
   if (!langwatch.disabled) {
     const traceExporter = new LangWatchTraceExporter({
@@ -457,6 +475,8 @@ function attachToExistingProvider(
 
   const langwatch = getLangWatchConfig(options);
   const addedProcessors: SpanProcessor[] = [];
+
+  addBraidProcessors({ options, addedProcessors, addProcessor });
 
   if (!langwatch.disabled) {
     const traceExporter = new LangWatchTraceExporter({
@@ -554,7 +574,7 @@ export function createAndStartNodeSdk(
     logger.info(`Using LangWatch ${langwatch.processorType} processors for tracing and logging`);
   }
 
-  const spanProcessors: SpanProcessor[] = [];
+  const spanProcessors: SpanProcessor[] = [...braidSpanProcessors(options.braids)];
   const logProcessors: LogRecordProcessor[] = [];
 
   // Console processors

@@ -119,20 +119,25 @@ function matchRows({
   );
 }
 
-/** Drives the read and hands back the span query it issued. Missing span
- * read is a broken fixture, not a failed expectation. Throws to report setup
- * break as a setup break, keeping assertions in the it blocks. */
-async function readTraces(traceIds: string[]) {
+/** Drives the read; a page with no summaries issues no span read at all. */
+function findTraces(traceIds: string[]) {
   const service = mappedLegacyRead({
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,
   });
-  await service.findTracesWithSpans({
+  return service.findTracesWithSpans({
     authorization: OWN_READ,
     projectId: "proj-1",
     traceIds,
     protections,
   });
+}
+
+/** Drives the read and hands back the span query it issued. Missing span
+ * read is a broken fixture, not a failed expectation. Throws to report setup
+ * break as a setup break, keeping assertions in the it blocks. */
+async function readTraces(traceIds: string[]) {
+  await findTraces(traceIds);
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),
   );
@@ -221,5 +226,51 @@ describe("given the light resolve that bounds a hint-less batch read", () => {
     );
     expect(resolveCall).toBeDefined();
     expect(String(resolveCall![0].query)).toContain("OccurredAt > fromUnixTimestamp64Milli(0)");
+  });
+});
+
+/** The summary read the service issued, located by its shape. */
+function summaryReadIssued() {
+  const call = mockClickHouseQuery.mock.calls.find(([args]) =>
+    String(args.query).includes("FROM trace_summaries AS t"),
+  );
+  if (!call) {
+    throw new Error("fixture: the service issued no trace_summaries read");
+  }
+  return call[0] as { query: string; query_params: Record<string, unknown> };
+}
+
+describe("given trace ids read by id alone", () => {
+  describe("when the resolve finds no summary filed under a real time", () => {
+    /** @scenario "Traces the resolve finds no filed summary for read only the epoch partition" */
+    it("bounds the summary read to the epoch partition", async () => {
+      mockReads({ resolved: { fromMs: null, toMs: null }, summaries: [] });
+
+      await expect(findTraces(["missing-1"])).resolves.toBeDefined();
+
+      const summaryRead = summaryReadIssued();
+      expect(summaryRead.query).toContain(
+        "t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      );
+      expect(summaryRead.query_params).toMatchObject({ fromMs: 0, toMs: 0 });
+    });
+  });
+
+  describe("when the resolve fails", () => {
+    /** @scenario "A resolve that fails still reads the summaries" */
+    it("reads the summaries without a time bound, as before", async () => {
+      mockClickHouseQuery.mockReset();
+      mockClickHouseQuery.mockImplementation(({ query }: { query: string }) => {
+        if (query.includes("AS fromMs")) return Promise.reject(new Error("resolve failed"));
+        const rows = matchRows({ query, resolved: { fromMs: null, toMs: null }, summaries: [] });
+        return Promise.resolve({ json: () => Promise.resolve(rows) });
+      });
+
+      await expect(findTraces(["t1"])).resolves.toBeDefined();
+
+      const summaryRead = summaryReadIssued();
+      expect(summaryRead.query).not.toContain("t.OccurredAt >=");
+      expect(summaryRead.query_params).not.toHaveProperty("fromMs");
+    });
   });
 });

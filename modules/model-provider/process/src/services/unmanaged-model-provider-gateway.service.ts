@@ -1,3 +1,5 @@
+import type { ManagedBedrockCredentials } from "@langwatch/enterprise-managed-provider-contract";
+
 import { ModelProviderManagedGateway } from "./managed-model-provider-gateway.service.ts";
 
 /**
@@ -25,5 +27,9 @@ export class UnmanagedModelProviderGatewayService extends ModelProviderManagedGa
     provider: string;
   }): Promise<Record<string, string>> {
     return Promise.resolve(input.parameters);
+  }
+
+  getBedrockCredentials(_input: { organizationId: string }): Promise<ManagedBedrockCredentials> {
+    return Promise.reject(new Error("This deployment manages no Bedrock credentials."));
   }
 }

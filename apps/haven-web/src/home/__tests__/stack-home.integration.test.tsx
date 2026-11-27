@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { ToastProvider } from "@langwatch/design-system-internal";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { stubDaemon, type DaemonReply } from "../../__fixtures__/daemon-fetch.ts";
 import { liveHome, notFound, stoppedHome, surfacesFor } from "../../__fixtures__/daemon.ts";
@@ -10,6 +10,19 @@ import type { StackHome } from "../../shared/contract.ts";
 import { StackHomeApp } from "../stack-home-app.tsx";
 
 const NOW = msOf({ iso: "2026-09-28T12:00:00Z" });
+
+// Each tab past the overview is a lazy chunk. Its first import is a cold transform that can
+// outlast a findBy wait on a loaded runner; loading them up front leaves the waits to the page.
+beforeAll(async () => {
+  await Promise.all([
+    import("../sims/sims-tab.tsx"),
+    import("../orb/orb-tab.tsx"),
+    import("../browser/browser-tab.tsx"),
+    import("../obs/obs-tab.tsx"),
+    import("../db/db-tab.tsx"),
+    import("../logs/logs-tab.tsx"),
+  ]);
+}, 60_000);
 
 const serve = ({
   home,

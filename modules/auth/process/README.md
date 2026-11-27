@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:26`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withEventing(impersonationExpiryEventing).provideMiddlewareContext(…).withTasks(…).provideMiddlewareBindings(…)`, `src/auth.module.ts:27`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:105`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:107`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -86,6 +86,38 @@ Clears the claims, returning the session to its own user without ending it; idem
 
 ```typescript
 stopImpersonation(input: { sessionId: string }): Promise<void>;
+```
+
+#### `hasPasskey`
+
+Whether this person has registered at least one passkey.
+
+```typescript
+hasPasskey(input: { userId: string }): Promise<boolean>;
+```
+
+#### `findSignInFacts`
+
+The accounts behind exactly one address, matched the way sign-in matches it: ids, method codes, counts, flags and times for a staff investigation (ADR-202). Empty when there is none.
+
+```typescript
+findSignInFacts(input: Readonly<{ email: string }>): Promise<SignInFacts[]>;
+```
+
+#### `passkeyAssertionOptions`
+
+The WebAuthn request options for this person's own passkeys over a caller-chosen base64url challenge, user verification required. Refuses `unknown_credential` when they hold none.
+
+```typescript
+passkeyAssertionOptions(input: { userId: string; challenge: string; }): Promise<PasskeyAssertionOptions>;
+```
+
+#### `verifyPasskeyAssertion`
+
+Verifies a signature over exactly that challenge by one of this person's passkeys, with user verification, and advances its counter. Throws `passkey_assertion_refused` otherwise.
+
+```typescript
+verifyPasskeyAssertion(input: { userId: string; challenge: string; response: PasskeyAssertionResponse; }): Promise<{ credentialId: string }>;
 ```
 
 #### `verifyBrowserSession`
@@ -474,6 +506,14 @@ The same figure for one organization, counted over the members the caller names.
 countUsageForMembers(input: { memberUserIds: readonly string[]; at: number; }): Promise<AuthUsageCount>;
 ```
 
+#### `findSessionUsersSince`
+
+Which of these people used a browser session at or after `since` (epoch ms).
+
+```typescript
+findSessionUsersSince(input: { userIds: readonly string[]; since: number; }): Promise<readonly string[]>;
+```
+
 ## REST transport
 
 ### `authCliDeviceFlowRest`
@@ -528,7 +568,7 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 
 ```typescript
-// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:78
+// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:83
 interface Query {
   user_code?: string;
 }
@@ -579,7 +619,7 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 
 ```typescript
-// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:86
+// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:91
 interface Query {
   device_code: string;
 }
@@ -687,7 +727,7 @@ interface Input {
   email: string;
   addressProof: string;
 }
-type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:106
+type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:110
 
 // auth.route
 // Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:24
@@ -703,7 +743,7 @@ interface Input {
   email: string;
   callbackUrl?: string;
 }
-// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:21
+// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:25
 type Output =
   | {
       sent: true;
@@ -718,7 +758,7 @@ type Output =
 interface Input {
   inviteCode: string;
 }
-// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:143
+// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:148
 interface Output {
   organizationName: string;
   inviterName: string | null;
@@ -727,7 +767,7 @@ interface Output {
 
 // auth.requestFreshInvite
 type Input = z.infer<typeof frontDoorInviteCodeInputSchema>; // ../contract/src/front-door.schemas.ts:76
-// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:38
+// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:42
 interface Output {
   asked: boolean;
 }
@@ -735,7 +775,7 @@ interface Output {
 // auth.myAddressConfirmation
 // Input: inline, ../contract/src/auth.trpc.ts:70
 type Input = unknown;
-// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:77
+// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:81
 interface Output {
   email: string | null;
   confirmed: boolean;
@@ -747,7 +787,7 @@ interface Output {
 interface Input {
   codeChallenge: string;
 }
-// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:32
+// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:36
 interface Output {
   sent: true;
   identifierId: string;
@@ -756,7 +796,7 @@ interface Output {
 // auth.priorSession
 // Input: inline, ../contract/src/auth.trpc.ts:79
 type Input = unknown;
-// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:86
+// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:90
 type Output =
   | {
       kind: "expired";
@@ -782,11 +822,11 @@ type Input = Record<string, unknown>;
 // Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:93)
 
 // auth.endBrowserSession
-// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:128
+// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:131
 interface Input {
   sessionId: string;
 }
-// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:138
+// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:141
 interface Output {
   ended: number;
 }
@@ -794,7 +834,13 @@ interface Output {
 // auth.recordPageOpened
 // Input: inline, ../contract/src/auth.trpc.ts:101
 interface Input {
-  page: "me_sessions";
+  page:
+    | "me_sessions"
+    | "me_overview"
+    | "settings_usage"
+    | "settings_plans"
+    | "settings_subscription"
+    | "governance_costs";
 }
 // Output: inline, ../contract/src/auth.trpc.ts:102
 type Output = unknown;
@@ -911,6 +957,14 @@ Declared at `src/eventing/auth.pipeline.ts:33`.
 | --------------- | ---------------- | ------------------------------------------------------------------------------------- | ---------------------------------- |
 | process manager | `signInLockReap` | every 1 h (`SIGN_IN_LOCK_REAP_INTERVAL_MS = 60 * 60 * 1000`); intents `reap` (outbox) | `src/eventing/auth.pipeline.ts:38` |
 
+### Pipeline `impersonation_maintenance` (aggregate `global`)
+
+Declared at `src/eventing/impersonation-expiry.pipeline.ts:37`.
+
+| Kind            | Name                  | Handles                                                                                      | Declared at                                        |
+| --------------- | --------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| process manager | `impersonationExpiry` | every 10 min (`IMPERSONATION_EXPIRY_INTERVAL_MS = 10 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/impersonation-expiry.pipeline.ts:42` |
+
 ### Tasks
 
 Run by the tasks process, before serve.
@@ -924,17 +978,17 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:275`                            |
-| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
-| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
-| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
-| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:55` |
-| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:56` |
-| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:57` |
-| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
-| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
-| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:278`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:291`                            |
+| secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:80` |
+| secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:81` |
+| secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:82` |
+| secret | `azureAdClientSecret`         | `AZURE_AD_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:83` |
+| secret | `auth0ClientSecret`           | `AUTH0_CLIENT_SECRET`                     | `../../../packages/secrets/src/shared-secrets.ts:84` |
+| secret | `oktaClientSecret`            | `OKTA_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:85` |
+| secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:86` |
+| secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:87` |
+| secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:88` |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:294`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

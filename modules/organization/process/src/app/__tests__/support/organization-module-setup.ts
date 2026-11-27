@@ -42,6 +42,7 @@ export function organizationModuleSetup(
     config: {
       signUp: { mode: "open", allowedDomains: [], adminEmails: [] },
       publicBaseUrl: "https://app.langwatch.test",
+      isSaas: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

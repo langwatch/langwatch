@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
+import { sessionIdIndexNotReady } from "../../__tests__/support/session-id-index-not-ready.fixture.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
 
@@ -90,6 +91,7 @@ function evaluate(row: Record<string, unknown>, expression: string): number | st
  */
 function orderingClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
   return clickHouseQueryClientDouble({
+    ...sessionIdIndexNotReady,
     query: async (request: { sql: string }) => ({
       rows: applyOrderBy(rows, request.sql).slice(0, 1),
     }),
@@ -271,6 +273,7 @@ function listClient(rows: Record<string, unknown>[]): {
 } {
   let sent = "";
   const client = clickHouseQueryClientDouble({
+    ...sessionIdIndexNotReady,
     query: async (request: { sql: string; params?: Record<string, unknown> }) => {
       sent = request.sql;
       const params = request.params ?? {};

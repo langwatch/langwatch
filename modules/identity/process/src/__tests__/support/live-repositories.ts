@@ -12,6 +12,7 @@ export function liveRepositories(prisma: PrismaClient): IdentityRepositories {
     eventReadSeat: {
       getEvent: () => Promise.reject(new Error("no event log in this test")),
       findAggregateEvents: async () => [],
+      findEventsOfAggregates: async () => [],
     },
   });
 }

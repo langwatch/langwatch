@@ -22,6 +22,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import { keyScopesReachProject } from "../rules/gateway-a2a-target.rules.ts";
 import {
   type GatewayConfigAssembly,
   type GatewayModelProviderCredentials,
@@ -38,6 +39,7 @@ import {
   type GatewayConfigPayload,
   type ProviderExclusionWire,
 } from "../rules/gateway-config-wire.rules.ts";
+import type { GatewayA2aTargetService } from "./gateway-a2a-target.service.ts";
 import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayTraceExportKeyService } from "./gateway-trace-export-key.service.ts";
@@ -52,8 +54,11 @@ const logger = createLogger("langwatch:gateway:config-materialiser");
  */
 export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
-/** The one model-provider read the bundle needs. */
-export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
+/** Model provider reads: a row's keys for the bundle, and its keys window for the version token. */
+export type GatewayCustomKeys = Pick<
+  ModelProviderApi,
+  "getGatewayCustomKeys" | "getGatewayKeysEpoch"
+>;
 
 const NO_KEYS: GatewayModelProviderCredentials = { readCustomKeys: () => ({}) };
 const PLAIN_KEYS: GatewayModelProviderCredentials = {
@@ -74,6 +79,7 @@ export class GatewayConfigMaterialiserService {
   private readonly langyMirrorProjectId: string | undefined;
   private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
   private readonly traceExportKeys: GatewayTraceExportKeyService | undefined;
+  private readonly a2aTargets: GatewayA2aTargetService | undefined;
 
   private constructor(
     /** Which providers a key reaches, and in which dispatch order. */
@@ -87,6 +93,7 @@ export class GatewayConfigMaterialiserService {
       langyMirrorProjectId,
       connectUpstream,
       traceExportKeys,
+      a2aTargets,
     }: {
       scopeResolution: GatewayScopeResolutionService;
       projects: ProjectApi;
@@ -97,6 +104,7 @@ export class GatewayConfigMaterialiserService {
       langyMirrorProjectId: string | undefined;
       connectUpstream: GatewayConnectUpstreamService | undefined;
       traceExportKeys: GatewayTraceExportKeyService | undefined;
+      a2aTargets: GatewayA2aTargetService | undefined;
     },
   ) {
     this.scopeResolution = scopeResolution;
@@ -108,6 +116,7 @@ export class GatewayConfigMaterialiserService {
     this.langyMirrorProjectId = langyMirrorProjectId;
     this.connectUpstream = connectUpstream;
     this.traceExportKeys = traceExportKeys;
+    this.a2aTargets = a2aTargets;
   }
 
   static create(input: {
@@ -123,6 +132,8 @@ export class GatewayConfigMaterialiserService {
     connectUpstream?: GatewayConnectUpstreamService | undefined;
     /** Absent only in tests: the bundle then carries no export token. */
     traceExportKeys?: GatewayTraceExportKeyService | undefined;
+    /** Absent only in tests: the bundle then carries no A2A targets. */
+    a2aTargets?: GatewayA2aTargetService | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService({
       scopeResolution: input.scopeResolution,
@@ -134,6 +145,7 @@ export class GatewayConfigMaterialiserService {
       langyMirrorProjectId: input.langyMirrorProjectId,
       connectUpstream: input.connectUpstream,
       traceExportKeys: input.traceExportKeys,
+      a2aTargets: input.a2aTargets,
     });
   }
 
@@ -181,11 +193,45 @@ export class GatewayConfigMaterialiserService {
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
     const token = await this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+    const traceProject = await this.traceProjectOf(vk);
     const keyIds =
-      vk.traceProjectId && this.traceExportKeys
-        ? await this.traceExportKeys.findKeyIds(vk.traceProjectId)
+      traceProject && this.traceExportKeys
+        ? await this.traceExportKeys.findKeyIds(traceProject.id)
         : [];
-    return [token, ...keyIds].join(".");
+    const a2a = this.a2aTargets
+      ? await this.a2aTargets.bundleFingerprint(this.a2aScopeOf(vk, traceProject))
+      : "";
+    const keysEpoch = this.modelProviders.getGatewayKeysEpoch({
+      organizationId: vk.organizationId,
+    });
+    return [token, ...keyIds, ...(a2a ? [a2a] : []), ...(keysEpoch ? [keysEpoch] : [])].join(".");
+  }
+
+  /** The key's trace project as materialise resolves it; versionToken reads the same one. */
+  private async traceProjectOf(vk: VirtualKeyWithScopes) {
+    if (!vk.traceProjectId) return null;
+    return this.projects.findTraceDestination(vk.traceProjectId);
+  }
+
+  /**
+   * The A2A registry slice a key reads: org-wide targets, plus its trace project's own targets
+   * when the key's scopes reach that project. The trace destination grants no access, and it
+   * stays put when scopes move.
+   */
+  private a2aScopeOf(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string; teamId: string } | null,
+  ): {
+    organizationId: string;
+    projectId: string | null;
+    virtualKeyId: string;
+  } {
+    const reached = traceProject && keyScopesReachProject({ vk, project: traceProject });
+    return {
+      organizationId: vk.organizationId,
+      projectId: reached ? traceProject.id : null,
+      virtualKeyId: vk.id,
+    };
   }
 
   /** The trace project's export token; never `Project.apiKey`. */
@@ -209,9 +255,7 @@ export class GatewayConfigMaterialiserService {
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await this.scopeResolution.eligibleModelProvidersForVk(vk);
-    const traceProject = vk.traceProjectId
-      ? await this.projects.findTraceDestination(vk.traceProjectId)
-      : null;
+    const traceProject = await this.traceProjectOf(vk);
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const config = parseVirtualKeyConfig(vk.config);
@@ -222,18 +266,7 @@ export class GatewayConfigMaterialiserService {
     );
     const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
     const slots = await this.providerSlots({ organizationId: vk.organizationId, providers });
-    // The cache-rule bundle, the project's guardrail catalogue and the key's
-    // surviving attachments come from the one Gateway service that owns those
-    // tables, rather than from a second copy of each query living here.
-    const bundle = await this.budgetDecisions.loadConfigurationPersistence({
-      organizationId: vk.organizationId,
-      traceProjectId: traceProject?.id ?? null,
-      guardrailAttachments: config.guardrailAttachments.map((attachment) => ({
-        direction: attachment.direction,
-        guardrailIds: [...attachment.guardrailIds],
-      })),
-    });
-    const otlpToken = await this.traceExportToken(vk, traceProject);
+    const { bundle, otlpToken, a2aTargets } = await this.persistedSlices(vk, traceProject, config);
 
     return {
       revision: vk.revision.toString(),
@@ -281,10 +314,35 @@ export class GatewayConfigMaterialiserService {
       },
       budgets: budgets.map((resolved) => budgetToWire(resolved, spendByBudgetId)),
       cache_rules: bundle.cacheRules.map(cacheRuleToWire),
+      a2a_targets: a2aTargets,
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),
     };
+  }
+
+  /** The slices other Gateway services own: cache rules, guardrails, export token, A2A targets. */
+  private async persistedSlices(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string; teamId: string } | null,
+    config: ReturnType<typeof parseVirtualKeyConfig>,
+  ) {
+    // The cache-rule bundle, the project's guardrail catalogue and the key's
+    // surviving attachments come from the one Gateway service that owns those
+    // tables, rather than from a second copy of each query living here.
+    const bundle = await this.budgetDecisions.loadConfigurationPersistence({
+      organizationId: vk.organizationId,
+      traceProjectId: traceProject?.id ?? null,
+      guardrailAttachments: config.guardrailAttachments.map((attachment) => ({
+        direction: attachment.direction,
+        guardrailIds: [...attachment.guardrailIds],
+      })),
+    });
+    const otlpToken = await this.traceExportToken(vk, traceProject);
+    const a2aTargets = this.a2aTargets
+      ? await this.a2aTargets.bundleFor(this.a2aScopeOf(vk, traceProject))
+      : [];
+    return { bundle, otlpToken, a2aTargets };
   }
 
   /** Dispatch slots: the key's own providers with their credentials, then the upstream. */
@@ -318,7 +376,9 @@ export class GatewayConfigMaterialiserService {
   private async credentialReaderFor(mp: ModelProvider): Promise<GatewayModelProviderCredentials> {
     if (mp.id.startsWith(PLATFORM_PROVIDER_ID_PREFIX)) return PLAIN_KEYS;
     try {
-      const { customKeys } = await this.modelProviders.getCustomKeys({ modelProviderId: mp.id });
+      const { customKeys } = await this.modelProviders.getGatewayCustomKeys({
+        modelProviderId: mp.id,
+      });
       return { readCustomKeys: () => customKeys };
     } catch (error) {
       if (error instanceof ModelProviderCustomKeysMissingError) return NO_KEYS;

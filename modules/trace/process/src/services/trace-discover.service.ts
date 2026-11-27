@@ -13,6 +13,7 @@ import type {
   DiscoverResult,
   DiscreteFacetResult,
   FacetDescriptor,
+  SpanAnalyticsFloor,
   TraceListRead,
 } from "@langwatch/trace-contract";
 
@@ -21,6 +22,7 @@ import type {
   FacetDefinition,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
+import { settleCapped } from "../features/facet/rules/facet-read-concurrency.rules.ts";
 import { isExpressionCategorical } from "../features/facet/rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
@@ -28,12 +30,14 @@ import type { TraceTopicNamingService } from "../features/topic/services/trace-t
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
+  discoverPassKey,
   snapToWindowPreset,
   type DiscoverParams,
 } from "../rules/trace-list-cache-key.rules.ts";
 import {
   TraceDiscoverTaskService,
   type BatchedRegistrySlots,
+  type DiscoverTask,
   type FacetFilters,
   type Outcome,
 } from "./trace-discover-task.service.ts";
@@ -59,12 +63,11 @@ interface CachedDiscover {
 
 const DISCOVER_CACHE = TraceTtlCacheService.create<CachedDiscover>(DISCOVER_TTL_MS);
 
-/**
- * Refresh lock — a separate cache because the lease needs a short TTL so a
- * crashed refresher self-recovers quickly, while the value cache keeps a long one. Reusing the
- * value cache for locks would mean half an hour of stale data after a refresher crash.
- */
-const DISCOVER_REFRESH_LOCK_CACHE = TraceTtlCacheService.create<number>(60_000);
+/** ClickHouse statements one pass runs at once; the rest of its reads wait their turn. */
+const DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS = 4;
+
+/** How long a pass that failed holds off the next one for its key. */
+const DISCOVER_PASS_FAILURE_COOLDOWN_MS = 30_000;
 
 const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
 
@@ -180,12 +183,14 @@ export class TraceDiscoverService {
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
     updates: Pick<PresenceApi, "publishProjectEvent">;
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }) {
     this.descriptors = deps.descriptors;
     this.tasks = TraceDiscoverTaskService.create({
       repository: deps.repository,
       descriptors: deps.descriptors,
       facets: deps.facets,
+      ...(deps.lightFloor ? { lightFloor: deps.lightFloor } : {}),
     });
     this.facets = deps.facets;
     this.updates = deps.updates;
@@ -196,23 +201,28 @@ export class TraceDiscoverService {
     topicNaming,
     facets,
     updates,
+    lightFloor,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
     facets: FacetCatalog;
     /** Where a finished background refresh tells the tenant's tabs to refetch. */
     updates: Pick<PresenceApi, "publishProjectEvent">;
+    /** Where span_analytics starts; batched span facets read it inside that window. */
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }): TraceDiscoverService {
     return new TraceDiscoverService({
       repository,
       descriptors: TraceFacetDescriptorService.create({ repository, topicNaming, facets }),
       facets,
       updates,
+      ...(lightFloor ? { lightFloor } : {}),
     });
   }
 
-  /** Per-pod dedup of in-flight background refreshes. */
+  /** Per-pod: the pass keys with a pass running, and when a failed one may run again. */
   private readonly discoverRefreshing = new Set<string>();
+  private readonly discoverFailedUntil = new Map<string, number>();
 
   async getDiscover(params: DiscoverParams): Promise<DiscoverResult> {
     // Snap the requested window to a canonical preset BEFORE the cache
@@ -226,6 +236,7 @@ export class TraceDiscoverService {
       timeRange: { from: snapped.from, to: snapped.to },
     };
     const cacheKey = discoverCacheKey({ authorization: params.authorization, snapped });
+    const passKey = discoverPassKey({ authorization: params.authorization, snapped });
     const lookup = await DISCOVER_CACHE.get(cacheKey);
 
     if (lookup.kind === "hit") {
@@ -236,7 +247,7 @@ export class TraceDiscoverService {
       // completion so any open browser invalidates and re-reads from
       // the now-warm cache.
       if (nowInstant().epochMilliseconds - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
-        this.refreshDiscoverInBackground(snappedParams, cacheKey);
+        this.refreshDiscoverInBackground({ params: snappedParams, cacheKey, passKey });
       }
 
       return { facets: cached.value, pending: false };
@@ -247,7 +258,7 @@ export class TraceDiscoverService {
     // `pending` as a loading signal so the curated skeleton renders instead of an
     // empty sidebar (~1-2s for the first viewer); `discover_updated` flips `pending`
     // to false without the user refreshing.
-    this.refreshDiscoverInBackground(snappedParams, cacheKey);
+    this.refreshDiscoverInBackground({ params: snappedParams, cacheKey, passKey });
 
     return { facets: [], pending: true };
   }
@@ -267,27 +278,30 @@ export class TraceDiscoverService {
     return this.computeFacets({ params, filterFor, includeDynamicKeys: false });
   }
 
-  private refreshDiscoverInBackground(params: DiscoverParams, cacheKey: string): void {
-    // Avoid stacking redundant background refreshes on the same key inside this process;
-    // the lock cache holds the claim for one refresh window.
-    if (this.discoverRefreshing.has(cacheKey)) {
+  private refreshDiscoverInBackground({
+    params,
+    cacheKey,
+    passKey,
+  }: {
+    params: DiscoverParams;
+    cacheKey: string;
+    passKey: string;
+  }): void {
+    // One pass per key in this process: a live window's cache key rolls every bucket, and a new
+    // bucket must not start a second pass beside the one still reading, nor right after one failed.
+    const now = nowInstant().epochMilliseconds;
+    if (
+      this.discoverRefreshing.has(passKey) ||
+      (this.discoverFailedUntil.get(passKey) ?? 0) > now
+    ) {
       return;
     }
 
-    this.discoverRefreshing.add(cacheKey);
+    this.discoverRefreshing.add(passKey);
+    this.discoverFailedUntil.delete(passKey);
 
     void (async () => {
       try {
-        // 60s lease is enough for any single compute (5-8s on the slowest tenants); a lost
-        // claim means a refresh is already running and its write hydrates the value cache.
-        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
-          cacheKey,
-          nowInstant().epochMilliseconds,
-        );
-        if (!claimed) {
-          return;
-        }
-
         const fresh = await this.computeDiscover(params);
         await DISCOVER_CACHE.set(cacheKey, {
           value: fresh,
@@ -318,6 +332,10 @@ export class TraceDiscoverService {
           );
         }
       } catch (err) {
+        this.discoverFailedUntil.set(
+          passKey,
+          nowInstant().epochMilliseconds + DISCOVER_PASS_FAILURE_COOLDOWN_MS,
+        );
         discoverLogger.warn(
           {
             cacheKey,
@@ -326,7 +344,7 @@ export class TraceDiscoverService {
           "Background discover refresh failed; cached value still served",
         );
       } finally {
-        this.discoverRefreshing.delete(cacheKey);
+        this.discoverRefreshing.delete(passKey);
       }
     })();
   }
@@ -357,21 +375,24 @@ export class TraceDiscoverService {
     });
     const taskTimings: { label: string; durationMs: number }[] = [];
     const startedAt = nowInstant().epochMilliseconds;
-    const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
-      const t0 = nowInstant().epochMilliseconds;
+    const timed = (task: DiscoverTask): DiscoverTask => ({
+      ...task,
+      run: () => {
+        const t0 = nowInstant().epochMilliseconds;
 
-      return p.finally(() => {
-        taskTimings.push({ label, durationMs: nowInstant().epochMilliseconds - t0 });
-      });
-    };
+        return task.run().finally(() => {
+          taskTimings.push({ label: task.label, durationMs: nowInstant().epochMilliseconds - t0 });
+        });
+      },
+    });
 
-    const tasks: Promise<Outcome>[] = [
-      ...this.tasks.batchTasks(params, batched, wrap),
-      ...this.tasks.standaloneTasks({ params, standalone, filters, wrap }),
-      ...this.tasks.discreteTasks(params, filters, wrap),
-    ];
+    const tasks = [
+      ...this.tasks.batchTasks(params, batched),
+      ...this.tasks.standaloneTasks({ params, standalone, filters }),
+      ...this.tasks.discreteTasks(params, filters),
+    ].map(timed);
 
-    const settled = await Promise.allSettled(tasks);
+    const settled = await settleCapped(tasks, DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS);
     this.logSlowDiscover({
       params,
       totalMs: nowInstant().epochMilliseconds - startedAt,

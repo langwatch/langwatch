@@ -38,3 +38,12 @@ Feature: Inviting a teammate through a drawer
     When the admin submits an email with a team assignment
     Then the invite is created against that organization and team
     And the drawer closes on success
+
+  # A lenient batch can create fewer invitations than were asked for; an empty
+  # answer is never reported as sent.
+  @integration
+  Scenario: The invite drawer never reports success when no invitation was created
+    Given the server answers a batch with no invitation created
+    When the admin sends the invite form
+    Then they are told no invitation was sent
+    And the drawer stays open

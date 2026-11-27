@@ -1,4 +1,5 @@
 import type { RegisteredNotice } from "../notice.ts";
+import { accountPaymentFailedNotice } from "./account-payment-failed-notice.ts";
 import { billingThresholdFailureNotice } from "./billing-threshold-failure-notice.ts";
 import { licensePurchaseNotice } from "./license-purchase-notice.ts";
 import { planLimitReachedNotice, resourceLimitReachedNotice } from "./limit-notices.ts";
@@ -13,6 +14,7 @@ import {
 } from "./scim-sync-summary-notice.ts";
 import { selfHostedSignalNotice } from "./self-hosted-signal-notice.ts";
 import {
+  seatRequestedNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
   subscriptionProspectiveNotice,
@@ -27,8 +29,10 @@ export const slackNotices: readonly RegisteredNotice[] = [
   subscriptionProspectiveNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
+  seatRequestedNotice,
   licensePurchaseNotice,
   billingThresholdFailureNotice,
+  accountPaymentFailedNotice,
   planLimitReachedNotice,
   resourceLimitReachedNotice,
   selfHostedSignalNotice,
@@ -38,6 +42,7 @@ export const slackNotices: readonly RegisteredNotice[] = [
 export type { NewOrganizationNoticeProps, NewUserNoticeProps, ScimSyncSummaryNoticeProps };
 
 export {
+  accountPaymentFailedNotice,
   billingThresholdFailureNotice,
   licensePurchaseNotice,
   newOrganizationNotice,
@@ -45,6 +50,7 @@ export {
   planLimitReachedNotice,
   resourceLimitReachedNotice,
   scimSyncSummaryNotice,
+  seatRequestedNotice,
   selfHostedSignalNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,

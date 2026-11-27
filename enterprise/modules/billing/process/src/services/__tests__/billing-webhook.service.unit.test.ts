@@ -27,6 +27,7 @@ const createMockHost = (): {
 } => ({
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
+  sendSlackAccountPaymentFailed: vi.fn().mockResolvedValue(undefined),
 });
 
 const createMockBillingSubscription = (): {
@@ -42,7 +43,7 @@ const createMockBillingSubscription = (): {
   recordPaymentFailure: vi.fn(),
   cancel: vi.fn(),
   cancelTrialSubscriptions: vi.fn(),
-  migrateToSeatEvent: vi.fn(),
+  findSupersededBySeatEvent: vi.fn(),
   updateQuantities: vi.fn(),
 });
 
@@ -51,6 +52,7 @@ const createMockOrganizationRepository = (): {
 } => ({
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
+  isOnSeatEventPricing: vi.fn().mockResolvedValue(false),
 });
 
 const ORGANIZATION_ROW_COMMANDS = [
@@ -59,6 +61,7 @@ const ORGANIZATION_ROW_COMMANDS = [
   "recordPricingModelChanged",
   "recordSeatCheckoutPaid",
   "recordSeatCheckoutsAbandoned",
+  "recordOverPlanChanged",
 ] as const;
 type OrganizationRowCommand = (typeof ORGANIZATION_ROW_COMMANDS)[number];
 
@@ -82,7 +85,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
     ...unused,
   });
   const announcer = BillingLifecycleAnnouncerService.create({
-    subscriptions: { findLastNonCancelled: async () => null },
+    subscriptions: { findActive: async () => null },
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -101,6 +104,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
     recordPricingModelChanged: rowSender("recordPricingModelChanged"),
     recordSeatCheckoutPaid: rowSender("recordSeatCheckoutPaid"),
     recordSeatCheckoutsAbandoned: rowSender("recordSeatCheckoutsAbandoned"),
+    recordOverPlanChanged: rowSender("recordOverPlanChanged"),
   });
   return { announcer, sent };
 }
@@ -134,6 +138,7 @@ const createMockItemCalculator = () => ({
     GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_growth_events_eur_annual_until_mar_2026",
     GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_growth_events_usd_monthly_until_mar_2026",
     GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_growth_events_usd_annual_until_mar_2026",
+    DEVELOPER_SEAT_EUR_MONTHLY: "price_developer_seat_eur_monthly",
   },
 });
 
@@ -149,8 +154,11 @@ const makeSubscription = (
   startDate: Temporal.Now.instant(),
   endDate: null,
   lastPaymentFailedDate: null,
+  seatsKept: null,
+  seatsKeptUntil: null,
   maxMembers: null,
   maxMembersLite: null,
+  maxMembersDeveloper: null,
   maxMessagesPerMonth: null,
   ...overrides,
 });
@@ -186,6 +194,7 @@ const stripeSubscription = (overrides: Partial<BillingSubscription> = {}): Billi
 const itemFor = (priceId: string): BillingSubscriptionItem => ({
   id: `si_${priceId}`,
   priceId,
+  createdAt: 1_700_000_000,
   unitAmount: null,
   interval: null,
 });
@@ -789,9 +798,9 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         });
-        subRepo.migrateToSeatEvent.mockResolvedValue([
-          { stripeSubscriptionId: "sub_old_1" },
-          { stripeSubscriptionId: "sub_old_2" },
+        subRepo.findSupersededBySeatEvent.mockResolvedValue([
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1", cancelledInRecords: false },
+          { id: "sub_db_old_2", stripeSubscriptionId: "sub_old_2", cancelledInRecords: false },
         ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -801,22 +810,25 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.migrateToSeatEvent).toHaveBeenCalledWith({
+        expect(subRepo.findSupersededBySeatEvent).toHaveBeenCalledWith({
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(localStripe.cancellations).toContainEqual({
-          subscriptionId: "sub_old_1",
-          prorate: true,
-        });
-        expect(localStripe.cancellations).toContainEqual({
-          subscriptionId: "sub_old_2",
-          prorate: true,
-        });
+        expect(localStripe.cancellations).toEqual([
+          { subscriptionId: "sub_old_1", prorate: true },
+          { subscriptionId: "sub_old_2", prorate: true },
+        ]);
+        expect(subRepo.cancel.mock.calls).toEqual([
+          [{ id: "sub_db_old_1" }],
+          [{ id: "sub_db_old_2" }],
+        ]);
       });
 
-      it("logs but does not fail when Stripe cancellation fails", async () => {
-        const localStripe = subscriptionsTwin();
+      it("fails the delivery and keeps the old row live when Stripe refuses the cancel", async () => {
+        const localStripe = subscriptionsTwin(
+          stripeSubscription(),
+          stripeSubscription({ id: "sub_old_1" }),
+        );
         localStripe.refuse({ operation: "cancelSubscription", error: new Error("Stripe error") });
         service = EEWebhookService.create({
           licenses,
@@ -840,16 +852,22 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         });
-        subRepo.migrateToSeatEvent.mockResolvedValue([{ stripeSubscriptionId: "sub_old_1" }]);
+        subRepo.findSupersededBySeatEvent.mockResolvedValue([
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1", cancelledInRecords: false },
+        ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
         });
+        const outcome = promise.then(
+          () => "resolved",
+          () => "rejected",
+        );
 
         await vi.advanceTimersByTimeAsync(2000);
-        // Should not throw
-        await promise;
 
+        expect(await outcome).toBe("rejected");
+        expect(subRepo.cancel).not.toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
     });
@@ -1010,6 +1028,7 @@ describe("EEWebhookService", () => {
 
     describe("when subscription is ACTIVE", () => {
       /** @scenario "A failed invoice payment does not immediately remove the plan" */
+      /** @scenario "The day a renewal payment fails, the organization keeps its paid plan" */
       /** @scenario Payment failure on an active subscription records the failure */
       it("keeps status as ACTIVE with failed payment date", async () => {
         subRepo.findByStripeId.mockResolvedValue(
@@ -1385,6 +1404,80 @@ describe("EEWebhookService", () => {
         });
       });
 
+      describe("when the subscription carries Growth seats", () => {
+        const updateWithItems = async (items: { price: { id: string }; quantity: number }[]) => {
+          subRepo.findByStripeId.mockResolvedValue(
+            makeSubscription({
+              status: SubscriptionStatus.ACTIVE,
+              plan: "GROWTH_SEAT_EUR_MONTHLY",
+            }),
+          );
+          subRepo.updateQuantities.mockResolvedValue({
+            outcome: "updated",
+            subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+          });
+          const promise = service.handleSubscriptionUpdated({
+            subscription: {
+              id: "sub_stripe_1",
+              status: "active",
+              canceled_at: null,
+              ended_at: null,
+              items: { data: items },
+            } as any,
+          });
+          await vi.advanceTimersByTimeAsync(2000);
+          await promise;
+        };
+
+        /** @scenario Developer seats bought on Growth become the Developer seat cap */
+        it("stores the Developer seat line quantity as the Developer seat cap", async () => {
+          await updateWithItems([
+            { price: { id: "price_growth_seat_eur_monthly" }, quantity: 5 },
+            { price: { id: "price_developer_seat_eur_monthly" }, quantity: 3 },
+          ]);
+
+          expect(subRepo.updateQuantities).toHaveBeenCalledWith(
+            expect.objectContaining({ id: "sub_db_1", maxMembers: 5, maxMembersDeveloper: 3 }),
+          );
+        });
+
+        /** @scenario Removing the Developer seat line sets the Developer seat cap to none */
+        it("stores a Developer seat cap of 0 when no Developer seat line remains", async () => {
+          await updateWithItems([{ price: { id: "price_growth_seat_eur_monthly" }, quantity: 5 }]);
+
+          expect(subRepo.updateQuantities).toHaveBeenCalledWith(
+            expect.objectContaining({ maxMembersDeveloper: 0 }),
+          );
+        });
+      });
+
+      /** @scenario A subscription without Growth seats keeps the Developer seat cap Ops set */
+      it("leaves the Developer seat cap alone on a tiered subscription", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+        );
+        subRepo.updateQuantities.mockResolvedValue({
+          outcome: "updated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            canceled_at: null,
+            ended_at: null,
+            items: { data: [{ price: { id: "price_launch_users" }, quantity: 2 }] },
+          } as any,
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.updateQuantities.mock.calls[0]?.[0]).not.toHaveProperty(
+          "maxMembersDeveloper",
+        );
+      });
+
       /** @scenario Transition to active triggers a notification */
       it("notifies when transitioning from non-active to active", async () => {
         subRepo.findByStripeId.mockResolvedValue(
@@ -1559,7 +1652,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       waitUntilReady: async () => {},
     };
     const announcer = BillingLifecycleAnnouncerService.create({
-      subscriptions: subRepo,
+      subscriptions: { findActive: async () => null },
       organizations: { findActiveMemberIds: async () => ["user-1"] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -1583,6 +1676,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       recordPricingModelChanged: { send: async () => {}, ...unused },
       recordSeatCheckoutPaid: { send: async () => {}, ...unused },
       recordSeatCheckoutsAbandoned: { send: async () => {}, ...unused },
+      recordOverPlanChanged: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,
@@ -1647,7 +1741,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
         makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
       );
       subRepo.activate.mockResolvedValue({ outcome: "activated", subscription: seat });
-      subRepo.migrateToSeatEvent.mockResolvedValue([]);
+      subRepo.findSupersededBySeatEvent.mockResolvedValue([]);
 
       await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
 

@@ -48,6 +48,28 @@ Feature: A run carries a snapshot of the board
     When I run one row
     Then the run carries the other row's cells
 
+  # The board's cells answer the saved dataset's rows. A run over rows sent in
+  # the request, another dataset or other parameters is answering different
+  # questions, so a board cell copied into it would sit on the wrong row.
+
+  @unit
+  Scenario: A run of rows sent in the request carries nothing from the board
+    Given a board with two rows that both have results
+    When the run API runs one row of rows sent in the request
+    Then the run carries no cells from the board
+
+  @unit
+  Scenario: A run of another dataset carries nothing from the board
+    Given a board with two rows that both have results
+    When the run API runs one row of a dataset other than the saved one
+    Then the run carries no cells from the board
+
+  @unit
+  Scenario: A run with its own parameters carries nothing from the board
+    Given a board with two rows that both have results
+    When the run API runs one row with parameters of its own
+    Then the run carries no cells from the board
+
   @unit
   Scenario: A cell with nothing on the board is not carried
     Given a board with a column that has results for the first row only

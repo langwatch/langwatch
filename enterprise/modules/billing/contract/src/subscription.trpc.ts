@@ -2,6 +2,7 @@
  * Every `subscription.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the billing page has always called.
  */
+import { growthRetentionDaysSchema } from "@langwatch/data-retention-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
@@ -9,8 +10,15 @@ import {
   billingDisplayInvoiceSchema,
   billingPortalSessionSchema,
   billingRedirectSchema,
+  developerSeatQuoteSchema,
+  developerSeatsSchema,
   subscriptionItemsUpdatedSchema,
 } from "./billing-types.ts";
+import {
+  paymentRecoveryDetailsSchema,
+  paymentRecoveryPayLinkSchema,
+  paymentRecoverySummarySchema,
+} from "./payment-recovery.ts";
 import { SUBSCRIBABLE_PLANS } from "./plan-types.ts";
 import { currencySchema } from "./pricing.ts";
 
@@ -39,7 +47,7 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
       plan: subscribablePlanSchema,
       upgradeMembers: z.boolean(),
       upgradeTraces: z.boolean(),
-      totalMembers: z.number(),
+      totalMembers: z.number().int().nonnegative(),
       totalTraces: z.number(),
       // Echoed back from `previewProration` so the charge prices the same
       // instant the customer was quoted. Optional: a caller that never showed
@@ -59,6 +67,8 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
       tracesToAdd: z.number().optional(),
       currency: currencySchema.optional(),
       billingInterval: subscriptionBillingIntervalSchema.optional(),
+      /** The retention picked in the upgrade dialog; set on the organization once it is paid. */
+      retentionDays: growthRetentionDaysSchema.optional(),
     }),
   )
   .withOutput(billingRedirectSchema)
@@ -89,9 +99,41 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
   // reads it, and it is carried unchanged so the wire does not move.
   .withOutput(providerOwnedSchema)
 
+  .query("developerSeats")
+  .withInput(organizationScopeSchema)
+  .withOutput(developerSeatsSchema)
+
+  .query("previewDeveloperSeats")
+  .withInput(z.object({ ...organizationScopeSchema.shape, quantity: z.number().int().min(0) }))
+  .withOutput(developerSeatQuoteSchema)
+
+  .mutation("setDeveloperSeats")
+  .withInput(
+    z.object({
+      ...organizationScopeSchema.shape,
+      quantity: z.number().int().min(0),
+      quotedAt: z.number().int().positive().optional(),
+    }),
+  )
+  .withOutput(subscriptionItemsUpdatedSchema)
+
   .query("listInvoices")
   .withInput(organizationScopeSchema)
   .withOutput(billingDisplayInvoiceSchema.array())
+
+  // Whether a failed payment has the organization failing or paused; every member reads it.
+  .query("paymentRecovery")
+  .withInput(organizationScopeSchema)
+  .withOutput(paymentRecoverySummarySchema)
+
+  // The open case's invoice, amount, card and stop date, for those who can pay it.
+  .query("paymentRecoveryDetails")
+  .withInput(organizationScopeSchema)
+  .withOutput(paymentRecoveryDetailsSchema)
+
+  .mutation("paymentRecoveryPayLink")
+  .withInput(organizationScopeSchema)
+  .withOutput(paymentRecoveryPayLinkSchema)
   .build();
 
 export const billingCallerEmailSchema = z.string().nullable();

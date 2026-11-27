@@ -20,7 +20,7 @@ type ResourceLimitAlertDependencies = Readonly<{
   cooldown: BillingCooldownCache;
   organizations: Pick<BillingUsageLimitOrganization, "findWithAdmins">;
   plans: Pick<SaaSPlanProviderService, "getActivePlan">;
-  notices: Pick<NotificationService, "sendSlackResourceLimitAlert">;
+  notices: Pick<NotificationService, "sendSlackResourceLimitAlert" | "sendSlackSeatRequest">;
   errors: BillingErrorReporter;
 }>;
 
@@ -75,6 +75,28 @@ export class ResourceLimitAlertService {
         limitType,
       });
       await cooldown.delete(cooldownKey);
+    }
+  }
+
+  /** Sales hear of a seat request on an account-managed plan; SaaS only, never throws. */
+  async notifySalesOfSeatRequest(input: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void> {
+    if (!this.dependencies.isSaas) return;
+    try {
+      await this.dependencies.notices.sendSlackSeatRequest(input);
+    } catch (error) {
+      logger.error(
+        { error, organizationId: input.organizationId },
+        "[billing] Seat request notice failed",
+      );
+      this.dependencies.errors.capture(error instanceof Error ? error : new Error(String(error)), {
+        organizationId: input.organizationId,
+      });
     }
   }
 }

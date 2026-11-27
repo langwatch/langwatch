@@ -101,6 +101,9 @@ class FakeObjects implements GovernanceObjectStore {
     ): Promise<{ keys: string[]; isTruncated: boolean }> => ({ keys: [], isTruncated: false }),
   );
   readonly readText = vi.fn(async (_input: Parameters<GovernanceObjectStore["readText"]>[0]) => "");
+  readonly readBytes = vi.fn(
+    async (_input: Parameters<GovernanceObjectStore["readText"]>[0]) => new Uint8Array(),
+  );
 }
 
 function httpAdapter(http: FakeHttp): HttpPollingPullerAdapter {
@@ -207,6 +210,8 @@ describe("HTTP polling puller", () => {
   });
 });
 
+const S3_KEYS = { aws_access_key_id: "access", aws_secret_access_key: "secret" };
+
 describe("S3 polling puller", () => {
   it("validates parser and bucket while defaulting an omitted prefix", () => {
     const adapter = s3Adapter(new FakeObjects());
@@ -248,6 +253,7 @@ describe("S3 polling puller", () => {
           accessKeyId: "access",
           secretAccessKey: "secret",
           sessionToken: void 0,
+          requireStaticKeys: true,
         },
       }),
     );
@@ -260,7 +266,10 @@ describe("S3 polling puller", () => {
     const adapter = s3Adapter(resumed);
 
     await expect(
-      adapter.runOnce({ cursor: "logs/002.ndjson" }, adapter.validateConfig(s3Config)),
+      adapter.runOnce(
+        { cursor: "logs/002.ndjson", credentials: S3_KEYS },
+        adapter.validateConfig(s3Config),
+      ),
     ).resolves.toMatchObject({ cursor: "logs/003.ndjson" });
     expect(resumed.list).toHaveBeenCalledWith(
       expect.objectContaining({ startAfter: "logs/002.ndjson" }),
@@ -269,7 +278,10 @@ describe("S3 polling puller", () => {
     const drained = new FakeObjects();
     const empty = s3Adapter(drained);
     await expect(
-      empty.runOnce({ cursor: "logs/003.ndjson" }, empty.validateConfig(s3Config)),
+      empty.runOnce(
+        { cursor: "logs/003.ndjson", credentials: S3_KEYS },
+        empty.validateConfig(s3Config),
+      ),
     ).resolves.toMatchObject({ cursor: "logs/003.ndjson", events: [], errorCount: 0 });
   });
 
@@ -286,7 +298,10 @@ describe("S3 polling puller", () => {
       .mockRejectedValueOnce(new Error("missing object"));
     const adapter = s3Adapter(objects);
 
-    const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(s3Config));
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: S3_KEYS },
+      adapter.validateConfig(s3Config),
+    );
 
     expect(result.events.map((item) => item.source_event_id)).toEqual(["one", "two"]);
     expect(result.cursor).toBe("logs/missing.ndjson");
@@ -307,7 +322,7 @@ describe("S3 polling puller", () => {
     const adapter = s3Adapter(objects);
 
     const result = await adapter.runOnce(
-      { cursor: null },
+      { cursor: null, credentials: S3_KEYS },
       adapter.validateConfig({ ...s3Config, parser }),
     );
 

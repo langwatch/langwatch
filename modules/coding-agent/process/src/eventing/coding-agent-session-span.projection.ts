@@ -40,6 +40,13 @@ const GEN_AI_TOOL_NAME = "gen_ai.tool.name";
  */
 const SPAN_REPORTED_COST_KEYS: readonly string[] = ["pi.ai.usage.cost"];
 /**
+ * Model calls whose context is the whole prompt, fresh input and both cache buckets: pi's input
+ * leaves the cache out, and a call that caches nothing would otherwise read zero (ADR-188).
+ */
+const CONTEXT_COUNTS_FRESH_INPUT_SPAN_NAMES: ReadonlySet<string> = new Set(["pi.ai.request"]);
+/** Session spans that each open on one user prompt: pi starts one run per prompt it is given. */
+const PROMPT_SESSION_SPAN_NAMES: ReadonlySet<string> = new Set(["pi.harness.run"]);
+/**
  * The spans whose tokens the fold counts as a model call, across every span-bearing agent. The
  * contribute service stamps exactly these with the session's declared working context, so the fold
  * can charge their tokens to it; every other span charges nothing anywhere and rides unstamped.
@@ -280,9 +287,12 @@ export class CodingAgentSessionSpanProjection {
   }): CodingAgentSessionData {
     const before = this.stateProjection.withIdentity(state, span.attrs);
     if (role === "session") {
+      const prompted = PROMPT_SESSION_SPAN_NAMES.has(span.name)
+        ? { ...before, prompts: before.prompts + 1 }
+        : before;
       // The root's prompt names an unnamed session, as a Claude Code prompt event does.
       return this.stateProjection.withTitle({
-        state: before,
+        state: prompted,
         value: this.stateProjection.coerceString(span.attrs[SESSION_TITLE_FALLBACK_FACT_KEY]),
         source: "prompt",
       });
@@ -304,6 +314,7 @@ export class CodingAgentSessionSpanProjection {
       state: before,
       attrs: facts,
       fallbackDurationMs: durationMs,
+      countsFreshInput: CONTEXT_COUNTS_FRESH_INPUT_SPAN_NAMES.has(span.name),
     });
     return this.chargePricedCall({ before, folded, facts, context });
   }

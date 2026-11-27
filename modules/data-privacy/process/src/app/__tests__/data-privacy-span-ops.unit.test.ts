@@ -1,5 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { type DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -36,6 +37,7 @@ async function boot({ enforcement }: { enforcement?: string }) {
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+      entitlements: createApiFixture<EntitlementApi>(),
     },
   });
 

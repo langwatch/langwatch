@@ -46,6 +46,8 @@ export type DeferredOriginPayload = {
   id: string;
   tenantId: string;
   traceId: string;
+  /** The trace's storage anchor, when its summary was found: the event's time (ADR-087). */
+  traceAnchorMs?: number;
 };
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
@@ -105,7 +107,12 @@ export function createDeferredOriginHandler(
       traceId: payload.traceId,
       origin: "application",
       reason: "deferred_fallback",
-      occurredAt: nowInstant().epochMilliseconds,
+      // The folds read back within a window around the event's time; stamped now, an event for
+      // a backfilled trace misses its row and folds an empty one over it.
+      occurredAt:
+        payload.traceAnchorMs !== undefined && payload.traceAnchorMs > 0
+          ? payload.traceAnchorMs
+          : nowInstant().epochMilliseconds,
     });
   };
 }

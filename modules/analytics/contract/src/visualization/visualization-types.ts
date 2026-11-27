@@ -30,7 +30,12 @@ export interface LangWatchQLVegaLiteChartProps {
   ariaLabel?: string;
   /** Keeps the workbench's note under the chart for screen readers only, where no table is near. */
   isResultNoteHidden?: boolean;
+  /** The ids a crash while drawing is reported with, where the chart sits on a board. */
+  crashContext?: LangWatchQLChartCrashContext;
 }
+
+/** Which board and widget a chart that crashed sits on; never its data or its SQL. */
+export type LangWatchQLChartCrashContext = Readonly<{ dashboardId?: string; widgetId?: string }>;
 
 /**
  * Stable presentation keys the client presentation registry is keyed by; the

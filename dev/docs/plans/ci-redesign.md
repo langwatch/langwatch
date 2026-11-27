@@ -42,7 +42,7 @@ lighter set and lets a newer main commit cancel an older run.
 | Small checks on every pull request, no path filter | architecture-section-check, cache-cleanup, issue-link, no-committed-screenshots, pr-impact-map, pr-token-usage, readme-links, release-scope-guard                                                                                                    | 1 job each                                |
 | Checks with a path filter                          | agent-plugin-ci, clickhouse-serverless-chart, coderabbit-config-check, deployment-impact-check, gateway-matrix, ksuid-python-ci, langwatch-chart, langy-scenarios-sync, migration-compat, migration-order, ssrf-conformance, workflow-security-guard | none (GitHub does not start them)         |
 | Need `pull_request_target`                         | pr-conventional-commits-title, pr-auto-approve                                                                                                                                                                                                       | stay as they are                          |
-| LLM review                                         | pr-review-bot                                                                                                                                                                                                                                        | stays as it is                            |
+| LLM review                                         | job `review` in pr.yml, after ci-complete                                                                                                                                                                                                            | moved last (issue 9342)                   |
 | Release, publish, nightly, scheduled               | every `*-cd`, `publish-*`, `release-*`, nightly, upgrade-rehearsal, and the rest                                                                                                                                                                     | not on pull requests; untouched           |
 
 Required checks on main: `validate title`, `review`, and ten `*-complete`
@@ -64,7 +64,8 @@ pull_request / merge_group
        ├─ sdks      │
        ├─ docs      │
        ├─ security ─┘      codeql + code-scanners
-       └─ ci-complete      the one required check
+       ├─ ci-complete      the one required check
+       └─ review           the LLM review, only after ci-complete passed
 ```
 
 `ci-complete` passes when every started call passed and every other call was

@@ -2,6 +2,7 @@ import {
   TeamNotFoundError,
   TeamMembershipChangedError,
   TeamSlugConflictError,
+  BillingOnlyNoTeamAccessError,
   UserNotInOrganizationError,
   type OrganizationTeam,
   type OrganizationTeamPage,
@@ -202,6 +203,7 @@ export class PrismaTeamRepository extends TeamRepository {
     userIds: string[];
     organizationId: string;
     activeOnly?: boolean;
+    grantingAccess?: boolean;
   }): Promise<string[]> => {
     if (input.userIds.length === 0) return [];
     const memberships = await this.database.organizationUser.findMany({
@@ -210,11 +212,14 @@ export class PrismaTeamRepository extends TeamRepository {
         userId: { in: input.userIds },
         ...(input.activeOnly ? { disabledAt: null } : {}),
       },
-      select: { userId: true },
+      select: { userId: true, billingOnly: true },
     });
     const found = new Set(memberships.map(({ userId }) => userId));
     const missing = input.userIds.find((userId) => !found.has(userId));
     if (missing) throw new UserNotInOrganizationError(missing);
+    if (input.grantingAccess && memberships.some(({ billingOnly }) => billingOnly)) {
+      throw new BillingOnlyNoTeamAccessError();
+    }
     return memberships.map(({ userId }) => userId);
   };
 

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  euroUsagePriceErrors,
   OPTIONAL_STRIPE_METER_NAMES,
   OPTIONAL_STRIPE_PRICE_NAMES,
   STRIPE_METER_NAMES,
@@ -219,6 +220,8 @@ const resolveRequiredMappings = (params: {
     const selectedDetail = lookupMappedId ? fetchedPricesById[lookupMappedId] : undefined;
 
     if (!lookupMappedId || !selectedDetail) {
+      // An optional price not yet provisioned in this mode stays unmapped.
+      if (OPTIONAL_STRIPE_PRICE_NAMES.includes(key)) continue;
       errors.push(`Missing required lookup_key mapping for ${key} in ${environment} mode`);
       continue;
     }
@@ -311,7 +314,7 @@ export const validateMappings = (
     }
   }
 
-  return errors;
+  return [...errors, ...euroUsagePriceErrors({ file, environment })];
 };
 
 export const mergeWithExisting = (params: {

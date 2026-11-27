@@ -41,7 +41,6 @@ function renderComposer({ isSaaS }: { isSaaS: boolean }) {
         modelOptions={["openai/gpt-5-mini"]}
         onModelChange={() => {}}
         onSend={() => {}}
-        onStop={() => {}}
         disabled={false}
       />
     </DesignSystemProvider>,

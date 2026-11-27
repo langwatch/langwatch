@@ -1,9 +1,9 @@
 /**
- * The access refusals: what a caller sees when a declared permission, a lite
- * membership or a disabled membership stops them. Authz raises most of them;
+ * The access refusals: what a caller sees when a declared permission, a lite or disabled
+ * membership, or an impersonated credential mint stops them. Authz raises most of them;
  * the framework raises the same classes, so there is one of each.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 import type { AuthzDenialReason } from "./decision.ts";
 import type { ScopeTier } from "./scope-tiers.ts";
@@ -20,6 +20,9 @@ function permissionDeniedMessage({
     return "This feature is not available for your account";
   }
   if (denialReason === "developer-restricted") return "This is outside your Developer seat";
+  if (denialReason === "braids-kept-to-organisation-admins") {
+    return "Your organisation keeps braids to its admins, so only they can create, change or remove them";
+  }
   return `You do not have permission to access this ${scopeType}`;
 }
 
@@ -59,6 +62,27 @@ export class PermissionDeniedError extends HandledError {
 
   get denialReason(): AuthzDenialReason {
     return this.meta.denialReason as AuthzDenialReason;
+  }
+}
+
+/**
+ * An operator acting as a member asked to mint or rotate a credential as them. No grant
+ * allows it, so naming a permission to ask for would send them on an errand that cannot end.
+ */
+export class ImpersonationCannotMintCredentialError extends HandledError {
+  declare readonly code: "impersonation_cannot_mint_credential";
+
+  constructor() {
+    super(
+      "impersonation_cannot_mint_credential",
+      "Keys cannot be created or rotated while impersonating.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("impersonation_cannot_mint_credential"),
+      },
+    );
+    this.name = "ImpersonationCannotMintCredentialError";
   }
 }
 

@@ -5,13 +5,14 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { FacetState } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { FacetRow } from "../../../../ui/sections/explorer/filter-sidebar/facet-row.tsx";
-import type { FacetItem, FacetValueState } from "../types.ts";
+import type { FacetItem } from "../types.ts";
 
 const ITEM: FacetItem = {
   value: "error",
@@ -26,7 +27,7 @@ const renderRow = ({
   onToggle = vi.fn(),
   onExclude = vi.fn(),
 }: {
-  state: FacetValueState;
+  state: FacetState;
   onToggle?: (value: string) => void;
   onExclude?: (value: string) => void;
 }) =>

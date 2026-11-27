@@ -44,7 +44,7 @@ describe("InstantEvalSpendService", () => {
       organizationId: "org-1",
       teamId: "team-1",
       requestType: INSTANT_EVAL_REQUEST_TYPE,
-      model: "jev",
+      model: "langwatch-instant-preview",
       inputTokens: 12_000,
       costNanoUsd: 13_000_000,
     });
@@ -114,31 +114,8 @@ describe("InstantEvalSpendService", () => {
     await expect(service.recordSpend(RECORD)).rejects.toThrow(/not registered/);
   });
 
-  it("nudges the organization's month once the spend has landed", async () => {
-    const reportBillingMonth = vi.fn(async () => undefined);
-    const service = InstantEvalSpendService.create({ peers: peers({ reportBillingMonth }) });
-
-    await service.recordSpend(RECORD);
-
-    expect(reportBillingMonth).toHaveBeenCalledWith({
-      organizationId: "org-1",
-      occurredAt: RECORD.occurredAt,
-    });
-  });
-
-  it("keeps the spend when the nudge fails: the report has three other ways to fire", async () => {
-    const service = InstantEvalSpendService.create({
-      peers: peers({
-        reportBillingMonth: async () => {
-          throw new Error("billing pipeline unavailable");
-        },
-      }),
-    });
-
-    await expect(service.recordSpend(RECORD)).resolves.toBeUndefined();
-  });
-
-  it("bills nothing extra on a deployment with no meter to nudge", async () => {
+  /** @scenario "Instant Evals no longer nudges the billing report itself" */
+  it("records the priced spend once and leaves the month report to billing", async () => {
     const recordPricedSpend = vi.fn(async () => undefined);
     const service = InstantEvalSpendService.create({ peers: peers({ recordPricedSpend }) });
 

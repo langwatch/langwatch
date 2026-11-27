@@ -49,6 +49,23 @@ langevals:
     requests: { cpu: 1, memory: 4Gi }
     limits: { cpu: 2, memory: 8Gi }
 
+piiRedactionModel:
+  # Off by default (see the chart README); two replicas when turned on.
+  enabled: false
+  replicaCount: 2
+  podDisruptionBudget:
+    maxUnavailable: 1
+  # One replica per zone where the cluster has zones.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: pii-redaction-model
+      matchLabelKeys:
+        - app.kubernetes.io/instance
+
 clickhouse:
   chartManaged: true
   replicas: 3

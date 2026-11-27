@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   auditBackLink,
   auditProjectFilterIn,
+  auditTargetChipText,
   matchMemberId,
   readAuditPaging,
   readAuditTarget,
@@ -234,5 +235,42 @@ describe("given a project filter picked in one organization", () => {
       const empty = { organizationId: "org-acme", projectId: null };
       expect(auditProjectFilterIn({ filter: empty, organizationId: "org-acme" })).toEqual(empty);
     });
+  });
+});
+
+describe("given a target label on a link that is not a braid's", () => {
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("shows the target's id, not the label the link carries", () => {
+    const target = readAuditTarget({
+      targetKind: "virtual_key",
+      targetId: "vk_A",
+      targetLabel: "Prod key",
+    });
+    expect(target && auditTargetChipText(target)).toBe("virtual_key = vk_A…");
+  });
+});
+
+describe("given the audit log opened from a braid", () => {
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("names the braid by its projects", () => {
+    const target = readAuditTarget({
+      targetKind: "braid",
+      targetId: "rolebinding_00041n",
+      targetLabel: "payments-agent → checkout-web",
+    });
+    expect(target && auditTargetChipText(target)).toBe("Braid: payments-agent → checkout-web");
+  });
+
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("reads Braid alone when the link carries no label", () => {
+    const target = readAuditTarget({ targetKind: "braid", targetId: "rolebinding_00041n" });
+    expect(target && auditTargetChipText(target)).toBe("Braid");
+  });
+
+  /** @scenario A braid's target chip names its projects, never its grant id */
+  it("drops the label with the rest of the target when the chip clears", () => {
+    expect(
+      withoutAuditTarget({ targetKind: "braid", targetId: "rb_1", targetLabel: "a → b" }),
+    ).toEqual({});
   });
 });

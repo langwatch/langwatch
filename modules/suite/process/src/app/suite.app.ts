@@ -1,7 +1,7 @@
-import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 /**
  * The suite feature's application: what both of its doors call.
  */
+import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   EvaluatorApi,
@@ -29,6 +29,8 @@ import {
   type EvaluatorAttachment,
   type ScenarioApi as ScenarioApiType,
   type RunActor,
+  type ScenarioActor,
+  type ScenarioCaller,
   type ScenarioRunConfig,
   type ScenarioTestSuite,
   type ScenarioTestSuiteCreateInput,
@@ -39,6 +41,9 @@ import {
 } from "@langwatch/scenario-contract";
 import {
   SuiteApi,
+  type AppliedSuiteTemplate,
+  type ApplySuiteTemplateTrpcInput,
+  type SuiteTemplate,
   SuiteNotFoundError,
   type SuiteRunParameters,
   type SuiteRunResult,
@@ -71,6 +76,7 @@ import {
   buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
 } from "../eventing/suite-run-processing.pipeline.ts";
+import { SuiteTemplateService } from "../features/suite-templates/services/suite-template.service.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
@@ -227,7 +233,10 @@ export class SuiteModule implements SuiteApi {
    */
   private static infrastructureOver(input: {
     agents: Pick<AgentApiType, "getPresence">;
-    scenarios: Pick<ScenarioApiType, "resolveRunParametersForScenarios" | "queueSimulationRun">;
+    scenarios: Pick<
+      ScenarioApiType,
+      "assertSimulationRunAllowed" | "resolveRunParametersForScenarios" | "queueSimulationRun"
+    >;
     commands: SuiteRunCommands;
     resolveRunModels?: SuiteRunModelsResolver;
     resolveRunEvaluators?: SuiteRunEvaluatorsResolver;
@@ -295,6 +304,7 @@ export class SuiteModule implements SuiteApi {
   readonly #runItems: SuiteRunItemCommandsService;
   readonly #runPlans: RunPlanReadService;
   readonly #connectedTargets: ConnectedTargetService;
+  readonly #templates: SuiteTemplateService;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
@@ -311,6 +321,7 @@ export class SuiteModule implements SuiteApi {
     this.#runItems = runItems;
     this.#runPlans = runPlans;
     this.#dependencies = rest;
+    this.#templates = SuiteTemplateService.create({ scenarios: rest.scenarios });
     this.#connectedTargets = ConnectedTargetService.create({
       agents: rest.agents,
       owners: AgentOwnerNamesService.create(rest.agents),
@@ -482,6 +493,18 @@ export class SuiteModule implements SuiteApi {
     return this.#dependencies.suites.createTestSuite(input);
   }
 
+  async listTemplates(_input: { projectId: string }): Promise<SuiteTemplate[]> {
+    return this.#templates.listTemplates();
+  }
+
+  applyTemplate(
+    input: ApplySuiteTemplateTrpcInput,
+    by: ScenarioCaller,
+    author?: ScenarioActor,
+  ): Promise<AppliedSuiteTemplate> {
+    return this.#templates.applyTemplate(input, by, author);
+  }
+
   /**
    * Updates one suite, whichever kind it turns out to be.
    */
@@ -636,6 +659,8 @@ const EXECUTION_FIELD_REFUSALS = {
   repeatCount: "A test suite has no repeat count; it travels with each run",
   simulatorModel: "A test suite has no simulator model; it travels with each run",
   judgeModel: "A test suite has no judge model; it travels with each run",
+  traceQuietPeriodMs: "A test suite has no trace quiet period; it travels with each run",
+  traceWaitTimeoutMs: "A test suite has no trace wait; it travels with each run",
 } as const;
 
 function refuseExecutionSettings(input: UpdateSuiteCommand): void {
@@ -678,10 +703,14 @@ export interface SuiteExecution {
      */
     simulatorModel?: string | null;
     judgeModel?: string | null;
+    /** The plan's judge trace wait in ms, stamped on every run; it wins over the scenario's. */
+    traceQuietPeriodMs?: number | null;
+    traceWaitTimeoutMs?: number | null;
   }): Promise<SuiteRunResult>;
 }
 
-/** The suite run's own start command; each scenario run is queued by the scenario owner. */
+/** The suite run's start command, and the item close for a run the cap refused to queue. */
 export interface SuiteRunCommands {
   startSuiteRun(data: StartSuiteRunCommandData): Promise<void>;
+  completeSuiteRunItem(data: CompleteSuiteRunItemCommandData): Promise<void>;
 }

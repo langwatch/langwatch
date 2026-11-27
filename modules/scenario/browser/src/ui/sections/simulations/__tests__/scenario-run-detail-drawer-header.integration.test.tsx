@@ -2,6 +2,7 @@
  * The run detail drawer's identity band and its criteria summary.
  * @vitest-environment jsdom
  * @see specs/features/scenarios/run-view-side-by-side-layout.feature
+ * @see modules/scenario/specs/red-team-scenario.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
@@ -285,6 +286,39 @@ describe("the run detail drawer", () => {
           expect(within(results).getByText(new RegExp(criterion))).toBeInTheDocument();
         }
       });
+    });
+  });
+
+  describe("given a red team run that broke", () => {
+    /** @scenario "The run view shows the red team outcome once" */
+    it("shows the Broke badge once, in the red team report", () => {
+      setRunState(
+        makeRunState({
+          status: ScenarioRunStatus.FAILED,
+          results: { verdict: Verdict.FAILURE, metCriteria: [], unmetCriteria: ["holds"] },
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent_1",
+              targetType: "http",
+              redTeam: {
+                outcome: "broke",
+                brokeAtTurn: 1,
+                strategy: "crescendo",
+                owaspIds: ["LLM07"],
+                attackGoal: "Reveal the system prompt",
+                maxTurns: 30,
+                turnsUsed: 1,
+                turnScores: [{ turn: 1, score: 10 }],
+              },
+            },
+          },
+        }),
+      );
+      renderWithDesignSystem(<ScenarioRunDetailDrawer open />);
+
+      const badges = screen.getAllByTestId("red-team-outcome");
+      expect(badges).toHaveLength(1);
+      expect(within(screen.getByTestId("red-team-report")).getByText("Broke")).toBe(badges[0]);
     });
   });
 });

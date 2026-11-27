@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
-import type { LanguageModel } from "ai";
+
+import type { MeterableModel } from "./vercel-provider-usage.rules.ts";
 
 /**
  * The handle for prepared parameters: they travel as `x-litellm-*` headers to nlpgo's in-process
@@ -14,7 +15,7 @@ export function handleForParameters(input: {
   executionProxyBaseUrl: string;
   /** The engine hop's shared credential, as the process resolved it. */
   internalSecret?: string | undefined;
-}): LanguageModel {
+}): MeterableModel {
   const headers = {
     ...Object.fromEntries(
       Object.entries(input.parameters).map(([key, value]) => [`x-litellm-${key}`, value]),

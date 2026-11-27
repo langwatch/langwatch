@@ -45,7 +45,12 @@ function contractCases(backend: Backend): void {
 
     await expect(
       repository.findProjectPlacement({ projectId: seeded.liveProjectId }),
-    ).resolves.toEqual({ projectId: seeded.liveProjectId, organizationId, teamId });
+    ).resolves.toEqual({
+      projectId: seeded.liveProjectId,
+      organizationId,
+      teamId,
+      kind: "application",
+    });
     await expect(repository.findTeamOrganizationId({ teamId: seeded.emptyTeamId })).resolves.toBe(
       organizationId,
     );
@@ -87,6 +92,7 @@ function contractCases(backend: Backend): void {
       projectId: seeded.archivedProjectId,
       organizationId: seeded.organizationId,
       teamId: seeded.teamId,
+      kind: "application",
     });
   });
 }
@@ -104,6 +110,7 @@ describe("given the memory placement reader", () => {
       projectId,
       organizationId: seeded.organizationId,
       teamId: seeded.teamId,
+      kind: "application",
     })),
     teams: [{ teamId: seeded.emptyTeamId, organizationId: seeded.organizationId }],
   });

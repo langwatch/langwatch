@@ -7,6 +7,8 @@
 import {
   ApiKeyScopeViolationError,
   publicDocsOrigins,
+  type DocsSessionKeyAccess,
+  type DocsSessionKeyLifetimeMinutes,
   type DocsSessionKeyMinted,
 } from "@langwatch/api-key-contract";
 import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
@@ -27,6 +29,7 @@ import {
   type AuthorizeScope,
   type AuthorizeSessionStatus,
   type AuthorizeSuccessNotice,
+  type DocsSessionAvailabilityReading,
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "../model/authorize-host.ts";
@@ -58,7 +61,10 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
       mintDocsSessionKey: (input: {
         projectId: string;
         docsOrigin: string;
+        access: DocsSessionKeyAccess;
+        lifetimeMinutes: DocsSessionKeyLifetimeMinutes;
       }) => Promise<DocsSessionKeyMinted>;
+      docsSessionAvailability: DocsSessionAvailabilityReading;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
     },
@@ -130,8 +136,17 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
     return typeof window === "undefined" ? "" : window.location.origin;
   }
 
-  mintDocsSessionKey(input: { projectId: string; docsOrigin: string }) {
+  mintDocsSessionKey(input: {
+    projectId: string;
+    docsOrigin: string;
+    access: DocsSessionKeyAccess;
+    lifetimeMinutes: DocsSessionKeyLifetimeMinutes;
+  }) {
     return this.deps.mintDocsSessionKey(input);
+  }
+
+  docsSessionAvailability(): DocsSessionAvailabilityReading {
+    return this.deps.docsSessionAvailability;
   }
 
   closeWindow(): void {
@@ -156,6 +171,21 @@ class HostServiceAuthorizeHost extends AuthorizeHostApi {
   }
 }
 
+/**
+ * Unread reads as loading, so Allow waits for the switch. A failed read leaves the choice to the
+ * mint, which asks the organization again and refuses by name.
+ */
+function availabilityReadingOf({
+  data,
+  failed,
+}: {
+  data: { enabled: boolean } | undefined;
+  failed: boolean;
+}): DocsSessionAvailabilityReading {
+  if (!data) return failed ? "enabled" : "loading";
+  return data.enabled ? "enabled" : "disabled";
+}
+
 /** The page config's docs origins; a shell without one registers none, so nothing connects. */
 function docsOriginsOfPage(): readonly string[] {
   try {
@@ -174,10 +204,11 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     projectId: activeScope.projectId ?? void 0,
   });
   const sessionActor = session.currentUser();
-  // What the person holds on the project, resolved by the server: the token's ceiling.
+  // What the person holds on the project, the token's ceiling: read only when a token is minted,
+  // since this mount wraps every page and the session already reads grants on each load.
   const standing = apiKeyApi.authz.effectivePermissions.useQuery(
     { projectId: activeScope.projectId ?? "" },
-    { enabled: !!activeScope.projectId },
+    { enabled: false },
   );
   const { refetch: refetchStanding } = standing;
   // As `useMintPersonalToken`: the token is never kept in the mutation cache.
@@ -188,6 +219,15 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
   const { mutateAsync: mintDocsKey, reset: resetDocsMint } =
     apiKeyApi.apiKey.mintDocsSessionKey.useMutation({ gcTime: 0 });
   const Switcher = useLent(ProjectSwitcherToken);
+  // Read only on the docs consent page, for the project its picker holds.
+  const availability = apiKeyApi.apiKey.docsSessionAvailability.useQuery(
+    { projectId: activeScope.projectId ?? "" },
+    { enabled: !!activeScope.projectId && location.pathname.startsWith("/connect/docs") },
+  );
+  const docsSessionAvailability = availabilityReadingOf({
+    data: availability.data,
+    failed: availability.isError,
+  });
 
   const host = useMemo(
     () =>
@@ -205,7 +245,9 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         mintProjectToken: async ({ expiresAt }) => {
           const { organizationId, projectId } = activeScope;
           if (!organizationId || !projectId) return void 0;
-          const held = (standing.data ?? (await refetchStanding()).data)?.permissions ?? [];
+          const read = await refetchStanding();
+          if (!read.data && read.error) throw read.error;
+          const held = read.data?.permissions ?? [];
           const permissions = cappedDeviceFlowPermissions({ held });
           if (permissions.length === 0) {
             throw new ApiKeyScopeViolationError(
@@ -231,13 +273,13 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
             resetDocsMint();
           }
         },
+        docsSessionAvailability,
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
       }),
     [
       activeScope,
       graph,
-      standing.data,
       refetchStanding,
       sessionActor,
       session,
@@ -249,6 +291,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
       resetMint,
       mintDocsKey,
       resetDocsMint,
+      docsSessionAvailability,
     ],
   );
 

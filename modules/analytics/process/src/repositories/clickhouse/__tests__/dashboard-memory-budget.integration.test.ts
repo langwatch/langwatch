@@ -37,12 +37,12 @@ const RAG_DOCUMENT_COUNT = 2_000;
 const SCALED_JOIN_BYTES = "30000000";
 
 /**
- * Model-grouped chart: its span-model join stacks three aggregations, and merging spilled parts
- * costs memory per part. At 100 MB spill (production: 500 MB) it peaks at 145-193 MiB across
- * runs against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
+ * Span-model join stacks 3 aggregations; each spilled part costs memory to merge. At 100 MB spill
+ * (production: 500 MB) on CAPPED_SETTINGS' 2 threads, passing runs peak at 145-193 MiB; runs were
+ * refused at 239-242 MiB. ~520 MiB unspilled, so this cap still fails a query that stops spilling.
  */
 const MODEL_GROUPED_SETTINGS = {
-  max_memory_usage: "250000000",
+  max_memory_usage: "300000000",
   max_bytes_before_external_group_by: "100000000",
 } as const;
 

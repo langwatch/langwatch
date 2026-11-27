@@ -1,5 +1,7 @@
 import {
   ClickHouseQueryClient,
+  coalesceKeyOf,
+  type InsertRequest,
   routingDriver,
   type ClickHouseConnection,
   type RoutableStatementClient,
@@ -73,6 +75,132 @@ describe("BillableEventsMeterClickHouseRepository.countByProjects", () => {
       await meter.countByProjects(READ);
 
       expect(organizationsResolved).toEqual(["org_1"]);
+    });
+  });
+});
+
+describe("BillableEventsMeterClickHouseRepository.countByDay", () => {
+  describe("given an organization metered in events", () => {
+    it("reads uniq keys per UTC day across the named projects", async () => {
+      const { meter, statements } = meterOver([{ day: "2026-09-02", total: "4" }]);
+
+      await expect(meter.countByDay(READ)).resolves.toEqual([{ day: "2026-09-02", count: 4 }]);
+      const sql = statements[0]?.query.replace(/\s+/g, " ");
+      expect(sql).toContain(
+        "SELECT toString(toDate(EventTimestamp, 'UTC')) as day, uniq(DeduplicationKeyHash) as total",
+      );
+      expect(sql).toContain("AND TenantId IN {projectIds:Array(String)}");
+      expect(sql).toContain("GROUP BY day ORDER BY day");
+    });
+
+    it("asks nothing for an organization with no projects", async () => {
+      const { meter, statements } = meterOver([]);
+
+      await expect(meter.countByDay({ ...READ, projectIds: [] })).resolves.toEqual([]);
+      expect(statements).toHaveLength(0);
+    });
+  });
+});
+
+describe("BillableEventsMeterClickHouseRepository.hasDeduplicationKey", () => {
+  describe("given a run start already metered under its key", () => {
+    it("finds the key by its hash in the project's rows of the organization", async () => {
+      const { meter, organizationsResolved, statements } = meterOver([{ total: "1" }]);
+
+      const found = await meter.hasDeduplicationKey({
+        organizationId: "org_1",
+        projectId: "project_a",
+        deduplicationKey: "project_a:run_1:startRun",
+      });
+
+      expect(found).toBe(true);
+      expect(organizationsResolved).toEqual(["org_1"]);
+      expect(statements[0]?.query).toContain("cityHash64({deduplicationKey:String})");
+      expect(statements[0]?.query_params).toMatchObject({
+        organizationId: "org_1",
+        projectId: "project_a",
+        deduplicationKey: "project_a:run_1:startRun",
+      });
+    });
+  });
+
+  describe("given no row under the key", () => {
+    it("answers false", async () => {
+      const { meter } = meterOver([{ total: "0" }]);
+
+      await expect(
+        meter.hasDeduplicationKey({
+          organizationId: "org_1",
+          projectId: "project_a",
+          deduplicationKey: "project_a:run_2:startRun",
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("BillableEventsMeterClickHouseRepository.countByType", () => {
+  describe("given an organization metered in events", () => {
+    /** @scenario "The per-type meter read is an approximate distinct count grouped by event type" */
+    it("reads uniq keys per event type across the named projects", async () => {
+      const { meter, statements, organizationsResolved } = meterOver([
+        { eventType: "lw.obs.log.record_received", total: "5" },
+      ]);
+
+      await expect(meter.countByType(READ)).resolves.toEqual([
+        { eventType: "lw.obs.log.record_received", count: 5 },
+      ]);
+      const sql = statements[0]?.query.replace(/\s+/g, " ");
+      expect(sql).toContain(
+        "SELECT EventType as eventType, uniq(DeduplicationKeyHash) as total FROM billable_events",
+      );
+      expect(sql).toContain("WHERE OrganizationId = {organizationId:String}");
+      expect(sql).toContain("AND TenantId IN {projectIds:Array(String)}");
+      expect(sql).toContain("GROUP BY EventType");
+      expect(organizationsResolved).toEqual(["org_1"]);
+    });
+
+    /** @scenario "The per-type meter read is an approximate distinct count grouped by event type" */
+    it("asks nothing for an organization with no projects", async () => {
+      const { meter, statements } = meterOver([]);
+
+      await expect(meter.countByType({ ...READ, projectIds: [] })).resolves.toEqual([]);
+      expect(statements).toHaveLength(0);
+    });
+  });
+});
+
+describe("BillableEventsMeterClickHouseRepository.insert", () => {
+  describe("given one billable event", () => {
+    it("sends an insert the member may coalesce, with async deduplication off", async () => {
+      const inserts: InsertRequest[] = [];
+      const meter = BillableEventsMeterClickHouseRepository.create(
+        createApiFixture<ClickHouseQueryClient>({
+          insert: async (request) => {
+            inserts.push(request);
+          },
+        }),
+      );
+
+      await meter.insert({
+        organizationId: "org_1",
+        record: {
+          organizationId: "org_1",
+          tenantId: "project_1",
+          eventId: "event_1",
+          eventType: "span",
+          deduplicationKey: "trace_1",
+          eventTimestamp: 1_700_000_000_000,
+        },
+      });
+
+      expect(inserts).toHaveLength(1);
+      expect(inserts[0]?.settings).toEqual({
+        async_insert: 1,
+        wait_for_async_insert: 1,
+        async_insert_deduplicate: 0,
+      });
+      expect(inserts.map(coalesceKeyOf)).not.toContain(null);
     });
   });
 });

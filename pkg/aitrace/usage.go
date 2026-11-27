@@ -62,6 +62,12 @@ type Usage struct {
 	// thinking. The provider already bills those tokens inside the
 	// completion total, so this count is reported and never priced.
 	ReasoningTokens int
+
+	// WebSearchRequests is how many server-side web searches the call ran,
+	// which providers bill per query on top of the tokens: Anthropic's
+	// usage.server_tool_use.web_search_requests, or the web_search_call
+	// items of an OpenAI Responses answer.
+	WebSearchRequests int
 }
 
 // BillableInputTokens is the input to charge at the plain input rate: the

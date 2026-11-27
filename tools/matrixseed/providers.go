@@ -1,7 +1,8 @@
 // Package matrixseed seeds the fresh control plane a gateway-matrix run boots:
 // one organization, one project, a model provider per provider the job holds
-// credentials for, and one virtual key per model provider. It talks only to the
-// public REST routes, starting from the instance administrator key.
+// credentials for, and one virtual key per model provider. It talks to the
+// public REST routes, starting from the instance administrator key, and to
+// Google's token endpoint to mint VERTEX_ACCESS_TOKEN from a service-account key.
 //
 // Spec: specs/ci/gateway-matrix-seed.feature
 package matrixseed

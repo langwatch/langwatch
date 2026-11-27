@@ -14,6 +14,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -80,6 +81,7 @@ async function boot(rest: RestHost) {
     .provide({
       "data-retention": createApiFixture<DataRetentionApi>({}),
       webhook: createApiFixture<WebhookApi>(),
+      notification: createApiFixture<NotificationService>(),
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>({

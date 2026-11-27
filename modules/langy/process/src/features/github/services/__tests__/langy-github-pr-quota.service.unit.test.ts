@@ -1,171 +1,149 @@
 /**
  * The PR cap is the only thing standing between a runaway worker (bad skill, prompt-injected pull)
- * and a user's GitHub account getting flagged for abuse.
+ * and a user's GitHub account getting flagged for abuse. It counts the pull requests Langy opened,
+ * one row each in the read model, by the day they opened.
  * @vitest-environment node
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTenantId } from "@langwatch/eventing";
+import { initLangyConversationState } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
 
-import {
-  type LangyGithubPrCountRedis,
-  LangyGithubPrCountRedisRepository,
-} from "../../../../repositories/redis/redis.langy-github-pr-count.repository.ts";
+import { LangyMemoryStore } from "../../../../repositories/memory/langy-memory.store.ts";
+import { MemoryLangyConversationProjectionRepository } from "../../../../repositories/memory/memory.langy-conversation-projection.repository.ts";
+import { MemoryLangyPullRequestRepository } from "../../../../repositories/memory/memory.langy-pull-request.repository.ts";
 import { LangyGithubPrQuotaService } from "../langy-github-pr-quota.service.ts";
 
-const get = vi.fn<(key: string) => Promise<string | null>>();
-const incr = vi.fn<(key: string, amount: number) => Promise<number>>();
-const decr = vi.fn<(key: string) => Promise<number>>();
-const expire = vi.fn<(key: string, seconds: number) => Promise<number>>();
-const floored = vi.fn<(script: string, numKeys: number, ...args: string[]) => Promise<unknown>>();
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PROJECT_ID = "project-1";
 
-/** The deployment's Redis, as the count repository drives it. */
-const redis: LangyGithubPrCountRedis = { get, incrby: incr, decr, expire, eval: floored };
+async function harness() {
+  const store = LangyMemoryStore.create();
+  const conversations = MemoryLangyConversationProjectionRepository.create(store);
+  const pullRequests = MemoryLangyPullRequestRepository.create(store);
+  const quota = LangyGithubPrQuotaService.create({ pullRequests });
+  let answers = 0;
 
-const counts = LangyGithubPrCountRedisRepository.create({ redis });
-const quota = LangyGithubPrQuotaService.create({ counts });
+  /** One answer in a conversation of `userId` that opened these pull requests of "acme/a". */
+  const opened = async ({
+    userId,
+    numbers,
+    at,
+    conversationId = `conv-${userId}`,
+  }: {
+    userId: string;
+    numbers: number[];
+    at: number;
+    conversationId?: string;
+  }) => {
+    const context = { tenantId: createTenantId(PROJECT_ID), aggregateId: conversationId };
+    await conversations.store(
+      {
+        state: {
+          ...initLangyConversationState(),
+          ConversationId: conversationId,
+          UserId: userId,
+          CreatedAt: at,
+          UpdatedAt: at,
+          LastEventOccurredAt: at,
+        },
+        cursor: { acceptedAt: at, eventId: `evt-${conversationId}` },
+        occurredAt: at,
+        createdAt: at,
+        updatedAt: at,
+        version: "test",
+      },
+      context,
+    );
+    answers += 1;
+    await pullRequests.append(
+      {
+        ConversationId: conversationId,
+        PullRequests: numbers.map((prNumber) => ({ repositoryFullName: "acme/a", prNumber })),
+        OpenedAt: at,
+        SourceEventId: `evt-answer-${answers}`,
+      },
+      context,
+    );
+  };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+  return { quota, opened };
+}
 
-describe("LangyGithubPrQuotaService.usage", () => {
-  describe("when the counter is below the cap", () => {
-    it("reports remaining as cap minus count and allowed=true", async () => {
-      get.mockResolvedValue("5");
-      const out = await quota.usage({ userId: "u1", limit: 20 });
-      expect(out).toMatchObject({ allowed: true, remaining: 15 });
-    });
-  });
+describe("LangyGithubPrQuotaService", () => {
+  describe("given three pull requests opened today", () => {
+    /** @scenario "The daily cap counts pull requests that opened, not turns" */
+    it("leaves the rest of the day's cap", async () => {
+      const { quota, opened } = await harness();
+      const at = nowInstant().epochMilliseconds;
 
-  describe("when the counter is at the cap", () => {
-    it("reports allowed=false and remaining=0", async () => {
-      get.mockResolvedValue("20");
-      const out = await quota.usage({ userId: "u1", limit: 20 });
-      expect(out).toMatchObject({ allowed: false, remaining: 0 });
-    });
-  });
-});
+      await opened({ userId: "u1", numbers: [1, 2], at });
+      await opened({ userId: "u1", numbers: [7], at, conversationId: "conv-u1-other" });
 
-describe("LangyGithubPrQuotaService.record", () => {
-  describe("given the first PR of the day", () => {
-    it("increments and sets a 2-day TTL on the bucket key", async () => {
-      incr.mockResolvedValue(1);
-      expire.mockResolvedValue(1);
-      const out = await quota.record({ userId: "u1", limit: 20 });
-      expect(incr).toHaveBeenCalledTimes(1);
-      expect(expire).toHaveBeenCalledWith(
-        expect.stringContaining("langy:gh:prs:u1:"),
-        60 * 60 * 24 * 2,
-      );
-      expect(out).toMatchObject({ allowed: true, remaining: 19 });
-    });
-  });
-
-  describe("when this increment crosses the cap", () => {
-    it("returns allowed=false on the post-increment count", async () => {
-      incr.mockResolvedValue(21);
-      const out = await quota.record({ userId: "u1", limit: 20 });
-      expect(out.allowed).toBe(false);
-      expect(out.remaining).toBe(0);
-    });
-  });
-
-  describe("when Redis throws mid-increment", () => {
-    it("fails open — chat must not break because the counter is sick", async () => {
-      incr.mockRejectedValue(new Error("boom"));
-      const out = await quota.record({ userId: "u1", limit: 20 });
-      expect(out).toMatchObject({ allowed: true, remaining: 20 });
-    });
-  });
-});
-
-describe("LangyGithubPrQuotaService.reservePermit", () => {
-  describe("when the reservation lands within the cap", () => {
-    it("INCRs once and returns allowed=true with no DECR", async () => {
-      incr.mockResolvedValue(5);
-      const out = await quota.reservePermit({
-        userId: "u1",
-        limit: 20,
+      expect(await quota.usage({ userId: "u1", limit: 20 })).toMatchObject({
+        allowed: true,
+        remaining: 17,
       });
-      expect(incr).toHaveBeenCalledTimes(1);
-      expect(decr).not.toHaveBeenCalled();
-      expect(out).toMatchObject({ allowed: true, remaining: 15 });
     });
   });
 
-  describe("when the reservation would push past the cap", () => {
-    it("rolls back via DECR and returns allowed=false", async () => {
-      incr.mockResolvedValue(21);
-      decr.mockResolvedValue(20);
-      const out = await quota.reservePermit({
+  describe("when the answer that opened a pull request is stored twice", () => {
+    /** @scenario "Pushing to a pull request already opened does not count again" */
+    it("counts it once", async () => {
+      const { quota, opened } = await harness();
+      const at = nowInstant().epochMilliseconds;
+
+      await opened({ userId: "u1", numbers: [1], at });
+      await opened({ userId: "u1", numbers: [1], at });
+
+      expect((await quota.usage({ userId: "u1", limit: 20 })).remaining).toBe(19);
+    });
+  });
+
+  describe("given the per-day maximum already opened", () => {
+    /** @scenario "The API process counts the daily pull-request cap from the pull requests Langy opened" */
+    it("refuses the person until the day rolls over, and only that person", async () => {
+      const { quota, opened } = await harness();
+      const at = nowInstant().epochMilliseconds;
+
+      await opened({ userId: "u1", numbers: Array.from({ length: 20 }, (_, n) => n + 1), at });
+
+      const usage = await quota.usage({ userId: "u1", limit: 20 });
+      expect(usage).toMatchObject({ allowed: false, remaining: 0 });
+      expect(usage.resetAt).toBe((Math.floor(at / DAY_MS) + 1) * DAY_MS);
+      expect((await quota.usage({ userId: "u2", limit: 20 })).allowed).toBe(true);
+    });
+  });
+
+  describe("given pull requests opened yesterday", () => {
+    it("does not count them against today", async () => {
+      const { quota, opened } = await harness();
+      const yesterday = nowInstant().epochMilliseconds - DAY_MS;
+
+      await opened({
         userId: "u1",
-        limit: 20,
+        numbers: Array.from({ length: 20 }, (_, n) => n + 1),
+        at: yesterday,
       });
-      expect(incr).toHaveBeenCalledTimes(1);
-      // DECR must run, otherwise N concurrent over-cap reservers each leave
-      // the counter inflated by 1 and the user is silently locked out beyond
-      // the legitimate cap until the bucket rolls.
-      expect(decr).toHaveBeenCalledTimes(1);
-      expect(out).toMatchObject({ allowed: false, remaining: 0 });
+
+      expect((await quota.usage({ userId: "u1", limit: 20 })).allowed).toBe(true);
     });
   });
 
-  describe("when two requests race the same bucket", () => {
-    it("only one is granted; the loser sees DECR and allowed=false", async () => {
-      // Simulated atomic INCR across two callers at count=20 (one slot left):
-      // winner sees post-count=20 (granted), loser sees post-count=21 (denied
-      // → rolls back to 20). This is what makes the cap an enforced boundary
-      // instead of a TOCTOU advisory.
-      incr.mockResolvedValueOnce(20).mockResolvedValueOnce(21);
-      decr.mockResolvedValue(20);
-      const [winner, loser] = await Promise.all([
-        quota.reservePermit({ userId: "u1", limit: 20 }),
-        quota.reservePermit({ userId: "u1", limit: 20 }),
-      ]);
-      expect(winner.allowed).toBe(true);
-      expect(loser.allowed).toBe(false);
-      expect(decr).toHaveBeenCalledTimes(1);
-    });
-  });
-});
-
-describe("LangyGithubPrQuotaService.reservePermit on the day bucket", () => {
-  describe("when the API process composed a Redis connection", () => {
-    /** @scenario "The API process meters the daily pull-request cap on its own Redis" */
-    it("spends the permit against that user's day bucket and no other user's", async () => {
-      incr.mockResolvedValue(1);
-
-      const out = await quota.reservePermit({ userId: "u1", limit: 20 });
-      await quota.reservePermit({ userId: "u2", limit: 20 });
-
-      expect(out).toMatchObject({ allowed: true, reserved: true, remaining: 19 });
-      const keys = incr.mock.calls.map(([key]) => key);
-      expect(keys[0]).toMatch(/^langy:gh:prs:u1:\d+$/);
-      expect(keys[1]).toMatch(/^langy:gh:prs:u2:\d+$/);
-      expect(keys[0]).not.toBe(keys[1]);
-    });
-  });
-
-  describe("when the counter cannot be reached at all", () => {
+  describe("when the read model cannot be read at all", () => {
     /** @scenario "A deployment with no counter never denies a pull request" */
-    it("allows the pull request and reports that nothing was reserved", async () => {
-      incr.mockRejectedValue(new Error("no redis connection"));
+    it("allows the pull request", async () => {
+      const quota = LangyGithubPrQuotaService.create({
+        pullRequests: {
+          countOpenedSince: async () => {
+            throw new Error("no database connection");
+          },
+        },
+      });
 
-      const out = await quota.reservePermit({ userId: "u1", limit: 20 });
+      const usage = await quota.usage({ userId: "u1", limit: 20 });
 
-      expect(out).toMatchObject({ allowed: true, reserved: false, remaining: 20 });
-      expect(decr).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("LangyGithubPrQuotaService.releasePermit", () => {
-  describe("when called for a turn that opened no PR", () => {
-    /** @scenario "Permit must be released on every non-PR exit" */
-    it("gives the slot back through the floored decrement, never below zero", async () => {
-      floored.mockResolvedValue(4);
-      await quota.releasePermit({ userId: "u1" });
-      expect(floored).toHaveBeenCalledTimes(1);
-      expect(floored.mock.calls[0]?.[2]).toMatch(/^langy:gh:prs:u1:/);
+      expect(usage).toMatchObject({ allowed: true, remaining: 20 });
     });
   });
 });

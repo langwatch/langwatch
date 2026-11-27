@@ -304,6 +304,15 @@ describe("signIn", () => {
       expect(consumeStoredReturnTo()).toBe(AGENT_TESTING_PATH);
     });
   });
+
+  describe("when signing in through an organization's connection with the typed address", () => {
+    /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
+    it("hands the address to the sign-in start as its login hint", async () => {
+      await signIn("ssoc_2f8Qk3", { loginHint: "sam@acme.com", redirect: false });
+
+      expect(ssoSpy.mock.calls[0]![0]).toMatchObject({ loginHint: "sam@acme.com" });
+    });
+  });
 });
 
 describe("linkAccount", () => {

@@ -62,7 +62,7 @@ const (
 // time, so a customer base URL that resolves public and then private cannot
 // slip past the pre-flight check.
 func newRealtimeClient(policy customerEndpointPolicy) *http.Client {
-	dialer := policyDialer(policy, realtimeMintTimeout)
+	dialer := policy.egress.Dialer(realtimeMintTimeout)
 	return &http.Client{
 		Timeout:   realtimeMintTimeout,
 		Transport: &http.Transport{DialContext: dialer.DialContext},

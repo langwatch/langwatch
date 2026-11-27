@@ -8,6 +8,7 @@
 
 import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
 import {
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
@@ -15,6 +16,8 @@ import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it } from "vitest";
 
 import { ClaudeAnswersTraceCanonicalisation } from "../../__tests__/fixtures/trace-canonicalisation.fixture.ts";
+import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
+import { accountColumnsOf } from "../coding-agent-account.rules.ts";
 import { liftLogContribution } from "../coding-agent-log-facts.rules.ts";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
@@ -167,6 +170,32 @@ describe("liftLogContribution", () => {
       expect(contribution!.facts["service.version"]).toBe("2.0.1");
       // No correlation on the record: the contribution carries no trace.
       expect(contribution!.traceId).toBeNull();
+    });
+  });
+
+  describe("when a launcher declares its own session on the resource", () => {
+    /** @scenario a launcher's declared session groups every harness session it runs */
+    it("keys every run's records on the declared session", () => {
+      const { lift, dispatched } = makeLift();
+
+      for (const [recordId, sessionId] of [
+        ["rec-a", "cc-run-1"],
+        ["rec-b", "cc-run-2"],
+      ] as const) {
+        lift(
+          canonicalLogRecord({
+            recordId,
+            attributes: { "event.name": "claude_code.user_prompt", "session.id": sessionId },
+            providerSessionId: sessionId,
+            resourceAttributes: { "langwatch.session.id": "agent_scout" },
+          }),
+        );
+      }
+
+      expect(dispatched.map((contribution) => contribution.sessionId)).toEqual([
+        "agent_scout",
+        "agent_scout",
+      ]);
     });
   });
 
@@ -552,6 +581,52 @@ describe("liftLogContribution", () => {
     });
   });
 
+  describe("when the launcher names the session in the resource attributes", () => {
+    const promptEvent = ({
+      resourceName,
+      recordName,
+    }: {
+      resourceName: string;
+      recordName?: string;
+    }) =>
+      canonicalLogRecord({
+        attributes: {
+          "event.name": "user_prompt",
+          "session.id": "sess-named",
+          prompt: "## Your skills\nInstalled: triage.",
+          ...(recordName === undefined ? {} : { "langwatch.session.name": recordName }),
+        },
+        resourceAttributes: { "service.version": "2.0.1", "langwatch.session.name": resourceName },
+      });
+
+    /** @scenario A launcher names its sessions through the resource attributes */
+    it("contributes the resource's name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "Scout" }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBe("Scout");
+    });
+
+    /** @scenario A name on the record itself outranks the resource's name */
+    it("keeps the record's own name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "Scout", recordName: "pr-reviewer" }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBe("pr-reviewer");
+    });
+
+    /** @scenario A blank resource name names nothing */
+    it("contributes no name for a whitespace resource name", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(promptEvent({ resourceName: "   " }));
+
+      expect(dispatched[0]!.facts[SESSION_NAME_FACT_KEY]).toBeUndefined();
+    });
+  });
+
   describe("when a coding-agent record has no session key and no correlation", () => {
     it("skips it — there is nothing to aggregate under", () => {
       const { lift, dispatched } = makeLift();
@@ -563,6 +638,99 @@ describe("liftLogContribution", () => {
       );
 
       expect(dispatched).toHaveLength(0);
+    });
+  });
+
+  describe("when a launcher sets the account on the resource", () => {
+    /** @scenario a launcher sets the account once on the resource */
+    it("fills the account facts the record left unset, and the record's own value wins", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        canonicalLogRecord({
+          attributes: {
+            "event.name": "claude_code.api_request",
+            "session.id": "sess-account",
+            "langwatch.account.name": "ACME Max 2",
+          },
+          resourceAttributes: {
+            "langwatch.account.id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+            "langwatch.account.name": "Resource name",
+            "langwatch.account.usage.percent": 31,
+            "langwatch.account.usage.window": "five_hour",
+          },
+        }),
+      );
+
+      const facts = dispatched[0]!.facts;
+      expect(facts["langwatch.account.id"]).toBe("0f1e2d3c4b5a69788796a5b4c3d2e1f0");
+      expect(facts["langwatch.account.name"]).toBe("ACME Max 2");
+      expect(facts["langwatch.account.usage.percent"]).toBe(31);
+      expect(facts["langwatch.account.usage.window"]).toBe("five_hour");
+    });
+
+    it("uses the agent's own account id from the resource as the account key", () => {
+      const { lift, dispatched } = makeLift();
+
+      lift(
+        canonicalLogRecord({
+          attributes: { "event.name": "claude_code.api_request", "session.id": "sess-uuid" },
+          resourceAttributes: { "user.account_uuid": "5a6b7c8d-0000-4000-8000-000000000001" },
+        }),
+      );
+
+      expect(accountColumnsOf(dispatched[0]!.facts).accountId).toBe(
+        "5a6b7c8d-0000-4000-8000-000000000001",
+      );
+    });
+
+    /** @scenario a resource account id never names the session's user */
+    it("leaves the session's user unset when only the resource carries the agent's account id", () => {
+      const { lift, dispatched } = makeLift();
+      const stateProjection = CodingAgentSessionStateProjection.create();
+
+      lift(
+        canonicalLogRecord({
+          attributes: { "event.name": "claude_code.api_request", "session.id": "sess-uuid" },
+          resourceAttributes: {
+            "user.account_uuid": "5a6b7c8d-0000-4000-8000-000000000001",
+            "user.account_id": "acct-from-resource",
+          },
+        }),
+      );
+
+      const facts = dispatched[0]!.facts;
+      expect(facts["user.account_uuid"]).toBeUndefined();
+      expect(facts["user.account_id"]).toBeUndefined();
+      const session = stateProjection.withIdentity(
+        stateProjection.createInitCodingAgentSession(),
+        facts,
+      );
+      expect(session.userId).toBeNull();
+    });
+
+    it("keeps the record's own account uuid as both the session's user and the account key", () => {
+      const { lift, dispatched } = makeLift();
+      const stateProjection = CodingAgentSessionStateProjection.create();
+
+      lift(
+        canonicalLogRecord({
+          attributes: {
+            "event.name": "claude_code.api_request",
+            "session.id": "sess-uuid",
+            "user.account_uuid": "record-uuid",
+          },
+          resourceAttributes: { "user.account_uuid": "resource-uuid" },
+        }),
+      );
+
+      const facts = dispatched[0]!.facts;
+      const session = stateProjection.withIdentity(
+        stateProjection.createInitCodingAgentSession(),
+        facts,
+      );
+      expect(session.userId).toBe("record-uuid");
+      expect(accountColumnsOf(facts).accountId).toBe("record-uuid");
     });
   });
 });

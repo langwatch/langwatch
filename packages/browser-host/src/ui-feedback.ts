@@ -8,6 +8,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 import {
   explainHandledError,
+  supplementalTips,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import {
@@ -141,36 +142,6 @@ function toastBody({
   if (!tip) return description;
 
   return /[.!?]$/.test(description) ? `${description} ${tip}` : `${description}. ${tip}`;
-}
-
-/**
- * Compared on a normalised form (lower-cased, punctuation flattened),
- * since a tip is never character-identical to the description it
- * overlaps — e.g. `query_timeout`'s tip repeats part of its description.
- */
-function supplementalTips({
-  tips,
-  description,
-}: {
-  tips: readonly string[];
-  description: string;
-}): readonly string[] {
-  const target = normalise(description);
-  if (!target) return tips;
-
-  return tips.filter((tip) => {
-    const candidate = normalise(tip);
-    if (!candidate) return false;
-    return !target.includes(candidate) && !candidate.includes(target);
-  });
-}
-
-/** Words only: two sentences that say the same thing must compare equal. */
-function normalise(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 }
 
 /** The toaster this feedback is rendered on, so a test can record instead. */

@@ -5,8 +5,14 @@
  */
 
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import { createUiQueryClient } from "@langwatch/browser/query-client";
 import { answeringUiTransport, type UiProcedureAnswer } from "@langwatch/browser/testing-transport";
+import { DEFAULT_DASHBOARD_HOME_PRODUCT } from "@langwatch/dashboard-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -14,10 +20,11 @@ import type { ReactElement } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { AnalyticsTestHarness, type StubAnalyticsHost } from "../../../testing.tsx";
 
-/** What a board row carries when the project in view ("proj-1") owns it, at the scope Project. */
+/** What a board row carries when the project in view ("proj-1") owns it: LLM Ops, at Project. */
 export const HOME_BOARD = {
   projectId: "proj-1",
   scope: "PROJECT",
+  homeProduct: DEFAULT_DASHBOARD_HOME_PRODUCT,
   organizationId: null,
   ownerProject: null,
 } as const;
@@ -44,6 +51,20 @@ export function renderDashboards({
       </analyticsApi.Provider>
     </AnalyticsTestHarness>,
   );
+}
+
+export { RecordingUiAnalytics };
+
+/** Puts a recording destination above the element, through the real host-service seam. */
+export function withAnalytics(element: ReactElement, analytics: RecordingUiAnalytics) {
+  const services = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    analytics,
+  };
+  return <UiHostServicesContextProvider value={services}>{element}</UiHostServicesContextProvider>;
 }
 
 /** The bridge's first message to a widget frame: what its reserved parameters bind from. */

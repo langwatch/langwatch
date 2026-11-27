@@ -212,6 +212,61 @@ Feature: Credential Validation
     Then validation is skipped instead of probing a relative URL
     And no misleading network-connection error is shown
 
+  # Azure has no models route to list, so its probe is one chat completion
+  # against a named deployment. It proves the key, the endpoint and the
+  # deployment together, and only when the caller names a deployment.
+  @unit
+  Scenario: An Azure key is checked with one chat completion against the chosen deployment
+    Given an Azure endpoint, key and deployment name
+    When I call validateProviderApiKey for it
+    Then one chat completion with max_tokens 1 is posted to the deployment's chat completions route
+    And the key travels in the api-key header, never in the URL
+
+  @unit
+  Scenario: An Azure credential is checked at its own api-version
+    Given an Azure credential that sets AZURE_OPENAI_API_VERSION
+    When I call validateProviderApiKey for it
+    Then the chat completion is posted at that api-version, the one execution will use
+
+  @unit
+  Scenario: Azure reports a refused key as a bad key
+    Given Azure answers the check with 401 or 403
+    Then the key is reported as refused
+
+  @unit
+  Scenario: Azure reports a missing deployment by its name
+    Given Azure answers the check with 404 and the DeploymentNotFound code
+    Then the refusal names the deployment that was not found
+
+  # A wrong endpoint path answers 404 too, before the key is looked at.
+  @unit
+  Scenario: A bare Azure 404 does not claim the key works
+    Given Azure answers the check with 404 and no DeploymentNotFound code
+    Then the check is reported as refused, not as a missing deployment
+    And the message sends me to check the endpoint, not to try again later
+
+  @unit
+  Scenario: Azure answering past authentication proves the credential
+    Given Azure answers the check with 429 or 400
+    Then the credential is reported as verified
+
+  @unit
+  Scenario: An Azure endpoint that does not answer is reported as unreachable
+    Given the Azure endpoint does not resolve or never answers
+    Then the provider is reported unreachable, with advice to check the endpoint
+
+  @unit
+  Scenario: An Azure credential routed through an API gateway is not checked
+    Given an Azure credential with an API gateway base URL
+    When I call validateProviderApiKey for it
+    Then validation is skipped as not probeable, since the gateway speaks its own auth
+
+  @unit
+  Scenario: An Azure credential with no deployment to ask is not checked
+    Given an Azure credential and no deployment name
+    When I call validateProviderApiKey for it
+    Then validation is skipped as not probeable
+
   # A refused key holds the save back on the first attempt, so the message has
   # to name the real cause — otherwise the customer regenerates a working key
   # over and over. Saving anyway is available once the reason has been read.
@@ -315,6 +370,38 @@ Feature: Credential Validation
     When validation runs
     Then I am told the endpoint redirects somewhere else
     And I am not told the provider could not be reached
+
+  # A base URL the instance's outbound policy refuses was never asked at all.
+  # Calling that unreachable sends an operator to debug a network that works;
+  # what they need is to know a policy refused it, and which setting, if any,
+  # lifts the refusal.
+
+  @unit
+  Scenario: A base URL refused by the outbound policy is reported as refused, not as unreachable
+    Given a base URL on a cloud provider domain such as an AWS load balancer name
+    When validation runs
+    Then I am told the instance's outbound policy refused the base URL
+    And I am told to point a DNS name of my own at the endpoint instead
+    And I am not told the provider could not be reached
+
+  @unit
+  Scenario: A private base URL refused by the outbound policy names the setting that allows it
+    Given the instance blocks local calls and a base URL that resolves to a private address
+    When validation runs
+    Then I am told an administrator can allow the host with ALLOWED_PROXY_HOSTS
+
+  @integration
+  Scenario: A base URL refused by the outbound policy offers no Save anyway
+    Given validation reported the base URL as refused by the outbound policy
+    When I look at the save button
+    Then it still says Save, since saving that base URL is refused too
+
+  @integration
+  Scenario: A save refused for its base URL says why in the form
+    Given the save of a provider is refused because its base URL is not allowed
+    When the refusal comes back
+    Then the form shows why the base URL cannot be used
+    And the provider form stays open
 
   @unit
   Scenario: The API key is never sent in a URL

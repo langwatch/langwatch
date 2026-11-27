@@ -19,6 +19,7 @@ import type {
   RecordPricingModelChangedCommandData,
   RecordSeatCheckoutPaidCommandData,
   RecordSeatCheckoutsAbandonedCommandData,
+  RecordOverPlanChangedCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
 import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
 import {
@@ -46,11 +47,14 @@ const billedLookup: BillingReportOrganizationLookup = {
     stripeCustomerId: "cus_1",
     subscriptions: [{ id: "sub-1" }],
     contract: "cloud",
+    growthSeatPeriods: [],
   },
 };
 
 function announcerOver(input: {
   remaining: boolean;
+  /** Also holds a pending checkout, which is never active. */
+  pending?: boolean;
   lookup?: () => Promise<BillingReportOrganizationLookup>;
   /** Fails the usage-billing send on these attempts, counted from 1. */
   failingUsageSends?: readonly number[];
@@ -62,8 +66,14 @@ function announcerOver(input: {
   const pauses: number[] = [];
   const usageSends = { attempts: 0 };
   const { logger, lines } = createTestLogger();
+  const held = [
+    ...(input.remaining ? [{ status: "ACTIVE", plan: "LAUNCH" }] : []),
+    ...(input.pending ? [{ status: "PENDING", plan: "GROWTH_SEAT_EUR_MONTHLY" }] : []),
+  ];
   const service = BillingLifecycleAnnouncerService.create({
-    subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
+    subscriptions: {
+      findActive: async () => held.find((row) => row.status === "ACTIVE") ?? null,
+    },
     organizations: { findActiveMemberIds: async () => ["user-1", "user-2"] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -96,6 +106,7 @@ function announcerOver(input: {
     recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
     recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
     recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
+    recordOverPlanChanged: recorder<RecordOverPlanChangedCommandData>([]),
   });
   return { service, changed, started, checkouts, usageBilling, usageSends, pauses, lines };
 }
@@ -141,7 +152,7 @@ describe("BillingLifecycleAnnouncerService", () => {
     expect(started).toEqual([]);
   });
 
-  it("records a cancellation as no subscription only when none remains", async () => {
+  it("records a cancellation as no subscription only when no active one remains", async () => {
     const none = announcerOver({ remaining: false });
     const some = announcerOver({ remaining: true });
 
@@ -150,6 +161,103 @@ describe("BillingLifecycleAnnouncerService", () => {
 
     expect(none.changed[0]?.hasSubscription).toBe(false);
     expect(some.changed[0]?.hasSubscription).toBe(true);
+  });
+
+  it("records no subscription and FREE when only a pending checkout remains", async () => {
+    const { service, changed } = announcerOver({ remaining: false, pending: true });
+
+    await service.subscriptionCancelled({ organizationId: "org-1" });
+
+    expect(changed).toEqual([expect.objectContaining({ hasSubscription: false, plan: "FREE" })]);
+  });
+
+  describe("when a subscription change is recorded", () => {
+    it("carries the active subscription's plan, and FREE once none is active", async () => {
+      const some = announcerOver({ remaining: true });
+      const none = announcerOver({ remaining: false });
+
+      await some.service.subscriptionCancelled({ organizationId: "org-1" });
+      await none.service.subscriptionCancelled({ organizationId: "org-1" });
+
+      expect(some.changed).toEqual([expect.objectContaining({ plan: "LAUNCH" })]);
+      expect(none.changed).toEqual([
+        expect.objectContaining({ plan: "FREE", hasSubscription: false }),
+      ]);
+    });
+
+    it("is not a catch-up fact", async () => {
+      const { service, changed } = announcerOver({ remaining: true });
+
+      await service.subscriptionActivated(activation);
+
+      expect(changed[0]).not.toHaveProperty("fromCatchUp");
+    });
+  });
+
+  describe("when the Customer.io plan resync catches an organization up", () => {
+    it("records one catch-up fact with its plan and active members", async () => {
+      const { service, changed } = announcerOver({ remaining: true });
+
+      await expect(service.customerIoPlanCaughtUp({ organizationId: "org-1" })).resolves.toEqual({
+        members: 2,
+      });
+
+      expect(changed).toEqual([
+        expect.objectContaining({
+          organizationId: "org-1",
+          memberUserIds: ["user-1", "user-2"],
+          hasSubscription: true,
+          plan: "LAUNCH",
+          fromCatchUp: true,
+        }),
+      ]);
+    });
+
+    it("reads the members on a dry run and records nothing", async () => {
+      const { service, changed } = announcerOver({ remaining: true });
+
+      await expect(
+        service.customerIoPlanCaughtUp({ organizationId: "org-1", isDryRun: true }),
+      ).resolves.toEqual({ members: 2 });
+
+      expect(changed).toEqual([]);
+    });
+
+    it("says no subscription and free when only a pending row exists", async () => {
+      const { service, changed } = announcerOver({ remaining: false, pending: true });
+
+      await service.customerIoPlanCaughtUp({ organizationId: "org-1" });
+
+      expect(changed).toEqual([expect.objectContaining({ hasSubscription: false, plan: "FREE" })]);
+    });
+
+    it("throws on a dry run too when its senders are not connected", async () => {
+      const service = BillingLifecycleAnnouncerService.create({
+        subscriptions: { findActive: async () => null },
+        organizations: { findActiveMemberIds: async () => ["user-1"] },
+        resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+        planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+        billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
+      });
+
+      await expect(
+        service.customerIoPlanCaughtUp({ organizationId: "org-1", isDryRun: true }),
+      ).rejects.toThrow("not connected");
+    });
+
+    it("throws when its senders are not connected, so the step stops where it failed", async () => {
+      const service = BillingLifecycleAnnouncerService.create({
+        subscriptions: { findActive: async () => null },
+        organizations: { findActiveMemberIds: async () => ["user-1"] },
+        resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+        planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+        billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
+      });
+
+      await expect(service.customerIoPlanCaughtUp({ organizationId: "org-1" })).rejects.toThrow(
+        "not connected",
+      );
+    });
   });
 
   it("records a completed checkout with the session's creation instant", async () => {
@@ -175,7 +283,7 @@ describe("BillingLifecycleAnnouncerService", () => {
     const changed: RecordSubscriptionChangedCommandData[] = [];
     const started: RecordSubscriptionStartedCommandData[] = [];
     const service = BillingLifecycleAnnouncerService.create({
-      subscriptions: { findLastNonCancelled: async () => null },
+      subscriptions: { findActive: async () => null },
       organizations: {
         findActiveMemberIds: async () => {
           throw new Error("member lookup failed");
@@ -196,6 +304,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
       recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
       recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
+      recordOverPlanChanged: recorder<RecordOverPlanChangedCommandData>([]),
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
@@ -205,7 +314,7 @@ describe("BillingLifecycleAnnouncerService", () => {
 
   it("never throws when its senders are not connected", async () => {
     const service = BillingLifecycleAnnouncerService.create({
-      subscriptions: { findLastNonCancelled: async () => null },
+      subscriptions: { findActive: async () => null },
       organizations: { findActiveMemberIds: async () => [] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },

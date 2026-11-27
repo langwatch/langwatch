@@ -1,6 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { AccessState } from "@langwatch/design-system/access-state";
 import { Banner } from "@langwatch/design-system/banner";
+import { EnterpriseBadge } from "@langwatch/design-system/enterprise-badge";
 /**
  * Whether every member must prove a second factor. The server enforces it; the
  * switch stays available for turning it off after an Enterprise plan lapses.
@@ -10,7 +11,6 @@ import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/prim
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
 import { PolicySection } from "../elements/policy-section.tsx";
 
 const OFF_EXPLANATION =
@@ -46,7 +46,7 @@ export function TwoStepRequirementCard({
       title="Require two-step verification"
       hint="A code, a passkey, or one their identity provider confirms. Turning it on signs nobody out."
       badge={
-        planLocked ? <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" /> : void 0
+        planLocked ? <EnterpriseBadge data-testid="two-step-requirement-plan-badge" /> : void 0
       }
       actions={
         <HStack
@@ -83,7 +83,7 @@ export function TwoStepRequirementCard({
       {planLocked && (
         <AccessState
           kind="upgrade"
-          compact
+          inset
           title="Requiring two-step verification needs Enterprise"
           description={explanation}
           data-testid="two-step-requirement-plan-notice"

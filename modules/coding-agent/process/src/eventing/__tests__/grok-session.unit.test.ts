@@ -397,24 +397,25 @@ describe("Grok sessions", () => {
       expect(state.failedTools).toBe(1);
     });
 
-    /** @scenario Grok's tool decisions are counted in its own words */
-    it("counts deny and followup as denied, cancelled as aborted, allow as neither", () => {
-      const decision = (value: string) =>
+    /** @scenario "Grok's tool decisions are counted in its own words" */
+    it("counts deny as denied, cancelled as aborted, allow and followup as neither", () => {
+      const decision = (value: string, source: string) =>
         grokRecord({
           eventName: "grok_code.tool_decision",
           sessionId: PARENT,
-          attributes: { tool_name: "run_terminal_command", decision: value, source: "user" },
+          attributes: { tool_name: "run_terminal_command", decision: value, source },
         });
       const state = foldOne([
         ...turn(PARENT),
-        decision("allow"),
-        decision("deny"),
-        decision("followup"),
-        decision("cancelled"),
+        decision("allow", "allowed"),
+        decision("deny", "user_reject"),
+        decision("followup", "user_followup"),
+        decision("cancelled", "user_abort"),
       ]);
 
-      expect(state.toolsDenied).toBe(2);
+      expect(state.toolsDenied).toBe(1);
       expect(state.toolsAborted).toBe(1);
+      expect(state.failedTools).toBe(0);
     });
 
     /** @scenario A Grok MCP tool run names its server and tool on the row */

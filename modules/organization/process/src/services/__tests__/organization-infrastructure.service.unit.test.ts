@@ -16,6 +16,7 @@ import {
   TeamMembershipNotFoundError,
   TeamNotFoundError,
   UserNotInOrganizationError,
+  type DocsPlaygroundPolicy,
   type OrganizationBillingProfile,
   type OrganizationIdPage,
   type OrganizationTeam,
@@ -33,6 +34,7 @@ import type * as groupRepositoryModule from "../../repositories/group.repository
 import {
   OrganizationRepository,
   type EnsuredPersonalTeam,
+  type OrganizationActiveMemberPage,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
@@ -53,6 +55,14 @@ class StubRepository extends OrganizationRepository {
   }
 
   async findPresenceSettingPage(): Promise<[]> {
+    return [];
+  }
+
+  async findActiveMemberPage(): Promise<OrganizationActiveMemberPage> {
+    return { lastOrganizationId: null, organizations: 0, members: [] };
+  }
+
+  async findOperatorRows(): Promise<[]> {
     return [];
   }
 
@@ -78,6 +88,12 @@ class StubRepository extends OrganizationRepository {
   }
 
   async saveSessionPolicy(): Promise<void> {}
+
+  async getDocsPlaygroundPolicy(): Promise<DocsPlaygroundPolicy> {
+    return { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: null };
+  }
+
+  async saveDocsPlaygroundPolicy(): Promise<void> {}
 
   async getSignInSecurityPolicy(): Promise<never> {
     throw new Error("not used");
@@ -106,6 +122,12 @@ class StubRepository extends OrganizationRepository {
   }
 
   async recordInstantEvalsOptIn(): Promise<void> {}
+
+  async isPiiRedactionModelAccepted(): Promise<boolean> {
+    return false;
+  }
+
+  async recordPiiRedactionModelAcceptance(): Promise<void> {}
 
   async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
     return this.guidedOnboarding;

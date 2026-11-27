@@ -77,14 +77,14 @@ describe("a worker whose boot is held by a slow stage", () => {
             return application;
           });
 
-        const response = await eventually(() => fetch(`http://127.0.0.1:${port}/healthz`));
+        const response = await eventually(() => fetch(`http://localhost:${port}/healthz`));
 
         expect(response.status).toBe(200);
         expect(stageDone).toBe(false);
         release();
         const application = await booting;
         await server.run(application);
-        expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(200);
+        expect((await fetch(`http://localhost:${port}/healthz`)).status).toBe(200);
       } finally {
         release();
         await server.close();
@@ -131,7 +131,7 @@ describe("a worker whose boot is refused after its liveness door opened", () => 
           .container("worker")
           .boot({ classifyEventLogRetention: () => "traces" });
         await second.run(application);
-        expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(200);
+        expect((await fetch(`http://localhost:${port}/healthz`)).status).toBe(200);
       } finally {
         await second.close();
       }
@@ -165,7 +165,7 @@ describe("a server whose liveness door opened ahead of listen", () => {
 
       await server.close();
 
-      await expect(fetch(`http://127.0.0.1:${address.port}/healthz`)).rejects.toThrow(TypeError);
+      await expect(fetch(`http://localhost:${address.port}/healthz`)).rejects.toThrow(TypeError);
     });
   });
 });

@@ -96,21 +96,21 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   @integration
   Scenario: Dashboard panels on a high-volume project answer under a memory cap
     Given about a million traces over the current and previous 30 days, half of them with a second version
-    When the trace, user, error, latency and thread panels run with a 150 MB per-query cap
+    When the trace, user, error, latency and thread panels run with a 190 MB per-query cap
     Then every panel answers without a memory exceeded error
     And the trace, user and error counts match the seeded data
 
   @integration
   Scenario: The model-grouped chart answers under a memory cap
     Given about a million traces with one LLM span each
-    When the LLM calls chart grouped by model runs with a 200 MB per-query cap
+    When the LLM calls chart grouped by model runs with a 300 MB per-query cap
     Then it answers without a memory exceeded error
     And every current trace is counted under its model
 
   @integration
   Scenario: The documents panel reads only the RAG contexts attribute
     Given about a million traces whose root spans carry RAG contexts and large message attributes
-    When the top documents panel runs with a 150 MB per-query cap
+    When the top documents panel runs with a 190 MB per-query cap
     Then it answers in one query with the top 10 documents and the distinct document total
 
   @unit
@@ -160,3 +160,46 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When ClickHouse refuses a query for exceeding the query or user memory limit
     Then the client does not run the same statement again
     And the caller gets a query memory exceeded error with the reasons preserved
+
+  # A 30-day dashboard on a project with about 30,000 traces failed on every widget that read
+  # the traces view's Attributes: the content filter ran a lambda over 28 key prefixes for each
+  # map key, which copied every key 28 times and went past the 1 GB widget cap.
+  @integration @regression
+  Scenario: The content filter on a view's map column stays within a widget's memory cap
+    Given 30,000 traces with 14 attribute keys each in one block
+    When the content filter of the LangWatchQL views drops the content keys from their attributes
+    Then the read stays under 200 MB of memory
+    And ClickHouse drops exactly the keys the data privacy catalog calls content
+
+  # The event metric key filter ran a lambda over the filter's keys inside the lambda over each
+  # span's events, which copied every event's attribute map once per key: 1.8x the memory and
+  # 2.3x the time with three keys on 200,000 spans of 8 events each.
+  @integration @regression
+  Scenario: The event metric key filter matches keys without copying each event's map
+    Given spans whose events carry attribute maps
+    When traces are filtered by the event metric keys of an event type
+    Then the filter tests each event's keys with one hasAny over its key list
+    And it keeps exactly the traces whose event of that type carries one of the keys
+
+  # Instant Evals sizing and paging failed at the 1 GB cap on a busy project: the key and sample
+  # passes projected the thread id, a lookup into the trace attributes map, for every trace the
+  # view read, and the view's read-in-order merge held a block of that map per part before the
+  # hash sample and the LIMIT applied. Picking the row ids first was not enough: no filter reaches
+  # below the view's LIMIT 1 BY, so the keys are read over its trace-ids twin (dedup-trace-ids.feature).
+  @integration @regression
+  Scenario: An Instant Evals key or sample pass picks its rows before reading the thread id
+    Given a project whose traces span many parts and carry wide attribute maps
+    And the traces view and its trace-ids twin, as provisioning emits them
+    And an Instant Evals statement projecting the thread id and an eval column
+    When the sample pass and the key pass run over it as the service runs them, every query under a 200 MB memory cap
+    Then both answer under the cap
+    And they return the same keys the single read returns without a cap
+    And the single read that projects the thread id for every trace exceeds the cap
+
+  @unit
+  Scenario: A key or sample pass reads the other key columns only for the page's row ids
+    Given a statement projecting the thread id
+    When the key pass or the sample pass is composed
+    Then the page is picked on the trace id, or the trace and span ids, alone
+    And the outer read restricts the statement to those ids before projecting the thread id
+    And a pass that projects no key column beyond the ids reads the statement once

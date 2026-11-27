@@ -7,6 +7,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -57,10 +58,11 @@ async function harness() {
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
+      judges: createApiFixture<InstantEvalJudgeApi>(),
       evaluations: createApiFixture<EvaluationApi>(),
       users: {} as UserApi,
-      projects: {} as ProjectApi,
-      plans: {} as EntitlementApi,
+      projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "organization-1" }),
+      plans: createApiFixture<EntitlementApi>({ assertScenarioRunAllowed: async () => {} }),
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -362,6 +364,22 @@ describe("given a run a suite queued", () => {
       judgeModel: "openai/gpt-5",
     });
   });
+
+  /** @scenario "A run plan's trace wait settings travel with each run it queues" */
+  it("records the plan's judge trace wait in the reserved namespace, and nothing when unset", async () => {
+    const withWait = await harness();
+    const without = await harness();
+
+    await withWait.queue({ traceQuietPeriodMs: 12_000, traceWaitTimeoutMs: 90_000 });
+    await without.queue({ traceQuietPeriodMs: null, traceWaitTimeoutMs: undefined });
+
+    expect(withWait.metadata().langwatch).toMatchObject({
+      traceQuietPeriodMs: 12_000,
+      traceWaitTimeoutMs: 90_000,
+    });
+    expect(without.metadata().langwatch).not.toHaveProperty("traceQuietPeriodMs");
+    expect(without.metadata().langwatch).not.toHaveProperty("traceWaitTimeoutMs");
+  });
 });
 
 describe("ScenarioModule.getRunDataForAllSuites", () => {
@@ -380,6 +398,7 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         repositories,
         dependencies: {
           agents: createApiFixture<AgentApi>(),
+          judges: createApiFixture<InstantEvalJudgeApi>(),
           evaluations: createApiFixture<EvaluationApi>(),
           users: createApiFixture<UserApi>(),
           projects: createApiFixture<ProjectApi>(),
@@ -429,6 +448,7 @@ describe("given a live process whose scenario registry reads ClickHouse", () => 
       }),
       dependencies: {
         agents: createApiFixture<AgentApi>(),
+        judges: createApiFixture<InstantEvalJudgeApi>(),
         evaluations: createApiFixture<EvaluationApi>(),
         users: createApiFixture<UserApi>(),
         projects: createApiFixture<ProjectApi>(),

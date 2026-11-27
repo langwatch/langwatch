@@ -57,6 +57,17 @@ from the event and passes it to the repository. A windowed miss is checked once
 without the window before absence is accepted or the declared rebuild policy
 runs. Repositories do not invent their own windows.
 
+A fold that rebuilds its state from the event log on a store miss asks the log
+first whether the aggregate is new, with two existence checks that read no
+events. A log that shows the delivered event and nothing before it proves the
+aggregate new, and the fold starts from an empty state without replaying. Earlier
+events with no saved state, or a log that does not show the delivered event yet,
+most likely mean the answering replica has not caught up with a write. The job
+then goes back to the queue for a jittered wait of 2 to 5 seconds, at most twice
+by default, before the next miss replays the history. A row the store found but
+cannot decode is rebuilt at once. A fold running outside the queue, or keyed
+across aggregates, replays at once as before.
+
 ### Bounded coalescing
 
 Backlogged work for one aggregate is folded in queue order with one state load

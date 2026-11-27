@@ -84,7 +84,7 @@ Each field earns its place:
 | `message` | **Write it so a customer could read it.** It is server-_first_ — logs, OTel and exception capture are its main readers — but it is not private: the REST boundary puts it straight in the response body (`error-handler.ts` sends `{ error: code, message }`, pinned by `error-handler.unit.test.ts`). Nothing on a handled error is sensitive; that is what "handled" means. So no env vars, no internal hostnames, no service names — those go in the log line next to the throw, where they belong. This is _not_ the app's UI copy either: that lives in the client presentation registry, keyed by `code`. See "Where the words come from" below. |
 | `fault`   | Who can act. Drives **log level and alerting**, not UI. Defaults to `customer` — so any subclass with a 5xx status must set `platform` or `provider` explicitly, or a real incident logs as routine noise.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `meta`    | Structured context the **client can actually use**. Not a debug dump. If no UI reads a field, it does not belong here — put it in the log instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `tips`    | Short, actionable, imperative. Written for an agent driving the API/CLI/MCP with no UI to fall back on. In the app they are a _fallback_, shown only for a code the presentation registry has no description for — see "Surfacing one to the user".                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tips`    | Short, actionable, imperative. Written for an agent driving the API/CLI/MCP with no UI to fall back on. In the app a tip shows beside the registry description when it adds to it; a tip that names a `meta` field is for API callers only and never shown to a person, so write a person's action in the description or a tip of its own — see "Surfacing one to the user", rule 3.                                                                                                                                                                                                                                                                   |
 | `docsUrl` | Canonical `docs.langwatch.ai` link, built from a static path in `error-remediation.ts` — never interpolated from request data. The client renders it as an `href` and validates the origin first (`safeDocsUrl` in `readHandledError.ts`), dropping anything that isn't a link to the docs site — because a relayed Go error's `docs_url` is parsed from an upstream response body.                                                                                                                                                                                                                                                                    |
 | `reasons` | The cause chain. Non-handled links serialise as `{ code: "unknown" }` automatically — safe to pass an internal error here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
@@ -229,11 +229,21 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
    every error, and `clickhouse_unavailable`'s "check the status page or
    contact support" never once reached a customer.
 
-   `resolveErrorCopy` (`packages/error-views/src/resolve-error-copy.ts`) applies that comparison
-   once, on a normalised form, and both surfaces render its output:
-   `<HandledErrorAlert>` lists every remaining tip, `showErrorToast` folds in
-   the first. Pinned by `logic/__tests__/showErrorToast.unit.test.ts` and
-   `components/__tests__/HandledErrorAlert.integration.test.tsx`.
+   One kind of tip is never shown to a person: a tip that names a `meta`
+   field ("Read `meta.status`", "the role in meta.role"). A person never sees
+   `meta` (rule 4), so the tip is for an API caller; `isTipForPeople` in
+   `packages/handled-error/src/presentation.ts` drops it on every surface. The
+   cost is that a tip mixing an action with a `meta` pointer loses the action
+   in the app, so keep a person's action out of such a tip: put it in the
+   registry description or in a tip of its own. Every code with a `meta` tip
+   must still give a person a next step, a registered description or a tip
+   for them; `presentation.caller-tips.unit.test.ts` fails the build otherwise.
+
+   `supplementalTips` (`packages/handled-error/src/presentation.ts`) is that comparison,
+   on a normalised form: a tip the description already contains is dropped, and a tip
+   that repeats the description and adds a step is kept. The inline alert, the toast and
+   Langy's failure card all call it: `<HandledErrorAlert>` lists every remaining tip,
+   `showErrorToast` folds in the first. Pinned by `presentation.supplemental-tips.unit.test.ts`.
 
 4. **Never render raw `meta` or the reason chain in the UI.** They are for agents
    and logs. A customer sees a title, a description (registry copy, plus any

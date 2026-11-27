@@ -20,6 +20,7 @@ export {
   parseOtlpTraces,
   readOtlpBody,
   decodeOtlpBody,
+  type OtlpBodyLimit,
   type OtlpParseResult,
 } from "./body.ts";
 export {
@@ -35,6 +36,9 @@ export {
   isIngestDoorRefusal,
   isUnknownCredentialRefusal,
   logCorrectedOtlpPath,
+  recordIngestDoorRefusal,
+  resetIngestDoorRefusalLog,
+  withClientFaultSpan,
   otlpBodyForensics,
   OTLP_REFUSED_MEDIA_TYPES,
   otlpDoorFailureAnswer,

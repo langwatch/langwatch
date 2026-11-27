@@ -621,6 +621,8 @@ export function Dialog({
             display="contents"
             onSubmit={(event) => {
               event.preventDefault();
+              // Portalled, but React bubbles submit along the tree into an opener's own form.
+              event.stopPropagation();
               if (!busy) onSubmit(event);
             }}
           >

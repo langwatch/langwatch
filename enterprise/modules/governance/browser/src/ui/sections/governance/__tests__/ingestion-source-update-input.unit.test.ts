@@ -26,7 +26,7 @@
 import { describe, expect, it } from "vitest";
 
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
-import { buildEditSubmission } from "../governance-inventory.screen.tsx";
+import { buildEditSubmission } from "../inventory/source-submission.ts";
 
 /**
  * `databricks_genie` routes conversations and is NOT an editable pull source

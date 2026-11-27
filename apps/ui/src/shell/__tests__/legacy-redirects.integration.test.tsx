@@ -10,7 +10,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { uiLegacyRedirectRoutes, uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
+import { uiLegacyRedirectRoutes, uiRouteDescriptors, uiMountedRouteTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
 const legacyRedirectRoutes = createUiRouteObjects({
@@ -24,7 +24,9 @@ const legacyRedirectRoutes = createUiRouteObjects({
  * hide.
  */
 const gatewayHomeRoute = createUiRouteObjects({
-  table: uiRouteDescriptors(uiRouteTable).filter((descriptor) => descriptor.path === "/gateway"),
+  table: uiRouteDescriptors(uiMountedRouteTable).filter(
+    (descriptor) => descriptor.path === "/gateway",
+  ),
   loaders: {},
 });
 

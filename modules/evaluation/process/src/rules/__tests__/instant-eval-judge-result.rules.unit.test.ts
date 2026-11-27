@@ -166,3 +166,64 @@ describe("instantEvalJudgeResult", () => {
     });
   });
 });
+
+describe("instantEvalJudgeResult on a routed judgement", () => {
+  /** @scenario "A routed result names the LangWatch Judge, never a backend" */
+  it("names the LangWatch Judge and how many escalated", () => {
+    const result = instantEvalJudgeResult({
+      judge: booleanJudge,
+      judgement: {
+        ...answered({ probability: 0.92 }),
+        costNanoUsd: 1_200,
+        routing: {
+          answeredBy: { anthropic: 1 },
+          escalated: 1,
+          mode: "instant",
+          slot: "short",
+          inputView: "full",
+          flags: [],
+        },
+      },
+      priceUsd: 0.0001,
+    });
+
+    expect(result).toMatchObject({
+      status: "processed",
+      details: "Instant Evals: true, 92% confident. LangWatch Judge, 1 escalated",
+    });
+  });
+
+  /** @scenario "A routed result names the LangWatch Judge, never a backend" */
+  it("names no backend that answered", () => {
+    const result = instantEvalJudgeResult({
+      judge: booleanJudge,
+      judgement: {
+        ...answered({ probability: 0.92 }),
+        costNanoUsd: 1_200,
+        routing: {
+          answeredBy: { jev: 1, dm: 2 },
+          escalated: 0,
+          mode: "instant",
+          slot: "short",
+          inputView: "full",
+          flags: [],
+        },
+      },
+      priceUsd: 0.0001,
+    });
+
+    expect(result.details).toBe("Instant Evals: true, 92% confident. LangWatch Judge");
+    expect(result.details).not.toMatch(/\b(jev|dm)\b/);
+  });
+
+  /** @scenario "A routed result names the LangWatch Judge, never a backend" */
+  it("reads exactly as before when the judgement was not routed", () => {
+    const result = instantEvalJudgeResult({
+      judge: booleanJudge,
+      judgement: answered({ probability: 0.92 }),
+      priceUsd: 0.0001,
+    });
+
+    expect(result).toMatchObject({ details: "Instant Evals: true, 92% confident" });
+  });
+});

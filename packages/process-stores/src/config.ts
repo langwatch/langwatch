@@ -41,6 +41,11 @@ export interface MalformedPrivateVariable {
 export interface ClickHouseConfig {
   /** `CLICKHOUSE_URL` — the shared server. Absent where every tenant is private. */
   readonly url?: string;
+  /**
+   * `CLICKHOUSE_PASSWORD_FILE` — a file holding the shared server's password, re-read while
+   * running so a rotation needs no restart. The URL still names the user. Private routes ignore it.
+   */
+  readonly passwordFile?: string;
   /** `CLICKHOUSE_URL__<label>__<orgId>`, the stores' secret family parsed once at boot. */
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
   /** Route variables that did not parse: those organizations are refused, never shared. */
@@ -116,10 +121,16 @@ export interface EventingConfig {
   readonly participation?: EventingParticipation;
 }
 
+/**
+ * Where clients send an upload's bytes: straight to the bucket on a signed URL, or to
+ * LangWatch's own signed route when browsers cannot reach the bucket (issue #9666).
+ */
+export type ObjectStorageUploads = "direct" | "through-langwatch";
+
 /** Where one S3 account's objects are written, and under whose credentials. */
 export interface ObjectStorageAccount {
   readonly bucket: string;
-  /** Absent leaves AWS endpoints on the SDK's own chain and names `auto` for any other. */
+  /** Absent: `auto` off AWS; on AWS, AWS_REGION or the profile, else the bucket's own region. */
   readonly region?: string;
   /** A non-AWS endpoint (MinIO, R2, a dev container). Absent uses AWS itself. */
   readonly endpoint?: string;
@@ -133,6 +144,8 @@ export interface ObjectStorageAccount {
   readonly roleArn?: string;
   /** Absent keeps the bucket in the path, which every S3-compatible endpoint accepts. */
   readonly forcePathStyle?: boolean;
+  /** Absent uploads direct. */
+  readonly uploads?: ObjectStorageUploads;
 }
 
 /** One organization writing to its own S3 account rather than the shared backend. */
@@ -163,6 +176,8 @@ export interface ObjectStorageAzureConfig {
   /** Plaintext token endpoints for emulator tests; the boot seam never sets it in production. */
   readonly allowInsecureTokenEndpointForTests?: boolean;
   readonly identity?: ObjectStorageAzureIdentity;
+  /** Absent uploads direct. */
+  readonly uploads?: ObjectStorageUploads;
 }
 
 /**

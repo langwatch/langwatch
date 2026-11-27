@@ -14,6 +14,7 @@ import {
   type EventStore,
   EventStoreProducerOnly,
   EventUpcastReader,
+  eventSourcingClaimsIndex,
   pipelineRetentionOf,
   pipelineUpcastsOf,
   type ProcessStore,
@@ -234,6 +235,8 @@ function replayEngineOver({
           : unionReplayTenants({ source: logSource, listTenants: privateTenants }),
       redis: connection,
       ...(retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver }),
+      // Only replay steps drive this engine; each runs after the claims fill, old images gone.
+      claims: eventSourcingClaimsIndex({ redis: connection, isReady: async () => true }),
     });
     return {
       service,

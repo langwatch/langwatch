@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
@@ -348,7 +348,7 @@ export async function deadLetterJob({
     errorMessage,
     errorStack,
     String(DLQ_TTL_SECONDS),
-    String(nowInstant().epochMilliseconds),
+    String(nowEpochMs()),
     claimToken,
   );
   if (Number(moved) === -1) return "claim-lost";

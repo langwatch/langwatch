@@ -53,6 +53,8 @@ const EXPECTED_CACHED_SCRIPT_SOURCES = [
   "RELEASE_LUA",
   "RESTAGE_AND_BLOCK_LUA",
   "RETRY_RESTAGE_LUA",
+  "ADD_TENANT_CLAIMS_LUA",
+  "READ_TENANT_CLAIMS_LUA",
   "STAGE_BATCH_LUA",
   "STAGE_LUA",
   "TAKE_LUA",
@@ -60,7 +62,7 @@ const EXPECTED_CACHED_SCRIPT_SOURCES = [
 ].toSorted((a, b) => a.localeCompare(b));
 
 /** Variable names of every `new CachedLuaScript(`...`)` built from an inline template. */
-const EXPECTED_INLINE_CACHED_SCRIPTS = ["groupRoutingLabelsScript"];
+const EXPECTED_INLINE_CACHED_SCRIPTS = ["groupHeadAgesScript", "groupRoutingLabelsScript"];
 
 /**
  * Exported `*_LUA` constants not reachable from a package entry;

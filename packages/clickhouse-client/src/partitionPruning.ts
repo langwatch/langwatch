@@ -21,7 +21,11 @@ export async function partsAfterPartitionPruning({
   return partsInExplain(rows.map((row) => String(Reflect.get(Object(row), "explain"))));
 }
 
-/** The pruned part count of each `ReadFromMergeTree` in an EXPLAIN, from its Partition stage. */
+/**
+ * Pruned part count of each `ReadFromMergeTree` in an EXPLAIN, from its Partition stage. Reads the
+ * indented layout before 26.7 and the box-drawn `pretty` tree from it. A stage sits one level under
+ * `Indexes:`, so a bare key name deeper down is not taken for one.
+ */
 export function partsInExplain(lines: readonly string[]): number {
   let total = 0;
   let section = "";
@@ -32,13 +36,16 @@ export function partsInExplain(lines: readonly string[]): number {
     entering = undefined;
     pruned = undefined;
   };
+  let stageDepth: number | undefined;
   for (const line of lines) {
-    const text = line.trim();
+    const depth = TREE_PREFIX.exec(line)?.[0].length ?? 0;
+    const text = line.slice(depth).trim();
     if (text.startsWith("ReadFromMergeTree")) {
       settle();
       continue;
     }
-    if (/^[A-Za-z]+$/.test(text)) section = text;
+    if (text === "Indexes:") stageDepth = depth + 2;
+    if (depth === stageDepth && /^[A-Za-z-]+$/.test(text)) section = text;
     const parts = /^Parts: (\d+)\/(\d+)$/.exec(text);
     if (!parts) continue;
     entering ??= Number(parts[2]);
@@ -47,3 +54,6 @@ export function partsInExplain(lines: readonly string[]): number {
   settle();
   return total;
 }
+
+/** The `pretty` plan's tree glyphs and the indentation before them. */
+const TREE_PREFIX = /^[\s\u2500-\u257F]+/u;

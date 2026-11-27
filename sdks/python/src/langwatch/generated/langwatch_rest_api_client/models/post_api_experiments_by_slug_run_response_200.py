@@ -17,12 +17,14 @@ class PostApiExperimentsBySlugRunResponse200:
         run_id (str): Identifier to poll this run with
         status (Literal['running']):
         total (float): Number of cells this run will execute
+        concurrency (int | Unset): Cells this run executes at once: the request's `concurrency`, else the server default
         run_url (str | Unset): Link to the run in the LangWatch app
     """
 
     run_id: str
     status: Literal["running"]
     total: float
+    concurrency: int | Unset = UNSET
     run_url: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,6 +33,8 @@ class PostApiExperimentsBySlugRunResponse200:
         status = self.status
 
         total = self.total
+
+        concurrency = self.concurrency
 
         run_url = self.run_url
 
@@ -43,6 +47,8 @@ class PostApiExperimentsBySlugRunResponse200:
                 "total": total,
             }
         )
+        if concurrency is not UNSET:
+            field_dict["concurrency"] = concurrency
         if run_url is not UNSET:
             field_dict["runUrl"] = run_url
 
@@ -59,12 +65,15 @@ class PostApiExperimentsBySlugRunResponse200:
 
         total = d.pop("total")
 
+        concurrency = d.pop("concurrency", UNSET)
+
         run_url = d.pop("runUrl", UNSET)
 
         post_api_experiments_by_slug_run_response_200 = cls(
             run_id=run_id,
             status=status,
             total=total,
+            concurrency=concurrency,
             run_url=run_url,
         )
 

@@ -19,6 +19,9 @@ import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
 const CODE = "export default function Widget() { return null; }";
 const QUERY = { name: "traces", sql: "SELECT count() AS value FROM analytics.traces" };
+const READS_SOURCES =
+  "SELECT count() AS value FROM analytics.trace_metrics " +
+  "WHERE Source IN {dashboard_context_sources:Array(String)}";
 const VALID = [QUERY];
 const INVALID = [{ ...QUERY, parameters: [{ name: "prototype", type: "string" as const }] }];
 
@@ -68,7 +71,7 @@ describe("given the dashboard widget service over the memory repository", () => 
         }),
       ).rejects.toMatchObject({ code: "dashboard_widget_definition_refused", httpStatus: 422 });
       const read = await service.getById({ projectId: "project-1", id: created.id });
-      expect(read.definition.queries).toEqual([{ ...QUERY, sources: ["application"] }]);
+      expect(read.definition.queries).toEqual([QUERY]);
     });
   });
 });
@@ -95,7 +98,10 @@ describe("given a query's sources", () => {
         input: {
           name: "Traces",
           code: CODE,
-          queries: [QUERY, { ...QUERY, name: "turns", sources: ["langy"] }],
+          queries: [
+            { ...QUERY, sql: READS_SOURCES },
+            { ...QUERY, name: "turns", sources: ["langy"] },
+          ],
         },
       });
 

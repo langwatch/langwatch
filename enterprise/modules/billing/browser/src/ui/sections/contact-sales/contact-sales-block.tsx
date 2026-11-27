@@ -3,11 +3,11 @@ import { AccessState } from "@langwatch/design-system/access-state";
 /**
  * Contact Sales Block - CTA for enterprise or higher-tier needs
  */
-import { Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
+import { Button } from "@langwatch/design-system/primitives";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
-import { Check } from "lucide-react";
 
 import { ENTERPRISE_PLAN_FEATURES } from "../../../model/billing-plans.ts";
+import { PlanFeatureList } from "../../elements/plan-feature-list.tsx";
 
 export function ContactSalesBlock() {
   return (
@@ -24,20 +24,7 @@ export function ContactSalesBlock() {
         </Button>
       }
     >
-      <SimpleGrid
-        data-testid="enterprise-features-list"
-        templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-        gap={2}
-        marginTop={4}
-        color="fg.muted"
-      >
-        {ENTERPRISE_PLAN_FEATURES.map((feature) => (
-          <HStack key={feature} gap={2} alignItems="start">
-            <Check size={16} />
-            <Text fontSize="sm">{feature}</Text>
-          </HStack>
-        ))}
-      </SimpleGrid>
+      <PlanFeatureList features={ENTERPRISE_PLAN_FEATURES} data-testid="enterprise-features-list" />
     </AccessState>
   );
 }

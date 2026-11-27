@@ -23,6 +23,7 @@ import {
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "../features/conversation/services/langy-conversation.service.ts";
+import type { LangyCiFollowUpTurn } from "../features/turn/services/langy-turn-shared.service.ts";
 import type { LangyTurnService } from "../features/turn/services/langy-turn.service.ts";
 import type { LatestControlRequestReading } from "../rules/langy-local-control-request-state.rules.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
@@ -227,6 +228,15 @@ export class LangyService {
   startUnattendedTurn(
     input: LangyStartConversationTurnInput & {
       unattended: { title: string; countTurn: () => Promise<void> };
+    },
+  ): Promise<{ conversationId: string; turnId: string }> {
+    return this.turns.startConversationTurn(input);
+  }
+
+  /** A turn CI started on a pull request Langy opened, in the conversation that opened it. */
+  startCiFollowUpTurn(
+    input: LangyStartConversationTurnInput & {
+      ciFollowUp: LangyCiFollowUpTurn;
     },
   ): Promise<{ conversationId: string; turnId: string }> {
     return this.turns.startConversationTurn(input);

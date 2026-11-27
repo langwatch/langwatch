@@ -16,6 +16,7 @@ import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -53,6 +54,7 @@ const storesConfig: StoresConfig = {
   queueTenantCap: undefined,
   queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
+  clickhousePasswordFile: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,
@@ -64,6 +66,7 @@ const storesConfig: StoresConfig = {
   redis: { dbIndex: undefined },
   objectStorage: {
     backend: "file",
+    uploads: undefined,
     localRoot: "/tmp/langwatch-keyless-test",
     s3: { bucket: undefined, endpoint: undefined, region: undefined },
     azure: {
@@ -155,6 +158,10 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
       testPeer({ token: GatewayApi, instance: createApiFixture<GatewayApi>() }),
       testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
+      testPeer({
+        token: InstantEvalJudgeApi,
+        instance: createApiFixture<InstantEvalJudgeApi>(),
+      }),
     ],
   });
 }

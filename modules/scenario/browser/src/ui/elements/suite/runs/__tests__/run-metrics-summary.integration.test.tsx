@@ -94,4 +94,30 @@ describe("<RunMetricsSummary/>", () => {
       expect(pill.textContent).toBe("Pass75%");
     });
   });
+
+  describe("given a run group where half the runs passed", () => {
+    /** @scenario "Accordion header circle reads amber for a partial pass rate" */
+    it("draws the pass rate circle in the amber of a partial pass rate", () => {
+      const summary = computeGroupSummary({
+        group: {
+          groupKey: "batch_1",
+          groupLabel: "batch_1",
+          groupType: "none",
+          timestamp: 0,
+          scenarioRuns: [
+            run(1, ScenarioRunStatus.SUCCESS),
+            run(2, ScenarioRunStatus.SUCCESS),
+            run(3, ScenarioRunStatus.FAILED),
+            run(4, ScenarioRunStatus.FAILED),
+          ],
+        },
+      });
+
+      renderWithDesignSystem(<RunMetricsSummary summary={summary} />);
+
+      const pill = screen.getByTestId("run-metrics-summary");
+      const circle = within(pill).getByText("50%").previousElementSibling;
+      expect(circle).toHaveStyle({ background: "var(--chakra-colors-orange-solid)" });
+    });
+  });
 });

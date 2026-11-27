@@ -1,3 +1,4 @@
+import { Box, HStack } from "@langwatch/design-system/primitives";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { type ProfilerOnRenderCallback, type RefObject, useEffect, useMemo } from "react";
@@ -16,9 +17,11 @@ import type {
 import type { useLangyListError } from "../../../behavior/panel/use-langy-panel-errors.ts";
 import type { LangyPanelSend } from "../../../behavior/panel/use-langy-panel-send.ts";
 import type { useLangyTurnFailure } from "../../../behavior/panel/use-langy-turn-failure.ts";
+import { LangyTurnStopButton } from "../../elements/langy-turn-stop-button.tsx";
 import { LangyLocalWorkspaceChip } from "../langy-local-workspace-chip.tsx";
 import type { LangySend } from "../langy-send-context.tsx";
 import { toPendingCapabilities } from "../langy-tool-activity.tsx";
+import { panelGutter } from "./langy-panel-chrome.ts";
 import {
   LangyColumnError,
   type LangyColumnState,
@@ -276,36 +279,62 @@ export function LangyWaitingCardsSlot({
   );
 }
 
-/** The working lines, only while a turn is in flight. */
+/**
+ * The working row pinned above the composer: the working lines while a turn is in flight, with
+ * Stop beside them for as long as the turn phase says one runs (ADR-078), startup included.
+ */
 export function LangyTurnWorkingLineSlot({
+  floating,
   view,
   activity,
   waits,
   hasInlineProgressOwner,
+  onStop,
 }: {
+  floating: boolean;
   view: TimeTravelView;
   activity: ReturnType<typeof useLangyTurnActivity>;
   waits: LocalWaits;
   hasInlineProgressOwner: boolean;
+  onStop: () => void;
 }) {
   const warmed = useLangyStore((s) => s.warmedConversationId);
   const activeConversationId = useLangyStore((s) => s.activeConversationId);
   const pendingConversationId = useLangyStore((s) => s.pendingConversationId);
-  if (!view.turnInFlight) return null;
+  const turnPhase = useLangyStore((s) => s.turnPhase);
+  const stoppable = !view.timeTravel && turnPhase !== "idle";
+  if (!view.turnInFlight && !stoppable) return null;
   const workerReady =
     warmed != null && (warmed === activeConversationId || warmed === pendingConversationId);
   return (
-    <LangyTurnWorkingLine
-      messages={view.displayMessages}
-      signals={view.displaySignals}
-      ownership={activity.activityOwnership}
-      hasTurnDetail={activity.hasTurnDetail}
-      hasInlineProgressOwner={hasInlineProgressOwner}
-      awaitingAnswer={waits.awaitingAnswer}
-      terminalConnected={waits.terminalConnected}
-      activityKey={activity.turnActivityKey}
-      workerReady={workerReady}
-    />
+    <HStack
+      align="center"
+      gap={2}
+      minWidth={0}
+      flexShrink={0}
+      paddingX={panelGutter(floating)}
+      paddingBottom={2}
+      data-testid="langy-turn-working-row"
+    >
+      <Box flex={1} minWidth={0}>
+        {view.turnInFlight ? (
+          <LangyTurnWorkingLine
+            messages={view.displayMessages}
+            signals={view.displaySignals}
+            ownership={activity.activityOwnership}
+            hasTurnDetail={activity.hasTurnDetail}
+            hasInlineProgressOwner={hasInlineProgressOwner}
+            awaitingAnswer={waits.awaitingAnswer}
+            terminalConnected={waits.terminalConnected}
+            activityKey={activity.turnActivityKey}
+            workerReady={workerReady}
+          />
+        ) : null}
+      </Box>
+      {stoppable ? (
+        <LangyTurnStopButton isStopping={turnPhase === "stopping"} onStop={onStop} />
+      ) : null}
+    </HStack>
   );
 }
 

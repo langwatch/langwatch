@@ -3,6 +3,7 @@ import {
   type Event,
   type CutoffInfo,
   type DiscoveredAggregate,
+  eventSourcingClaimsIndex,
   type MapProjectionDefinition,
   type OccurredAtBounds,
   type RegisteredMapProjection,
@@ -323,6 +324,7 @@ describe("ops replay full rebuild", () => {
           service: new EventingReplayService({
             eventSource: new MemoryEventSource([event]),
             redis: replayRedis,
+            claims: eventSourcingClaimsIndex({ redis, isReady: async () => true }),
           }),
           projections: [],
           mapProjections: [mapProjection],

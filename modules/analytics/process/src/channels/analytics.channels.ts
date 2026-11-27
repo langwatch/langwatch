@@ -3,8 +3,11 @@ import type { BoundApis } from "@langwatch/process";
 
 /** Every channel analytics holds, as the container hands them to the module class. */
 export interface AnalyticsChannels {
-  /** Judges a synchronous query's eval columns, publishes its limits and records the spend. */
-  readonly judge: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
+  /**
+   * Judges a synchronous query's eval columns, publishes its limits and records the spend, and
+   * answers whether a project may call an eval function at all: Instant Evals owns that rule.
+   */
+  readonly judge: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits" | "isEnabled">;
 }
 
 /**

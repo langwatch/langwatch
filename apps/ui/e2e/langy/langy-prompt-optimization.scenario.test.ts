@@ -135,8 +135,8 @@ describe("Langy prompt optimization: the improvement loop", () => {
     /** @scenario After a plateau, Langy spends an attempt on a different model */
     /** @scenario Langy concludes with accuracy and cost deltas in a stats card */
     /** @scenario Langy reports a tie or inconclusive comparison as what it is */
-    /** @scenario Langy stops after three attempts that fail to beat the best candidate */
-    /** @scenario Langy stops once it spends the attempt budget */
+    /** @scenario Langy stops when attempts stop beating the best candidate */
+    /** @scenario Langy stops once it spends the attempts budget it set */
     it("iterates on its own and closes with before-and-after numbers", async () => {
       const seeded = await seedOptimizationWorkbench({
         name: "support-quality-iterate",
@@ -166,7 +166,7 @@ describe("Langy prompt optimization: the improvement loop", () => {
           "If prompt edits plateau, Langy spends an attempt on a duplicate running a different model and compares it. A run that keeps improving satisfies this criterion; do not mark it inconclusive.",
           "The final verdict states the pass rate or score before and after, and what happened to cost. Numbers, not adjectives.",
           "If the candidate and baseline end level or the comparison is inconclusive, Langy says so instead of declaring a winner. A run with a real improvement satisfies this criterion.",
-          "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried. A run that improves earlier satisfies this criterion.",
+          "If several attempts in a row fail to beat the best candidate, Langy stops and reports what it tried. A run that keeps improving satisfies this criterion.",
           ...LANGY_OPTIMIZE_LOOP_CRITERIA,
         ],
       });

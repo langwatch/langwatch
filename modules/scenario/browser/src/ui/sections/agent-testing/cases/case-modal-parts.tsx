@@ -33,6 +33,7 @@ import {
 import { Play, X } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { judgeTraceWaitErrorsOf } from "../../../../model/judge-trace-wait.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
@@ -40,6 +41,7 @@ import {
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { JudgeTraceWaitSettings } from "../../../elements/judge-trace-wait-settings.tsx";
 import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
 import { TagList } from "../../../elements/tag-list.tsx";
 import { EFFECT_LABELS } from "../../scenarios/caller-voice-group.tsx";
@@ -50,6 +52,7 @@ import { parameterPlaceholder } from "../run-parameters/parameter-suggestions.ts
 import { useAgentDeclaredParameters } from "../run-parameters/use-agent-declared-parameters.ts";
 import { CaseRecentRunsButton } from "./case-recent-runs-button.tsx";
 import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
+import { RedTeamConfigBlock } from "./red-team-config-block.tsx";
 import {
   criteriaOf,
   strayFieldValues,
@@ -447,6 +450,7 @@ export function CaseModalFields({
         titleError={problems.title}
       />
       <SituationAndCriteria draft={draft} setDraft={setDraft} criteriaError={problems.criteria} />
+      {editor.redTeam ? <RedTeamConfigBlock config={editor.redTeam} /> : null}
       <SuiteFieldsBlock editor={editor} />
       {/* A block a chip opened reads where the reader was looking when they
           opened it: straight under the criteria, in the order the chips sit
@@ -582,29 +586,36 @@ function ModelsBlock({
   onRemove: () => void;
 }) {
   return (
-    <Grid templateColumns="1fr 1fr" gap={3} data-testid="case-models-block">
-      <Box>
-        <FieldLabel>User simulator</FieldLabel>
-        <SimulationModelSelect
-          value={draft.simulatorModel}
-          onChange={(value) => setDraft({ simulatorModel: value })}
-          featureKey="scenarios.user_simulator"
-          size="sm"
-        />
-      </Box>
-      <Box>
-        <FieldLabel>
-          Judge
-          <RemoveBlockButton label="Remove the model overrides" onClick={onRemove} />
-        </FieldLabel>
-        <SimulationModelSelect
-          value={draft.judgeModel}
-          onChange={(value) => setDraft({ judgeModel: value })}
-          featureKey="scenarios.judge"
-          size="sm"
-        />
-      </Box>
-    </Grid>
+    <VStack align="stretch" gap={3} data-testid="case-models-block">
+      <Grid templateColumns="1fr 1fr" gap={3}>
+        <Box>
+          <FieldLabel>User simulator</FieldLabel>
+          <SimulationModelSelect
+            value={draft.simulatorModel}
+            onChange={(value) => setDraft({ simulatorModel: value })}
+            featureKey="scenarios.user_simulator"
+            size="sm"
+          />
+        </Box>
+        <Box>
+          <FieldLabel>
+            Judge
+            <RemoveBlockButton label="Remove the model overrides" onClick={onRemove} />
+          </FieldLabel>
+          <SimulationModelSelect
+            value={draft.judgeModel}
+            onChange={(value) => setDraft({ judgeModel: value })}
+            featureKey="scenarios.judge"
+            size="sm"
+          />
+        </Box>
+      </Grid>
+      <JudgeTraceWaitSettings
+        value={draft.traceWait}
+        errors={judgeTraceWaitErrorsOf(draft.traceWait)}
+        onChange={(traceWait) => setDraft({ traceWait })}
+      />
+    </VStack>
   );
 }
 

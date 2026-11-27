@@ -956,14 +956,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ $serverMaxConcurrentQueries | quote }}
 {{- if .Values.clickhouse.client.maxOpenConnections }}
 - name: CLICKHOUSE_MAX_OPEN_CONNECTIONS
-  value: {{ .Values.clickhouse.client.maxOpenConnections | quote }}
+  value: {{ .Values.clickhouse.client.maxOpenConnections | int64 | quote }}
 {{- end }}
 {{- $chCold := (.Values.clickhouse).cold }}
 {{- if $chCold.enabled }}
 - name: CLICKHOUSE_COLD_STORAGE_ENABLED
   value: "true"
 - name: CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS
-  value: {{ $chCold.defaultTtlDays | default "49" | quote }}
+  value: {{ $chCold.defaultTtlDays | default "49" | int64 | quote }}
 {{- end }}
 {{/* Backup-status gauges (system.backup_log) are opt-OUT in the app/worker: an
      unset CLICKHOUSE_BACKUP_METRICS_ENABLED collects, so no deployment can lose
@@ -1110,9 +1110,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.bucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_REGION" "fieldValues" .Values.app.dataplane.providers.awsS3.region) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
+{{- end }}
+{{- /* Where clients send upload bytes (#9666): straight to the bucket, or through
+       LangWatch's signed route when browsers and SDKs cannot reach the bucket. */}}
+{{- with .Values.app.dataplane.uploads }}
+{{- if not (has (toString .) (list "direct" "through-langwatch")) }}
+{{- fail (printf "app.dataplane.uploads is %q; use direct or through-langwatch, or leave it empty for direct." (toString .)) }}
+{{- end }}
+- name: STORED_OBJECTS_UPLOADS
+  value: {{ . | quote }}
 {{- end }}
 {{/* The active provider's WRITE configuration above never depends on the
      legacy read flags below — an Azure->S3 migration must configure S3
@@ -1156,6 +1166,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_REGION" "fieldValues" .Values.app.dataplane.providers.awsS3.region) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
@@ -1170,6 +1181,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # enable dataplane with a real object-storage backend.
 - name: LANGWATCH_LOCAL_STORAGE_PATH
   value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
+{{- else }}
+# Neither a bucket nor the local-filesystem volume: stored objects would land
+# on the pods' ephemeral disk. Trace media then stays inline in ClickHouse
+# instead of being moved there and lost on the next restart.
+- name: RELEASE_TRACE_MEDIA_EXTRACTION
+  value: "0"
 {{- end }}
 
 # NextAuth secret. Lives in sharedEnv (not just the app Deployment) because
@@ -1287,7 +1304,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.app.email.providers.smtp.host | quote }}
 {{- if .Values.app.email.providers.smtp.port }}
 - name: SMTP_PORT
-  value: {{ .Values.app.email.providers.smtp.port | quote }}
+  value: {{ .Values.app.email.providers.smtp.port | int64 | quote }}
 {{- end }}
 {{- /* Emptiness, not truthiness: `secure: false` is a real setting
        (force STARTTLS on 465) and must not be dropped. */}}
@@ -1532,6 +1549,22 @@ LWQL_POSTGRES_READER_PASSWORD
 {{- end -}}
 {{- end -}}
 
+{{/* PII_REDACTION_MODEL_ENDPOINT: the chart's Service when piiRedactionModel.enabled,
+     else piiRedactionModel.externalEndpoint, else nothing. */}}
+{{- define "langwatch.piiRedactionModel.endpoint" -}}
+{{- if .Values.piiRedactionModel.enabled -}}
+http://{{ .Release.Name }}-pii-redaction-model:{{ .Values.piiRedactionModel.service.port }}
+{{- else -}}
+{{- .Values.piiRedactionModel.externalEndpoint | default "" | trim -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The common labels without app.kubernetes.io/name and instance, for a
+     component that sets its own: langwatch.labels repeats both keys. */}}
+{{- define "langwatch.componentLabels" -}}
+{{- toYaml (omit (include "langwatch.labels" . | fromYaml) "app.kubernetes.io/name" "app.kubernetes.io/instance") -}}
+{{- end -}}
+
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true
@@ -1678,16 +1711,23 @@ containers:
     {{- /* Everything the app is given beyond its port and its own address:
            the worker parses the same config over the same modules (Alex,
            2026-09-30), including the Langy pair its turns are dispatched
-           with. app.extraEnvs reaches it too; workers.extraEnvs renders
-           after and so wins a duplicate. */}}
+           with. app.extraEnvs reaches it too, minus any name workers.extraEnvs
+           also sets: a duplicate env name breaks `helm upgrade` (strategic
+           merge patch refuses it), so the workers value is the only one. */}}
     {{- include "langwatch.processEnv" . | nindent 4 }}
     {{- if and (not .Values.workers.enabled) .Values.app.telemetry.metrics.enabled }}
     # Sidecar: the api in this pod holds 9464, so the worker scrapes on 9465 (SIDECAR-METRICS-9465).
     - name: OTEL_EXPORTER_PROMETHEUS_PORT
       value: "9465"
     {{- end }}
-    {{- with .Values.app.extraEnvs}}
-    {{- toYaml . | nindent 4 }}
+    {{- $workerEnvNames := list }}
+    {{- range (default (list) .Values.workers.extraEnvs) }}
+    {{- $workerEnvNames = append $workerEnvNames .name }}
+    {{- end }}
+    {{- range (default (list) .Values.app.extraEnvs) }}
+    {{- if not (has .name $workerEnvNames) }}
+    {{- toYaml (list .) | nindent 4 }}
+    {{- end }}
     {{- end }}
     {{- with .Values.workers.extraEnvs}}
     {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
@@ -2103,6 +2143,12 @@ here, once, by name, so both consuming templates agree.
       key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
 {{- include "langwatch.langyCallbackUrlEnv" . | nindent 0 }}
 {{- end }}
+{{- /* Strict PII analysis goes to this model; unset, it stays on Presidio.
+       Only the app and workers call it, so it is not in sharedEnv. */}}
+{{- with (include "langwatch.piiRedactionModel.endpoint" .) }}
+- name: PII_REDACTION_MODEL_ENDPOINT
+  value: {{ . | quote }}
+{{- end }}
 {{- /* Langy's rollout flag is SYSTEM-scoped and defaults off, because
        the hosted product opens it one cohort at a time. A self-hosted
        install has a single cohort — the people who installed it — so
@@ -2119,6 +2165,11 @@ here, once, by name, so both consuming templates agree.
 {{- end }}
 {{- if and (index .Values "langyagent").chartManaged (index .Values "langyagent").enableForAllUsers }}
 {{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
+{{- end }}
+{{- /* Configuring a PII redaction model is the decision to use it, as for
+       Langy. Its price is the server's rule: never priced on self-hosted. */}}
+{{- if include "langwatch.piiRedactionModel.endpoint" . }}
+{{- $forcedFlags = append $forcedFlags "release_pii_redaction_model_enabled" }}
 {{- end }}
 {{- if $forcedFlags }}
 - name: FEATURE_FLAG_FORCE_ENABLE

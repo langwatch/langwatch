@@ -1,8 +1,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { histogram } from "@langwatch/observability/metrics";
+import { counter, histogram } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
 
-import { CODING_AGENT_SESSION_LIST_READ_METRIC_NAME } from "../../rules/coding-agent-read-metrics.rules.ts";
+import {
+  CODING_AGENT_SESSION_ID_INDEX_NOT_READY_METRIC_NAME,
+  CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
+} from "../../rules/coding-agent-read-metrics.rules.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import type { CodingAgentProjectionRepositories } from "../coding-agent.repositories.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.coding-agent-session-event.repository.ts";
@@ -37,6 +40,10 @@ export class ClickHouseCodingAgentRepositories {
       name: CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
       description: "Duration of the bounded coding-agent session-list storage read",
     });
+    const sessionIdIndexNotReady = counter({
+      name: CODING_AGENT_SESSION_ID_INDEX_NOT_READY_METRIC_NAME,
+      description: "Coding-agent session reads that found the session id index not ready",
+    });
 
     return {
       sessions: CodingAgentSessionClickHouseRepository.create({
@@ -44,6 +51,8 @@ export class ClickHouseCodingAgentRepositories {
         metrics: {
           observeSessionListRead: ({ table, outcome, durationMs }) =>
             sessionListReadDuration.observe(durationMs, { table, outcome }),
+          countSessionIdIndexNotReady: ({ read, target }) =>
+            sessionIdIndexNotReady.inc({ read, target }),
         },
         clock,
       }),

@@ -1,10 +1,10 @@
 /**
- * The run's effects: plan it, judge a page, finish it. The work costs money, so
- * an attempt below the cap rethrows and the final one fails the run instead.
+ * The run's effects: plan it, judge a page, finish it. Below the attempt cap a step rethrows;
+ * on its last attempt a plan or finish fails the run, and a page records its failure.
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import type { IntentContext, IntentExecutor } from "@langwatch/eventing";
+import { isOutboxRetryRefused, type IntentContext, type IntentExecutor } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -156,6 +156,13 @@ export interface InstantEvalOutcomeCommands {
     costUsd: number;
     priceUsd: number;
   }): Promise<unknown>;
+  recordPageFailed(args: {
+    tenantId: string;
+    occurredAt: number;
+    runId: string;
+    page: number;
+    errorCode: string;
+  }): Promise<unknown>;
 }
 
 export interface InstantEvalDispatchDeps {
@@ -186,9 +193,9 @@ function instantEvalFailureCode(error: unknown): string {
 }
 
 /**
- * Records a run as failed, best-effort. The spend carries through: a run that
- * judged eighty pages and lost the eighty-first still spent what those pages
- * spent, and zeroing the counters here would file that spend nowhere.
+ * Records a run as failed, best-effort, for a plan or a finish; a page failure goes through
+ * the run's process instead. The spend carries through: a finish that cannot write its cost
+ * row still reports what the run's pages spent, rather than zeroing it.
  */
 async function recordInstantEvalFailure({
   deps,
@@ -228,8 +235,67 @@ async function recordInstantEvalFailure({
 }
 
 /**
- * The shared failure branch: retry while attempts remain, otherwise fail the
- * run and retire the message.
+ * Records a page that failed for good, best-effort. The run's process turns it into a failed
+ * finish carrying what the judged pages summed, which the page alone does not know (ADR-174
+ * decision 24). Lost, it leaves the run to the stall wake, which bills the same totals.
+ */
+async function recordInstantEvalPageFailure({
+  deps,
+  payload,
+  code,
+  context,
+}: {
+  deps: InstantEvalDispatchDeps;
+  payload: { runId: string; projectId: string; page: number };
+  code: string;
+  context: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await deps.commands().recordPageFailed({
+      tenantId: payload.projectId,
+      occurredAt: deps.clock?.() ?? nowInstant().epochMilliseconds,
+      runId: payload.runId,
+      page: payload.page,
+      errorCode: code,
+    });
+  } catch (error) {
+    logger.error(
+      { ...context, error: instantEvalErrorText(error) },
+      "Instant Eval page failure could not be recorded; the stall wake will fail the run",
+    );
+  }
+}
+
+/** Rethrows while the outbox will retry; on the last chance, logs and returns. */
+function rethrowWhileRetried({
+  deps,
+  error,
+  intentContext,
+  context,
+}: {
+  deps: InstantEvalDispatchDeps;
+  error: unknown;
+  intentContext: IntentContext;
+  context: Record<string, unknown>;
+}): void {
+  const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
+  // An error the outbox will not retry retires the message now: the last chance to record it.
+  if (intentContext.attempt < maxAttempts && !isOutboxRetryRefused(error)) {
+    logger.warn(
+      { ...context, attempt: intentContext.attempt, error: instantEvalErrorText(error) },
+      "Instant Eval step failed; the outbox will retry",
+    );
+    throw error;
+  }
+  logger.error(
+    { ...context, error: instantEvalErrorText(error) },
+    "Instant Eval step failed on its final attempt; recording the failure",
+  );
+}
+
+/**
+ * The shared failure branch: retry while attempts remain, otherwise record the
+ * failure and retire the message.
  */
 async function handleInstantEvalIntentFailure({
   deps,
@@ -246,18 +312,7 @@ async function handleInstantEvalIntentFailure({
   context: Record<string, unknown>;
   spend?: { inputTokens: number; requests: number; costNanoUsd?: number };
 }): Promise<void> {
-  const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
-  if (intentContext.attempt < maxAttempts) {
-    logger.warn(
-      { ...context, attempt: intentContext.attempt, error: instantEvalErrorText(error) },
-      "Instant Eval step failed; the outbox will retry",
-    );
-    throw error;
-  }
-  logger.error(
-    { ...context, error: instantEvalErrorText(error) },
-    "Instant Eval step failed on its final attempt; failing the run",
-  );
+  rethrowWhileRetried({ deps, error, intentContext, context });
   await recordInstantEvalFailure({
     deps,
     payload,
@@ -320,7 +375,13 @@ export function createInstantEvalJudgePageHandler(
         deadlineAt: intentContext.leaseExpiresAt ?? null,
       });
     } catch (error) {
-      await handleInstantEvalIntentFailure({ deps, payload, error, intentContext, context });
+      rethrowWhileRetried({ deps, error, intentContext, context });
+      await recordInstantEvalPageFailure({
+        deps,
+        payload,
+        code: instantEvalFailureCode(error),
+        context,
+      });
 
       return;
     }

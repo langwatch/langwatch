@@ -22,6 +22,10 @@ export type GatewayJwtClaims = {
    *  this instant, so a key that runs out stops serving on schedule even while
    *  the control plane is unreachable. */
   vk_expires_at: number | null;
+  /** Unix seconds at which a rotated key's previous secret stops, sent only when
+   *  that secret was presented inside its grace. Its own claim because a config
+   *  refresh moves `vk_expires_at` to the key's date and must not lift this end. */
+  secret_valid_until?: number;
   /** The hosted services a resolved license token is entitled to (ADR-156). A plain virtual
    *  key omits the claim and a license entitled to nothing sends `[]`: omitted, not null,
    *  because null would decode the same way the empty array does. */
@@ -31,8 +35,9 @@ export type GatewayJwtClaims = {
 /** What a caller hands the signer: the identity claims, plus the key's own
  *  expiration as an instant. The `vk_expires_at` claim is derived here so
  *  one place decides both the claim and the token lifetime it bounds. */
-export type GatewayJwtSubject = Omit<GatewayJwtClaims, "vk_expires_at"> & {
+export type GatewayJwtSubject = Omit<GatewayJwtClaims, "vk_expires_at" | "secret_valid_until"> & {
   notAfter?: Instant | null;
+  secretNotAfter?: Instant | null;
 };
 
 /**
@@ -54,21 +59,24 @@ export class GatewayJwtService {
    *  expiration, whichever comes first. A caller skipping the resolve-key
    *  expiry check still gets a one-second floor rather than `exp <= iat`,
    *  since some verifiers reject that as malformed rather than expired. */
-  sign({ notAfter, ...identity }: GatewayJwtSubject): {
+  sign({ notAfter, secretNotAfter, ...identity }: GatewayJwtSubject): {
     jwt: string;
     expiresAt: number;
   } {
     const secret = this.secret;
     const issuedAt = Math.floor(nowInstant().epochMilliseconds / 1000);
     const keyExpiresAt = notAfter ? Math.floor(notAfter.epochMilliseconds / 1000) : null;
-    const ttlExpiresAt = issuedAt + TTL_SECONDS;
-    const expiresAt = Math.max(
-      issuedAt + 1,
-      keyExpiresAt === null ? ttlExpiresAt : Math.min(ttlExpiresAt, keyExpiresAt),
+    const secretValidUntil = secretNotAfter
+      ? Math.floor(secretNotAfter.epochMilliseconds / 1000)
+      : null;
+    const ends = [issuedAt + TTL_SECONDS, keyExpiresAt, secretValidUntil].filter(
+      (at): at is number => at !== null,
     );
+    const expiresAt = Math.max(issuedAt + 1, Math.min(...ends));
     const claims: GatewayJwtClaims = {
       ...identity,
       vk_expires_at: keyExpiresAt,
+      ...(secretValidUntil !== null ? { secret_valid_until: secretValidUntil } : {}),
     };
     const signedJwt = jwt.sign({ ...claims, exp: expiresAt }, secret, {
       algorithm: "HS256",
@@ -93,6 +101,7 @@ export class GatewayJwtService {
       principal_id: payload.principal_id,
       revision: payload.revision,
       vk_expires_at: payload.vk_expires_at ?? null,
+      ...(payload.secret_valid_until ? { secret_valid_until: payload.secret_valid_until } : {}),
       ...(payload.connect_services ? { connect_services: payload.connect_services } : {}),
     };
   }

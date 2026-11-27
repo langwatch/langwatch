@@ -24,6 +24,14 @@ Feature: The package-suites shards keep vitest's transformed modules between run
 
   Rule: a restored transform is never stale
 
+    # Vitest keeps one cache per user (ADR-196), outside the checkout, so the
+    # directory the job restores is the one only when the job names it.
+    @unit
+    Scenario: Vitest writes its transforms to the directory the job restores
+      Given the package-suites job
+      When its environment is read
+      Then VITEST_FS_MODULE_CACHE_DIR names the workspace's node_modules/.vitest-cache
+
     @unit
     Scenario: The transform cache is restored only for the same inputs
       Given the package-suites job's vitest transform cache

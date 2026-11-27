@@ -1,12 +1,12 @@
 Feature: Personal-workspace progressive feature unlock — minimal-by-default, click-to-enable
-  The personal workspace at /me is a trial-wedge surface. By default it
+  The personal workspace at /coding-agents is a trial-wedge surface. By default it
   exposes only the Traces Explorer + lightweight admin (Sessions /
   Settings) — NOT the full LLMOps library (Evaluations / Datasets /
   Annotations / Automations). End users who grow into needing those
   features unlock them by either:
 
     (a) flipping a single 'Enable advanced features' checkbox in
-        /me/settings → 'Workspace features' card, OR
+        /coding-agents/configure → 'Workspace features' card, OR
     (b) clicking a disabled-feature button on a trace in the Traces
         Explorer → modal asks 'Enable advanced features in your
         personal workspace?' → consent flips the bundle + the user
@@ -39,14 +39,14 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     And the user has just signed up + completed /onboarding/welcome
     And the user's Personal Project has `personalFeatures` defaulted to
       `{evaluations: false, datasets: false, annotations: false, automations: false}`
-    And the user is signed in and on /me
+    And the user is signed in and on /coding-agents
 
   # ---------------------------------------------------------------------------
   # Default sidebar shape — minimal-by-default
   # ---------------------------------------------------------------------------
 
   @bdd @ui @personal-workspace @default-shape
-  Scenario: Default /me sidebar shows Traces but not library entries
+  Scenario: Default /coding-agents sidebar shows Traces but not library entries
     When the personal-scope sidebar renders
     Then the sidebar shows in order:
       | entry           | visible-by-default                                                         |
@@ -61,7 +61,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
         per `packages/prisma-client/prisma/schema.prisma`)
     And clicking 'Traces' must NOT flip the chrome to the project-shell
         — the PersonalSidebar stays present throughout the user's
-        navigation in their own personal project (the `/me` chrome
+        navigation in their own personal project (the `/coding-agents` chrome
         is the persona-aware design surface; chrome-flipping on click
         would be a UX regression relative to the persona-aware
         design rchaves locked earlier)
@@ -105,7 +105,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
 
   @bdd @ui @personal-workspace @storage
   Scenario: Single 'Enable advanced features' checkbox flips all four to true atomically
-    Given the user is on /me/settings → 'Workspace features' card
+    Given the user is on /coding-agents/configure → 'Workspace features' card
     When the user toggles 'Enable advanced features'
     Then `personalWorkspaceFeatures.enableAll` is called
     And `Project.personalFeatures` is updated atomically to
@@ -170,7 +170,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     When future work adds a trigger for either feature inside the
         traces-v2 explorer (e.g. 'Run evaluation on this trace' or
         'Schedule recurring run on this query') OR a project-shell
-        preflight before navigating to those page surfaces from /me chrome
+        preflight before navigating to those page surfaces from /coding-agents chrome
     Then that new trigger MUST use `usePersonalFeatureGate(<feature>)`
         + render `<PersonalFeatureGateDialog>` inline — the hook + dialog
         are the canonical contract; per-surface wiring is mechanical
@@ -191,7 +191,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
   Scenario: Disabling the bundle does NOT close tRPC routers — UI hides, data accessible
     Given the user previously had `personalFeatures.datasets = true` and authored
         Datasets / Evaluations / Annotations / Automations during the enabled window
-    When the user disables the bundle in /me/settings
+    When the user disables the bundle in /coding-agents/configure
     Then `Project.personalFeatures` flips to all-false
     And the sidebar entries for the four features hide on next render
     And the underlying tRPC routers (`datasets.*`, `evaluations.*`,
@@ -243,7 +243,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
 
   @bdd @audit @personal-workspace
   Scenario: Bundle enable / disable writes audit-log rows
-    When the user toggles the bundle in /me/settings (either direction)
+    When the user toggles the bundle in /coding-agents/configure (either direction)
     Then exactly one audit-log row is written per toggle, shape:
       | field           | value                                                       |
       | actor.userId    | the user                                                    |
@@ -253,7 +253,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
       | occurredAt      | server timestamp                                            |
     And the row is visible at /settings/audit-log to org admins (per
         the existing audit-log RBAC) AND to the user themselves on
-        /me/settings → 'Activity' tab (so the user can self-audit)
+        /coding-agents/configure → 'Activity' tab (so the user can self-audit)
 
   # ---------------------------------------------------------------------------
   # Self-trace visibility + cross-user isolation (covered in detail in
@@ -263,7 +263,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
   @bdd @api @personal-workspace @isolation
   Scenario: User sees own traces in Traces Explorer scoped to their personal project
     Given the user has fired N completions through their Personal VK
-    When the user opens /me Traces (the explorer mounted on the user's
+    When the user opens /coding-agents Traces (the explorer mounted on the user's
         Personal Project)
     Then the explorer lists the user's own traces only
     And the explorer's scope is `projectId = personalProjectId` —
@@ -298,7 +298,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     Given user A has Personal Project `personalProjectIdA`
     And user B has Personal Project `personalProjectIdB`
     When user A direct-pastes `/[personalProjectSlugB]/traces` or
-        `/me/traces` rendered with `?projectId=personalProjectIdB`
+        `/[personalProjectSlugA]/traces` rendered with `?projectId=personalProjectIdB`
     Then the existing project-guard middleware rejects (redirect or 403)
         — user A is NOT a member of personalProjectIdB, the guard fires
         the same as for any other foreign-project access
@@ -322,5 +322,5 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     Then the full library (Evaluations / Datasets / Annotations / Automations
         / Optimization Studio) is visible by default
     And no `personalFeatures`-style gating applies to non-personal scopes
-    And the only surface that uses the bundle predicate is /me + the
+    And the only surface that uses the bundle predicate is /coding-agents + the
         user's own Personal Project context

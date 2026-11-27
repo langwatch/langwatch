@@ -31,4 +31,23 @@ export class MemoryCodingAgentTraceSessionRepository extends CodingAgentTraceSes
       null
     );
   }
+
+  async findRecentBySessionId(input: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]> {
+    return [...this.memory.traceSessions.values()]
+      .filter(
+        (record) =>
+          record.tenantId === input.tenantId &&
+          record.sessionId === input.sessionId &&
+          record.occurredAtMs >= input.fromMs &&
+          record.occurredAtMs <= input.toMs,
+      )
+      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs || a.traceId.localeCompare(b.traceId))
+      .slice(0, input.limit);
+  }
 }

@@ -412,8 +412,8 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 	}
 	data := resolve(root, op.sel)
 	s.mu.Unlock()
-	for _, d := range g.deliveries {
-		s.deliverAsync(d)
+	for i := range g.deliveries {
+		s.deliverAsync(g.deliveries[i])
 	}
 	out := map[string]any{"data": data}
 	if len(g.errors) > 0 {

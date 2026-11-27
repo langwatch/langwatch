@@ -29,15 +29,12 @@ import {
   defaultBackfillStart,
   SOURCE_BACKFILL_MONTHS,
 } from "../../../../features/ingestion-sources/model/pull-cadence.ts";
-import {
-  buildOpenAiAdminPullConfig,
-  type ComposerState,
-  dateInputValue,
-  defaultParserValues,
-  fieldControl,
-  PARSER_FIELDS,
-  seedComposerParserConfig,
-} from "../governance-inventory.screen.tsx";
+import { buildOpenAiAdminPullConfig } from "../inventory/admin-api-pull-config.ts";
+import { PARSER_FIELDS } from "../inventory/parser-field-catalog.ts";
+import { dateInputValue, fieldControl } from "../inventory/parser-field-controls.ts";
+import { defaultParserValues } from "../inventory/parser-fields.ts";
+import { type ComposerState } from "../inventory/source-composer-state.ts";
+import { seedComposerParserConfig } from "../inventory/source-submission.ts";
 
 const fieldFor = (sourceType: "openai_admin" | "anthropic_admin", key: string) => {
   const field = PARSER_FIELDS[sourceType].find((f) => f.key === key);

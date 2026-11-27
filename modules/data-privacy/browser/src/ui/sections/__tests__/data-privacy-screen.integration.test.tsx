@@ -22,9 +22,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DataPrivacyHostApi,
+  type PrivacyBillingCurrencyReading,
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
+  type PrivacyLicence,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../../../model/data-privacy-host.ts";
@@ -55,10 +57,11 @@ const { snapshot, invalidate, removeForScope, setForScope } = vi.hoisted(() => {
         teams: [{ id: "team-1", name: "Platform" }],
         projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
       },
-      audienceOptions: { groups: [] },
+      audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
       effective: baseline,
       effectiveTeam: baseline,
       effectiveOrganization: baseline,
+      piiRedactionModelAccepted: false,
       rules: [
         {
           scopeType: "TEAM" as const,
@@ -82,6 +85,9 @@ vi.mock("../../../behavior/data-privacy-api.ts", () => ({
       },
       setForScope: {
         useMutation: () => ({ mutateAsync: setForScope, isPending: false }),
+      },
+      acceptPiiRedactionModel: {
+        useMutation: () => ({ mutateAsync: vi.fn(async () => undefined), isPending: false }),
       },
     },
   },
@@ -116,6 +122,20 @@ class TestPrivacyHost extends DataPrivacyHostApi {
   failed(failure: PrivacyFailureNotice): void {
     this.failures.push(failure);
   }
+
+  licence(): PrivacyLicence {
+    return "unknown";
+  }
+
+  mayManageLicence(): boolean {
+    return false;
+  }
+
+  billingCurrency(): PrivacyBillingCurrencyReading {
+    return "USD";
+  }
+
+  async refreshBillingCurrency(): Promise<void> {}
 }
 
 function renderScreen(host: TestPrivacyHost) {

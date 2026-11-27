@@ -1,3 +1,4 @@
+import { NEW_DASHBOARD_PATH } from "@langwatch/analytics-client";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { ProjectNavigation } from "@langwatch/project-contract";
 import {
@@ -355,7 +356,7 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-settings-members",
     label: "Members",
-    description: "Settings → Directory → People",
+    description: "Settings → Users → People",
     icon: Users,
     category: "navigation",
     keywords: ["users", "team", "people", "invite", "member", "directory"],
@@ -364,7 +365,7 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-settings-teams",
     label: "Teams",
-    description: "Settings → Directory → Teams & projects",
+    description: "Settings → Users → Teams & projects",
     icon: Building2,
     category: "navigation",
     keywords: ["team", "group", "department", "directory"],
@@ -373,7 +374,7 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-settings-projects",
     label: "Projects",
-    description: "Settings → Directory → Teams & projects",
+    description: "Settings → Users → Teams & projects",
     icon: FolderKanban,
     category: "navigation",
     keywords: ["project", "workspace", "directory"],
@@ -382,7 +383,7 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-settings-groups",
     label: "Groups",
-    description: "Settings → Directory → Groups",
+    description: "Settings → Users → Groups",
     icon: Users,
     category: "navigation",
     keywords: ["group", "directory", "scim", "role assignment"],
@@ -439,16 +440,16 @@ export const navigationCommands: Command[] = [
     description: "Settings → Usage",
     icon: TrendingUp,
     category: "navigation",
-    keywords: ["usage", "billing", "quota"],
+    keywords: ["usage", "events", "quota", "seats"],
     path: "/settings/usage",
   },
   {
     id: "nav-settings-subscription",
-    label: "Subscription",
-    description: "Settings → Subscription",
+    label: "Plan & billing",
+    description: "Settings → Plan & billing",
     icon: CreditCard,
     category: "navigation",
-    keywords: ["subscription", "billing", "plan", "payment"],
+    keywords: ["plan", "billing", "subscription", "payment", "invoices"],
     path: "/settings/subscription",
   },
   {
@@ -486,11 +487,11 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-settings-directory",
-    label: "Directory",
-    description: "Settings → Directory — who is here, and how they got here",
+    label: "Users",
+    description: "Settings → Users: who is here, and how they got here",
     icon: Users,
     category: "navigation",
-    keywords: ["directory", "people", "members", "teams", "groups", "identity provider"],
+    keywords: ["directory", "users", "people", "members", "teams", "groups", "identity provider"],
     path: "/settings/directory",
   },
   {
@@ -505,7 +506,7 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-settings-access",
     label: "Joining",
-    description: "Settings → Directory → who may join without an invitation",
+    description: "Settings → Users → who may join without an invitation",
     icon: UserPlus,
     category: "navigation",
     keywords: ["access", "join", "joining", "join requests", "domain", "auto-join", "policy"],
@@ -642,6 +643,20 @@ export const actionCommands: Command[] = [
     keywords: ["invite", "member", "teammate", "add", "user", "people", "organization", "team"],
   },
 ];
+
+/**
+ * "Create a dashboard": the organization's library with its create dialog open, as each Dashboards
+ * section's "+" opens it. Offered only beside the Dashboards entry, and only where that library is.
+ */
+export const createDashboardCommand: Command = {
+  id: "action-create-dashboard",
+  label: "Create a dashboard",
+  description: "Open the new dashboard dialog",
+  icon: Plus,
+  category: "actions",
+  keywords: ["new dashboard", "create", "analytics", "chart"],
+  path: NEW_DASHBOARD_PATH,
+};
 
 /**
  * Support/help commands that open external links.

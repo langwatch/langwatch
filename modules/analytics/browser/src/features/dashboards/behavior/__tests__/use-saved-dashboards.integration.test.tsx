@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
- * Creating a board sends no scope (the server starts it at Project), and the list carries
- * each board's star, scope and last change, the organization's boards apart from the project's.
+ * The list carries each board's star, scope and last change, the organization's boards apart
+ * from the project's, and deletes go through the Dashboards area's own procedure.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -34,8 +34,6 @@ const mocks = vi.hoisted(() => ({
     isStarred: false,
     updatedAt: new Date("2026-01-02"),
   },
-  create: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
-  star: { mutateAsync: vi.fn(), isPending: false },
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
@@ -47,7 +45,6 @@ const mocks = vi.hoisted(() => ({
   },
   host: {
     project: () => ({ id: "project-1", slug: "acme", name: "Acme", hasFirstMessage: true }),
-    navigate: vi.fn(),
     failed: vi.fn(),
   },
 }));
@@ -67,8 +64,6 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
           };
         },
       },
-      create: { useMutation: () => mocks.create },
-      star: { useMutation: () => mocks.star },
       update: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
     },
@@ -83,40 +78,6 @@ import { useSavedDashboards } from "../use-saved-dashboards.ts";
 
 beforeEach(() => {
   vi.clearAllMocks();
-});
-
-describe("given a member creates a board", () => {
-  /** @scenario "AC10 Blank board matches the reference" */
-  it("sends the project and a numbered name, and no scope", () => {
-    const { result } = renderHook(() => useSavedDashboards());
-
-    act(() => result.current.createBoard());
-
-    expect(mocks.create.mutate).toHaveBeenCalledWith(
-      { projectId: "project-1", name: "Untitled dashboard 2" },
-      expect.anything(),
-    );
-  });
-});
-
-describe("given the pin fails after the board is made", () => {
-  /** @scenario "A failed pin leaves exactly one dashboard" */
-  it("tells the member, and the created board still opens with Add a widget", async () => {
-    const error = new Error("pin down");
-    mocks.create.mutate.mockImplementationOnce(
-      (_input: unknown, options: { onSuccess: (board: { id: string }) => Promise<void> }) =>
-        void options.onSuccess({ id: "board-new" }),
-    );
-    mocks.star.mutateAsync.mockRejectedValueOnce(error);
-    const { result } = renderHook(() => useSavedDashboards());
-
-    act(() => result.current.createBoard({ pin: true, addWidget: true }));
-
-    await waitFor(() =>
-      expect(mocks.host.navigate).toHaveBeenCalledWith("/acme/dashboards/board-new?addBlock=open"),
-    );
-    expect(mocks.host.failed).toHaveBeenCalledWith(expect.objectContaining({ error }));
-  });
 });
 
 describe("given the project has boards", () => {

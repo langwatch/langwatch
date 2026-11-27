@@ -87,7 +87,31 @@ function watchClips() {
   });
 }
 
+let posterObserver: IntersectionObserver | null = null;
+
+/** Below-fold posters (`data-docs-poster`, from the build) load once a video is a screen away. */
+function watchPosters() {
+  posterObserver?.disconnect();
+  posterObserver = new IntersectionObserver(
+    (entries) => {
+      for (const { target, isIntersecting } of entries) {
+        if (!isIntersecting || !(target instanceof HTMLVideoElement)) continue;
+        const poster = target.dataset.docsPoster;
+        if (poster) target.poster = poster;
+        delete target.dataset.docsPoster;
+        posterObserver?.unobserve(target);
+      }
+    },
+    { rootMargin: "100% 0px" },
+  );
+  document
+    .querySelectorAll<HTMLVideoElement>("video[data-docs-poster]")
+    .forEach((video) => posterObserver?.observe(video));
+}
+
 installMedia();
 watchClips();
+watchPosters();
 document.addEventListener("docs:navigated", watchClips);
+document.addEventListener("docs:navigated", watchPosters);
 motion.addEventListener("change", watchClips);

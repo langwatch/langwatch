@@ -130,7 +130,7 @@ function TourPoster() {
         sizes={TOUR_POSTER_SIZES}
       />
       <img
-        src={withBasePath({ basePath, path: "/media/posters/introduction.jpg" })}
+        src={withBasePath({ basePath, path: "/media/posters/introduction-1664.webp" })}
         width={TOUR_POSTER.width}
         height={TOUR_POSTER.height}
         alt=""

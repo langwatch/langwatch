@@ -1,0 +1,29 @@
+{
+  "release": "3.30.0",
+  "previous": "3.29.0",
+  "cutAt": "2026-11-26T09:29:09+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261125140001_model_provider_last_listed_model_ids",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: model provider last listed model ids"
+    },
+    {
+      "id": "clickhouse:00134",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "entitlement",
+      "description": "ClickHouse schema: billable events delete ttl"
+    },
+    {
+      "id": "entitlement:materialise-billable-events-ttl",
+      "kind": "data",
+      "mode": "background",
+      "owner": "entitlement",
+      "description": "Applies the 13-month retention to billable events written before it, deleting older rows.",
+      "needsOldWritersGone": false
+    }
+  ]
+}

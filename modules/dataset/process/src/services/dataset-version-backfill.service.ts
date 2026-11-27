@@ -1,6 +1,6 @@
 /**
- * The background step that gives every dataset made before versioning its
- * version 1, one project at a time, checkpointed after each project. It sends
+ * The background step that gives every dataset with rows made before versioning
+ * its version 1, one project at a time, checkpointed after each project. It sends
  * no queue work: each snapshot is written in the step's own run.
  */
 import {
@@ -112,11 +112,38 @@ export class DatasetVersionBackfillService {
       summary.skipped += 1;
       return;
     }
+    // An empty dataset gets no version 1: its first real save becomes version 1.
+    const content = await this.contentOf({ projectId, datasetId: entry.id });
+    if (content !== "rows") {
+      summary[content === "failed" ? "failed" : "skipped"] += 1;
+      return;
+    }
     if (dryRun) {
       summary.wouldCreate += 1;
       return;
     }
     await this.backfillDataset({ projectId, datasetId: entry.id, summary });
+  }
+
+  private async contentOf({
+    projectId,
+    datasetId,
+  }: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<"rows" | "nothing" | "failed"> {
+    try {
+      return (await this.deps.service.hasRows({ projectId, datasetId })) ? "rows" : "nothing";
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError || error instanceof DatasetNotReadyError) {
+        return "nothing";
+      }
+      logger.warn(
+        { error, projectId, datasetId },
+        "A dataset's rows could not be read; the step retries it",
+      );
+      return "failed";
+    }
   }
 
   private async backfillDataset({

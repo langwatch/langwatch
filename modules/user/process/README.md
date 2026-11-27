@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:57`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:58`; nothing else in this package is public.
 
 #### `findById`
 
@@ -122,6 +122,14 @@ Whether the account behind an id holds the platform-operator grant.
 isOperator(input: { userId: string }): Promise<boolean>;
 ```
 
+#### `searchForOperators`
+
+Accounts whose id, name or address holds the query, for a platform operator's search.
+
+```typescript
+searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
+```
+
 #### `findByEmail`
 
 The account holding an address, matched on its stored lower-cased form, however typed.
@@ -130,12 +138,28 @@ The account holding an address, matched on its stored lower-cased form, however 
 findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
 ```
 
+#### `findSignInAccounts`
+
+The accounts behind one address, matched the way sign-in matches it, as ids, method codes, flags and times only (ADR-202). Empty when there is none or the text is no address.
+
+```typescript
+findSignInAccounts(input: Readonly<{ email: string }>): Promise<UserSignInAccount[]>;
+```
+
 #### `create`
 
 Mints a directory account with no sign-in method of its own.
 
 ```typescript
 create(input: CreateUserInput): Promise<UserProfile>;
+```
+
+#### `recordCreated`
+
+Commits the created fact for an account Better Auth wrote itself (social and single sign-on sign-up), which never passes a mint here. Keyed by the user, so a repeat records nothing new.
+
+```typescript
+recordCreated(input: UserIdInput): Promise<void>;
 ```
 
 #### `createPasskeyUser`
@@ -362,6 +386,14 @@ The same figures for one organization, counted over the members the caller names
 countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
 ```
 
+#### `findSignedInSince`
+
+Which of these people last signed in at or after `since` (epoch ms).
+
+```typescript
+findSignedInSince(input: { userIds: readonly string[]; since: number; }): Promise<readonly string[]>;
+```
+
 #### `hasAccountOnDomain`
 
 Whether anybody with an address on this domain has an account; no address leaves.
@@ -378,23 +410,31 @@ Whether the installation holds any account at all; false only on a fresh install
 hasAnyAccount(): Promise<boolean>;
 ```
 
+#### `isFirstCreatedAccount`
+
+Whether this account is the install's first-created one, deactivated or not. Once the first account was erased no remaining one is.
+
+```typescript
+isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
+```
+
 ## REST transport
 
 ### `meRest`
 
-|             |                              |
-| ----------- | ---------------------------- |
-| Declared at | `src/transport/me.rest.ts:8` |
-| Base URL    | `/api/me`, twin `/api/v1/me` |
-| Addressing  | dated                        |
-| Credential  | project                      |
-| Versions    | `2026-08-07`                 |
+|             |                               |
+| ----------- | ----------------------------- |
+| Declared at | `src/transport/me.rest.ts:13` |
+| Base URL    | `/api/me`, twin `/api/v1/me`  |
+| Addressing  | dated                         |
+| Credential  | project                       |
+| Versions    | `2026-08-07`                  |
 
 #### `GET /project` · `getApiMeProject`
 
-Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.
+Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Answers any API key bound to the project, an ingestion key holding only traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say which project a key targets without any further access.
 
-Permission `project:view`. Declared at `src/transport/me.rest.ts:12`.
+Authenticated: Any key bound to a project, an ingestion key holding only traces:create included, reads only that project's identity (id, name, slug, isPersonal), which the door resolved from the key itself. Declared at `src/transport/me.rest.ts:17`.
 
 Answers at `/api/me/project`, `/api/v1/me/project`; also, undocumented, `/api/me/2026-08-07/project`, `/api/v1/me/2026-08-07/project`, `/api/me/latest/project`, `/api/v1/me/latest/project`.
 

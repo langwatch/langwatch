@@ -5,6 +5,7 @@ import {
   simulationRecordAgentInstanceSchema,
   simulationRecordCutAtLimitSchema,
   simulationRecordHooksSchema,
+  simulationRecordRedTeamReportSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
@@ -26,6 +27,7 @@ import type {
   SimulationRecordAgentInstance,
   SimulationRecordCutAtLimit,
   SimulationRecordHooks,
+  SimulationRecordRedTeamReport,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -36,7 +38,6 @@ import type {
   SimulationLastResultSummariesInput,
   SimulationLastResultSummary,
   SimulationProjectDateRangeInput,
-  SimulationProjectIdsInput,
   SimulationFinishRun,
   RecordEvaluationsCommandData,
   SimulationMessageSnapshot,
@@ -138,10 +139,6 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.findAllRunIdsForSet(input);
   }
 
-  getDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>> {
-    return this.repository.findDistinctExternalSetIds(input);
-  }
-
   countRunsForExport(input: SimulationExportFilterInput): Promise<number> {
     return this.repository.countRunsForExport(input);
   }
@@ -206,5 +203,9 @@ export class SimulationService extends SimulationServiceContract {
 
   recordHooks(input: SimulationRecordHooks): Promise<void> {
     return this.execution.recordHooks(simulationRecordHooksSchema.parse(input));
+  }
+
+  recordRedTeamReport(input: SimulationRecordRedTeamReport): Promise<void> {
+    return this.execution.recordRedTeamReport(simulationRecordRedTeamReportSchema.parse(input));
   }
 }

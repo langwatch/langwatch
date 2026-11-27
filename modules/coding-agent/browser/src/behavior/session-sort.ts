@@ -1,3 +1,4 @@
+import { sessionDisplayName } from "../model/session-display-name.ts";
 import {
   type ColumnSortRules,
   type ColumnSortState,
@@ -29,9 +30,11 @@ export const DEFAULT_SESSIONS_SORT = {
 export interface SortableSessionRow {
   /** The title the agent generated, or null when there is none to show. */
   title: string | null;
-  /** The branch the session ended on, which names an untitled row. */
+  /** The branch the session ended on. */
   gitBranch: string;
   agent: string;
+  /** When the session started, which names an unnamed row with its agent. */
+  startedAtMs: number;
   /** When the session last moved: its last event, or its start. */
   lastUpdateAtMs: number;
   /** Every token the session consumed, the four counters summed. */
@@ -80,9 +83,9 @@ const SESSIONS_SORT_RULES: ColumnSortRules<SessionsSortColumn, SortableSessionRo
     pullRequests: "desc",
   },
   keyOf: {
-    // An untitled session is still named on the row, by the branch it drove,
-    // so it sorts by the same words the reader is looking at.
-    session: (row) => (row.title ?? row.gitBranch).toLowerCase(),
+    // A session sorts by the same words the reader is looking at, including
+    // the agent-and-day name an unnamed one is shown under.
+    session: (row) => sessionDisplayName(row).text.toLowerCase(),
     agent: (row) => row.agent.toLowerCase() || null,
     lastUpdate: (row) => row.lastUpdateAtMs,
     // The column reads peak context above the total, and sorts by the total:

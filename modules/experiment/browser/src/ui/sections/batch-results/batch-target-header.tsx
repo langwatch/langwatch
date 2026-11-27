@@ -4,7 +4,7 @@ import { formatCost } from "@langwatch/design-system/metric-value-formatters";
  *
  * Shows target name with icon and summary statistics (similar to V3 TargetHeader).
  */
-import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { memo } from "react";
 import {
@@ -17,6 +17,7 @@ import {
   LuTriangleRight,
 } from "react-icons/lu";
 
+import { agentLabelText } from "../../../model/batch-evaluation-results.agent-label.ts";
 import { MetricStatsTooltip } from "../../elements/batch-results/metric-stats-tooltip.tsx";
 import { ColorfulBlockIcon, type StudioPalette } from "../../elements/workflow/workflow-icons.tsx";
 import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates.ts";
@@ -352,6 +353,24 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
         <Text textStyle="label" truncate>
           {target.displayName ?? target.name}
         </Text>
+        {target.type === "agent" && target.agentLabel && (
+          <Tooltip
+            content={
+              target.agentVersion
+                ? `Ran version ${target.agentVersion}, deployed as ${target.agentLabel} when the run started`
+                : `Ran the agent version deployed as ${target.agentLabel}`
+            }
+          >
+            <Badge
+              size="xs"
+              variant="subtle"
+              flexShrink={0}
+              data-testid={`batch-target-agent-label-${target.id}`}
+            >
+              {agentLabelText({ label: target.agentLabel, version: target.agentVersion })}
+            </Badge>
+          </Tooltip>
+        )}
       </HStack>
 
       {/* Summary badge */}

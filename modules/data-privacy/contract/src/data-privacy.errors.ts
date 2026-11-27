@@ -41,6 +41,20 @@ export class ScopeWriteForbiddenError extends HandledError {
   }
 }
 
+/** ADR-208: a rule save adds an API key, which needs organization:manage; the rest may stay. */
+export class ApiKeyAddForbiddenError extends HandledError {
+  declare readonly code: "data_privacy_api_key_add_forbidden";
+
+  constructor() {
+    super(
+      "data_privacy_api_key_add_forbidden",
+      "Only an organization admin can add an API key to the restricted content audience.",
+      { httpStatus: 403, meta: { requiredPermission: "organization:manage" } },
+    );
+    this.name = "ApiKeyAddForbiddenError";
+  }
+}
+
 /**
  * The rule the caller sent is not a configuration this feature can store.
  * `meta.reason` names the offending pattern, which is the only part the reader

@@ -55,8 +55,10 @@ export function useLangyConversationNavigation({
   };
 
   const askQueuedPrompt = useEffectEvent((prompt: string) => {
+    // A follow-up from where the open conversation started goes on in it, messages kept.
+    const continues = useLangyStore.getState().pendingPromptContinues;
     consumePendingPrompt();
-    resetChatEngine({ clearMessages: true });
+    if (!continues) resetChatEngine({ clearMessages: true });
     void send(prompt);
   });
   useEffect(() => {

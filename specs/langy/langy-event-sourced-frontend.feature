@@ -152,11 +152,11 @@ Feature: Langy's view of a conversation is the recorded conversation itself
   # optimistic pending marker covers the gap and reconciles against the record.
 
   @integration
-  Scenario: Sending stays unavailable exactly while a turn is recorded in flight
+  Scenario: The composer reads as mid-turn exactly while a turn is recorded in flight
     Given a turn is recorded as in progress
-    Then the composer does not send
+    Then the composer says Langy is working, so a message sent now is queued
     When the turn reaches a recorded terminal
-    Then the composer becomes available
+    Then the composer reads as idle again
 
   @integration
   Scenario: A just-sent message appears at once and settles as recorded

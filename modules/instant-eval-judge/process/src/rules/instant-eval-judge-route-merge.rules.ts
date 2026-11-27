@@ -44,7 +44,7 @@ export function instantEvalJudgeKindGroupsOf({
 /**
  * Per kind's plan, the first kind whose plan makes the same first send: a decision-model primary
  * with the same pair partner, input view, text and fallbacks. Those kinds send once with all
- * their questions, and each escalates from that answer. An LLM asks per question, never shared.
+ * their questions, and each escalates from that answer. An LLM and a gated plan never share.
  */
 export function instantEvalJudgeFirstSendLeadsOf({
   plans,
@@ -54,6 +54,7 @@ export function instantEvalJudgeFirstSendLeadsOf({
   table: InstantEvalJudgeRouteTable;
 }): number[] {
   const isShareable = (plan: InstantEvalJudgeRoutePlan) => {
+    if (plan.gate) return false;
     const kind = table.backends[plan.primary]?.kind;
     return kind === "jev" || kind === "decisions";
   };
@@ -66,6 +67,7 @@ function isSameFirstSend(a: InstantEvalJudgeRoutePlan, b: InstantEvalJudgeRouteP
   const fallbacksOf = (plan: InstantEvalJudgeRoutePlan) =>
     [plan.primary, plan.pairWith].map((backend) => plan.fallbacks[backend ?? ""] ?? []);
   return (
+    !a.gate &&
     a.primary === b.primary &&
     a.pairWith === b.pairWith &&
     a.inputView === b.inputView &&

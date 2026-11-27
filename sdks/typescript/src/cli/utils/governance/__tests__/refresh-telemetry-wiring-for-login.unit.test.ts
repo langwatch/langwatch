@@ -64,6 +64,23 @@ describe("refreshTelemetryWiringForLogin", () => {
       expect(result).toMatchObject({ warnings: [notice] });
     });
   });
+  describe("when a stale tool needs a new key and the config cannot be saved", () => {
+    /** @scenario "A login that cannot refresh a tool's key says so" */
+    it("mints nothing and warns that the tool was not refreshed", async () => {
+      installAppEnv(
+        appSettingsTargetFor("claude")!,
+        buildOtelEnvBlock("claude", STALE_ENDPOINT, STALE_TOKEN),
+      );
+      // A FILE where the config folder belongs fails the save for any user, root included.
+      fs.writeFileSync(path.join(temp.home, ".langwatch"), "");
+
+      const result = await refreshTelemetryWiringForLogin(baseCfg());
+
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+      expect(result.warnings?.join("\n")).toContain("claude telemetry was not refreshed");
+    });
+  });
+
   describe("given a copilot scoped function already pointing at this login", () => {
     /** @scenario "A login re-asserts the Copilot hook file where Copilot capture is persisted" */
     it("writes the LangWatch Copilot hook file the wiring was persisted without", async () => {

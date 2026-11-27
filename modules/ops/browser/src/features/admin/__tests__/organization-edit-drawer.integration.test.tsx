@@ -16,6 +16,13 @@ const mutate =
     (input: { id: string; data: Record<string, unknown> }, callbacks: UpdateCallbacks) => void
   >();
 
+// The drawer also reads the seat peak; this suite is about the form, so it stays loading.
+vi.mock("../../../behavior/ops-api.ts", () => ({
+  api: {
+    organizationSeatPeak: { get: { useQuery: () => ({ data: undefined, isLoading: true }) } },
+  },
+}));
+
 vi.mock("../behavior/use-admin-resource.ts", () => ({
   useAdminUpdate: () => ({ mutate, isPending: false }),
 }));

@@ -43,6 +43,36 @@ describe("summarizeLogEvent", () => {
     });
   });
 
+  describe("given another agent's spelling of a decision", () => {
+    it.each([
+      [{ decision: "allow", source: "allowed", tool_name: "read_file" }, "Approved read_file"],
+      [{ decision: "approved", source: "User", tool_name: "shell" }, "Approved shell"],
+      [
+        { decision: "followup", source: "user_followup", tool_name: "edit_file" },
+        "Answered instead of approving edit_file",
+      ],
+      [
+        { decision: "cancelled", source: "user_abort", tool_name: "edit_file" },
+        "Aborted edit_file (user_abort)",
+      ],
+      [{ decision: "timed_out", tool_name: "edit_file" }, "Aborted edit_file"],
+      [{ decision: "deny", source: "config", tool_name: "edit_file" }, "Denied edit_file (config)"],
+    ])("reads %o by its outcome", (attributes, expected) => {
+      expect(summarizeLogEvent(log({ "event.name": "tool_decision", ...attributes }))).toBe(
+        expected,
+      );
+    });
+
+    it("leaves an approval neutral and flags only a denial", () => {
+      const tone = (decision: string) =>
+        logEventTone(log({ "event.name": "tool_decision", decision, tool_name: "shell" }));
+      expect(tone("allow")).toBe("neutral");
+      expect(tone("approved_for_session")).toBe("neutral");
+      expect(tone("followup")).toBe("neutral");
+      expect(tone("denied")).toBe("danger");
+    });
+  });
+
   describe("given a compaction with before/after counts", () => {
     it("reports the token counts", () => {
       const summary = summarizeLogEvent(

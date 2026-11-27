@@ -127,6 +127,8 @@ The gateway serves `GET /metrics` on its own listener, separate from the API por
 | ---------------------------------- | ------- | ------ | ------------------------------------------------------- |
 | `gateway_auth_cache_hits_total`    | counter | `tier` | Virtual-key resolutions served from cache               |
 | `gateway_auth_cache_misses_total`  | counter | `tier` | Resolutions that fell through to the control plane      |
+| `gateway_auth_cache_refusals_total` | counter | `reason` | Cached keys refused by the revocation list (`denied_vk_revoked`, `denied_vk_disabled`) or the fail-closed rule (`fail_closed`) |
+| `gateway_auth_cache_stale_serves_total` | counter | `source` | Keys served from cache because the control plane could not answer (`stale_while_error`, `last_known`) |
 | `gateway_auth_cache_lookups_total` | counter | none   | Resolutions attempted. The denominator for the hit rate |
 | `gateway_auth_cache_size`          | gauge   | `tier` | Virtual keys held in the cache                          |
 

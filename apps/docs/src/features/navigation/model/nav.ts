@@ -59,6 +59,8 @@ export type SiteMeta = {
   github: string;
   llms: string;
   stars: number | null;
+  /** The start of the UTC day GitHub reported `stars`, in epoch milliseconds; null when unknown. */
+  starsReadAt: number | null;
   notFound: { title: string; description: string; content: Inline[] };
   /** docs.json `description`: the meta description of a page without its own. */
   description: string;

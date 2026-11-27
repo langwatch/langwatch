@@ -25,6 +25,7 @@ import {
 } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import { untrustedCertHint } from "../../utils/localDevCa";
+import { NOTHING_YET_AFTER_MS, nonEmpty } from "./account";
 import { askBox, createStdinKeySource, type BoxCard, type KeySource } from "./approval";
 import { LocalCallFailure } from "./errors";
 import { askedAgo, consoleWriter, noticeRows, terminalWidth, wrapWords, type UiWriter } from "./ui";
@@ -388,11 +389,6 @@ async function signInAgain({
  * organization, as the login recorded them. A request is answered on its own
  * project, so no project and no --project belong in this line.
  */
-const nonEmpty = (value: string | undefined): string | undefined => {
-  const trimmed = value?.trim();
-  return trimmed === "" ? undefined : trimmed;
-};
-
 export function loginLine(): string {
   let cfg: ReturnType<typeof loadConfig> | undefined;
   try {
@@ -652,6 +648,8 @@ export async function waitForRequests({
       setTimeout(resolve, ms);
     }),
   attempts = Number.POSITIVE_INFINITY,
+  onNothingYet,
+  nothingYetAfterMs = NOTHING_YET_AFTER_MS,
 }: {
   api: ControlApi;
   intervalMs?: number;
@@ -659,8 +657,13 @@ export async function waitForRequests({
   sleep?: (ms: number) => Promise<void>;
   /** For tests: how many times the list is read before giving up. */
   attempts?: number;
+  /** Said once, after `nothingYetAfterMs` of waiting with nothing; the wait goes on. */
+  onNothingYet?: () => void;
+  nothingYetAfterMs?: number;
 }): Promise<ControlRequest[]> {
   let announced = false;
+  let toldNothingYet = false;
+  let waitedMs = 0;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const requests = await api.list();
     if (requests.length > 0) return requests;
@@ -668,7 +671,12 @@ export async function waitForRequests({
       announced = true;
       onWaiting?.();
     }
+    if (!toldNothingYet && waitedMs >= nothingYetAfterMs) {
+      toldNothingYet = true;
+      onNothingYet?.();
+    }
     await sleep(intervalMs);
+    waitedMs += intervalMs;
   }
   return [];
 }

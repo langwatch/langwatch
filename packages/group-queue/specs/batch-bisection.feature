@@ -99,9 +99,10 @@ Feature: GroupQueue batch bisection
     Then the batch is not split
     And the failure is surfaced without further handler calls
 
-  # An overloaded server (ClickHouse MEMORY_LIMIT_EXCEEDED, too many queries, a
-  # timeout) fails a half just as it failed the whole, and every split re-runs
-  # the heavy work on it at once. The failure names a retry delay instead.
+  # An overloaded server (ClickHouse's server-wide memory limit, too many
+  # queries, a statement the client shed, a timeout) fails a half just as it
+  # failed the whole, and every split re-runs the heavy work on it at once. The
+  # failure names a retry delay instead.
   @unit @coalescing @bisection
   Scenario: An overloaded server backs the whole batch off instead of splitting it
     Given a coalesced batch whose failure names a retry delay
@@ -109,6 +110,42 @@ Feature: GroupQueue batch bisection
     Then the batch is not split
     And the whole batch is re-staged once, after a backoff delay
     And one warning names the error and the delay
+
+  # One statement over its own memory limit is the batch's size, not the
+  # server's load: a smaller batch reads and writes less, so it may fit.
+  @unit @coalescing @bisection
+  Scenario: A statement over its own memory limit splits the batch
+    Given a coalesced batch whose ClickHouse statement exceeds the per-query memory limit
+    When the batch fails
+    Then the failure names no retry delay
+    And the queue splits the batch as it would any retryable failure
+
+  # Overload is not the job's fault. Spending the ordinary budget on it blocked
+  # healthy groups after a few hours of a busy server, for an operator to unblock.
+  @unit @bisection
+  Scenario: An overloaded server does not spend a group's ordinary retry budget
+    Given a job that has used the ordinary attempt budget
+    When it fails again with a failure that names a retry delay
+    Then it is re-staged with backoff instead of blocking its group
+    And its group blocks only once the longer overload budget is spent
+
+  # Overload retries are not the job's own failures, so a job that rode them out
+  # still has its ordinary rungs once the server recovers.
+  @unit @bisection
+  Scenario: An ordinary failure after an overload spell still gets its ordinary budget
+    Given a job that spent its earlier retries on failures that named a retry delay
+    When it fails with a failure that names no retry delay
+    Then it is re-staged with backoff until it has used the ordinary budget on top of those retries
+    And it never retries past the overload budget
+    And a body the blob store cannot reach for a while gets the same budget
+
+  # A job that is not coalesced reads overload the same way a batch does.
+  @unit @bisection
+  Scenario: A single job on an overloaded server takes the overload retry budget
+    Given a job that is processed on its own, not in a coalesced batch
+    When it fails because ClickHouse is overloaded
+    Then the failure names a retry delay
+    And the job takes the longer overload retry budget instead of the ordinary one
 
   @integration @coalescing @bisection
   Scenario: Splitting is bounded within one locked attempt

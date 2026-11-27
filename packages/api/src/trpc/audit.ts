@@ -58,13 +58,35 @@ export function auditScopeIds(input: unknown): {
 const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
 const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
 
-/** Main's self-audited paths: the handler writes a richer row, with the previous value. */
-const SELF_AUDITED_PATHS = new Set(["identity.joinRequests.setJoining"]);
-
 export function isAuditLogExempt(path: string): boolean {
-  if (AUDIT_LOG_EXEMPT_PATHS.has(path) || SELF_AUDITED_PATHS.has(path)) return true;
+  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
 
   return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
+/** Failures a procedure's own trail or service answered for; the generic row skips them. */
+const ANSWERED_FAILURES = new WeakSet<object>();
+const MAX_ANSWERED_CAUSE_DEPTH = 3;
+
+/** The error and its causes, as far as a rewrap by the handled-error middleware reaches. */
+function failureChain(error: unknown): object[] {
+  const chain: object[] = [];
+  let current: unknown = error;
+  while (typeof current === "object" && current !== null) {
+    chain.push(current);
+    if (chain.length > MAX_ANSWERED_CAUSE_DEPTH) break;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+/** Says a call's failure already has its row, so no generic row is written beside it. */
+export function markFailureAnswered(error: unknown): void {
+  for (const link of failureChain(error)) ANSWERED_FAILURES.add(link);
+}
+
+export function isFailureAnswered(error: unknown): boolean {
+  return failureChain(error).some((link) => ANSWERED_FAILURES.has(link));
 }
 
 /**
@@ -218,7 +240,7 @@ const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
  * Field names that carry credential material whatever mutation they ride on.
  */
 const SENSITIVE_FIELD_NAME =
-  /(password|passphrase|privatekey|publickey|secretkey|sharedsecret|clientsecret|signingkey|apikey|accesskey|encryptionkey|licensekey|certificate|secret|token(?!s)|credential|slackwebhook|webhookurl|authorization|bearer)/;
+  /(password|passphrase|privatekey|publickey|secretkey|sharedsecret|clientsecret|signingkey|apikey|accesskey|encryptionkey|licensekey|certificate|secret|token(?!s)|credential|slackwebhook|webhookurl|authorization|bearer|upstreamheaders)/;
 
 /**
  * A name ending in `Id` or `Ids` NAMES a credential; it does not carry one.

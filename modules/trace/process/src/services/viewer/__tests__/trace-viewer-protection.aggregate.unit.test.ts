@@ -3,8 +3,9 @@ import {
   narrowAuthorization,
   sealAuthorization,
 } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { builtinRoleGrants, type AuthzApi } from "@langwatch/authz-contract";
 import {
+  EMPTY_AUDIENCE,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
@@ -91,9 +92,9 @@ describe("resolving a viewer's protections", () => {
         projectId: A,
       });
 
-      expect(
-        await policyProjectsFor({ projectId: AGG, authorization: narrowed ?? undefined }),
-      ).toEqual([[AGG, A]]);
+      expect(await policyProjectsFor({ projectId: AGG, authorization: narrowed })).toEqual([
+        [AGG, A],
+      ]);
     });
   });
 
@@ -118,5 +119,50 @@ describe("resolving a viewer's protections", () => {
         await policyProjectsFor({ projectId: A, authorization: proof({ shared: [B] }) }),
       ).toEqual([[A]]);
     });
+  });
+});
+
+describe("given input restricted to admins, read through an aggregate", () => {
+  const adminsOnlyInput = {
+    ...PLATFORM_DEFAULT_DATA_PRIVACY,
+    categories: {
+      ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+      input: { disposition: "restrict" as const, audience: { ...EMPTY_AUDIENCE, admins: true } },
+    },
+  };
+
+  /** The viewer's built-in role at each project; none where the map names none. */
+  function inputVisibleWith(roleAt: Record<string, "admin" | "member">) {
+    return TraceViewerProtectionService.create({
+      authz: createApiFixture<AuthzApi>({
+        hasPermission: async ({ permission, projectId }) => {
+          const role = projectId === undefined ? undefined : roleAt[projectId];
+          return role !== undefined && builtinRoleGrants({ role, permission });
+        },
+      }),
+      projects: createApiFixture<ProjectApi>({ findWithTeam: async () => null }),
+      plans: createApiFixture<PlanProvider>({}),
+      dataPrivacy: createApiFixture<DataPrivacyApi>({
+        getResolvedForProjects: async () => adminsOnlyInput,
+      }),
+      fallbackVisibilityDays: 30,
+      logger: createTestLogger().logger,
+    })
+      .resolve({
+        projectId: AGG,
+        userId: "user-1",
+        publiclyShared: false,
+        authorization: proof({ shared: [B] }),
+      })
+      .then((protections) => protections.canSeeCapturedInput);
+  }
+
+  /** @scenario "Admins-only content stays hidden when a read spans a project where the viewer is no admin" */
+  it("hides it from the aggregate's Admin who is only a Member of the member project", async () => {
+    await expect(inputVisibleWith({ [AGG]: "admin", [B]: "member" })).resolves.toBe(false);
+  });
+
+  it("shows it to an Admin of every project the read spans", async () => {
+    await expect(inputVisibleWith({ [AGG]: "admin", [B]: "admin" })).resolves.toBe(true);
   });
 });

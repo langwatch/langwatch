@@ -150,6 +150,7 @@ describe("the evaluators REST family", () => {
   });
 
   describe("when the project's evaluators are listed", () => {
+    /** @scenario A code evaluator's platform link opens the code editor */
     it("publishes each one with the address its editor opens at", async () => {
       const { hono, mocks } = buildApi();
 
@@ -392,7 +393,8 @@ describe("the evaluators REST family", () => {
   });
 
   describe("when a create names a type the catalog does have", () => {
-    it("passes the body through to the application unchanged", async () => {
+    /** @scenario A create that names no type still makes a built-in evaluator */
+    it("passes the body through to the application as a built-in evaluator", async () => {
       const { hono, mocks } = buildApi();
 
       const response = await post(hono, {
@@ -404,6 +406,7 @@ describe("the evaluators REST family", () => {
       expect(mocks.createWithResolvedDefaults).toHaveBeenCalledWith({
         projectId: "project-1",
         name: "quick-relevancy",
+        type: "evaluator",
         config: { evaluatorType: "ragas/response_relevancy" },
         caller: KEY_CALLER,
       });
@@ -418,6 +421,160 @@ describe("the evaluators REST family", () => {
       });
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe("when a create names a custom code evaluator", () => {
+    const program = {
+      code: 'class Code:\n    def __call__(self, output: str):\n        return {"passed": True}\n',
+      inputs: [{ identifier: "output", type: "str" }],
+    };
+
+    /** @scenario The REST create makes a custom code evaluator */
+    it("hands the program to the application with no built-in type demanded", async () => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, { name: "Exact", type: "code", config: program });
+
+      expect(response.status).toBe(200);
+      expect(mocks.createWithResolvedDefaults).toHaveBeenCalledWith({
+        projectId: "project-1",
+        name: "Exact",
+        type: "code",
+        config: program,
+        caller: KEY_CALLER,
+      });
+    });
+
+    /** @scenario The REST create makes a custom code evaluator */
+    it("accepts the fixed result fields a read of a code evaluator returns", async () => {
+      const { hono } = buildApi();
+
+      const response = await post(hono, {
+        name: "Exact",
+        type: "code",
+        config: { ...program, outputs: [{ identifier: "passed", type: "bool" }] },
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    /** @scenario A code evaluator's platform link opens the code editor */
+    it("answers with a platformUrl that opens the code evaluator editor", async () => {
+      const created: Evaluator = { ...evaluator, type: "code", config: program };
+      const { hono } = buildApi({
+        createWithResolvedDefaults: vi.fn(async () => created),
+        findByIdOrSlugWithFields: vi.fn(async () => ({ ...created, fields: [], outputFields: [] })),
+      });
+
+      const response = await post(hono, { name: "Exact", type: "code", config: program });
+
+      await expect(response.json()).resolves.toMatchObject({
+        platformUrl:
+          "https://app.langwatch.test/project-one/evaluators?drawer.open=codeEvaluatorEditor&drawer.evaluatorId=evaluator_1",
+      });
+    });
+
+    /** @scenario The REST create refuses a code evaluator without a runnable program */
+    it.each([
+      ["config.code", { inputs: program.inputs }],
+      ["config.inputs", { code: program.code }],
+      ["config.inputs", { code: program.code, inputs: [] }],
+    ])("answers 422 naming %s when the program is incomplete", async (field, config) => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, { name: "Exact", type: "code", config });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "validation_error",
+        meta: { fields: expect.arrayContaining([field]) },
+      });
+      expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The REST create refuses a code evaluator without a runnable program */
+    it("answers 422 for a key a code evaluator does not carry", async () => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, {
+        name: "Exact",
+        type: "code",
+        config: { ...program, evaluatorType: "langevals/exact_match" },
+      });
+
+      expect(response.status).toBe(422);
+      expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The REST create refuses result fields outside the evaluator contract */
+    it("answers 422 naming config.outputs for a result field outside the contract", async () => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, {
+        name: "Exact",
+        type: "code",
+        config: { ...program, outputs: [{ identifier: "confidence", type: "float" }] },
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "validation_error",
+        meta: { fields: expect.arrayContaining(["config.outputs"]) },
+      });
+      expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a create names a workflow evaluator", () => {
+    /** @scenario The REST create makes an evaluator that wraps a workflow */
+    it("hands the workflow to the application", async () => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, {
+        name: "Judge",
+        type: "workflow",
+        config: {},
+        workflowId: "workflow_1",
+      });
+
+      expect(response.status).toBe(200);
+      expect(mocks.createWithResolvedDefaults).toHaveBeenCalledWith({
+        projectId: "project-1",
+        name: "Judge",
+        type: "workflow",
+        config: {},
+        workflowId: "workflow_1",
+        caller: KEY_CALLER,
+      });
+    });
+
+    /** @scenario The REST create refuses a workflow evaluator without its workflow */
+    it("answers 422 naming workflowId when none is given", async () => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, { name: "Judge", type: "workflow", config: {} });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "validation_error",
+        meta: { fields: ["workflowId"] },
+      });
+      expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
+    });
+
+    it("answers 422 naming workflowId when a built-in evaluator names one", async () => {
+      const { hono, mocks } = buildApi();
+
+      const response = await post(hono, {
+        name: "Judge",
+        config: { evaluatorType: "langevals/exact_match" },
+        workflowId: "workflow_1",
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({ meta: { fields: ["workflowId"] } });
+      expect(mocks.createWithResolvedDefaults).not.toHaveBeenCalled();
     });
   });
 

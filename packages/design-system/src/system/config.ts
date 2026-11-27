@@ -147,26 +147,34 @@ export const designSystemConfig = defineConfig({
       radii: { showcase: { value: "{radii.xl}" } },
       shadows: { showcase: { value: "{shadows.md}" } },
       colors: {
-        // Terminal roles preserve the existing ANSI rendering in both colour modes.
+        // The Terminal tab recreates a real dark terminal screen, so it stays dark in
+        // both colour modes, like a console pane inside a light IDE. ANSI values follow
+        // VS Code's integrated terminal scheme.
         terminal: {
-          fg: { value: { _light: "{colors.fg}", _dark: "{colors.fg}" } },
-          bg: { value: { _light: "{colors.bg.card}", _dark: "{colors.bg.card}" } },
-          black: { value: { _light: "{colors.fg.subtle}", _dark: "{colors.fg.subtle}" } },
-          red: { value: { _light: "{colors.red.fg}", _dark: "{colors.red.fg}" } },
-          green: { value: { _light: "{colors.green.fg}", _dark: "{colors.green.fg}" } },
-          yellow: { value: { _light: "{colors.yellow.fg}", _dark: "{colors.yellow.fg}" } },
-          blue: { value: { _light: "{colors.blue.fg}", _dark: "{colors.blue.fg}" } },
-          magenta: { value: { _light: "{colors.purple.fg}", _dark: "{colors.purple.fg}" } },
-          cyan: { value: { _light: "{colors.cyan.fg}", _dark: "{colors.cyan.fg}" } },
-          white: { value: { _light: "{colors.fg}", _dark: "{colors.fg}" } },
-          brightBlack: { value: { _light: "{colors.fg.muted}", _dark: "{colors.fg.muted}" } },
-          brightRed: { value: { _light: "{colors.red.fg}", _dark: "{colors.red.fg}" } },
-          brightGreen: { value: { _light: "{colors.green.fg}", _dark: "{colors.green.fg}" } },
-          brightYellow: { value: { _light: "{colors.yellow.fg}", _dark: "{colors.yellow.fg}" } },
-          brightBlue: { value: { _light: "{colors.blue.fg}", _dark: "{colors.blue.fg}" } },
-          brightMagenta: { value: { _light: "{colors.pink.fg}", _dark: "{colors.pink.fg}" } },
-          brightCyan: { value: { _light: "{colors.cyan.fg}", _dark: "{colors.cyan.fg}" } },
-          brightWhite: { value: { _light: "{colors.fg}", _dark: "{colors.fg}" } },
+          bg: { value: { _light: "#0A0A0A", _dark: "#0A0A0A" } },
+          fg: { value: { _light: "#E8E8E8", _dark: "#E8E8E8" } },
+          frame: { value: { _light: "#141414", _dark: "#141414" } },
+          border: { value: { _light: "#2A2A2A", _dark: "#2A2A2A" } },
+          faint: { value: { _light: "#8A8A8A", _dark: "#8A8A8A" } },
+          accent: { value: { _light: "#E8926A", _dark: "#E8926A" } },
+          diffAddBg: { value: { _light: "#0F2E1C", _dark: "#0F2E1C" } },
+          diffRemoveBg: { value: { _light: "#3A1418", _dark: "#3A1418" } },
+          black: { value: { _light: "#6B6B6B", _dark: "#6B6B6B" } },
+          red: { value: { _light: "#F14C4C", _dark: "#F14C4C" } },
+          green: { value: { _light: "#2CD97C", _dark: "#2CD97C" } },
+          yellow: { value: { _light: "#F5DE3D", _dark: "#F5DE3D" } },
+          blue: { value: { _light: "#5DA5F5", _dark: "#5DA5F5" } },
+          magenta: { value: { _light: "#E56FE5", _dark: "#E56FE5" } },
+          cyan: { value: { _light: "#3ECFE0", _dark: "#3ECFE0" } },
+          white: { value: { _light: "#E8E8E8", _dark: "#E8E8E8" } },
+          brightBlack: { value: { _light: "#8A8A8A", _dark: "#8A8A8A" } },
+          brightRed: { value: { _light: "#FF6E6E", _dark: "#FF6E6E" } },
+          brightGreen: { value: { _light: "#5CEBA1", _dark: "#5CEBA1" } },
+          brightYellow: { value: { _light: "#FFEB6B", _dark: "#FFEB6B" } },
+          brightBlue: { value: { _light: "#82BCFF", _dark: "#82BCFF" } },
+          brightMagenta: { value: { _light: "#F19BF1", _dark: "#F19BF1" } },
+          brightCyan: { value: { _light: "#70E3F0", _dark: "#70E3F0" } },
+          brightWhite: { value: { _light: "#FFFFFF", _dark: "#FFFFFF" } },
         },
         // Fixed illustration pigments keep the artwork identical in either mode.
         illustration: {
@@ -502,6 +510,26 @@ export const designSystemConfig = defineConfig({
           face: { value: { _light: "white", _dark: "transparent" } },
           wordmark: { value: { _light: "#1D293D", _dark: "{colors.gray.100}" } },
           wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.gray.300}" } },
+        },
+
+        // A branded feature's colour roles: feature.<name>.*. The lead strand is the app orange
+        // by reference, never a second orange. See docs/feature-branding.md.
+        feature: {
+          braids: {
+            lead: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.solid}" } },
+            weave: { value: { _light: "#3D3D4D", _dark: "#E7ECF2" } },
+            // Example projects in the illustrations: the brand kit's orange, blue and green.
+            project: {
+              1: { value: { _light: "{colors.orange.solid}", _dark: "{colors.orange.300}" } },
+              2: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.300}" } },
+              3: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
+            },
+            projectInk: {
+              1: { value: { _light: "#141417", _dark: "#141417" } },
+              2: { value: { _light: "white", _dark: "#141417" } },
+              3: { value: { _light: "white", _dark: "#141417" } },
+            },
+          },
         },
 
         // Data series, in the order `rotatingColors` hands out hues.

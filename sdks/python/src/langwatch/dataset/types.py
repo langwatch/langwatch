@@ -126,3 +126,13 @@ class UploadResult(BaseModel):
     datasetId: Optional[str] = None
     recordsCreated: int = 0
     dataset: Optional[DatasetInfo] = None
+
+
+class UpsertResult(BaseModel):
+    """Result of upsert_records(): what was created, what was updated, how many were left alone."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    created: List[DatasetRecord] = []
+    updated: List[DatasetRecord] = []
+    unchanged: int = 0

@@ -18,13 +18,25 @@ export class LimitExceededError extends HandledError {
   ) {
     super(
       "resource_limit_exceeded",
-      `You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`,
+      limitType === "scenarioRuns"
+        ? `Your plan includes ${max} scenario runs a month and this month's are used. Upgrade your plan to keep running scenarios: https://app.langwatch.ai/settings/subscription`
+        : `You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`,
       {
         meta: { limitType, current, max },
         httpStatus: 403,
       },
     );
     this.name = "LimitExceededError";
+  }
+}
+
+/** The suite cap refused a template apply: the `scenarioSets` limit, counted as suites. */
+export class TestSuiteLimitExceededError extends LimitExceededError {
+  constructor(current: number, max: number) {
+    super("scenarioSets", current, max);
+    this.name = "TestSuiteLimitExceededError";
+    this.meta.countedAs = "testSuites";
+    this.message = "You have reached the maximum number of suites";
   }
 }
 

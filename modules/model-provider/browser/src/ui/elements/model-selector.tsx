@@ -13,12 +13,14 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
-import { Select } from "@langwatch/design-system/select";
+import { scrollToListItem, Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type BuiltInModel,
+  canonicalModelId,
   type GroupedModelOptions,
+  findSelectedOptions,
   isServedOnlyAsBuiltIn,
   modelSelectionFrom,
   type ModelOption,
@@ -65,7 +67,7 @@ export const useModelSelectionOptions = ({
     ...(builtInModels ? { builtInModels } : {}),
   });
 
-  const modelOption = selectOptions.find((opt) => opt.value === model);
+  const [modelOption] = findSelectedOptions({ options: selectOptions, model });
 
   // THE LOCAL DEV ESCAPE HATCH DID NOT TRAVEL. It read `import.meta.env.PROD`,
   // and a reusable package may not read the environment (ADR-101) — the same
@@ -248,14 +250,31 @@ function ModelOptionItem({
   return (
     <>
       {showDivider && <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />}
-      <Select.Item item={item}>
-        <HStack gap={2}>
+      <Select.Item item={item} flexShrink={0}>
+        <HStack gap={2} minWidth={0}>
           {isProviderKey(provider) && (
             <ProviderIconGlyph provider={provider} size={MODEL_ICON_SIZE} />
           )}
-          <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
-            {item.label}
-          </Box>
+          {item.subtitle ? (
+            // A named entry, such as a decision model: its title, then what it is.
+            <Box minWidth={0}>
+              <Text textStyle={isSmall ? "caption" : "body"} fontWeight="medium" truncate>
+                {item.label}
+              </Text>
+              <Text
+                textStyle="caption"
+                color="fg.muted"
+                truncate
+                data-testid="model-option-subtitle"
+              >
+                {item.subtitle}
+              </Text>
+            </Box>
+          ) : (
+            <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
+              {item.label}
+            </Box>
+          )}
         </HStack>
       </Select.Item>
     </>
@@ -296,14 +315,7 @@ function ModelOptionGroup({
 
 function ConfigureModelsAction({ size }: { size: SelectorSize }) {
   return (
-    <Box
-      position="sticky"
-      bottom={0}
-      bg="bg.panel"
-      borderTop="1px solid"
-      borderColor="border"
-      zIndex="1"
-    >
+    <Box flexShrink={0} bg="bg.panel" borderTop="1px solid" borderColor="border" zIndex="1">
       <Button
         width="full"
         fontWeight="500"
@@ -331,7 +343,7 @@ function ConfigureModelsAction({ size }: { size: SelectorSize }) {
 }
 
 export function ModelSelector({
-  model,
+  model: storedModel,
   options,
   onChange,
   size = "md",
@@ -360,12 +372,15 @@ export function ModelSelector({
   /** Models LangWatch serves itself, listed first even with no provider configured. */
   builtInModels?: readonly BuiltInModel[];
 }) {
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
+  const { groupedByProvider, isEmpty, isLoading, modelOption } = useModelSelectionOptions({
     options,
-    model,
+    model: storedModel,
     mode,
     builtInModels,
   });
+  const selectedItem = modelOption;
+  // The select holds the option's own id, so a legacy stored id still shows as picked.
+  const model = selectedItem?.value ?? canonicalModelId(storedModel);
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules
@@ -380,8 +395,6 @@ export function ModelSelector({
   const modelCollection = createListCollection({
     items: allFilteredModels,
   });
-
-  const selectedItem = selectOptions.find((option) => option.value === model);
 
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;
@@ -450,6 +463,7 @@ export function ModelSelector({
       {...(open !== undefined ? { open } : {})}
       {...(onOpenChange ? { onOpenChange: (e) => onOpenChange(e.open) } : {})}
       loopFocus={true}
+      scrollToIndexFn={scrollToListItem}
       highlightedValue={highlightedValue}
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
@@ -467,9 +481,10 @@ export function ModelSelector({
       >
         <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
       </Select.Trigger>
-      <Select.Content>
+      {/* Only the rows scroll, below the search, so none passes behind it. */}
+      <Select.Content overflow="hidden">
         <Field.Root asChild>
-          <Box position="sticky" top={0} zIndex="1">
+          <Box flexShrink={0}>
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
@@ -494,9 +509,16 @@ export function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredGroups.map((group) => (
-          <ModelOptionGroup key={group.provider} group={group} size={size} />
-        ))}
+        <Select.List data-testid="model-selector-list">
+          {filteredGroups.length === 0 && modelSearch ? (
+            <Text paddingX={2} paddingY={2} color="fg.muted" textStyle="xs">
+              No models match your search.
+            </Text>
+          ) : null}
+          {filteredGroups.map((group) => (
+            <ModelOptionGroup key={group.provider} group={group} size={size} />
+          ))}
+        </Select.List>
         {showConfigureAction && <ConfigureModelsAction size={size} />}
       </Select.Content>
     </Select.Root>

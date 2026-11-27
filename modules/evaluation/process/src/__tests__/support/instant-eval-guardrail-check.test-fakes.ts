@@ -43,6 +43,7 @@ export function instantEvalGuardrailCheckOver({
     workflowExecutor: { run: unreachable("a workflow") },
     judges,
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
     installEnvironment: {},
   });
   const check = EvaluationGuardrailCheckService.create({

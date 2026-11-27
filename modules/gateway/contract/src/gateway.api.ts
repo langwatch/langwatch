@@ -38,11 +38,21 @@ import type {
 import type {
   GatewayPricedSpend,
   GatewayPricedSpendResult,
+  GatewayProviderUsage,
+  GatewayProviderUsageResult,
   SpendEventRow,
   SpendEventStatus,
   SpendFilters,
   SpendUsage,
 } from "./features/spend/gateway-spend.schemas.ts";
+import type {
+  CreateGatewayA2aTargetInput,
+  GatewayA2aTargetDto,
+  SetGatewayA2aTargetBlockedInput,
+  SetProjectGatewayA2aTargetBlockedInput,
+  UpdateGatewayA2aTargetInput,
+  UpdateProjectGatewayA2aTargetInput,
+} from "./gateway-a2a-target.ts";
 import type {
   ArchiveGatewayCacheRuleInput,
   CreateGatewayCacheRuleInput,
@@ -514,8 +524,16 @@ export type GatewaySpendEventAcrossTenantsQuery = {
   statuses: readonly SpendEventStatus[];
 };
 
+/**
+ * A key found by a presented secret: `presentedPreviousSecret` when it is the one a
+ * rotation replaced.
+ */
+export type GatewayPresentedVirtualKey = GatewayVirtualKeyRecord & {
+  presentedPreviousSecret: boolean;
+};
+
 export interface GatewayInternalProtocol {
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null>;
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null>;
   /** Resolves an `lwl_` token by the facts licensing wrote onto its managed key. */
   resolveLicenseToken(input: {
     token: string;
@@ -684,6 +702,29 @@ export interface GatewayApi extends GatewayInternalProtocol {
   createCacheRule(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   updateCacheRule(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
+
+  /** Org-wide and project-scoped A2A targets; each A2A operation refuses a missing organization. */
+  listA2aTargets(organizationId: string): Promise<GatewayA2aTargetDto[]>;
+  createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
+  updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
+  /** The kill switch for one target: the gateway refuses calls to a blocked target. */
+  setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetDto>;
+  archiveA2aTarget(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetDto>;
+  /** The project's own targets; org-wide ones stay with the organization. */
+  listProjectA2aTargets(input: { projectId: string }): Promise<GatewayA2aTargetDto[]>;
+  updateProjectA2aTarget(input: UpdateProjectGatewayA2aTargetInput): Promise<GatewayA2aTargetDto>;
+  setProjectA2aTargetBlocked(
+    input: SetProjectGatewayA2aTargetBlockedInput,
+  ): Promise<GatewayA2aTargetDto>;
+  archiveProjectA2aTarget(input: {
+    id: string;
+    projectId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetDto>;
 
   listGuardrails(projectId: string): Promise<GatewayGuardrailResource[]>;
   findGuardrail(input: { id: string; projectId: string }): Promise<GatewayGuardrailResource | null>;
@@ -909,6 +950,12 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * drain path's re-rating would answer zero for it.
    */
   recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult>;
+
+  /**
+   * Appends one call LangWatch made with stored provider credentials, rated against the model
+   * registry and debited from the project's, team's and organization's budgets (ADR-193).
+   */
+  recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult>;
 
   /**
    * What one request type has cost these tenants, in integer nano-USD, over the

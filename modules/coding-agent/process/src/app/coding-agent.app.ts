@@ -14,6 +14,7 @@ import {
   type CodingAgentPullRequestUsage,
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
+  type CodingAgentSessionLastTurn,
   type CodingAgentSessionEvent,
   type CodingAgentSessionEventsInput,
   type CodingAgentSessionListRow,
@@ -40,6 +41,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
 import {
   TraceApi,
   type TraceSessionGroupsInput,
@@ -60,7 +62,9 @@ import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
+  gateSessionTitle,
 } from "../rules/coding-agent-gates.rules.ts";
+import { repositoryKeyOfWith } from "../rules/coding-agent-repository-key.rules.ts";
 import {
   encodeSessionCursor,
   readSessionCursor,
@@ -149,6 +153,11 @@ export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
   /** The shared fold-cache TTL the session fold cache keeps. */
   static readonly config = codingAgentConfig;
+  static readonly secrets = {
+    /** Keys the repo in a stored session's fact: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
+    repositoryKey: credentialsSecret,
+    repositoryKeyFallback: sessionSecret,
+  } as const;
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
     github: GithubApi,
@@ -167,7 +176,14 @@ export class CodingAgentModule implements CodingAgentApi {
     governance: GovernanceRestApi,
   };
 
-  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
+  static async create({
+    dependencies,
+    repositories,
+    secrets,
+  }: CodingAgentSetup): Promise<CodingAgentModule> {
+    const repositoryKeySecret =
+      (await secrets.into(CodingAgentModule.secrets.repositoryKey, (value) => value ?? "")) ||
+      (await secrets.into(CodingAgentModule.secrets.repositoryKeyFallback, (value) => value ?? ""));
     // One price list for the fold, its per-call rows and the reads that ask what it covers.
     const modelProviders = ModelCatalogCostEstimatorService.create();
     const service = CodingAgentFeatureService.create({
@@ -175,6 +191,7 @@ export class CodingAgentModule implements CodingAgentApi {
       traceSessions: repositories.traceSessions,
       metricSeries: repositories.metricSeries,
       sessionEvents: repositories.sessionEvents,
+      storedTraces: dependencies.traces,
       github: dependencies.github,
       projects: dependencies.projects,
       billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
@@ -219,6 +236,10 @@ export class CodingAgentModule implements CodingAgentApi {
         sessions: repositories.sessions,
         recorder: milestones,
         clock: SystemCodingAgentClockService.create(),
+      }),
+      repositoryKeyOf: repositoryKeyOfWith({
+        secret: repositoryKeySecret,
+        normalizeHost: (host) => dependencies.github.normalizeRepositoryHost(host),
       }),
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,
@@ -328,11 +349,35 @@ export class CodingAgentModule implements CodingAgentApi {
     return this.#codingAgents.findBySessionId(input);
   }
 
-  findSessionForTrace(input: {
+  /** The session one trace belongs to; its name follows content visibility, as on the list. */
+  async findSessionForTraceForViewer(
+    input: { projectId: string; traceId: string; authorization: Authorization },
+    by: CodingAgentViewer,
+  ): Promise<CodingAgentSession | null> {
+    const [visibility, session] = await Promise.all([
+      this.#visibility.readVisibility({
+        userId: by.id,
+        projectId: input.projectId,
+        authorization: input.authorization,
+      }),
+      this.#codingAgents.findSessionForTrace({
+        projectId: input.projectId,
+        traceId: input.traceId,
+      }),
+    ]);
+
+    if (session === null) return null;
+    return gateSessionTitle({
+      session,
+      canReadCapturedContent: visibility.canReadCapturedContent,
+    });
+  }
+
+  findLastTurnOfSession(input: {
     projectId: string;
-    traceId: string;
-  }): Promise<CodingAgentSession | null> {
-    return this.#codingAgents.findSessionForTrace(input);
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null> {
+    return this.#codingAgents.findLastTurnOfSession(input);
   }
 
   /** Port of main's `traces.codingAgentTranscript`: trace redacts for the viewer, then builds. */

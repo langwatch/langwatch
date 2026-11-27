@@ -60,7 +60,8 @@ function mountedGraphs() {
 }
 
 const GRAPH = { name: "Latency", graph: { graphType: "line" } };
-const SIZE = { colSpan: 1, rowSpan: 1 };
+// Literal on purpose: a constant-derived expectation would follow a regression.
+const SIZE = { colSpan: 4, rowSpan: 3 };
 const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
   colSpan: graph.colSpan,
   rowSpan: graph.rowSpan,
@@ -68,8 +69,8 @@ const sizeOf = (graph: { colSpan: number; rowSpan: number }) => ({
 
 describe("the graphs REST family", () => {
   describe("when a graph is posted without a size", () => {
-    /** @scenario "A graph created over REST without a size is 1 by 1, as on main" */
-    it("is one column by one row", async () => {
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by three" */
+    it("is four columns by three rows", async () => {
       const graphs = mountedGraphs();
 
       const created = await graphs.create(GRAPH);
@@ -80,7 +81,7 @@ describe("the graphs REST family", () => {
       });
     });
 
-    /** @scenario "A graph created over REST without a size is 1 by 1, as on main" */
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by three" */
     it("keeps a size the caller sent", async () => {
       const graphs = mountedGraphs();
 
@@ -90,9 +91,63 @@ describe("the graphs REST family", () => {
     });
   });
 
+  describe("when a graph is posted with only a width", () => {
+    /** @scenario "A graph created over REST without a size lands at the grid's default of four by three" */
+    it("takes the service default height, so colSpan 2 lands two by three", async () => {
+      const graphs = mountedGraphs();
+
+      const created = await graphs.create({ ...GRAPH, colSpan: 2 });
+
+      expect({ status: created.status, size: sizeOf(created.json) }).toEqual({
+        status: 201,
+        size: { colSpan: 2, rowSpan: 3 },
+      });
+    });
+  });
+
+  describe("when a graph is posted with a size at the grid's bounds", () => {
+    /** @scenario "A graph created over REST accepts the size it would default to" */
+    it("accepts the default size and the grid's full bounds as input", async () => {
+      const graphs = mountedGraphs();
+
+      const atDefault = await graphs.create({ ...GRAPH, gridColumn: 4, ...SIZE });
+      const fullWidth = await graphs.create({ ...GRAPH, gridColumn: 0, colSpan: 8, rowSpan: 20 });
+
+      expect({ status: atDefault.status, size: sizeOf(atDefault.json) }).toEqual({
+        status: 201,
+        size: SIZE,
+      });
+      expect({ status: fullWidth.status, size: sizeOf(fullWidth.json) }).toEqual({
+        status: 201,
+        size: { colSpan: 8, rowSpan: 20 },
+      });
+    });
+  });
+
+  describe("when a graph is posted with a size outside the grid", () => {
+    /** @scenario "A graph posted over REST with a size outside the grid is refused" */
+    it.each([
+      ["a fractional colSpan", { colSpan: 2.5 }],
+      ["a gridRow above the grid's last row", { gridRow: 2_000_000_001 }],
+      ["a span past the grid's right edge", { gridColumn: 6, colSpan: 4 }],
+      ["a column the default width runs past the edge from", { gridColumn: 7 }],
+    ])("refuses %s and stores nothing", async (_case, size) => {
+      const graphs = mountedGraphs();
+
+      const created = await graphs.create({ ...GRAPH, ...size });
+      const listed = await graphs.list();
+
+      expect({ status: created.status, code: created.json.code, listed: listed.json }).toEqual({
+        status: 422,
+        code: "validation_error",
+        listed: [],
+      });
+    });
+  });
+
   describe("when a graph posted without a size is read, listed and renamed", () => {
-    /** @scenario "A graph created over REST without a size reads back, lists and renames at 1 by 1" */
-    it("answers one column by one row each time", async () => {
+    /** @scenario "A graph created over REST without a size reads back, lists and renames at four by three" */
+    it("answers four columns by three rows each time", async () => {
       const graphs = mountedGraphs();
       const created = await graphs.create(GRAPH);
 

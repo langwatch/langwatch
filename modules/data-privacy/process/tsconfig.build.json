@@ -51,7 +51,13 @@
       "path": "../../../packages/otlp/tsconfig.build.json"
     },
     {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/limiter/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -69,10 +75,22 @@
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/aws-client/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"

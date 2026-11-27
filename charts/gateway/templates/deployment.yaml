@@ -38,6 +38,8 @@ spec:
         - name: gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # The image runs whichever service its first argument names.
+          args: ["aigateway"]
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           ports:
             - name: http

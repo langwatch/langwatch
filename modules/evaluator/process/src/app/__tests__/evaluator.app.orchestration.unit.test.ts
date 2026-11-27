@@ -4,8 +4,10 @@
  * validation, workflow/archive rules, and per-project filtering. These
  * moved out of the tRPC class, so assertions target stable error codes.
  * @see modules/evaluator/specs/evaluator-deleted-fact.feature
+ * @see modules/evaluator/specs/evaluator-created-fact.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import type * as Observability from "@langwatch/observability";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
 import type { EvaluatorGraph } from "../evaluator.app.ts";
@@ -16,6 +18,35 @@ import {
 } from "./evaluator.fixture.ts";
 
 const graph = testEvaluatorGraph;
+
+/** Every error line any evaluator logger writes, so a lost created fact can be checked. */
+const loggedErrors = vi.hoisted((): { fields: unknown; message: unknown }[] => []);
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof Observability>()),
+  createLogger: () => ({
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: (fields: unknown, message: unknown) => void loggedErrors.push({ fields, message }),
+  }),
+}));
+
+const lostCreatedFacts = () =>
+  loggedErrors.filter(
+    (e) =>
+      typeof e.message === "string" &&
+      e.message.startsWith("evaluator created fact was not recorded"),
+  );
+
+/** Connects a created-fact sender that keeps what it is sent. */
+function recordingCreatedFacts(app: ReturnType<typeof anApp>["app"]) {
+  const sent: unknown[] = [];
+  app.connectLifecycle({
+    recordEvaluatorDeleted: { send: async () => undefined },
+    recordEvaluatorCreated: { send: async (data) => void sent.push(data) },
+  });
+  return sent;
+}
 
 function anApp(
   options: {
@@ -129,6 +160,7 @@ describe("when an evaluator is cascade archived", () => {
     const sent: unknown[] = [];
     app.connectLifecycle({
       recordEvaluatorDeleted: { send: async (data) => void sent.push(data) },
+      recordEvaluatorCreated: { send: async () => undefined },
     });
     await repository.create({
       id: "evaluator-1",
@@ -362,5 +394,177 @@ describe("when copying an evaluator into another project", () => {
       workflowId: "workflow-2",
       projectId: "target",
     });
+  });
+
+  /** @scenario "copying an evaluator into another project records the copy as created" */
+  it("records one created fact for the copy, keyed to the target project", async () => {
+    const { app, repository } = anApp();
+    const sent = recordingCreatedFacts(app);
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    await app.copy({
+      evaluatorId: "evaluator-1",
+      projectId: "project-2",
+      sourceProjectId: "project-1",
+      newEvaluatorId: "evaluator-copy",
+      actorId: "user-1",
+      shouldCheckEvaluatorCap: false,
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-2",
+        projectId: "project-2",
+        evaluatorId: "evaluator-copy",
+        occurredAt: expect.any(Number),
+      },
+    ]);
+  });
+});
+
+describe("when an evaluator is created", () => {
+  beforeEach(() => {
+    loggedErrors.length = 0;
+  });
+
+  /** @scenario "creating an evaluator records that it was created" */
+  it("records one created fact of ids only, after the row exists", async () => {
+    const { app, repository } = anApp();
+    const sent: unknown[] = [];
+    let rowExisted = false;
+    app.connectLifecycle({
+      recordEvaluatorDeleted: { send: async () => undefined },
+      recordEvaluatorCreated: {
+        send: async (data) => {
+          rowExisted =
+            (await repository.findById({ id: "evaluator-1", projectId: "project-1" })) !==
+            undefined;
+          sent.push(data);
+        },
+      },
+    });
+
+    await app.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    expect(rowExisted).toBe(true);
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  /** @scenario "a lost created fact never fails the create" */
+  it("creates the evaluator when evaluator_lifecycle is not registered, and logs the lost fact", async () => {
+    const { app } = anApp();
+
+    const created = await app.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    expect(created.id).toBe("evaluator-1");
+    expect(lostCreatedFacts()).toEqual([
+      {
+        fields: { tenantId: "project-1", projectId: "project-1", evaluatorId: "evaluator-1" },
+        message: expect.any(String),
+      },
+    ]);
+  });
+
+  /** @scenario "a lost created fact never fails the create" */
+  it("creates the evaluator when the record fails, and logs the lost fact", async () => {
+    const { app } = anApp();
+    app.connectLifecycle({
+      recordEvaluatorDeleted: { send: async () => undefined },
+      recordEvaluatorCreated: {
+        send: async () => {
+          throw new Error("queue down");
+        },
+      },
+    });
+
+    const created = await app.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    expect(created.id).toBe("evaluator-1");
+    expect(lostCreatedFacts()).toEqual([
+      {
+        fields: expect.objectContaining({
+          tenantId: "project-1",
+          projectId: "project-1",
+          evaluatorId: "evaluator-1",
+        }),
+        message: expect.any(String),
+      },
+    ]);
+  });
+
+  /** @scenario "creating an evaluator records that it was created" */
+  it("records one created fact when the public API creates on resolved models", async () => {
+    const { app } = anApp();
+    const sent = recordingCreatedFacts(app);
+
+    await app.createWithResolvedDefaults({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      config: { evaluatorType: "ragas/faithfulness" },
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  /** @scenario "creating an evaluator records that it was created" */
+  it("records one created fact when the caller already resolved the models", async () => {
+    const { app } = anApp();
+    const sent = recordingCreatedFacts(app);
+
+    await app.createWithDefaults({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: { evaluatorType: "ragas/faithfulness" },
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
   });
 });

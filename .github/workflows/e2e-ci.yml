@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -145,7 +146,7 @@ jobs:
           --health-retries 5
 
       clickhouse:
-        image: clickhouse/clickhouse-server:25.10.2.65
+        image: clickhouse/clickhouse-server:26.8.36.3
         ports:
           - 8123:8123
         env:
@@ -350,6 +351,7 @@ jobs:
         run: go run ./cmd/slacknotify -job e2e
 
   e2e-complete:
+    timeout-minutes: 5
     needs: [changes, e2e]
     if: always()
     runs-on: ubuntu-latest

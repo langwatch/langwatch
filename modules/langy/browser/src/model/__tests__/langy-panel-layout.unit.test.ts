@@ -1,14 +1,12 @@
-import { LANGY_SHELL_DOCK_INSET } from "@langwatch/langy-contract";
+import { LANGY_SHELL_DOCK_GUTTER_PX, langyShellDockInset } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   FLOATING_PANEL_MAX_WIDTH,
   INSPECTOR_TUCK,
   LANGY_DOCK_GAP,
-  LANGY_DOCKED_OFFSET,
   resolveFloatingPanelWidth,
   resolveInspectorFrame,
   SIDEBAR_PANEL_WIDTH,
@@ -39,6 +37,7 @@ describe("resolveInspectorFrame", () => {
         floating: true,
         dockShellClaimed: false,
         panelHeightPx: 487,
+        panelWidthPx: FLOATING_PANEL_MAX_WIDTH,
       });
 
       expect(frame.height).toBe("487px");
@@ -53,10 +52,11 @@ describe("resolveInspectorFrame", () => {
         floating: true,
         dockShellClaimed: false,
         panelHeightPx: 487,
+        panelWidthPx: FLOATING_PANEL_MAX_WIDTH,
       });
 
       expect(frame.right).toBe(
-        `calc(${FLOATING_PANEL_CSS_WIDTH} + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
+        `calc(${FLOATING_PANEL_MAX_WIDTH}px + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
       );
     });
 
@@ -65,6 +65,7 @@ describe("resolveInspectorFrame", () => {
         floating: true,
         dockShellClaimed: false,
         panelHeightPx: null,
+        panelWidthPx: FLOATING_PANEL_MAX_WIDTH,
       });
 
       expect(frame.height).not.toBeNull();
@@ -78,6 +79,7 @@ describe("resolveInspectorFrame", () => {
         floating: false,
         dockShellClaimed: true,
         panelHeightPx: null,
+        panelWidthPx: SIDEBAR_PANEL_WIDTH,
       });
 
       expect(frame.top).toBe(`${APP_HEADER_HEIGHT}px`);
@@ -91,6 +93,7 @@ describe("resolveInspectorFrame", () => {
         floating: false,
         dockShellClaimed: false,
         panelHeightPx: null,
+        panelWidthPx: SIDEBAR_PANEL_WIDTH,
       });
 
       expect(frame.top).toBe("0px");
@@ -101,6 +104,8 @@ describe("resolveInspectorFrame", () => {
 
 describe("the room a claiming app shell keeps for the dock", () => {
   it("is the docked panel's width plus the gap between the two cards", () => {
-    expect(LANGY_SHELL_DOCK_INSET).toBe(LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP);
+    expect(LANGY_SHELL_DOCK_GUTTER_PX).toBe(LANGY_DOCK_GAP);
+    expect(langyShellDockInset(SIDEBAR_PANEL_WIDTH)).toBe(SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP);
+    expect(langyShellDockInset(480)).toBe(480 + LANGY_DOCK_GAP);
   });
 });

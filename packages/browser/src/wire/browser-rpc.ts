@@ -53,4 +53,9 @@ export class BrowserUiRpc extends UiRpc {
     await this.queryClient.invalidateQueries();
     return output;
   }
+
+  /** No read shows what this writes, so nothing is marked stale and the page refetches nothing. */
+  override record(path: string, input: unknown): Promise<unknown> {
+    return this.transport.mutation(path, input);
+  }
 }

@@ -47,6 +47,20 @@ describe("data privacy server configuration", () => {
     });
   });
 
+  describe("given the PII redaction model settings", () => {
+    /** @scenario "A deployment that names no model behaves exactly as today" */
+    it("carries the one setting as written, an ARN or an address, and leaves it unset by default", () => {
+      const arn = "arn:aws:lambda:eu-central-1:123456789012:function:pii-model:live";
+
+      expect(read({ PII_REDACTION_MODEL_ENDPOINT: arn }).piiRedactionModelEndpoint).toBe(arn);
+      expect(
+        read({ PII_REDACTION_MODEL_ENDPOINT: "http://pii-redaction-model:8080" })
+          .piiRedactionModelEndpoint,
+      ).toBe("http://pii-redaction-model:8080");
+      expect(read({}).piiRedactionModelEndpoint).toBeUndefined();
+    });
+  });
+
   describe("given native enforcement is turned off", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("carries the deployment's own word for it", () => {

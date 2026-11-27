@@ -38,7 +38,7 @@ export function firstUsableAnchor({
 interface AnchorableTraceState {
   /** The frozen storage anchor, epoch ms. 0 / undefined = nothing frozen yet. */
   storageAnchorMs?: number;
-  /** The span timing baseline, epoch ms. Span-seeded only; 0 = no span folded. */
+  /** The timing baseline, epoch ms: span-seeded, or log-seeded on a log-only trace. 0 = unset. */
   occurredAt: number;
 }
 

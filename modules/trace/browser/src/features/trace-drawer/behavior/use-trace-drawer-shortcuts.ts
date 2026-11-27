@@ -13,6 +13,7 @@ interface ShortcutsParams {
   navigateToTrace: ReturnType<typeof useTraceDrawerNavigation>["navigateToTrace"];
   goBack: () => void;
   canGoBack: boolean;
+  showsAgents: boolean;
   refreshActiveTrace: () => Promise<void> | void;
   onClose: () => void;
 }
@@ -35,6 +36,7 @@ export function useTraceDrawerShortcuts({
   navigateToTrace,
   goBack,
   canGoBack,
+  showsAgents,
   refreshActiveTrace,
   onClose,
 }: ShortcutsParams) {
@@ -57,6 +59,7 @@ export function useTraceDrawerShortcuts({
         navigateToTrace,
         goBack,
         canGoBack,
+        showsAgents,
         refreshActiveTrace,
         onClose,
       });
@@ -73,6 +76,7 @@ export function useTraceDrawerShortcuts({
     navigateToTrace,
     goBack,
     canGoBack,
+    showsAgents,
     refreshActiveTrace,
     onClose,
   ]);

@@ -453,15 +453,23 @@ export async function createPrompt(data: {
   return makeRequest("POST", "/api/v1/prompts", data) as Promise<PromptMutationResponse>;
 }
 
+/** The fields an update may change; the server keeps every field left out. */
+export interface PromptUpdateData {
+  messages?: { role: string; content: string }[];
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  inputs?: { identifier: string; type: string }[];
+  outputs?: { identifier: string; type: string; json_schema?: Record<string, unknown> }[];
+  parameters?: Record<string, unknown>;
+  commitMessage: string;
+  tags?: string[];
+}
+
 /** Updates an existing prompt by ID or handle. */
 export async function updatePrompt(
   idOrHandle: string,
-  data: {
-    messages?: { role: string; content: string }[];
-    model?: string;
-    commitMessage: string;
-    tags?: string[];
-  },
+  data: PromptUpdateData,
 ): Promise<PromptMutationResponse> {
   return makeRequest(
     "PUT",

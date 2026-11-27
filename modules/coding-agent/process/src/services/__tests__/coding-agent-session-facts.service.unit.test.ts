@@ -8,7 +8,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { projectRow } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { OtherSessionKind } from "../../repositories/coding-agent-session.repository.ts";
+import {
+  type OtherSessionKind,
+  SessionIdIndexNotReadyError,
+} from "../../repositories/coding-agent-session.repository.ts";
 import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   HOLD_SWEEP_THRESHOLD,
@@ -25,6 +28,8 @@ const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
   occurredAt: Date.UTC(2026, 9, 20, 12),
   firstStoredAt: Date.UTC(2026, 9, 20, 12),
   auxiliary: false,
+  terminalType: null,
+  repositoryKey: null,
   ...over,
 });
 
@@ -80,6 +85,64 @@ describe("CodingAgentSessionFactsService", () => {
           occurredAt: Date.UTC(2026, 9, 20, 12),
         },
       ]);
+    });
+  });
+
+  describe("given a stored session with a terminal type and a repo key", () => {
+    /** @scenario "A stored session's fact carries its terminal type and repo key" */
+    it("records both on the fact", async () => {
+      const { service, recorded } = factsOver();
+
+      await service.record([stored({ terminalType: "vscode", repositoryKey: "a1b2" })]);
+
+      expect(recorded[0]).toMatchObject({ terminalType: "vscode", repositoryKey: "a1b2" });
+    });
+  });
+
+  describe("given a stored session with no terminal type or repo", () => {
+    /** @scenario "A stored session with no terminal type or repo records a fact without them" */
+    it("records the fact without them", async () => {
+      const { service, recorded } = factsOver();
+
+      await service.record([stored()]);
+
+      expect([recorded[0]?.terminalType, recorded[0]?.repositoryKey]).toEqual([
+        undefined,
+        undefined,
+      ]);
+    });
+  });
+
+  describe("given a session whose fact was recorded before its repo was known", () => {
+    /** @scenario "A session that learns its terminal type or repo inside the hold records again" */
+    it("records a second fact when the repo arrives inside the hold", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored()]);
+      await service.record([stored({ repositoryKey: "a1b2" })]);
+
+      expect(recorded.map((fact) => fact.repositoryKey)).toEqual([undefined, "a1b2"]);
+    });
+
+    it("records a second fact when the terminal type arrives inside the hold", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored()]);
+      await service.record([stored({ terminalType: "vscode" })]);
+
+      expect(recorded.map((fact) => fact.terminalType)).toEqual([undefined, "vscode"]);
+    });
+
+    it("records nothing when reported again unchanged inside the hold", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored({ repositoryKey: "a1b2" })]);
+      await service.record([stored({ repositoryKey: "a1b2" })]);
+
+      expect(recorded).toHaveLength(1);
     });
   });
 
@@ -282,6 +345,80 @@ describe("CodingAgentSessionFactsService", () => {
       await service.record([stored()]);
 
       expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    /** @scenario "A history check fails closed while the session id index is not ready" */
+    it("fails closed when the session id index is not ready", async () => {
+      const { service, recorded } = factsOver({
+        findOtherSessionKind: async () => {
+          throw new SessionIdIndexNotReadyError({ read: "other_session_kind" });
+        },
+      });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+  });
+
+  describe("given a stamped project", () => {
+    /** A helpers-only history that records each tenant it was asked about. */
+    const countingHistory = () => {
+      const asked: string[] = [];
+      const findOtherSessionKind = async ({
+        tenantId,
+      }: {
+        tenantId: string;
+      }): Promise<OtherSessionKind> => {
+        asked.push(tenantId);
+        return "helpers_only";
+      };
+      return { asked, findOtherSessionKind };
+    };
+
+    /** @scenario "A stamped project outside the session's first fact window reads no history" */
+    it("reads no history when the stamp came after the session's first store", async () => {
+      const { asked, findOtherSessionKind } = countingHistory();
+      const firstStoredAt = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(firstStoredAt + 1),
+        findOtherSessionKind,
+        nowMs: () => firstStoredAt + 1_000,
+      });
+
+      await service.record([stored({ firstStoredAt })]);
+
+      expect(asked).toEqual([]);
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    /** @scenario "A stamped project outside the session's first fact window reads no history" */
+    it("reads no history when the fold comes after the session's first fact window", async () => {
+      const { asked, findOtherSessionKind } = countingHistory();
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(1),
+        findOtherSessionKind,
+        nowMs: () => stored().firstStoredAt + CODING_AGENT_SESSION_SEEN_WINDOW_MS,
+      });
+
+      await service.record([stored()]);
+
+      expect(asked).toEqual([]);
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    it("reads the history when the stamp predates the session inside its first window", async () => {
+      const { asked, findOtherSessionKind } = countingHistory();
+      const { service, recorded } = factsOver({
+        lastCodingAgentSessionAt: new Date(1),
+        findOtherSessionKind,
+        nowMs: () => stored().firstStoredAt + 1_000,
+      });
+
+      await service.record([stored()]);
+
+      expect(asked).toEqual(["project-1"]);
+      expect(recorded[0]?.firstForProject).toBe(true);
     });
   });
 

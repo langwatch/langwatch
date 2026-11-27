@@ -5,6 +5,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  LapsedImpersonation,
   SessionExpiry,
   StoredBrowserSession,
 } from "../auth-session.repository.ts";
@@ -89,6 +90,27 @@ export class PrismaAuthSessionRepository
       distinct: ["userId"],
     });
     return rows.length;
+  }
+
+  /** `updatedAt` rolls once a day while a session is used; `lastSeenAt` is finer where set. */
+  async findSessionUsersSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const after = new Date(since);
+    const rows = await this.prisma.session.findMany({
+      where: {
+        userId: { in: [...userIds] },
+        OR: [{ updatedAt: { gte: after } }, { lastSeenAt: { gte: after } }],
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return rows.map((row) => row.userId);
   }
 
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
@@ -186,6 +208,61 @@ export class PrismaAuthSessionRepository
         impersonationExpiresAt: null,
       },
     });
+  }
+
+  async findLapsedImpersonations({
+    before,
+    limit,
+  }: {
+    before: Instant;
+    limit: number;
+  }): Promise<readonly LapsedImpersonation[]> {
+    const rows = await this.prisma.session.findMany({
+      where: { impersonationExpiresAt: { lt: toDate(before) } },
+      orderBy: { impersonationExpiresAt: "asc" },
+      take: limit,
+      select: {
+        id: true,
+        actorUserId: true,
+        subjectUserId: true,
+        impersonationReason: true,
+        impersonationExpiresAt: true,
+      },
+    });
+
+    return rows.flatMap((row) =>
+      row.impersonationExpiresAt
+        ? [
+            {
+              sessionId: row.id,
+              actorUserId: row.actorUserId,
+              subjectUserId: row.subjectUserId,
+              reason: row.impersonationReason,
+              expiresAt: fromDate(row.impersonationExpiresAt),
+            },
+          ]
+        : [],
+    );
+  }
+
+  async clearLapsedImpersonation({
+    sessionId,
+    expiresAt,
+  }: {
+    sessionId: string;
+    expiresAt: Instant;
+  }): Promise<boolean> {
+    const cleared = await this.prisma.session.updateMany({
+      where: { id: sessionId, impersonationExpiresAt: toDate(expiresAt) },
+      data: {
+        actorUserId: null,
+        subjectUserId: null,
+        impersonationReason: null,
+        impersonationExpiresAt: null,
+      },
+    });
+
+    return cleared.count > 0;
   }
 
   async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {

@@ -15,11 +15,20 @@ export class TestUserApi implements UserApi {
 
   constructor(private readonly overrides: Partial<UserApi> = {}) {}
 
+  findSignedInSince: UserApi["findSignedInSince"] = (input) =>
+    this.overrides.findSignedInSince?.(input) ?? this.unimplemented("findSignedInSince");
+
+  findSignInAccounts: UserApi["findSignInAccounts"] = (input) =>
+    this.overrides.findSignInAccounts?.(input) ?? this.unimplemented("findSignInAccounts");
+
   hasAccountOnDomain: UserApi["hasAccountOnDomain"] = (input) =>
     this.overrides.hasAccountOnDomain?.(input) ?? this.unimplemented("hasAccountOnDomain");
 
   hasAnyAccount: UserApi["hasAnyAccount"] = () =>
     this.overrides.hasAnyAccount?.() ?? this.unimplemented("hasAnyAccount");
+
+  isFirstCreatedAccount: UserApi["isFirstCreatedAccount"] = (input) =>
+    this.overrides.isFirstCreatedAccount?.(input) ?? this.unimplemented("isFirstCreatedAccount");
 
   findById: UserApi["findById"] = (input) =>
     this.overrides.findById?.(input) ?? this.unimplemented("findById");
@@ -74,11 +83,16 @@ export class TestUserApi implements UserApi {
   isOperator: UserApi["isOperator"] = (input) =>
     this.overrides.isOperator?.(input) ?? this.unimplemented("isOperator");
 
+  searchForOperators: UserApi["searchForOperators"] = (input) =>
+    this.overrides.searchForOperators?.(input) ?? this.unimplemented("searchForOperators");
   findByEmail: UserApi["findByEmail"] = (input) =>
     this.overrides.findByEmail?.(input) ?? this.unimplemented("findByEmail");
 
   create: UserApi["create"] = (input) =>
     this.overrides.create?.(input) ?? this.unimplemented("create");
+
+  recordCreated: UserApi["recordCreated"] = (input) =>
+    this.overrides.recordCreated?.(input) ?? this.unimplemented("recordCreated");
 
   createPasskeyUser: UserApi["createPasskeyUser"] = (input) =>
     this.overrides.createPasskeyUser?.(input) ?? this.unimplemented("createPasskeyUser");

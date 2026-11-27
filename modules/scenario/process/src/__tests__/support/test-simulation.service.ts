@@ -17,6 +17,7 @@ import {
   type SimulationRecordAgentInstance,
   type SimulationRecordCutAtLimit,
   type SimulationRecordHooks,
+  type SimulationRecordRedTeamReport,
   type RecordEvaluationsCommandData,
   type SimulationStartRun,
   type SimulationTextMessageEnd,
@@ -113,10 +114,6 @@ export class TestSimulationService extends SimulationService {
     };
   }
 
-  async getDistinctExternalSetIds(): Promise<Set<string>> {
-    return new Set();
-  }
-
   async countRunsForExport(): Promise<number> {
     return 0;
   }
@@ -162,6 +159,8 @@ export class TestSimulationService extends SimulationService {
   async recordCutAtLimit(_input: SimulationRecordCutAtLimit): Promise<void> {}
 
   async recordHooks(_input: SimulationRecordHooks): Promise<void> {}
+
+  async recordRedTeamReport(_input: SimulationRecordRedTeamReport): Promise<void> {}
 
   async recordEvaluations(input: RecordEvaluationsCommandData): Promise<void> {
     await this.options.recordEvaluations?.(input);

@@ -25,6 +25,14 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.reject(new Error("Not used by Trace tests."));
   }
 
+  getGatewayCustomKeys(): Promise<never> {
+    return Promise.reject(new Error("Not used by Trace tests."));
+  }
+
+  getGatewayKeysEpoch(): string {
+    throw new Error("Not used by Trace tests.");
+  }
+
   readonly costInputs: ModelCostEstimateInput[] = [];
 
   constructor(private readonly cost = 0) {}
@@ -32,6 +40,10 @@ export class TestModelProviderService implements ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number {
     this.costInputs.push(input);
     return this.cost;
+  }
+
+  listForProjectWithServedModels(): Promise<[]> {
+    return Promise.resolve([]);
   }
 
   listForProject(): Promise<[]> {

@@ -22,7 +22,7 @@ import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contr
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryModelProviderCodexGatewayPingChannel } from "../../channels/memory/memory.model-provider-codex-gateway-ping.channel.ts";
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
@@ -754,6 +754,26 @@ class ManagedCatalog extends Catalog {
     return Promise.resolve(input.parameters);
   }
 }
+class ManagedBedrockCatalog extends Catalog {
+  constructor(public roleHop: "succeeds" | "fails" = "succeeds") {
+    super();
+  }
+
+  isManagedProvider(input: { organizationId: string; provider: string }): boolean {
+    return input.provider === "bedrock" && input.organizationId === "org_1";
+  }
+
+  getManagedBedrockCredentials(_input: { organizationId: string }) {
+    if (this.roleHop === "fails") return Promise.reject(new Error("AssumeRole throttled"));
+    return Promise.resolve({
+      accessKeyId: "ASIA-customer-role",
+      secretAccessKey: "customer-role-secret",
+      sessionToken: "customer-role-session",
+      region: "us-east-1",
+      runtimeEndpoint: "http://vpce-1.vpce-svc-1.us-east-1.vpce.amazonaws.com",
+    });
+  }
+}
 class Translator extends ModelTranslation {
   model: string | null = null;
   translate(input: { model: string }): Promise<string> {
@@ -840,6 +860,7 @@ function service(
 ) {
   return ModelProviderService.create({
     isOwnDecisionModelAllowed: () => Promise.resolve(false),
+    isJudgePreviewAllowed: () => Promise.resolve(false),
     repository: providers,
     projects: createProjects(),
     organizations: organizationApi(),
@@ -1388,6 +1409,7 @@ describe("ModelProviderService", () => {
     ];
     const modelProviders = ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      isJudgePreviewAllowed: () => Promise.resolve(false),
       repository: new Providers(),
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1423,6 +1445,7 @@ describe("ModelProviderService", () => {
     const managed = new ManagedCatalog();
     const modelProviders = ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      isJudgePreviewAllowed: () => Promise.resolve(false),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1454,6 +1477,145 @@ describe("ModelProviderService", () => {
       projectId: "project_1",
       model: "openai/gpt-5-mini",
       provider: "openai",
+    });
+  });
+  describe("when the gateway reads a Bedrock row's keys", () => {
+    /** @scenario "The gateway reads a managed Bedrock row with the customer role's credentials" */
+    it("carries the customer role's credentials and names the private endpoint", async () => {
+      const providers = new Providers();
+      providers.rows = [provider({ provider: "bedrock", customKeys: null })];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toEqual({
+        id: "mp_1",
+        provider: "bedrock",
+        organizationId: "org_1",
+        customKeys: {
+          AWS_ACCESS_KEY_ID: "ASIA-customer-role",
+          AWS_SECRET_ACCESS_KEY: "customer-role-secret",
+          AWS_SESSION_TOKEN: "customer-role-session",
+          AWS_REGION_NAME: "us-east-1",
+          AWS_BEDROCK_RUNTIME_ENDPOINT: "http://vpce-1.vpce-svc-1.us-east-1.vpce.amazonaws.com",
+        },
+      });
+    });
+
+    it("puts the customer role's session over keys the managed row still stores", async () => {
+      const providers = new Providers();
+      providers.rows = [
+        provider({
+          provider: "bedrock",
+          customKeys: { AWS_ACCESS_KEY_ID: "AKIA-stale", AWS_SECRET_ACCESS_KEY: "stale-secret" },
+        }),
+      ];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toMatchObject({
+        customKeys: {
+          AWS_ACCESS_KEY_ID: "ASIA-customer-role",
+          AWS_SECRET_ACCESS_KEY: "customer-role-secret",
+          AWS_SESSION_TOKEN: "customer-role-session",
+        },
+      });
+    });
+
+    /** @scenario "A Bedrock row outside a managed organization reaches the gateway with its own keys" */
+    it("returns the stored keys unchanged for an organization that is not managed", async () => {
+      const stored = { AWS_ACCESS_KEY_ID: "AKIA-own", AWS_SECRET_ACCESS_KEY: "own-secret" };
+      const providers = new Providers();
+      providers.rows = [
+        provider({ provider: "bedrock", organizationId: "org_2", customKeys: stored }),
+      ];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toMatchObject({ customKeys: stored });
+    });
+
+    /** @scenario "The gateway re-reads a managed row's keys before its session expires" */
+    it("names a new keys window every five minutes for a managed organization, none otherwise", () => {
+      vi.useFakeTimers();
+      try {
+        const modelProviders = service(new Providers(), new ManagedBedrockCatalog());
+        const windowStart = 5_986_000 * 5 * 60 * 1000;
+        vi.setSystemTime(windowStart);
+        const first = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+        vi.setSystemTime(windowStart + 5 * 60 * 1000 - 1);
+        const sameWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+        vi.setSystemTime(windowStart + 5 * 60 * 1000);
+        const nextWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+
+        expect(first).not.toBe("");
+        expect(sameWindow).toBe(first);
+        expect(nextWindow).not.toBe(first);
+        expect(modelProviders.getGatewayKeysEpoch({ organizationId: "org_2" })).toBe("");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "The gateway re-reads a managed row's keys before its session expires" */
+    it("retries a failed mint in the next window, replacing the stored-key fallback", async () => {
+      vi.useFakeTimers();
+      try {
+        const providers = new Providers();
+        providers.rows = [provider({ provider: "bedrock", customKeys: { MANAGED: "true" } })];
+        const catalog = new ManagedBedrockCatalog("fails");
+        const modelProviders = service(providers, catalog);
+        const windowStart = 5_986_000 * 5 * 60 * 1000;
+        vi.setSystemTime(windowStart);
+
+        const fallback = await modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" });
+        const failedWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+        catalog.roleHop = "succeeds";
+        vi.setSystemTime(windowStart + 5 * 60 * 1000);
+        const nextWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
+        const minted = await modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" });
+
+        expect(fallback.customKeys).toEqual({ MANAGED: "true" });
+        expect(nextWindow).not.toBe(failedWindow);
+        expect(minted.customKeys).toMatchObject({ AWS_SESSION_TOKEN: "customer-role-session" });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario "A runtime endpoint saved on a row never reaches the gateway" */
+    it("drops a runtime endpoint the row stores, keeping its other keys", async () => {
+      const stored = {
+        AWS_ACCESS_KEY_ID: "AKIA-own",
+        AWS_SECRET_ACCESS_KEY: "own-secret",
+        AWS_BEDROCK_RUNTIME_ENDPOINT: "http://vpce-attacker.vpce.amazonaws.com",
+      };
+      const providers = new Providers();
+      providers.rows = [
+        provider({ provider: "bedrock", organizationId: "org_2", customKeys: stored }),
+      ];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      const keys = await modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" });
+
+      expect(keys.customKeys).toEqual({
+        AWS_ACCESS_KEY_ID: "AKIA-own",
+        AWS_SECRET_ACCESS_KEY: "own-secret",
+      });
+    });
+
+    /** @scenario "A failed role hop leaves the row's own keys and fails only that row" */
+    it("falls back to the stored keys when the role hop fails, throwing nothing", async () => {
+      const stored = { MANAGED: "true" };
+      const providers = new Providers();
+      providers.rows = [provider({ provider: "bedrock", customKeys: stored })];
+      const modelProviders = service(providers, new ManagedBedrockCatalog("fails"));
+
+      await expect(
+        modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" }),
+      ).resolves.toMatchObject({ customKeys: stored });
     });
   });
   it("keeps the Codex execution refusal byte-for-byte", async () => {
@@ -1853,6 +2015,7 @@ describe("ModelProviderService", () => {
     const defaults = new Defaults();
     const modelProviders = ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      isJudgePreviewAllowed: () => Promise.resolve(false),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),
@@ -1904,6 +2067,7 @@ describe("ModelProviderService", () => {
 
     await ModelProviderService.create({
       isOwnDecisionModelAllowed: () => Promise.resolve(false),
+      isJudgePreviewAllowed: () => Promise.resolve(false),
       repository: providers,
       projects: createProjects(),
       organizations: organizationApi(),

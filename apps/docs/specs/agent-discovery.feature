@@ -22,6 +22,19 @@ Feature: Agents discover the documentation and its skills
     Then the agent card carries the site summary, the docs address and one entry per skill
 
   @unit
+  Scenario: The addresses agents learned from the previous docs host keep answering
+    Given the skills named in the skills pages manifest
+    When the discovery files are generated
+    Then /skill.md is a skill named langwatch that points at llms.txt, the Markdown twins and each installable skill
+    And /.well-known/llms.txt is the same file as /llms.txt
+
+  @unit
+  Scenario: The docs MCP keeps its server card
+    When the discovery files are generated
+    Then /.well-known/mcp/server-card.json names the docs MCP at https://langwatch.ai/docs/mcp
+    And it takes no credential and lists the two docs tools
+
+  @unit
   Scenario: Robots.txt declares the content signals
     When the discovery files are generated
     Then robots.txt has the content signal line right after the user agent line
@@ -38,6 +51,11 @@ Feature: Agents discover the documentation and its skills
     Then the preview answers with the Markdown twin as text/markdown
     And every page response names its twin in a Link header and varies by Accept
     But a browser asking for HTML still gets the page
+    And a crawler that does not ask for Markdown gets the page, whatever its user agent
+  # The preview negotiates on Accept only. In production the docs distribution also answers
+  # ChatGPT-User and OAI-SearchBot with the Markdown twin by user agent, as the previous docs
+  # host did (langwatch-saas docs-site-viewer-request.js, ruled 2026-11-10); GPTBot and other
+  # crawlers still get the page unless they ask.
 
   @unit
   Scenario: Serve files with the caching a production host gives them

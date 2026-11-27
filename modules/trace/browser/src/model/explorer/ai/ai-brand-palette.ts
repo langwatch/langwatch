@@ -39,3 +39,11 @@ export const OPENCODE_GRAY = "#808080";
 export const OPENCODE_GRAY_FILL = "#282828";
 export const OPENCODE_WHITE = "#EEEEEE";
 export const OPENCODE_WHITE_FILL = "#434343";
+// pi's logo colours (apps/ui/public/images/external-icons/pi.svg).
+export const PI_MARK_COLORS = {
+  coral: "#F09082",
+  blue: "#4D9ABF",
+  yellow: "#F1BE58",
+} as const;
+// The xterm-256 grey 242 grok 1.0.70 draws its welcome-screen mark in.
+export const GROK_MARK_GREY = "#6c6c6c";

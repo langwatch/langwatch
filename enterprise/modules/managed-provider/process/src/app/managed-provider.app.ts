@@ -50,4 +50,6 @@ export class ManagedProviderModule implements ManagedProviderApiContract {
 
   buildLitellmParameters: ManagedProviderApiContract["buildLitellmParameters"] = (input) =>
     this.#service.buildLitellmParameters(input);
+  getBedrockCredentials: ManagedProviderApiContract["getBedrockCredentials"] = (input) =>
+    this.#service.getBedrockCredentials(input);
 }

@@ -20,11 +20,14 @@ import {
 } from "./blob-store.ts";
 import {
   opsFeatureFlagKeyInputSchema,
+  opsFeatureFlagTargetListSchema,
+  opsFindFeatureFlagTargetsInputSchema,
+  opsSearchFeatureFlagTargetsInputSchema,
   opsOkOutputSchema,
   opsSetFeatureFlagInputSchema,
   opsSetFeatureFlagRulesInputSchema,
 } from "./ops-feature-flag.ts";
-import { opsQueueNameListSchema } from "./ops.responses.ts";
+import { opsQueueNameListSchema, seatSharingCheckSchema } from "./ops.responses.ts";
 
 export const opsPlatformTrpc = defineTrpcContract("ops")
   /**
@@ -43,6 +46,16 @@ export const opsPlatformTrpc = defineTrpcContract("ops")
   .mutation("setFeatureFlagRules")
   .withInput(opsSetFeatureFlagRulesInputSchema)
   .withOutput(opsOkOutputSchema)
+
+  /** Organizations, projects or users a targeting rule may name, by name, slug, id or email. */
+  .query("searchFeatureFlagTargets")
+  .withInput(opsSearchFeatureFlagTargetsInputSchema)
+  .withOutput(opsFeatureFlagTargetListSchema)
+
+  /** The ids stored rules name, with the details that tell them apart; unknown ids are left out. */
+  .query("findFeatureFlagTargets")
+  .withInput(opsFindFeatureFlagTargetsInputSchema)
+  .withOutput(opsFeatureFlagTargetListSchema)
 
   .mutation("clearFeatureFlag")
   .withInput(opsFeatureFlagKeyInputSchema)
@@ -71,4 +84,9 @@ export const opsPlatformTrpc = defineTrpcContract("ops")
   .mutation("deleteBlob")
   .withInput(deleteBlobOperatorInputSchema)
   .withOutput(deleteBlobResultSchema)
+
+  /** The last seat sharing check, empty before the first one. Cloud admin only. */
+  .query("findSeatSharingChecks")
+  .withInput(z.void())
+  .withOutput(z.array(seatSharingCheckSchema))
   .build();

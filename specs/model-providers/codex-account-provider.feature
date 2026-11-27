@@ -305,6 +305,17 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     When a codex model is picked for topic clustering and the config is saved
     Then the save is refused as a validation error naming the restriction
 
+  # No process composes the AI gateway road for the in-process fast assists yet,
+  # so a codex model that reaches in-process execution fails on every attempt.
+  # The refusal is typed so a background caller can stop instead of retrying.
+  @regression
+  Scenario: A codex model this process cannot execute is refused with a typed code
+    Given a fast assist whose resolved model is a codex model
+    And the process composes no AI gateway road for codex models
+    When the assist asks for its model handle
+    Then it is refused with the code "model_execution_unavailable"
+    And the refusal is not reworded as a generic AI call failure
+
   # ── Where Codex is reached ─────────────────────────────────────────────────
 
   Rule: Codex is reached at a configured base, the real vendor unless the deployment names another

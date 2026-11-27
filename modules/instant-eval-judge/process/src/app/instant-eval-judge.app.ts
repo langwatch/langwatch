@@ -16,6 +16,8 @@ import {
   type InstantEvalJudgeSpendRecord,
   type InstantEvalJudgement,
   type InstantEvalPricing,
+  type InstantEvalScenarioJudgeAnswer,
+  type InstantEvalScenarioJudgeCall,
   isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
@@ -31,6 +33,7 @@ import { hostedDecisionsApiKey } from "../channels/instant-eval-hosted-decisions
 import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
 import {
   llmJudgeAnthropicApiKey,
+  llmJudgeGeminiApiKey,
   llmJudgeOpenAiApiKey,
 } from "../channels/instant-eval-llm-judge.channel.ts";
 import {
@@ -50,6 +53,7 @@ import { InstantEvalJudgeFactsService } from "../services/instant-eval-judge-fac
 import { InstantEvalJudgeRouterService } from "../services/instant-eval-judge-router.service.ts";
 import { InstantEvalJudgeService } from "../services/instant-eval-judge.service.ts";
 import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-limiter.service.ts";
+import { InstantEvalScenarioJudgeService } from "../services/instant-eval-scenario-judge.service.ts";
 
 type InstantEvalJudgeSetup = FeatureSetup<
   typeof InstantEvalJudgeModule.dependencies,
@@ -78,12 +82,14 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     classifierApiKey,
     hostedDecisionsApiKey,
     llmJudgeAnthropicApiKey,
+    llmJudgeGeminiApiKey,
     llmJudgeOpenAiApiKey,
   } as const;
 
   readonly #facts: InstantEvalJudgeFactsService;
   readonly #classifier: InstantEvalClassifierChannel | undefined;
   readonly #judge: InstantEvalJudgeService;
+  readonly #scenarioJudge: InstantEvalScenarioJudgeService;
   readonly #queryHoldPricing: InstantEvalPricing;
   #spendCommands: EventingCommands<InstantEvalJudgeSpendPipeline> | undefined;
 
@@ -113,6 +119,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
       repositories: setup.repositories,
       classifier,
       decisionModels,
+      spend: setup.channels.spend,
       limiter,
       isCloud: isLangWatchJudgeHost(setup.config),
       recordSpendPriced: async (fact) => {
@@ -123,6 +130,14 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
       },
       mintRequestId: () => generate(INSTANT_EVAL_JUDGE_KSUID_RESOURCE).toString(),
       now: nowInstant,
+    });
+    this.#scenarioJudge = InstantEvalScenarioJudgeService.create({
+      judge: this.#judge,
+      router,
+      table: routeTable,
+      pricing: routePricing,
+      llmJudge: setup.channels.llmJudge,
+      limiter,
     });
   }
 
@@ -196,6 +211,14 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
     return this.#judge.judge(input);
+  }
+
+  judgeScenario(input: InstantEvalScenarioJudgeCall): Promise<InstantEvalScenarioJudgeAnswer> {
+    return this.#scenarioJudge.judge(input);
+  }
+
+  async isScenarioJudgeConfigured(): Promise<boolean> {
+    return this.#scenarioJudge.isConfigured();
   }
 
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void> {

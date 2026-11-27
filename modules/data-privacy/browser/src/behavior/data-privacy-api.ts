@@ -7,7 +7,16 @@
 import { createModuleApi, type ContractApiMap, type ModuleApi } from "@langwatch/api/web";
 import type { dataPrivacyTrpc } from "@langwatch/data-privacy-contract";
 
-export type DataPrivacyApiMap = ContractApiMap<typeof dataPrivacyTrpc>;
+/** Borrowed from entitlement: the plan type saying the organization holds an Enterprise licence. */
+type BorrowedProcedures = {
+  plan: {
+    getActivePlan: {
+      query: { input: { organizationId: string }; output: { type: string } };
+    };
+  };
+};
+
+export type DataPrivacyApiMap = ContractApiMap<typeof dataPrivacyTrpc> & BorrowedProcedures;
 
 /**
  * The Data Privacy family's typed tRPC hooks. Same machinery, same transport

@@ -35,7 +35,7 @@ export default function ConnectorsScreen() {
           onNavigate={(href) => navigation?.navigate(href)}
         />
       </PageLayout.Header>
-      <Box paddingTop={4}>
+      <Box>
         <ScimSettingsContent
           organizationId={organizationId}
           lede="Your identity provider creates, updates and removes people here on its own, over SCIM."

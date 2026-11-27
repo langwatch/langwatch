@@ -1,7 +1,7 @@
 /**
- * `langwatch ingest install pi_cli`: the source type is the argument, the
- * seam is the telemetry extension, and no hook entries land anywhere.
- * Feature: specs/ai-governance/cli-wrappers/pi-extension-install.feature
+ * `langwatch ingest install pi_cli`: the seam is the extension, no hook entries land anywhere.
+ * Features: specs/ai-governance/cli-wrappers/pi-extension-install.feature,
+ * specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import * as fs from "node:fs";
@@ -89,7 +89,10 @@ afterEach(() => {
 
 describe("the pi ingestion install", () => {
   describe("when run with the pi_cli source type", () => {
-    /** @scenario "Installing for pi takes the plugin arm, never the hook-entries fallback" */
+    /**
+     * @scenario "Installing for pi takes the plugin arm, never the hook-entries fallback"
+     * @scenario "pi's row carries a plugin hook target, as opencode's does"
+     */
     it("writes the extension and no hook entries anywhere else", async () => {
       const { installCommand } = await import("../install.js");
 

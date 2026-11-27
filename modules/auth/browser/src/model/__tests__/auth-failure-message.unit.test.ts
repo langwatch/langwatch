@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { authFailureMessage } from "../auth-failure-message.ts";
+import { authFailureMessage, ssoHandOffFailureMessage } from "../auth-failure-message.ts";
 import { frontDoorErrorCopy } from "../front-door-error-copy.ts";
 
 const registryCopy = (code: string): string => {
@@ -147,6 +147,24 @@ describe("authFailureMessage", () => {
 
       expect(message).toBe("Sign in did not go through. Please try again.");
       expect(message).not.toContain("SOME_NEW_CODE");
+    });
+  });
+});
+
+describe("ssoHandOffFailureMessage", () => {
+  describe("when the identity provider's setup was refused", () => {
+    it("points the person at their administrator instead of the server's technical reason", () => {
+      expect(ssoHandOffFailureMessage({ code: "discovery_untrusted_origin", status: 400 })).toBe(
+        "We couldn't start your organization's sign-in. Try again, or ask your administrator to check the single sign-on connection.",
+      );
+    });
+  });
+
+  describe("when the hand-off was rate limited", () => {
+    it("tells the person to wait", () => {
+      expect(ssoHandOffFailureMessage({ status: 429 })).toBe(
+        "Too many attempts. Wait a minute and try again.",
+      );
     });
   });
 });

@@ -46,7 +46,7 @@ const build = (withPrivate: boolean) =>
     clickhouse: clickHouseQueryClientDouble(),
     eventing: { definitions: [] },
     ...(withPrivate ? { privateTenants } : {}),
-  }).create({ retention });
+  }).create({ retention, claimsIndexReady: async () => true });
 
 describe("given ops' live replay runtime repository", () => {
   describe("when the tenant directory lists private tenants", () => {

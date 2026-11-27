@@ -1,25 +1,22 @@
-import { Link } from "@langwatch/browser-host/link";
-import { Card } from "@langwatch/design-system/card";
-import { Box, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
-import { useProductAccent } from "@langwatch/design-system/use-product-accent";
-import { Lock } from "lucide-react";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
+import { Box, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { useGovernanceHost } from "../../model/governance-host.ts";
+
 interface Props {
   children: ReactNode;
   featureName: string;
-  description?: string;
+  description: string;
 }
 
 /**
- * Full-page enterprise gate: renders children on the Enterprise plan,
- * otherwise an upsell card linking to the subscription page. Skeleton
- * during plan-load to avoid flashing the gate before the tier resolves.
+ * Full-page enterprise gate: renders children on the Enterprise plan, otherwise the shared
+ * Enterprise lock. Skeleton during plan-load to avoid flashing the gate before the tier resolves.
  */
 export function EnterpriseLockedSurface({ children, featureName, description }: Props) {
-  const { isEnterprise, isLoading } = useGovernanceHost().plan();
-  const accent = useProductAccent();
+  const host = useGovernanceHost();
+  const { isEnterprise, isLoading } = host.plan();
 
   if (isLoading) {
     return (
@@ -38,19 +35,13 @@ export function EnterpriseLockedSurface({ children, featureName, description }: 
   return (
     <Box padding={8}>
       <Box maxWidth="640px" marginX="auto" marginY={12}>
-        <Card padding="lg" icon={<Lock size={16} />} title={featureName}>
-          <VStack align="start" gap={4}>
-            <Text color="fg.muted" fontSize="sm">
-              {description ??
-                `${featureName} is available on Enterprise plans. Upgrade to unlock this surface for your organization.`}
-            </Text>
-            <Button asChild size="sm" colorPalette={accent.colorPalette}>
-              <Link unstyled href="/settings/subscription">
-                Upgrade →
-              </Link>
-            </Button>
-          </VStack>
-        </Card>
+        <EnterpriseLock
+          feature={featureName}
+          description={description}
+          canManage={host.hasPermission("organization:manage")}
+          canSeePlans={host.hasPermission("organization:view")}
+          data-testid="governance-enterprise-lock"
+        />
       </Box>
     </Box>
   );

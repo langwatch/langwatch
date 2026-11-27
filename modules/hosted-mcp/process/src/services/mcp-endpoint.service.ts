@@ -24,6 +24,7 @@ import {
 } from "../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
+import { McpDocsTransportService } from "./mcp-docs-transport.service.ts";
 import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
 import { type McpCliSessions, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
@@ -109,9 +110,10 @@ export class McpEndpointService implements McpHandler {
       oauthTokens: this.#oauthTokens,
       clients: collaborators.oauthClients,
     });
-    this.#routes = this.#routeTable(
-      McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
-    );
+    this.#routes = this.#routeTable({
+      streamable: McpStreamableTransportService.create({ http, auth, sessions: this.#sessions }),
+      docs: McpDocsTransportService.create({ http }),
+    });
     this.#reaper = setInterval(() => this.#reap(), REAPER_INTERVAL_MS);
     this.#keepalive = setInterval(() => this.#sessions.pingOpenStreams(), KEEPALIVE_INTERVAL_MS);
     // The process may exit while either timer is still scheduled.
@@ -197,7 +199,13 @@ export class McpEndpointService implements McpHandler {
     await handle(req, res);
   }
 
-  #routeTable(streamable: McpStreamableTransportService): ReadonlyMap<string, RouteVerbs> {
+  #routeTable({
+    streamable,
+    docs,
+  }: {
+    streamable: McpStreamableTransportService;
+    docs: McpDocsTransportService;
+  }): ReadonlyMap<string, RouteVerbs> {
     const oauth = this.#oauth;
     const only = (method: string, handler: RouteHandler): RouteVerbs => ({
       byMethod: new Map([[method, handler]]),
@@ -230,6 +238,8 @@ export class McpEndpointService implements McpHandler {
       ["/oauth/register", only("POST", (req, res) => oauth.handleRegister(req, res))],
       ["/oauth/token", only("POST", (req, res) => oauth.handleToken(req, res))],
       ["/mcp", streamableVerbs],
+      // Stateless, so there is no stream to GET and no session to DELETE: both answer 405.
+      ["/mcp/docs", only("POST", (req, res) => docs.handlePost(req, res))],
       // The SSE transport is retired; a client still configured with its URL is served the
       // Streamable HTTP transport there.
       ["/sse", streamableVerbs],

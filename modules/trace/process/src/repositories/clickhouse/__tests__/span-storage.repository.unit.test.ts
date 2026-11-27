@@ -1,5 +1,5 @@
 import { ForgedAuthorizationError } from "@langwatch/authorization";
-import { AuthorizedClickHouse } from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse, coalesceKeyOf } from "@langwatch/clickhouse-client";
 import {
   idIndexedClientDouble,
   type ScriptedStatements,
@@ -59,11 +59,13 @@ const STORED_SPAN_COLUMNS = [
   "CreatedAt",
   "UpdatedAt",
   "_retention_days",
+  "IdLayout",
 ];
 
 const STORED_SPAN_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
+  async_insert_deduplicate: 0,
   input_format_json_throw_on_bad_escape_sequence: 0,
 };
 
@@ -216,6 +218,15 @@ describe("SpanStorageClickHouseRepository", () => {
       expect(Object.keys(clickhouse.rows()[0]!)).toEqual(STORED_SPAN_COLUMNS);
     });
 
+    /** @scenario "A span row records the layout its id was minted in" */
+    it("records IdLayout v2", async () => {
+      const { clickhouse, repo } = repository();
+
+      await repo.insertSpan(span());
+
+      expect(clickhouse.rows()[0]?.IdLayout).toBe("v2");
+    });
+
     /** @scenario "The rows carry the columns the table declares" */
     it("writes to the stored spans table as JSON-each-row", async () => {
       const { clickhouse, repo } = repository();
@@ -250,6 +261,23 @@ describe("SpanStorageClickHouseRepository", () => {
 
       expect(clickhouse.inserts[0]?.clickhouse_settings?.async_insert).toBe(1);
       expect(clickhouse.inserts[0]?.clickhouse_settings?.wait_for_async_insert).toBe(1);
+    });
+
+    it("turns async deduplication off so a waiting insert may share a statement", async () => {
+      const { clickhouse, repo } = repository();
+
+      await repo.insertSpan(span());
+
+      const insert = clickhouse.inserts[0];
+      expect(insert?.clickhouse_settings?.async_insert_deduplicate).toBe(0);
+      expect(
+        coalesceKeyOf({
+          tenantId: "project-1",
+          table: insert?.table ?? "",
+          rows: clickhouse.rows(),
+          ...(insert?.clickhouse_settings ? { settings: insert.clickhouse_settings } : {}),
+        }),
+      ).not.toBeNull();
     });
 
     /** @scenario "The version column is the span's own start" */

@@ -5,6 +5,7 @@ import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   ModelRestrictedForExecutionError,
+  lookUpMappedDeployment,
   modelProviderExecutionParametersSchema,
   modelProviderExecutionPrepareInputSchema,
   translateModelIdForLitellm,
@@ -254,12 +255,12 @@ export class ModelProviderExecutionService {
       throw new ModelProviderInvalidError("Execution parameters are missing a model.");
     }
 
-    const deployment = ModelProviderExecutionService.deploymentForModel(
-      provider.deploymentMapping,
-      model,
-    );
-    if (deployment) {
-      parameters.deployment = deployment;
+    const mapped = lookUpMappedDeployment({
+      deploymentMapping: provider.deploymentMapping,
+      qualifiedModel: model,
+    });
+    if (mapped.kind === "mapped") {
+      parameters.deployment = mapped.deployment;
     }
 
     if (provider.extraHeaders.length > 0) {
@@ -328,18 +329,5 @@ export class ModelProviderExecutionService {
     }
 
     return `${provider}/${reference.model}`;
-  }
-
-  private static deploymentForModel(
-    deploymentMapping: Record<string, string> | null | undefined,
-    model: string,
-  ): string | null {
-    if (!deploymentMapping) {
-      return null;
-    }
-
-    const modelName = model.split("/").slice(1).join("/");
-
-    return deploymentMapping[modelName] ?? deploymentMapping[model] ?? null;
   }
 }

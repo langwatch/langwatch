@@ -40,10 +40,11 @@ data:
   # service auth secret (LANGY_INTERNAL_SECRET) is NOT here — it comes from
   # the existing Secret, injected directly in the Deployment env.
   ENVIRONMENT: {{ $env | quote }}
-  PORT: {{ .Values.manager.port | quote }}
-  LANGY_MAX_WORKERS: {{ .Values.manager.maxWorkers | quote }}
-  LANGY_WORKER_IDLE_MS: {{ .Values.manager.workerIdleMs | quote }}
-  LANGY_READINESS_TIMEOUT_MS: {{ .Values.manager.readinessTimeoutMs | quote }}
+  PORT: {{ include "langyagent.string" .Values.manager.port | quote }}
+  LANGY_MAX_WORKERS: {{ include "langyagent.string" .Values.manager.maxWorkers | quote }}
+  LANGY_WORKER_IDLE_MS: {{ include "langyagent.string" .Values.manager.workerIdleMs | quote }}
+  LANGY_WORKER_MAX_AGE_MS: {{ include "langyagent.string" .Values.manager.workerMaxAgeMs | quote }}
+  LANGY_READINESS_TIMEOUT_MS: {{ include "langyagent.string" .Values.manager.readinessTimeoutMs | quote }}
   # Egress enforcement (ADR-076). The FQDN floor is the operator-owned
   # always-allowed set; the toggles gate the enforcement rungs. Per-project
   # customer allow-lists do NOT live here — they ride the per-request
@@ -72,5 +73,5 @@ data:
   LANGY_MIRROR_TRACE_ENDPOINT: {{ . | quote }}
   {{- end }}
   {{- range $key, $value := .Values.extraConfig }}
-  {{ $key }}: {{ $value | toString | quote }}
+  {{ $key }}: {{ include "langyagent.string" $value | quote }}
   {{- end }}

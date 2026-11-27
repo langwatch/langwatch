@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
@@ -25,6 +26,7 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   });
   const database = prisma;
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     repository: EventingAuthzReadRepository.create(database),
     listing: EventingAuthzListingRepository.create(database),
     bindings: PrismaAuthzManagedGrantRepository.create({

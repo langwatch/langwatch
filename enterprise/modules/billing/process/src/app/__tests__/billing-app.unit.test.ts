@@ -5,7 +5,9 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { billingProcessModule } from "../../billing.module.ts";
+import type { BillingSubscriptionNotifier } from "../../channels/billing-subscription-notifier.channel.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
+import { MemoryPaymentRecoveryEmailChannel } from "../../channels/memory/memory.billing.channels.ts";
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
 import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
@@ -17,6 +19,8 @@ import type { RecordBillingAuditCommandData } from "../../eventing/billing-lifec
 import { MemoryBillingOrganizationRepository } from "../../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+import { MemoryPaymentRecoveryRepository } from "../../repositories/memory/memory.payment-recovery.repository.ts";
+import { MemoryBillingSubscriptionRepository } from "../../repositories/memory/memory.subscription.repository.ts";
 import { BillingLifecycleAnnouncerService } from "../../services/billing-lifecycle-announcer.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import type { UsageReportingService } from "../../services/usage-reporting.service.ts";
@@ -88,7 +92,7 @@ function lifecycleRecording() {
     waitUntilReady: async () => {},
   });
   const lifecycle = BillingLifecycleAnnouncerService.create({
-    subscriptions: { findLastNonCancelled: async () => null },
+    subscriptions: { findActive: async () => null },
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
@@ -105,6 +109,7 @@ function lifecycleRecording() {
     recordPricingModelChanged: ignored(),
     recordSeatCheckoutPaid: ignored(),
     recordSeatCheckoutsAbandoned: ignored(),
+    recordOverPlanChanged: ignored(),
   });
   return { lifecycle, audited };
 }
@@ -128,11 +133,14 @@ function billingApp({
   withStripe,
   commitUsdCents = 100_00,
   webhookSecret,
+  withSubscriptions = false,
 }: {
   isSaas: boolean;
   withStripe: boolean;
   commitUsdCents?: number;
   webhookSecret?: string;
+  /** Composes the subscription door, as a deployment that sells plans does. */
+  withSubscriptions?: boolean;
 }) {
   const registry = licensedAt(commitUsdCents);
   // Acme is a connected self-hosted customer on organization's shared table (C2 B).
@@ -150,6 +158,8 @@ function billingApp({
   const repositories = {
     ...MemoryBillingRepositories.create(),
     organizations: MemoryBillingOrganizationRepository.create(store),
+    subscriptions: MemoryBillingSubscriptionRepository.create(store),
+    paymentRecovery: MemoryPaymentRecoveryRepository.create(store),
   };
   const stripe = withStripe ? stripeTwins({ webhookSecret }) : void 0;
   const { lifecycle, audited } = lifecycleRecording();
@@ -167,9 +177,21 @@ function billingApp({
     peers: registry.peers,
     stripe,
     usageReporting: () => createApiFixture<UsageReportingService>({}, "usage meter"),
+    ...(withSubscriptions
+      ? {
+          subscription: {
+            notifier: createApiFixture<BillingSubscriptionNotifier>({}),
+            facts: lifecycle,
+          },
+        }
+      : {}),
     webhook: {
       host: MemoryBillingWebhookHostChannel.create(),
       licenses: createApiFixture<LicensingApi>({}),
+      recovery: {
+        emails: MemoryPaymentRecoveryEmailChannel.create(),
+        publicBaseUrl: "https://app.langwatch.example",
+      },
     },
   });
   return { app, asked: registry.asked, audited, repositories, stripe };
@@ -194,6 +216,17 @@ describe("the installed billing application", () => {
       await expect(app.renewConnectedTerm(renewal(100_00), STAFF)).rejects.toMatchObject({
         code: "connected_billing_unavailable",
       });
+    });
+
+    /** @scenario "The connected-billing overview is refused outside LangWatch Cloud" */
+    it("refuses the overview by the same handled code, reading and auditing nothing", async () => {
+      const { app, asked, audited } = billingApp({ isSaas: false, withStripe: false });
+
+      await expect(
+        app.getConnectedBillingOverview({ organizationId: ACME }, STAFF),
+      ).rejects.toMatchObject({ code: "connected_billing_unavailable" });
+      expect(asked).toEqual([]);
+      expect(audited).toEqual([]);
     });
 
     it("runs no billing tick and no seat invoicing pass at all", async () => {
@@ -491,6 +524,65 @@ describe("the subscription door BillingModule serves", () => {
         code: "not_found",
         httpStatus: 404,
       });
+    });
+  });
+});
+
+describe("the seat price BillingModule quotes", () => {
+  describe("given a Cloud organization with five seats and an unpaid renewal", () => {
+    async function unpaidGrowth() {
+      const world = billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+      const { subscriptions, paymentRecovery } = world.repositories;
+      const row = await subscriptions.createPending({
+        organizationId: ACME,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      await subscriptions.updateStatus({ id: row.id, status: "ACTIVE" });
+      await subscriptions.updateQuantities({
+        id: row.id,
+        maxMembers: 5,
+        maxMessagesPerMonth: null,
+      });
+      await paymentRecovery.open({
+        subscriptionId: row.id,
+        invoiceId: "in_renewal",
+        startedAt: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+      });
+      return world;
+    }
+
+    /** @scenario "While a payment is unpaid, pricing more seats names the failed payment" */
+    it("refuses the price of more seats by the hold, and asks the provider for fewer", async () => {
+      const { app, stripe } = await unpaidGrowth();
+
+      await expect(
+        app.previewProration({ organizationId: ACME, newTotalSeats: 6 }),
+      ).rejects.toMatchObject({ code: "seats_held_for_payment" });
+      expect(stripe?.channels.subscriptions.reads ?? []).toEqual([]);
+
+      const fewer = await app
+        .previewProration({ organizationId: ACME, newTotalSeats: 4 })
+        .catch((error: unknown) => error);
+      expect(fewer).not.toMatchObject({ code: "seats_held_for_payment" });
+    });
+
+    /** @scenario "While a payment is unpaid, buying more seats is refused before the card is charged" */
+    it("refuses saving more seats from the drawer, and lets fewer through", async () => {
+      const { app } = await unpaidGrowth();
+      const save = (totalMembers: number) =>
+        app
+          .updateSubscriptionItems({
+            organizationId: ACME,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers,
+            totalTraces: 0,
+          })
+          .catch((error: unknown) => error);
+
+      expect(await save(6)).toMatchObject({ code: "seats_held_for_payment" });
+      expect(await save(4)).not.toMatchObject({ code: "seats_held_for_payment" });
     });
   });
 });

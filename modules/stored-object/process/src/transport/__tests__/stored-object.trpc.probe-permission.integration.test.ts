@@ -43,6 +43,10 @@ class PurposeFiles implements StoredObjectFileReader {
     return this.rows.get(input.id) ?? { status: "not_found" };
   }
 
+  async findRowById(): Promise<null> {
+    return null;
+  }
+
   async getById(): Promise<StoredObjectFileStreamRead> {
     throw new StoredObjectNotFoundError();
   }

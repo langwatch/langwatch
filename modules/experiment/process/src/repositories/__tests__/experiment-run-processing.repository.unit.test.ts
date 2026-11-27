@@ -2,6 +2,7 @@ import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ExperimentRunActivityRecorder } from "../../eventing/experiment-run-activity.subscriber.ts";
 import { ExecuteExperimentCellCommand } from "../../eventing/experiment-run-cell.commands.ts";
 import type { ExperimentRunExecutionEffects } from "../../eventing/experiment-run-execution.process.ts";
 import { createExperimentRunFramesSubscriber } from "../../eventing/experiment-run-frames.subscriber.ts";
@@ -45,6 +46,7 @@ function foldedState(overrides: Partial<ExperimentRunStateData> = {}): Experimen
     StoppedAt: null,
     ExpectedTargetResults: null,
     ExpectedEvaluatorResults: null,
+    Concurrency: null,
     TotalScoreSum: 0.75,
     ScoreCount: 1,
     PassedCount: 1,
@@ -114,6 +116,7 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
     }),
     runExecution: createApiFixture<ExperimentRunExecutionEffects>({}, "runExecution"),
     traceMetricsSync: async () => undefined,
+    runActivity: createApiFixture<ExperimentRunActivityRecorder>({}, "runActivity"),
     runFrames: createExperimentRunFramesSubscriber({
       stream: MemoryExperimentRunEventStreamRepository.create(),
     }),

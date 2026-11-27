@@ -45,6 +45,17 @@ Feature: Project becomes integrated after first trace ingestion
     Then project.firstMessage stays false
     And no "first_trace_integrated" PostHog event is tracked
 
+  # Governance ingestion lands traces in the organization's hidden governance
+  # project, stamped langwatch.origin.kind = "ingestion_source". They are not
+  # the customer's own integration, so they set no flag and record no milestone.
+  @unit
+  Scenario: A governance-ingested trace is not the project's first trace
+    Given a project with firstMessage set to false
+    When a trace stamped langwatch.origin.kind "ingestion_source" is processed
+    Then project.firstMessage and project.integrated stay false
+    And no first_trace_recorded, project_traced or "first_trace_integrated" is recorded
+    And on a project that already traced, no trace_received is recorded either
+
   @unit
   Scenario: PostHog integration milestone reports unknown when SDK attributes are absent
     Given a project with firstMessage set to false
@@ -58,6 +69,16 @@ Feature: Project becomes integrated after first trace ingestion
     And the project resolves no org admin user
     When a trace is processed through the trace-processing pipeline
     Then no "first_trace_integrated" PostHog event is tracked
+
+  # Per-email usage (2026-11-11): nurturing throttles its trace-usage sync per organization, and
+  # each project of a new organization sends a first trace, so that fact names it too.
+  @unit
+  Scenario: A project's first trace's fact names the admin's organization
+    Given a project with firstMessage set to false whose org admin resolves with its organization
+    When a trace is processed through the trace-processing pipeline
+    Then first_trace_recorded carries the organization's id
+    And when the lookup names no organization, the fact is still recorded without one
+    And a first_trace_recorded from before the field existed still parses
 
   @unit
   Scenario: PostHog integration milestone fires only on the firstMessage transition

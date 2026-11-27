@@ -6,6 +6,11 @@ import {
 } from "@langwatch/eventing";
 
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
+import {
+  storedRunRepeatOf,
+  storedRunTargetOf,
+  withRunRepeat,
+} from "../rules/experiment-run-stored-target.rules.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -21,9 +26,13 @@ import {
   traceMetricsComputedEventSchema,
 } from "./experiment-run-events.process.ts";
 
-/** Clamps a nullable duration to a non-negative value; clock skew can make one negative. */
+/**
+ * A nullable duration as whole, non-negative milliseconds. Clock skew can make
+ * one negative, and an SDK can report a fraction, which the integer columns
+ * refuse: ClickHouse then rejects the whole insert.
+ */
 export function normalizeDurationMs(duration: number | null | undefined): number | null {
-  return duration != null ? Math.max(0, duration) : null;
+  return duration != null ? Math.max(0, Math.round(duration)) : null;
 }
 
 /**
@@ -52,6 +61,8 @@ export interface ExperimentRunStateData {
   /** Rows and verdicts the reporter counted for the whole run; null when it reported none. */
   ExpectedTargetResults: number | null;
   ExpectedEvaluatorResults: number | null;
+  /** Cells the run kept in flight, from its plan; null for a run started without one. */
+  Concurrency: number | null;
 
   // Raw counters for incremental aggregation
   TotalScoreSum: number;
@@ -83,10 +94,13 @@ function mergeTargetsJson(
 
   const byId = new Map(existing.map((t) => [t.id, t]));
   for (const t of incoming) {
-    byId.set(t.id, t);
+    byId.set(t.id, storedRunTargetOf(t));
   }
+  const merged = Array.from(byId.values());
+  // The run's repeat survives a later event that restates a target without it.
+  const repeat = Math.max(storedRunRepeatOf(merged), storedRunRepeatOf(existing));
 
-  return JSON.stringify(Array.from(byId.values()));
+  return JSON.stringify(withRunRepeat({ targets: merged, repeat }));
 }
 
 const experimentRunEvents = [
@@ -150,6 +164,7 @@ export class ExperimentRunStateFoldProjection
       StoppedAt: null,
       ExpectedTargetResults: null,
       ExpectedEvaluatorResults: null,
+      Concurrency: null,
       TotalScoreSum: 0,
       ScoreCount: 0,
       PassedCount: 0,
@@ -168,8 +183,12 @@ export class ExperimentRunStateFoldProjection
       ExperimentId: event.data.experimentId,
       WorkflowVersionId: event.data.workflowVersionId ?? null,
       Total: Math.max(state.Total, event.data.total),
-      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
+      Targets: mergeTargetsJson(
+        state.Targets,
+        withRunRepeat({ targets: event.data.targets ?? [], repeat: event.data.plan?.repeat }),
+      ),
       StartedAt: state.StartedAt ?? event.occurredAt,
+      Concurrency: event.data.plan?.concurrency ?? state.Concurrency,
     };
   }
 

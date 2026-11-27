@@ -1,13 +1,51 @@
 package render
 
 import (
+	_ "embed"
+	"fmt"
+	"maps"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
+// profilePinsYAML holds 25.10's query behaviour on 26.8, shared with CI's servers.
+//
+//go:embed profile-pins.yaml
+var profilePinsYAML []byte
+
+// profilePins reads the default profile's settings out of profile-pins.yaml.
+func profilePins() (map[string]any, error) {
+	var doc struct {
+		Profiles struct {
+			Default map[string]any `yaml:"default"`
+		} `yaml:"profiles"`
+	}
+	if err := yaml.Unmarshal(profilePinsYAML, &doc); err != nil {
+		return nil, fmt.Errorf("profile-pins.yaml: %w", err)
+	}
+	if len(doc.Profiles.Default) == 0 {
+		return nil, fmt.Errorf("profile-pins.yaml: no profiles.default settings")
+	}
+	return doc.Profiles.Default, nil
+}
+
+// auditedQueryLog is what CLICKHOUSE_AUDIT_QUERY_LOG pins on the default profile:
+// every query, from its start, with its profile events, uncut. log_query_settings
+// stays per user, so a user can keep a secret setting out of query_log.Settings.
+var auditedQueryLog = map[string]any{
+	"log_queries":                       1,
+	"log_queries_min_type":              "QUERY_START",
+	"log_queries_min_query_duration_ms": 0,
+	"log_queries_probability":           1,
+	"log_queries_cut_to_length":         0,
+	"log_profile_events":                1,
+}
+
 // renderProfiles writes profiles.yaml with the default user profile settings.
-func renderProfiles(c *config.Computed, usersD string) error {
+func renderProfiles(input *config.Input, c *config.Computed, usersD string) error {
 	profile := map[string]any{
 		"max_memory_usage":                   c.MaxMemoryUsagePerQuery,
 		"max_bytes_before_external_group_by": c.MaxBytesBeforeExternalGroupBy,
@@ -24,6 +62,23 @@ func renderProfiles(c *config.Computed, usersD string) error {
 		"http_receive_timeout":               c.HTTPReceiveTimeout,
 		"http_send_timeout":                  c.HTTPSendTimeout,
 		"tcp_keep_alive_timeout":             c.TCPKeepAliveTimeout,
+	}
+	pins, err := profilePins()
+	if err != nil {
+		return err
+	}
+	maps.Copy(profile, pins)
+
+	// Opt-in, user-level settings (in config.d the server refuses to boot):
+	// inter-server compression, and stopping a read whose HTTP client has gone.
+	if c.NetworkCompressionMethod != "" {
+		profile["network_compression_method"] = c.NetworkCompressionMethod
+	}
+	if c.NetworkZstdCompressionLevel != 0 {
+		profile["network_zstd_compression_level"] = c.NetworkZstdCompressionLevel
+	}
+	if c.CancelHTTPReadonlyQueriesOnClientClose != 0 {
+		profile["cancel_http_readonly_queries_on_client_close"] = c.CancelHTTPReadonlyQueriesOnClientClose
 	}
 
 	// Query limits — only include non-zero values.
@@ -45,6 +100,21 @@ func renderProfiles(c *config.Computed, usersD string) error {
 	if c.MaxRowsToGroupBy != 0 {
 		profile["max_rows_to_group_by"] = c.MaxRowsToGroupBy
 		profile["group_by_overflow_mode"] = c.GroupByOverflowMode
+	}
+	constraints := map[string]any{}
+	if share := input.MaxConcurrentQueriesForUser; share > 0 {
+		// A session may lower its share but never lift it, and 0 would mean no limit.
+		profile["max_concurrent_queries_for_user"] = share
+		constraints["max_concurrent_queries_for_user"] = map[string]any{"min": 1, "max": share}
+	}
+	if input.AuditQueryLog {
+		maps.Copy(profile, auditedQueryLog)
+		for name := range auditedQueryLog {
+			constraints[name] = map[string]any{"const": ""}
+		}
+	}
+	if len(constraints) > 0 {
+		profile["constraints"] = constraints
 	}
 	return writeYAML(filepath.Join(usersD, "profiles.yaml"), map[string]any{
 		"profiles": map[string]any{"default": profile},

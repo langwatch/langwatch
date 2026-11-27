@@ -7,6 +7,7 @@ import { StubAuthzListingRepository } from "../repositories/__tests__/support/au
 import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
@@ -16,6 +17,7 @@ describe("AuthzService on a resource scope", () => {
   describe("given a live public share link for trace t1 and no session", () => {
     const authzWithLink = () =>
       AuthzService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         // These suites exercise the engine path, which is what the absent
         // gate used to default to.
         isOnEngine: async () => true,
@@ -50,6 +52,7 @@ describe("AuthzService on a resource scope", () => {
 describe("AuthzGrantsService and resource scopes", () => {
   const makeService = () =>
     AuthzGrantsService.create({
+      policies: MemoryAuthzOrganizationPolicyRepository.create(),
       permissions: permissiveGrantGuards,
       repository: {} as AuthzGrantRepository,
       ledger: {} as EventingAuthzLedgerAdapter,

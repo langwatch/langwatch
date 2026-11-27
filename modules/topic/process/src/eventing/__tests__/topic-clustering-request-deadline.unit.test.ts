@@ -10,8 +10,7 @@ import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  fetchTopicsBatchClustering,
-  fetchTopicsIncrementalClustering,
+  requestClustering,
   TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
 } from "../topic-clustering-runner.intent.ts";
 import {
@@ -28,6 +27,12 @@ const batchParams = {
 };
 
 const incrementalParams = { ...batchParams, topics: [], subtopics: [] };
+
+const batchCall = (deps: ReturnType<typeof fakeRunnerDeps>) =>
+  requestClustering(deps, { projectId: "proj-1", mode: "batch", params: batchParams });
+
+const incrementalCall = (deps: ReturnType<typeof fakeRunnerDeps>) =>
+  requestClustering(deps, { projectId: "proj-1", mode: "incremental", params: incrementalParams });
 
 describe("topic clustering langevals requests", () => {
   beforeEach(() => {
@@ -74,7 +79,7 @@ describe("topic clustering langevals requests", () => {
         const deps = fakeRunnerDeps();
         hangUntilAborted(deps);
 
-        const call = fetchTopicsBatchClustering(deps, "proj-1", batchParams);
+        const call = batchCall(deps);
         const settled = call.catch((error) => error);
 
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
@@ -89,9 +94,7 @@ describe("topic clustering langevals requests", () => {
         const deps = fakeRunnerDeps();
         hangUntilAborted(deps);
 
-        const settled = fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
-          (error) => error,
-        );
+        const settled = batchCall(deps).catch((error) => error);
 
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
         const error = await settled;
@@ -112,9 +115,7 @@ describe("topic clustering langevals requests", () => {
         const deps = fakeRunnerDeps();
         hangUntilAborted(deps);
 
-        const settled = fetchTopicsIncrementalClustering(deps, "proj-1", incrementalParams).catch(
-          (error) => error,
-        );
+        const settled = incrementalCall(deps).catch((error) => error);
 
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
         const error = await settled;
@@ -139,9 +140,7 @@ describe("topic clustering langevals requests", () => {
         });
         deps.evaluations.requestTopicClustering.mockRejectedValue(refusal);
 
-        const error = await fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
-          (caught: unknown) => caught,
-        );
+        const error = await batchCall(deps).catch((caught: unknown) => caught);
 
         expect(classifyClusteringError(error)).toEqual({
           code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
@@ -164,9 +163,7 @@ describe("topic clustering langevals requests", () => {
           failureCode,
         }),
       );
-      return fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
-        (caught: unknown) => caught,
-      );
+      return batchCall(deps).catch((caught: unknown) => caught);
     };
 
     describe("when the provider rejected the credentials", () => {
@@ -174,6 +171,16 @@ describe("topic clustering langevals requests", () => {
       it("fails the page as a provider-authentication failure the customer can fix", async () => {
         expect(classifyClusteringError(await refusedWith("model_provider_auth_failed"))).toEqual({
           code: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
+          isUserActionable: true,
+        });
+      });
+    });
+
+    describe("when the provider has no API key", () => {
+      /** @scenario "A model provider with no API key named by the clustering service is the customer's to fix" */
+      it("fails the page as a missing-key failure the customer can fix", async () => {
+        expect(classifyClusteringError(await refusedWith("model_provider_key_missing"))).toEqual({
+          code: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_KEY_MISSING,
           isUserActionable: true,
         });
       });
@@ -218,7 +225,7 @@ describe("topic clustering langevals requests", () => {
           response: body,
         });
 
-        await expect(fetchTopicsBatchClustering(deps, "proj-1", batchParams)).resolves.toEqual({
+        await expect(batchCall(deps)).resolves.toEqual({
           kind: "clustered",
           response: body,
         });
@@ -226,7 +233,7 @@ describe("topic clustering langevals requests", () => {
 
       it("does not leave the deadline abort pending against a finished call", async () => {
         const deps = fakeRunnerDeps();
-        await fetchTopicsBatchClustering(deps, "proj-1", batchParams);
+        await batchCall(deps);
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS * 2);
 
         const signal = deps.evaluations.requestTopicClustering.mock.calls[0]?.[0]?.signal;

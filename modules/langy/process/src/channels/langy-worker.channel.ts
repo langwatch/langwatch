@@ -1,3 +1,5 @@
+import type { LangyAttachmentRef } from "@langwatch/langy-contract";
+
 /** How long one dispatch to the worker manager may take before it counts as unavailable. */
 export const LANGY_AGENT_DISPATCH_TIMEOUT_MS = 60_000;
 
@@ -29,6 +31,9 @@ export type LangyWorkerWarmInput = {
   modelOverride?: string;
 };
 
+/** One image a turn hands the model, as base64 bytes; never logged. */
+export type LangyWorkerImage = { name: string; mediaType: string; data: string };
+
 export type LangyWorkerDispatchInput = {
   intent: "create" | "revive" | "continue";
   conversationId: string;
@@ -42,6 +47,9 @@ export type LangyWorkerDispatchInput = {
   credentials: unknown;
   modelOverride?: string;
   resumeToken?: string;
+  /** The user message's images, read into `images` before the request leaves (ADR-158). */
+  imageRefs?: readonly LangyAttachmentRef[];
+  images?: readonly LangyWorkerImage[];
 };
 
 export type LangyWorkerCancelInput = {

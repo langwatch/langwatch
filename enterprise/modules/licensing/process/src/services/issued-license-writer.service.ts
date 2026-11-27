@@ -56,6 +56,7 @@ export class IssuedLicenseWriterService {
     current: IssuedLicenseRecord;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     expiresAt: Instant;
     operatorId: string;
@@ -70,6 +71,7 @@ export class IssuedLicenseWriterService {
       ...licenseSeats({
         members: input.maxMembers ?? current.maxMembers,
         membersLite: input.maxMembersLite ?? signedLiteSeats(current).membersLite,
+        membersDeveloper: input.maxMembersDeveloper ?? current.maxMembersDeveloper ?? undefined,
       }),
       maxMessagesPerMonth: input.maxMessagesPerMonth,
       expiresAt: toDate(input.expiresAt),
@@ -123,6 +125,7 @@ export class IssuedLicenseWriterService {
           membersLite: signed.data.plan.maxMembersLite,
         }),
         ...storedLiteSeats({ signed: signed.data.plan.maxMembersLite }),
+        maxMembersDeveloper: signed.data.plan.maxMembersDeveloper ?? null,
         issuedAt: Temporal.Instant.from(signed.data.issuedAt),
         expiresAt: Temporal.Instant.from(signed.data.expiresAt),
         tokenHash,

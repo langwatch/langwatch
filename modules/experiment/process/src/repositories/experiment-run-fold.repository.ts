@@ -40,6 +40,8 @@ const experimentRunEvaluatorScoreSchema = z.object({
   score: z.number().optional(),
   label: z.string().optional(),
   passed: z.boolean().optional(),
+  /** The evaluator crashed on this cell, so it gave no verdict. */
+  errored: z.boolean().optional(),
 });
 
 /** What the fold needs to know of an evaluator when its verdict arrives. */
@@ -72,6 +74,8 @@ export const experimentRunProgressStateSchema = z.object({
   /** Cells finished, failed ones included. */
   progress: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
+  /** Cells the run keeps in flight, from its plan; absent for a run started without one. */
+  concurrency: z.number().int().positive().optional(),
   startedAt: z.number(),
   finishedAt: z.number().optional(),
   summary: executionSummarySchema.optional(),
@@ -108,6 +112,7 @@ export const experimentRunStartRecordSchema = experimentRunProgressStateSchema.p
   runId: true,
   experimentId: true,
   total: true,
+  concurrency: true,
   startedAt: true,
 });
 

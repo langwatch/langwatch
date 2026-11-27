@@ -106,6 +106,12 @@ export function toJudgment(row: JudgmentRow): InstantEvalJudgment {
 }
 
 /**
+ * A match: a boolean question that passed, or a judged score or category question, which has no
+ * yes. Never NULL: skipped and failed rows carry a NULL Passed, which NOT would drop (#9741).
+ */
+const IS_MATCHED = "(ifNull(Passed = 1, 0) OR (Kind != 'boolean' AND Status = 'judged'))";
+
+/**
  * The predicates one query needs, split by what each can read: a sort-key
  * filter goes in WHERE where the index uses it, a verdict filter in HAVING
  * because the verdict does not exist until the group is formed.
@@ -143,13 +149,7 @@ export function buildFilters(query: InstantEvalJudgmentQuery): {
     parameters.status = query.status;
   }
   if (query.matched !== undefined) {
-    // A match is a boolean question that passed. A score or category question
-    // has no yes, so `matched` over one of those is its judged rows.
-    having.push(
-      query.matched
-        ? "(Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))"
-        : "NOT (Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
-    );
+    having.push(query.matched ? IS_MATCHED : `NOT ${IS_MATCHED}`);
   }
 
   return { where, having, parameters };

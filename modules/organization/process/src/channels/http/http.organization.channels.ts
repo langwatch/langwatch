@@ -3,6 +3,7 @@ import type { BoundApis } from "@langwatch/process";
 import { internalSlackSignupsWebhook, type ScopedSecrets } from "@langwatch/secrets";
 
 import type { OrganizationChannels } from "../organization.channels.ts";
+import { SesAccessNoticeMailChannel } from "../ses/ses.access-notice-mail.channel.ts";
 import { SesOrganizationInviteMailChannel } from "../ses/ses.organization-invite-mail.channel.ts";
 import { SlackSignupAnnouncementChannel } from "../slack/slack.signup-announcement.channel.ts";
 
@@ -24,6 +25,7 @@ export class HttpOrganizationChannels {
     return {
       signupAnnouncements,
       inviteMail: SesOrganizationInviteMailChannel.create({ notifications: bound.notifications }),
+      accessNoticeMail: SesAccessNoticeMailChannel.create({ notifications: bound.notifications }),
     };
   }
 }

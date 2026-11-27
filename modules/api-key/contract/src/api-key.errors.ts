@@ -76,6 +76,21 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
   }
 }
 
+/** An expired key keeps its expiry through a rotation, so a new secret for it would be dead. */
+export class ApiKeyExpiredError extends HandledError {
+  declare readonly code: "api_key_expired";
+
+  constructor(id: string) {
+    super("api_key_expired", "API Key has expired", {
+      meta: { apiKeyId: id },
+      httpStatus: 409,
+      fault: "customer",
+      ...remediation("api_key_expired"),
+    });
+    this.name = "ApiKeyExpiredError";
+  }
+}
+
 export class ApiKeyReservedNameError extends HandledError {
   declare readonly code: "api_key_reserved_name";
 
@@ -207,5 +222,19 @@ export class AggregateProjectHasNoCredentialError extends HandledError {
       { httpStatus: 403, meta: options.meta },
     );
     this.name = "AggregateProjectHasNoCredentialError";
+  }
+}
+
+/** A signing key that is not in the named project, or does not exist: one answer for both. */
+export class SigningKeyNotFoundError extends NotFoundError {
+  declare readonly code: "not_found";
+
+  constructor(keyId: string) {
+    super(
+      "not_found",
+      { resource: "Signing key", id: keyId },
+      { meta: { signingKeyId: keyId }, fault: "customer" },
+    );
+    this.name = "SigningKeyNotFoundError";
   }
 }

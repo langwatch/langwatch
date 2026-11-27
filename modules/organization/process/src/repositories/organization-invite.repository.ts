@@ -18,6 +18,8 @@ export type WriteInviteInput = {
   role: OrganizationUserRole;
   /** The user who sent it; null for an invitation a service created. */
   requestedBy?: string | null;
+  /** The Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
 };
 
 /** One listed invitation, with the admin who asked for it. */
@@ -55,6 +57,16 @@ export abstract class OrganizationInviteRepository {
     email: string;
     organizationId: string;
   }): Promise<boolean>;
+  /** Whether the address holds a live (not payment-pending) invite that has not expired. */
+  abstract hasPendingInviteForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean>;
+  /** Deletes the address's invites held for a seat checkout that has not been paid. */
+  abstract deletePaymentPendingInvitesForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<number>;
   /** The stored address of each of these that is already a member. */
   abstract findMemberEmails(input: { organizationId: string; emails: string[] }): Promise<string[]>;
   abstract findTeamIdsInOrganization(input: {
@@ -160,6 +172,8 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
+    /** A Billing-only membership (ADR-205): no team, no seat. */
+    billingOnly?: boolean;
   }): Promise<void>;
   /** Throws `InviteNotFoundError`. */
   abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;

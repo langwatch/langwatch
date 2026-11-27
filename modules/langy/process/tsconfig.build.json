@@ -52,6 +52,9 @@
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
+      "path": "../../stored-object/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../secret/contract/tsconfig.build.json"
     },
     {

@@ -1,11 +1,13 @@
 /**
- * "Add a widget": the board's ask bar as its search, then the templates finder's category and
- * agent-type chips over the built widgets in question-tree branch sections. A pick adds the widget
- * and drafts its prompt in Langy (AC141); "I'll build it myself" goes to the widget editor instead.
+ * "Add a widget": the ask bar as its search, the finder's chips, and the built widgets as one
+ * ranked list tagged by branch under "All", or branch sections under a category. A pick adds
+ * the widget and drafts its prompt in Langy (AC141); "I'll build it myself" opens the editor.
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { langyQuestionAsked } from "@langwatch/langy-contract";
 import {
   Activity,
   AlertTriangle,
@@ -22,6 +24,7 @@ import { useRef, useState } from "react";
 
 import {
   AGENT_KIND_CHIP_LABELS,
+  type AgentKind,
   pickerPool,
   type PickerQuestion,
   type PickerSection,
@@ -73,6 +76,9 @@ export function BlockPickerDialog({
   onAddWidgets,
   onSkip,
   onClose,
+  allowBuildYourOwn = true,
+  seedsLangyAfterAdd = true,
+  startingAgentKind,
 }: {
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
@@ -82,19 +88,30 @@ export function BlockPickerDialog({
   /** Opens the widget editor on a new widget instead; the caller closes the picker with it. */
   onSkip: () => void;
   onClose: () => void;
+  /** False on a board that takes no widgets of its own, where there is no editor to go to. */
+  allowBuildYourOwn?: boolean;
+  /** False when the add opens another board, whose Langy context this board is not. */
+  seedsLangyAfterAdd?: boolean;
+  /** The agent-type chip picked on open: a coding agents board opens on its coding widgets. */
+  startingAgentKind?: AgentKind;
 }) {
   const langy = useLangyAsk();
+  const analytics = useUiAnalytics();
   // Closed here first: the address that unmounts the picker commits in a transition, which a
   // board busy drawing the picked widget holds back for seconds.
   const [isOpen, setIsOpen] = useState(true);
-  const [filters, setFilters] = useState<CatalogueFilters>(NO_CATALOGUE_FILTERS);
+  const [filters, setFilters] = useState<CatalogueFilters>(
+    startingAgentKind
+      ? { ...NO_CATALOGUE_FILTERS, agentKind: startingAgentKind }
+      : NO_CATALOGUE_FILTERS,
+  );
   const searchRef = useRef<HTMLInputElement>(null);
 
   // The agent type picks the pool; the search and the category narrow it.
   const pool = pickerPool({ agentKind: filters.agentKind });
-  const sections = pickerSections({ questions: filterCatalogue({ items: pool, filters }) });
+  const shown = filterCatalogue({ items: pool, filters });
   const typed = filters.search.trim();
-  const hasMatches = sections.length > 0;
+  const hasMatches = shown.length > 0;
 
   const addWidget = async (question: WidgetQuestion) => {
     // Closed at once: the board shows the widget while it is written. A refused write is
@@ -103,7 +120,7 @@ export function BlockPickerDialog({
     onClose();
     // After the close has painted: starting the write redraws every card on the board.
     await afterNextPaint();
-    if (!(await onAddWidgets(question)) || !langy.enabled) return;
+    if (!(await onAddWidgets(question)) || !langy.enabled || !seedsLangyAfterAdd) return;
     for (const widget of pickerWidgets(question.id)) {
       langy.ask(widgetPromptDraft({ widget, board, period }));
     }
@@ -112,6 +129,10 @@ export function BlockPickerDialog({
   const askLangy = (text: string) => {
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
     langy.ask(boardQuestion({ question, board, period }));
+    // A question the member put to Langy; the drafts seeded after an add send nothing.
+    analytics.track(langyQuestionAsked({ surface: "add_widget" }));
+    // Closed here too, as on an add: the address that closes it can commit late.
+    setIsOpen(false);
     onClose();
   };
 
@@ -137,9 +158,11 @@ export function BlockPickerDialog({
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
           <HStack width="full" gap={2}>
             <Dialog.Title textStyle="cardTitle">Add a widget</Dialog.Title>
-            <Button size="sm" variant="outline" marginStart="auto" onClick={onSkip}>
-              {BUILD_IT_MYSELF}
-            </Button>
+            {allowBuildYourOwn && (
+              <Button size="sm" variant="outline" marginStart="auto" onClick={onSkip}>
+                {BUILD_IT_MYSELF}
+              </Button>
+            )}
             <Dialog.CloseTrigger position="static" />
           </HStack>
         </Dialog.Header>
@@ -171,17 +194,23 @@ export function BlockPickerDialog({
         </VStack>
         <Dialog.Body overflowY="auto" paddingX={3} paddingY={4}>
           <VStack align="stretch" gap={5}>
-            {sections.map((section) => (
-              <WidgetSection
-                key={section.id}
-                section={section}
-                onChoose={(question) => void addWidget(question)}
-              />
-            ))}
+            {filters.trunk ? (
+              pickerSections({ questions: shown }).map((section) => (
+                <WidgetSection
+                  key={section.id}
+                  section={section}
+                  onChoose={(question) => void addWidget(question)}
+                />
+              ))
+            ) : (
+              <RankedWidgets questions={shown} onChoose={(question) => void addWidget(question)} />
+            )}
             {!hasMatches && (
               <VStack align="start" gap={2} paddingX={3}>
                 <Text textStyle="bodySm" color="fg.muted">
-                  {`No widget matches. Press "${BUILD_IT_MYSELF}" to write your own with Langy.`}
+                  {allowBuildYourOwn
+                    ? `No widget matches. Press "${BUILD_IT_MYSELF}" to write your own with Langy.`
+                    : "No widget matches. Clear the search and filters to see them all."}
                 </Text>
                 <Button
                   size="xs"
@@ -272,15 +301,60 @@ function WidgetSection({
   );
 }
 
+/** "All": one list, most asked-about first, each row tagged with its branch. */
+function RankedWidgets({
+  questions,
+  onChoose,
+}: {
+  questions: readonly PickerQuestion[];
+  onChoose: (question: PickerQuestion) => void;
+}) {
+  return (
+    <VStack as="section" aria-label="All widgets" align="stretch" gap={0.5}>
+      {questions.map((question) => (
+        <PickerRow
+          key={question.id}
+          question={question}
+          palette={TRUNK_PALETTES[question.trunk]}
+          showsBranch
+          onChoose={() => onChoose(question)}
+        />
+      ))}
+    </VStack>
+  );
+}
+
+/** The row's branch, small and in its trunk's colour, where no section heading names it. */
+function BranchTag({ question }: { question: PickerQuestion }) {
+  return (
+    <Text
+      as="span"
+      data-branch-tag
+      flexShrink={0}
+      paddingX={1.5}
+      borderRadius="sm"
+      textStyle="caption"
+      colorPalette={TRUNK_PALETTES[question.trunk]}
+      background="colorPalette.subtle"
+      color="colorPalette.fg"
+    >
+      {question.branch.title}
+    </Text>
+  );
+}
+
 /** A row: the question that adds the widget, what it shows, and the agent types it is made for. */
 function PickerRow({
   question,
   palette,
+  showsBranch = false,
   onChoose,
 }: {
   question: PickerQuestion;
   /** The trunk's design-system palette, tinting the icon. */
   palette: string;
+  /** Tags the row with its branch, in a list with no branch headings. */
+  showsBranch?: boolean;
   onChoose: () => void;
 }) {
   const Icon = QUESTION_ICONS[question.icon];
@@ -313,9 +387,12 @@ function PickerRow({
         <Icon size={14} strokeWidth={2.1} aria-hidden />
       </Box>
       <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
-        <Text textStyle="label" color="fg" truncate>
-          {question.question}
-        </Text>
+        <HStack gap={2} minWidth={0}>
+          <Text textStyle="label" color="fg" truncate>
+            {question.question}
+          </Text>
+          {showsBranch && <BranchTag question={question} />}
+        </HStack>
         <Text textStyle="caption" lineHeight="18px" color="fg.muted" truncate>
           {question.why}
         </Text>

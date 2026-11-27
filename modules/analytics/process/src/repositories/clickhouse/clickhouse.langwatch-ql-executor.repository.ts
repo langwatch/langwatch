@@ -1,7 +1,7 @@
 /**
  * The LangWatchQL executor over a real ClickHouse endpoint.
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
   LangWatchQLBusyError,
@@ -19,6 +19,13 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { bindLangWatchQLInstantParameters } from "../../rules/langwatch-ql-instant-parameters.rules.ts";
+import {
+  withoutTenantCapability,
+  withTenantCapability,
+} from "../../rules/langwatch-ql-tenant-capability.rules.ts";
+import { isFlooredViewName } from "../../rules/lwql-dedup-floor.rules.ts";
+import { isTraceIdsViewName } from "../../rules/lwql-dedup-trace-ids.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -27,6 +34,7 @@ import {
 } from "../langwatch-ql-executor.repository.ts";
 import {
   extractBadQueryParameter,
+  isClickHouseAuthenticationError,
   isClickHouseBadQueryParameterError,
   isClickHouseInvalidQueryError,
   isClickHouseObjectAccessDeniedError,
@@ -37,40 +45,86 @@ import {
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   extractUnknownIdentifier,
+  extractUnknownTableFunction,
   toError,
 } from "./clickhouse.query-error-translation.mapper.ts";
 
-/**
- * How long the driver waits on a LangWatchQL query, in milliseconds.
- */
-const LWQL_REQUEST_TIMEOUT_MS = (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
+/** How long the driver waits on a LangWatchQL query, in milliseconds: the cap, plus slack. */
+export const LWQL_REQUEST_TIMEOUT_MS =
+  (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds + 5) * 1000;
 
 /**
  * Sockets this process may hold open against the LangWatchQL endpoint at once.
  */
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
+/**
+ * A copy of the driver's error with the capability taken out of its message, stack and text
+ * fields, keeping its code, type, status and cause: ClickHouse quotes the failing statement back,
+ * so no refusal's reasons, and no log of them, may hold the original. The driver's is untouched.
+ */
+function withoutCapability({ error, capability }: { error: unknown; capability: string }): unknown {
+  if (!(error instanceof Error) || capability === "") return error;
+  const scrub = (text: string) => withoutTenantCapability({ text, capability });
+  const scrubbed = new Error(scrub(error.message), { cause: error.cause });
+  scrubbed.name = error.name;
+  if (error.stack !== undefined) scrubbed.stack = scrub(error.stack);
+  const fields = Object.entries(error).map(([key, value]) => [
+    key,
+    typeof value === "string" ? scrub(value) : value,
+  ]);
+  return Object.assign(scrubbed, Object.fromEntries(fields));
+}
+
 /** ClickHouse reports elapsed time in seconds; the response speaks milliseconds. */
 function elapsedMs(elapsedSeconds: number | undefined): number {
   return Math.round((elapsedSeconds ?? 0) * 1000);
 }
 
-/**
- * What a failed governed run is reported as.
- */
 function namesAnAppFunction(sql: string): boolean {
   return lwqlAppFunctionNames().some((name) => new RegExp(`\\b${name}\\s*\\(`, "i").test(sql));
 }
 
+/** Which ClickHouse an executor dials: the shared one, or one organization's own. */
+export type LangWatchQLTarget = "shared" | "private";
+
+/**
+ * On an organization's own ClickHouse, an unknown identity or a missing LangWatchQL object means
+ * nobody provisioned it there yet: that organization's gap, not the deployment's.
+ */
+function isPrivateTargetNotSetUp(error: unknown): boolean {
+  return isClickHouseAuthenticationError(error) || isClickHouseObjectMissingError(error);
+}
+
+/**
+ * The refusal names, as an unknown table function, a floored or trace-ids twin the statement
+ * reads. Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
+ */
+function namesMissingTwin({ error, sql }: { error: unknown; sql: string }): boolean {
+  const twin = extractUnknownTableFunction(error)?.split(".").at(-1);
+  const isTwin = twin !== undefined && (isFlooredViewName(twin) || isTraceIdsViewName(twin));
+  return isTwin && sql.includes(`${twin}(`);
+}
+
+/** What a failed governed run is reported as. */
 function refusalFor({
   error,
   durationMs,
   sql,
+  target,
 }: {
   error: unknown;
   durationMs: number;
   sql: string;
+  target: LangWatchQLTarget;
 }): unknown {
+  if (target === "private" && isPrivateTargetNotSetUp(error)) {
+    return new LangWatchQLUnavailableError({
+      message: "LangWatchQL is not set up on this organization's ClickHouse yet.",
+      reasons: [toError(error)],
+    });
+  }
+
   if (isClickHouseObjectMissingError(error)) {
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
@@ -105,6 +159,12 @@ function refusalFor({
     return new LangWatchQLBusyError({ reasons: [toError(error)] });
   }
 
+  // A twin not provisioned yet is read as a table function the server lacks: the
+  // deployment is missing an object, as code 60 says for a plain view, so the floor falls back.
+  if (namesMissingTwin({ error, sql })) {
+    return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+
   // An unknown function in a statement that calls one of ours cannot be the
   // caller's: the catalog is what the provisioning DDL is generated from, so
   // the server is missing the projection UDFs this API declares. A statement
@@ -127,11 +187,14 @@ function refusalFor({
 export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutorRepository {
   static create({
     connection,
+    target = "shared",
   }: {
     connection: LangWatchQLConnection;
+    target?: LangWatchQLTarget;
   }): ClickHouseLangWatchQLExecutorRepository {
     return new ClickHouseLangWatchQLExecutorRepository(
       connection,
+      target,
       createClient({
         url: connection.url,
         username: connection.username,
@@ -139,12 +202,16 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         database: connection.database,
         request_timeout: LWQL_REQUEST_TIMEOUT_MS,
         max_open_connections: LWQL_MAX_OPEN_CONNECTIONS,
+        // The driver's own logger prints a failed statement's server text, capability included;
+        // a refusal reaches the app only through the scrubbed error.
+        log: { level: ClickHouseLogLevel.OFF },
       }),
     );
   }
 
   private constructor(
     private readonly connection: LangWatchQLConnection,
+    private readonly target: LangWatchQLTarget,
     private readonly client: ClickHouseClient,
   ) {
     super();
@@ -154,17 +221,25 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
     sql,
     parameters,
     tenantCapability,
+    projectIds,
   }: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
+    const statement = withTenantCapability({
+      sql,
+      setting: this.connection.tenantSetting,
+      capability: tenantCapability,
+      projectIds,
+    });
     const startedAt = nowInstant().epochMilliseconds;
 
     try {
       const resultSet = await this.client.query({
-        // The statement the service handed down. The only thing the transport
-        // adds is the `FORMAT` the driver appends to read the response.
-        query: sql,
+        // The statement the service handed down and the capability's clause; the driver adds only
+        // the `FORMAT` it reads the response in.
+        query: statement,
         format: "JSON",
-        clickhouse_settings: { [this.connection.tenantSetting]: tenantCapability },
-        query_params: parameters as Record<string, unknown> | undefined,
+        query_params: parameters
+          ? { ...bindLangWatchQLInstantParameters({ sql: statement, parameters }) }
+          : undefined,
       });
       const response = await resultSet.json<Record<string, unknown>>();
       const rows = response.data;
@@ -180,7 +255,12 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         },
       };
     } catch (error) {
-      throw refusalFor({ error, durationMs: nowInstant().epochMilliseconds - startedAt, sql });
+      throw refusalFor({
+        error: withoutCapability({ error, capability: tenantCapability }),
+        durationMs: nowInstant().epochMilliseconds - startedAt,
+        sql,
+        target: this.target,
+      });
     }
   }
 

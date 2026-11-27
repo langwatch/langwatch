@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.23.0",
+  "version": "3.31.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "keywords": [
     "ai",
@@ -42,7 +42,7 @@
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm.test.ts test/app-archive.test.ts"
+    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm.test.ts test/app-archive.test.ts test/services/pipe-to-bus.test.ts"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",

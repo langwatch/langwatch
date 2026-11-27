@@ -49,7 +49,10 @@ const connectLicenceCallerSchemaDefinition = z.object({
   licenseRowId: z.string(),
   organizationId: z.string(),
   instanceId: z.string(),
-  virtualKeyId: z.string(),
+  /** Null only for an expired license collecting its renewal, which holds no hosted key. */
+  virtualKeyId: z.string().nullable(),
+  /** The caller may collect its waiting renewal over the sync and do nothing else. */
+  renewalOnly: z.literal(true).optional(),
 });
 export interface ConnectLicenceCallerSchema extends Named<
   typeof connectLicenceCallerSchemaDefinition

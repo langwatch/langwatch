@@ -18,12 +18,13 @@ import {
   type ReplayEventSource,
   ReplayService,
 } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { EventStoreMemory, IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -70,6 +71,7 @@ export function organizationIdPages({
 function replayEngineOver(eventSource: ReplayEventSource) {
   return () => ({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource,
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
@@ -127,6 +129,7 @@ export async function bootGovernanceWorker({
       log: createApiFixture<LogApi>(),
       metric: createApiFixture<MetricApi>(),
       webhook: createApiFixture<WebhookApi>(),
+      notification: createApiFixture<NotificationService>(),
     })
     .boot();
 

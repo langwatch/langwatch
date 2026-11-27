@@ -37,8 +37,11 @@ const signal = (traceProjectId: string | null): GatewayVirtualKeyLifecycleSignal
     name: "Production key",
     displayPrefix: "lw_vk_",
     traceProjectId,
+    principalUserId: "user-holder",
+    purpose: "USER",
   },
   action: "disabled",
+  actorUserId: "user-admin",
   reason: "billing hold",
 });
 
@@ -63,6 +66,9 @@ describe("GatewayGovernanceEventsService", () => {
           name: "Production key",
           display_prefix: "lw_vk_",
           reason: "billing hold",
+          actor_user_id: "user-admin",
+          principal_user_id: "user-holder",
+          purpose: "USER",
           occurred_at: NOW.epochMilliseconds,
         },
       ]);
@@ -112,12 +118,41 @@ describe("GatewayGovernanceEventsService", () => {
           anchor_project_id: "project-1",
           window: "MONTH",
           period_started_at_ms: 0,
+          period_ends_at_ms: null,
           limit_usd: "1.000000",
           spent_usd: "2.000000",
           on_breach: "block",
           occurred_at: 1,
         }),
       ).rejects.toThrow("governance_events_processing");
+    });
+  });
+
+  describe("when an organization's unbudgeted spend is recorded", () => {
+    const fact = {
+      organization_id: "org-1",
+      iso_week: "2026-W48",
+      keys: [{ virtual_key_id: "vk-1", name: "CI key", spent_usd: "12.5" }],
+      key_count: 1,
+      total_spent_usd: "12.5",
+      occurred_at: 1,
+    };
+
+    it("records it under one stable organization project", async () => {
+      const { service, lifecycle } = harness();
+      service.connect({ recordUnbudgetedSpend: lifecycle.sender });
+
+      await service.recordUnbudgetedSpend(fact);
+
+      expect(lifecycle.sent).toEqual([{ tenantId: "project-a", ...fact }]);
+    });
+
+    it("refuses it where the pipeline is not registered, so the sweep logs and retries it", async () => {
+      const { service } = harness();
+
+      await expect(service.recordUnbudgetedSpend(fact)).rejects.toThrow(
+        "governance_events_processing",
+      );
     });
   });
 });

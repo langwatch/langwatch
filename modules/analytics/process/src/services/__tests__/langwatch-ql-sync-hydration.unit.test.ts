@@ -6,6 +6,10 @@
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
 import {
   LangWatchQLHydrationComputeService,
@@ -56,6 +60,8 @@ const traceSource: LangWatchQLTraceSource = {
   readTraces: async () => [],
   readThreadTraces: async ({ threadKeys }) =>
     threadKeys.includes("thread-a") ? [trace({ id: "trace-a", threadId: "thread-a" })] : [],
+  readThreadTraceIds: async ({ threadKeys }) =>
+    threadKeys.includes("thread-a") ? [{ threadId: "thread-a", traceIds: ["trace-a"] }] : [],
 };
 
 /** Answers with the keys it was given under one column, as the identity UDF does. */
@@ -98,6 +104,8 @@ function serviceOver({
   });
 
   return LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: new KeyAnsweringExecutor(keys),
     database: "analytics",
     hydration,

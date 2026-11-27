@@ -197,6 +197,8 @@ describe("TraceModule.composeTree", () => {
         cacheReadTokens: null,
         cacheCreationTokens: null,
         updatedAtMs: 30,
+        agentName: null,
+        isA2aCall: false,
       },
     ]);
     expect(modelProviders.costInputs).toEqual([

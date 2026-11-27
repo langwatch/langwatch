@@ -98,11 +98,63 @@ Feature: The checkup page of a self-hosted install
 
   @unit
   Scenario: A license that names no hosted service leaves the connect rows unblocked rather than failed
-    Given the organization holds a license that names no hosted service
+    Given the organization holds no license
     When the checkup runs
     Then the connect row reads not checked
     And the row says what a license with hosted services gives
     And the row names the activation code as the way in
+
+  @unit
+  Scenario: An active license without hosted services is not asked for an activation code
+    Given the organization holds an active license that names no hosted service
+    When the checkup runs
+    Then the connect row reads not checked
+    And the row says this license includes no hosted services
+    And the row does not ask for an activation code
+
+  @unit
+  Scenario: A license whose hosted services could not be read is not called empty
+    Given the organization holds an active license
+    And reading which hosted services it names failed
+    When the checkup runs
+    Then the connect row does not say the license includes no hosted services
+    And a recorded sync failure is still shown
+
+  @unit
+  Scenario Outline: A refused license sync reads as a plain sentence, never as its code
+    Given the last license sync was refused with "<code>"
+    When the checkup runs
+    Then the connect row reads fail
+    And the row says "<sentence>"
+    And the row does not show "<code>"
+
+    Examples:
+      | code                       | sentence                                    |
+      | connect_unreachable        | This install could not reach LangWatch      |
+      | connect_license_revoked    | LangWatch revoked this license              |
+      | connect_license_expired    | The license has expired                     |
+      | connect_wrong_instance     | The license is bound to another install     |
+      | hosted_service_unavailable | LangWatch did not answer with a result      |
+
+  @unit
+  Scenario: A license sync refused with a code the checkup does not know still reads as a sentence
+    Given the last license sync was refused with a code the checkup does not know
+    When the checkup runs
+    Then the connect row reads fail
+    And the row says LangWatch refused the sync, without the code
+
+  @unit
+  Scenario: An unreachable license sync names the host and port to allow
+    Given the last license sync could not reach the connect host
+    When the checkup runs
+    Then the connect row's fix names the connect host and port 443
+
+  @unit
+  Scenario: A refresh that cannot reach LangWatch names the host and port to allow
+    Given a license refresh failed because the connect host could not be reached on port 443
+    When the failure is shown
+    Then it names the host and port 443 to allow
+    And without a host it asks to allow outbound access to LangWatch, naming nothing it does not know
 
   @unit
   Scenario: Connect switched off by the deployment is not checked with the variable named

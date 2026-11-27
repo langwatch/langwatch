@@ -2,6 +2,7 @@
  * Where upgrade goes; local copy of hook, pure half only (inputs as args).
  */
 
+import { UPGRADE_DIALOG_HREF } from "./checkout-intent.ts";
 import { PricingModel } from "./prisma-types.ts";
 
 /**
@@ -10,6 +11,20 @@ import { PricingModel } from "./prisma-types.ts";
  */
 export function planManagementUrl(isSaaS: boolean): string {
   return isSaaS ? "/settings/subscription" : "/settings/license";
+}
+
+/** Where the usage page's plan action goes: a Free cloud plan opens the Growth seat dialog. */
+export function planActionHref({
+  isSaaS,
+  isFree,
+  isEnterprise,
+}: {
+  isSaaS: boolean;
+  isFree: boolean;
+  isEnterprise: boolean;
+}): string {
+  if (isSaaS && isFree && !isEnterprise) return UPGRADE_DIALOG_HREF;
+  return planManagementUrl(isSaaS);
 }
 
 /**

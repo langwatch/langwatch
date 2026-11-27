@@ -17,7 +17,9 @@ import {
   SHARE_MAX_FULL_SPANS,
   sharedTraceDtoSchema,
   TraceNotFoundError,
+  TraceWithheldOverPlanError,
   traceSummaryDataSchema,
+  traceWithholdingOf,
   type Protections,
   type SharedTraceDto,
   type SpanResourceInfo,
@@ -38,7 +40,7 @@ import {
   gateHeaderCost,
   gateResources,
   gateTreeCost,
-  withoutHiddenResourceAttrs,
+  withoutIngestKey,
 } from "../../../rules/trace-view-gates.rules.ts";
 import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
 import type { TraceRateLimitRepository } from "../../ingestion/repositories/trace-rate-limit.repository.ts";
@@ -173,10 +175,18 @@ export class TraceSharedReadService {
     let summary;
     try {
       summary = traceSummaryDataSchema.parse(
-        await reads.readTraceSummary({ authorization, traceId, visibilityCutoffMs }),
+        await reads.readTraceSummary({
+          authorization,
+          traceId,
+          visibilityCutoffMs,
+          withholding: traceWithholdingOf(protections),
+        }),
       );
     } catch (error) {
-      if (error instanceof TraceNotFoundError) throw new ShareLinkNotFoundError();
+      // A withheld trace reads as a missing link: its plan counts are not for a public viewer.
+      if (error instanceof TraceNotFoundError || error instanceof TraceWithheldOverPlanError) {
+        throw new ShareLinkNotFoundError();
+      }
       throw error;
     }
     const at = { authorization, traceId, occurredAtMs: summary.occurredAt };
@@ -238,25 +248,17 @@ function hashViewer({
     .slice(0, 32);
 }
 
-/** Stamped by the ingestion receiver; an internal key id the share page never renders. */
-const API_KEY_ID_ATTRIBUTE = "langwatch.api_key.id";
-
-function sharedResourceAttrs(attrs: Record<string, string>): Record<string, string> {
-  const { [API_KEY_ID_ATTRIBUTE]: _apiKeyId, ...rest } = withoutHiddenResourceAttrs(attrs);
-  return rest;
-}
-
 function resourceInfoOf(rows: SpanResourceInfo[]): TraceResourceInfoDto {
   const root = rows.find((row) => row.parentSpanId == null) ?? rows[0] ?? null;
 
   return {
     rootSpanId: root?.spanId ?? null,
-    resourceAttributes: sharedResourceAttrs(root?.resourceAttributes ?? {}),
+    resourceAttributes: withoutIngestKey(root?.resourceAttributes ?? {}),
     scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
     spans: rows.map((row) => ({
       spanId: row.spanId,
       parentSpanId: row.parentSpanId,
-      resourceAttributes: sharedResourceAttrs(row.resourceAttributes),
+      resourceAttributes: withoutIngestKey(row.resourceAttributes),
       scope: { name: row.scopeName ?? "", version: row.scopeVersion },
     })),
   };

@@ -111,6 +111,58 @@ describe("BoardService", () => {
 
       await expect(listed(stars, "member-1")).resolves.toEqual([]);
     });
+
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("marks it as its maker's, and a rename keeps the mark", async () => {
+      const { service } = serviceWith();
+      const created = await myDashboard(service);
+
+      const renamed = await service.updateBoard({
+        projectId: PROJECT,
+        dashboardId: created.id,
+        viewer: { userId: "member-1" },
+        name: "Team pulse",
+      });
+
+      expect({ made: created.myDashboardOfUserId, renamed: renamed.myDashboardOfUserId }).toEqual({
+        made: "member-1",
+        renamed: "member-1",
+      });
+      const [listedBoard] = await service.findBoards({
+        projectId: PROJECT,
+        viewer: { userId: "member-1" },
+      });
+      expect(listedBoard).toMatchObject({ name: "Team pulse", myDashboardOfUserId: "member-1" });
+    });
+
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("marks no second board named My dashboard once the maker has one marked", async () => {
+      const { service } = serviceWith();
+      const first = await myDashboard(service);
+      await service.updateBoard({
+        projectId: PROJECT,
+        dashboardId: first.id,
+        viewer: { userId: "member-1" },
+        name: "Team pulse",
+      });
+
+      const second = await myDashboard(service);
+
+      expect(second.myDashboardOfUserId).toBeNull();
+    });
+
+    it("marks nothing on a board with another name or no maker", async () => {
+      const { service } = serviceWith();
+
+      const named = await service.createBoard({
+        projectId: PROJECT,
+        name: "Reports",
+        createdById: "member-1",
+      });
+      const anonymous = await service.createBoard({ projectId: PROJECT, name: MY_DASHBOARD_NAME });
+
+      expect([named.myDashboardOfUserId, anonymous.myDashboardOfUserId]).toEqual([null, null]);
+    });
   });
 
   describe("given one member's stars", () => {

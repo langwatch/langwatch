@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
-import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
@@ -16,6 +15,7 @@ import {
   seededAtRead,
   simulationRunFinishedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
+import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 
 /** How long a counted evaluation or run is remembered against a redelivered event. */
 const COUNTED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
@@ -60,20 +60,11 @@ async function claimedOnly<Item>({
   );
   const rejected = results.flatMap((result) => (result.status === "rejected" ? [result] : []));
   if (rejected.length === 0) return taken;
-  const released = await releasedAll({ keys: taken.map(keyOf), claims });
+  const released = await NurturingClaimReleaseService.create(claims).releasedAll(taken.map(keyOf));
   throw new AggregateError(
     [...rejected.map((result) => result.reason), ...released],
     "nurturing could not claim every item in the batch",
   );
-}
-
-/** Gives every claim back; the reasons a release failed, so the batch error carries them. */
-async function releasedAll({
-  keys,
-  claims,
-}: Readonly<{ keys: readonly string[]; claims: NurturingClaimRepository }>): Promise<unknown[]> {
-  const results = await Promise.allSettled(keys.map((key) => claims.release(key)));
-  return results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
 }
 
 /** Items grouped by a key, the groups in order of their first item. */
@@ -92,10 +83,10 @@ function latestOf<Item>(items: readonly Item[], instantOf: (item: Item) => numbe
 }
 
 /**
- * Nurturing's own read model: which organization a project belongs to and its admin, from
- * project's created event, and each organization's evaluation and run counts, from evaluation's
- * and scenario's (§9). Counts come in batches: a backed-up project's settled evaluations or
- * finished runs are counted in one step and raise one signal, however many the batch holds.
+ * Each organization's evaluation and run counts, from evaluation's and scenario's facts (§9), told
+ * against the admin the usage pipeline's admin map folded from project's created facts. Counts
+ * come in batches: a backed-up project's settled evaluations or finished runs are counted in one
+ * step and raise one signal, however many the batch holds.
  */
 export class NurturingMilestonesService {
   static create(dependencies: MilestonesDependencies): NurturingMilestonesService {
@@ -103,15 +94,6 @@ export class NurturingMilestonesService {
   }
 
   private constructor(private readonly dependencies: MilestonesDependencies) {}
-
-  /** A backfilled project seeds its organization: its first_* milestones already happened. */
-  projectCreated(data: ProjectCreatedEventData): Promise<void> {
-    return this.dependencies.milestones.recordOrganization({
-      organizationId: data.organizationId,
-      adminUserId: data.adminUserId ?? null,
-      seeded: data.backfilled === true,
-    });
-  }
 
   /**
    * Counts a batch of settled evaluations, each once, and delivers one signal per project and
@@ -210,10 +192,9 @@ export class NurturingMilestonesService {
       try {
         signals = await signalsFor(project);
       } catch (error) {
-        const released = await releasedAll({
-          keys: project.map(claimKeyOf),
-          claims: this.dependencies.claims,
-        });
+        const released = await NurturingClaimReleaseService.create(
+          this.dependencies.claims,
+        ).releasedAll(project.map(claimKeyOf));
         countFailures.push(error, ...released);
         continue;
       }

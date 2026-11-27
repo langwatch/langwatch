@@ -26,6 +26,7 @@ class PostApiExperimentsBySlugRunBody:
         parameters (PostApiExperimentsBySlugRunBodyParameters | Unset):
         row_indices (list[int] | Unset):
         concurrency (int | Unset):
+        repeat (int | Unset):
     """
 
     data: list[PostApiExperimentsBySlugRunBodyDataItem] | Unset = UNSET
@@ -34,6 +35,7 @@ class PostApiExperimentsBySlugRunBody:
     parameters: PostApiExperimentsBySlugRunBodyParameters | Unset = UNSET
     row_indices: list[int] | Unset = UNSET
     concurrency: int | Unset = UNSET
+    repeat: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,6 +60,8 @@ class PostApiExperimentsBySlugRunBody:
 
         concurrency = self.concurrency
 
+        repeat = self.repeat
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -73,6 +77,8 @@ class PostApiExperimentsBySlugRunBody:
             field_dict["row_indices"] = row_indices
         if concurrency is not UNSET:
             field_dict["concurrency"] = concurrency
+        if repeat is not UNSET:
+            field_dict["repeat"] = repeat
 
         return field_dict
 
@@ -106,6 +112,8 @@ class PostApiExperimentsBySlugRunBody:
 
         concurrency = d.pop("concurrency", UNSET)
 
+        repeat = d.pop("repeat", UNSET)
+
         post_api_experiments_by_slug_run_body = cls(
             data=data,
             dataset_id=dataset_id,
@@ -113,6 +121,7 @@ class PostApiExperimentsBySlugRunBody:
             parameters=parameters,
             row_indices=row_indices,
             concurrency=concurrency,
+            repeat=repeat,
         )
 
         post_api_experiments_by_slug_run_body.additional_properties = d

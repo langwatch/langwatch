@@ -168,6 +168,8 @@ export type EnrichedAuditLog = {
   targetKind: string | null;
   /** Gateway resource id — only set when source="gateway". */
   targetId: string | null;
+  /** The target's name as the row recorded it (`metadata.targetName`), shown in place of its id. */
+  targetName: string | null;
   /** Gateway-side diff (before state). Only set when source="gateway". */
   before: unknown;
   /** Gateway-side diff (after state). Only set when source="gateway". */
@@ -179,6 +181,8 @@ export type EnrichedAuditLog = {
   channel: AuditChannel | null;
   /** The API key the call presented: a service key acting alone, or a person's own key. */
   apiKeyId: string | null;
+  /** Set on staff access rows (ADR-202); the approving operator is `actorUser`. */
+  staffAccess: AuditStaffAccess | null;
 };
 
 /** The door an audit row came through. */
@@ -192,6 +196,37 @@ export interface AuditImpersonationMetadataSchema extends Named<
 > {}
 export const auditImpersonationMetadataSchema: AuditImpersonationMetadataSchema =
   auditImpersonationMetadataSchemaDefinition;
+
+/** An operator a staff access row names; older rows carry only the id. */
+const auditStaffPersonSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().nullish(),
+  email: z.string().nullish(),
+});
+
+/**
+ * What a staff access row (ADR-202) carries: the principal that acted, the approval reason, the
+ * operator who approved it and, on a revoke, the operator who ended it.
+ */
+const auditStaffAccessMetadataSchemaDefinition = z.object({
+  principal: z.string().min(1),
+  reason: z.string().nullable().catch(null),
+  approvedBy: auditStaffPersonSchema.nullish().catch(null),
+  revokedBy: auditStaffPersonSchema.nullish().catch(null),
+});
+export interface AuditStaffAccessMetadataSchema extends Named<
+  typeof auditStaffAccessMetadataSchemaDefinition
+> {}
+export const auditStaffAccessMetadataSchema: AuditStaffAccessMetadataSchema =
+  auditStaffAccessMetadataSchemaDefinition;
+export type AuditStaffAccess = z.infer<typeof auditStaffAccessMetadataSchema>;
+/** A producer that knows its target's name records it as `metadata.targetName`. */
+const auditTargetNameMetadataSchemaDefinition = z.object({ targetName: z.string().min(1) });
+export interface AuditTargetNameMetadataSchema extends Named<
+  typeof auditTargetNameMetadataSchemaDefinition
+> {}
+export const auditTargetNameMetadataSchema: AuditTargetNameMetadataSchema =
+  auditTargetNameMetadataSchemaDefinition;
 
 /**
  * How colleagues on a matching domain get into an organization; identity's join ledger
@@ -239,6 +274,24 @@ export interface SignInSecurityPolicySchema extends Named<
 export const signInSecurityPolicySchema: SignInSecurityPolicySchema =
   signInSecurityPolicySchemaDefinition;
 export type SignInSecurityPolicy = z.infer<typeof signInSecurityPolicySchema>;
+
+/**
+ * Whether members may connect the docs playground to their own access (ADR-185, amendment of
+ * 2026-11-13). Off, no key is minted; one minted at or before `docsPlaygroundSessionsDisabledAt`
+ * never authenticates again, even once it is back on (amendment of 2026-11-14).
+ */
+const docsPlaygroundPolicySchemaDefinition = z
+  .object({
+    docsPlaygroundSessionsEnabled: z.boolean(),
+    docsPlaygroundSessionsDisabledAt: z.date().nullable(),
+  })
+  .strict();
+export interface DocsPlaygroundPolicySchema extends Named<
+  typeof docsPlaygroundPolicySchemaDefinition
+> {}
+export const docsPlaygroundPolicySchema: DocsPlaygroundPolicySchema =
+  docsPlaygroundPolicySchemaDefinition;
+export type DocsPlaygroundPolicy = z.infer<typeof docsPlaygroundPolicySchema>;
 
 /**
  * Who may create an account on this installation, and who may found an

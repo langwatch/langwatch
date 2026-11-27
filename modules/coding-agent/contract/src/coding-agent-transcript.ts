@@ -2,7 +2,7 @@ import type { Named } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { collectLogEntries } from "./coding-agent-transcript-log.ts";
+import { collectDeliveredPolls, collectLogEntries } from "./coding-agent-transcript-log.ts";
 import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
 import {
   type SpanReply,
@@ -61,14 +61,19 @@ const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
     failed: z.boolean(),
     agentId: z.string().nullable(),
     spanId: z.string(),
+    // True for a call Claude Code's Code Mode made from inside a REPL script: it left only a
+    // decision log, so it has no span and no recorded output.
+    inScript: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal("tool_rejected"),
     atMs: z.number(),
     name: z.string().nullable(),
     reason: z.string().nullable(),
-    // A user who cancels a call did not refuse it; the line says which.
-    outcome: z.enum(["denied", "aborted"]),
+    // A user who cancels or answers instead did not refuse the call; the line says which.
+    outcome: z.enum(["denied", "redirected", "aborted"]),
+    // True only when the decision's source names the user; a policy denial is not theirs.
+    byUser: z.boolean(),
   }),
   z.object({
     kind: z.literal("note"),
@@ -123,7 +128,12 @@ export function buildCodingAgentTranscript({
   // A log event is the richer record of a prompt; the span's copy fills in when none arrived.
   const logsReportPrompts = fromLogs.entries.some(isUserPromptEntry);
   const spanPrompts = logsReportPrompts ? [] : fromSpans.spanPrompts;
-  const entries = [...fromSpans.entries, ...spanPrompts, ...logEntries];
+  const entries = [
+    ...fromSpans.entries,
+    ...spanPrompts,
+    ...logEntries,
+    ...collectDeliveredPolls(logs),
+  ];
 
   addUnduplicatedSpanReplies(entries, fromSpans.spanReplies, fromLogs.entries);
   entries.sort((left, right) => left.atMs - right.atMs);

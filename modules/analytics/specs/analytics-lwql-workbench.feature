@@ -244,6 +244,13 @@ Feature: LangWatchQL queries on the dashboard
       Then costs and captured content are both hidden
 
     @unit
+    Scenario: Analytics hides content restricted to admins from a plain member, as the trace view does
+      Given a project whose captured input and output are restricted to admins
+      When the workbench resolves what a project Member may see
+      Then captured input and output are both hidden
+      And a project Admin still sees both
+
+    @unit
     Scenario: A thrown data-privacy read hides captured content rather than defaulting it open
       Given a member whose data-privacy policy read fails
       When the workbench resolves what that member may see
@@ -272,3 +279,15 @@ Feature: LangWatchQL queries on the dashboard
       Given a project whose policy shows captured content to members only
       When the query surface resolves what an api key may see
       Then captured content is hidden, because an api key reads the public cut
+
+    @unit
+    Scenario: An api key the policy's audience names reads captured content
+      Given a project whose policy shows captured content to admins and one named api key
+      When the query surface resolves what that api key may see
+      Then captured content is visible, and another api key still reads the public cut
+
+    @unit
+    Scenario: A project-bound access token reads captured content as its person
+      Given a project whose policy shows captured content to admins only
+      When the query surface resolves what an admin's project-bound access token may see
+      Then captured content is visible, as it is to that admin in the workbench

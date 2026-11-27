@@ -44,6 +44,7 @@
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",

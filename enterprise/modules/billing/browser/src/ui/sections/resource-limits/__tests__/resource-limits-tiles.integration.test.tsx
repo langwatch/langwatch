@@ -24,27 +24,27 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 const limits = {
-  members: { current: 4, max: 100 },
-  membersLite: { current: 0, max: 50 },
-  messagesPerMonth: { current: 184, max: 10_000 },
+  members: { current: 4 },
+  membersLite: { current: 0 },
+  messagesPerMonth: { current: 184 },
 };
 
 afterEach(() => cleanup());
 
 describe("ResourceLimitsDisplay", () => {
   describe("given limits that are shown", () => {
-    /** @scenario Usage against each limit is read on the Usage page */
-    it("shows each resource as current against its limit, lite members included on request", () => {
-      render(<ResourceLimitsDisplay limits={limits} showLimits showLiteMembers />, {
+    /** @scenario Each resource's current use is read on the Usage page */
+    it("shows each resource's current use, lite members included on request", () => {
+      render(<ResourceLimitsDisplay limits={limits} showLiteMembers />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("limit-Team members").textContent).toBe("4 / 100");
-      expect(screen.getByTestId("limit-Lite members").textContent).toBe("0 / 50");
-      expect(screen.getByTestId("limit-Events / month").textContent).toBe("184 / 10000");
+      expect(screen.getByTestId("limit-Team members").textContent).toBe("4");
+      expect(screen.getByTestId("limit-Lite members").textContent).toBe("0");
+      expect(screen.getByTestId("limit-Events / month").textContent).toBe("184");
     });
 
-    /** @scenario Usage against each limit is read on the Usage page */
+    /** @scenario Each resource's current use is read on the Usage page */
     it("names the usage row after traces when asked", () => {
       render(<ResourceLimitsDisplay limits={limits} messagesLabel="Traces / month" />, {
         wrapper: Wrapper,

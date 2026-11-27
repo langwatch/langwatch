@@ -35,6 +35,9 @@ const createMockPrisma = () => ({
   customRole: {
     findMany: vi.fn().mockResolvedValue([]),
   },
+  seatHold: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
   cost: {
     aggregate: vi.fn().mockResolvedValue({ _sum: { amount: null } }),
   },
@@ -60,6 +63,22 @@ describe("PrismaOrganizationSeatRepository", () => {
 
     afterEach(() => {
       vi.useRealTimers();
+    });
+
+    it("counts a live seat hold as a full seat unless its person holds one again", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+        { userId: "back", role: OrganizationUserRole.MEMBER },
+      ]);
+      mockPrisma.seatHold.findMany.mockResolvedValue([{ userId: "back" }, { userId: "removed" }]);
+
+      const seats = await repository.countMemberSeats(organizationId);
+
+      expect(seats).toMatchObject({ fullMembers: 3 });
+      expect(mockPrisma.seatHold.findMany).toHaveBeenCalledWith({
+        where: { organizationId, heldUntil: { gt: new Date("2024-03-15T12:00:00.000Z") } },
+        select: { userId: true, email: true },
+      });
     });
 
     it("counts ADMIN and MEMBER role users as full members", async () => {

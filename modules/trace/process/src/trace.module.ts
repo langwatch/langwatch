@@ -4,18 +4,48 @@ import {
   projectRequestContextOf,
 } from "@langwatch/api/rest";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { nowInstant } from "@langwatch/time";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
-import { defineMigrationStep } from "@langwatch/upgrade/step";
+import {
+  defineMigrationStep,
+  defineProjectionReplayStep,
+  type LaneReplayer,
+  type MigrationStep,
+  type MigrationStepDefinition,
+} from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
 import { traceChannels } from "./channels/trace-channels.registry.ts";
+import { SPAN_ANALYTICS_PROJECTION_NAME } from "./eventing/span-analytics.projection.ts";
+import { TRACE_ANALYTICS_PROJECTION_NAME } from "./eventing/trace-derived.projection.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
-import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
+import { APP_VERSION_REPLAY_STEP_ID } from "./rules/app-version.rules.ts";
+import {
+  MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+  MANAGED_VERSION_REPLAY_HOURS,
+} from "./rules/managed-prompt-version-replay.rules.ts";
+import {
+  RECORD_EVALUATION_OUTCOMES_STEP_ID,
+  TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+} from "./rules/trace-evaluation-analytics.rules.ts";
+import {
+  SPAN_ANALYTICS_REPLAY_STEP_ID,
+  TRACE_ANALYTICS_REPLAY_STEP_ID,
+  WIDGET_COLUMNS_REPLAY_HOURS,
+} from "./rules/trace-widget-columns.rules.ts";
+import {
+  EVALUATION_OUTCOMES_BACKFILL_HOURS,
+  evaluationOutcomesBackfillReportSchema,
+} from "./services/trace-evaluation-outcomes-migration.service.ts";
+import {
+  materialisationProgressSchema,
+  TraceIndexMaterialisationService,
+} from "./services/trace-index-materialisation.service.ts";
 import { traceMonthIdsReportSchema } from "./services/trace-month-ids-migration.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
@@ -28,6 +58,30 @@ import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { tracesRest } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
+
+/**
+ * Refolds the 122 days att-change reads so each trace_analytics row carries its trace's managed
+ * prompt version (goose 00133), once no older writer is left to write rows without it.
+ * `after` names the lane's earlier replays: two replays of one lane share its markers and pause.
+ */
+export function managedPromptVersionReplayStep({
+  replayer,
+  after,
+}: {
+  replayer: LaneReplayer;
+  after: NonNullable<MigrationStepDefinition["after"]>;
+}): MigrationStep {
+  return defineProjectionReplayStep({
+    id: MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+    description:
+      "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
+    lane: TRACE_ANALYTICS_PROJECTION_NAME,
+    since: nowInstant().subtract({ hours: MANAGED_VERSION_REPLAY_HOURS }).toString(),
+    needsOldWritersGone: true,
+    after,
+    replayer,
+  });
+}
 
 /**
  * Canonical Trace server feature installer: the registry chooses every repository tier, and
@@ -81,42 +135,145 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ app, repositories }) => [
-      defineMigrationStep({
-        id: "trace:track-updated-at-index-materialisation",
+    .withMigrations(({ app, repositories, replayer }) => {
+      // Refold the window the stock widgets read, once no older writer is left to write rows
+      // without the fold's columns (analytics ADR-006); one step per lane.
+      const replayTraceAnalytics = defineProjectionReplayStep({
+        id: TRACE_ANALYTICS_REPLAY_STEP_ID,
+        description:
+          "Refolds the last 62 days of trace analytics rows so they carry the stock widgets' metadata columns.",
+        lane: TRACE_ANALYTICS_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+        needsOldWritersGone: true,
+        replayer,
+      });
+      // Done once every command is sent; the live trace fold writes those rows as it handles them.
+      const recordEvaluationOutcomes = defineMigrationStep({
+        id: RECORD_EVALUATION_OUTCOMES_STEP_ID,
         kind: "data",
         mode: "background",
         description:
-          "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
-        needsOldWritersGone: false,
-        run: ({ checkpoint, dryRun, signal }) =>
-          TraceIndexMaterialisationService.create({
-            mutations: repositories.indexMaterialisation,
-          }).waitForUpdatedAtIndex({
-            dryRun,
-            signal,
-            onPoll: (progress) => checkpoint.save({ report: progress }),
-          }),
-      }),
-      defineMigrationStep({
-        id: "trace:send-month-trace-ids",
-        kind: "data",
-        mode: "background",
-        description:
-          "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
-        // An old worker counts no trace live, so the step lists traces until the last is gone.
+          "Records each evaluation of the last 62 days on its trace, so the trace's evaluation rows can be written.",
+        // An older worker records no outcome live, so the step pages until the last is gone.
         needsOldWritersGone: true,
         run: ({ checkpoint, dryRun, signal }) => {
-          const resumed = traceMonthIdsReportSchema.safeParse(checkpoint.resumeFrom);
-          return app.sendMonthTraceIds({
+          const resumed = evaluationOutcomesBackfillReportSchema.safeParse(checkpoint.resumeFrom);
+          return app.recordEvaluationOutcomes({
             resumeFrom: resumed.success ? resumed.data : null,
             dryRun,
             signal,
             onPage: (report) => checkpoint.save({ report }),
           });
         },
-      }),
-    ])
+      });
+      // After both: the outcomes are in the log and the lane's own replay has run, so this pass
+      // writes every recent trace's evaluation rows from the whole history (trace ADR-003).
+      const replayEvaluationAnalytics = defineProjectionReplayStep({
+        id: TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+        description:
+          "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+        lane: TRACE_ANALYTICS_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
+        needsOldWritersGone: true,
+        after: [recordEvaluationOutcomes, replayTraceAnalytics],
+        replayer,
+      });
+      const managedPromptVersion = managedPromptVersionReplayStep({
+        replayer,
+        after: [replayTraceAnalytics, replayEvaluationAnalytics],
+      });
+      return [
+        // An old image stores trace media without a link, so wait until none serves.
+        defineMigrationStep({
+          id: "trace:link-unowned-trace-media",
+          kind: "tenant",
+          mode: "background",
+          tenants: "project",
+          needsOldWritersGone: true,
+          title: "Owner links for trace media stored before them",
+          description:
+            "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+          requiresOperatorConfirmation: false,
+          runsAutomaticallyOnSelfHosted: true,
+          enrolledAutomatically: true,
+          migrateTenant: (args) => app.linkUnownedTraceMedia(args),
+        }),
+        defineMigrationStep({
+          id: "trace:track-updated-at-index-materialisation",
+          kind: "data",
+          mode: "background",
+          description:
+            "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+          needsOldWritersGone: false,
+          run: ({ checkpoint, dryRun, signal }) =>
+            TraceIndexMaterialisationService.create({
+              mutations: repositories.indexMaterialisation,
+            }).waitForUpdatedAtIndex({
+              dryRun,
+              signal,
+              onPoll: (progress) => checkpoint.save({ report: progress }),
+            }),
+        }),
+        defineMigrationStep({
+          id: "trace:track-analytics-metadata-columns-materialisation",
+          kind: "data",
+          mode: "background",
+          description:
+            "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+          needsOldWritersGone: false,
+          run: ({ checkpoint, dryRun, signal }) =>
+            TraceIndexMaterialisationService.create({
+              mutations: repositories.indexMaterialisation,
+            }).waitForAnalyticsMetadataColumns({
+              dryRun,
+              resumed: materialisationProgressSchema.validate(checkpoint.resumeFrom),
+              signal,
+              onPoll: (progress) => checkpoint.save({ report: progress }),
+            }),
+        }),
+        replayTraceAnalytics,
+        defineProjectionReplayStep({
+          id: SPAN_ANALYTICS_REPLAY_STEP_ID,
+          description:
+            "Fills span_analytics with the last 62 days of spans, the history the stock span widgets read.",
+          lane: SPAN_ANALYTICS_PROJECTION_NAME,
+          since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+          needsOldWritersGone: true,
+          replayer,
+        }),
+        defineMigrationStep({
+          id: "trace:send-month-trace-ids",
+          kind: "data",
+          mode: "background",
+          description:
+            "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
+          // An old worker counts no trace live, so the step lists traces until the last is gone.
+          needsOldWritersGone: true,
+          run: ({ checkpoint, dryRun, signal }) => {
+            const resumed = traceMonthIdsReportSchema.safeParse(checkpoint.resumeFrom);
+            return app.sendMonthTraceIds({
+              resumeFrom: resumed.success ? resumed.data : null,
+              dryRun,
+              signal,
+              onPage: (report) => checkpoint.save({ report }),
+            });
+          },
+        }),
+        recordEvaluationOutcomes,
+        replayEvaluationAnalytics,
+        managedPromptVersion,
+        defineProjectionReplayStep({
+          id: APP_VERSION_REPLAY_STEP_ID,
+          description:
+            "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
+          lane: TRACE_ANALYTICS_PROJECTION_NAME,
+          since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
+          needsOldWritersGone: true,
+          after: [replayTraceAnalytics, replayEvaluationAnalytics, managedPromptVersion],
+          replayer,
+        }),
+      ];
+    })
     .withIdIndexes(TRACE_ID_INDEXES, {
       description:
         "Fills the trace id indexes from rows older than their views, then marks them ready.",

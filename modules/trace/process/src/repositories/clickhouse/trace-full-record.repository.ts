@@ -10,11 +10,11 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceFullIo } from "../../features/read/services/trace-read-full-io.service.ts";
 import {
   applyTraceFullReadProtections,
   internalTraceFullReadProtections,
-} from "../../rules/trace-full-protection.rules.ts";
+} from "../../features/read/rules/trace-full-protection.rules.ts";
+import type { TraceFullIo } from "../../features/read/services/trace-read-full-io.service.ts";
 import {
   type StoredSpanRow,
   collectDroppedCategories,

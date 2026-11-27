@@ -13,16 +13,26 @@ describe("studio-url", () => {
     it("round-trips through parse and build", () => {
       const state = {
         ...DEFAULT_URL_STATE,
-        view: "gallery" as const,
+        view: "inspect" as const,
         templateId: "reset-password",
         fixtureName: "default",
         width: "mobile" as const,
-        density: "compact" as const,
         theme: "dark" as const,
-        everyFixture: true,
       };
 
       expect(parseUrlState(buildSearch(state))).toEqual(state);
+    });
+
+    /** @scenario "The studio opens on the weekly digests, and old links still land" */
+    it("opens the weekly digests when no view is given", () => {
+      expect(parseUrlState("").view).toBe("review");
+      expect(parseUrlState("?view=review").view).toBe("review");
+    });
+
+    /** @scenario "The studio opens on the weekly digests, and old links still land" */
+    it("opens all other emails for the old Inspect and Gallery links", () => {
+      expect(parseUrlState("?view=inspect").view).toBe("inspect");
+      expect(parseUrlState("?view=gallery").view).toBe("inspect");
     });
 
     it("falls back to the default state when the query is empty", () => {

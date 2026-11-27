@@ -36,13 +36,10 @@ type s3Disk struct {
 	Endpoint                  string `yaml:"endpoint"`
 	Region                    string `yaml:"region,omitempty"`
 	AccessKeyID               string `yaml:"access_key_id,omitempty"`
-	SecretAccessKey            string `yaml:"secret_access_key,omitempty"`
+	SecretAccessKey           string `yaml:"secret_access_key,omitempty"`
 	UseEnvironmentCredentials bool   `yaml:"use_environment_credentials"`
 	UseInsecureIMDSRequest    bool   `yaml:"use_insecure_imds_request"`
 	MetadataPath              string `yaml:"metadata_path,omitempty"`
-	CacheEnabled              bool   `yaml:"cache_enabled,omitempty"`
-	CachePath                 string `yaml:"cache_path,omitempty"`
-	MaxCacheSize              int64  `yaml:"max_cache_size,omitempty"`
 	SkipAccessCheck           bool   `yaml:"skip_access_check"`
 }
 
@@ -50,7 +47,7 @@ type s3PlainDisk struct {
 	Type            string `yaml:"type"`
 	Endpoint        string `yaml:"endpoint"`
 	AccessKeyID     string `yaml:"access_key_id,omitempty"`
-	SecretAccessKey  string `yaml:"secret_access_key,omitempty"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty"`
 	SkipAccessCheck bool   `yaml:"skip_access_check"`
 }
 
@@ -79,11 +76,6 @@ func Render(input *config.Input, computed *config.Computed) ([]byte, error) {
 
 	// Cold storage: object disk + tiered storage policy
 	if input.ColdEnabled {
-		cacheSize := computed.CacheMaxSize
-		if cacheSize <= 0 {
-			cacheSize = 1 << 30 // 1GB fallback
-		}
-
 		objectDisk := s3Disk{
 			Type:                      "s3",
 			Endpoint:                  endpoint,
@@ -91,9 +83,6 @@ func Render(input *config.Input, computed *config.Computed) ([]byte, error) {
 			UseEnvironmentCredentials: input.UseEnvironmentCredentials,
 			UseInsecureIMDSRequest:    input.UseInsecureIMDS,
 			MetadataPath:              "/var/lib/clickhouse/disks/object/",
-			CacheEnabled:              true,
-			CachePath:                 "/var/lib/clickhouse/disks/object/cache/",
-			MaxCacheSize:              cacheSize,
 			SkipAccessCheck:           true,
 		}
 

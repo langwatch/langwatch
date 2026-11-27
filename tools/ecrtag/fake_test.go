@@ -18,7 +18,8 @@ const (
 var errAccessDenied = errors.New("an error occurred (AccessDeniedException)")
 
 type entry struct {
-	digest, mediaType, body, label string
+	digest, mediaType, body, label, inputs string
+	labelErr                               error
 }
 
 // fakeRegistry is one ECR repository: a tag per entry.
@@ -67,6 +68,23 @@ func (r *fakeRegistry) Tags(context.Context, string) ([]string, error) {
 	return tags, nil
 }
 
+// ImageTags is every tag whose entry has the same digest as ref's.
+func (r *fakeRegistry) ImageTags(_ context.Context, ref ecrtag.Ref) ([]string, error) {
+	e, ok := r.tags[ref.Tag]
+	if !ok {
+		return nil, ecrtag.ErrNotFound
+	}
+	var tags []string
+	for tag, other := range r.tags {
+		if other.digest == e.digest {
+			tags = append(tags, tag)
+		}
+	}
+	slices.Sort(tags)
+
+	return tags, nil
+}
+
 func (r *fakeRegistry) Manifest(_ context.Context, ref ecrtag.Ref) (ecrtag.Manifest, error) {
 	e, ok := r.tags[ref.Tag]
 	if !ok {
@@ -92,6 +110,15 @@ func (r *fakeRegistry) Label(_ context.Context, ref ecrtag.Ref, key string) (str
 	}
 
 	return r.tags[ref.Tag].label, nil
+}
+
+func (r *fakeRegistry) ImageLabel(_ context.Context, ref ecrtag.Ref, key string) (string, error) {
+	if key != ecrtag.InputsKey {
+		return "", errors.New("unexpected label " + key)
+	}
+	e := r.tags[ref.Tag]
+
+	return e.inputs, e.labelErr
 }
 
 // fakeAncestry walks a first-parent history, nearest commit first.

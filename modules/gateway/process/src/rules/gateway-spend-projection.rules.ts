@@ -26,4 +26,5 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
   input_image_tokens: 0,
   output_image_tokens: 0,
   image_count: 0,
+  web_search_requests: 0,
 };

@@ -186,7 +186,7 @@ export class OrganizationService {
 
   /** Every organization this person belongs to, for a caller with no list of
    *  candidates to filter. */
-  organizationIdsForMember(input: { userId: string }): Promise<string[]> {
+  organizationIdsForMember(input: { userId: string; activeOnly?: boolean }): Promise<string[]> {
     return this.teams.organizationIdsForMember(input);
   }
 
@@ -224,6 +224,17 @@ export class OrganizationService {
   /** The moment that counts is the one the agreement was given, so it is taken here. */
   recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void> {
     return this.repository.recordInstantEvalsOptIn({ ...input, at: nowInstant() });
+  }
+
+  isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean> {
+    return this.repository.isPiiRedactionModelAccepted(input);
+  }
+
+  recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    return this.repository.recordPiiRedactionModelAcceptance({ ...input, at: nowInstant() });
   }
 
   /** The guided-onboarding record, where the organization keeps it. */

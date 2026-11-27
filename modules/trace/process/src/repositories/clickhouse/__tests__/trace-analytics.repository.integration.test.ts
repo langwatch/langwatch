@@ -186,6 +186,61 @@ describe.skipIf(!clickHouseConfigured)(
       });
     });
 
+    describe("given a trace carrying the metadata keys the stock widgets read", () => {
+      /** @scenario "The fold's real insert lets the database compute the metadata columns" */
+      it("inserts without ILLEGAL_COLUMN; the 9 read back computed, the 3 plain as written", async () => {
+        const traceId = `${tag}-metadata`;
+        const row = traceRow({
+          traceId,
+          attributes: {
+            "metadata.output_action": "approve",
+            "metadata.outcome": "resolved",
+            "metadata.sent_to_review": "true",
+            "metadata.document_type": "invoice",
+            "metadata.flow": "intake",
+            "metadata.language": "en",
+            "metadata.segment": "smb",
+            "metadata.team": "platform",
+            "metadata.topic": "billing",
+            "metadata.outcome_reason": "policy",
+            "metadata.prompt_version": "v7",
+            "metadata.env": "staging",
+          },
+        });
+
+        await repo.upsertBatch([{ row, retentionDays: 30 }]);
+
+        const result = await ch.query({
+          query: `SELECT MetadataOutputAction, MetadataOutcome, MetadataSentToReview,
+                    MetadataDocumentType, MetadataFlow, MetadataLanguage, MetadataSegment,
+                    MetadataTeam, MetadataTopic, MetadataOutcomeReason, MetadataPromptVersion,
+                    MetadataEnvironment
+                  FROM trace_analytics
+                  WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}`,
+          query_params: { tenantId, traceId },
+          format: "JSONEachRow",
+        });
+        const rows = await result.json<Record<string, string>>();
+
+        expect(rows).toEqual([
+          {
+            MetadataOutputAction: "approve",
+            MetadataOutcome: "resolved",
+            MetadataSentToReview: "true",
+            MetadataDocumentType: "invoice",
+            MetadataFlow: "intake",
+            MetadataLanguage: "en",
+            MetadataSegment: "smb",
+            MetadataTeam: "platform",
+            MetadataTopic: "billing",
+            MetadataOutcomeReason: "policy",
+            MetadataPromptVersion: "v7",
+            MetadataEnvironment: "staging",
+          },
+        ]);
+      });
+    });
+
     describe("given a pre-migration row that omits the 00056 columns", () => {
       it("decodes with documented defaults instead of refolding", async () => {
         const traceId = `${tag}-legacy`;

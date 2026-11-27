@@ -10,6 +10,11 @@ import * as path from "node:path";
 import { appSettingsTargetFor } from "./app-settings";
 import { opencodePluginTarget } from "./opencode-plugin";
 import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
+import {
+  CLAUDE_SHAPE_HOOK_FILE_FORMAT,
+  COPILOT_HOOK_FILE_FORMAT,
+  type OwnedHookFileFormat,
+} from "./owned-hook-file-formats";
 import { piExtensionTarget } from "./pi-plugin";
 
 /** Where one agent's hook lives on disk. */
@@ -27,7 +32,7 @@ export interface HooksTarget {
 export type HookTarget =
   | { kind: "entries"; resolve: () => HooksTarget }
   | { kind: "plugin"; resolve: () => HooksTarget }
-  | { kind: "owned-file"; resolve: () => HooksTarget };
+  | { kind: "owned-file"; resolve: () => HooksTarget; format: OwnedHookFileFormat };
 
 export interface SessionContextAgent {
   /** The tool argument `langwatch ingest hook` is called with. */
@@ -50,6 +55,8 @@ export interface SessionContextAgent {
    * it, since it follows the session into a worktree it switches to.
    */
   projectDirVar?: string;
+  /** The `langwatch ingest guidance` argument its SessionStart entry also runs, if any. */
+  sessionStartGuidance?: string;
   hookTarget: HookTarget;
 }
 
@@ -88,6 +95,7 @@ export const SESSION_CONTEXT_AGENTS = {
     keySourceType: only("claude_code"),
     sessionIdVar: "CLAUDE_CODE_SESSION_ID",
     projectDirVar: "CLAUDE_PROJECT_DIR",
+    sessionStartGuidance: "claude-code",
     hookTarget: {
       kind: "entries",
       resolve: () => {
@@ -141,6 +149,7 @@ export const SESSION_CONTEXT_AGENTS = {
     hookTarget: {
       kind: "owned-file",
       resolve: () => ownedHookFileIn({ homeVar: "COPILOT_HOME", homeDir: ".copilot" }),
+      format: COPILOT_HOOK_FILE_FORMAT,
     },
   },
   grok: {
@@ -154,6 +163,8 @@ export const SESSION_CONTEXT_AGENTS = {
     hookTarget: {
       kind: "owned-file",
       resolve: () => ownedHookFileIn({ homeVar: "GROK_HOME", homeDir: ".grok" }),
+      // Grok reads Claude Code's hook shape (ADR-192).
+      format: CLAUDE_SHAPE_HOOK_FILE_FORMAT,
     },
   },
   pi: {
@@ -188,6 +199,11 @@ export type OwnedHookFileTool = {
 /** Whether the agent's hook is a whole file of ours rather than entries in one of the user's. */
 export function hasOwnedHookFile(id: SessionContextAgentId): id is OwnedHookFileTool {
   return SESSION_CONTEXT_AGENTS[id].hookTarget.kind === "owned-file";
+}
+
+/** The format the agent reads its hook file of ours in, from its row. */
+export function ownedHookFileFormat(id: OwnedHookFileTool): OwnedHookFileFormat {
+  return SESSION_CONTEXT_AGENTS[id].hookTarget.format;
 }
 
 /**

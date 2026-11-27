@@ -15,8 +15,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
-import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const settledMutation = {

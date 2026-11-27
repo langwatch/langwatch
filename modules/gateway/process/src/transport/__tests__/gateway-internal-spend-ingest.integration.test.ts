@@ -12,6 +12,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import type { GatewaySpendRating } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
+import type { GatewayFirstRequestKey } from "../../services/gateway-governance-events.service.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,
@@ -38,6 +39,8 @@ const SECRET = "0123456789abcdef0123456789abcdef";
 let appended: Record<string, unknown>[] = [];
 /** Every confirmation the route appended, which the seam now enriches too. */
 let appendedConfirms: Record<string, unknown>[] = [];
+/** Every key the route recorded as serving its first request. */
+let firstRequestKeys: GatewayFirstRequestKey[] = [];
 
 /** A flat price, because what is under test is the join, not the rating. */
 class FlatRating implements GatewaySpendRating {
@@ -84,6 +87,12 @@ function buildApp(): void {
           })),
       }),
       budgetSpend: undefined,
+      firstRequests: {
+        recordVkFirstRequest: (virtualKey) => {
+          firstRequestKeys.push(virtualKey);
+          return Promise.resolve();
+        },
+      },
       spend: {
         commands: {
           admitSpend: record(appended),
@@ -196,6 +205,7 @@ describe.skipIf(!databaseUrl)("spend-command ingest enrichment (real PG + intern
   afterEach(() => {
     appended = [];
     appendedConfirms = [];
+    firstRequestKeys = [];
     vi.restoreAllMocks();
     buildApp();
   });
@@ -244,6 +254,8 @@ describe.skipIf(!databaseUrl)("spend-command ingest enrichment (real PG + intern
 
       await postRecords([admitRecord()]);
       expect((await lastUsedAt())?.getTime()).toBe(firstTouch?.getTime());
+      // Only the batch that saw the key unused records its first request.
+      expect(firstRequestKeys.map((key) => key.id)).toEqual([VK_ID]);
     });
 
     it("advances lastUsedAt for a key whose request the gateway went on to block", async () => {

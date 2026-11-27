@@ -5,7 +5,10 @@
  */
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
+import type {
+  LangWatchQLChartCrashContext,
+  LangWatchQLDatasetColumn,
+} from "@langwatch/analytics-contract/visualization";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { lazy, useMemo } from "react";
@@ -36,6 +39,8 @@ export interface LangWatchQLDashboardWidgetProps {
   readonly granularitySeconds?: LangWatchQLGranularityStep;
   /** The card's title, used to describe the chart to a screen reader. */
   readonly name: string;
+  /** The board the card sits on, named when its chart crashes while drawing. */
+  readonly dashboardId?: string;
 }
 
 export function LangWatchQLDashboardWidget({
@@ -43,6 +48,7 @@ export function LangWatchQLDashboardWidget({
   projectId,
   granularitySeconds,
   name,
+  dashboardId,
 }: LangWatchQLDashboardWidgetProps) {
   const { period } = useAnalyticsPeriod();
   const refreshedAt = useDashboardRefreshedAt();
@@ -98,6 +104,7 @@ export function LangWatchQLDashboardWidget({
       columns={columns}
       vegaLiteSpec={chartQuery.data.definition.vegaLiteSpec}
       name={name}
+      crashContext={{ widgetId: chartId, ...(dashboardId === undefined ? {} : { dashboardId }) }}
     />
   );
 }
@@ -108,11 +115,13 @@ function WidgetBody({
   columns,
   vegaLiteSpec,
   name,
+  crashContext,
 }: {
   result: NonNullable<ReturnType<typeof useLangWatchQLWidgetRun>["result"]>;
   columns: readonly LangWatchQLDatasetColumn[];
   vegaLiteSpec: Record<string, unknown> | undefined;
   name: string;
+  crashContext: LangWatchQLChartCrashContext;
 }) {
   const coarsenedFrom = result.coarsenedFromSeconds;
 
@@ -139,6 +148,7 @@ function WidgetBody({
           rows={result.rows}
           {...(vegaLiteSpec ? { vegaLiteSpec } : {})}
           ariaLabel={name}
+          crashContext={crashContext}
         />
       </Box>
     </VStack>

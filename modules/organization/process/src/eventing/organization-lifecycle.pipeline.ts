@@ -32,7 +32,10 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import {
+  ORGANIZATION_AGGREGATE_TYPE,
+  OrganizationNotFoundError,
+} from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
@@ -46,7 +49,10 @@ import {
   RecordMemberDisabledCommand,
   RecordMemberEnabledCommand,
   RecordMemberRemovedCommand,
+  RecordMemberListedCommand,
   RecordMemberDepartmentChangedCommand,
+  RecordMemberRoleChangedCommand,
+  RecordMemberAdmittedCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPersonalTeamCreatedCommand,
   RecordPersonalWorkspaceArchivedCommand,
@@ -55,21 +61,25 @@ import {
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
   RecordTraceSharingDisabledCommand,
+  RecordDocsPlaygroundSessionsDisabledCommand,
 } from "./organization-lifecycle.commands.ts";
 import {
   integrationMethodChosenEventSchema,
   inviteAcceptedEventSchema,
   membersInvitedEventSchema,
-  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   organizationCreatedEventSchema,
   organizationMemberDisabledEventSchema,
   organizationMemberEnabledEventSchema,
   organizationMemberRemovedEventSchema,
+  organizationMemberListedEventSchema,
   organizationMemberDepartmentChangedEventSchema,
+  organizationMemberRoleChangedEventSchema,
+  organizationMemberAdmittedEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
+  organizationDocsPlaygroundSessionsDisabledEventSchema,
   personalWorkspaceProvisionedEventSchema,
   personalTeamCreatedEventSchema,
   personalWorkspaceArchivedEventSchema,
@@ -129,11 +139,15 @@ function lifecycleCommands() {
       personalWorkspaceFeaturesChangedEventSchema,
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
+      organizationDocsPlaygroundSessionsDisabledEventSchema,
       organizationMemberDisabledEventSchema,
       organizationMemberEnabledEventSchema,
       organizationMemberRemovedEventSchema,
       organizationMemberDepartmentChangedEventSchema,
+      organizationMemberRoleChangedEventSchema,
+      organizationMemberAdmittedEventSchema,
       organizationCreatedEventSchema,
+      organizationMemberListedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
@@ -149,11 +163,18 @@ function lifecycleCommands() {
     )
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
     .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
+    .withCommand(
+      "recordDocsPlaygroundSessionsDisabled",
+      RecordDocsPlaygroundSessionsDisabledCommand,
+    )
     .withCommand("recordMemberDisabled", RecordMemberDisabledCommand)
     .withCommand("recordMemberEnabled", RecordMemberEnabledCommand)
     .withCommand("recordMemberRemoved", RecordMemberRemovedCommand)
     .withCommand("recordMemberDepartmentChanged", RecordMemberDepartmentChangedCommand)
-    .withCommand("recordCreated", RecordCreatedCommand);
+    .withCommand("recordMemberRoleChanged", RecordMemberRoleChangedCommand)
+    .withCommand("recordMemberAdmitted", RecordMemberAdmittedCommand)
+    .withCommand("recordCreated", RecordCreatedCommand)
+    .withCommand("recordMemberListed", RecordMemberListedCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<
@@ -258,23 +279,26 @@ export function buildOrganizationLifecyclePipeline({
     .withPeerSubscriber("organizationAuthzMemberOffboarded", {
       eventType: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
       data: authzMemberOffboardedEventDataSchema,
-      handle: ({ organizationId, userId, offboardedByUserId, occurredAt }) =>
+      handle: ({ organizationId, userId, offboardedByUserId, occurredAt, heldFullSeat }) =>
         onLiveOrganization(() =>
           memberFacts.recordMemberOffboarded({
             organizationId,
             userId,
             offboardedByUserId,
             occurredAt,
+            heldFullSeat,
           }),
         ),
     })
     .withPeerSubscriber("organizationUserErased", {
       eventType: USER_ERASED_EVENT_TYPE,
       data: userErasedEventDataSchema,
-      handle: async ({ userId, organizationIds, occurredAt }) => {
+      handle: async ({ userId, organizationIds, fullSeatOrganizationIds, occurredAt }) => {
         for (const organizationId of organizationIds ?? []) {
+          // Facts from before the seat type was read carry no list and count as full seats.
+          const heldFullSeat = fullSeatOrganizationIds?.includes(organizationId);
           await onLiveOrganization(() =>
-            memberFacts.recordMemberErased({ organizationId, userId, occurredAt }),
+            memberFacts.recordMemberErased({ organizationId, userId, occurredAt, heldFullSeat }),
           );
         }
       },
@@ -286,5 +310,8 @@ export const organizationLifecycleEventing = defineEventingModule({
   pipeline: ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   build: ({ app }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
     app.lifecyclePipeline(),
-  connect: ({ app, commands }) => app.connectLifecycle(commands),
+  connect: ({ app, commands }) => {
+    app.connectLifecycle(commands);
+    app.connectMemberListing(commands);
+  },
 });

@@ -6,12 +6,10 @@ Feature: Settings Plans Comparison Page
   Background:
     Given I am logged in as a member of an organization
 
-  # 5 of 9 scenarios are bound to existing tests in [gone] src/components/plans/__tests__/PlansComparisonPage.integration.test.tsx.
-  # The remaining 4 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
-  # — detail tables rendered as feature tag lists, not structured detail/value rows — and need the scenarios
+  # The 3 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
+  # (detail tables rendered as feature tag lists, not structured detail/value rows) and need the scenarios
   # rewritten before binding (tracked under #3458):
   #   - "Free plan column shows default limits"
-  #   - "Growth plan column shows seat and usage pricing in the selected currency"
   #   - "Enterprise plan column shows custom commercial option"
   #   - "Plan details are visually comparable by row"
 
@@ -62,6 +60,13 @@ Feature: Settings Plans Comparison Page
     Then I see a notice that my current pricing model has been discontinued
     And the notice contains a link to /settings/subscription to update my plan
 
+  @integration
+  Scenario: Upgrade now on the Growth column starts the Growth checkout
+    Given my organization is on the Free plan
+    And I picked the annual billing period and the USD currency on /settings/plans
+    When I press "Upgrade now" in the "Growth" column
+    Then I am sent to /settings/subscription asking it to start the annual Growth checkout in USD
+
   @integration @unimplemented
   Scenario: Free plan column shows default limits
     Given I am on /settings/plans
@@ -75,25 +80,27 @@ Feature: Settings Plans Comparison Page
       | custom evaluations | 3              |
     And the plan is presented as the default starter tier
 
-  @integration @unimplemented
+  @integration
   Scenario Outline: Growth plan column shows seat and usage pricing in the selected currency
     Given I am on /settings/plans
     When I select the <currency> currency
-    Then the "Growth" plan shows:
-      | detail                        | value                                          |
-      | base price                    | <seat> per seat per month                      |
-      | included events               | 200,000                                        |
-      | extra event pricing           | <events> per additional 100,000 events         |
-      | included data retention       | 30 days                                        |
-      | custom retention              | <retention> per GB                             |
-      | core users                    | up to 20 with volume discount                  |
-      | lite users                    | unlimited                                      |
-      | evals simulations and prompts | unlimited                                      |
+    Then the "Growth" plan shows the monthly seat price from the price catalogue in <currency> per seat/month
+    And the seat price says it excludes VAT
+    And the "Growth" plan lists:
+      | feature                                        |
+      | Everything in Free                             |
+      | 200,000 events included                        |
+      | <events> per additional 100,000 events         |
+      | 30 days retention (+ custom at <retention>/GB) |
+      | Volume discounts above 20 users                |
+      | Unlimited lite users                           |
+      | Unlimited evals, simulations and prompts       |
+      | Slack support                                  |
 
     Examples:
-      | currency | seat | events | retention |
-      | EUR      | €29  | €5     | €3        |
-      | USD      | $34  | $6     | $4        |
+      | currency | events | retention |
+      | EUR      | €5     | €3        |
+      | USD      | $6     | $4        |
 
   @integration @unimplemented
   Scenario: Enterprise plan column shows custom commercial option

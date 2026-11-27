@@ -17,11 +17,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [LangWatch CLI](https://langwatch.ai/docs/integration/cli.md): The `langwatch` CLI is a single tool that drives LangWatch from the terminal, for you and for your coding assistant. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 - [LangWatch MCP Server](https://langwatch.ai/docs/integration/mcp.md): Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
+- [Debug LLM traces from your coding assistant with MCP](https://langwatch.ai/docs/integration/mcp-debug-traces.md): The LangWatch MCP server lets Claude Code, Cursor or Copilot search and read your agent's traces themselves.
 - [Changelog](https://langwatch.ai/docs/changelog.md): What changed in each recent LangWatch release, from the release notes in the repository.
 
 ## Agent Testing
 
-- [Agent Testing](https://langwatch.ai/docs/agent-testing/overview.md): Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
+- [AI agent testing with simulated users](https://langwatch.ai/docs/agent-testing/overview.md): Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
+- [Test AI agents with simulated users in pytest or vitest](https://langwatch.ai/docs/agent-testing/simulated-users.md): Scenario, LangWatch's open-source testing library, runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
 
 ### Get started
 
@@ -63,6 +65,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Voice Agents](https://langwatch.ai/docs/agent-testing/voice-agents.md): Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
 - [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
+- [OWASP Red Team Pack](https://langwatch.ai/docs/agent-testing/owasp-red-team.md): Run one multi-turn attack per OWASP risk against your agent as pytest or vitest scenario tests, with every verdict in LangWatch.
+- [Red Team Templates](https://langwatch.ai/docs/agent-testing/red-team-templates.md): Create a red team test suite from an OWASP pack in the platform, fit it to your agent, run it and read which attacks your agent held against.
+- [Red team AI agents with an open-source multi-turn attacker](https://langwatch.ai/docs/agent-testing/red-team-open-source.md): Scenario, LangWatch's open-source testing library, attacks your agent over dozens of turns inside pytest or vitest and fails the test when it breaks.
 
 ## Observability
 
@@ -79,8 +84,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
 - [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
-- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+- [Dashboards](https://langwatch.ai/docs/features/dashboards.md): Build dashboards of charts over your LangWatch data, or start one from the My agent at a glance template for a quick view of your project.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
+- [Braids](https://langwatch.ai/docs/features/braids.md): Show another project's matching spans inside your traces, so an agent that calls agents in other projects can follow each call all the way down. The spans stay where they were recorded.
 - [Topic clustering](https://langwatch.ai/docs/features/topic-clustering.md): Group your traces into topics and subtopics automatically, choose the model it uses, and run it on demand from Settings.
 - [Exporting Analytics](https://langwatch.ai/docs/features/embedded-analytics.md): Export LangWatch analytics into your own dashboards to monitor LLM quality, agent testing metrics, and evaluation performance.
 
@@ -100,6 +106,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Pairwise Comparison: judge candidates head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
 
 - [Running Experiments in CI/CD](https://langwatch.ai/docs/evaluations/experiments/ci-cd.md): Automate LLM quality gates by running experiments in your CI/CD pipelines.
+- [Versions and Deploy Labels](https://langwatch.ai/docs/evaluations/experiments/versions-and-deploy-labels.md): Save agent and evaluator versions, point a deploy label such as production at one, and roll back by moving the label, with no code change.
 - [Multimodal Evaluation: images, PDFs and vision models](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 
 ### Online Evaluation
@@ -225,6 +232,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Getting Started](https://langwatch.ai/docs/integration/overview.md): LangWatch integrates with all major LLM providers, frameworks, and tools. See our complete list of integrations below.
 - [Choosing the right OTel endpoint](https://langwatch.ai/docs/observability/trace-vs-activity-ingestion.md): LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/v1/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
+- [Multi-agent traces across A2A](https://langwatch.ai/docs/observability/multi-agent-a2a.md): See every agent of an A2A call chain in one trace, with the calls, errors, latency and cost between them.
 
 ## SDKs
 
@@ -321,6 +329,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### LangGraph
 
+- [Trace a LangGraph agent node by node](https://langwatch.ai/docs/integration/langgraph-tracing.md): Pass the LangWatch callback to your graph's invoke and every node, tool call and LLM call becomes a span you can open.
 - [LangGraph Instrumentation](https://langwatch.ai/docs/integration/python/integrations/langgraph.md): Instrument LangGraph applications with the LangWatch Python SDK to trace graph nodes, analyze workflows, and support AI agent testing.
 - [LangGraph Instrumentation](https://langwatch.ai/docs/integration/typescript/integrations/langgraph.md): Instrument LangGraph applications with the LangWatch TypeScript SDK for deep observability and agent testing workflows.
 
@@ -333,6 +342,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### DSPy Optimization
 
 - [DSPy Visualization Quickstart](https://langwatch.ai/docs/dspy-visualization/quickstart.md): Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
+- [Track DSPy optimization (MIPROv2, GEPA) in a UI](https://langwatch.ai/docs/dspy-visualization/follow-optimization-in-a-ui.md): One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
 - [Tracking Custom DSPy Optimizer](https://langwatch.ai/docs/dspy-visualization/custom-optimizer.md): Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 - [RAG Visualization](https://langwatch.ai/docs/dspy-visualization/rag-visualization.md): Visualize DSPy RAG optimization steps in LangWatch to better understand performance and support AI agent testing.
 
@@ -420,7 +430,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [LangWatch AI Gateway](https://langwatch.ai/docs/ai-gateway/overview.md): One OpenAI- and Anthropic-compatible endpoint for every LLM call in your company, with provider keys kept in LangWatch, a virtual key per application, team or person, budgets that block or warn, and a trace for every request.
 - [Quickstart](https://langwatch.ai/docs/ai-gateway/quickstart.md): Create a virtual key, send one request through the LangWatch AI Gateway with the OpenAI SDK, open the trace and see the spend on the key.
+- [AI gateway budgets: cap LLM spend with virtual keys](https://langwatch.ai/docs/ai-gateway/cap-spend-per-team.md): The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
 - [Concepts](https://langwatch.ai/docs/ai-gateway/concepts.md): The nouns of the LangWatch AI Gateway, each defined once, virtual key, scope, provider credential, routing policy, budget, spend event and gateway request id.
+- [A2A proxy](https://langwatch.ai/docs/ai-gateway/a2a-proxy.md): Register an agent-to-agent (A2A) target and call it through the gateway at /a2a/<name> with a virtual key.
 
 ## SDK Integration
 
@@ -462,7 +474,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): Add model providers, set the routing handle and the fallback order, create a routing policy, set budgets, then verify the LangWatch AI Gateway with one request.
 - [Routing Policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): A routing policy decides once which providers a virtual key routes through, what the model tiers mean, and which tools, servers, addresses and models a request may name.
 - [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): What the LangWatch AI Gateway stores for each request, and which setting governs how long each record lives.
-- [OCSF / SIEM export](https://langwatch.ai/docs/ai-gateway/governance/ocsf-export.md): Pull governance events into your SIEM as OCSF 1.1 records through a cursor-paginated read procedure.
+- [OCSF / SIEM export](https://langwatch.ai/docs/ai-gateway/governance/ocsf-export.md): Send AI activity and audit events to your SIEM as OCSF 1.9.0 events, pulled with an API key or pushed to a signed webhook, and push OCSF events from other tools into LangWatch.
 - [LangWatch AI Gateway architecture](https://langwatch.ai/docs/ai-gateway/governance/architecture.md): The components of the LangWatch AI Gateway and how they connect, from the request pipeline in the gateway service to the control plane routes, the change feed, the spend spool and the auth cache.
 
 ## Providers
@@ -548,26 +560,31 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Get Started
 
 - [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, the agents they run, and a personal home page for each developer.
-- [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
+- [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /coding-agents, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 - [From zero to your first governed request (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough to publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
 
 ## Personal Portal
 
-- [AI Tools Portal overview](https://langwatch.ai/docs/ai-governance/personal-portal/overview.md): A customizable card-grid home at /me where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
-- [AI Tools Portal tile interactions](https://langwatch.ai/docs/ai-governance/personal-portal/end-user.md): What each tile class expands into when an end user clicks it on /me. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
-- [AI Tools Portal admin catalog editor](https://langwatch.ai/docs/ai-governance/personal-portal/admin-catalog.md): How to publish, scope, and edit the AI tools that your developers see on /me. Covers starter-pack import, the three tile-type drawers, scope binding, reordering, and archive.
+- [AI Tools Portal overview](https://langwatch.ai/docs/ai-governance/personal-portal/overview.md): A customizable card-grid home at /coding-agents where every developer in your organization can see the AI tools available to them, coding assistants, model providers for virtual-key creation, and admin-curated external tools, published and scoped by your IT admins.
+- [AI Tools Portal tile interactions](https://langwatch.ai/docs/ai-governance/personal-portal/end-user.md): What each tile class expands into when an end user clicks it on /coding-agents. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
+- [AI Tools Portal admin catalog editor](https://langwatch.ai/docs/ai-governance/personal-portal/admin-catalog.md): How to publish, scope, and edit the AI tools that your developers see on /coding-agents. Covers starter-pack import, the three tile-type drawers, scope binding, reordering, and archive.
 - [AI Tools Portal devices](https://langwatch.ai/docs/ai-governance/personal-portal/sessions.md): See where your CLI is signed in across machines (laptop, workstation, dev container, CI runner), identify each session by device, see when it was last used, revoke any device in one click. Mirrors the macOS "Logged-in devices", GitHub "Active sessions", Apple ID "Trusted devices" pattern.
 
 ## Workspaces & Access
 
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
-- [Personas and default landing](https://langwatch.ai/docs/ai-governance/personas.md): LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /me, project-only LLMOps user to their project, mixed user to /me with a workspace switcher.
+- [Personas and default landing](https://langwatch.ai/docs/ai-governance/personas.md): LangWatch detects four personas based on org membership + activity signals, and routes each to the home that fits their work, admin to the bird-eye, personal-only user to /coding-agents, project-only LLMOps user to their project, mixed user to /coding-agents with a workspace switcher.
 
 ## Dashboards
 
 - [The /governance overview](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): What the /governance page shows today, where each governance number actually lives, and the setup-state signal behind the section.
 - [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
+
+## Agent Registry
+
+- [Agent registry](https://langwatch.ai/docs/governance/agent-registry.md): A machine-readable registry of every AI agent in your organization, served as REST, as an ARD v0.91 manifest, as a change feed and as signed webhooks.
+- [Agent kill switch](https://langwatch.ai/docs/governance/kill-switch.md): Stop an agent on the platform it runs on, with an approval when you want one, and restore it with one action.
 
 ## Privacy
 
@@ -584,6 +601,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Microsoft Copilot Studio](https://langwatch.ai/docs/ai-governance/ingestion-sources/copilot-studio.md): Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
 - [OpenAI Enterprise Compliance](https://langwatch.ai/docs/ai-governance/ingestion-sources/openai-compliance.md): Setup contract only, S3 bucket + cross-account role config captured; the JSONL puller is pending.
 - [Anthropic Claude Enterprise Compliance](https://langwatch.ai/docs/ai-governance/ingestion-sources/claude-compliance.md): Setup contract only, workspace API key captured; the compliance API poller is pending.
+- [Cloud agent discovery](https://langwatch.ai/docs/ai-governance/cloud-agent-discovery.md): List the agents your organisation runs on AWS Bedrock, Bedrock AgentCore, Google Cloud Vertex AI Agent Engine and any ARD registry, and find the shadow and dormant ones.
 
 ## Detection
 
@@ -609,9 +627,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [Coding Agent Monitoring and Cost Tracking](https://langwatch.ai/docs/coding-agents/overview.md): Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
+- [Coding Agent Monitoring and Cost Tracking](https://langwatch.ai/docs/coding-agents/overview.md): Track what Claude Code, Codex, Copilot, Gemini CLI, opencode, Grok CLI and pi really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
 - [Coding Agent Quickstart](https://langwatch.ai/docs/coding-agents/quickstart.md): Connect Claude Code, Codex, Copilot, Gemini CLI or opencode to LangWatch with one command.
 - [Track Your Claude Code Usage](https://langwatch.ai/docs/coding-agents/claude-code-usage.md): See Claude Code usage per session: what you spent, which model took each turn, how much context came back from cache, and what the agent actually did. Works on Claude Max and Pro plans, and on pay-per-token API keys.
+- [Track Claude Code usage and cost across a team](https://langwatch.ai/docs/coding-agents/claude-code-team.md): Send every engineer's Claude Code telemetry to LangWatch and see cost per session, engineer, project and pull request, without reading anyone's prompts.
 
 ## Set Up Your Agent
 
@@ -634,6 +653,14 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### OpenCode
 
 - [OpenCode Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/opencode.md): Monitor opencode with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+
+### Grok CLI
+
+- [Grok CLI Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/grok-cli.md): Monitor the Grok CLI with OpenTelemetry. Send sessions, cost and prompts to LangWatch with the LangWatch command-line tool.
+
+### pi
+
+- [pi Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/pi.md): Monitor the pi coding agent with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ## See Your Usage
 
@@ -688,7 +715,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker with per-worker file and control-port walls and an L7 egress adapter, under gVisor on LangWatch Cloud and optionally when self-hosted. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
 - [Langy Data Flow and Privacy](https://langwatch.ai/docs/langy/security/data-flow-and-privacy.md): Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it.
-- [What Langy Can Do in Your GitHub](https://langwatch.ai/docs/langy/security/github-access.md): Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
+- [What Langy Can Do in Your GitHub](https://langwatch.ai/docs/langy/security/github-access.md): Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with only the scopes the installation granted, and the install is the access boundary.
 
 ## Reference
 
@@ -715,6 +742,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Environment Variables](https://langwatch.ai/docs/self-hosting/configuration/environment-variables.md): Complete environment variable reference for LangWatch self-hosting
 - [Sizing & Scaling](https://langwatch.ai/docs/self-hosting/configuration/sizing-and-scaling.md): Resource requirements, size profiles, and scaling recommendations for LangWatch
 - [Backups](https://langwatch.ai/docs/self-hosting/configuration/backups.md): Backup and restore strategies for LangWatch data stores
+- [ClickHouse access](https://langwatch.ai/docs/self-hosting/configuration/clickhouse-access.md): Give people and tools their own ClickHouse logins: access tiers, rolling passwords and OIDC token logins
 - [Object Storage Lifecycle](https://langwatch.ai/docs/self-hosting/configuration/object-storage-lifecycle.md): The lifecycle rules to create on your bucket or container, and the one setting that confirms them
 - [SSO Configuration](https://langwatch.ai/docs/self-hosting/configuration/sso.md): Set up Single Sign-On for LangWatch with your identity provider
 - [Email](https://langwatch.ai/docs/self-hosting/configuration/email.md): Configure the gateway LangWatch sends alerts, invitations and password resets through
@@ -772,6 +800,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
 - [Discover what the trace filter fields hold](https://langwatch.ai/docs/api-reference/traces/discover-what-the-trace-filter-fields-hold.md)
+- [Recommended trace wait for a scenario judge](https://langwatch.ai/docs/api-reference/traces/recommended-trace-wait-for-a-scenario-judge.md)
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
 - [Get Transcript](https://langwatch.ai/docs/api-reference/traces/get-transcript.md)
@@ -984,10 +1013,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Overview](https://langwatch.ai/docs/api-reference/test-suites/overview.md): Organise agent tests. A test suite groups scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.
 - [List the project's test suites](https://langwatch.ai/docs/api-reference/test-suites/list-test-suites.md)
+- [List suite templates](https://langwatch.ai/docs/api-reference/test-suites/list-suite-templates.md)
 - [Create a test suite](https://langwatch.ai/docs/api-reference/test-suites/create-test-suites.md)
 - [Read one test suite](https://langwatch.ai/docs/api-reference/test-suites/read-one-test-suite.md)
 - [Rename a test suite](https://langwatch.ai/docs/api-reference/test-suites/update-test-suites.md)
 - [Run a test suite](https://langwatch.ai/docs/api-reference/test-suites/run-a-test-suite.md)
+- [Apply a suite template](https://langwatch.ai/docs/api-reference/test-suites/apply-a-suite-template.md)
 - [Archive a test suite](https://langwatch.ai/docs/api-reference/test-suites/delete-test-suites.md)
 
 ## Suites
@@ -1018,6 +1049,32 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Create Test](https://langwatch.ai/docs/api-reference/agents/action-test.md)
 - [Remove a deploy label from an agent](https://langwatch.ai/docs/api-reference/agents/remove-a-deploy-label-from-an-agent.md)
 - [Archive an agent](https://langwatch.ai/docs/api-reference/agents/delete-agents.md)
+
+## Agent Registry
+
+- [Overview](https://langwatch.ai/docs/api-reference/governance-agent-registry/overview.md): Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.
+- [List the organisation's agent registry](https://langwatch.ai/docs/api-reference/governance-agent-registry/list-the-organisation-s-agent-registry.md)
+- [Get the registry as an ARD manifest](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest.md)
+- [Read the registry change feed](https://langwatch.ai/docs/api-reference/governance-agent-registry/read-the-registry-change-feed.md)
+- [Get the registry's JSON Schemas](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-the-registry-s-json-schemas.md)
+- [Get the registry settings](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-the-registry-settings.md)
+- [Search the registry (ARD search)](https://langwatch.ai/docs/api-reference/governance-agent-registry/search-the-registry-ard-search.md)
+- [Get one registry agent](https://langwatch.ai/docs/api-reference/governance-agent-registry/get-one-registry-agent.md)
+- [List one registry agent's versions](https://langwatch.ai/docs/api-reference/governance-agent-registry/list-one-registry-agent-s-versions.md)
+- [Save the registry settings](https://langwatch.ai/docs/api-reference/governance-agent-registry/save-the-registry-settings.md)
+
+## Agent Kill Switch
+
+- [Overview](https://langwatch.ai/docs/api-reference/governance-kill-switch/overview.md): Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.
+- [List the organisation's agent stops](https://langwatch.ai/docs/api-reference/governance-kill-switch/list-the-organisation-s-agent-stops.md)
+- [Get an agent's latest stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/get-an-agent-s-latest-stop.md)
+- [Get an agent's stop plan](https://langwatch.ai/docs/api-reference/governance-kill-switch/get-an-agent-s-stop-plan.md)
+- [Replace an agent's stop plan](https://langwatch.ai/docs/api-reference/governance-kill-switch/replace-an-agent-s-stop-plan.md)
+- [Approve a pending stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/approve-a-pending-stop.md)
+- [Deny a pending stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/deny-a-pending-stop.md)
+- [Restore a stopped agent](https://langwatch.ai/docs/api-reference/governance-kill-switch/restore-a-stopped-agent.md)
+- [Retry a stop](https://langwatch.ai/docs/api-reference/governance-kill-switch/retry-a-stop.md)
+- [Stop an agent](https://langwatch.ai/docs/api-reference/governance-kill-switch/stop-an-agent.md)
 
 ## Coding Agents
 
@@ -1232,6 +1289,23 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List SCIM tokens](https://langwatch.ai/docs/api-reference/scim-tokens/list-scim-tokens.md)
 - [Create SCIM token](https://langwatch.ai/docs/api-reference/scim-tokens/create-scim-token.md)
 - [Revoke SCIM token](https://langwatch.ai/docs/api-reference/scim-tokens/revoke-scim-token.md)
+
+## OCSF SIEM Export
+
+- [Overview](https://langwatch.ai/docs/api-reference/governance-ocsf/overview.md): Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.
+- [Export governance events as OCSF 1.9.0](https://langwatch.ai/docs/api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0.md)
+- [Export project traces as OCSF 1.9.0](https://langwatch.ai/docs/api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0.md)
+- [Export the audit log as OCSF 1.9.0](https://langwatch.ai/docs/api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0.md)
+- [Push OCSF events in from another source](https://langwatch.ai/docs/api-reference/governance-ocsf/push-ocsf-events-in-from-another-source.md)
+
+## Security Lake Sources
+
+- [Overview](https://langwatch.ai/docs/api-reference/governance-security-lake/overview.md): Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.
+- [Add an AWS Security Lake source](https://langwatch.ai/docs/api-reference/governance-security-lake/add-an-aws-security-lake-source.md)
+- [Edit an AWS Security Lake source](https://langwatch.ai/docs/api-reference/governance-security-lake/edit-an-aws-security-lake-source.md)
+- [Test a Security Lake source's connection](https://langwatch.ai/docs/api-reference/governance-security-lake/test-a-security-lake-source-s-connection.md)
+- [Read a Security Lake source's health](https://langwatch.ai/docs/api-reference/governance-security-lake/read-a-security-lake-source-s-health.md)
+- [Read a Security Lake source](https://langwatch.ai/docs/api-reference/governance-security-lake/read-a-security-lake-source.md)
 
 ## SCIM
 

@@ -31,6 +31,8 @@ export class LangyTurnBaseDependenciesService {
     modelOverride?: string;
     /** A turn nobody is watching; it reads only, like every later turn of its conversation. */
     unattended?: boolean;
+    /** The one repository a CI follow-up may reach; its LangWatch key stays read-only. */
+    ciFollowUpRepository?: string;
   }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
     await this.refuseOnAggregate(input);
     const conversation = await input.deps.conversations.ensureConversation({
@@ -58,10 +60,11 @@ export class LangyTurnBaseDependenciesService {
       projectId,
       userId,
       unattended,
+      ciFollowUpRepository,
     }: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0],
     conversation: { id: string; isNew: boolean },
   ): Promise<boolean> {
-    if (unattended) return true;
+    if (unattended || ciFollowUpRepository) return true;
     if (conversation.isNew) return false;
     const current = await deps.conversations.findByIdVisible({
       id: conversation.id,
@@ -90,7 +93,7 @@ export class LangyTurnBaseDependenciesService {
   private read(
     input: Parameters<LangyTurnBaseDependenciesService["resolve"]>[0] & { readOnly: boolean },
   ) {
-    const { deps, projectId, session, modelOverride, readOnly } = input;
+    const { deps, projectId, session, modelOverride, readOnly, ciFollowUpRepository } = input;
 
     return Promise.allSettled([
       modelOverride ? Promise.resolve(null) : deps.models.resolve({ projectId }),
@@ -98,7 +101,8 @@ export class LangyTurnBaseDependenciesService {
         projectId,
         session,
         mintSessionKey: false,
-        ...(readOnly ? { mintGithubToken: false } : {}),
+        ...(readOnly && !ciFollowUpRepository ? { mintGithubToken: false } : {}),
+        ...(ciFollowUpRepository ? { repositoryFullName: ciFollowUpRepository } : {}),
       }),
       deps.credentials.findEgressAllowlist({ projectId }),
       deps.credentials.resolveMirrorTier({ projectId }),

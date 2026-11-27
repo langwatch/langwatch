@@ -54,6 +54,8 @@ interface Scenario {
   turnInFlightById: Record<string, { turnId: string | null }>;
   /** Reject the stop mutation, to model a request that never lands. */
   failStop: boolean;
+  /** Keep the stop mutation unanswered, to look at the control while it is in flight. */
+  holdStop: boolean;
 }
 
 const scenarioRef: { current: Scenario } = {
@@ -64,6 +66,7 @@ const scenarioRef: { current: Scenario } = {
     slowList: null,
     turnInFlightById: {},
     failStop: false,
+    holdStop: false,
   },
 };
 
@@ -274,6 +277,9 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
             if (scenarioRef.current.failStop) {
               throw new Error("stop request did not land");
             }
+            if (scenarioRef.current.holdStop) {
+              return new Promise<{ stopped: boolean }>(() => undefined);
+            }
             return { stopped: true };
           },
         }),
@@ -416,6 +422,7 @@ function installScenario(scenario: {
   slowList?: { resolveLater: () => void };
   turnInFlightById?: Record<string, { turnId: string | null }>;
   failStop?: boolean;
+  holdStop?: boolean;
 }) {
   let openGate: () => void = () => undefined;
   const gate = scenario.slowList
@@ -432,6 +439,7 @@ function installScenario(scenario: {
     slowList: gate === null ? null : { gate },
     turnInFlightById: scenario.turnInFlightById ?? {},
     failStop: scenario.failStop ?? false,
+    holdStop: scenario.holdStop ?? false,
   };
   return spies;
 }
@@ -512,6 +520,7 @@ beforeEach(() => {
     slowList: null,
     turnInFlightById: {},
     failStop: false,
+    holdStop: false,
   };
   // These suites exercise an OPEN panel; a closed panel deliberately never fetches the
   // recents list (see useLangyConversationListQuery).
@@ -995,6 +1004,7 @@ describe("LangyPanel stopping a turn", () => {
           conversations,
           messagesById,
           turnInFlightById: { "conv-live": { turnId: "turn-from-other-tab" } },
+          holdStop: true,
         });
 
         await openLiveConversation();
@@ -1053,7 +1063,16 @@ describe("LangyPanel stopping a turn", () => {
       await sendMessage();
 
       expect(await stopButton()).toBeEnabled();
-      expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+      expect((await stopButton()).closest('[data-testid="langy-turn-working-row"]')).not.toBeNull();
+    });
+
+    /** @scenario The composer keeps Send while Langy is working */
+    it("keeps Send in the composer while Stop sits on the working row", async () => {
+      await sendMessage();
+
+      const stop = await stopButton();
+      expect(stop.closest('[data-testid="langy-turn-working-row"]')).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
     });
 
     /** @scenario Stop during startup is kept and dispatched when the turn is identified */
@@ -1102,6 +1121,27 @@ describe("LangyPanel stopping a turn", () => {
       expect(spies.stopMutation).not.toHaveBeenCalled();
       expect(await screen.findByRole("button", { name: "Send" })).toBeTruthy();
       expect(useLangyStore.getState().draft).toBe("explain this trace");
+    });
+  });
+
+  describe("given the backend confirmed the stop but no update signal arrives", () => {
+    /** @scenario A confirmed stop hands the composer back even when no update reaches the tab */
+    it("returns the composer to Send, so I can send again", async () => {
+      // The record still reads the turn in flight and no signal ever lands: the stop's own answer
+      // is the only news this tab gets.
+      installScenario({
+        conversations,
+        messagesById,
+        turnInFlightById: { "conv-live": { turnId: "turn-from-other-tab" } },
+      });
+
+      await openLiveConversation();
+      await userEvent.click(await stopButton());
+
+      await waitFor(() => expect(spies.stopMutation).toHaveBeenCalled());
+      expect(await screen.findByRole("button", { name: "Send" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Stopping" })).toBeNull();
+      expect(useLangyStore.getState().turnPhase).toBe("idle");
     });
   });
 

@@ -1,6 +1,6 @@
 ---
 title: Dashboards
-description: Build dashboards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+description: Build dashboards of charts over your LangWatch data, or start one from the My agent at a glance template for a quick view of your project.
 ---
 
 ## Open Dashboards
@@ -9,8 +9,9 @@ Dashboards is a product in the product switcher at the top left of LangWatch.
 On LangWatch Cloud, no setup is needed.
 
 On a self-hosted install, Dashboards stays off until an operator turns it on in
-**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
-`release_lwql_workbench` to build and edit widgets on a dashboard.
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards.
+Building and editing widgets on a dashboard also needs `release_lwql_workbench`,
+which is on by default on a self-hosted install.
 
 ## Your first dashboard
 
@@ -46,12 +47,13 @@ cannot be renamed or deleted.
 
 A dashboard without widgets shows the ask bar, suggested questions, and "Or start
 from a template" with the three From LangWatch dashboards and a **View all
-templates** link. The templates library lists every ready template by Grow,
-Protect, Profit and Trust, with a search box and filters for the category and
-the agent type.
+templates** link. The templates library lists every ready template once, the
+ones teams need most first, with a search box and filters for the category and
+the agent type. Picking an agent type shows the templates made for it, each with
+the widgets that suit that kind of agent.
 
 **Add to this project** on a card creates a new dashboard named after the template
-(numbered "Agent health 2" and so on if the name is taken), at the scope Project,
+(numbered "My agent at a glance 2" and so on if the name is taken), at the scope Project,
 with the template's widgets. A template you already added shows **Added**,
 linking to its dashboard.
 
@@ -64,13 +66,13 @@ prompt is drafted.
 A widget whose data is not set up yet says what is missing and links to the
 page that sets it up, such as evaluations, scenarios or feedback.
 
-The Agent health template holds five widgets:
+The My agent at a glance template holds five widgets:
 
-- This period
-- Status today
-- Needs attention
-- Top request my agent cannot serve
-- Conversations resolved per day
+- Is my agent doing its job?
+- Is my agent working right now?
+- What should I fix first this week?
+- What do users ask for most that my agent can't do?
+- Does my agent resolve more conversations each day?
 
 A new dashboard is yours like any other: every widget on it can be edited,
 duplicated, moved, resized or deleted, and your changes do not affect the
@@ -78,14 +80,28 @@ template.
 
 ## From LangWatch dashboards
 
-The From LangWatch group in the sidebar holds Release check, "Can I trust my
-numbers?" and Where my agent breaks. Each is a template shown live over your
+The From LangWatch group in the sidebar holds "Ready to ship?", "Fix missing
+data" and "Errors and failures". Each is a template shown live over your
 data and read-only: you cannot move, edit or add anything on it, and LangWatch
 stores no copy.
 
 To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
 edit**. That makes your own dashboard, named after the template plus "(copy)", with the template's
 widgets and opens it. The dashboard's header has no such button.
+
+### Releases
+
+"Ready to ship?" compares production before and after your newest change. A
+change is a new release of your application, a new prompt version, or a model
+your traces start using.
+
+LangWatch reads the release from the version your application sends with each
+trace: the OpenTelemetry resource attribute `service.version`, else `version` in
+the trace metadata, else `app_version`. A release is marked at the first trace
+that carries its version.
+
+The widget counts only traces of the sources it reads, so a version or model
+that only Langy's own runs used is never a release of your application.
 
 ## Period and grain
 
@@ -191,8 +207,12 @@ dashboard's scope.
 
 Every dashboard has an ask bar under its header, reading "What do you want to
 know?". On a stored dashboard, clicking it opens **Add a widget** with the cursor in
-its search. On a From LangWatch dashboard, the bar opens Langy when Langy is
-available, with the dashboard as context and no question sent yet.
+its search.
+
+On a From LangWatch dashboard, the bar opens **Add a widget** if you can create
+dashboards. Picking a widget makes a new dashboard with only that widget, named
+after it, and opens it. If you cannot create dashboards, the bar opens Langy when
+Langy is available, with the dashboard as context and no question sent yet.
 
 The picker lists suggested questions, grouped by the question tree, with a
 search and filters for the category and the agent type. Picking one adds that

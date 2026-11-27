@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -29,6 +31,7 @@ import {
   type SaveSignInSecurityResult,
   type SessionImpersonation,
   type SessionImpersonationState,
+  type SignInFacts,
   type SignInSecuritySettings,
   type VerifiedBrowserSession,
   type AuthUsageCount,
@@ -36,6 +39,8 @@ import {
   type SignUpEnrollment,
   type SignUpVerificationRequest,
   type PriorSession,
+  type PasskeyAssertionOptions,
+  type PasskeyAssertionResponse,
   isEmailPasswordEnabled,
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
@@ -62,9 +67,13 @@ import {
   type SsoArrivalAdmission,
   type SsoArrivalApi,
 } from "@langwatch/identity-contract";
-import { NotificationService } from "@langwatch/notification-contract";
+import { isEmailUnconfigured, NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type InviteLanding,
+  type OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -130,6 +139,7 @@ import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
+import { signInHintSealer } from "../rules/sign-in-hint.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
@@ -147,6 +157,7 @@ import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
+import { ImpersonationEndService } from "../services/impersonation-end.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -158,6 +169,7 @@ import {
   type PasswordResetMarks,
 } from "../services/own-password.service.ts";
 import { OwnSignInMethodService } from "../services/own-sign-in-method.service.ts";
+import { PasskeyAssertionService } from "../services/passkey-assertion.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
 import {
@@ -165,6 +177,7 @@ import {
   type ProviderAccountRow,
 } from "../services/provider-account-link.service.ts";
 import { SessionBoundService } from "../services/session-bound.service.ts";
+import { SignInFactsService } from "../services/sign-in-facts.service.ts";
 import {
   SignInLockoutService,
   type SignInLockoutEvidence,
@@ -194,7 +207,10 @@ const logger = createLogger("langwatch:auth");
 type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
-  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail">;
+  identity: Pick<
+    IdentityApi,
+    "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail" | "classifyRefusedSignIn"
+  >;
   /** The sign-up policy, and the invitation an invite link lands on (organization's). */
   organizations: SignUpPolicy &
     Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite" | "countMembershipsForUser">;
@@ -333,6 +349,8 @@ export class AuthModule implements AuthApiContract {
   #browserSession: BetterAuthDeploymentIdentity | undefined;
   /** Refuses until {@link AuthModule.create} resolves the session secret it is derived from. */
   #deriveQueryCacheKey = queryCacheKeyDeriver({ secret: undefined });
+  /** Seals the sign-in hint cookie; sealed under the session secret once it resolves. */
+  #signInHints = signInHintSealer({ secret: undefined });
 
   /** This deployment's answer to {@link AuthModule.offersPasskeys}. */
   #offersPasskeys = false;
@@ -377,14 +395,69 @@ export class AuthModule implements AuthApiContract {
     return this.#sessions.getImpersonation(input);
   }
 
+  /** A lapsed window the session still carries is audited as expired before the new one opens. */
   startImpersonation(
     input: SessionImpersonation & { sessionId: string; reason: string },
   ): Promise<void> {
-    return this.#sessions.startImpersonation(input);
+    if (!this.#impersonationEnd) return this.#sessions.startImpersonation(input);
+    return this.#impersonationEnd.start(input);
   }
 
+  /** Audits the window's end for each organization that saw its start, then clears it. */
   stopImpersonation(input: { sessionId: string }): Promise<void> {
-    return this.#sessions.stopImpersonation(input);
+    if (!this.#impersonationEnd) return this.#sessions.stopImpersonation(input);
+    return this.#impersonationEnd.stop(input);
+  }
+
+  /** Set by {@link AuthModule.create}; the scheduled sweep calls it in the worker. */
+  #impersonationEnd: ImpersonationEndService | null = null;
+
+  /** Audits and clears every impersonation whose window passed without a stop; idempotent. */
+  async expireLapsedImpersonations(): Promise<{ expired: number }> {
+    if (!this.#impersonationEnd) return { expired: 0 };
+    return { expired: await this.#impersonationEnd.sweep() };
+  }
+
+  /** Set by {@link AuthModule.create} over auth's own passkey rows. */
+  #passkeyAssertions: PasskeyAssertionService | null = null;
+
+  private passkeyAssertions(): PasskeyAssertionService {
+    if (!this.#passkeyAssertions) {
+      throw new AuthUnavailableError({ capability: "passkeys", processName: this.#processName });
+    }
+    return this.#passkeyAssertions;
+  }
+
+  hasPasskey(input: { userId: string }): Promise<boolean> {
+    return this.passkeyAssertions().hasPasskey(input);
+  }
+
+  /** Set by {@link AuthModule.create}, once the session secret that keys the lock table is read. */
+  #signInFacts: SignInFactsService | null = null;
+
+  findSignInFacts(input: Readonly<{ email: string }>): Promise<SignInFacts[]> {
+    if (!this.#signInFacts) {
+      throw new AuthUnavailableError({
+        capability: "sign_in_facts",
+        processName: this.#processName,
+      });
+    }
+    return this.#signInFacts.findByEmail(input);
+  }
+
+  passkeyAssertionOptions(input: {
+    userId: string;
+    challenge: string;
+  }): Promise<PasskeyAssertionOptions> {
+    return this.passkeyAssertions().options(input);
+  }
+
+  verifyPasskeyAssertion(input: {
+    userId: string;
+    challenge: string;
+    response: PasskeyAssertionResponse;
+  }): Promise<{ credentialId: string }> {
+    return this.passkeyAssertions().verify(input);
   }
 
   private constructor({
@@ -405,6 +478,7 @@ export class AuthModule implements AuthApiContract {
     priorSessions,
     twoStep,
     passwordResetMarks,
+    operatorAddressesFixed,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -423,6 +497,8 @@ export class AuthModule implements AuthApiContract {
     priorSessions: PriorSessionService;
     twoStep: TwoStepVerificationService;
     passwordResetMarks: PasswordResetMarks;
+    /** The hosted service keeps operating to staff, so an operator's address is fixed there. */
+    operatorAddressesFixed: boolean;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -451,6 +527,7 @@ export class AuthModule implements AuthApiContract {
     });
     this.#accounts = AccountLifecycleService.create({
       users: dependencies.users,
+      operatorAddressesFixed,
       credentials: {
         revokeAllBrowserSessions: (input) => this.revokeAllBrowserSessions(input),
         revokeCliTokens: (input) => this.revokeCliTokens(input),
@@ -501,6 +578,9 @@ export class AuthModule implements AuthApiContract {
       },
       deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
       now: nowInstant,
+      signInHints: () => this.#signInHints,
+      refusedSignIns: dependencies.identity,
+      newReferenceId: () => randomBytes(16).toString("hex"),
     });
   }
 
@@ -559,6 +639,7 @@ export class AuthModule implements AuthApiContract {
 
     const app = new AuthModule({
       passwordResetMarks: accountRows,
+      operatorAddressesFixed: config.isSaas && config.nodeEnvironment !== "development",
       sessions,
       cliSessions,
       cliDeviceFlow: {
@@ -586,10 +667,8 @@ export class AuthModule implements AuthApiContract {
         checkSignUp,
         isWithinBudget: (input) => app.isWithinBudget(input),
         revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input),
-        isEmailUnconfigured: async () => {
-          const view = await dependencies.notifications.getMailDelivery();
-          return view.provider === undefined && !view.misconfigured;
-        },
+        isEmailUnconfigured: async () =>
+          isEmailUnconfigured({ mail: await dependencies.notifications.getMailDelivery() }),
       }),
       processName,
       rateLimits: repositories.rateLimits,
@@ -660,6 +739,20 @@ export class AuthModule implements AuthApiContract {
     });
 
     app.#offersPasskeys = config.passkeysEnabled;
+    app.#passkeyAssertions = PasskeyAssertionService.create({
+      passkeys: repositories.passkeys,
+      relyingParty: () =>
+        PasskeyAssertionService.relyingPartyFor({
+          sessionUrl: config.sessionUrl,
+          publicBaseUrl: config.publicBaseUrl,
+        }),
+    });
+    app.#impersonationEnd = ImpersonationEndService.create({
+      sessions: repositories.sessions,
+      memberships: dependencies.organizations,
+      auditLog: dependencies.auditLog,
+      now,
+    });
     app.#offersTwoStepVerification = config.mfaEnrollmentOpen;
     app.#issuesOwnPasswords = config.localPasswords;
     app.#dialableIdentityProviderOrigins = resolveDialableIdentityProviderOrigins({
@@ -701,7 +794,15 @@ export class AuthModule implements AuthApiContract {
             }
           : undefined;
       app.#browserSession = identity;
+      app.#signInFacts = SignInFactsService.create({
+        users: dependencies.users,
+        passkeys: repositories.passkeys,
+        locks: repositories.signInLocks,
+        hashIdentifier: sessionSecret ? keyedIdentifierHasher(sessionSecret) : null,
+        now,
+      });
       app.#deriveQueryCacheKey = queryCacheKeyDeriver({ secret: sessionSecret });
+      app.#signInHints = signInHintSealer({ secret: sessionSecret });
 
       if (identity) {
         app.#composeBetterAuth = () =>
@@ -1006,6 +1107,13 @@ export class AuthModule implements AuthApiContract {
     return {
       signedInUsers: await this.#sessions.countSignedInUsersAmong({ userIds: memberUserIds, at }),
     };
+  }
+
+  findSessionUsersSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]> {
+    return this.#sessions.findSessionUsersSince(input);
   }
 
   listBrowserSessions(input: {
@@ -1544,6 +1652,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }

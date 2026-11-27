@@ -4,6 +4,7 @@ import {
   decodeJobEnvelope,
   encodeJobEnvelope,
   readJobAttempt,
+  readJobOverloadAttempts,
   splitEnvelope,
   withJobAttempt,
 } from "../jobEnvelope.ts";
@@ -81,6 +82,32 @@ describe("job envelope retry attempt", () => {
         expect(splitEnvelope(encoded).body).toBe("");
         expect(readJobAttempt(encoded)).toBe(7);
       });
+    });
+  });
+
+  describe("given a re-staged job that spent retries on an overloaded server", () => {
+    /** @scenario "An ordinary failure after an overload spell still gets its ordinary budget" */
+    it("reads the overload retries from the header while the body is held outside", async () => {
+      const encoded = await encodeGq2({
+        ...jobData(30),
+        __overloadAttempts: 29,
+        bulk: "x".repeat(200_000),
+      });
+
+      expect(splitEnvelope(encoded).body).toBe("");
+      expect(readJobOverloadAttempts(encoded)).toBe(29);
+      expect(readJobAttempt(encoded)).toBe(30);
+    });
+
+    it("keeps the count when the queue advances the attempt", async () => {
+      const encoded = await encodeGq2({ ...jobData(30), __overloadAttempts: 29 });
+
+      expect(readJobOverloadAttempts(withJobAttempt({ value: encoded, attempt: 31 }))).toBe(29);
+    });
+
+    it("reads none for a job that never met an overload, or a value it cannot parse", async () => {
+      expect(readJobOverloadAttempts(await encodeGq2(jobData(3)))).toBe(0);
+      expect(readJobOverloadAttempts("GQ2|nope")).toBe(0);
     });
   });
 

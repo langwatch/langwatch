@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -22,6 +26,7 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",

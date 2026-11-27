@@ -7,7 +7,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   Per gateway.md "screen 8":
       The CLI surfaces "Budget limit reached" with a clear amount + admin email
       + the budget-request page URL (the gateway-signed one when available).
-  The dashboard surfaces a red banner at the top of /me with the same info
+  The dashboard surfaces a red banner at the top of /coding-agents with the same info
   and a primary CTA to request an increase.
   The gateway returns a structured 402 (Payment Required) so any consuming
   CLI/SDK can render its own message.
@@ -36,7 +36,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
           "limit_usd": "500.00",
           "spent_usd": "500.00",
           "period": "month",
-          "request_increase_url": "https://app.langwatch.example.com/me/budget/request",
+          "request_increase_url": "https://app.langwatch.example.com/coding-agents/budget/request",
           "admin_email": "platform-team@acme.com"
         }
       }
@@ -62,7 +62,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
          Admin: platform-team@acme.com
 
          Need urgent access? Request an increase:
-           https://app.langwatch.example.com/me/budget/request
+           https://app.langwatch.example.com/coding-agents/budget/request
       """
     And the CLI exits with status 2 (configuration / quota error, not 1 generic)
     And no Claude/Codex/Cursor process is exec'd
@@ -82,6 +82,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
     Given the 402 payload carries an empty `request_increase_url`
     When jane runs `langwatch claude`
     Then the box's "Request an increase" line prints `<control_plane_url>/me/budget/request`
+    # /me, not /coding-agents: older servers have no /coding-agents route; newer ones redirect /me/budget/request with its query.
     # There is no `langwatch request-increase` command anymore: the box
     # prints the URL directly, so the one thing the command did happens
     # without a second step.
@@ -91,19 +92,19 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   # ---------------------------------------------------------------------------
 
   @bdd @ui @budget-exceeded @banner
-  Scenario: /me dashboard shows a red banner at the top when budget is exceeded
+  Scenario: /coding-agents dashboard shows a red banner at the top when budget is exceeded
     Given jane's personal budget is exceeded
-    When she navigates to "/me"
+    When she navigates to "/coding-agents"
     Then a Chakra `colorPalette="red"` banner is rendered above the cards
     And the banner reads "Budget limit reached — $500.00 of $500.00 spent this month."
     And the banner has a primary button "Request more"
     And the banner has a secondary link "Email your admin (platform-team@acme.com)"
-    And clicking "Request more" opens "/me/budget/request"
+    And clicking "Request more" opens "/coding-agents/budget/request"
 
   @bdd @ui @budget-exceeded @cards
   Scenario: The "Spent this month" card turns red and shows "Limit reached"
     Given jane's personal budget is exceeded
-    When she navigates to "/me"
+    When she navigates to "/coding-agents"
     Then the "Spent this month" card text colour is `red.600` (or themed equivalent)
     And the card's "of $X budget" subline is replaced with "Limit reached"
     And the card carries an inline icon `Warning`
@@ -115,7 +116,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   @bdd @ui @budget-exceeded @warn
   Scenario: 80% threshold renders a yellow banner instead of blocking
     Given jane has spent USD 410 of her USD 500/month budget (82%)
-    When she navigates to "/me"
+    When she navigates to "/coding-agents"
     Then a yellow `colorPalette="yellow"` banner reads "You've used 82% of your monthly budget."
     And requests are NOT blocked at the gateway
     And the card shows "$410 of $500" without colour change beyond the banner

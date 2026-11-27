@@ -4,11 +4,7 @@
  * has been deleted is reported, never skipped, so a run stops instead of reporting an empty column.
  */
 
-import {
-  AgentNotFoundError,
-  AgentVersionNotFoundError,
-  type Agent,
-} from "@langwatch/agent-contract";
+import { AgentNotFoundError, AgentVersionNotFoundError } from "@langwatch/agent-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
@@ -20,7 +16,11 @@ import {
   promptLoadKey,
   workflowLoadKey,
 } from "../rules/experiment-execution-data.rules.ts";
-import type { ExecutionDataServices, LoadedWorkflow } from "./experiment-execution-data.service.ts";
+import type {
+  ExecutionDataServices,
+  LoadedAgent,
+  LoadedWorkflow,
+} from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:target-loading");
 
@@ -106,8 +106,8 @@ export class ExperimentTargetLoadingService {
    * Every agent an agent target names. `getById` throws rather than returning a nullable, so a
    * deleted agent is refused the same way the other loaders refuse a missing target.
    */
-  async loadAgents({ projectId, targets, services }: LoadArgs): Promise<Map<string, Agent>> {
-    const loaded = new Map<string, Agent>();
+  async loadAgents({ projectId, targets, services }: LoadArgs): Promise<Map<string, LoadedAgent>> {
+    const loaded = new Map<string, LoadedAgent>();
     for (const target of targets) {
       if (target.type !== "agent" || !target.dbAgentId) {
         continue;
@@ -155,7 +155,7 @@ export class ExperimentTargetLoadingService {
     services,
     loadedAgents,
   }: LoadArgs & {
-    loadedAgents: Map<string, Agent>;
+    loadedAgents: Map<string, LoadedAgent>;
   }): Promise<Map<string, LoadedWorkflow>> {
     const loaded = new Map<string, LoadedWorkflow>();
     for (const request of this.workflowRequests({
@@ -184,7 +184,7 @@ export class ExperimentTargetLoadingService {
     loadedAgents,
   }: {
     targets: TargetForLoading[];
-    loadedAgents: Map<string, Agent>;
+    loadedAgents: Map<string, LoadedAgent>;
   }): { workflowId: string; workflowVersionId?: string }[] {
     const direct = targets.flatMap((target) =>
       target.type === "workflow" && target.workflowId

@@ -30,6 +30,11 @@ data:
                 <raft_logs_level>warning</raft_logs_level>
                 <snapshot_distance>100000</snapshot_distance>
                 <reserved_log_items>100000</reserved_log_items>
+                <!-- 26.8 writes snapshot V8 by default; 25.10 reads only up to
+                     V6. Held at 6 so the image can roll back to 25.10. Roll the
+                     chart and image back together: 25.10 rejects this key as
+                     UNKNOWN_SETTING. Raise it once the rollback window closes. -->
+                <write_snapshot_version>6</write_snapshot_version>
             </coordination_settings>
             <raft_configuration>
 {{- range $i := until $replicas }}

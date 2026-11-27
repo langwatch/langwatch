@@ -13,6 +13,8 @@ import type {
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { SeatHold } from "../seat-hold.repository.ts";
+
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
   /** Absent reads as a customer's organization. */
@@ -54,6 +56,10 @@ export interface MemoryOrganizationRow {
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** Whether the docs playground may connect (ADR-185); absent reads as on. */
+  docsPlaygroundSessionsEnabled?: boolean;
+  /** When the docs playground was last turned off; absent reads as never. */
+  docsPlaygroundSessionsDisabledAt?: Instant;
   /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
   lockoutAfterFailedAttempts?: number;
   lockoutMinutes?: number;
@@ -64,6 +70,9 @@ export interface MemoryOrganizationRow {
   /** The organization's own Instant Evals consent; absent reads as not given. */
   instantEvalsEnabledAt?: Instant | null;
   instantEvalsEnabledByUserId?: string | null;
+  /** An admin's acceptance of the PII Redaction Model's price; absent reads as not given. */
+  piiRedactionModelAcceptedAt?: Instant | null;
+  piiRedactionModelAcceptedByUserId?: string | null;
   /** The private route labels the organization was first seen with; absent reads as none. */
   privateClickHouseLabel?: string | null;
   privateS3Label?: string | null;
@@ -96,6 +105,12 @@ export interface MemoryOrganizationUserRow {
   /** The grant intent an unfinished automatic admission is resumed from. */
   pendingSsoGrantId?: string | null;
   departmentId?: string | null;
+  /** When the current full seat was taken; absent or null reads as `createdAt`. */
+  fullSeatSince?: Instant | null;
+  /** Set when admission left the person waiting for a seat. */
+  seatPendingSince?: Instant | null;
+  /** A Billing-only member (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** One person, the fields the membership repository joins against. */
@@ -123,8 +138,19 @@ export interface MemoryOrganizationInviteRow {
   subscriptionId: string | null;
   acceptedByUserId: string | null;
   acceptedViaIdentifierId: string | null;
+  /** The Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
   createdAt: Instant;
   updatedAt: Instant;
+}
+
+/** One member removed or disabled, and when. */
+export interface MemoryMemberDepartureRow {
+  organizationId: string;
+  userId: string;
+  occurredAt: Instant;
+  /** Whether the person held a full seat when they left, as the live fact records it. */
+  heldFullSeat: boolean;
 }
 
 /** One team-scoped membership row (the `TeamUser` join table). */
@@ -252,6 +278,8 @@ export class MemoryOrganizationDatabase {
   readonly licensingLicenseKeys = new Map<string, string>();
   readonly teams = new Map<string, MemoryTeamRow>();
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
+  /** Members removed or disabled, the twin of the member facts the lifecycle stream records. */
+  readonly memberDepartures: MemoryMemberDepartureRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();
   readonly groups = new Map<string, MemoryGroupRow>();
   readonly users = new Map<string, MemoryUserRow>();
@@ -259,6 +287,8 @@ export class MemoryOrganizationDatabase {
   readonly customRoles = new Map<string, MemoryCustomRoleRow>();
   readonly auditLogs: MemoryAuditLogRow[] = [];
   readonly invites = new Map<string, MemoryOrganizationInviteRow>();
+  /** Full seats still counted after a removal, one per organization and person. */
+  readonly seatHolds: SeatHold[] = [];
 
   static create(): MemoryOrganizationDatabase {
     return new MemoryOrganizationDatabase();

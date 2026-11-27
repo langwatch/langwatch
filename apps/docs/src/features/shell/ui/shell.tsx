@@ -9,6 +9,7 @@ import { SearchTemplates } from "../../search/ui.ts";
 import { AgentLauncher } from "./agent-launcher.tsx";
 import { SiteAnnouncement } from "./announcement.tsx";
 import { SiteBanner } from "./banner.tsx";
+import { CookieNotice } from "./cookie-notice.tsx";
 import { GithubLink } from "./github-link.tsx";
 import { Header, HEADER_HEIGHT, type PageKind } from "./header.tsx";
 import { PageFooter } from "./page-footer.tsx";
@@ -18,6 +19,9 @@ import { TocDisclosure, TocRail } from "./toc.tsx";
 import type { TocEntry } from "./toc.tsx";
 
 const ENDPOINT_QUERY = "@media (min-width: 80rem)";
+/* Tracing coding agents is one feature: its launcher shows where tracing is the subject, in the
+   Observability and Coding Agents sections and the Platform section's Observability group. */
+const LAUNCHER_SECTIONS = new Set(["Observability", "Coding Agents"]);
 
 type ShellProps = {
   slug: string;
@@ -135,7 +139,17 @@ export function DocsShell({
         data-scene={aside ? "true" : void 0}
       >
         <LeftRail>
-          <SideNav active={section} launcher={<AgentLauncher />} slug={slug} treeId="page-tree" />
+          <SideNav
+            active={section}
+            launcher={
+              LAUNCHER_SECTIONS.has(section?.title ?? "") ||
+              (section?.title === "Platform" && trail[0] === "Observability") ? (
+                <AgentLauncher />
+              ) : null
+            }
+            slug={slug}
+            treeId="page-tree"
+          />
         </LeftRail>
         {aside ? (
           <>
@@ -226,10 +240,11 @@ export function DocsShell({
             </Box>
           </Box>
         ) : null}
+        <SiteFooter />
       </Box>
-      <SiteFooter />
       <MobileNav githubLink={<GithubLink site={site} />} site={site} />
       <SearchTemplates />
+      <CookieNotice />
     </Box>
   );
 }

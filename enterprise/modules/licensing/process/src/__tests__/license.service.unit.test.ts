@@ -4,7 +4,7 @@ import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
 } from "@langwatch/enterprise-license-signing";
-import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
+import { DEFAULT_MEMBERS_LITE, UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -214,6 +214,21 @@ describe("LicenseService", () => {
       error: "License was issued for a different organization",
     });
     expect(repository.stored.size).toBe(0);
+  });
+
+  /** @scenario "Two syncs that race to store a delivered license leave the newer one" */
+  it("stores a delivered license only while the organization holds the key the sync read", async () => {
+    const newer = mintLicenseKey({ organizationId: ORGANIZATION_ID });
+    await service.validateAndStoreLicense({ organizationId: ORGANIZATION_ID, licenseKey: newer });
+
+    const result = await service.storeDeliveredLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: VALID_LICENSE_KEY,
+      replacing: null,
+    });
+
+    expect(result).toEqual({ success: false, superseded: true });
+    expect(repository.stored.get(ORGANIZATION_ID)?.licenseKey).toBe(newer);
   });
 
   describe("when platform single sign-on is asked about", () => {
@@ -437,6 +452,28 @@ describe("LicenseService", () => {
     await expect(service.getLicenseStatus(ORGANIZATION_ID)).resolves.toMatchObject({
       valid: true,
       connected: false,
+    });
+  });
+
+  /** @scenario "A license that states no Lite limit shows the one Lite seat it enforces" */
+  it("reports the default Lite seat limit for a license that states none", async () => {
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
+    const minted = cryptography.parseLicenseKey(mintLicenseKey());
+    if (!minted) throw new Error("the minted key parses");
+    const { maxMembersLite: _stated, ...planWithoutLite } = minted.data.plan;
+    const unstated = { ...minted.data, plan: planWithoutLite };
+    repository.stored.set(ORGANIZATION_ID, {
+      licenseKey: cryptography.encodeLicenseKey(
+        cryptography.signLicense(unstated, TEST_PRIVATE_KEY),
+      ),
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(0),
+      validatedAt: Temporal.Instant.fromEpochMilliseconds(0),
+    });
+
+    await expect(service.getLicenseStatus(ORGANIZATION_ID)).resolves.toMatchObject({
+      valid: true,
+      currentMembersLite: 2,
+      maxMembersLite: DEFAULT_MEMBERS_LITE,
     });
   });
 

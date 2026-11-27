@@ -34,6 +34,8 @@ export class MemoryIdentityChannels {
   }): IdentityChannels {
     const mailer: MailSender = { send: (content) => bound.notifications.sendEmail(content) };
     const baseUrl = config.publicBaseUrl ?? "";
+    // In memory there is no network route to differ by: both lookups read what a test seeded.
+    const issuerDiscovery = MemorySsoIssuerDiscoveryChannel.create();
     return {
       authReads: bound.authReads,
       authCommands: bound.authCommands,
@@ -44,7 +46,8 @@ export class MemoryIdentityChannels {
       ssoDomainProofMail: SesSsoDomainProofMailChannel.create({ mailer, baseUrl }),
       ssoDomainProofs: MemorySsoDomainProofChannel.create(),
       ssoDomainProofFiles: MemorySsoDomainProofFileChannel.create(),
-      ssoIssuerDiscovery: MemorySsoIssuerDiscoveryChannel.create(),
+      ssoRegistrationIssuerDiscovery: issuerDiscovery,
+      ssoSignInIssuerDiscovery: issuerDiscovery,
       ssoBreakGlassWarnings: MemorySsoBreakGlassWarningChannel.create(),
     };
   }

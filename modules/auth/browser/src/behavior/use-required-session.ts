@@ -1,3 +1,9 @@
+import {
+  CODING_AGENTS_PATH,
+  codingAgentsPath,
+  RETIRED_PERSONAL_PATH,
+} from "@langwatch/user-contract";
+
 import { useSession } from "./auth-client.tsx";
 import { useRouter } from "./use-route.ts";
 
@@ -68,14 +74,17 @@ export const noOrgBouncerRoutes = [
   // happens before the org has any project.
   "/gateway/routing-policies",
   // Personal-scope pages: persona-1 (org-less CLI/IDE devs) has a legitimate
-  // home at /me + /me/configure with no org required. Without this exemption,
-  // CommandBar's onboarding redirect wins the race and dumps them on
-  // /onboarding/welcome — the opposite of the p1 storyboard.
-  "/me",
-  "/me/configure",
+  // home at /coding-agents + /coding-agents/configure with no org required.
+  // Without this exemption, CommandBar's onboarding redirect wins the race
+  // and dumps them on /onboarding/welcome — the opposite of the p1 storyboard.
+  CODING_AGENTS_PATH,
+  codingAgentsPath({ page: "configure" }),
+  // Their retired /me addresses stay exempt so the redirect renders first.
+  RETIRED_PERSONAL_PATH,
+  `${RETIRED_PERSONAL_PATH}/configure`,
   // `pages/index.tsx` already resolves the right home per persona (via
-  // api.governance.resolveHome, falling back to /me for org-less p1). The
-  // no-org bouncer must defer to it, or CommandBar wins the race and dumps
+  // api.governance.resolveHome, falling back to /coding-agents for org-less
+  // p1). The no-org bouncer must defer to it, or CommandBar wins the race and dumps
   // p1 on /onboarding/welcome before the resolver effect fires.
   "/",
 ];

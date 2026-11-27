@@ -5,7 +5,7 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
-import { virtualKeyConfigSchema } from "./virtual-key-config.ts";
+import { virtualKeyConfigPatchSchema } from "./virtual-key-config.ts";
 
 /** How a key picks a provider when its primary is unavailable. */
 export const virtualKeyApiRoutingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
@@ -114,7 +114,7 @@ const virtualKeyApiCreateInputSchemaDefinition = z.object({
   /** When the key stops serving. Omit it and the key never expires. */
   expiresAt: z.coerce.date().optional(),
   budget: virtualKeyBudgetInputSchema.nullable().optional(),
-  config: virtualKeyConfigSchema.partial().optional(),
+  config: virtualKeyConfigPatchSchema.optional(),
   /** Also park the secret under a one-time reveal id; the secret is still returned. */
   revealOnce: z.boolean().optional(),
 });
@@ -137,7 +137,7 @@ const virtualKeyApiUpdateInputSchemaDefinition = z.object({
   /** Omitted leaves it alone; null clears it; a date moves it. */
   expiresAt: z.coerce.date().nullable().optional(),
   budget: virtualKeyBudgetInputSchema.nullable().optional(),
-  config: virtualKeyConfigSchema.partial().optional(),
+  config: virtualKeyConfigPatchSchema.optional(),
 });
 export interface VirtualKeyApiUpdateInputSchema extends Named<
   typeof virtualKeyApiUpdateInputSchemaDefinition

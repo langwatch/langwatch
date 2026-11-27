@@ -3,11 +3,16 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { computeBatchTargetAggregates } from "../ui/sections/batch-evaluation-results.aggregates.ts";
+import {
+  computeAllBatchAggregates,
+  computeBatchTargetAggregates,
+} from "../ui/sections/batch-evaluation-results.aggregates.ts";
 import {
   type BatchResultRow,
   type BatchTargetColumn,
+  transformBatchEvaluationData,
 } from "../ui/sections/batch-evaluation-results.types.ts";
+import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
 
 describe("computeBatchTargetAggregates", () => {
   const createTargetColumn = (id: string): BatchTargetColumn => ({
@@ -15,6 +20,136 @@ describe("computeBatchTargetAggregates", () => {
     name: id,
     type: "custom",
     outputFields: ["output"],
+  });
+
+  describe("given a run that holds rows 1 to 5 of the dataset", () => {
+    /** @scenario "A run of some rows counts only the rows it holds" */
+    it("reports 5 rows, not the 6 positions up to row 5", () => {
+      const data = transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: [1, 2, 3, 4, 5].map((index) => ({ index, entry: { question: `Q${index}` } })),
+        evaluations: [1, 2, 3, 4, 5].map((index) => ({
+          evaluator: "exact",
+          name: "Exact",
+          index,
+          status: "processed" as const,
+          passed: true,
+        })),
+        timestamps: { createdAt: 0, updatedAt: 0 },
+      });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate?.totalRows).toBe(5);
+      expect(aggregate?.completedRows).toBe(5);
+    });
+  });
+
+  describe("given a stopped run's plan", () => {
+    const stoppedRun = ({
+      answered,
+      total,
+      expectedCells,
+    }: {
+      answered: Record<string, number[]>;
+      total: number | null;
+      expectedCells: number | null;
+    }) => {
+      const cells = Object.entries(answered).flatMap(([targetId, rows]) =>
+        rows.map((index) => ({ targetId, index })),
+      );
+      return transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        total,
+        targets: Object.keys(answered).map((id) => ({ id, name: id, type: "prompt" })),
+        completeness: {
+          complete: true,
+          dataset: { received: cells.length, expected: expectedCells },
+          evaluations: { received: 0, expected: null },
+        },
+        dataset: cells.map(({ targetId, index }) => ({
+          index,
+          targetId,
+          entry: { question: `Q${index}` },
+          predicted: { output: `A${index}` },
+        })),
+        evaluations: [],
+        timestamps: { createdAt: 0, updatedAt: 0, stoppedAt: 1 },
+      });
+    };
+
+    it("counts each of two targets against its share of the planned cells", () => {
+      const data = stoppedRun({
+        answered: { a: [0, 1, 2, 3, 4], b: [0, 1, 2, 3, 4] },
+        total: 20,
+        expectedCells: null,
+      });
+
+      const aggregates = computeAllBatchAggregates(data);
+
+      expect(aggregates.get("a")).toMatchObject({ completedRows: 5, totalRows: 10 });
+      expect(aggregates.get("b")).toMatchObject({ completedRows: 5, totalRows: 10 });
+    });
+
+    it("takes the reported cell count when the run recorded no total", () => {
+      const data = stoppedRun({ answered: { a: [0, 1, 2, 4, 6] }, total: null, expectedCells: 10 });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate).toMatchObject({ completedRows: 5, totalRows: 10 });
+    });
+
+    it("never counts fewer rows than the run holds", () => {
+      const data = stoppedRun({ answered: { a: [0, 1, 2, 3] }, total: 2, expectedCells: null });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate).toMatchObject({ completedRows: 4, totalRows: 4 });
+    });
+  });
+
+  describe("given a finished run of two targets and a comparison evaluator", () => {
+    /** The plan adds one comparison cell per row: 10 rows plan 2 x 10 + 10 = 30 cells. */
+    it("counts each target against the dataset rows, not the comparison cells", () => {
+      const rows = Array.from({ length: 10 }, (_, index) => index);
+      const data = transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        total: 30,
+        progress: 30,
+        targets: ["a", "b"].map((id) => ({ id, name: id, type: "prompt" })),
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: rows.flatMap((index) =>
+          ["a", "b"].map((targetId) => ({
+            index,
+            targetId,
+            entry: { question: `Q${index}` },
+            predicted: { output: `${targetId} ${index}` },
+          })),
+        ),
+        evaluations: rows.map((index) => ({
+          evaluator: "langevals/select_best_compare",
+          name: "Comparison",
+          status: "processed" as const,
+          index,
+          targetId: "a",
+          label: "a",
+          inputs: { candidates: [{ id: "a" }, { id: "b" }] },
+        })),
+        timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 1 },
+      });
+
+      const aggregates = computeAllBatchAggregates(data);
+
+      expect(aggregates.get("a")).toMatchObject({ completedRows: 10, totalRows: 10 });
+      expect(aggregates.get("b")).toMatchObject({ completedRows: 10, totalRows: 10 });
+    });
   });
 
   describe("when counting completedRows", () => {

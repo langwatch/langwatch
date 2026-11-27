@@ -57,3 +57,4 @@ export function DesignSystemTestProvider({ children }: { children: ReactNode }) 
 }
 
 export { installTestColourVariables, type TestColourVariables } from "./colour-variables.ts";
+export { probeSearchBand, type SearchBandProbe } from "./select-list-geometry.ts";

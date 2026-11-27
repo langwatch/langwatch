@@ -16,6 +16,7 @@ import {
   type BatchResultRow,
   type BatchTargetColumn,
   type BatchTargetOutput,
+  rowsInRun,
 } from "./batch-evaluation-results.types.ts";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
@@ -256,7 +257,7 @@ export const buildCsvData = (
   data: BatchEvaluationData,
 ): { headers: string[]; rows: string[][] } => {
   const headers = buildCsvHeaders(data);
-  const rows = data.rows.map((row) => buildCsvRow(row, data));
+  const rows = rowsInRun(data.rows).map((row) => buildCsvRow(row, data));
   return { headers, rows };
 };
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// deployJob is docs-site.yml's deploy job, up to the next job.
+// deployJob is docs-site.yml's deploy job, its last job.
 func deployJob(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "docs-site.yml"))
@@ -19,12 +19,7 @@ func deployJob(t *testing.T) string {
 	if start < 0 {
 		t.Fatal("docs-site.yml has no deploy job")
 	}
-	end := strings.Index(wf[start+1:], "\n  docs-site-complete:\n")
-	if end < 0 {
-		t.Fatal("the deploy job is not followed by docs-site-complete")
-	}
-
-	return wf[start : start+1+end]
+	return wf[start:]
 }
 
 // steps returns each `- name:` step of the job with its body.
@@ -47,6 +42,7 @@ func TestDeployRunsOnlyOnMainAfterTheChecks(t *testing.T) {
 		"github.ref == 'refs/heads/main'",
 		"(github.event_name == 'push' || github.event_name == 'workflow_dispatch')",
 		"vars.DOCS_SITE_BUCKET != ''",
+		"needs.changes.outputs.docs-site == 'true'",
 		"group: docs-deploy",
 		"cancel-in-progress: false",
 		"id-token: write",
@@ -105,5 +101,31 @@ func TestDeployUploadsByNameInOrderAndNeverDeletesHashedFiles(t *testing.T) {
 	}
 	if !strings.Contains(s["Upload the text indexes"], "--content-type 'text/plain; charset=utf-8'") {
 		t.Error("llms.txt and the other text files are not uploaded as UTF-8")
+	}
+}
+
+// @scenario "A deploy tells IndexNow which pages it changed"
+func TestDeployReadsTheLiveSitemapFirstAndPingsIndexNowLast(t *testing.T) {
+	job := deployJob(t)
+	read := strings.Index(job, "- name: Read the live sitemap\n")
+	upload := strings.Index(job, "- name: Upload the content-hashed files\n")
+	invalidate := strings.Index(job, "- name: Invalidate the distribution\n")
+	ping := strings.Index(job, "- name: Tell IndexNow what changed\n")
+	if read < 0 || read > upload {
+		t.Error("the live sitemap must be read before anything is uploaded")
+	}
+	if ping < invalidate {
+		t.Error("IndexNow must hear of the pages after the distribution serves them")
+	}
+	live := steps(job)["Read the live sitemap"]
+	if !strings.Contains(live, "https://langwatch.ai/docs/sitemap.xml") || strings.Contains(live, "s3://") {
+		t.Errorf("the live sitemap must be read from the public site; the deploy role cannot read the bucket:\n%s", live)
+	}
+	if !strings.Contains(live, "::warning::") {
+		t.Errorf("a failed read of the live sitemap must warn, since IndexNow then hears of every page:\n%s", live)
+	}
+	body := steps(job)["Tell IndexNow what changed"]
+	if !strings.Contains(body, "go run ./cmd/docsdeploy indexnow") || !strings.Contains(body, "::warning::") {
+		t.Errorf("the IndexNow step must run docsdeploy and only warn on a refusal:\n%s", body)
 	}
 }

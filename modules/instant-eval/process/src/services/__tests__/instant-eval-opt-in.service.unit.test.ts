@@ -20,6 +20,8 @@ function service(overrides: Partial<InstantEvalOptInPeers> = {}) {
     isEnterprisePlan: async () => false,
     mayManageOrganization: async () => true,
     isReleased: async () => false,
+    isHostedReleased: async () => false,
+    isHostedOff: async () => false,
     recordOptIn: async (input) => {
       recorded.push(input);
     },
@@ -36,6 +38,7 @@ describe("given an organization on the hosted service that is not on an enterpri
     it("offers the switch", async () => {
       await expect(service().optIns.getAccess(asked)).resolves.toEqual({
         released: false,
+        hostedReleased: false,
         offer: "enable",
         viaConnect: false,
       });
@@ -56,10 +59,24 @@ describe("given an organization on the hosted service that is not on an enterpri
       const { optIns, recorded } = service();
       await expect(optIns.optIn(asked)).resolves.toEqual({
         released: true,
+        hostedReleased: true,
         offer: "enable",
         viaConnect: false,
       });
       expect(recorded).toEqual([{ organizationId: "organization-1", userId: "user-1" }]);
+    });
+  });
+});
+
+describe("given a project released by its own decision model alone", () => {
+  describe("when the explorer asks for its Instant Evals access", () => {
+    /** @scenario "The popover reports LangWatch's model apart from an own one" */
+    it("is released, and LangWatch's own model is not", async () => {
+      const { optIns } = service({ isReleased: async () => true });
+      await expect(optIns.getAccess(asked)).resolves.toMatchObject({
+        released: true,
+        hostedReleased: false,
+      });
     });
   });
 });
@@ -166,6 +183,57 @@ describe("given a project deleted between the permission check and the read", ()
     it("refuses with the handled project not-found", async () => {
       const { optIns } = service({ findOrganizationId: async () => undefined });
       await expect(optIns.getAccess(asked)).rejects.toMatchObject({ code: "project_not_found" });
+    });
+  });
+});
+
+describe("given a self-serve organization LangWatch switched its hosted model off for", () => {
+  describe("when the popover asks what to offer a member who may manage the organization", () => {
+    /** @scenario "An organization with hosted switched off is offered no switch" */
+    it("offers a word with us, never the switch, and LangWatch's model is not released", async () => {
+      const switchReads: { projectId: string; organizationId: string }[] = [];
+      const { optIns } = service({
+        isHostedOff: async (input) => {
+          switchReads.push(input);
+          return true;
+        },
+      });
+      await expect(optIns.getAccess(asked)).resolves.toEqual({
+        released: false,
+        hostedReleased: false,
+        offer: "contact_us",
+        viaConnect: false,
+      });
+      expect(switchReads).toEqual([{ projectId: "project-1", organizationId: "organization-1" }]);
+    });
+  });
+
+  describe("when a member throws the switch anyway", () => {
+    /** @scenario "The server refuses the switch for an organization with hosted switched off" */
+    it("refuses it as not offered, names the own decision model and records nothing", async () => {
+      const { optIns, recorded } = service({ isHostedOff: async () => true });
+      await expect(optIns.optIn(asked)).rejects.toMatchObject({
+        code: "instant_eval_opt_in_not_offered",
+        meta: { deployment: "hosted_off" },
+        message:
+          "LangWatch's hosted model is turned off for this organization. Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+      });
+      expect(recorded).toEqual([]);
+    });
+  });
+});
+
+describe("given a self-hosted install whose organization is named by the hosted switch", () => {
+  it("is told its own reason, and the hosted switch is not read", async () => {
+    const { optIns } = service({
+      isSaas: () => false,
+      judgeRoute: async () => "off",
+      isHostedOff: () => {
+        throw new Error("the hosted switch was read");
+      },
+    });
+    await expect(optIns.getAccess(asked)).resolves.toMatchObject({
+      offer: "ask_operator",
     });
   });
 });

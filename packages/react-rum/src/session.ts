@@ -5,11 +5,13 @@ import { nowInstant } from "@langwatch/time";
  * inactivity gap so a reopened tab starts a new visit rather than one long one.
  */
 
-const SESSION_ID_KEY = "langwatch.rum.session.id";
-const SESSION_LAST_SEEN_KEY = "langwatch.rum.session.lastSeen";
+import {
+  RUM_SESSION_ID_KEY as SESSION_ID_KEY,
+  RUM_SESSION_LAST_SEEN_KEY as SESSION_LAST_SEEN_KEY,
+  SESSION_INACTIVITY_MS,
+} from "./constants.ts";
 
-/** A gap longer than this ends the session; the next span starts a new one. */
-export const SESSION_INACTIVITY_MS = 30 * 60 * 1000;
+export { SESSION_INACTIVITY_MS };
 
 const newSessionId = (): string => {
   // Matches the OTel session.id shape (16 bytes, hex). `randomUUID` is not used

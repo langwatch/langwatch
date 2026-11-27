@@ -78,6 +78,12 @@ Feature: What a failed single sign-on is allowed to say
     # single sign-on shipped.
 
   @unit
+  Scenario: The logged cause names the provider's code
+    Given a sign-in that failed with a provider code we have not written down
+    When the failure is logged
+    Then the record's cause is a sign-in refusal carrying that code
+
+  @unit
   Scenario: A description supplied by the caller is never echoed
     Given somebody opens the sign-in error screen with an error description of their own
     When the screen renders
@@ -126,7 +132,71 @@ Feature: What a failed single sign-on is allowed to say
     Given a provider sign-in that the identity provider refuses with "access_denied"
     When the person is sent to the sign-in error screen
     Then the code crosses as itself
-    And the refusal is logged at warn with the code and the trace id, not at error
+    And the refusal is logged at warn with its reference, not at error
     And the provider's description is neither logged nor kept on the redirect
-    And the screen says the sign-in was cancelled or their identity provider refused it
-    And it tells them that, if they sign in through their company, their IT administrator can give them access
+    And the screen says their company sign-in refused it, not LangWatch
+    And it tells them their IT team can assign them the LangWatch app, or to try again if they cancelled
+    # What the refusal names and when it becomes a seat limit: specs/identity/idp-refused-sign-in.feature
+
+  @unit @regression
+  Scenario: A sign-in that succeeds is not read as a failure
+    Given a person who is signed in, or whose provider account is already linked, signs in
+    When the callback redirects without an error code
+    Then no error code is read and the redirect passes through unchanged
+
+  # Better Auth redirects a refused link with its own codes. Each one a person can act on is
+  # folded to the screen code that has words for it; every other one is classified as having no
+  # specific screen, so it crosses as the generic code above.
+  @unit @regression
+  Scenario: The native account-link refusal maps to a stable sign-in error
+    When the authentication library reports that the account is not linked
+    Then the error is treated as OAuthAccountNotLinked
+    And it is classified as a stable sign-in error
+
+  @unit @regression
+  Scenario: The different-email refusal shows the specific message
+    When the authentication library reports "email_does_not_match"
+    Then the error is treated as DIFFERENT_EMAIL_NOT_ALLOWED
+
+  @unit @regression
+  Scenario: The earlier library's different-email spelling still shows the specific message
+    When a sign-in link from the earlier library release reports "email_doesn't_match"
+    Then the error is treated as DIFFERENT_EMAIL_NOT_ALLOWED
+
+  @unit @regression
+  Scenario: Every link refusal the installed library redirects with has a specific screen code
+    Given the callback error codes and sign-in result codes the installed authentication library defines
+    Then email_does_not_match is treated as DIFFERENT_EMAIL_NOT_ALLOWED
+    And account_already_linked_to_different_user is treated as ACCOUNT_LINKED_TO_ANOTHER_USER
+    And the refusal for an existing account under another method is treated as OAuthAccountNotLinked
+    And every other code read is classified as having no specific screen
+
+  # Linking from Settings > Security with a provider account another LangWatch user already holds
+  # is not the wrong-method sign-in: the person is signed in, and signing out or connecting the
+  # method in Settings is exactly what just failed. It needs its own code and its own words.
+  @unit @regression
+  Scenario: A provider account already linked to another user crosses with its own code
+    When the authentication library reports "account_already_linked_to_different_user"
+    Then the error is treated as ACCOUNT_LINKED_TO_ANOTHER_USER, not OAuthAccountNotLinked
+    And it is classified as a stable sign-in error, so it may cross to the screen
+
+  @unit @regression
+  Scenario: An upgrade that adds or renames a library code fails until the code is classified
+    Given the sign-in library redirects with a set of error codes
+    When an upgrade adds or renames one of them
+    Then the upgrade cannot merge until that code is classified
+
+  @unit @regression
+  Scenario: The SSO plugin's spaced account-link spelling still shows the account-link message
+    When the SSO plugin's OIDC callback reports "account not linked"
+    Then the error is treated as OAuthAccountNotLinked
+
+  @unit @regression
+  Scenario: A bookmarked error address with a retired spelling shows the generic error
+    When an error address carries "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
+    Then the code is not one of ours to hand to somebody, so it is withheld
+
+  @unit @regression
+  Scenario: The organization's sign-in cutover codes are unchanged
+    When any cutover sign-in error code is read
+    Then it is returned as itself and is classified as a stable sign-in error

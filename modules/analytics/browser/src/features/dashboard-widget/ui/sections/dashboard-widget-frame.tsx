@@ -4,22 +4,37 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 import type {
+  LangWatchQLAcceptedGranularityStep,
+  LangWatchQLRunTelemetryRequest,
+} from "@langwatch/analytics-contract";
+import type {
+  ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   NavigableTarget,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
+import { useManagedPromptVersionFloor } from "../../../../behavior/use-managed-prompt-version-floor.ts";
+import { useSpanDataFloor } from "../../../../behavior/use-span-data-floor.ts";
 import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
 import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
 import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import {
+  managedPromptVersionGate,
+  readsManagedPromptVersionFromTraceMetrics,
+} from "../../../../model/dashboard-widget/managed-prompt-version-floor.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
+import {
+  readsSpanMetrics,
+  spanDataFloorNotice,
+} from "../../../../model/dashboard-widget/span-data-floor.ts";
 import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
 import {
   awaitsFirstAnswer,
@@ -36,6 +51,11 @@ import {
   noTrafficGuidance,
 } from "../../../../model/dashboard-widget/widget-guidance.ts";
 import {
+  type WidgetLimitAudience,
+  isWidgetLimitFailure,
+  widgetLimitWords,
+} from "../../../../model/dashboard-widget/widget-limit-failure.ts";
+import {
   WidgetFailedFace,
   WidgetLoadingFace,
   WidgetNoAccessFace,
@@ -46,6 +66,7 @@ import { useDashboardRefreshedAt } from "../../../../ui/sections/use-dashboard-a
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useSlowLoading } from "../../behavior/use-slow-loading.ts";
+import { type ParsedDefinition, placedWidgetTelemetry } from "../../model/widget-run-telemetry.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 
@@ -61,6 +82,11 @@ export interface DashboardWidgetFrameProps {
   readonly dashboardId?: string;
   /** The widget's own name, for LW.dashboardContext.widgetName. */
   readonly widgetName?: string;
+  /**
+   * What the widget's runs say they are for, on their log line. Absent, a placed widget sends
+   * its board and its id; a frame on no board, such as the editor's preview, sends nothing.
+   */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
 }
 
 /** A widget over the page's period selector, as the analytics dashboard draws it. */
@@ -79,17 +105,34 @@ export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
     [period.startDate, period.endDate],
   );
 
-  return <DashboardWidgetFrameOverWindow {...props} timeWindow={timeWindow} />;
+  // No product caller today; a window that rolls on refresh would restart the widget each time.
+  return (
+    <DashboardWidgetFrameOverWindow
+      {...props}
+      timeWindow={timeWindow}
+      periodKey={`${timeWindow.start}:${timeWindow.end}`}
+    />
+  );
 }
 
 /** What a widget over a window its caller owns takes, such as a Dashboards board's period. */
 type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** The reader's chosen period and step; a new key starts the widget over, a refresh keeps it. */
+  readonly periodKey: string;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Drafts Langy about a bar, point or legend entry clicked; absent, none is clickable. */
+  readonly onAskLangyAbout?: (subject: ChartAskSubject) => void;
+  /** Told whether the widget's code reports the problem it watches for (`LW.signal`). */
+  readonly onSignal?: (signal: ChartSignal) => void;
+  /** Who reads the card; with it, a memory or time limit failure gets its own words and actions. */
+  readonly limitAudience?: WidgetLimitAudience;
   /** Told which face the frame draws, so the card offers only what that face allows. */
   readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Told whether the card's final failure is a resource limit, so a board can say so once. */
+  readonly onLimitFailureChange?: (limited: boolean) => void;
   /** Told the messages of what the server limited in the run, joined; "" when it limited none. */
   readonly onLimitsChange?: (limits: string) => void;
   /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
@@ -99,18 +142,76 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
 };
 
 /**
- * A widget over a window its caller owns. A new SQL statement or sources list starts it over, so
- * no answer to an earlier query stays on the card; the period and grain re-run it in place
- * through the dashboard context (dashboards-v2 AC201d).
+ * A widget over a window its caller owns. A new SQL statement, sources list, code, or chosen
+ * period and step starts it over, so no earlier answer stays on the card. A refresh of the same
+ * choice moves only the window's end and keeps the chart if the run fails (dashboards-v2 AC201d).
  */
 export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWindowProps) {
   const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
   const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
-  return <WidgetFrameOverWindow key={`${props.id}:${queries}`} {...props} parsed={parsed} />;
+  const code = parsed.success ? parsed.data.code : "";
+  const key = `${props.id}:${queries}:${code}:${props.periodKey}`;
+  const body = <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
+  if (!parsed.success || !readsManagedPromptVersionFromTraceMetrics(parsed.data.queries)) {
+    return body;
+  }
+  return (
+    <ManagedPromptVersionGate projectId={props.projectId} timeWindow={props.timeWindow}>
+      {body}
+    </ManagedPromptVersionGate>
+  );
 }
 
-/** The outcome of reading a row's graph, parsed once by the caller. */
-type ParsedDefinition = ReturnType<typeof dashboardWidgetDefinitionSchema.safeParse>;
+/**
+ * A widget reading LastUsedPromptVersionId mounts its body, and so runs its queries, only once
+ * the replay is done; over a window reaching before its since the body carries a note. Until the
+ * floor answers it shows the loading face (ADR-006).
+ */
+function ManagedPromptVersionGate({
+  projectId,
+  timeWindow,
+  children,
+}: {
+  readonly projectId: string;
+  readonly timeWindow: { start: number; end: number };
+  readonly children: ReactNode;
+}) {
+  const read = useManagedPromptVersionFloor({ projectId });
+  const gate = managedPromptVersionGate({ read, timeWindow });
+  if (gate.kind === "body" && !gate.note) return <>{children}</>;
+  if (gate.kind === "body") {
+    return (
+      <Box position="relative" height="full">
+        {children}
+        <Text
+          as="output"
+          position="absolute"
+          bottom={1}
+          left={2}
+          textStyle="xs"
+          color="fg.muted"
+          data-testid="widget-prompt-version-note"
+        >
+          {gate.note}
+        </Text>
+      </Box>
+    );
+  }
+  if (gate.kind === "loading") return <WidgetLoadingFace slow={false} />;
+  return (
+    <Box height="full" display="flex" alignItems="center" justifyContent="center" padding={4}>
+      <Text
+        as="output"
+        textStyle="xs"
+        color="fg.muted"
+        textAlign="center"
+        data-testid="widget-prompt-version-notice"
+      >
+        {gate.notice}
+      </Text>
+    </Box>
+  );
+}
 
 /**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
@@ -123,10 +224,15 @@ function WidgetFrameOverWindow({
   maxHeight,
   dashboardId,
   widgetName,
+  telemetry: given,
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
+  onAskLangyAbout,
+  onSignal,
+  limitAudience,
   onFaceChange,
+  onLimitFailureChange,
   onLimitsChange,
   onExportChange,
   onEmptyChange,
@@ -141,6 +247,9 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
+  // A new object each render is fine: the executor reads it by its ids, so a re-render with the
+  // same ids does not start the queries over.
+  const telemetry = given ?? placedWidgetTelemetry({ dashboardId, widgetId: id, parsed });
   const {
     executeQuery: runQuery,
     params: hostParams,
@@ -148,6 +257,7 @@ function WidgetFrameOverWindow({
   } = useDashboardWidgetExecutor(projectId, definition.queries, {
     timeWindow,
     ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+    ...(telemetry ? { telemetry } : {}),
   });
   const { executeQuery, records, results, reset } = useWidgetQueryRecords({
     executeQuery: runQuery,
@@ -156,6 +266,13 @@ function WidgetFrameOverWindow({
   const face = useMemo(() => widgetFace(records), [records]);
   usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
   useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
+  const limitFailed = face.kind === "failed" && isWidgetLimitFailure(face.error.code);
+  useEffect(() => onLimitFailureChange?.(limitFailed), [onLimitFailureChange, limitFailed]);
+  // The card swaps this frame out once a limit-failed widget's sources are emptied; the board
+  // would keep counting it unless the frame says so. The ref avoids re-firing on each render.
+  const limitFailureChange = useRef(onLimitFailureChange);
+  limitFailureChange.current = onLimitFailureChange;
+  useEffect(() => () => limitFailureChange.current?.(false), []);
   const limitsLine = limits.join(" · ");
   useEffect(() => onLimitsChange?.(limitsLine), [onLimitsChange, limitsLine]);
 
@@ -184,6 +301,7 @@ function WidgetFrameOverWindow({
   // on the wire — omitted where a caller (e.g. the playground) has none.
   // refreshedAt is the dashboard's scheduled-refresh clock: a new value is a
   // context change the frame's useChartQuery re-runs on.
+  const canAskLangy = onAskLangyAbout !== undefined;
   const dashboardContext: ChartFrameDashboardContext = useMemo(
     () => ({
       timeWindow: hostParams.timeWindow,
@@ -195,8 +313,9 @@ function WidgetFrameOverWindow({
       dashboardId,
       widgetName,
       ...(refreshedAt === undefined ? {} : { refreshedAt }),
+      canAskLangy,
     }),
-    [hostParams, colorMode, id, projectId, dashboardId, widgetName, refreshedAt],
+    [hostParams, colorMode, id, projectId, dashboardId, widgetName, refreshedAt, canAskLangy],
   );
 
   // LW.params has no other source of a value yet (no dashboard-side
@@ -210,6 +329,7 @@ function WidgetFrameOverWindow({
   // shown on the card, never restarted.
   const { diagnostic, fatal, onLog } = useFrameDiagnostic({
     resetKey: `${definition.code}:${attempt}`,
+    crashContext: { widgetId: id, ...(dashboardId === undefined ? {} : { dashboardId }) },
   });
   // Until a query answers the frame has nothing to draw; code that crashed never will.
   const loading = hasQueries && !fatal && !frameIdle && awaitsFirstAnswer(records);
@@ -225,13 +345,14 @@ function WidgetFrameOverWindow({
 
   const cover = faceInPlaceOfChart({
     face,
-    name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
+    limitAudience,
     onSetUp: (target) => onNavigate({ target, params: {} }),
   });
 
-  // The frame stays mounted under a face, so a new period can bring the chart back.
+  // The frame stays mounted under a face, so a refresh of the same period can bring the chart
+  // back. Retry remounts it through its key instead.
   return (
     <Box position="relative" height="full">
       <Box visibility={cover ? "hidden" : "visible"} aria-hidden={cover ? true : undefined}>
@@ -243,40 +364,95 @@ function WidgetFrameOverWindow({
           params={paramsSnapshot}
           onLog={onLog}
           onNavigate={onNavigate}
+          onAskLangy={onAskLangyAbout}
+          onSignal={onSignal}
           maxHeight={maxHeight}
           cover={loading && !cover ? <WidgetLoadingFace slow={slow} /> : undefined}
           onIdleChange={setFrameIdle}
         />
       </Box>
       {cover && (
-        <Box position="absolute" inset={0} data-testid="widget-state-face">
+        <Box position="absolute" inset={0} containerType="size" data-testid="widget-state-face">
           {cover}
         </Box>
+      )}
+      {/* An empty span widget may only lack history, so its empty face keeps the notice. */}
+      {(!cover || face.kind === "no_traffic") && readsSpanMetrics(definition.queries) && (
+        <SpanDataFloorNotice
+          projectId={projectId}
+          queries={definition.queries}
+          periodStart={timeWindow.start}
+        />
       )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
   );
 }
 
+/** Where span history starts, on a span widget whose period begins earlier (analytics ADR-006). */
+function SpanDataFloorNotice({
+  projectId,
+  queries,
+  periodStart,
+}: {
+  readonly projectId: string;
+  readonly queries: readonly { readonly sql: string }[];
+  readonly periodStart: number;
+}) {
+  const floor = useSpanDataFloor({ projectId });
+  const notice = spanDataFloorNotice({ queries, periodStart, floor });
+  if (!notice) return null;
+  return (
+    <Text
+      as="output"
+      position="absolute"
+      bottom={1}
+      left={2}
+      textStyle="xs"
+      color="fg.muted"
+      data-testid="widget-span-floor-notice"
+    >
+      {notice}
+    </Text>
+  );
+}
+
 /** The face drawn over the frame, or null when the widget's own code draws the card. */
 function faceInPlaceOfChart({
   face,
-  name,
   onRetry,
   onAskLangyToSetUp,
+  limitAudience,
   onSetUp,
 }: {
   face: WidgetFace;
-  name: string;
   onRetry: () => void;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  limitAudience?: WidgetLimitAudience;
   onSetUp: (target: NavigableTarget) => void;
 }) {
   switch (face.kind) {
     case "no_access":
       return <NoAccessFace missingGates={face.missingGates} />;
-    case "failed":
-      return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+    case "failed": {
+      const limit = widgetLimitWords({ code: face.error.code, audience: limitAudience });
+      if (!limit) {
+        return <WidgetFailedFace message={face.error.message} onRetry={onRetry} />;
+      }
+      const editable = limitAudience?.kind === "editable" ? limitAudience : undefined;
+      return (
+        <WidgetFailedFace
+          message={limit.message}
+          note={limit.note}
+          shortMessage={limit.shortMessage}
+          shortNote={limit.shortNote}
+          editsDisabled={editable?.editsDisabled}
+          onRetry={onRetry}
+          onEditWithLangy={editable?.onEditWithLangy}
+          onEditCode={editable?.onEditCode}
+        />
+      );
+    }
     case "no_traffic":
       return <NoTrafficFace unit={face.unit} onSetUp={onSetUp} />;
     case "missing":

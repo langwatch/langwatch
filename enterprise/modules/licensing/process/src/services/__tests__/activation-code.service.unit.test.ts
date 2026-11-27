@@ -50,6 +50,7 @@ function rowFor(
     maxMembers: 25,
     maxMembersLite: 0,
     liteSeatsUnlimited: false,
+    maxMembersDeveloper: null,
     licenseTermDays: 365,
     services: ["instant_evals"],
     expiresAt: Temporal.Instant.from("2026-02-01T00:00:00.000Z"),
@@ -71,11 +72,13 @@ class RecordingMinter implements LicenseMinter {
     services?: string[];
   }[] = [];
   readonly liteSeats: (number | undefined)[] = [];
+  readonly developerSeats: (number | undefined)[] = [];
   refusing = false;
 
   async issue(input: Parameters<LicenseMinter["issue"]>[0]) {
     if (this.refusing) throw new Error("the signing key is not configured");
     this.liteSeats.push(input.maxMembersLite);
+    this.developerSeats.push(input.maxMembersDeveloper);
     this.issued.push({
       organizationId: input.customer.organizationId,
       expiresAt: input.expiresAt.toString(),
@@ -285,6 +288,31 @@ describe("redeeming an activation code", () => {
     expect(licenses.issued).toHaveLength(1);
   });
 
+  /** @scenario "A code this install already redeemed is refused as used here" */
+  it("tells an install that redeems its own used code again that the code was used here", async () => {
+    const { service, licenses } = harness();
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
+
+    const again = redeemCode(service, { code: CODE, instanceId: "install-1" });
+
+    await expect(again).rejects.toBeInstanceOf(ActivationCodeAlreadyRedeemedError);
+    await expect(again).rejects.toMatchObject({ meta: { sameInstall: true } });
+    expect(licenses.issued).toHaveLength(1);
+  });
+
+  /** @scenario "A code another install redeemed is refused as used elsewhere" */
+  it("tells another install that the code was used elsewhere", async () => {
+    const { service } = harness();
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
+
+    await expect(
+      redeemCode(service, { code: CODE, instanceId: "install-2" }),
+    ).rejects.toMatchObject({
+      code: "activation_code_already_redeemed",
+      meta: { sameInstall: false },
+    });
+  });
+
   /** @scenario "A claim whose license could not be signed is released again" */
   it("puts the claim back when signing failed, so the code is not burned", async () => {
     const { service, licenses, repository } = harness();
@@ -377,7 +405,9 @@ describe("the admin side of activation codes", () => {
   });
 });
 
-function enterpriseInput(overrides: { maxMembersLite?: number } = {}) {
+function enterpriseInput(
+  overrides: { maxMembersLite?: number; maxMembersDeveloper?: number } = {},
+) {
   return {
     organizationId: "org-acme",
     organizationName: "ACME",
@@ -440,4 +470,35 @@ describe("lite seats on an activation code", () => {
 
     expect(licenses.liteSeats).toEqual([UNLIMITED]);
   });
+});
+
+describe("Developer seats on an activation code", () => {
+  /** @scenario An activation code carries its Developer seats to the licence it mints */
+  it("stores the Developer seats it was issued with and mints exactly those", async () => {
+    const { service, licenses, repository } = harness({ rows: [] });
+
+    const { code, row } = await service.issue(enterpriseInput({ maxMembersDeveloper: 3 }));
+    expect(row.maxMembersDeveloper).toBe(3);
+    expect((await repository.findById(row.id))?.maxMembersDeveloper).toBe(3);
+
+    await redeemCode(service, { code, instanceId: "install-1" });
+
+    expect(licenses.developerSeats).toEqual([3]);
+  });
+
+  it.each([{ stated: undefined }, { stated: 0 }])(
+    "stores none and mints none when $stated are stated",
+    async ({ stated }) => {
+      const { service, licenses } = harness({ rows: [] });
+
+      const { code, row } = await service.issue(
+        enterpriseInput(stated === undefined ? {} : { maxMembersDeveloper: stated }),
+      );
+      expect(row.maxMembersDeveloper).toBeNull();
+
+      await redeemCode(service, { code, instanceId: "install-1" });
+
+      expect(licenses.developerSeats).toEqual([undefined]);
+    },
+  );
 });

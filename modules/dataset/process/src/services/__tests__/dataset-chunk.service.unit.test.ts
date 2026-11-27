@@ -102,6 +102,7 @@ function fakeStorage(chunks: unknown[][] = []) {
       chunks.length = Math.min(chunks.length, fromIndex);
     },
     readChunks: unwired("readChunks"),
+    readMeasuredChunk: unwired("readMeasuredChunk"),
     readStagedUpload: unwired("readStagedUpload"),
     removeStagedUpload: unwired("removeStagedUpload"),
   };
@@ -293,6 +294,35 @@ describe("DatasetChunkService", () => {
         { id: "r1", entry: { a: 1 } },
         { id: "r2", entry: { a: 99 } },
       ]);
+    });
+  });
+
+  describe("when an edit names a column a column edit already removed", () => {
+    /** @scenario "A record write that arrives during a column edit waits for it and is refused when keyed by a removed column" */
+    it("refuses the edit as stale and writes nothing", async () => {
+      const dataset = readyDataset({
+        chunkCount: 1,
+        rowCount: 1,
+        sizeBytes: 10n,
+        chunkOffsets: [{ index: 0, start: 0, rowCount: 1, byteSize: 10 }],
+        columnTypes: [{ name: "a", type: "number" }],
+      });
+      const { chunks } = fakeRepository(dataset);
+      const { storage, chunks: stored } = fakeStorage([[{ id: "r1", entry: { a: 1 } }]]);
+
+      const refusal = await chunks
+        .editRecord({
+          dataset,
+          projectId,
+          recordId: "r1",
+          entry: { gone: 2 },
+          columns: ["gone"],
+          storage,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "dataset_stale_columns", httpStatus: 409 });
+      expect(stored[0]).toEqual([{ id: "r1", entry: { a: 1 } }]);
     });
   });
 

@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
+import type { EventLogPageCursor } from "./event-log-page-order.ts";
+import type { EventLogProbe } from "./repositories/eventRepository.types.ts";
 
 /**
  * Event store read context; tenantId is REQUIRED for tenant isolation.
@@ -122,15 +124,16 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   }): Promise<readonly EventType[]>;
 
   /**
-   * Cursor-paginated variant of getEventsUpTo; enables paging large histories without
-   * materializing all events. Optional: callers must check presence and fall back to getEventsUpTo.
+   * Cursor-paginated getEventsUpTo for large histories; callers fall back to getEventsUpTo
+   * when it is absent. Pages come in key order, not time order (see EventLogPageCursor), so
+   * only order-insensitive folds may use it.
    */
   getEventsUpToPaged?(request: {
     aggregateId: string;
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     upToEvent: EventType;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }): Promise<readonly EventType[]>;
 
@@ -145,6 +148,20 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     beforeTimestamp: number;
     beforeEventId: string;
   }): Promise<number>;
+
+  /**
+   * Whether the log, as the replica answering sees it, holds `event` and any event accepted
+   * before it: two existence checks, no rows read. Optional: a fold without it keeps replaying
+   * its history on a store miss. Validates tenantId like getEvents.
+   */
+  probeEventsBefore?(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    event: EventType;
+    /** Events the caller already holds, never counted as earlier. */
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe>;
 }
 
 /**

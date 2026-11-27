@@ -1,4 +1,4 @@
-import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
@@ -32,6 +32,51 @@ describe("PrismaBillingSubscriptionRepository", () => {
       for (const field of NUMERIC_OVERRIDE_FIELDS) {
         expect(call.data[field]).toBeNull();
       }
+    });
+  });
+
+  describe("findSupersededBySeatEvent()", () => {
+    it("lists cancelled tiered rows too, flagged, and only rows Stripe holds", async () => {
+      const findMany = vi.fn(async (_args: unknown) => [
+        { id: "sub_live", stripeSubscriptionId: "stripe_live", status: SubscriptionStatus.ACTIVE },
+        {
+          id: "sub_done",
+          stripeSubscriptionId: "stripe_done",
+          status: SubscriptionStatus.CANCELLED,
+        },
+        { id: "sub_local", stripeSubscriptionId: null, status: SubscriptionStatus.ACTIVE },
+      ]);
+      const superseded = PrismaBillingSubscriptionRepository.create(
+        prismaDouble({ subscription: { findMany } }),
+      );
+
+      const found = await superseded.findSupersededBySeatEvent({
+        organizationId: "org_1",
+        excludeSubscriptionId: "sub_growth",
+      });
+
+      expect(found).toEqual([
+        { id: "sub_live", stripeSubscriptionId: "stripe_live", cancelledInRecords: false },
+        { id: "sub_done", stripeSubscriptionId: "stripe_done", cancelledInRecords: true },
+      ]);
+      expect(findMany).toHaveBeenCalledTimes(1);
+      const [query] = findMany.mock.calls[0] ?? [];
+      const { where } = query as { where: Record<string, unknown> };
+      expect(where).toEqual({
+        organizationId: "org_1",
+        id: { not: "sub_growth" },
+        stripeSubscriptionId: { not: null },
+        plan: {
+          in: [
+            PlanTypes.LAUNCH,
+            PlanTypes.ACCELERATE,
+            PlanTypes.LAUNCH_ANNUAL,
+            PlanTypes.ACCELERATE_ANNUAL,
+            PlanTypes.PRO,
+            PlanTypes.GROWTH,
+          ],
+        },
+      });
     });
   });
 });

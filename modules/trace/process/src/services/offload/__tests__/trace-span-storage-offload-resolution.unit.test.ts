@@ -372,7 +372,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         narrowAuthorization({
           authorization: aggregateReadsMember(),
           projectId: MEMBER,
-        })!;
+        });
 
       it("resolves the body under the member for the trace's spans", async () => {
         const blobStore = memberBlobStore();

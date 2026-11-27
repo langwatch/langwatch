@@ -55,14 +55,15 @@ function zrangebyscoreModel({
 }
 
 /**
- * Minimal Redis stub exposing only the reads collect() performs. `readyZset`
- * backs both zrangebyscore calls through the model above; `headJobScores`
- * maps a group's jobs key to the [member, score] pair its zrange returns.
+ * Minimal Redis stub exposing only the reads collect() performs. `readyZset` backs both
+ * zrangebyscore calls; `headJobScores` and `headStagedAt` feed the head-ages script.
  */
 function makeRedis(
   opts: {
     readyZset?: ReadyEntry[];
     headJobScores?: Record<string, string[]>;
+    /** groupId -> the staged time its head job's header carries. Absent means none. */
+    headStagedAt?: Record<string, number>;
     /** groupId -> HLEN of its `:data` hash. Absent means the key is gone (0). */
     stagingDepths?: Record<string, number>;
     /** groupIds whose pipelined HLEN comes back as an error reply. */
@@ -84,7 +85,7 @@ function makeRedis(
     blocked?: string[];
     /** SCARD of the blocked set when it exceeds the members a scan returns. */
     blockedTotal?: number;
-    /** Make the label script reject, or the blocked-set scan throw. */
+    /** Make the label and head-ages scripts reject, or the blocked-set scan throw. */
     evalshaRejects?: boolean;
     blockedScanRejects?: boolean;
     /** groupId -> the [pipeline, jobType, jobName] its head job's header carries. */
@@ -119,9 +120,17 @@ function makeRedis(
     const nextCursor = cursor + pageSize >= members.length ? "0" : String(cursor + pageSize);
     return [nextCursor, page];
   });
+  // The two scripts route on different keys: the head-ages script on the ready set, the
+  // label script on the blocked set.
   const evalsha = vi.fn(
-    async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) => {
+    async (_sha: string, _numKeys: number, key: string, _prefix: string, ...ids: string[]) => {
       if (opts.evalshaRejects) throw new Error("script failed");
+      if (key === `${PREFIX}ready`) {
+        return ids.flatMap((id) => [
+          opts.headJobScores?.[`${PREFIX}group:${id}:jobs`]?.[1] ?? "",
+          opts.headStagedAt?.[id] === undefined ? "" : String(opts.headStagedAt[id]),
+        ]);
+      }
       return ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]);
     },
   );
@@ -140,25 +149,21 @@ function makeRedis(
       key.endsWith("blocked") ? (opts.blockedTotal ?? opts.blocked?.length ?? 0) : 0,
     ),
     smembers: vi.fn(async () => Object.keys(opts.parked ?? {})),
+    sismember: vi.fn(async (key: string, member: string) =>
+      key.endsWith("blocked") && opts.blocked?.includes(member) ? 1 : 0,
+    ),
     evalsha,
     zrangebyscore,
     sscan,
     pipeline: vi.fn(() => {
-      const cmds: { op: "zrange" | "hlen"; key: string }[] = [];
+      const keys: string[] = [];
       const chain = {
-        zrange: (key: string) => {
-          cmds.push({ op: "zrange", key });
-          return chain;
-        },
         hlen: (key: string) => {
-          cmds.push({ op: "hlen", key });
+          keys.push(key);
           return chain;
         },
         exec: async () =>
-          cmds.map(({ op, key }) => {
-            if (op === "zrange") {
-              return [null, opts.headJobScores?.[key] ?? []];
-            }
+          keys.map((key) => {
             const groupId = key.slice(`${PREFIX}group:`.length).replace(/:data$/, "");
             if (opts.stagingDepthErrors?.includes(groupId)) {
               return [new Error("READONLY"), undefined];
@@ -270,14 +275,14 @@ describe("GroupQueueMetricsCollector — oldest pending age", () => {
 
     // The query must start at the plausible-epoch floor (which drops the
     // unblock sentinel and every mis-scored row alike), cap at "now", and read
-    // only the single oldest member. This is the FIRST zrangebyscore call (the
-    // eligible probe); the second is the deferred-backlog sample.
+    // a bounded sample of the nearest-due members. This is the FIRST
+    // zrangebyscore call (the eligible probe); the second is the deferred-backlog sample.
     const args = zrangebyscore.mock.calls[0]!;
     expect(args[0]).toBe(`${PREFIX}ready`);
     expect(args[1]).toBe(MIN_PLAUSIBLE_EPOCH_MS);
     expect(args[2]).toBe(Date.now());
     expect(args).toContain("WITHSCORES");
-    expect(args.slice(-3)).toEqual(["LIMIT", 0, 1]);
+    expect(args.slice(-3)).toEqual(["LIMIT", 0, 50]);
   });
 
   /**
@@ -383,6 +388,117 @@ describe("GroupQueueMetricsCollector - scores that are not timestamps", () => {
       await runCollect(redis);
 
       expect(readBacklogGauge()).toBe(30 * 24 * 60 * 60 * 1000);
+    });
+  });
+});
+
+describe("GroupQueueMetricsCollector - events older than their job", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    meter.uninstall();
+  });
+
+  const TEN_HOURS_MS = 10 * 60 * 60 * 1000;
+
+  describe("given a job staged a moment ago for an event from ten hours ago", () => {
+    /**
+     * The ready score is the event's own time, so the score alone reads ten
+     * hours of lag for a job that has waited three seconds.
+     */
+    /** @scenario "a fresh job for an old event reads as a short wait" */
+    it("reports how long the job has waited, not how old its event is", async () => {
+      const { redis } = makeRedis({
+        readyZset: [{ member: "t1/late-event", score: Date.now() - TEN_HOURS_MS }],
+        headStagedAt: { "t1/late-event": Date.now() - 3_000 },
+      });
+
+      await runCollect(redis);
+
+      expect(readGauge()).toBe(3_000);
+      expect(readBacklogGauge()).toBe(3_000);
+    });
+  });
+
+  describe("given a late event's group and a group that has truly waited a minute", () => {
+    /** @scenario "the gauge names the group that waited longest" */
+    it("reports and labels the group that waited longest, not the one with the oldest score", async () => {
+      const { redis } = makeRedis({
+        readyZset: [
+          { member: "t1/late-event", score: Date.now() - TEN_HOURS_MS },
+          { member: "t2/waiting", score: Date.now() - 60_000 },
+        ],
+        headStagedAt: {
+          "t1/late-event": Date.now() - 2_000,
+          "t2/waiting": Date.now() - 60_000,
+        },
+        routing: {
+          "t1/late-event": ["trace_processing", "projection", "traceSummary"],
+          "t2/waiting": ["evaluation", "handler", "runEval"],
+        },
+      });
+
+      await runCollect(redis);
+
+      expect(readGauge()).toBe(60_000);
+      expect(
+        meter
+          .valuesOf("gq_oldest_pending_age_milliseconds", {
+            queue_name: QUEUE,
+            job_name: "runEval",
+          })
+          .at(-1),
+      ).toBe(60_000);
+    });
+  });
+
+  describe("given a deferred group whose head job is for an event from ten hours ago", () => {
+    /** @scenario "a deferred group's backlog counts from when its head job was staged" */
+    it("counts the backlog from when the job was staged", async () => {
+      const { redis } = makeRedis({
+        readyZset: [{ member: "t1/backoff", score: Date.now() + 5_000 }],
+        headJobScores: {
+          [`${PREFIX}group:t1/backoff:jobs`]: ["job-1", String(Date.now() - TEN_HOURS_MS)],
+        },
+        headStagedAt: { "t1/backoff": Date.now() - 90_000 },
+      });
+
+      await runCollect(redis);
+
+      expect(readGauge()).toBe(0);
+      expect(readBacklogGauge()).toBe(90_000);
+    });
+  });
+
+  describe("given a head job staged after its ready score", () => {
+    it("never reads its wait as negative", async () => {
+      const { redis } = makeRedis({
+        readyZset: [{ member: "t1/skewed", score: Date.now() - 5_000 }],
+        headStagedAt: { "t1/skewed": Date.now() + 2_000 },
+      });
+
+      await runCollect(redis);
+
+      expect(readGauge()).toBe(0);
+    });
+  });
+
+  describe("given the head-ages script rejects", () => {
+    it("falls back to the ready score rather than dropping the gauge", async () => {
+      const { redis } = makeRedis({
+        readyZset: [{ member: "t1/late-event", score: Date.now() - TEN_HOURS_MS }],
+        headStagedAt: { "t1/late-event": Date.now() - 3_000 },
+        evalshaRejects: true,
+      });
+
+      await runCollect(redis);
+
+      expect(readGauge()).toBe(TEN_HOURS_MS);
     });
   });
 });
@@ -630,6 +746,66 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         expect(readMax()).toBe(STAGING_DEPTH_REPORT_FLOOR * 25);
         expect(readOverThreshold()).toBe(1);
       });
+    });
+  });
+
+  describe("given a rotation whose deepest group is over the reporting floor", () => {
+    const warningsNamingDeepest = (logger: ReturnType<typeof makeLogger>) =>
+      logger.warn.mock.calls.filter((call) => String(call[1]).includes("staged backlog"));
+
+    describe("when the rotation ends", () => {
+      /** @scenario "The deepest staged group over the reporting floor is named in a warning" */
+      it("names the group, its depth and whether it is blocked", async () => {
+        const logger = makeLogger();
+        const deep = STAGING_DEPTH_REPORT_FLOOR * 30;
+        const { redis } = makeRedis({
+          readyZset: ready("project_a/fold/x/1", "project_b/fold/x/2"),
+          stagingDepths: { "project_a/fold/x/1": 3, "project_b/fold/x/2": deep },
+          blocked: ["project_b/fold/x/2"],
+        });
+
+        await makeCollector({ redis, logger }).collect();
+
+        const warnings = warningsNamingDeepest(logger);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]?.[0]).toMatchObject({
+          groupId: "project_b/fold/x/2",
+          projectId: "project_b",
+          stagingDepth: deep,
+          isBlocked: true,
+        });
+      });
+
+      /** @scenario "The deepest staged group over the reporting floor is named in a warning" */
+      it("warns again only after the rate limit, not every rotation", async () => {
+        const logger = makeLogger();
+        const { redis } = makeRedis({
+          readyZset: ready("project_a/deep"),
+          stagingDepths: { "project_a/deep": STAGING_DEPTH_REPORT_FLOOR * 2 },
+        });
+        const collector = makeCollector({ redis, logger });
+
+        await collector.collect();
+        await collector.collect();
+
+        expect(warningsNamingDeepest(logger)).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given a rotation whose deepest group is under the reporting floor", () => {
+    it("names no group", async () => {
+      const logger = makeLogger();
+      const { redis } = makeRedis({
+        readyZset: ready("project_a/shallow"),
+        stagingDepths: { "project_a/shallow": STAGING_DEPTH_REPORT_FLOOR - 1 },
+      });
+
+      await makeCollector({ redis, logger }).collect();
+
+      expect(
+        logger.warn.mock.calls.filter((call) => String(call[1]).includes("staged backlog")),
+      ).toHaveLength(0);
     });
   });
 

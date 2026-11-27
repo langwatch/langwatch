@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Check, Clipboard, Eye, EyeOff, Key } from "lucide-react";
-import { type Ref, useMemo, useRef, useState } from "react";
+import { type Ref, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
@@ -167,10 +167,24 @@ function KeyHandOff({
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  const isMountedRef = useRef(false);
+
+  // Cleanup runs before an await resumes, so the mounted flag guards the resumed copy.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      window.clearTimeout(copiedTimer.current);
+    };
+  }, []);
+
   const copyKey = async () => {
-    if (!(await copy({ text: token, what: "API key" }))) return;
+    const didCopy = await copy({ text: token, what: "API key" });
+    if (!isMountedRef.current || !didCopy) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
   };
   return (
     <Card
@@ -573,6 +587,7 @@ function TokenCreatedBody({
 
 export function TokenCreatedDialog({
   newToken,
+  title = "Token created",
   keyName,
   projectId,
   endpoint,
@@ -580,6 +595,8 @@ export function TokenCreatedDialog({
   onClose,
 }: {
   newToken: string | null;
+  /** A rotation reuses the dialog under its own title. */
+  title?: string;
   keyName?: string;
   projectId?: string;
   endpoint: string;
@@ -591,7 +608,7 @@ export function TokenCreatedDialog({
     <Dialog
       open={!!newToken}
       onClose={onClose}
-      title="Token created"
+      title={title}
       size="xl"
       cancelLabel={null}
       closeOnInteractOutside={false}

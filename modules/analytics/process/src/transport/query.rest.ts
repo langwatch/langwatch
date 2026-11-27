@@ -4,11 +4,13 @@
  * @see modules/analytics/specs — lwql-api
  */
 import {
+  langWatchQLKeyDoor,
   langWatchQLKeyReach,
   lwqlKeyStatementSchema,
   lwqlResultSchema,
   lwqlSchemaSchema,
   queryReferenceSchema,
+  type LangWatchQLKeyDoor,
   type LangWatchQLKeyReach,
   type LangWatchQLKeyStatementRequest,
   type LangWatchQLQueryResult,
@@ -39,7 +41,12 @@ import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../rules/langwatch-ql-diagnostic
 export interface AnalyticsQueryApi {
   runLangWatchQLForKey(
     input: Readonly<
-      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
+      {
+        reach: LangWatchQLKeyReach;
+        /** The client the request came from; absent, `rest_api`. */
+        door?: LangWatchQLKeyDoor;
+        signal?: AbortSignal;
+      } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult>;
   describeLangWatchQLSchemaForKey(
@@ -120,7 +127,7 @@ export const queryRest = defineRestRouter(AnalyticsQueryApi)
   .withoutAudit("read sent as a POST")
   .withInput(lwqlKeyStatementSchema)
   .withAccess(anyAuthenticated({ reason: THE_KEY_FANS_OUT }))
-  .withMiddlewareContext(langWatchQLKeyReach)
+  .withMiddlewareContext(langWatchQLKeyReach, langWatchQLKeyDoor)
   .withOutput(lwqlResultSchema)
   .withDocs({
     summary: "Run a LangWatchQL query",
@@ -140,8 +147,8 @@ export const queryRest = defineRestRouter(AnalyticsQueryApi)
       },
     },
   })
-  .handle(({ app, input, signal }, reach) =>
-    app.runLangWatchQLForKey({ reach, ...input, ...(signal ? { signal } : {}) }),
+  .handle(({ app, input, signal }, reach, door) =>
+    app.runLangWatchQLForKey({ reach, door, ...input, ...(signal ? { signal } : {}) }),
   )
 
   /**

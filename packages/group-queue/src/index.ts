@@ -41,4 +41,5 @@ export {
   refusesRetry,
 } from "./errors.ts";
 export type { MintStorageUri, ObjectStore } from "./storage.ts";
+export { readTenantClaimedGroups } from "./tenantClaims.ts";
 export { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicyEnvInputs } from "./policy-env.ts";

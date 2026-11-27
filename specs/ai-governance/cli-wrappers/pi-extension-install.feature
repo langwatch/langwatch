@@ -35,12 +35,14 @@
 # extension are met with signal aliases in pi's definition instead, which is
 # data, not an install.
 #
-# Both `langwatch ingest install pi_cli` and the `langwatch pi` wrapper write
-# the file. The install command is where every other agent's seam is written,
-# so pi takes the plugin arm of it, or it writes hook entries into a file pi
-# never reads. The wrapper writes it too because pi ships no exporter: a live
-# run proved `langwatch pi` alone sent nothing, as most users never run the
-# install command (ADR-188 Decision 4).
+# `langwatch ingest install pi_cli`, the `langwatch pi` wrapper and
+# `langwatch instrument pi` all write the file. The install command is where
+# every other agent's seam is written, so pi takes the plugin arm of it, or it
+# writes hook entries into a file pi never reads. The wrapper and instrument
+# write it too because pi ships no exporter: a live run proved `langwatch pi`
+# alone sent nothing, as most users never run the install command, and the
+# shell function instrument writes is only env that reaches nothing without
+# the file (ADR-188 Decision 4).
 #
 # Ownership is by a first-line marker and a contents comparison, as for the
 # opencode plugin, not by a version stamp. A single file written into a
@@ -48,14 +50,11 @@
 # what it would write: if the file differs, rewrite it; if it carries no marker,
 # it is the user's and we leave it alone.
 #
-# Three scenarios stay @unimplemented, each for a reason outside this file:
-#   1. The minimum-version refusal: ADR-188's Constants table records the
-#      minimum pi version as UNVERIFIED, and a refusal below an unknown floor
-#      would be a guess.
-#   2. The declared-vocabulary check: pi's schema package is not a dependency
+# Two scenarios stay @unimplemented, each for a reason outside this file:
+#   1. The declared-vocabulary check: pi's schema package is not a dependency
 #      of the SDK, and the extension also emits gen_ai.* mirrors, which pi
 #      does not declare.
-#   3. The community aliases: they live in pi's definition under
+#   2. The community aliases: they live in pi's definition under
 #      modules/coding-agent/, not in the CLI.
 
 Feature: `langwatch ingest install pi_cli` writes a first-party extension that speaks pi's own telemetry
@@ -110,6 +109,21 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       And a later launch with the same extension says nothing about it
 
     @unit
+    Scenario: Instrumenting pi writes the extension beside the shell function
+      Given pi's extension directory holds no LangWatch extension
+      When the user runs `langwatch instrument pi`
+      Then the scoped pi function is written into the shell rc
+      And the LangWatch extension is written into pi's extension directory
+      And the closing notes name both files
+
+    @unit
+    Scenario: Instrumenting pi over a file of the user's says pi sends no telemetry
+      Given a file at pi's extension path that carries no LangWatch marker
+      When the user runs `langwatch instrument pi`
+      Then the file is left exactly as it is
+      And the install reports that pi sessions send no telemetry
+
+    @unit
     Scenario: A failed extension write is reported and pi still starts
       Given pi's extension directory cannot be written
       When the user runs `langwatch pi`
@@ -123,13 +137,13 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       Then the extension file is removed from pi's extension directory
       And a file at that path without our marker is left in place
 
-    # becomes @unit
-    @unimplemented
-    Scenario: An installed pi below the minimum version is left uninstrumented
-      Given the installed pi reports a version below the minimum the extension was written against
-      When the user runs `langwatch ingest install pi_cli`
-      Then no extension is written into pi's extension directory
-      And one notice names the pi version the extension needs
+    # Capture still works below the minimum, so it warns and never blocks (ADR-188).
+    @unit
+    Scenario: An installed pi below the minimum version gets a warning and the run continues
+      Given the installed pi reports a version below 0.80.5, the first that emits agent_settled
+      When the user runs `langwatch pi`
+      Then one warning names the installed pi version and 0.80.5
+      And pi starts as usual
 
   Rule: The extension emits pi's declared vocabulary, never names of our own
 
@@ -244,6 +258,111 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       When the extension handles an agent start
       Then the extension does not wait on the command it spawned
       And pi continues the run
+
+    @unit
+    Scenario: The hook is handed the session's own directory before pi's process directory
+      Given a pi agent start whose session manager reports a worktree the session moved into
+      When the extension runs the hook command
+      Then the working directory it passes is the session manager's, not pi's process directory
+
+    @unit
+    Scenario: The hook is handed the name the user gave the session in pi
+      Given the content switch is on
+      And a pi agent start in a session the user named with /name
+      When the extension runs the hook command
+      Then the payload carries that name as the session title
+
+    # The name is the user's own words, so it leaves the machine only with content.
+
+    @unit
+    Scenario: Without the content switch the hook is handed no session name
+      Given the content switch is not set
+      And a pi agent start in a session the user named with /name
+      When the extension runs the hook command
+      Then the payload carries no session title
+
+    @unit
+    Scenario: The name the user gave a pi session rides the context record
+      Given the extension's payload carries a session title
+      When the session-context command handles it for pi
+      Then the record carries that name as the session's own name
+
+  Rule: A span carries no session id it does not have
+
+    @unit
+    Scenario: A compaction or tree move with no session id emits nothing
+      Given pi compacts or moves in its session tree before any run named a session
+      And the handler's context carries no session id either
+      When the extension handles the events
+      Then no span is emitted with an empty pi.session.id
+
+  Rule: Message content rides the GenAI convention keys, and only when switched on
+
+    pi declares no attribute for a prompt, a reply or a tool's arguments, so
+    content travels on the published GenAI keys beside pi's own: the run's
+    gen_ai.input.messages and gen_ai.output.messages, each call's
+    gen_ai.output.messages, and each tool run's gen_ai.tool.call.arguments and
+    gen_ai.tool.call.result. Content is the user's own, so it is written only
+    when OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT is on, the switch
+    every GenAI instrumentation reads and the one `langwatch pi` sets.
+
+    @unit
+    Scenario: Without the content switch the spans carry no prompt, reply or tool arguments
+      Given the content switch is not set
+      When a run that calls a tool ends
+      Then no span carries a GenAI message, tool argument or tool result key
+
+    @unit
+    Scenario: The run carries the prompt that opened it and the reply that closed it
+      Given the content switch is on
+      When a run opened by the prompt "Add a greeting" ends with the reply "Done."
+      Then the run span's gen_ai.input.messages holds that prompt as the user's message
+      And its gen_ai.output.messages holds that reply as the assistant's, with its finish reason
+
+    @unit
+    Scenario: Each model call carries the reply it produced, tool calls included
+      Given the content switch is on
+      When a model call answers with text and a tool call
+      Then the call's gen_ai.output.messages holds the text and the tool call
+      And the call carries no gen_ai.input.messages
+
+    @unit
+    Scenario: Each tool run carries its arguments and the text it returned
+      Given the content switch is on
+      When a tool run ends
+      Then its span carries the call's arguments and the text the tool returned
+
+    # A run posts as one batch, so one huge value could push it past the body
+    # limit and lose the whole run. The server keeps 256 KiB of any one value,
+    # so each value is bounded as written, JSON escaping included.
+
+    @unit
+    Scenario: A message too large for the server is cut as the server cuts it
+      Given the content switch is on
+      When a run's reply is larger than 256 KiB
+      Then the span's output messages stay within 256 KiB as valid JSON
+      And the reply is cut, marked with the full size
+
+    @unit
+    Scenario: A message whose escaping takes it past the limit is cut too
+      Given the content switch is on
+      When a run's prompt is under 256 KiB as text but over it as JSON
+      Then the span's input messages stay within 256 KiB as valid JSON
+
+    @unit
+    Scenario: Oversized tool arguments stay valid JSON and keep the file path
+      Given the content switch is on
+      When a write call's arguments are larger than 256 KiB
+      Then the tool span's arguments and the call's output messages stay within 256 KiB
+      And both are valid JSON that still name the file path
+
+  Rule: The resource names pi's version
+
+    @unit
+    Scenario: The resource carries pi's version as service.version
+      Given pi's own package is resolvable from the extension
+      When the extension exports its spans
+      Then the resource carries pi's version as service.version
 
   Rule: Community extensions are met with aliases, never an install
 

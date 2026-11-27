@@ -27,11 +27,13 @@ import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsMigrationRepository } from "./ops-migration.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
 import type { PipelineDefinitionsRepository } from "./pipeline-definitions.repository.ts";
+import type { ProcessFleetReadingsRepository } from "./process-fleet-readings.repository.ts";
 import type { ProcessManagerPurgeRepository } from "./process-manager-purge.repository.ts";
 import type { ProcessOpsRepository } from "./process-ops.repository.ts";
 import type { QueueRepository } from "./queue.repository.ts";
 import type { ReplayRuntimeRepository } from "./replay-runtime.repository.ts";
 import type { ReplayRepository } from "./replay.repository.ts";
+import type { SeatSharingCheckRepository } from "./seat-sharing-check.repository.ts";
 import type { StorageFootprintRepository } from "./storage-footprint.repository.ts";
 import type { StorageStatsReadingsRepository } from "./storage-stats-readings.repository.ts";
 import type {
@@ -89,10 +91,14 @@ export interface OpsRepositories {
   /** One per process: the queue-metrics writer records into it, the detector reads it. */
   readonly rateTracker: AnomalyRateTrackerRepository;
   readonly storageReadings: StorageStatsReadingsRepository;
+  /** The fleet counts the scheduled collector shares for every process's `pm_*` gauges. */
+  readonly processFleetReadings: ProcessFleetReadingsRepository;
   /** The newest release cloud named in the last usage-report reply. */
   readonly cloudLatestRelease: CloudLatestReleaseRepository;
   /** The notices cloud named in the last usage-report reply. */
   readonly cloudNotices: CloudNoticeRepository;
+  /** The last seat sharing check the worker ran. */
+  readonly seatSharingChecks: SeatSharingCheckRepository;
   readonly redisHealth: RedisHealthRepository;
   readonly clickhouseHealth: ClickHouseHealthRepository;
   readonly events: EventExplorerRepository;

@@ -105,5 +105,47 @@ describe("IssueActivationCodeDrawer", () => {
         expect(mutate.mock.calls[1]?.[0]).toMatchObject({ maxMembersLite: 7 });
       });
     });
+
+    describe("when the operator leaves Developer seats empty, or types a number", () => {
+      /** @scenario The admin console states and shows Developer seats */
+      it("sends no Developer seats when empty, and the typed number otherwise", async () => {
+        mutate.mockClear();
+        renderDrawer();
+        await fillCustomer();
+
+        const developers = screen.getByRole("spinbutton", { name: "Developer seats" });
+        expect(developers).toHaveValue(null);
+
+        fireEvent.click(screen.getByRole("button", { name: "Issue code" }));
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+        expect(mutate.mock.calls[0]?.[0]).not.toHaveProperty("maxMembersDeveloper");
+
+        fireEvent.change(developers, { target: { value: "3" } });
+        fireEvent.click(screen.getByRole("button", { name: "Issue code" }));
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(2));
+        expect(mutate.mock.calls[1]?.[0]).toMatchObject({ maxMembersDeveloper: 3 });
+      });
+    });
+
+    describe("when the operator types a Developer seat count the licence cannot sign", () => {
+      /** @scenario The admin console states and shows Developer seats */
+      it.each([
+        ["-2", "Enter a whole number of Developer seats, 0 or more."],
+        ["1.5", "Enter a whole number of Developer seats, 0 or more."],
+        ["2147483648", "Developer seats can be at most 2147483647"],
+      ])("names %s on the field and issues no code", async (typed, problem) => {
+        mutate.mockClear();
+        renderDrawer();
+        await fillCustomer();
+
+        const developers = screen.getByRole("spinbutton", { name: "Developer seats" });
+        fireEvent.change(developers, { target: { value: typed } });
+        fireEvent.click(screen.getByRole("button", { name: "Issue code" }));
+
+        expect(await screen.findByText(problem)).toBeTruthy();
+        expect(developers).toHaveAttribute("aria-invalid", "true");
+        expect(mutate).not.toHaveBeenCalled();
+      });
+    });
   });
 });

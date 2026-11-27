@@ -52,7 +52,7 @@ export function wrapperFlagsHelp(tool: string): string {
 }
 
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
-const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
+export const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * The user's interactive shell when it is one whose aliases and functions the
@@ -65,8 +65,23 @@ export function aliasShellFor(env: NodeJS.ProcessEnv = process.env): string | nu
     : null;
 }
 
+/** The docs page that installs and sets up each wrapped tool; the rest share the overview. */
+const TOOL_DOCS_PAGES: Record<string, string> = {
+  claude: "claude-code",
+  codex: "openai-codex",
+  copilot: "github-copilot-cli",
+  gemini: "gemini-cli",
+  opencode: "opencode",
+  grok: "grok-cli",
+  pi: "pi",
+};
+
+/** The docs page for `tool`'s install and setup. */
+export const toolDocsUrl = (tool: string): string =>
+  `https://docs.langwatch.ai/coding-agents/${TOOL_DOCS_PAGES[tool] ?? "overview"}`;
+
 export const toolNotFoundMessage = (tool: string): string =>
-  `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
+  `${tool} not found in PATH - install it first (${toolDocsUrl(tool)})`;
 
 /**
  * Run the tool for its help or version and exit with its code. The tool is

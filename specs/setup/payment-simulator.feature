@@ -29,6 +29,13 @@ Feature: paymentsim, a local stand-in for Stripe
       And the billable-events meter under its catalog id
 
     @unit
+    Scenario: Each dollar usage price is metered on its own meter
+      Given a catalog mapping the Instant Evals and PII redaction prices at 100 cents per dollar, and their meters
+      When paymentsim seeds it
+      Then the Instant Evals price is metered on the Instant Evals meter
+      And the PII redaction price is metered on the PII redaction meter
+
+    @unit
     Scenario: An unknown id answers Stripe's resource_missing error
       When billing retrieves a subscription paymentsim does not hold
       Then paymentsim answers 404 with code resource_missing
@@ -95,6 +102,13 @@ Feature: paymentsim, a local stand-in for Stripe
       Then a subscription_cycle invoice bills the seats and the usage above the free tier, and is paid
 
     @unit
+    Scenario: A renewal bills the dollars judged on the catalog's Instant Evals price
+      Given paymentsim started with the billing contract's stripe-catalog.json
+      And a dollar subscription with two seats and the catalog's Instant Evals price
+      When 1.2345 dollars are sent to the Instant Evals meter and the clock moves past the period end
+      Then the renewal invoice bills the seats and 123 cents for Instant Evals
+
+    @unit
     Scenario: A forced payment failure fires invoice.payment_failed and marks the subscription past due
       Given the customer's next charge is set to fail
       When the clock moves past the period end
@@ -118,6 +132,28 @@ Feature: paymentsim, a local stand-in for Stripe
     Scenario: Meter events total exactly per customer
       When billing sends meter events for a customer
       Then the control API's usage totals give their exact sum and count
+
+    @unit
+    Scenario: A meter event value may be a decimal, as in Stripe
+      When billing sends meter events of 0.0001 and 1.1233 for a customer
+      Then the control API's usage total and the event summary give exactly 1.1234
+
+    @unit
+    Scenario: A meter event value that is not a number is refused
+      When a meter event carries the value "0,0001"
+      Then paymentsim answers 400 saying the value must be a number
+
+    @unit
+    Scenario: Decimal usage on a per-unit price bills to the cent
+      Given a metered price of 100 cents per unit
+      When the period's usage totals 1.1234 units
+      Then the renewal invoice line for that price is 112 cents
+
+    @unit
+    Scenario: Half a cent of decimal usage rounds up
+      Given a metered price of 100 cents per unit
+      When the period's usage totals 1.005 units
+      Then the line for that price is 101 cents, never 100
 
     @unit
     Scenario: A repeated meter event identifier is refused

@@ -1,0 +1,24 @@
+---
+title: "Multi-agent traces across A2A"
+description: "See every agent of an A2A call chain in one trace, with the calls, errors, latency and cost between them."
+---
+
+When one agent calls another over the Agent2Agent (A2A) protocol, LangWatch shows the whole chain as one trace. Open the trace and pick the **Agents** tab to see which agent called which, how often, how many calls failed, how long they took and what each agent cost.
+
+## How spans join one trace
+
+Spans from different agents join the same trace when the caller sends the W3C `traceparent` header on its A2A request and the callee continues that context. Most OpenTelemetry HTTP instrumentations do this for you. If the callee starts a new trace instead, its spans land in a separate trace and the graph shows only one side.
+
+A span whose parent span ID is not in the trace is still drawn as an agent, marked "Caller not in this trace". This happens when the caller's spans were not sent to LangWatch, or were sent to another project. A callee that got no `traceparent` starts its own trace instead, with no marker.
+
+## Attributes LangWatch reads
+
+Each span belongs to the agent named by `gen_ai.agent.name` (or `gen_ai.agent.id`). An A2A client span can also name its callee through `a2a.agent.name`, `a2a.agent.card.name` or a span name like `invoke_agent Bob`; that span and the spans under it belong to the callee. A span without a name belongs to its parent's agent. When `service.name` changes under a span, the new service becomes its own node, unless the parent is an A2A client span that names its callee.
+
+A span is marked as an A2A call when it carries `a2a.*` attributes, such as `a2a.method`, `a2a.context.id`, `a2a.task.id` and `a2a.task.state`. Those spans get an **A2A** label in the span tree. An edge appears where a span belongs to a different agent than its parent, and it is marked A2A when that span is an A2A span. An A2A span that stays in its parent's agent adds no edge.
+
+## The call graph
+
+Each node is an agent, with its span count and the cost of its own LLM spans, so a parent is never charged for its children. Each edge counts the calls from one agent to another, with errors, average and maximum latency. Click an edge to open its first call in the span details.
+
+The **Agents** tab appears when a trace names more than one agent or holds an A2A call. When the graph finds only one agent, the tab stays and shows that one node. Each edge's latency is the caller's A2A client span when there is one, else the callee's first span. Edges with errors come first, then the busiest; a node with failed calls has a red border and the slowest callee an orange one.

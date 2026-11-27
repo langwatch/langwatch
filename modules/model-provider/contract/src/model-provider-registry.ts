@@ -94,6 +94,11 @@ export type ModelProviderEditorValue = {
    * expression sources. Null or absent means the provider's registry default applies.
    */
   langySkipPermissionsModels?: string[] | null;
+  /**
+   * The bare model ids the provider's own model list answered with, or null when it was not
+   * asked or did not answer. A picker then offers only catalogue ids this list carries.
+   */
+  servedModels?: string[] | null;
   // Nullable like every other stored column on this row: the wire always
   // carries the key, and null is "no health check has recorded a verdict".
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN" | null;
@@ -538,6 +543,25 @@ export function pickParameterConstraints(modelId: string): ParameterConstraints 
     | ModelProviderDefinition
     | undefined;
   return definition?.parameterConstraints;
+}
+
+/** Whether a stored deployment mapping names a deployment for a model. */
+export type DeploymentMappingLookup = { kind: "mapped"; deployment: string } | { kind: "unmapped" };
+
+/**
+ * The deployment a stored mapping names for a model, keyed bare (`gpt-4o`) or
+ * qualified (`azure/gpt-4o`). Execution and the guided probe both read it here.
+ */
+export function lookUpMappedDeployment({
+  deploymentMapping,
+  qualifiedModel,
+}: {
+  deploymentMapping: Record<string, string> | null | undefined;
+  qualifiedModel: string;
+}): DeploymentMappingLookup {
+  const bareModel = qualifiedModel.split("/").slice(1).join("/");
+  const deployment = deploymentMapping?.[bareModel] ?? deploymentMapping?.[qualifiedModel];
+  return deployment ? { kind: "mapped", deployment } : { kind: "unmapped" };
 }
 
 function isValidJson(value: string): boolean {

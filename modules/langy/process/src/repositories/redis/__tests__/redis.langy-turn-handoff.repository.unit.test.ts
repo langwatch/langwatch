@@ -29,7 +29,6 @@ const handoff: LangyTurnHandoff = {
     organizationId: "org_1",
   },
   runToken: "run_token",
-  permitReserved: false,
 };
 
 /** Keys that lapse on the (fake) clock; EXPIRE only touches a key that still exists. */

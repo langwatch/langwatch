@@ -11,6 +11,7 @@ import {
   aiBrandPalette,
   aiBrandPaletteHot,
 } from "../../../../model/explorer/ai/ai-brand-palette.ts";
+import { DRAWER_KEEP_CLEAR_ATTRIBUTE } from "../../../../model/explorer/trace-drawer/drawer-fit.ts";
 import { ProviderPrimerPopover } from "./provider-primer-popover.tsx";
 
 // Slow, breathing halo that cycles through the palette so the Ask AI
@@ -88,6 +89,8 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       // floating popover orbits a small, named target instead of the
       // entire input row. See `TRACE_EXPLORER_SPOTLIGHTS[0]`.
       data-spotlight="ask-ai-chip"
+      // A wide trace drawer stops short of this button, so Ask Langy stays reachable.
+      {...{ [DRAWER_KEEP_CLEAR_ATTRIBUTE]: "" }}
       size="2xs"
       flexShrink={0}
       onClick={isGated ? undefined : onClick}

@@ -242,6 +242,7 @@ func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 	t.Setenv("LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", "300")
 	t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", "21600")
 	t.Setenv("LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS", "90")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS", "60")
 
 	cfg, err := LoadConfig(context.Background())
 	if err != nil {
@@ -255,6 +256,23 @@ func TestLoadConfig_AuthCacheSecondsFields(t *testing.T) {
 	}
 	if cfg.AuthCache.ConfigTTLSeconds != 90 {
 		t.Errorf("AuthCache.ConfigTTLSeconds = %d, want 90", cfg.AuthCache.ConfigTTLSeconds)
+	}
+	if cfg.AuthCache.FailClosedAfterSeconds != 60 {
+		t.Errorf("AuthCache.FailClosedAfterSeconds = %d, want 60", cfg.AuthCache.FailClosedAfterSeconds)
+	}
+}
+
+// @scenario "a fail-closed limit out of range or under the long-poll hold is refused"
+func TestLoadConfig_RefusesBadFailClosedLimit(t *testing.T) {
+	for _, v := range []string{"-1", "10", "9000000000000"} {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS", v)
+		_, err := LoadConfig(context.Background())
+		if err == nil || !strings.Contains(err.Error(), "LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS") {
+			t.Errorf("value %s: want a startup error naming the variable, got %v", v, err)
+		}
 	}
 }
 
@@ -495,6 +513,7 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS",
+		"LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS",
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
 		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL",

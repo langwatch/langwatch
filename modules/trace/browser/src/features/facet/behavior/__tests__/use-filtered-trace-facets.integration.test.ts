@@ -20,6 +20,7 @@ const harness = vi.hoisted(() => ({
     },
   },
   samplePreview: { value: false },
+  pendingNegatedEval: { value: false },
 }));
 
 vi.mock("../../../../behavior/trace-api.ts", () => ({
@@ -50,6 +51,10 @@ vi.mock("../../../instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [], evalRuns: undefined }),
 }));
 
+vi.mock("../../../instant-eval/behavior/use-has-pending-negated-eval.ts", () => ({
+  useHasPendingNegatedEval: () => harness.pendingNegatedEval.value,
+}));
+
 import type * as actualModule from "../../../../behavior/explorer.store.ts";
 import { useFilteredTraceFacets } from "../use-filtered-trace-facets.ts";
 
@@ -66,6 +71,7 @@ beforeEach(() => {
   }));
   harness.projectId.value = "proj-1";
   harness.samplePreview.value = false;
+  harness.pendingNegatedEval.value = false;
   harness.filter.debouncedQueryText = "status:error";
   harness.filter.debouncedTimeRange = { from: 10, to: 20, label: "Last 1 hour" };
 });
@@ -125,6 +131,28 @@ describe("useFilteredTraceFacets", () => {
     });
   });
 
+  describe("given a NOT eval chip no run has judged yet", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("does not query and hands back settled empty counts, as the table shows no row", () => {
+      harness.pendingNegatedEval.value = true;
+      harness.useQuery.mockImplementation(() => ({
+        data: { facets: [{ kind: "categorical", key: "status" }] },
+        isPlaceholderData: true,
+        isFetching: true,
+        isError: false,
+      }));
+      const { result } = renderHook(() => useFilteredTraceFacets());
+      expect(lastOpts()?.enabled).toBe(false);
+      expect(result.current).toEqual({
+        data: [],
+        isPlaceholderData: false,
+        isFetching: false,
+        isError: false,
+        matchesNothing: true,
+      });
+    });
+  });
+
   describe("given no project", () => {
     it("does not query at all", () => {
       harness.projectId.value = undefined;
@@ -146,6 +174,7 @@ describe("useFilteredTraceFacets", () => {
       isPlaceholderData: true,
       isFetching: true,
       isError: false,
+      matchesNothing: false,
     });
   });
 });

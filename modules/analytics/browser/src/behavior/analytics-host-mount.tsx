@@ -4,6 +4,7 @@
  * application. ARCHITECTURE.md §10.1.
  */
 
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import {
   useUiHostServices,
   useUiScope,
@@ -16,7 +17,7 @@ import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { LangyAskToken, type LangyAsk } from "@langwatch/langy-client";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import {
   AnalyticsHostApi,
@@ -34,6 +35,9 @@ import { automationDrawerAddress } from "../model/analytics-overlay-address.ts";
 import { isPersonalProject } from "../model/analytics-personal-project.ts";
 import { analyticsApi } from "./analytics-api.ts";
 
+/** Main's cadence: a role changed elsewhere reaches the section within a focus. */
+const GRANTS_STALE_TIME_MS = 30_000;
+
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
   private readonly organizationId_: string | undefined;
@@ -44,6 +48,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
   private readonly langy: (() => Promise<LangyAsk>) | undefined;
+  private readonly projectGrants: ReadonlyMap<string, ReadonlySet<string>>;
+  private readonly askAbout: (projectId: string) => void;
 
   constructor({
     project_,
@@ -55,6 +61,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     navigationCapability,
     feedback,
     langy,
+    projectGrants,
+    askAbout,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
@@ -65,6 +73,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
     langy: (() => Promise<LangyAsk>) | undefined;
+    projectGrants: ReadonlyMap<string, ReadonlySet<string>>;
+    askAbout: (projectId: string) => void;
   }) {
     super();
     this.project_ = project_;
@@ -76,6 +86,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
     this.langy = langy;
+    this.projectGrants = projectGrants;
+    this.askAbout = askAbout;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -96,6 +108,16 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 
   hasPermission(permission: string): boolean {
     return this.session.hasPermission(permission);
+  }
+
+  /** By the reader's own standing in that project, organization admin included, manage too. */
+  hasPermissionIn({ projectId, permission }: { projectId: string; permission: string }): boolean {
+    const granted = this.projectGrants.get(projectId);
+    if (!granted) {
+      this.askAbout(projectId);
+      return false;
+    }
+    return permissionSatisfiedBy({ granted, requested: permission });
   }
 
   isSettled(): boolean {
@@ -180,6 +202,45 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   );
   const isPersonal = isPersonalProject({ graph: scopeGraph.data ?? [], projectId: scopeProjectId });
 
+  // Only the projects a section asked about are read, never every project in the organization.
+  const [askedProjectIds, setAskedProjectIds] = useState<readonly string[]>([]);
+  const askAbout = useCallback(
+    (askedProjectId: string) => {
+      if (askedProjectIds.includes(askedProjectId)) return;
+      // Deferred: a section asks while rendering, when setting this mount's state is refused.
+      queueMicrotask(() =>
+        setAskedProjectIds((asked) =>
+          asked.includes(askedProjectId) ? asked : [...asked, askedProjectId],
+        ),
+      );
+    },
+    [askedProjectIds],
+  );
+  const standings = analyticsApi.useQueries((t) =>
+    askedProjectIds.map((askedProjectId) =>
+      t.authz.effectivePermissions(
+        { projectId: askedProjectId },
+        { staleTime: GRANTS_STALE_TIME_MS },
+      ),
+    ),
+  );
+  const landed = askedProjectIds.flatMap((askedProjectId, index) => {
+    const permissions = standings[index]?.data?.permissions;
+    return permissions ? [[askedProjectId, permissions] as const] : [];
+  });
+  // useQueries answers a new array every render, so the grants are keyed on what landed.
+  const landedKey = JSON.stringify(landed);
+  const projectGrants = useMemo(
+    () =>
+      new Map(
+        landed.map(
+          ([askedProjectId, permissions]) => [askedProjectId, new Set(permissions)] as const,
+        ),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [landedKey],
+  );
+
   // Primitive dependencies only, so the host stays the SAME object across
   // renders that carry the same reading.
   const host = useMemo(
@@ -204,6 +265,8 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
         navigationCapability: navigation,
         feedback,
         langy,
+        projectGrants,
+        askAbout,
       }),
     [
       scopeProjectId,
@@ -222,6 +285,8 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       navigation,
       feedback,
       langy,
+      projectGrants,
+      askAbout,
     ],
   );
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;

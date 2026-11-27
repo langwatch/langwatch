@@ -7,7 +7,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
 import { FakeApiKeyHost } from "../../../testing.tsx";
@@ -85,7 +85,15 @@ async function boxLabelled(label: string): Promise<HTMLElement> {
   });
 }
 
-afterEach(cleanup);
+// A copy button resets its label 2 s after a copy; faked so the reset never outlives the test.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+});
+afterEach(() => {
+  cleanup();
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
 
 describe("given a token has just been minted", () => {
   describe("when the .env tab renders", () => {
@@ -444,6 +452,66 @@ describe("given a token has just been minted", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    /** @scenario The dialog closes while a copy is still pending, and the copied state is never shown or reset afterwards */
+    it.each([
+      ["Copy API key", async () => screen.getByRole("button", { name: "Copy API key" })],
+      [
+        "the .env box",
+        async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
+      ],
+      ["the config block", async () => screen.findByRole("button", { name: /copy config/i })],
+    ])("schedules no reset and logs nothing when %s resolves after unmount", async (_, button) => {
+      const host = renderDialog();
+      const settle = host.deferNextCopy();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const timerSpy = vi.spyOn(globalThis, "setTimeout");
+      try {
+        fireEvent.click(await button());
+        expect(host.copies).toHaveLength(1);
+
+        cleanup();
+        timerSpy.mockClear();
+        await act(async () => {
+          settle(true);
+          await vi.advanceTimersByTimeAsync(2000);
+        });
+
+        expect(timerSpy).not.toHaveBeenCalledWith(expect.any(Function), 2000);
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+        timerSpy.mockRestore();
+      }
+    });
+
+    /** @scenario Copying twice restarts the reset window */
+    it.each([
+      [
+        "the .env box",
+        async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
+      ],
+      ["the config block", async () => screen.findByRole("button", { name: /copy config/i })],
+    ])("restarts the reset window for %s when copied again", async (_, button) => {
+      renderDialog();
+      const copyButton = await button();
+      const isChecked = () => copyButton.querySelector("svg.lucide-check") !== null;
+
+      fireEvent.click(copyButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      fireEvent.click(copyButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(isChecked()).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+      expect(isChecked()).toBe(false);
     });
 
     /** @scenario Copy success is announced to assistive tech */

@@ -1,7 +1,12 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
-import { isOwnDecisionModelId } from "./catalog/decision-models.ts";
-import { allLitellmModels } from "./catalog/model-catalog.ts";
+import {
+  canonicalModelId,
+  findDecisionModel,
+  isOwnDecisionModelId,
+} from "./catalog/decision-models.ts";
+import { isLatestAlias } from "./catalog/latest-aliases.ts";
+import { allLitellmModels, isChatSurfaceCatalogModel } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./model-provider-registry.ts";
@@ -13,11 +18,17 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
-/** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
-export type BuiltInModel = { value: string; label: string };
+/**
+ * A model LangWatch serves itself, so a project needs no provider of its own to pick it. Its line
+ * is the catalogue's, unless it sets its own: one id may be offered under two names.
+ */
+export type BuiltInModel = { value: string; label: string; description?: string };
 
-/** The heading built-in models are listed under. */
-export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
+/**
+ * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
+ * runs on the project's provider, which its icon names, as a chat model's does.
+ */
+export const BUILT_IN_MODELS_GROUP_LABEL = "Decision models";
 
 /**
  * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
@@ -147,6 +158,7 @@ const mergeProviderRowsByKey = (
         existing.customEmbeddingsModels,
         row.customEmbeddingsModels,
       ),
+      servedModels: existing.servedModels ?? row.servedModels ?? null,
     };
   }
   return byKey;
@@ -197,6 +209,36 @@ const enabledCustomModelIds = (
   return ids;
 };
 
+/**
+ * Per provider key, the bare ids its own model list answered with, or none to trust the catalogue.
+ * A list sharing no id with the catalogue names models another way (a proxy's own aliases), so it
+ * proves nothing about which catalogue ids answer and the catalogue is kept.
+ */
+const servedModelSets = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  options: string[],
+): Map<string, Set<string>> => {
+  const sets = new Map<string, Set<string>>();
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.servedModels?.length) continue;
+    const served = new Set(config.servedModels);
+    const prefix = `${providerKey}/`;
+    const overlaps = options.some(
+      (option) => option.startsWith(prefix) && served.has(option.slice(prefix.length)),
+    );
+    if (overlaps) sets.set(providerKey, served);
+  }
+  return sets;
+};
+
+/** Whether the provider's own model list, when known, carries this registry id. */
+const isServedByProvider = (option: string, served: Map<string, Set<string>>): boolean => {
+  const provider = option.split("/")[0]!;
+  const set = served.get(provider);
+  if (!set || isLatestAlias(option)) return true;
+  return set.has(option.slice(provider.length + 1));
+};
+
 /** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
 export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,
@@ -206,6 +248,7 @@ export const getCustomModels = (
   const customModelIds = enabledCustomModelIds(modelProviders, mode);
   const registryModelIds: string[] = [];
   const customSet = new Set(customModelIds);
+  const served = servedModelSets(modelProviders, options);
 
   // Include registry models from enabled providers, filtered by mode
   for (const option of options) {
@@ -214,6 +257,8 @@ export const getCustomModels = (
 
     const registryMode = allLitellmModels[option]?.mode;
     if (registryMode && registryMode !== mode) continue;
+    if (mode === "chat" && !isChatSurfaceCatalogModel(option)) continue;
+    if (!isServedByProvider(option, served)) continue;
 
     // Skip if already added as a custom model (same ID)
     if (customSet.has(option)) continue;
@@ -260,13 +305,19 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => ({
-    label,
-    value,
-    isDisabled: false,
-    mode,
-    isBuiltIn: true,
-  }));
+  // A decision model's line, and a shorter row title where it has one, come from the catalogue.
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label, description }) => {
+    const entry = findDecisionModel(value);
+    const subtitle = description ?? entry?.description;
+    return {
+      label: entry?.pickerLabel ?? label,
+      value,
+      isDisabled: false,
+      mode,
+      isBuiltIn: true,
+      ...(subtitle ? { subtitle } : {}),
+    };
+  });
   const builtInGroups: GroupedModelOptions =
     builtInOptions.length === 0
       ? []
@@ -281,4 +332,23 @@ export function modelSelectionFrom({
     selectOptions: [...builtInOptions, ...selectOptions],
     groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
   };
+}
+
+/**
+ * The options a stored model selects, best first: the one with its exact id, then the ones it reads
+ * as (a legacy LangWatch id, ADR-182). Exact first, so two names on related ids stay apart.
+ */
+export function findSelectedOptions<T extends { value: string }>({
+  options,
+  model,
+}: {
+  options: readonly T[];
+  model: string;
+}): T[] {
+  const canonical = canonicalModelId(model);
+  const exact = options.filter((option) => option.value === model);
+  const read = options.filter(
+    (option) => option.value !== model && canonicalModelId(option.value) === canonical,
+  );
+  return [...exact, ...read];
 }

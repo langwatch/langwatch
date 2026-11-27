@@ -9,6 +9,7 @@ import {
   type LangWatchQLAcceptedGranularityStep,
   type LangWatchQLGranularityStep,
   type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetryRequest,
 } from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
@@ -23,19 +24,34 @@ import {
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
-import { useCallback, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
+import { runSources } from "../../dashboards/model/widget-sources.ts";
 
-/** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
-const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
-  "SHARE_WINDOW_LIMITED",
-  "SOURCES_IGNORED",
-  "GRANULARITY_COARSENED",
-];
+/**
+ * The diagnostics that say the server limited a run, shown on the card as one (i) line.
+ * SOURCES_IGNORED is left to the sources line: its text is for the query's author.
+ */
+const LIMIT_DIAGNOSTIC_CODES: readonly string[] = ["SHARE_WINDOW_LIMITED", "GRANULARITY_COARSENED"];
+
+/** The messages a card's (i) line shows for one run's diagnostics (dashboards-v2 AC213). */
+export function cardLimitMessages(
+  diagnostics: readonly { code: string; message: string }[],
+): string[] {
+  return diagnostics
+    .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
+    .map(({ message }) => message);
+}
+
+/**
+ * Whether a widget naming no projects reads every project the member may read, not the bound
+ * one: true on a Gateway or Governance board, which reads the organization (ADR-002, D2).
+ */
+export const WidgetReadsEveryProjectContext = createContext(false);
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -70,6 +86,29 @@ export interface DashboardWidgetExecutorOverrides {
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** The placed widget its runs are for, for their log line; absent in the editor's preview. */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
+}
+
+/** The ids a widget's runs are logged under, apart, so a hook can depend on them by value. */
+function telemetryIdsOf(
+  overrides: DashboardWidgetExecutorOverrides | undefined,
+): Partial<LangWatchQLRunTelemetryRequest> {
+  return overrides?.telemetry ?? {};
+}
+
+/** The ids put back together for the request; none when the run is no placed widget's. */
+function runTelemetryOf({
+  dashboardId,
+  widgetId,
+  templateId,
+}: Partial<LangWatchQLRunTelemetryRequest>): LangWatchQLRunTelemetryRequest | undefined {
+  if (widgetId === void 0) return void 0;
+  return {
+    widgetId,
+    ...(dashboardId === void 0 ? {} : { dashboardId }),
+    ...(templateId === void 0 ? {} : { templateId }),
+  };
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -89,6 +128,9 @@ export function useDashboardWidgetExecutor(
   const pageWindow = overrides?.timeWindow ?? mountWindow;
   const granularitySeconds: LangWatchQLAcceptedGranularityStep =
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  // By value, not by object: a caller that builds the ids afresh each render keeps one run.
+  const { dashboardId, widgetId, templateId } = telemetryIdsOf(overrides);
+  const readsEveryProject = useContext(WidgetReadsEveryProjectContext);
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -96,8 +138,9 @@ export function useDashboardWidgetExecutor(
           mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
         },
         projectId,
+        readsEveryProject,
       }),
-    [utils, projectId],
+    [utils, projectId, readsEveryProject],
   );
   const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
 
@@ -105,9 +148,7 @@ export function useDashboardWidgetExecutor(
   const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
   const noteLimits = useCallback(
     ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
-      const messages = result.diagnostics
-        .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
-        .map(({ message }) => message);
+      const messages = cardLimitMessages(result.diagnostics);
       setLimitsBySql((prev) =>
         prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
       );
@@ -122,7 +163,7 @@ export function useDashboardWidgetExecutor(
 
   const runValidated = useCallback(
     async (
-      query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
+      query: Pick<DashboardWidgetQuery, "name" | "sql" | "sources" | "projects">,
       params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
@@ -132,9 +173,9 @@ export function useDashboardWidgetExecutor(
           parameters: params,
           timeWindow: pageWindow,
           granularitySeconds,
-          // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
-          sources: query.sources ?? null,
+          sources: runSources(query),
           ...(query.projects ? { projects: query.projects } : {}),
+          telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
@@ -143,7 +184,7 @@ export function useDashboardWidgetExecutor(
       noteLimits({ query: query.sql, result });
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds, noteLimits],
+    [execute, pageWindow, granularitySeconds, noteLimits, dashboardId, widgetId, templateId],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(

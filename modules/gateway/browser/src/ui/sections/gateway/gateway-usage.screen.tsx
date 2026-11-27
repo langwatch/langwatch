@@ -315,9 +315,6 @@ function GatewayUsagePage() {
 
         <PageLayout.Container>
           <VStack align="stretch" gap={6}>
-            <Text color="fg.muted">
-              What your virtual keys spent, by key, model and provider, over the window you pick.
-            </Text>
             <FilterChips
               groupLabel="Time range"
               value={String(days)}

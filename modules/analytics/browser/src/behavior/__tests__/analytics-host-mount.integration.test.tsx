@@ -27,6 +27,8 @@ vi.mock("../analytics-api.ts", () => ({
   analyticsApi: {
     project: { getHasFirstMessage: { useQuery: () => firstMessage() } },
     organization: { getScopeGraph: { useQuery: () => scopeGraph() } },
+    // No section here asks about another project's grants, so none are read.
+    useQueries: () => [],
   },
 }));
 

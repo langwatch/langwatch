@@ -15,7 +15,7 @@ data:
   LOG_LEVEL: {{ .Values.logging.level | quote }}
   {{- if .Values.metrics.enabled }}
   OTEL_METRICS_EXPORTER: "otlp,prometheus"
-  OTEL_EXPORTER_PROMETHEUS_PORT: {{ .Values.metrics.port | quote }}
+  OTEL_EXPORTER_PROMETHEUS_PORT: {{ .Values.metrics.port | int64 | quote }}
   {{- end }}
   {{/* The route back to the control plane. Derived from the release name,
        because that is what the cluster names the app Service after: a fixed
@@ -38,13 +38,18 @@ data:
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
   # The drain timing from values.yaml, carried to the two fields serve.go
   # reads (pkg/config.Server.DrainDelaySeconds / GracefulSeconds).
-  SERVER_DRAIN_DELAY_SECONDS: {{ .Values.shutdown.preDrainWaitSeconds | quote }}
-  SERVER_GRACEFUL_SECONDS: {{ .Values.shutdown.timeoutSeconds | quote }}
+  SERVER_DRAIN_DELAY_SECONDS: {{ .Values.shutdown.preDrainWaitSeconds | int64 | quote }}
+  SERVER_GRACEFUL_SECONDS: {{ .Values.shutdown.timeoutSeconds | int64 | quote }}
   # How long brokered voice calls keep running after SIGTERM
   # (services/aigateway VoiceConfig.DrainSeconds).
-  LW_GATEWAY_VOICE_DRAIN_SECONDS: {{ .Values.shutdown.voiceDrainSeconds | quote }}
+  LW_GATEWAY_VOICE_DRAIN_SECONDS: {{ .Values.shutdown.voiceDrainSeconds | int64 | quote }}
   BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
   REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
   ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}
+  {{- with .Values.publicUrl }}
+  # The base of the /a2a URLs in proxied Agent Cards. Unset, the gateway
+  # refuses Agent Card calls rather than trust the caller's Host header.
+  A2A_PUBLIC_BASE_URL: {{ . | quote }}
+  {{- end }}
   # Empty leaves CORS off: the gateway reads an empty value as unset.
   LW_GATEWAY_CORS_ALLOWED_ORIGINS: {{ join "," .Values.security.corsAllowedOrigins | quote }}

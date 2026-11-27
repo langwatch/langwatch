@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { narrowMapColumnProjection } from "../clickhouse.field-mappings.mapper.ts";
 import {
+  latestVersionColumnOf,
+  latestVersionKey,
   latestVersionSubquery,
   parseLatestVersionColumn,
 } from "../clickhouse.latest-version-dedup.mapper.ts";
@@ -25,6 +27,22 @@ describe("parseLatestVersionColumn", () => {
   });
 });
 
+describe("latestVersionKey", () => {
+  describe("when the column has a name the fence reads", () => {
+    it("names it Latest<Column>, and latestVersionColumnOf maps it back", () => {
+      expect(latestVersionKey("OccurredAt")).toBe("LatestOccurredAt");
+      expect(latestVersionColumnOf("LatestOccurredAt")).toBe("OccurredAt");
+    });
+  });
+
+  describe("when the column has any other name", () => {
+    it("keeps the name both ways", () => {
+      expect(latestVersionKey("TotalCost")).toBe("TotalCost");
+      expect(latestVersionColumnOf("TotalCost")).toBe("TotalCost");
+    });
+  });
+});
+
 describe("latestVersionSubquery", () => {
   const build = (columns: string[]) =>
     latestVersionSubquery({
@@ -36,11 +54,37 @@ describe("latestVersionSubquery", () => {
     });
 
   describe("when the version column is requested bare", () => {
-    it("exposes it as max(version) instead of carrying it in the tuple", () => {
+    it("exposes it as max(version) under its Latest key instead of carrying it in the tuple", () => {
       const sql = build(["TotalCost", "UpdatedAt"]);
 
-      expect(sql).toContain("max(__version) AS UpdatedAt");
+      expect(sql).toContain("max(__version) AS LatestUpdatedAt");
       expect(sql).toContain("tuple(TotalCost) AS __latest_row");
+    });
+  });
+
+  describe("when a carried column has a name the fence reads", () => {
+    it("exposes it under its Latest key and names no alias after it", () => {
+      const sql = build(["OccurredAt", "TotalCost"]);
+
+      expect(sql).toContain("tupleElement(__latest, 1) AS LatestOccurredAt");
+      expect(sql).toContain("tupleElement(__latest, 2) AS TotalCost");
+      expect(sql).not.toMatch(/\bAS\s+(TenantId|TraceId|OccurredAt|UpdatedAt)\b/);
+    });
+  });
+
+  describe("when the keys are read through a source alias", () => {
+    it("selects them qualified, without re-aliasing them to their own names", () => {
+      const sql = latestVersionSubquery({
+        table: "trace_analytics",
+        alias: "ta",
+        sourceAlias: "ta",
+        keyColumns: ["TenantId", "TraceId"],
+        columns: [{ name: "TotalCost" }],
+        where: "TenantId = {tenantId:String}",
+      });
+
+      expect(sql).toContain("SELECT ta.TenantId, ta.TraceId, ta.UpdatedAt AS __version");
+      expect(sql).toContain("GROUP BY TenantId, TraceId");
     });
   });
 

@@ -18,6 +18,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ScenarioRunSecretSeal } from "../../../repositories/scenario.repository.ts";
+import { redTeamRunEnvironment } from "../../../rules/red-team-job.rules.ts";
 import { hookCallsEnvironment } from "../../../rules/scenario-run-hooks.rules.ts";
 import { ScenarioExecutionLookupService } from "../../../services/scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "../../../services/scenario-model-parameters.service.ts";
@@ -25,6 +26,8 @@ import { ScenarioRunKeyService } from "../../../services/scenario-run-key.servic
 import { ScenarioRunSecretsService } from "../../../services/scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
 import type { ScenarioService } from "../../../services/scenario.service.ts";
+import type { JudgePreviewAvailabilityService } from "../../judge-preview/services/judge-preview-availability.service.ts";
+import { JudgePreviewModelParametersService } from "../../judge-preview/services/judge-preview-model-parameters.service.ts";
 import { AgentTestPrefetchService } from "./agent-test-prefetch.service.ts";
 import type { ConnectorTargetReader } from "./scenario-connector-target.service.ts";
 import {
@@ -63,6 +66,8 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
   voiceTargets: VoiceTargetReader | null;
   connectorTargets: ConnectorTargetReader | null;
+  /** Whether LangWatch Judge (preview) may judge a project's run. */
+  judgePreviewAvailability: JudgePreviewAvailabilityService;
 };
 
 type DecryptedRunSecrets =
@@ -96,6 +101,10 @@ export class ScenarioExecutionPrefetcherService {
       config: options.config,
       lookups,
       modelParameters,
+      judgePreview: JudgePreviewModelParametersService.create({
+        availability: options.judgePreviewAvailability,
+        langwatchEndpoint: options.config.langwatchEndpoint,
+      }),
       traces: options.traces,
       runKeys,
       workflows: options.workflows,
@@ -193,6 +202,7 @@ export class ScenarioExecutionPrefetcherService {
               apiKey,
             },
             ...("success" in adapter ? {} : hookCallsEnvironment(adapter)),
+            ...redTeamRunEnvironment(scenario.config),
           };
         })
         .catch(() => null),

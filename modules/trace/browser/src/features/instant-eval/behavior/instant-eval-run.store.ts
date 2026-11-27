@@ -10,11 +10,14 @@ import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contra
 import { nowInstant } from "@langwatch/time";
 import { isExplorerInstantEvalRunActive } from "@langwatch/trace-contract";
 
+import { typedQuestionKey } from "../../../model/surely-instant-eval-chip.ts";
+
 /**
  * Where a run is, as the page shows it. Counters can still move after the
- * status turns terminal, so the page reads until they hold still.
+ * status turns terminal, so the page reads until they hold still. A failed run
+ * says so at once and keeps saying it, settled or not, until the query changes.
  */
-export type InstantEvalRunPhase = "judging" | "stopping" | "settling" | "settled";
+export type InstantEvalRunPhase = "judging" | "stopping" | "settling" | "settled" | "failed";
 
 /**
  * A run read for the first time this long after it ended is taken as settled:
@@ -34,6 +37,7 @@ export function instantEvalRunPhase({
   if (isExplorerInstantEvalRunActive(run.status)) {
     return isStopRequested ? "stopping" : "judging";
   }
+  if (run.status === "failed") return "failed";
   return isSettled ? "settled" : "settling";
 }
 
@@ -54,6 +58,14 @@ interface InstantEvalRunState {
   quiet: Record<string, true>;
   /** Quiet runs whose final numbers the table and the sidebar have read. */
   settled: Record<string, true>;
+  /**
+   * Questions the reader submitted as Instant Evals on this page, by `typedQuestionKey`. A bare
+   * chip outside it may still be an evaluator name from before Instant Evals.
+   */
+  typedQuestions: Record<string, true>;
+  markTyped: (typed: { projectId: string; question: string }) => void;
+  /** Skip on a refused judgement: the reader said the words were no Instant Eval. */
+  unmarkTyped: (typed: { projectId: string; question: string }) => void;
   setRun: (run: ExplorerInstantEvalProgress, now?: number) => void;
   markStopped: (runId: string) => void;
   markSettled: (runId: string) => void;
@@ -112,6 +124,21 @@ export const useInstantEvalRunStore = defineSlice<InstantEvalRunState>({
     stoppedByUser: {},
     quiet: {},
     settled: {},
+    typedQuestions: {},
+    markTyped: (typed) =>
+      set((state) => {
+        const key = typedQuestionKey(typed);
+        return state.typedQuestions[key]
+          ? state
+          : { typedQuestions: { ...state.typedQuestions, [key]: true } };
+      }),
+    unmarkTyped: (typed) =>
+      set((state) => {
+        const key = typedQuestionKey(typed);
+        if (!state.typedQuestions[key]) return state;
+        const { [key]: _dropped, ...typedQuestions } = state.typedQuestions;
+        return { typedQuestions };
+      }),
     setRun: (run, now = nowInstant().epochMilliseconds) =>
       set((state) => withRead({ state, run, now })),
     markStopped: (runId) =>
@@ -147,4 +174,16 @@ export function selectInstantEvalRunPhase(
     isStopRequested: state.stoppedByUser[runId] === true,
     isSettled: state.settled[runId] === true,
   });
+}
+
+/** Skip or a declined run: drops the marks the refused submit made, keeping ones made earlier. */
+export function unmarkNewlyTyped({
+  projectId,
+  questions = [],
+}: {
+  projectId: string;
+  questions?: readonly string[];
+}): void {
+  const { unmarkTyped } = useInstantEvalRunStore.getState();
+  for (const question of questions) unmarkTyped({ projectId, question });
 }

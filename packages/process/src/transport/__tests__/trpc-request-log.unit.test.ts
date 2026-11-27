@@ -19,6 +19,10 @@ class ClickhouseOverloadedError extends HandledError {
   }
 }
 
+const hostRecords = vi.hoisted(
+  () => [] as { logger: string; level: string; message: string; fields: Record<string, unknown> }[],
+);
+
 const records = vi.hoisted(
   () => [] as { logger: string; message: string; fields: Record<string, unknown> }[],
 );
@@ -29,7 +33,18 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
     ...actual,
     createLogger: (name: string) => {
       const logger = actual.createLogger(name);
-      if (name !== "langwatch:api:hono") return logger;
+      if (name !== "langwatch:api:hono") {
+        const keep =
+          (level: string) =>
+          (fields: Record<string, unknown>, message: string): void => {
+            hostRecords.push({ logger: name, level, message, fields });
+          };
+        return Object.assign(Object.create(logger), {
+          info: keep("info"),
+          warn: keep("warn"),
+          error: keep("error"),
+        });
+      }
       const capture =
         () =>
         (fields: Record<string, unknown>, message: string): void => {
@@ -89,6 +104,7 @@ function composeSweeper(sweep: () => { swept: number }) {
 describe("the tRPC lane's access record", () => {
   beforeEach(() => {
     records.length = 0;
+    hostRecords.length = 0;
   });
 
   describe("when the dashboard calls a procedure that answers", () => {
@@ -153,6 +169,24 @@ describe("the tRPC lane's access record", () => {
         handledErrorCode: "clickhouse_overloaded",
         handledErrorFault: "platform",
       });
+    });
+  });
+
+  describe("when the procedure fails with an unhandled error", () => {
+    /** @scenario "A failed tRPC call writes its failure once" */
+    it("writes the failure on one trpc call record and nowhere else", async () => {
+      const boom = new Error("boom");
+      const app = composeSweeper(() => {
+        throw boom;
+      });
+
+      await app.request("/api/trpc/sweeper.sweep");
+
+      const failures = hostRecords.filter((record) => record.level === "error");
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.message).toBe("trpc call");
+      expect(failures[0]?.fields.error).toBeDefined();
+      expect(hostRecords.map((record) => record.message)).not.toContain("tRPC call failed");
     });
   });
 });

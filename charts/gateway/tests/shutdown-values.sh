@@ -233,6 +233,24 @@ test_extra_ca_certs_reach_the_pod() {
   fi
 }
 
+# publicUrl becomes A2A_PUBLIC_BASE_URL; unset renders no key, so card calls are refused.
+test_the_public_url_reaches_the_a2a_proxy() {
+  local base
+  base=$(configmap_value_of "" "A2A_PUBLIC_BASE_URL")
+  if [ -n "$base" ]; then
+    fail "a2a base default" "A2A_PUBLIC_BASE_URL is '$base', expected absent"
+  else
+    echo "ok   [a2a base default] A2A_PUBLIC_BASE_URL is absent"
+  fi
+
+  base=$(configmap_value_of "--set publicUrl=https://gateway.example.com" "A2A_PUBLIC_BASE_URL")
+  if [ "$base" != "https://gateway.example.com" ]; then
+    fail "a2a base override" "A2A_PUBLIC_BASE_URL is '${base:-<absent>}', expected https://gateway.example.com"
+  else
+    echo "ok   [a2a base override] A2A_PUBLIC_BASE_URL=$base"
+  fi
+}
+
 # The metrics listener is opt-in: off renders no key, on renders the switch, the port and the secret.
 test_the_metrics_listener_is_opt_in() {
   local exporter port rendered
@@ -257,6 +275,7 @@ test_the_metrics_listener_is_opt_in() {
 
 test_drain_timing_reaches_the_configmap
 test_the_metrics_listener_is_opt_in
+test_the_public_url_reaches_the_a2a_proxy
 test_cors_allowed_origins_reach_the_configmap
 test_extra_ca_certs_reach_the_pod
 test_the_duration_string_keys_are_refused

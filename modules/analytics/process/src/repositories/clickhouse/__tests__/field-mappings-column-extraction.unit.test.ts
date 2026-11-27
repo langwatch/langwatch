@@ -216,15 +216,15 @@ describe("extractReferencedTraceColumns", () => {
 });
 
 describe("spanAttributesNarrowProjection", () => {
-  it("reconstructs a single-key map aliased as SpanAttributes", () => {
+  it("reconstructs a single-key map aliased as JoinedSpanAttributes", () => {
     expect(spanAttributesNarrowProjection(["langwatch.span.type"])).toBe(
-      "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+      "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS JoinedSpanAttributes",
     );
   });
 
   it("reconstructs a multi-key map preserving each referenced key", () => {
     expect(spanAttributesNarrowProjection(["langwatch.span.type", "gen_ai.request.model"])).toBe(
-      "map('langwatch.span.type', SpanAttributes['langwatch.span.type'], 'gen_ai.request.model', SpanAttributes['gen_ai.request.model']) AS SpanAttributes",
+      "map('langwatch.span.type', SpanAttributes['langwatch.span.type'], 'gen_ai.request.model', SpanAttributes['gen_ai.request.model']) AS JoinedSpanAttributes",
     );
   });
 });
@@ -248,7 +248,7 @@ describe("narrowSpanAttributesColumns", () => {
         expressions: ["ss.SpanAttributes['langwatch.span.type']"],
       });
       expect(result).toContain(
-        "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+        "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS JoinedSpanAttributes",
       );
       expect(result.has("SpanAttributes")).toBe(false);
     });
@@ -263,7 +263,7 @@ describe("narrowSpanAttributesColumns", () => {
       });
       const narrow = [...result].find((c) => c.includes("map("));
       expect(narrow).toBe(
-        "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+        "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS JoinedSpanAttributes",
       );
     });
 

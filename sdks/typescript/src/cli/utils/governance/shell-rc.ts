@@ -17,6 +17,7 @@ import {
   defaultCodexNotifyCommand,
   writeCodexNotifyBlock,
 } from "../codex-config-toml";
+import { writeSecretFile } from "../secret-file";
 import {
   type AppSettingsTarget,
   appEnvHasAllVars,
@@ -246,7 +247,8 @@ export function persistBlockToRc(
     const needsNewline = existing.length > 0 && !existing.endsWith("\n");
     next = existing + (needsNewline ? "\n" : "") + "\n" + wrapped;
   }
-  fs.writeFileSync(file, next);
+  // The block exports an API key, so the rc file is kept to its owner.
+  writeSecretFile(file, next);
   return file;
 }
 

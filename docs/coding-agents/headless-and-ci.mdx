@@ -8,6 +8,8 @@ keywords:
   - coding agent ci telemetry
   - ingest key
   - github actions claude code
+  - pi coding agent ci
+  - grok cli headless
   - agent fleet telemetry
 ---
 
@@ -20,11 +22,17 @@ A background agent spends tokens the same way an interactive one does, and needs
 ```bash
 langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
+langwatch instrument pi --key ik-lw-...
+langwatch instrument grok --key ik-lw-...
 ```
 
 GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
 
 `langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
+
+pi and Grok work the same way: `langwatch instrument pi` and `langwatch instrument grok` each write a shell function, because neither tool reads its export settings from a file. In a CI step or a service, set the variables from [pi manual setup](/coding-agents/pi#manual-setup) or [Grok manual setup](/coding-agents/grok-cli#manual-opentelemetry-setup) in the job instead.
+
+pi also needs its telemetry extension on the machine, so run `langwatch instrument pi --key ik-lw-...` once in the job first, or `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` set: it writes the extension, and pi sends no telemetry without it.
 
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
@@ -60,15 +68,53 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
+A job running pi headless writes the extension first, then sets the variables on the step that runs pi:
+
+```yaml
+      - run: npm install -g langwatch @earendil-works/pi-coding-agent
+      - run: langwatch instrument pi
+        env:
+          LANGWATCH_INGEST_KEY: ${{ secrets.LANGWATCH_INGEST_KEY }}
+      - run: pi -p "Update the dependency table in README.md"
+        env:
+          OTEL_TRACES_EXPORTER: otlp
+          OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true"
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+          OTEL_EXPORTER_OTLP_ENDPOINT: https://app.langwatch.ai/api/otel
+          OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer ${{ secrets.LANGWATCH_INGEST_KEY }}
+          OTEL_RESOURCE_ATTRIBUTES: service.name=pi
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
 The session appears on the project's [sessions list](/coding-agents/sessions) like any other, and its branch work attributes to [pull requests](/coding-agents/pull-requests) the same way.
 
 For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent, `langwatch login --api-key <sk-lw-...>` writes a project API key to `.env` non-interactively, and `langwatch login --token <token>` installs a pre-minted device token. Both fail fast on a machine without a terminal instead of hanging on a device-code prompt.
 
+## Agents started by a harness
+
+A harness that runs Claude Code for you, such as a sandbox supervisor, an agent platform or a session manager like rush, starts `claude -p` with an environment it builds itself. Put the variables from [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) in that environment, with a project ingest key (`ik-lw-...`) in `OTEL_EXPORTER_OTLP_HEADERS`. Keep a project API key (`sk-lw-...`) out of it, since the agent can read every variable the harness gives it.
+
+Each Claude Code session the harness keeps becomes one session in LangWatch, each turn one trace, and a subagent's model calls and tool calls nest under the `Agent` tool call that started it.
+
+Three things to check in the harness:
+
+- `env` in a `settings.json` that Claude Code reads (the account's `~/.claude/settings.json`, or the file in `CLAUDE_CONFIG_DIR`) can override the same variables in the process environment. Keep the OTLP variables in one place.
+- Remove `TRACEPARENT` and `TRACESTATE` from the environment the harness passes on. Claude Code sets them for every command it runs, so a harness started from inside a Claude Code session inherits them, and every turn it runs then joins that outer session's trace.
+- A harness that stops idle sessions should close their input and give Claude Code a few seconds to exit, so the last spans and logs are exported.
+
+To send metadata only, set `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` to `0`. Tokens, cost, model, timings and tool names still arrive.
+
+Prompts and responses then show as `<REDACTED>`, and tool arguments and outputs are not sent; a Bash call keeps only its program name and command class. To enforce the same on the server for everything a project receives, set the input, output and tool categories of a [data privacy policy](/coding-agents/privacy) to drop.
+
 ## Bake it into an image
 
-`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`, `grok_cli`, `pi_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
 
 `--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
+
+For `grok_cli`, the skipped hook file is `~/.grok/hooks/langwatch.json`, so Grok sessions report no repository or branch. For `pi_cli`, the skipped file is pi's telemetry extension, and without it pi sends no telemetry at all.
+
+Write pi's extension when the container starts, not while the image builds: run `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` supplied as a runtime secret. Both commands that write the extension also save the ingest key to the CLI's config file, so running either in a build step leaves the key in an image layer.
 
 ## Roll out to a managed fleet
 
@@ -80,8 +126,44 @@ For Claude Code, an administrator can apply the telemetry configuration to every
 
 Put the same `env` block in it that [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) shows for `~/.claude/settings.json`. Variables in the managed settings file take precedence, and a user cannot override them.
 
+## Name the sessions of a background agent
+
+The Sessions page names a session by the title the agent generated or by the first line of its first prompt. A background agent often starts every session with the same scripted text, so its sessions all get the same name, or none.
+
+To name them yourself, add `langwatch.session.name` to the resource attributes the agent exports with. Keep the ones already in `OTEL_RESOURCE_ATTRIBUTES`, such as `service.name=claude-code`, and append the name after a comma:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.name=nightly-maintenance"
+```
+
+Every session the agent starts is then listed under that name. When the LangWatch hooks report a name the harness holds, such as one from Claude Code's `--name` or `/rename`, that name replaces it.
+
+## Keep a long-lived agent on one session
+
+Each Claude Code session gets its own row on the Sessions page. An agent that restarts, or starts a new session for each scheduled run, ends up with one row per run.
+
+To list all of them as one session, add `langwatch.session.id` to the same resource attributes, with an id that stays the same for the agent:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.session.id=nightly-maintenance,langwatch.session.name=nightly-maintenance"
+```
+
+Every run recorded from then on adds its traces, tokens and cost to that one session. Runs recorded before keep their own rows. Link to the session with `/<project>/sessions?session=nightly-maintenance`.
+
+If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins over the shell export, so add `langwatch.session.id` to the value in the managed settings file instead.
+
+## Name the account an agent runs on
+
+A harness that runs agents on several subscription logins can say which login each session used, so you can chart usage per account. Add the account attributes to the same resource attributes:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.account.id=4f1c9e2a7b6d4c3e8a1f0b2c3d4e5f60,langwatch.account.name=Work%20Max,langwatch.account.source=pool"
+```
+
+Percent-encode spaces and commas in values, as `OTEL_RESOURCE_ATTRIBUTES` requires. To show how much of its limit an account used, stamp the provider's own figure on each record as `langwatch.account.usage.percent`, with `langwatch.account.usage.window`, `langwatch.account.usage.resets_at` and `langwatch.account.usage.read_at`, and `langwatch.account.limited_until` while it is out of usage. The full list is on [Usage](/coding-agents/usage-analytics#subscription-accounts).
+
 ## See your machines
 
-Every CLI sign-in, CI runners included, appears under **Devices** on [/me/configure](https://app.langwatch.ai/me/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
+Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
 
 **Also check:** [Team projects](/coding-agents/team-projects) for pinning interactive machines to a shared project with a login.

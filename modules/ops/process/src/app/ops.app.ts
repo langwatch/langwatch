@@ -28,12 +28,17 @@ import {
   LicensingApi,
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   Event,
   RegisteredFoldProjection,
   RegisteredMapProjection,
   RegisteredStateProjection,
   ReplayService as EventingReplayService,
+} from "@langwatch/eventing";
+import {
+  bindProcessFleetMetricsSource,
+  unbindProcessFleetMetricsSource,
 } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import {
@@ -59,6 +64,7 @@ import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
   OpsApi,
+  type SeatSharingCheck,
   adminResourceNameSchema,
   type CheckupAnswer,
   CheckupNotSelfHostedError,
@@ -257,6 +263,12 @@ import {
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
+  type OpsFeatureFlagTarget,
+  type OpsFindFeatureFlagTargetsInput,
+  type OpsSearchFeatureFlagTargetsInput,
+  tenantQueueCountInputSchema,
+  type TenantQueueCount,
+  type TenantQueueCountInput,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -292,6 +304,7 @@ import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-d
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
+import { installationOf, installationPageOf } from "#rules/installation-name.rules";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
@@ -326,6 +339,7 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { grantsAreStaffOnly } from "../rules/platform-operator-staff.rules.ts";
 import { MOVED_TO_OWNERS } from "../rules/system-migration-support.rules.ts";
 import {
   type AdminAccess,
@@ -337,10 +351,12 @@ import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts"
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
+import { FeatureFlagTargetDirectoryService } from "../services/feature-flag-target-directory.service.ts";
 import { GroupQueueReaperService } from "../services/group-queue-reaper.service.ts";
 import {
   type AdminAuditSink,
   ImpersonationService,
+  type ImpersonationMemberships,
   type ImpersonationSessions,
 } from "../services/impersonation.service.ts";
 import { InsightScheduleOpsService } from "../services/insight-schedule-ops.service.ts";
@@ -360,10 +376,18 @@ import {
   type PlatformOperatorSeedSettings,
 } from "../services/platform-operators.service.ts";
 import { ProcessAuditService } from "../services/process-audit.service.ts";
+import { ProcessFleetCollectionService } from "../services/process-fleet-collection.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
+import { QueueClaimsIndexReadinessService } from "../services/queue-claims-index-readiness.service.ts";
+import {
+  QueueTenantClaimsFillService,
+  type TenantClaimsFillInput,
+  type TenantClaimsFillOutcome,
+} from "../services/queue-tenant-claims-fill.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
+import { SeatSharingCheckService } from "../services/seat-sharing-check.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
 import {
   StorageStatsCollectionService,
@@ -571,6 +595,8 @@ export interface OpsAppDependencies {
   retention: DataRetentionApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
+  /** The organizations a person belongs to, so an impersonation is audited in each. */
+  organizations: Pick<OrganizationApi, "organizationIdsForMember">;
   /** The report schedules the operator scheduler lists and controls. */
   automations: Pick<
     AutomationApi,
@@ -725,12 +751,17 @@ type OpsRuntimeDependencies = Readonly<{
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
+  /** The rules dialog's target search; absent where a composition built none. */
+  featureFlagTargets: FeatureFlagTargetDirectoryService | undefined;
   /** Settings, Checkup and the usage report; absent where a composition built none. */
   checkup: OpsCheckupService | undefined;
   /** The detector `ops_anomaly_detection` ticks; absent where a composition built none. */
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  processFleet: ProcessFleetCollectionService | undefined;
+  /** The daily check `ops_seat_sharing` runs; absent where a composition built none. */
+  seatSharing: SeatSharingCheckService | undefined;
   /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
   groupQueueReaper: GroupQueueReaperService;
   /** The orphaned-organization rate; absent where a composition built none. */
@@ -793,6 +824,7 @@ export class OpsModule implements OpsApi {
     // The checkup and the usage report ask each owner for its own facts.
     organizations: OrganizationApi,
     licensing: LicensingApi,
+    entitlement: EntitlementApi,
     modelProviders: ModelProviderApi,
     datasets: DatasetApi,
     annotations: AnnotationApi,
@@ -841,11 +873,18 @@ export class OpsModule implements OpsApi {
     // One tracker: the queue-metrics writer records into it, the detector reads it.
     const { rateTracker } = setup.repositories;
     const logger = createLogger("langwatch:ops");
+    const processFleet = ProcessFleetCollectionService.create({
+      fleet: setup.repositories.processFleet,
+      readings: setup.repositories.processFleetReadings,
+      logger,
+    });
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
       declaredMigrationSteps: setup.declaredMigrationSteps,
       // Only the worker runs listed work; a tasks pass keeps reading the whole queue's depth.
       runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
+      reportsFleetGauges: setup.role === "worker",
+      processFleet,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -907,7 +946,26 @@ export class OpsModule implements OpsApi {
       resolveInstances: async () => [sharedStorageStatsInstance(repositories.storageFootprint)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
+      clusterName: setup.config.clickhouseCluster,
       logger,
+    });
+
+    const featureFlagTargets = FeatureFlagTargetDirectoryService.create({
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+      users: dependencies.users,
+      plans: dependencies.entitlement,
+    });
+    const seatSharing = SeatSharingCheckService.create({
+      organizationIds: repositories.organizationTenants,
+      peers: {
+        plans: dependencies.entitlement,
+        organizations: dependencies.organizations,
+        sessions: dependencies.auth,
+        users: dependencies.users,
+      },
+      checks: repositories.seatSharingChecks,
+      now: () => nowInstant().epochMilliseconds,
     });
 
     const isCloud = config.isSaas || cloudOps;
@@ -921,13 +979,24 @@ export class OpsModule implements OpsApi {
       },
       automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
     });
+    const operatorsPage = installationPageOf({
+      baseUrl: config.publicBaseUrl,
+      path: "/ops/operators",
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
       organizations: dependencies.organizations,
+      mail: dependencies.notifications,
       deployment: {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
+      },
+      notice: {
+        mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
+        installation: installationOf(config.publicBaseUrl),
+        operatorsUrl: operatorsPage.kind === "web" ? operatorsPage.url.toString() : null,
       },
     });
     const app = OpsModule.fromInfrastructure({
@@ -937,6 +1006,8 @@ export class OpsModule implements OpsApi {
       checkup,
       anomalies,
       storageStats,
+      processFleet,
+      seatSharing,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
         identity: dependencies.identity,
@@ -952,6 +1023,7 @@ export class OpsModule implements OpsApi {
         ...(isCloud ? {} : { diagnostics: upgradeDiagnostics }),
       }),
       upgradeDiagnostics,
+      featureFlagTargets,
     });
     return app;
   }
@@ -967,10 +1039,13 @@ export class OpsModule implements OpsApi {
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
+    processFleet?: ProcessFleetCollectionService;
+    seatSharing?: SeatSharingCheckService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
     upgradeDiagnostics?: UpgradeDiagnosticsService;
+    featureFlagTargets?: FeatureFlagTargetDirectoryService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -1017,6 +1092,8 @@ export class OpsModule implements OpsApi {
       }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      processFleet: setup.processFleet,
+      seatSharing: setup.seatSharing,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
         audit: QueueAuditService.create({ auditLog: dependencies.auditLog }),
@@ -1025,6 +1102,7 @@ export class OpsModule implements OpsApi {
       platformOperators: setup.platformOperators,
       upgradeAlerts: setup.upgradeAlerts,
       upgradeDiagnostics: setup.upgradeDiagnostics,
+      featureFlagTargets: setup.featureFlagTargets,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1138,6 +1216,22 @@ export class OpsModule implements OpsApi {
 
   async featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
     return this.#dependencies.featureFlags.listOperatorCatalogue();
+  }
+
+  searchFeatureFlagTargets(
+    input: OpsSearchFeatureFlagTargetsInput,
+  ): Promise<OpsFeatureFlagTarget[]> {
+    return this.#featureFlagTargets().search(input);
+  }
+
+  findFeatureFlagTargets(input: OpsFindFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]> {
+    return this.#featureFlagTargets().find(input);
+  }
+
+  #featureFlagTargets(): FeatureFlagTargetDirectoryService {
+    const service = this.#dependencies.featureFlagTargets;
+    if (!service) throw new OpsCapabilityUnavailableError("the feature flag target directory");
+    return service;
   }
 
   /** Turns one registered flag on or off. */
@@ -1384,6 +1478,11 @@ export class OpsModule implements OpsApi {
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]> {
     return this.#dependencies.ops.listAllQueueDlqGroups();
   }
+  countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]> {
+    return this.#dependencies.ops.countQueueGroupsForTenants(
+      tenantQueueCountInputSchema.parse(input),
+    );
+  }
   pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void> {
     return this.#dependencies.ops.pauseQueuePipeline(input);
   }
@@ -1487,6 +1586,10 @@ export class OpsModule implements OpsApi {
   }
   reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome> {
     return this.#dependencies.ops.reconcileQueuePending(input);
+  }
+  /** The one paced walk that lists claims made before the claimed-groups index (ADR-092). */
+  fillQueueTenantClaims(input: TenantClaimsFillInput): Promise<TenantClaimsFillOutcome> {
+    return this.#dependencies.ops.fillQueueTenantClaims(input);
   }
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage> {
     return this.#dependencies.ops.listParkedQueueTenants(input);
@@ -2145,7 +2248,10 @@ export class OpsModule implements OpsApi {
     return this.#platformOperators().seedOnce(operatorSeed);
   }
 
-  /** Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it. */
+  /**
+   * Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it; with
+   * no email configured an unverified one only as the install's first-created account.
+   */
   seedPlatformOperatorsFromAdminEmails({ dryRun }: { dryRun: boolean }): Promise<number> {
     const { operatorSeed } = this.#dependencies;
     if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
@@ -2215,11 +2321,33 @@ export class OpsModule implements OpsApi {
     await upgradeAlerts.check(input);
   }
 
-  /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
-  measureStorage(): Promise<void> {
-    const { storageStats } = this.#dependencies;
+  /**
+   * One pass of `ops_storage_stats`: measures every endpoint and saves the readings, then
+   * counts the process-manager fleet and shares those counts for the pm_* gauges.
+   */
+  async measureStorage(): Promise<void> {
+    const { storageStats, processFleet } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
-    return storageStats.collect();
+    await storageStats.collect();
+    await processFleet?.collect();
+  }
+
+  /** The last seat sharing check, Cloud admin only; empty before the first one. */
+  async findSeatSharingChecks(): Promise<SeatSharingCheck[]> {
+    this.#refuseWithoutCloudOps();
+    return this.#seatSharing.findLast();
+  }
+
+  /** One pass of `ops_seat_sharing`; a deployment without Cloud admin checks nothing. */
+  async runSeatSharingCheck(): Promise<void> {
+    if (!this.#dependencies.cloudOps) return;
+    await this.#seatSharing.run();
+  }
+
+  get #seatSharing(): SeatSharingCheckService {
+    const { seatSharing } = this.#dependencies;
+    if (!seatSharing) throw new OpsCapabilityUnavailableError("the seat sharing check");
+    return seatSharing;
   }
 
   /** Deletes the queue groups stranded long enough that no dispatch still holds them. */
@@ -2428,6 +2556,10 @@ function buildOpsInfrastructure(input: {
   /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
   declaredMigrationSteps: (() => readonly unknown[]) | undefined;
   runListedWork: SystemMigrationRunnerDeps["runListedWork"];
+  /** Only the worker binds the pm_* gauges, so api and tasks pods never read the fleet counts. */
+  reportsFleetGauges: boolean;
+  /** The one fleet service: ops_storage_stats collects through it, the gauges read it. */
+  processFleet: ProcessFleetCollectionService;
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2461,8 +2593,17 @@ function buildOpsInfrastructure(input: {
     stop: () => queueMetricsWriter.stop(),
   });
 
+  // pm_instances / pm_outbox_* report nothing until a source is bound. The source reads the
+  // counts `ops_storage_stats` shares, never the tables, and refuses them once stale.
+  if (input.reportsFleetGauges) {
+    const { processFleet } = input;
+    bindProcessFleetMetricsSource(() => processFleet.currentReadings());
+    resources.own("process fleet metrics source", () => unbindProcessFleetMetricsSource());
+  }
+
   const explainRuntime = OpsClickHouseRuntime.create({
     url: config.clickhouseOpsUrl,
+    passwordFile: config.clickhouseOpsPasswordFile,
     buildTime: false,
   });
   resources.own("api ops explain client", () => explainRuntime.close());
@@ -2471,6 +2612,10 @@ function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
         authz: dependencies.authz,
+        operatorAddressesFixed: grantsAreStaffOnly({
+          cloud: config.isSaas || input.cloudOps,
+          isLocalDevelopment: config.nodeEnvironment === "development",
+        }),
         repositories,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
@@ -2479,6 +2624,7 @@ function buildOpsInfrastructure(input: {
         ssoRouting: organizationSsoRouting(dependencies.identity),
         audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
         sessions: dependencies.auth,
+        memberships: dependencies.organizations,
         auditLog: dependencies.auditLog,
         users: dependencies.users,
         accounts: dependencies.auth,
@@ -2507,6 +2653,11 @@ function buildOpsInfrastructure(input: {
               create: () =>
                 repositories.replayRuntimes.create({
                   retention: ReplayRetentionService.create(dependencies.retention),
+                  claimsIndexReady: () =>
+                    QueueClaimsIndexReadinessService.create({
+                      ledger: repositories.upgradeLedger,
+                      staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs,
+                    }).isReady(),
                 }),
             },
           }),
@@ -2583,6 +2734,8 @@ function organizationSsoRouting(identity: OpsAppDependencies["identity"]): Organ
 
 interface OpsOperationsOptions {
   authz: AdminAccessServiceOptions["authz"];
+  /** Where only staff may operate, the Back office never changes an operator's address. */
+  operatorAddressesFixed: boolean;
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
     OpsRepositories,
@@ -2591,6 +2744,8 @@ interface OpsOperationsOptions {
   audit: AdminAuditSink;
   /** Auth's session claims, which an impersonation starts, reads and stops. */
   sessions: ImpersonationSessions;
+  /** The organizations an impersonated person belongs to, each audited on start. */
+  memberships: ImpersonationMemberships;
   /** The shared audit log every operator act is recorded on. */
   auditLog: AuditLogApi;
   access?: AdminAccess | undefined;
@@ -2642,11 +2797,13 @@ export class OpsOperations {
         projects: this.options.scheduler.projects,
         shares: this.options.shares,
         ssoRouting: this.options.ssoRouting,
+        operatorAddressesFixed: this.options.operatorAddressesFixed,
       }),
       blobStore: BlobStoreService.create(repositories.blobStore),
       impersonation: ImpersonationService.create({
         repository: repositories.impersonation,
         sessions: this.options.sessions,
+        memberships: this.options.memberships,
         access,
         audit: this.options.audit,
         now: this.options.now,
@@ -2666,6 +2823,7 @@ export class OpsOperations {
       }),
       anomalyState: repositories.anomalyState,
       queues,
+      claimsFill: QueueTenantClaimsFillService.create({ repository: repositories.queues }),
       explorers: this.options.explorers,
     });
   }

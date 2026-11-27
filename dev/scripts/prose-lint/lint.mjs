@@ -6,7 +6,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const API_URL = "https://api.typesafe.ai/v1/systemone";
@@ -198,7 +198,7 @@ function founderUnitsIn(paragraphs) {
   for (const p of paragraphs) {
     const founderLines = p.text
       .split("\n")
-      .map((l) => l.replace(/\s+/g, " ").trim())
+      .map((l) => stripMarkup(l).replace(/\s+/g, " ").trim())
       .filter(isFounder);
     for (const u of p.units) {
       const onFounderLine = isFounder(u) || founderLines.some((l) => l.includes(u));
@@ -229,7 +229,7 @@ function parseFrontmatter(src) {
   return { frontmatter, body: rest.replace(/^\n/, "") };
 }
 
-function splitSections(body, level) {
+export function splitSections(body, level) {
   const lines = body.split("\n");
   const sections = [];
   let current = { heading: "", level: 0, lines: [] };
@@ -353,17 +353,72 @@ function splitSentences(s) {
     .filter((x) => x.length > 0);
 }
 
-// Markup that is not prose and carries punctuation the regex rules would
-// otherwise count: an image's leading exclamation mark, a comment's arrow.
-// Both go entirely, an unclosed comment to the end, until none is left.
-function stripMarkup(s) {
+// Markup that is not prose: an image and a comment go entirely, an
+// unclosed comment to the end; a link keeps its text and drops its URL.
+export function stripMarkup(s) {
   let text = s;
   let previous;
   do {
     previous = text;
     text = text.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
   } while (text !== previous);
-  return text.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  return stripLinks(text);
+}
+
+// Walks `[label](url)` and `![alt](url)` with nested brackets and balanced
+// parentheses, which a regex cannot match. Brackets are paired in one pass
+// first, so the walk stays linear and never recurses.
+function stripLinks(text) {
+  const match = pairBrackets(text);
+  const skipTo = new Map();
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (skipTo.has(i)) {
+      i = skipTo.get(i);
+      continue;
+    }
+    // An escaped character is literal, so `\![` and `\[` open nothing.
+    if (text[i] === "\\" && i + 1 < text.length) {
+      out += text.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    const link = linkAt({ text, start: i, match });
+    if (!link) {
+      out += text[i];
+      i += 1;
+    } else if (link.isImage) {
+      i = link.urlEnd + 1;
+    } else {
+      // Keep the label, nested links included, then jump over `](url)`.
+      skipTo.set(link.labelEnd, link.urlEnd + 1);
+      i = link.open + 1;
+    }
+  }
+  return out;
+}
+
+function linkAt({ text, start, match }) {
+  const isImage = text[start] === "!" && text[start + 1] === "[";
+  const open = isImage ? start + 1 : start;
+  const labelEnd = text[open] === "[" ? match[open] : -1;
+  const urlEnd = labelEnd >= 0 && text[labelEnd + 1] === "(" ? match[labelEnd + 1] : -1;
+  return urlEnd < 0 ? null : { isImage, open, labelEnd, urlEnd };
+}
+
+// The index of the closing bracket for every unescaped `[` and `(`, or -1.
+function pairBrackets(text) {
+  const match = Array.from({ length: text.length }, () => -1);
+  const stacks = { "[": [], "(": [] };
+  const opener = { "]": "[", ")": "(" };
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === "\\") i += 1;
+    else if (c in stacks) stacks[c].push(i);
+    else if (c in opener && stacks[opener[c]].length > 0) match[stacks[opener[c]].pop()] = i;
+  }
+  return match;
 }
 
 function stripInlineCode(s) {
@@ -502,12 +557,54 @@ function titleHowToFindings({ rule, section, doc }) {
   return [{ rule, probability: 1, sentence: `title: ${title}` }];
 }
 
+// An opening question warns instead of failing: writing-rules allows one, rarely,
+// when the answer lands in the same line in the reader's own words.
+const OPENER_KINDS = new Set(["prose", "heading", "list"]);
+const hasText = (unit) => /\w/.test(unit.replace(/<[^>]*>/g, ""));
+const QUESTION_END = /\?["')\]]*\s*$/;
+
+/** The H1 (even in a heading-only section) and the first sentence with text. */
+function openerCandidates(sections, firstContentIndex) {
+  const out = [];
+  const h1 = sections.slice(0, firstContentIndex + 1).find((s) => s.level === 1);
+  if (h1) out.push({ sentence: h1.heading, raw: h1.heading });
+  const p = sections[firstContentIndex]?.paragraphs.find(
+    (x) => OPENER_KINDS.has(x.kind) && !x.exempt && x.units.some(hasText),
+  );
+  if (p) out.push({ sentence: p.units.find(hasText), raw: p.text });
+  return out;
+}
+
+/** The first opener that is a question, with whether its answer shares its line. */
+export function openingQuestion(sections, firstContentIndex) {
+  for (const c of openerCandidates(sections, firstContentIndex)) {
+    const question = c.sentence.split(/(?<=\?)\s/)[0];
+    if (!QUESTION_END.test(question)) continue;
+    const mark = c.raw.indexOf("?");
+    const lineEnd = c.raw.indexOf("\n", mark);
+    const rest = c.raw.slice(mark + 1, lineEnd < 0 ? undefined : lineEnd);
+    return { question, answeredInLine: rest.replace(/[#*_`\s]/g, "") !== "" };
+  }
+  return null;
+}
+
+function questionOpenerFindings({ rule, section, doc }) {
+  if (section.index !== doc.firstContentIndex) return [];
+  const found = openingQuestion(doc.sections, doc.firstContentIndex);
+  if (!found) return [];
+  const note = found.answeredInLine
+    ? "answer in the same line: keep only if the question is the reader's own words"
+    : "no answer in the same line";
+  return [{ rule, probability: 1, sentence: `${found.question} (${note})` }];
+}
+
 /** The local checks by name; each returns the findings it raises for one section. */
 const LOCAL_CHECKS = {
   "paragraph-words": paragraphWordsFindings,
   "one-sentence-paragraph-run": oneSentenceRunFindings,
   "title-repeated-as-heading": titleRepeatedFindings,
   "title-how-to": titleHowToFindings,
+  "question-opener": questionOpenerFindings,
 };
 
 function runLocalRules(rules, section, doc) {
@@ -618,7 +715,7 @@ async function askInBatches(key, state, questions, usage) {
   return answers;
 }
 
-const hasContent = (section) =>
+export const hasContent = (section) =>
   section.paragraphs.some((p) => p.kind === "code" || p.units.length > 0);
 
 // The state a section is judged in. `withAbove` adds everything the reader
@@ -834,12 +931,13 @@ async function lintFile(file, rules, opts, key) {
           match: f.match ?? null,
           count: f.count ?? null,
           founder: f.rule.kind === "judge" && (f.founder ?? isFounder(f.sentence)),
+          warning: f.rule.severity === "warning",
         })),
     })),
     usage: { ...usage, usd: round((usage.inputTokens / 1e6) * PRICE_PER_MTOK, 6) },
   };
   out.failed = out.sections.some((s) =>
-    s.findings.some((f) => f.probability >= opts.threshold && !f.founder),
+    s.findings.some((f) => f.probability >= opts.threshold && !f.founder && !f.warning),
   );
   return out;
 }
@@ -848,6 +946,7 @@ const round = (x, d = 3) => Math.round(x * 10 ** d) / 10 ** d;
 
 function findingFlag(f, threshold) {
   if (f.founder) return "f";
+  if (f.warning) return "w";
   return f.probability >= threshold ? "!" : " ";
 }
 
@@ -898,7 +997,9 @@ async function main() {
   process.exit(reports.some((r) => r.failed) ? 1 : 0);
 }
 
-main().catch((e) => {
-  console.error(e.stack ?? String(e));
-  process.exit(2);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e.stack ?? String(e));
+    process.exit(2);
+  });
+}

@@ -189,8 +189,9 @@ Feature: Upload a file for a purpose
 
   @unit
   Scenario: A file LangWatch stores itself gets a new id and is hashed as it streams
-    When LangWatch stores the same picture from two traces
+    When LangWatch stores two different pictures from two traces
     Then each is stored as its own file with its own new id
+    # The same picture twice is reused instead: stored-object-reuse-and-retention.feature.
     And each digest is computed as the bytes stream to storage, never over the whole file in memory
 
   # ============================================================================

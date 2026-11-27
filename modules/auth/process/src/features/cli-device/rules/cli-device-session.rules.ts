@@ -17,8 +17,11 @@ const DEVICE_CODE_PREFIX = "lwcli:device:";
 /** Redis key prefix for the per-device-code poll window. */
 const POLL_RATE_PREFIX = "lwcli:poll:";
 
-/** Lifetime of an unredeemed device_code, in seconds. */
-export const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
+/**
+ * Lifetime of an unredeemed device_code: 15 min, RFC 8628's example and GitHub's, long enough
+ * for a person to read a link an agent sent them minutes later.
+ */
+export const DEVICE_CODE_TTL_SECONDS = 15 * 60;
 /** Minimum poll interval the CLI should respect. */
 export const MIN_POLL_INTERVAL_SECONDS = 5;
 /** Access token lifetime. Short; refresh is the rotation path. */
@@ -65,6 +68,9 @@ export type CliClientInfo = {
   session_started_at?: number;
 };
 
+/** A known app that may name itself on the approval page. */
+export type CliDeviceClient = "laze";
+
 export interface CliDeviceCodeRecord {
   device_code: string;
   user_code: string;
@@ -78,6 +84,11 @@ export interface CliDeviceCodeRecord {
    * Absent on records minted before the field, which read as not asked.
    */
   management?: boolean;
+  /**
+   * The known app connecting a project (`client` on the device-code request).
+   * Absent on CLI logins and on records minted before the field.
+   */
+  client?: CliDeviceClient;
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;

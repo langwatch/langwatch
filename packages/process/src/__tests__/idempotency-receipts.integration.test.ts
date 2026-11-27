@@ -23,6 +23,8 @@ import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
+import { idempotencyReceiptsOn } from "../transport/idempotency-receipts.ts";
+
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 const identityCipher = { encrypt: (value: string) => value, decrypt: (value: string) => value };
@@ -64,7 +66,7 @@ describe.skipIf(!DB_URL)("idempotency receipts on Postgres", () => {
       it("hands the claim to the first and sends the second back to re-read", async () => {
         const existing = await silentClaim();
         const takeOver = (tx: Prisma.TransactionClient) =>
-          takeOverClaim({ receipts: tx, existing, now: nowInstant() });
+          takeOverClaim({ receipts: idempotencyReceiptsOn(tx), existing, now: nowInstant() });
 
         const verdicts = await raceOnOneRow({
           prisma,
@@ -90,7 +92,7 @@ describe.skipIf(!DB_URL)("idempotency receipts on Postgres", () => {
           table: "IdempotencyReceipt",
           first: async (tx) => {
             await finalizeClaim({
-              receipts: tx,
+              receipts: idempotencyReceiptsOn(tx),
               cipher: identityCipher,
               receiptId: existing.id,
               claimId: existing.claimId,
@@ -100,7 +102,13 @@ describe.skipIf(!DB_URL)("idempotency receipts on Postgres", () => {
             return "finalized";
           },
           second: async (tx) =>
-            (await takeOverClaim({ receipts: tx, existing, now: nowInstant() })).kind,
+            (
+              await takeOverClaim({
+                receipts: idempotencyReceiptsOn(tx),
+                existing,
+                now: nowInstant(),
+              })
+            ).kind,
         });
 
         expect(answers.second).toBe("retry");
@@ -121,10 +129,16 @@ describe.skipIf(!DB_URL)("idempotency receipts on Postgres", () => {
           prisma,
           table: "IdempotencyReceipt",
           first: async (tx) =>
-            (await takeOverClaim({ receipts: tx, existing, now: nowInstant() })).kind,
+            (
+              await takeOverClaim({
+                receipts: idempotencyReceiptsOn(tx),
+                existing,
+                now: nowInstant(),
+              })
+            ).kind,
           second: async (tx) => {
             await finalizeClaim({
-              receipts: tx,
+              receipts: idempotencyReceiptsOn(tx),
               cipher: identityCipher,
               receiptId: existing.id,
               claimId: existing.claimId,

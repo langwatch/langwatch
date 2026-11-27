@@ -3,6 +3,7 @@
  *
  * @see specs/scenarios/go-scenario-runner-choice.feature
  * @see modules/scenario/specs/scenario-run-hooks.feature
+ * @see modules/scenario/specs/red-team-scenario.feature
  */
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -143,6 +144,22 @@ describe("ScenarioChildChoiceService", () => {
       const { choice, nodeStart, goStart, isEnabled } = harness({ flag: true });
 
       await choice.start({ jobData: job("connector"), environment });
+
+      expect(nodeStart).toHaveBeenCalledTimes(1);
+      expect(goStart).not.toHaveBeenCalled();
+      expect(isEnabled).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the flag is on and the run is a red team scenario", () => {
+    /** @scenario "A red team run starts on the Node child whatever the Go runner flag says" */
+    it("starts the run on the Node child without reading the flag", async () => {
+      const { choice, nodeStart, goStart, isEnabled } = harness({ flag: true });
+
+      await choice.start({
+        jobData: job("http"),
+        environment: { ...environment, runsRedTeam: true },
+      });
 
       expect(nodeStart).toHaveBeenCalledTimes(1);
       expect(goStart).not.toHaveBeenCalled();

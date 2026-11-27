@@ -12,6 +12,7 @@ import IdentityLookupView from "../../../features/admin/ui/sections/identity-loo
 import LicensesView from "../../../features/admin/ui/sections/licenses-view.tsx";
 import OrganizationsView from "../../../features/admin/ui/sections/organizations-view.tsx";
 import ProjectsView from "../../../features/admin/ui/sections/projects-view.tsx";
+import SeatUseView from "../../../features/admin/ui/sections/seat-use-view.tsx";
 import SelfHostedInstancesView from "../../../features/admin/ui/sections/self-hosted-instances-view.tsx";
 import SsoConnectionsView from "../../../features/admin/ui/sections/sso-connections-view.tsx";
 import SubscriptionsView from "../../../features/admin/ui/sections/subscriptions-view.tsx";
@@ -75,6 +76,14 @@ export function CloudBugReportsScreen() {
   return (
     <CloudOnly>
       <BugReportsView />
+    </CloudOnly>
+  );
+}
+
+export function CloudSeatUseScreen() {
+  return (
+    <CloudOnly>
+      <SeatUseView />
     </CloudOnly>
   );
 }

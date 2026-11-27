@@ -38,6 +38,8 @@ export {
   permissionOf,
   projectRequestContext,
   type FeatureApiWitness,
+  type RestBodyLimit,
+  type RestBodyLimitResolver,
   type RestDeprecation,
   type RestDoorCredential,
   type RestLegacyKeyScopes,
@@ -63,6 +65,17 @@ export {
   type RestConfirmationReceipt,
   type RestConfirmationRequest,
 } from "./confirmation.ts";
+export {
+  bindStaffAccessGate,
+  openStaffAccessGate,
+  type RestStaffAccessGate,
+  type RestStaffAccessIdentity,
+  type RestStaffAccessOutcome,
+  type RestStaffAccessRefusal,
+  type RestStaffAccessReceipt,
+  type RestStaffAccessRequest,
+  type StaffAccessGateBinding,
+} from "./staff-access.ts";
 export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";
 
 export {
@@ -109,8 +122,10 @@ export {
 } from "./idempotency.ts";
 export type {
   IdempotencyReceiptCreateInput,
+  IdempotencyReceiptFence,
   IdempotencyReceiptPersistence,
   IdempotencyReceiptRecord,
+  IdempotencyReceiptUpdate,
 } from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
 export { recordRequestPrincipal } from "./request-principal.ts";

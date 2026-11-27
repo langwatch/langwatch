@@ -145,8 +145,8 @@ describe("the My Workspace entry's governance gate", () => {
       await user.click(screen.getByRole("button", { name: /Open user menu/i }));
     });
 
-    /** @scenario With a single governance organization, My Workspace links to /me */
-    it("writes that organization into scope and opens /me when picked", async () => {
+    /** @scenario With a single governance organization, My Workspace links to /coding-agents */
+    it("writes that organization into scope and opens /coding-agents when picked", async () => {
       await user.click(screen.getByText("My Workspace"));
 
       expect(rememberScopeMock).toHaveBeenCalledWith({
@@ -154,7 +154,7 @@ describe("the My Workspace entry's governance gate", () => {
         teamId: "",
         projectSlug: "",
       });
-      expect(navigateMock).toHaveBeenCalledWith("/me");
+      expect(navigateMock).toHaveBeenCalledWith("/coding-agents");
     });
 
     /** @scenario A single governance organization still shows its name with My Workspace nested under it */

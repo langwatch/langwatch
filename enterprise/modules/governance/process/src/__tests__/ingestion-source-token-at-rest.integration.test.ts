@@ -19,6 +19,7 @@ import { createGovernanceTestConnection } from "../app/__tests__/governance-data
 import { MemoryOttlTransformChannel } from "../channels/memory/memory.ottl-transform.channel.ts";
 import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
 import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
+import { IngestionSourceFactsService } from "../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -82,6 +83,7 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
       providerAccounts: MemoryProviderAccountChannel.create(),
       diagnostics: new NoopDiagnostics(),
       ottl: MemoryOttlTransformChannel.create(),
+      facts: IngestionSourceFactsService.create({ reportError: () => {} }),
     });
 
   beforeAll(async () => {

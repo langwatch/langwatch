@@ -24,6 +24,8 @@ export type MemoryBillingOrganization = {
   teamIds: string[];
   signupData: Record<string, unknown>;
   sentPlanLimitAlert?: Instant | null;
+  /** When an admin accepted the PII Redaction Model's price; absent reads as never. */
+  piiRedactionModelAcceptedAt?: Instant | null;
 };
 
 /** A membership as organization's shared OrganizationUser table shows it to billing. */
@@ -70,6 +72,15 @@ type MemoryBillingBudgetLedgerRow = {
   occurredAtMs: number;
 };
 
+/** A pending seat line repair as the Subscription row's repair columns hold it. */
+type MemorySeatRepair = {
+  quantity: number;
+  liftedQuantity: number;
+  since: Instant;
+  attempts: number;
+  flaggedAt: Instant | null;
+};
+
 /**
  * One store behind the billing memory tier, the way one Postgres schema serves
  * the Prisma tier: a subscription written through `subscriptions` is what the
@@ -89,6 +100,23 @@ export class MemoryBillingStore {
   /** When each account's statement for a month went out, keyed `accountId|month`. */
   readonly connectedStatements = new Map<string, string>();
   readonly subscriptions: BillingSubscriptionRecord[] = [];
+  /** The Subscription row's seat line repair columns, keyed by subscription id while one is pending. */
+  readonly seatRepairs = new Map<string, MemorySeatRepair>();
+  /** The Subscription row's seatLineQuantity and seatLineQuantityAt, once a seat change set them. */
+  readonly seatLineTargets = new Map<string, { quantity: number; at: Instant }>();
+  /** The Subscription row's seat line write-ahead columns, keyed by id while a write is pending. */
+  readonly seatLineWrites = new Map<
+    string,
+    {
+      quantities: number[];
+      since: Instant;
+      at: Instant;
+      attempts: number;
+      flaggedAt: Instant | null;
+    }
+  >();
+  /** The Subscription row's seat line lease columns, keyed by subscription id while one is held. */
+  readonly seatLineLeases = new Map<string, { token: string; until: Instant }>();
   readonly checkpoints = new Map<string, BillingCheckpoint>();
   readonly organizationOfTenant = new Map<string, string>();
   /** Project's rows and gateway's ledger, as their shares show them to billing. */

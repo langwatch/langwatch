@@ -109,7 +109,11 @@ export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
  * docs builds write to disk before they read it.
  */
 export async function buildOpenApiDocument(restApp: Hono): Promise<Record<string, unknown>> {
-  const generated = await generateSpecs(restApp, { documentation: documentation() });
+  // Every mounted path is an API route, so a dotted last segment (`ard.json`) is documented too.
+  const generated = await generateSpecs(restApp, {
+    documentation: documentation(),
+    excludeStaticFile: false,
+  });
   // The corrections rewrite in place, and hono-openapi hands every call the SAME
   // resolved schema objects, so they run over a copy.
   const document: unknown = JSON.parse(JSON.stringify(generated));

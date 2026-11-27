@@ -88,3 +88,30 @@ export function filterAST(ast: LiqeQuery, predicate: (node: LiqeQuery) => boolea
 
   return ast;
 }
+
+/**
+ * Every tag with an `OR` above it, at any depth. Such a tag cannot be taken
+ * out on its own: what is left behind rebinds.
+ */
+export function tagsUnderOr(
+  ast: LiqeQuery,
+  inOr = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inOr) found.add(ast);
+    return found;
+  }
+  if (ast.type === "UnaryOperator") {
+    return tagsUnderOr(ast.operand, inOr, found);
+  }
+  if (ast.type === "ParenthesizedExpression") {
+    return tagsUnderOr(ast.expression, inOr, found);
+  }
+  if (ast.type === "LogicalExpression") {
+    const underOr = inOr || ast.operator.operator === "OR";
+    tagsUnderOr(ast.left, underOr, found);
+    tagsUnderOr(ast.right, underOr, found);
+  }
+  return found;
+}

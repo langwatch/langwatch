@@ -1,6 +1,16 @@
+import {
+  DECISION_MODELS,
+  decisionModelPickerTitle,
+  isOwnDecisionModelId,
+  LANGWATCH_DECISION_PREVIEWS,
+  LANGWATCH_JUDGE_MODEL_ID,
+  langWatchModelsFillingRole,
+  type DecisionModelEntry,
+} from "./catalog/decision-models.ts";
 import { findAliasTarget, isLatestAlias } from "./catalog/latest-aliases.ts";
 import { allLitellmModels } from "./catalog/model-catalog.ts";
 import { modelDisplayLabel } from "./model-provider-display-names.ts";
+import { findModelProviderDefinition } from "./model-provider-registry.ts";
 
 export type ModelOption = {
   label: string;
@@ -10,6 +20,8 @@ export type ModelOption = {
   isCustom?: boolean;
   /** Served by LangWatch's own offer, so no provider row of the project's has to carry it. */
   isBuiltIn?: boolean;
+  /** One line under the title: what a decision model is, from its catalogue entry. */
+  subtitle?: string;
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
@@ -27,9 +39,53 @@ export const allModelOptions = modelSelectorOptions.map((option) => option.value
 export type ModelPickerOption = {
   label: string;
   value: string;
-  /** Under the label: what an alias like `openai/latest` currently resolves to. */
+  /** Under the label: what an alias resolves to, or what a decision model is. */
   subtitle?: string;
+  /** Listed but not pickable: a decision model whose provider has no key yet. */
+  disabled?: boolean;
+  /** A short tag beside the title, such as "Coming soon". */
+  hint?: string;
 };
+
+/**
+ * LangWatch Judge (preview) as a judge picker's first row, where its flag is on. Its label and
+ * the line under it come from the catalogue, so every picker names it the same way.
+ */
+export function langwatchJudgePickerOption(): ModelPickerOption {
+  return langwatchPickerOptionOf(LANGWATCH_JUDGE_MODEL_ID);
+}
+
+/**
+ * A judge picker's rows: the LangWatch models whose catalogue entry fills the Judge column first,
+ * where the judge preview is offered, then the LLMs. Never one of them twice.
+ */
+export function judgePickerOptions({
+  llmOptions,
+  isJudgePreviewOffered,
+}: {
+  llmOptions: readonly ModelPickerOption[];
+  isJudgePreviewOffered: boolean;
+}): ModelPickerOption[] {
+  const judges = judgeColumnModelIds({ isJudgePreviewOffered });
+  const hosted = langWatchModelsFillingRole("JUDGE").map(({ id }) => id);
+  const llms = llmOptions.filter((option) => !hosted.includes(option.value));
+  return [...judges.map(langwatchPickerOptionOf), ...llms];
+}
+
+/** The LangWatch models the Judge column lists ahead of the LLMs: those filling it, if offered. */
+export function judgeColumnModelIds({
+  isJudgePreviewOffered,
+}: {
+  isJudgePreviewOffered: boolean;
+}): string[] {
+  if (!isJudgePreviewOffered) return [];
+  return langWatchModelsFillingRole("JUDGE").map(({ id }) => id);
+}
+
+function langwatchPickerOptionOf(id: string): ModelPickerOption {
+  const preview = LANGWATCH_DECISION_PREVIEWS.find((entry) => entry.id === id);
+  return { label: preview?.label ?? id, value: id, subtitle: preview?.description ?? "" };
+}
 
 /**
  * Alias entries (`<provider>/latest`, `<provider>/latest-mini`) read as
@@ -56,4 +112,41 @@ export function modelPickerOption({
     value: modelValue,
     subtitle: findAliasTarget(modelValue)[0] ?? "",
   };
+}
+
+/** The line on a decision model whose provider has no key at the picked scopes. */
+function addKeyHint(provider: string): string {
+  const name = findModelProviderDefinition(provider)?.name ?? provider;
+  const article = /^[aeiou]/i.test(name) ? "an" : "a";
+  return `Add ${article} ${name} key in Model Providers to use it.`;
+}
+
+function ownModelOption({
+  entry,
+  offered,
+}: {
+  entry: DecisionModelEntry;
+  offered: ReadonlySet<string>;
+}): ModelPickerOption {
+  const label = decisionModelPickerTitle(entry);
+  if (offered.has(entry.id)) return { label, value: entry.id, subtitle: entry.description };
+  return { label, value: entry.id, subtitle: addKeyHint(entry.provider), disabled: true };
+}
+
+/**
+ * Own-key decision models as picker rows, shared by Default models and the eval chip popover.
+ * What the server says would run (`pickable`) comes first; the rest follow in catalogue order and
+ * say which key to add. Unpickable rows keep full opacity, so order is what surfaces a usable one.
+ */
+export function ownDecisionModelPickerOptions(
+  pickable: readonly { value: string }[],
+): ModelPickerOption[] {
+  const offered = new Set(pickable.map((model) => model.value));
+  const options = DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id)).map((entry) =>
+    ownModelOption({ entry, offered }),
+  );
+  return [
+    ...options.filter((option) => !option.disabled),
+    ...options.filter((option) => option.disabled),
+  ];
 }

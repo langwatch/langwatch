@@ -11,7 +11,8 @@ export type LangyTurnAdmissionClaim =
       turnId: string;
     }
   | { kind: "pending" }
-  | { kind: "busy" }
+  /** Another turn holds the conversation; `heldTurnId` names it. */
+  | { kind: "busy"; conversationId: string; heldTurnId: string }
   /**
    * The idempotency key exists but was admitted with DIFFERENT content: the
    * derived turn id no longer matches the receipt's. Callers must error —

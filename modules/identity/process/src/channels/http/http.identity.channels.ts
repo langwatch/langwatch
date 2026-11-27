@@ -1,4 +1,9 @@
 import { AuthApi } from "@langwatch/auth-contract";
+import {
+  globalFetchUsesEnvProxy,
+  type OutboundProxyConfig,
+  parseOutboundProxyConfig,
+} from "@langwatch/egress";
 import type { IdentityServerConfig } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -40,6 +45,7 @@ export class HttpIdentityChannels {
   }): Promise<IdentityChannels> {
     const mailer: MailSender = { send: (content) => bound.notifications.sendEmail(content) };
     const baseUrl = config.publicBaseUrl ?? "";
+    const proxy = parseOutboundProxyConfig(config.outboundProxy);
     const signupAnnouncements = await secrets.into(internalSlackSignupsWebhook, (webhookUrl) =>
       webhookUrl ? SlackSignupAnnouncementChannel.create({ webhookUrl }) : undefined,
     );
@@ -56,13 +62,45 @@ export class HttpIdentityChannels {
       }),
       ssoDomainProofFiles: HttpsSsoDomainProofFileChannel.create({
         policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+        proxy,
       }),
       // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
-      ssoIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
-        policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+      ...issuerDiscoveryChannels({
+        proxy,
+        signInThroughProxy: globalFetchUsesEnvProxy(config.nodeEnvProxy),
         dialableInternalOrigins: () => bound.authReads.findDialableIdentityProviderOrigins(),
       }),
       ssoBreakGlassWarnings: LoggedSsoBreakGlassWarningChannel.create(),
     };
   }
+}
+
+/**
+ * Issuer discovery on two routes. Registration goes through the outbound proxy. The per-sign-in
+ * trust lookup takes the SSO engine's route, so the origins it trusts come from the document the
+ * engine is about to read: the engine uses global `fetch`, proxied only when Node is told to be.
+ */
+export function issuerDiscoveryChannels({
+  proxy,
+  signInThroughProxy,
+  dialableInternalOrigins,
+}: {
+  proxy: OutboundProxyConfig;
+  /** Whether global `fetch` goes through the proxy (`globalFetchUsesEnvProxy`). */
+  signInThroughProxy: boolean;
+  dialableInternalOrigins: () => readonly string[];
+}): Pick<IdentityChannels, "ssoRegistrationIssuerDiscovery" | "ssoSignInIssuerDiscovery"> {
+  const policy = SSO_DOMAIN_PROOF_PUBLIC_EGRESS;
+  return {
+    ssoRegistrationIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
+      policy,
+      proxy,
+      dialableInternalOrigins,
+    }),
+    ssoSignInIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
+      policy,
+      ...(signInThroughProxy ? { proxy } : {}),
+      dialableInternalOrigins,
+    }),
+  };
 }

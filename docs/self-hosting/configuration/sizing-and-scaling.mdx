@@ -28,6 +28,7 @@ These are the default resource requests and limits from the Helm chart (`values.
 | LangEvals                                 | 1000m       | 2000m     | 6Gi            | 8Gi          | ---                                          |
 | AI Gateway (2 to 10 replicas, autoscaled) | 200m        | 1000m     | 256Mi          | 512Mi        | ---                                          |
 | Langy                                     | 500m        | 2000m     | 1Gi            | 4Gi          | ---                                          |
+| PII redaction model (off by default)      | 2000m       | 4000m     | 7Gi            | 7Gi          | ---                                          |
 | PostgreSQL                                | 250m        | 1000m     | 512Mi          | 1Gi          | 20Gi                                         |
 | ClickHouse                                | 2 cores     | 2 cores   | 4Gi            | 4Gi          | 50Gi                                         |
 | Redis                                     | 250m        | 500m      | 256Mi          | 512Mi        | 10Gi                                         |
@@ -91,6 +92,7 @@ For production with single-node ClickHouse.
 - Redis: 500m/1 CPU, 1Gi/3Gi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
 - Total: ~9.1 CPU, ~23.8 Gi RAM requests
+- If you enable the PII redaction model: 2 replicas, 2/4 CPU, 7Gi/7Gi memory, PDB maxUnavailable 1, adding 4 CPU and 14 Gi to the requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -114,17 +116,37 @@ For production with replicated ClickHouse.
 - Redis: 500m/1 CPU, 1Gi/3Gi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
 - Total: ~23.1 CPU, ~85.6 Gi RAM requests
+- If you enable the PII redaction model: 2 replicas, 2/4 CPU, 7Gi/7Gi memory, PDB maxUnavailable 1, spread across zones, adding 4 CPU and 14 Gi to the requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-ha.yaml \
-  -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml \
-  --set clickhouse.objectStorage.bucket=my-langwatch-data \
-  --set clickhouse.objectStorage.region=us-east-1
+  -f examples/overlays/access-ingress.yaml
 ```
 
+Add ClickHouse backups to an object store as in [Backups](/self-hosting/configuration/backups).
+
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
+
+### PII redaction model
+
+The PII redaction model does the Strict PII level's analysis instead of Presidio. It is off by default in every profile; `size-prod` and `size-ha` run 2 replicas when you turn it on with `--set piiRedactionModel.enabled=true`. Each replica has a 7Gi memory request and limit and requests 2 CPU, so it needs a node with that much free.
+
+| Per replica | Value |
+| --- | --- |
+| Memory request and limit | 7Gi |
+| CPU request and limit | 2 / 4 |
+| Memory at rest, fresh pod (measured) | about 1.2 GB |
+| Memory after one long text, kept until restart (measured) | about 4.2 GB |
+| Peak memory, one request at a time (measured) | 4.4 to 4.9 GB; 5.3 GB on a 100,000-character text |
+| Throughput (measured on AWS Lambda at about 4 vCPU, not on a pod) | about 250 to 300 characters per second |
+
+- Each replica analyzes one batch at a time. Another batch waits for it; the model gives each batch 45 s, waiting included, and fails one it cannot finish in that time; that batch falls back to Presidio without pausing the model for other batches.
+- At that rate a 1,000-character span takes 3 to 4 seconds, so one replica handles roughly 15 such spans a minute. Add replicas for more Strict traffic.
+- A batch over 8,000 characters, or one the model does not answer within 50 s, goes to Presidio instead. After a timeout, that process sends every Strict batch to Presidio for 2 minutes.
+- The model needs an Enterprise license: an organization without one stays on Presidio, whatever the chart sets. It is not priced per character here; the price on LangWatch Cloud does not apply to a self-hosted deployment.
+- With neither `piiRedactionModel.enabled` nor `piiRedactionModel.externalEndpoint` set, Strict stays on Presidio. An `externalEndpoint` sends a licensed organization's Strict analysis to that model even when `enabled` is `false`.
+- If the model is down, Strict falls back to Presidio, so turning it off or losing a pod never stops redaction.
 
 ## Throughput by size
 
@@ -141,7 +163,7 @@ How much trace data each profile can take. Each profile accepts spans faster tha
 - Per day, per month and disk follow the processing rate, which is what the install keeps up with all day.
 - Treat these as ceilings and plan to run at about 70% of them. Long prompts and completions lower them.
 - Per day and per month assume the same rate around the clock. Size for your busiest hour.
-- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage or turn on [cold storage](#clickhouse-cold-storage-s3).
+- Disk is an estimate at about 1 KB per span. `size-prod.yaml` gives ClickHouse 100Gi, which fills in under two days at full rate: give it more storage.
 - `size-dev.yaml` ships Redis at 256Mi. Raise `redis.master.resources.limits.memory` to 512Mi to reach its rate.
 - `size-minimal.yaml` is held back by ClickHouse memory. Setting `clickhouse.memory` to 2Gi roughly doubles its processing rate.
 
@@ -193,6 +215,7 @@ To give a single project more, raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers
 | ClickHouse queries are slow, trace summaries lag    | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory`                    |
 | Evaluations are slow                                | LangEvals          | Increase `langevals.replicaCount`                                    |
 | Topic clustering is slow                            | LangEvals          | Increase `langevals.replicaCount`                                    |
+| `pii_redaction_model_fallbacks` grows with `reason="timeout"` or `"breaker_open"` | PII redaction model | Increase `piiRedactionModel.replicaCount` (7Gi each; about 250 to 300 characters per second each, measured on Lambda) |
 
 ### Horizontal Pod Autoscaler (HPA)
 
@@ -225,13 +248,13 @@ spec:
 - ~1 KB per span (compressed, varies with payload size)
 - 100K traces/day with avg 5 spans = ~500 MB/day = ~15 GB/month
 - 1M traces/day with avg 5 spans = ~5 GB/day = ~150 GB/month
-- Plan for 3-6 months of hot data before cold storage kicks in
+- Size the disk for all the data you keep: it stays on local disk unless you turn on cold storage
 
-### ClickHouse cold storage (S3)
+### ClickHouse cold storage (S3, optional)
 
-- Enable with `clickhouse.cold.enabled: true`
-- Default TTL: 49 days (data older than this moves to S3). We recommend multiples of 7 to align with ClickHouse's weekly partition boundaries
-- S3 cost is typically 10-20x cheaper than SSD storage
+- Off by default, and not needed: local disk is the simpler setup to run
+- Opt in with `clickhouse.cold.enabled: true`, plus `clickhouse.objectStorage.bucket` and its `region` or `endpoint` if disk cost matters more than query speed on older data
+- Data older than `clickhouse.cold.defaultTtlDays` (49) then moves to S3. Keep it a multiple of 7, to match ClickHouse's weekly partitions
 
 ### PostgreSQL
 

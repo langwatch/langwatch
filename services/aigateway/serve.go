@@ -12,6 +12,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
@@ -62,6 +63,22 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		CORSAllowedOrigins:    cfg.CORS.AllowedOriginList(),
 		WebhookRelay:          deps.ControlPlane,
 		VoiceRelay:            deps.Voice,
+		A2A: a2aproxy.New(a2aproxy.Config{
+			Registry: a2aproxy.BundleRegistry{},
+			// Wrapped as on the LLM routes, so /a2a verdicts and fail-opens are counted.
+			Scanner: a2aproxy.GuardrailScanner{Evaluator: gatewaymetrics.WithGuardrailMetrics(deps.ControlPlane, deps.Metrics)},
+			Bundle:  httpapi.BundleFromContext,
+			Client: a2aproxy.NewUpstreamClient(a2aproxy.UpstreamPolicy{
+				BlockLocal:   cfg.BlockLocalHTTPCalls,
+				AllowedHosts: splitAllowedHosts(cfg.AllowedProxyHosts),
+			}),
+			RateLimit:      deps.RateLimiter.Allow,
+			BudgetPrecheck: deps.BudgetChecker.Precheck,
+			RequireHTTPS:   cfg.RequireHTTPSCustomerEndpoints,
+			PublicBaseURL:  cfg.A2APublicBaseURL,
+			Tracer:         deps.TraceBridge.Tracer(),
+			Logger:         deps.Logger,
+		}),
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}

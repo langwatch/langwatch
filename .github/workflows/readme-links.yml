@@ -16,9 +16,8 @@ name: readme-links
 # reported as unverified and does not gate — npmjs.com answers 403 to CI egress
 # addresses, and a check that fails on that is a check people learn to ignore.
 #
-# No path filter: a filtered workflow in this repository needs a complementary
-# "-unmodified" stub so branch protection still resolves (specs/ci/path-filters.feature),
-# and this check is under a minute. Always running is the cheaper arrangement.
+# On pull requests it runs only when the README or the checker changes: that is
+# the only way a pull request adds a dead link. No check from it is required.
 #
 # Runs the checker from the PR head, so the trigger stays `pull_request` — never
 # `pull_request_target`. It needs no token.
@@ -28,6 +27,11 @@ name: readme-links
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - "README.md"
+      - "cmd/linkcheck/**"
+      - "tools/linkcheck/**"
+      - ".github/workflows/readme-links.yml"
   schedule:
     # Mondays, 07:00 UTC — a dead link found at the start of the week gets
     # fixed that week.

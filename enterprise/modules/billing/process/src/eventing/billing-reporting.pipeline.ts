@@ -15,11 +15,17 @@ import {
   type EventingParticipation,
   type EventingSetup,
   type Projection,
+  type QueueSendOptions,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  gatewaySpendConfirmedEventDataSchema,
+} from "@langwatch/gateway-contract";
 
 import type { BillingModule } from "../app/billing.app.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import { isMeteredSpend, spendReportOf } from "../rules/metered-spend-report.rules.ts";
 import type { UsageWarningService } from "../services/usage-warning.service.ts";
 import {
   ReportUsageForMonthCommandHandler,
@@ -39,6 +45,40 @@ export const BILLING_MONTH_COUNTED_SUBSCRIBER_NAME = "usageMonthCounted";
 /** The peer subscriber that mails each usage threshold entitlement records. */
 export const BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME = "usageThresholdCrossed";
 
+/** The peer subscriber that reports the month of confirmed metered spend (ADR-174 decision 20). */
+export const BILLING_SPEND_CONFIRMED_SUBSCRIBER_NAME = "gatewaySpendConfirmed";
+
+/** How long a report waits before it runs, so a burst collapses into one. */
+export const REPORT_DELAY_MS = 300_000;
+
+/** How long a spend report's one follow-up waits, for a spend row still being written. */
+const SPEND_FOLLOW_UP_DELAY_MS = 900_000;
+
+/** One queued report per key; a spend report's follow-up keeps a key of its own. */
+export function reportDedupId(data: ReportUsageForMonthCommandData): string {
+  const followUp = data.trigger === "spend_follow_up" ? "spend_follow_up" : undefined;
+  return [data.organizationId, data.billingMonth, data.countedEventId, followUp]
+    .filter(Boolean)
+    .join(":");
+}
+
+/** The follow-up's send: a longer delay, and a dedupe window that outlasts it. */
+const SPEND_FOLLOW_UP_SEND: QueueSendOptions<ReportUsageForMonthCommandData> = {
+  delay: SPEND_FOLLOW_UP_DELAY_MS,
+  deduplication: { makeId: reportDedupId, ttlMs: SPEND_FOLLOW_UP_DELAY_MS + 10_000 },
+};
+
+/** A spend report's send: a spend arriving while one waits joins it, never pushes it later. */
+const SPEND_REPORT_SEND: QueueSendOptions<ReportUsageForMonthCommandData> = {
+  delay: REPORT_DELAY_MS,
+  deduplication: { makeId: reportDedupId, ttlMs: REPORT_DELAY_MS + 10_000, extend: false },
+};
+
+type ReportSender = (
+  data: ReportUsageForMonthCommandData,
+  options?: QueueSendOptions<ReportUsageForMonthCommandData>,
+) => Promise<void>;
+
 type BillingReportingDeps = Omit<ReportUsageForMonthCommandDeps, "selfDispatch"> & {
   /** Skips a threshold already mailed this month, so a redelivered event mails nobody twice. */
   usageWarnings: Pick<UsageWarningService, "send">;
@@ -46,14 +86,14 @@ type BillingReportingDeps = Omit<ReportUsageForMonthCommandDeps, "selfDispatch">
 
 /**
  * The monthly roll-up's pipeline. The self-dispatch loop closes at registration,
- * not at first dispatch; usage's month_counted starts each month's report.
+ * not at first dispatch; usage's month_counted and gateway's metered spend start a report.
  */
 export class BillingReportingPipeline {
   static create(deps: BillingReportingDeps): BillingReportingPipeline {
     return new BillingReportingPipeline(deps);
   }
 
-  private send: ((data: ReportUsageForMonthCommandData) => Promise<void>) | undefined;
+  private send: ReportSender | undefined;
 
   private constructor(private readonly deps: BillingReportingDeps) {}
 
@@ -61,6 +101,8 @@ export class BillingReportingPipeline {
     if (!this.send) {
       throw new Error("Billing reporting cannot self-dispatch before its pipeline is registered.");
     }
+    if (data.trigger === "spend_follow_up") return this.send(data, SPEND_FOLLOW_UP_SEND);
+    if (data.trigger === "spend_confirmed") return this.send(data, SPEND_REPORT_SEND);
     return this.send(data);
   }
 
@@ -89,12 +131,11 @@ export class BillingReportingPipeline {
         handlerClass: ReportUsageForMonthCommandHandler,
         instance: reportUsageForMonthCommand,
         options: {
-          delay: 300_000, // 5 min delay (initial + re-trigger)
+          delay: REPORT_DELAY_MS,
           deduplication: {
             // Keyed by the counted event too: a retry replaces only its own job.
-            makeId: (p: ReportUsageForMonthCommandData) =>
-              [p.organizationId, p.billingMonth, p.countedEventId].filter(Boolean).join(":"),
-            ttlMs: 310_000, // 310s > 300s delay
+            makeId: reportDedupId,
+            ttlMs: REPORT_DELAY_MS + 10_000,
           },
         },
       })
@@ -118,12 +159,18 @@ export class BillingReportingPipeline {
           await usageWarnings.send(data);
         },
       })
+      .withPeerSubscriber(BILLING_SPEND_CONFIRMED_SUBSCRIBER_NAME, {
+        eventType: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+        data: gatewaySpendConfirmedEventDataSchema,
+        options: { enqueue: { filter: (spend) => isMeteredSpend({ spend }) } },
+        handle: async (spend) => {
+          if (isMeteredSpend({ spend })) await this.dispatch(spendReportOf({ spend }));
+        },
+      })
       .build();
   }
 
-  connectSelfDispatch(
-    sendReportUsageForMonth: (data: ReportUsageForMonthCommandData) => Promise<void>,
-  ): void {
+  connectSelfDispatch(sendReportUsageForMonth: ReportSender): void {
     this.send = sendReportUsageForMonth;
   }
 }

@@ -31,7 +31,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   Background:
     Given a project whose credential holds analytics:view
     And the caller holds the captured-input and captured-output permissions
-    And the Instant Evals flag is on for the project
+    And Instant Evals are enabled for the project
     And a classifier is configured for the deployment
 
   # ---------------------------------------------------------------------------
@@ -229,8 +229,8 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: An eval function is refused while the flag is off for the project
-    Given the Instant Evals flag is off for the project
+  Scenario: An eval function is refused while Instant Evals are not enabled for the project
+    Given Instant Evals are not enabled for the project
     When a statement calling eval is validated
     Then it is refused with APP_FUNCTION_GATED
     And the message says the feature is not open to this project
@@ -247,20 +247,30 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   @unit
   Scenario: An eval function is refused for a key that reads more than one project
     Given a key that can read two projects
-    And the Instant Evals flag is on for both of them
+    And Instant Evals are enabled for both of them
     When the caller asks whether Instant Evals are open to it
     Then the answer is no
 
   @unit
-  Scenario: A key that reads one project is judged on that project's own flag
+  Scenario: A key that reads one project is judged on that project's own Instant Evals access
     Given a key that can read one project
-    And the Instant Evals flag is on for it
+    And Instant Evals are enabled for it
     When the caller asks whether Instant Evals are open to it
     Then the answer is yes
 
+  # The release flag governs LangWatch's own model only (ADR-182): a project on its own decision
+  # model, or an organization that switched Instant Evals on, calls eval functions without it.
+  @unit
+  Scenario: Eval functions open on Instant Evals' own answer, not on the release flag
+    Given the Instant Evals release flag is off for the project
+    And Instant Evals are enabled for the project because it runs on its own decision model
+    When a statement calling eval is run
+    Then the eval gate is open
+    And Analytics never reads the release flag for it
+
   @unit
   Scenario: The schema publishes eval functions as unavailable while they are gated
-    Given the Instant Evals flag is off for the project
+    Given Instant Evals are not enabled for the project
     When the schema endpoint is asked for the functions section
     Then every eval function is listed with available false
     And the extraction functions keep the availability their permissions give them
@@ -335,6 +345,61 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And it names no run, because a synchronous query has none
     And its cost is the classifier's own cost
     And the customer price carries the platform markup
+
+  @unit @integration
+  Scenario: With the search router flag off a judged query sends no route
+    Given the search router flag is off for the project's organization
+    When a statement with an eval function is executed
+    Then every classifier request carries no route and no cost ceiling
+    And the query is held at the query token budget priced at the judge's hold rate, as before
+
+  @unit @integration
+  Scenario: With the search router flag on a judged query is routed under its cost ceiling
+    Given the search router flag is on for the project's organization
+    When a statement with an eval function is executed
+    Then every classifier request carries the "search" route and the query's one cost ceiling
+    And the ceiling is the query token budget at the routed query ceiling rate in ADR-190
+    And the query is held at that ceiling times the markup, the most it can be charged
+    And its spend is recorded once, priced from the summed cost of its calls at the markup
+    And the flag is read for the project within its organization, so an organization rule applies
+    And a row the ceiling has no room for is a null cell skipped as "query_cost_ceiling"
+    And LangWatch's own decision model passes the route and ceiling on to the judge
+    And a project on its own decision model, or an install judging through Connect, sends neither
+    And the module reads the real search router flag, so the flag alone turns routing on or off
+
+  @unit @regression
+  Scenario: A project on its own decision model is not held at the routed ceiling
+    Given the search router flag is on for the project's organization
+    And the project judges on its own decision model
+    When a statement with an eval function is executed
+    Then every classifier request carries no route and no cost ceiling
+    And the query is held at the query token budget priced at the judge's hold rate, not the ceiling
+    And a free organization with less than the ceiling but more than that hold left still runs it
+
+  @unit
+  Scenario: A routed query's ceiling holds sends up to the ceiling and no further
+    Given a routed query's cost ceiling
+    When sends hold their worst cases
+    Then a send is held while what was billed plus what is held stays within the ceiling
+    And a send that would pass it even with nothing held is refused at once and holds nothing
+    And a settled send frees its hold and counts what it was billed
+    And a worst case that is not a finite cost is never held
+
+  @unit
+  Scenario: A send that fits only once sends in flight settle waits for them
+    Given a routed query whose rows are judged in parallel
+    When the worst cases held for sends in flight leave no room for the next send
+    Then that send waits, in the order asked, until enough holds settle and then is held
+    And it is refused only once what was billed leaves it no room with nothing held
+    And a later send that would fit now still waits behind an earlier one
+    And a caller's stop ends the wait with the stop, holding nothing, and wakes the sends behind it
+    And a large query whose real cost stays under the ceiling skips no row as "query_cost_ceiling"
+
+  @unit
+  Scenario: LangWatch's cloud judge passes a routed query's route and ceiling to the judge
+    Given a routed query's classifier request
+    When LangWatch's cloud judge sends it
+    Then the Instant Evals judge receives its route and its cost ceiling
 
   @unit
   Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends

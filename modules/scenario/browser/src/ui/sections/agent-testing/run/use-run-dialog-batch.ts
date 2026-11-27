@@ -101,7 +101,7 @@ function useQueuePlanRun(input: BatchRunInput) {
   });
   const { projectId, target, noteInput, runParameters, suiteTargets } = input;
   const { runName, scope, scopedScenarioIds, evaluators } = input;
-  const { repeatCount, simulatorModel, judgeModel } = input;
+  const { repeatCount, simulatorModel, judgeModel, traceWait } = input;
   const setLastRunTarget = useAgentTestingStore((state) => state.setLastRunTarget);
 
   const queuePlanRun = useCallback(
@@ -120,6 +120,8 @@ function useQueuePlanRun(input: BatchRunInput) {
           repeatCount,
           simulatorModel,
           judgeModel,
+          traceQuietPeriodMs: traceWait.traceQuietPeriodMs,
+          traceWaitTimeoutMs: traceWait.traceWaitTimeoutMs,
           evaluators,
         },
         idempotencyKey: attempt.idempotencyKey,
@@ -145,6 +147,7 @@ function useQueuePlanRun(input: BatchRunInput) {
       repeatCount,
       simulatorModel,
       judgeModel,
+      traceWait,
       evaluators,
       noteInput,
       runParameters,
@@ -177,6 +180,7 @@ export function useBatchRun(input: BatchRunInput) {
     input.repeatCount,
     input.simulatorModel,
     input.judgeModel,
+    input.traceWait,
     input.noteInput,
     input.runParameters,
     input.evaluators,

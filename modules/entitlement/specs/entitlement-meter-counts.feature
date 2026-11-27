@@ -41,6 +41,33 @@ Feature: Enforcement counts billable events from entitlement's own meter
     And events from another organization, another month or an unnamed project do not count
 
   @unit @usage
+  Scenario: Every meter read counts a metric series once per hour
+    Given one metric series wrote five rows in one UTC hour and one row in the next
+    When the month is read as a total, per project, per day and per type
+    Then every read counts two events for the series
+
+  @unit @usage
+  Scenario: The meter counts the month's distinct events per event type
+    Given billable events of several types written to the memory meter
+    When an organization's month is counted per event type for its named projects
+    Then each type reports its distinct keys inside the half-open UTC window
+    And events from another organization, another month or an unnamed project do not count
+
+  @unit @usage
+  Scenario: The per-type meter read is an approximate distinct count grouped by event type
+    Given the live meter over an organization-keyed ClickHouse
+    When an organization's month is counted per event type
+    Then the read is `uniq(DeduplicationKeyHash)` grouped by `EventType` over `billable_events`
+    And an organization with no projects reads nothing
+
+  @integration @usage
+  Scenario: ClickHouse counts repeated metric rows of one series-hour once in every read
+    Given a ClickHouse meter holding five rows of one metric series-hour, a log record and a span
+    When the month is read as a total, per project, per day and per type
+    Then the series counts once in every read
+    And the per-type read answers one span, one log record and one metric series-hour
+
+  @unit @usage
   Scenario: The per-project meter read is billing's approximate query
     Given the live meter over an organization-keyed ClickHouse
     When an organization's projects are counted for one month

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * @see specs/upgrade/upgrade-command.feature
+ * @see specs/upgrade/release-manifests.feature
  * Requires LANGWATCH_TEST_DATABASE_URL. Every test gets its own Postgres schema; the schema applier
  * is a fake that writes `_prisma_migrations` rows and reports ClickHouse targets as told.
  */
@@ -304,7 +305,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       const applier = fakeApplier({
         release: "3.21.0",
         during: async () => {
-          await sleep(900);
+          await sleep(2_500);
           intruder = await ledger().acquireLease({
             name: "upgrade",
             owner: "x",
@@ -318,7 +319,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         runnerFor({
           release: "3.21.0",
           applier,
-          lease: { ttlMs: 400, heartbeatMs: 100, waitMs: 1_000, pollMs: 50 },
+          lease: { ttlMs: 1_500, heartbeatMs: 100, waitMs: 1_000, pollMs: 50 },
         }),
       );
       expect(intruder).toBeNull();
@@ -348,6 +349,38 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect(applier.calls).toEqual([]);
       expect(outcome.message).toContain("in packages/prisma-client with DATABASE_URL set");
       expect(outcome.message).toContain("runs the upgrade again by itself");
+    });
+  });
+
+  describe("when the image declares two goose files on one step id", () => {
+    /** @scenario "Two goose files sharing a numeric prefix are refused before the upgrade registers steps" */
+    it("records the run failed naming the id and both files, and registers and applies nothing", async () => {
+      const applier = fakeApplier({ release: "3.21.0" });
+      const shared = step("clickhouse:00125", "clickhouse-schema");
+      const image = {
+        release: "3.21.0",
+        steps: [...shippedUpTo("3.21.0"), shared, shared],
+        gooseFiles: ["00001_base.sql", "00002_add.sql", "00125_a.sql", "00125_b.sql"],
+      };
+      const message =
+        "two migrations share step id clickhouse:00125: 00125_a.sql, 00125_b.sql; " +
+        "renumber the one that has not been applied yet";
+
+      const outcome = await run(runnerFor({ release: "3.21.0", applier, image }));
+
+      expect(outcome).toMatchObject({ exitCode: 1, code: "failed", message });
+      expect((await ledger().findRuns()).at(-1)).toMatchObject({
+        kind: "upgrade",
+        outcome: "failed",
+        report: expect.objectContaining({
+          code: "failed",
+          error: message,
+          step: "clickhouse:00125",
+          files: ["00125_a.sql", "00125_b.sql"],
+        }),
+      });
+      expect(await ledger().findSteps()).toEqual([]);
+      expect(applier.calls).toEqual([]);
     });
   });
 
@@ -397,7 +430,14 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       });
       await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
       const applier = fakeApplier({ release: "3.21.0" });
-      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
+      const copyKeys = defineMigrationStep({
+        id: "dataset:copy-keys",
+        kind: "data",
+        mode: "blocking",
+        description: "copies the keys",
+        run: async () => ({ copied: 0 }),
+      });
+      const outcome = await run(runnerFor({ release: "3.21.0", applier, codeSteps: [copyKeys] }));
       expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
       expect(applier.calls).toContain("3.21.0");
     });

@@ -169,9 +169,17 @@ Feature: Data retention policy configuration
 
   @integration
   Scenario: A free plan sees the policies and is offered no way to change them
-    Given an organization whose plan does not unlock configurable retention
+    Given an organization on LangWatch Cloud whose plan does not unlock configurable retention
     When an admin opens the retention policies page
     Then the page says configurable retention is a paid-plan feature
+    And no control to add a retention policy is offered
+
+  @integration
+  Scenario: A self-hosted admin without a license is led to the License page from data retention
+    Given a self-hosted install with no Enterprise license
+    When an organization admin opens the retention policies page
+    Then the page says data retention is part of LangWatch Enterprise
+    And the lock offers "Activate a license" and "Get a license", both leading to Settings > License
     And no control to add a retention policy is offered
 
   @integration

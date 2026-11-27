@@ -101,7 +101,7 @@ describe("DraggableTabsBrowser keyboard", () => {
         ),
       );
       expect(await screen.findByText("Body of tab-2")).toBeInTheDocument();
-      expect(screen.queryByText("Body of tab-1")).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText("Body of tab-1")).not.toBeInTheDocument());
     });
 
     it("moves focus out of the strip with Tab and back with Shift-Tab", async () => {

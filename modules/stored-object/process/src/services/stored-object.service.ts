@@ -1,14 +1,14 @@
-import { Readable } from "node:stream";
-
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { type AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+import { readableBody } from "@langwatch/process-stores/members";
 import {
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
   StoredObjectNotFoundError,
   StoredObjectUnavailableError,
+  StoredObjectWriteConflictError,
   type ConfirmStoredObjectUploadInput,
   type CreateStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
@@ -35,6 +35,7 @@ import type {
   StoredObjectBytesRepository,
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
+import type { StoredObjectOwnerLinkRepository } from "../repositories/stored-object-owner-link.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -44,6 +45,7 @@ import type {
   StoredObjectFileStreamRead,
   StoredObjectProbe,
 } from "../rules/stored-object-file-access.rules.ts";
+import { movedOn } from "../rules/stored-object-lifecycle.rules.ts";
 import { requiredPermissionForPurpose } from "../rules/stored-object-purpose-permission.rules.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectCleanupService } from "./stored-object-cleanup.service.ts";
@@ -56,11 +58,15 @@ import type { StoredObjectFileReader } from "./stored-objects.service.ts";
 /** The peer decision a probe asks once the row names its purpose. */
 export type StoredObjectPermissions = Pick<AuthzApi, "getDecision">;
 
+/** Reads a delete takes when other writes keep moving the row under it. */
+const MAX_DELETE_ATTEMPTS = 4;
+
 /** How long a signed read URL answers, as long as an upload URL does (ADR-158 §4). */
 const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
 
 type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  ownerLinks: StoredObjectOwnerLinkRepository;
   permissions: StoredObjectPermissions;
   storage: StoredObjectBytesRepository;
   delivery: StoredObjectDelivery;
@@ -96,6 +102,7 @@ export class StoredObjectService {
     this.now = options.now ?? nowInstant;
     this.cleanup = StoredObjectCleanupService.create({
       records: options.records,
+      ownerLinks: options.ownerLinks,
       storage: options.storage,
       deleteObject: (input) => this.delete(input),
       cleanupBatchSize: options.cleanupBatchSize,
@@ -103,6 +110,7 @@ export class StoredObjectService {
     });
     this.uploads = StoredObjectUploadService.create({
       records: options.records,
+      ownerLinks: options.ownerLinks,
       storage: options.storage,
       signer: options.signer,
       maximumUploadBytes: options.maximumUploadBytes,
@@ -175,22 +183,14 @@ export class StoredObjectService {
     const facts = { mediaType: value.mediaType, purpose: value.purpose };
     if (!value.storage) return { status: "missing", ...facts };
 
-    try {
-      const bytes = await StoredObjectUploadService.storageCall(() =>
-        this.options.storage.getBytes({
-          projectId: input.projectId,
-          address: this.getStorage(value),
-        }),
-      );
-      await bytes[Symbol.asyncIterator]().return?.();
-    } catch (error) {
-      if (error instanceof HandledError && error.code === "stored_object_not_found") {
-        return { status: "missing", ...facts };
-      }
-      throw error;
-    }
+    const held = await StoredObjectUploadService.storageCall(() =>
+      this.options.storage.exists({
+        projectId: input.projectId,
+        address: this.getStorage(value),
+      }),
+    );
 
-    return { status: "available", ...facts };
+    return { status: held ? "available" : "missing", ...facts };
   }
 
   /**
@@ -216,7 +216,7 @@ export class StoredObjectService {
         projectId: input.projectId,
         address: value.storage,
       });
-      return { row, stream: Readable.from(bytes) };
+      return { row, stream: readableBody(bytes) };
     } catch (error) {
       if (error instanceof HandledError && error.code === "stored_object_not_found") {
         return { row, status: "missing" };
@@ -247,14 +247,27 @@ export class StoredObjectService {
     purpose: string;
     ownerKind: string;
   }): Promise<StoredObjectReadUrl> {
-    // ponytail: opens the bytes to read the row; a row-only read when avatar lists grow hot.
-    const read = await this.readById(input);
-    if ("stream" in read) read.stream.destroy();
-    if (read.row.purpose !== input.purpose || read.row.owner_kind !== input.ownerKind) {
+    const row = await this.rowOf(input);
+    if (row.purpose !== input.purpose || row.ownerKind !== input.ownerKind) {
       throw new StoredObjectNotFoundError();
     }
 
     return this.readUrlOf(input);
+  }
+
+  /** The row's purpose and owner kind, from Postgres or the legacy index; no bytes are opened. */
+  private async rowOf(input: {
+    projectId: string;
+    id: string;
+  }): Promise<{ purpose: string; ownerKind: string }> {
+    const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });
+    if (value) {
+      if (value.status !== "available") throw new StoredObjectNotFoundError();
+      return { purpose: value.purpose, ownerKind: value.ownerKind };
+    }
+    const legacy = await this.options.legacy.findRowById(input);
+    if (!legacy) throw new StoredObjectNotFoundError();
+    return { purpose: legacy.purpose, ownerKind: legacy.owner_kind };
   }
 
   /** The bytes a signed read URL names, once its seal opens; the seal is the whole credential. */
@@ -339,40 +352,42 @@ export class StoredObjectService {
     return this.getById(input);
   }
 
+  /** Marks the row deleted from what it holds now, then removes its bytes and its address. */
   async delete(input: DeleteStoredObjectInput): Promise<StoredObjectsDeleteOutput> {
-    const value = await this.getStoredObject(input);
-    if (value.status === "deleted" && value.deletedAt) {
-      return {
-        id: value.id,
-        generation: value.generation,
-        deletedAt: toDate(value.deletedAt).toISOString(),
-      };
-    }
+    for (let attempt = 0; attempt < MAX_DELETE_ATTEMPTS; attempt += 1) {
+      const value = await this.getStoredObject(input);
+      if (value.status === "deleted" && value.deletedAt) {
+        return {
+          id: value.id,
+          generation: value.generation,
+          deletedAt: toDate(value.deletedAt).toISOString(),
+        };
+      }
 
-    const deletedAt = this.now();
-    const deleted = {
-      ...value,
-      status: "deleted" as const,
-      generation: value.generation + 1,
-      deletedAt,
-      updatedAt: deletedAt,
-    };
-    await this.options.records.upsert(deleted);
-    if (deleted.storage) {
-      const cleaned = await this.cleanup.deleteStorageBestEffort({
-        projectId: input.projectId,
-        address: deleted.storage,
+      const deletedAt = this.now();
+      const deleted = movedOn({
+        value,
+        now: deletedAt,
+        // Expired, the reaper retries the bytes if this delete's own removal fails.
+        changes: {
+          status: "deleted",
+          deletedAt,
+          expiresAt: value.status === "uploading" ? value.expiresAt : deletedAt,
+        },
       });
-      if (cleaned) {
-        await this.options.records.upsert({ ...deleted, storage: null });
+      if (await this.options.records.transition({ expected: value, next: deleted })) {
+        // A write still streaming owns its bytes' fate: it discards them when it sees the delete.
+        if (value.status !== "uploading") await this.cleanup.removeBytesOf(deleted);
+
+        return {
+          id: deleted.id,
+          generation: deleted.generation,
+          deletedAt: toDate(deletedAt).toISOString(),
+        };
       }
     }
 
-    return {
-      id: deleted.id,
-      generation: deleted.generation,
-      deletedAt: toDate(deletedAt).toISOString(),
-    };
+    throw new StoredObjectWriteConflictError(input.projectId, input.id);
   }
 
   async getStorageUsageByProject(input: {
@@ -402,8 +417,15 @@ export class StoredObjectService {
     return this.options.storage.resolveDestination(input);
   }
 
-  probeStorage(input: { projectId: string }): Promise<void> {
-    return this.options.storage.probe(input);
+  /** Writes and removes a probe, then proves clients can be handed an upload address. */
+  async probeStorage(input: { projectId: string }): Promise<void> {
+    await this.options.storage.probe(input);
+    if (await this.options.storage.uploadsThroughProcess(input)) {
+      this.options.signer.publicOrigin();
+      return;
+    }
+    const expiresAt = this.now().add({ minutes: 1 });
+    await this.options.storage.signCheckupUpload({ ...input, expiresAt });
   }
 
   async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {

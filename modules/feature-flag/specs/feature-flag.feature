@@ -22,6 +22,21 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       Then the flag resolves to its registry default
 
     @unit
+    Scenario: A self-hosted install resolves a flag to its self-hosted default
+      Given a flag whose self-hosted default differs from its registry default
+      And IS_SAAS is unset, so the install is self-hosted
+      When a caller resolves the flag with nothing overriding it
+      Then the flag resolves to its self-hosted default
+      And LangWatch Cloud, with IS_SAAS set, resolves it to its registry default
+      And the operator catalogue shows the default this deployment resolves to
+
+    @unit
+    Scenario: An operator row overrides the self-hosted default
+      Given a flag whose self-hosted default is off on a self-hosted install
+      When an operator switches it on
+      Then the flag resolves on
+
+    @unit
     Scenario: An operator row overrides the registry default
       Given an operator switched a registered flag off fleet-wide
       When a caller resolves the flag
@@ -74,6 +89,35 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       Given a key that appears in no registry entry and matches no family
       When a caller resolves it
       Then resolution raises an unknown-flag error rather than inventing an answer
+
+    @unit
+    Scenario: Dashboards in every product is on by default
+      Given no environment override, force-enable entry or operator row sets release_dashboards_in_every_product
+      When the browser reads its flags for a project, on LangWatch Cloud or a self-hosted install
+      Then release_dashboards_in_every_product is on
+
+  Rule: A self-hosted install gets the features it can run without being switched on
+
+    @unit
+    Scenario: LangWatchQL is on by default on a self-hosted install
+      Given IS_SAAS is unset, so the install is self-hosted
+      When a caller resolves release_lwql_workbench with nothing overriding it
+      Then the flag resolves on
+      And LangWatch Cloud, with IS_SAAS set, still resolves it off unless a rule rolls it out
+
+    @unit
+    Scenario: The Instant Evals release flag is on by default on a self-hosted install
+      Given IS_SAAS is unset, so the install is self-hosted
+      When a caller resolves release_instant_evals with nothing overriding it
+      Then the flag resolves on
+      And LangWatch Cloud, with IS_SAAS set, still resolves it off, so the plan and the organization's own switch decide there
+
+    @unit
+    Scenario: A self-hosted install never loses a feature LangWatch Cloud has on by default
+      Given a flag that is on by default on LangWatch Cloud
+      When a self-hosted install resolves it with nothing overriding it
+      Then it resolves on too
+      But the Instant Evals judge router stays off there, since judging through Connect carries no route
 
   Rule: Targeting rules override the row for the targets they name, and nobody else
 

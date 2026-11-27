@@ -191,6 +191,33 @@ Feature: License sync
     When an admin opens Settings, Connect
     Then the page shows when sync last succeeded and why it is failing
 
+  @integration
+  Scenario: The sync line uses the same words on the Connect and License pages
+    Given a license that names a hosted service
+    When the last sync succeeded, the Connect page reads "Last synced" and how long ago
+    And when no sync has run yet, it reads "Not synced yet"
+    And the License page shows the same line from the same reading
+
+  @unit
+  Scenario: A sync time that cannot be read reads as not synced
+    Given the last sync time is missing or cannot be parsed
+    When the sync line is written
+    Then it reads "Not synced yet"
+    And a failed last sync still leads with "Last sync failed."
+
+  @integration
+  Scenario: The sync line follows a refresh once its outcome is recorded
+    Given a license that names a hosted service
+    When an admin refreshes the license on the License page
+    Then the page re-reads the sync line until the refresh's outcome is recorded
+    And it stops re-reading once the line changed
+
+  @integration
+  Scenario: A failure that is already the page's refusal is not shown twice
+    Given the last sync was refused for the same reason the hosted services refuse the license
+    When an admin opens Settings, Connect
+    Then the reason is shown once
+
   # ============================================================================
   # Refresh on demand
   # ============================================================================
@@ -235,6 +262,62 @@ Feature: License sync
     Then the response carries the reissued license
     And the install verifies it and stores it in place of the old one
     And the license page shows 80 seats
+
+  @unit
+  Scenario: An extension signed while another waited arrives in one sync
+    Given LangWatch extended the license, and extended it again before the install synced
+    When the install syncs
+    Then the response carries the newest extension
+    And once the install presents it, both licenses before it are superseded and neither copy is held
+
+  @unit
+  Scenario: An answer that arrives after a newer license was applied is not stored
+    Given the install asked for its license with its current credential
+    And another sync applied a newer license before the answer arrived
+    When the answer carries the license the newer one replaced
+    Then the install keeps the newer license and stores nothing
+
+  @unit
+  Scenario: Two syncs that race to store a delivered license leave the newer one
+    Given a sync read the license the organization holds before it asked
+    And another sync stored a newer license while the first one waited
+    When the first sync stores the license its answer carried
+    Then the store is a single write that keeps the newer license
+
+  @integration
+  Scenario: A delivered license is compared with the license the install reads
+    Given organization's licence column was written after licensing's own row
+    And a sync started from the key in that column
+    When the sync stores the license its answer carried
+    Then the store is accepted, because the column's key is the one the install reads
+
+  @integration
+  Scenario: A licence column written while a sync is out keeps the delivered license out
+    Given a sync started from the organization's key
+    And organization's licence column changed to another key while the answer was out
+    When the sync stores the license its answer carried
+    Then the store is refused and the newer column's key stays
+
+  @integration
+  Scenario: A licence written in the same millisecond as the one a sync read keeps the delivery out
+    Given a sync started from licensing's key A
+    And another write replaced A with B while the delivery waited, keeping A's timestamp
+    When the delivery's write runs after that write commits
+    Then the delivery is refused, because the key it would replace is B, not A
+
+  @integration
+  Scenario: A delivery that waited on organization's row is stamped after it
+    Given organization's column and licensing's row both hold key A, the row newer
+    And an organization write holds the row's lock and stamps it later than the delivery began
+    When the delivery replacing A runs once that write commits
+    Then the delivered row is newer than organization's column, so the install reads the delivered key
+
+  @unit
+  Scenario: A sync never carries a license that a delivery retired while it looked
+    Given LangWatch extended the license, and extended it again before the install synced
+    And a sync on the oldest license is walking the chain
+    When a sync presenting the newest extension completes its delivery during that walk
+    Then the sync on the oldest license carries no license
 
   @unit
   Scenario: A delivered license that does not verify is not applied

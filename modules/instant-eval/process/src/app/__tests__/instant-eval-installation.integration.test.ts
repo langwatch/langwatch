@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-api.feature
  * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  * @see specs/model-providers/instant-evals-decision-model.feature
+ * @see specs/lwql/eval-functions.feature
  */
 import type {
   AnalyticsApi,
@@ -16,9 +17,14 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
+import type {
+  GatewayApi,
+  GatewayBudgetCheckInput,
+  GatewayPricedSpend,
+} from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  INSTANT_EVALS_SEARCH_ROUTER_FLAG,
   InstantEvalApi,
   type InstantEvalActor,
   InstantEvalMemoryJudgeInProductionError,
@@ -27,6 +33,7 @@ import {
 import {
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_REQUEST_TYPE,
+  INSTANT_EVALS_HOSTED_DISABLED_FLAG,
   type InstantEvalClassification,
   type InstantEvalJudgeApi,
   type InstantEvalJudgement,
@@ -83,6 +90,7 @@ function planFor({ free }: { free: boolean }): Plan {
     free,
     maxMembers: free ? 1 : 10,
     maxMembersLite: 0,
+    maxMembersDeveloper: 0,
     maxMessagesPerMonth: free ? 1_000 : 100_000,
     canPublish: !free,
     prices: { USD: free ? 0 : 199, EUR: free ? 0 : 199 },
@@ -155,6 +163,9 @@ function installation({
   recordOptIn = async () => undefined,
   decisionModel = { kind: "langwatch" },
   judgeClassify,
+  judge = {},
+  isHostedOff = false,
+  isSearchRouted = false,
 }: {
   /** What the release flag answers: on the hosted service it releases an enterprise plan only. */
   isReleased?: boolean;
@@ -187,6 +198,12 @@ function installation({
   decisionModel?: DecisionModelResolution;
   /** The Instant Evals judge's classify, for a test that reads what it was asked. */
   judgeClassify?: InstantEvalJudgeApi["classify"];
+  /** Further Instant Evals judge operations a test answers itself. */
+  judge?: Partial<InstantEvalJudgeApi>;
+  /** Whether LangWatch switched its hosted model off for the organization. */
+  isHostedOff?: boolean;
+  /** What the search router flag answers, apart from the release flag. */
+  isSearchRouted?: boolean;
 } = {}) {
   return (
     createApp({ role: "api" })
@@ -214,12 +231,14 @@ function installation({
           isLangWatchQLAvailable: () => true,
           langWatchQLDatabase: () => "analytics",
           resolveApiKeyRunCaller: async () => ({ id: PROJECT, lwqlKey: "key" }),
+          ensureLwqlKeyMapRow: async () => true,
           resolveApiKeyProtections: async () => ({ catalogue: { permissions: [] } }),
           resolveRunCaller: async () => ({
             project: { id: PROJECT, lwqlKey: "key" },
             protections: { catalogue: { permissions: [] } },
           }),
           validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
+          validateLangWatchQLForRun: async () => ({ parameters: [], appFunctions: [] }),
           describeLangWatchQLJudgements: () => [JUDGEMENT],
           executeLangWatchQLPass: async () => execution([]),
           ...analytics,
@@ -236,7 +255,17 @@ function installation({
             ...(planType ? { type: planType } : {}),
           }),
         }),
-        gateway: createApiFixture<GatewayApi>(gateway),
+        // No gateway budget is reached unless a test says otherwise.
+        gateway: createApiFixture<GatewayApi>({
+          checkBudget: async () => ({
+            decision: "allow",
+            warnings: [],
+            blockReason: null,
+            blockedBy: [],
+            scopes: [],
+          }),
+          ...gateway,
+        }),
         licensing: createApiFixture<LicensingApi>({
           isConnectServiceEnabled: async () => isConnectOn,
         }),
@@ -247,9 +276,14 @@ function installation({
         }),
         authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
-          isEnabled: async () => isReleased,
+          isEnabled: async (flagKey) => {
+            if (flagKey === INSTANT_EVALS_HOSTED_DISABLED_FLAG) return isHostedOff;
+            if (flagKey === INSTANT_EVALS_SEARCH_ROUTER_FLAG) return isSearchRouted;
+            return isReleased;
+          },
         }),
-        // A project runs on LangWatch Instant Preview unless a test names its own model (ADR-182).
+        // A project runs on LangWatch Instant (preview) unless a test names its own model
+        // (ADR-182).
         "model-provider": createApiFixture<ModelProviderApi>({
           resolveDecisionModel: async () => decisionModel,
         }),
@@ -257,6 +291,7 @@ function installation({
         "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>({
           isClassifierConfigured: async () => judgeKey !== null,
           ...(judgeClassify ? { classify: judgeClassify } : {}),
+          ...judge,
         }),
       })
   );
@@ -345,6 +380,61 @@ describe("given a process that installs Instant Evals over the memory tier", () 
         });
 
         expect(run).toMatchObject({ limit: 50_000, status: "queued", sql: STATEMENT });
+      });
+    });
+  });
+
+  describe("when a paid plan's project budget is set to block and is reached", () => {
+    /** @scenario "A run is refused once a blocking budget is reached" */
+    it("refuses the run, asking the gateway for the project's own team and organization", async () => {
+      const asked: GatewayBudgetCheckInput[] = [];
+      const gateway: Partial<GatewayApi> = {
+        checkBudget: async (input) => {
+          asked.push(input);
+          return {
+            decision: "hard_block",
+            warnings: [],
+            blockReason: "Budget exceeded for scope=project window=month",
+            blockedBy: [
+              {
+                budgetId: "budget-1",
+                scope: "project",
+                scopeId: PROJECT,
+                window: "month",
+                limitUsd: "5",
+                spentUsd: "5.000000",
+              },
+            ],
+            scopes: [],
+          };
+        },
+      };
+
+      await withInstallation({ isFreePlan: false, gateway }, async (api) => {
+        const refusal = await refusalOf(
+          api.createRun({ projectId: PROJECT, actor: ACTOR, input: runOf() }),
+        );
+
+        expect(refusal.code).toBe("instant_eval_gateway_budget_exceeded");
+        expect(refusal.meta).toEqual({
+          budgetId: "budget-1",
+          scope: "project",
+          window: "month",
+          limitUsd: 5,
+          spentUsd: 5,
+        });
+        expect(asked).toEqual([
+          {
+            organizationId: ORGANIZATION,
+            teamId: "team-1",
+            projectId: PROJECT,
+            virtualKeyId: `_instant_eval_:project:${PROJECT}`,
+            principalUserId: null,
+            providerKey: null,
+            projectedCostUsd: 0,
+          },
+        ]);
+        await expect(api.findRuns({ projectId: PROJECT, limit: 10 })).resolves.toEqual([]);
       });
     });
   });
@@ -446,7 +536,7 @@ describe("given a process that installs Instant Evals over the memory tier", () 
     it("hands the gate each target's statement with every parameter it declares bound", async () => {
       const gated: { sql: string; parameters: Record<string, unknown> }[] = [];
       const analytics: Partial<AnalyticsApi> = {
-        validateLangWatchQL: ({ sql, parameters = {} }) => {
+        validateLangWatchQLForRun: async ({ sql, parameters = {} }) => {
           const declared = [...sql.matchAll(/\{(\w+):/g)].map((match) => match[1] ?? "");
           const unbound = declared.filter((name) => !(name in parameters));
           if (unbound.length > 0) throw new Error(`unbound parameters: ${unbound.join(", ")}`);
@@ -737,6 +827,52 @@ describe("given a project whose Instant Evals column names its own decision mode
   });
 });
 
+describe("given a judged query on LangWatch's cloud judge", () => {
+  const judgedQuery = async ({ isSearchRouted }: { isSearchRouted: boolean }) => {
+    const leaf = judgeLeaf();
+    await withInstallation(
+      {
+        isSearchRouted,
+        isFreePlan: false,
+        judgeClassify: leaf.classify,
+        judge: {
+          queryHoldPricing: async () => INSTANT_EVAL_PRICING,
+          recordSpend: async () => undefined,
+        },
+      },
+      (api) =>
+        api.judgeQuery({
+          projectId: PROJECT,
+          judgements: [JUDGEMENT],
+          rows: [{ polite: "thank you" }],
+        }),
+    );
+    return leaf.asked;
+  };
+
+  describe("when the search router flag is on", () => {
+    /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+    it("hands the judge the search route and a cost ceiling", async () => {
+      const asked = await judgedQuery({ isSearchRouted: true });
+
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.route).toEqual({ job: "search" });
+      expect(asked[0]?.costCeiling).toBeDefined();
+    });
+  });
+
+  describe("when the search router flag is off", () => {
+    /** @scenario "With the search router flag off a judged query sends no route" */
+    it("hands the judge no route and no cost ceiling", async () => {
+      const asked = await judgedQuery({ isSearchRouted: false });
+
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.route).toBeUndefined();
+      expect(asked[0]?.costCeiling).toBeUndefined();
+    });
+  });
+});
+
 describe("given an organization's own Instant Evals switch", () => {
   describe("when a member who may manage the organization reads the offer", () => {
     it("offers the switch on the hosted service", async () => {
@@ -744,7 +880,12 @@ describe("given an organization's own Instant Evals switch", () => {
         api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: false, offer: "enable", viaConnect: false });
+      expect(access).toEqual({
+        released: false,
+        hostedReleased: false,
+        offer: "enable",
+        viaConnect: false,
+      });
     });
   });
 
@@ -772,7 +913,12 @@ describe("given an organization's own Instant Evals switch", () => {
         (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: true, offer: "enable", viaConnect: false });
+      expect(access).toEqual({
+        released: true,
+        hostedReleased: true,
+        offer: "enable",
+        viaConnect: false,
+      });
       expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
     });
   });
@@ -790,7 +936,7 @@ describe("given an organization's own Instant Evals switch", () => {
 
       expect(access).toEqual({
         isEnabled: false,
-        offer: { released: false, offer: "enable", viaConnect: false },
+        offer: { released: false, hostedReleased: false, offer: "enable", viaConnect: false },
       });
     });
   });
@@ -825,6 +971,103 @@ describe("given an organization's own Instant Evals switch", () => {
         ),
       ).rejects.toMatchObject({ code: "instant_eval_opt_in_not_offered" });
       expect(recorded).toEqual([]);
+    });
+  });
+});
+
+describe("given an organization LangWatch switched its hosted model off for", () => {
+  const SENTENCE = { kind: "boolean" as const, instructions: "Annoyed?" };
+
+  describe("when a self-serve organization that switched Instant Evals on asks", () => {
+    it("is not released, is offered no switch, and a thrown switch is refused", async () => {
+      const recorded: unknown[] = [];
+      const read = await withInstallation(
+        {
+          isReleased: true,
+          isOptedIn: true,
+          isHostedOff: true,
+          recordOptIn: async (input) => {
+            recorded.push(input);
+          },
+        },
+        async (api) => ({
+          isEnabled: await api.isEnabled({ projectId: PROJECT }),
+          access: await api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+          optIn: await codeOf(api.optIn({ projectId: PROJECT, userId: "member-1" })),
+        }),
+      );
+
+      expect(read).toEqual({
+        isEnabled: false,
+        access: { released: false, hostedReleased: false, offer: "contact_us", viaConnect: false },
+        optIn: "instant_eval_opt_in_not_offered",
+      });
+      expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when a project on LangWatch Instant (preview) has text classified", () => {
+    it("skips as not configured and never reaches LangWatch's classifier", async () => {
+      const leaf = judgeLeaf();
+
+      const judgement = await withInstallation(
+        { isHostedOff: true, judgeClassify: leaf.classify },
+        (api) =>
+          api.classify({
+            projectId: PROJECT,
+            text: "I am fed up",
+            questions: [{ id: "annoyed", ...SENTENCE }],
+          }),
+      );
+
+      expect(judgement.skippedReason).toBe("classifier_not_configured");
+      expect(leaf.asked).toEqual([]);
+    });
+  });
+
+  describe("when the search bar classifies a sentence", () => {
+    it("routes nothing and never reaches LangWatch's classifier", async () => {
+      const leaf = judgeLeaf();
+
+      const classification = await withSearchBar(
+        { isHostedOff: true, decisionModel: OWN_DECISION_MODEL, judgeClassify: leaf.classify },
+        (app) =>
+          app.classifySearch({
+            projectId: PROJECT,
+            text: "frustrated users",
+            timeRange: { from: 0, to: 24 * 3_600_000 },
+            actor: { type: "user", id: "user-1" },
+          }),
+      );
+
+      expect(classification.classified).toBeNull();
+      expect(leaf.asked).toEqual([]);
+    });
+  });
+
+  describe("when the project's column is its own decision model", () => {
+    it("is released and judges on the own model with the organization's key", async () => {
+      const leaf = judgeLeaf();
+
+      const enabled = await withInstallation(
+        {
+          isHostedOff: true,
+          isOptedIn: false,
+          decisionModel: OWN_DECISION_MODEL,
+          judgeClassify: leaf.classify,
+        },
+        async (api) => {
+          await api.classify({
+            projectId: PROJECT,
+            text: "I am fed up",
+            questions: [{ id: "annoyed", ...SENTENCE }],
+          });
+          return api.isEnabled({ projectId: PROJECT });
+        },
+      );
+
+      expect(enabled).toBe(true);
+      expect(leaf.asked.map((request) => request.decisionModel?.apiKey)).toEqual(["customer-key"]);
     });
   });
 });

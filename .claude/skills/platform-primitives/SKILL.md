@@ -29,7 +29,8 @@ const agentId = generate("agent").toString(); // modules/agent/process/src/rules
 
 ## Time
 
-`@langwatch/time` is the one clock. `nowInstant()` for now, `Temporal` for arithmetic, `toDate` / `fromDate` only where a
+`@langwatch/time` is the one clock. `nowInstant()` for now as an Instant, `nowEpochMs()` when you only need the
+epoch millisecond count (no Instant is built, so prefer it on hot paths), `Temporal` for arithmetic, `toDate` / `fromDate` only where a
 boundary (Prisma, a driver) hands or wants a `Date`, `nextCronFireAt` for schedules, `formatDistance*` for relative text.
 Do not write `new Date(x)` or `Date.now()` in module code (`langwatch/temporal-only` names the fix).
 A service that needs a different clock takes `now: () => Instant` as an option, and memory twins take one too
@@ -69,6 +70,15 @@ Example: `modules/webhook/process/src/rules/webhook-url-policy.rules.ts` and
 `modules/webhook/process/src/channels/http/http.destination.channel.ts`. The TLS policy and address policy come from
 the composition root; the package reads no environment. Every fetch also carries a timeout (`langwatch/require-fetch-timeout`).
 Self-hosted calls leave through the proxy helpers in the same package.
+
+## S3 clients
+
+Every `new S3Client` takes `region: s3RegionOf({ region, endpoint })` from `@langwatch/aws-client`, inline or
+through a `const` bound to that call (`langwatch/s3-client-region`). It returns the configured region, else the
+one an AWS endpoint names, else `auto` for any other S3-compatible host. Never hand-pick a fallback: AWS refuses
+to sign with `auto` (`packages/process-stores/src/object-storage-s3.ts`). A client that knows its bucket passes
+`s3RegionFor({ region, endpoint, bucket, askBucket })` instead: the same rule, then AWS_REGION or the profile, then
+the bucket's own region, then the EC2 host's (tasks#1192).
 
 ## Redis and rate limits
 

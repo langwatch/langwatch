@@ -3,7 +3,9 @@
  * reads the URL directly. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
-import { type ScopeAssignment } from "@langwatch/data-retention-contract";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
+import { type ScopeAssignment, type StoredApplyStatus } from "@langwatch/data-retention-contract";
 import { Card } from "@langwatch/design-system/card";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -39,23 +41,30 @@ import {
   removeRetentionScope,
   retentionPolicySaver,
 } from "../../behavior/retention-policy-save.ts";
+import { useStoredRetentionApply } from "../../behavior/stored-retention-apply.ts";
 import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,
   type DataRetentionHostApi,
 } from "../../model/data-retention-host.ts";
-import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
+import {
+  BINDING_SCOPE_TIERS,
+  retentionLengthBillsStorage,
+  SCOPE_ICON,
+} from "../../model/retention-constants.ts";
 import {
   groupRulesByScope,
   renderPolicyValue,
   type RetentionScopeGroup,
 } from "../../model/retention-grouping.ts";
 import { retentionRemovalPreviewQuery } from "../../model/retention-removal-preview.ts";
+import { storedApplyLabel } from "../../model/stored-retention-copy.ts";
 import { AddOverrideDrawer, type RetentionEditTarget } from "../blocks/add-override-drawer.tsx";
-import { ApplyToExistingConfirmDialog } from "../blocks/apply-to-existing-confirm-dialog.tsx";
+import { ApplyStoredRetentionDialog } from "../blocks/apply-stored-retention-dialog.tsx";
 import { RemoveScopeConfirmDialog } from "../blocks/remove-scope-confirm-dialog.tsx";
 import { RetentionAndUsageCard } from "../blocks/retention-and-usage-card.tsx";
 import { RetroactiveProgressCard } from "../blocks/retroactive-progress-card.tsx";
+import { StoredRetentionNote } from "../blocks/stored-retention-note.tsx";
 
 const RETENTION_DOCS_HREF = "https://langwatch.ai/docs/platform/data-retention";
 
@@ -163,6 +172,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // Enterprise (and self-hosted, which resolves to enterprise) gets the full
   // retention menu + custom; paid non-enterprise gets the fixed short pair.
   const isEnterprise = host.isEnterprise();
+  const { isSaaS } = useUiDeployment();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   // When set, the Add drawer opens in edit mode locked to this scope's policy.
@@ -191,26 +201,22 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // column with identical "saved" messages. The drawer's onSave emits a
   // single aggregated notice after the batch resolves.
   const setForScope = dataRetentionApi.dataRetention.setForScope.useMutation();
+  // A length that bills storage asks subscription:manage on the organization: its own write.
+  const setBilledForScope = dataRetentionApi.dataRetention.setBilledForScope.useMutation();
 
   // Removing a scope's policy fans out one removeForScope call per category,
   // so we mirror the save-flow pattern: aggregate the result and emit a
   // single notice at the call site instead of one per mutation.
   const removeForScope = dataRetentionApi.dataRetention.removeForScope.useMutation();
 
-  // Retroactive apply: stamp the project's EXISTING ClickHouse rows with the
-  // effective retention. We don't know the stored _retention_days values
-  // without an extra query (they could still be the migration default), so we
-  // always route through the confirm dialog before mutating CH — the action is
-  // irreversible if it contracts.
-  const [pendingConfirm, setPendingConfirm] = useState<{
-    retentionDays: number;
-    /** True when the user saved at least one scope beyond the current project
-     *  (org/team or a different project). Retroactive apply only ever runs on
-     *  the current project; surfacing this in the dialog prevents a user from
-     *  expecting an org-wide save to retro-stamp every child project. */
-    savedScopeWiderThanCurrentProject: boolean;
-    onConfirm: () => void | Promise<void>;
-  } | null>(null);
+  const storedApply = useStoredRetentionApply({
+    projectId,
+    organizationId: () => organizationOf(organizationId),
+    viewedScope: storageScope,
+    notices: host,
+    canApply:
+      !!rulesQuery.data?.canConfigureRetention && hasWritableScope(rulesQuery.data?.available),
+  });
 
   const projectIsWritable =
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
@@ -222,14 +228,6 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     },
   );
   const activeMutations = progressQuery.data ?? [];
-
-  // Per-call toasts intentionally omitted — the drawer flow fans this out one
-  // call per category. Call sites emit a single aggregated notice.
-  const triggerUpdate = dataRetentionApi.dataRetention.triggerRetroactiveUpdate.useMutation({
-    onSuccess: () => {
-      void progressQuery.refetch();
-    },
-  });
 
   const killMutation = dataRetentionApi.dataRetention.killMutation.useMutation({
     onSuccess: () => {
@@ -246,6 +244,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   const available = snapshot?.available;
   const canConfigureRetention = !!snapshot?.canConfigureRetention;
   const canWrite = canConfigureRetention && hasWritableScope(available);
+  const storageBilled = !!snapshot?.storageBilled;
+  const billedLocked = storageBilled && !host.hasPermission("subscription:manage");
 
   // Open the Add drawer in edit mode for a scope group. The drawer edits one
   // retention value applied to all categories, so we seed it with the group's
@@ -270,20 +270,22 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   };
 
   const savePolicy = retentionPolicySaver({
-    projectId,
     notices: host,
-    write: ({ scope, category, retentionDays }) =>
-      setForScope.mutateAsync({
+    write: ({ scope, category, retentionDays }) => {
+      const input = {
         projectId,
         organizationId: organizationOf(organizationId),
         scope,
         category,
         retentionDays,
-      }),
-    trigger: (category) => triggerUpdate.mutateAsync({ projectId, category }),
+      };
+      return retentionLengthBillsStorage({ storageBilled, retentionDays })
+        ? setBilledForScope.mutateAsync(input)
+        : setForScope.mutateAsync(input);
+    },
     afterWrite: () => void invalidate(),
+    afterSave: (saved) => void storedApply.offer(saved.scopes),
     close: closeDrawer,
-    confirm: setPendingConfirm,
   });
 
   const hierarchy = scopeHierarchyOf(filterAvailable);
@@ -318,11 +320,21 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
-          How long your traces, scenarios and experiments are kept before deletion.
+          How long your traces, logs, metrics, scenarios and experiments are kept before deletion.
+          Logs and metrics follow the traces setting.
         </Text>
-        {!canConfigureRetention && snapshot && (
+        {!canConfigureRetention && snapshot && !isSaaS && (
+          <EnterpriseLock
+            compact
+            feature="Data retention"
+            description="Set how long traces, logs, metrics, scenarios and experiments are kept, per organization, team or project."
+            canManage={host.hasPermission("organization:manage")}
+            data-testid="retention-enterprise-upsell"
+          />
+        )}
+        {!canConfigureRetention && snapshot && isSaaS && (
           <Alert.Root status="info">
             <Alert.Indicator />
             <Alert.Content>
@@ -344,11 +356,20 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           />
         )}
 
+        {snapshot && storedApply.viewed && (
+          <StoredRetentionNote
+            counted={storedApply.viewed}
+            canApply={canWrite}
+            onApply={storedApply.offerViewed}
+          />
+        )}
+
         {snapshot && (
           <RetentionPolicyList
             ruleCount={snapshot.rules.length}
             defaultDays={snapshot.effective.traces}
             scopeGroups={scopeGroups}
+            storedApply={snapshot.storedApply}
             canWrite={canWrite}
             onAdd={() => setDrawerOpen(true)}
             onEdit={openEditForGroup}
@@ -371,7 +392,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isEnterprise={isEnterprise}
-            isSaving={setForScope.isPending || triggerUpdate.isPending}
+            billedLocked={billedLocked}
+            isSaving={setForScope.isPending || setBilledForScope.isPending}
             scopePicker={({ value, onChange }) => (
               <ScopeChipPicker
                 value={value}
@@ -417,16 +439,11 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           }}
         />
 
-        <ApplyToExistingConfirmDialog
-          pending={pendingConfirm}
-          isApplying={triggerUpdate.isPending || setForScope.isPending}
-          onCancel={() => setPendingConfirm(null)}
-          onConfirm={async () => {
-            if (!pendingConfirm) return;
-            const confirm = pendingConfirm.onConfirm;
-            setPendingConfirm(null);
-            await confirm();
-          }}
+        <ApplyStoredRetentionDialog
+          pending={storedApply.pending}
+          isApplying={storedApply.isApplying}
+          onDismiss={storedApply.dismiss}
+          onApply={storedApply.apply}
         />
       </VStack>
     </>
@@ -440,7 +457,7 @@ function DataRetentionLoading() {
       <PageLayout.Header>
         <PageLayout.Heading>Data Retention</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
+      <VStack gap={6} width="full" align="start" aria-busy="true">
         <SkeletonText noOfLines={1} width="sm" />
         <StatTileSkeleton columns={2} />
         <Card padding="lg">
@@ -460,6 +477,8 @@ type RetentionPolicyListProps = {
   /** With no policies written, the effective value is the deployment's platform default. */
   defaultDays: number;
   scopeGroups: RetentionScopeGroup[];
+  /** Per scope with a recorded change, whether that change reached stored data. */
+  storedApply: readonly StoredApplyStatus[];
   canWrite: boolean;
   onAdd: () => void;
   onEdit: (group: RetentionScopeGroup) => void;
@@ -471,11 +490,15 @@ function RetentionPolicyList({
   ruleCount,
   defaultDays,
   scopeGroups,
+  storedApply,
   canWrite,
   onAdd,
   onEdit,
   onRemove,
 }: RetentionPolicyListProps) {
+  const applyByScope = new Map(
+    storedApply.map((status) => [`${status.scopeType}:${status.scopeId}`, status]),
+  );
   if (ruleCount === 0) {
     return (
       <NoDataInfoBlock
@@ -509,12 +532,14 @@ function RetentionPolicyList({
         <ListTable.Row>
           <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Policy</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Stored data</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
         </ListTable.Row>
       </ListTable.Header>
       <ListTable.Body>
         {scopeGroups.map((group) => {
           const Icon = SCOPE_ICON[group.scopeType];
+          const applied = applyByScope.get(`${group.scopeType}:${group.scopeId}`);
           return (
             <ListTable.Row key={`${group.scopeType}:${group.scopeId}`}>
               <ListTable.Cell>
@@ -529,6 +554,17 @@ function RetentionPolicyList({
                 </HStack>
               </ListTable.Cell>
               <ListTable.Cell>{renderPolicyValue(group.byCategory)}</ListTable.Cell>
+              <ListTable.Cell>
+                {applied && (
+                  <Text
+                    fontSize="sm"
+                    color={applied.status === "applied" ? "fg.muted" : "orange.fg"}
+                    data-testid="stored-apply-status"
+                  >
+                    {storedApplyLabel(applied)}
+                  </Text>
+                )}
+              </ListTable.Cell>
               <ListTable.ActionCell>
                 {canWrite && (
                   <Menu.Root>

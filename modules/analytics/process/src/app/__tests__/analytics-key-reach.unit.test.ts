@@ -16,14 +16,27 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type * as Observability from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
+import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
+
+const logged = await vi.hoisted(async () => {
+  const { createTestLogger } = await import("@langwatch/test-harness");
+  return createTestLogger();
+});
+
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual = await importActual<typeof Observability>();
+  return { ...actual, createLogger: () => logged.logger };
+});
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-123";
@@ -73,21 +86,41 @@ const KEY: LangWatchQLKeyReach = {
 async function appOver(input: {
   listed: readonly Project[];
   grants: readonly string[];
-  flaggedProjects?: readonly string[];
+  enabledProjects?: readonly string[];
 }) {
-  const flagsAsked: string[] = [];
+  const accessAsked: string[] = [];
+  const keysAsked: string[] = [];
+  const peopleAsked: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
-      featureFlags: createApiFixture<FeatureFlagApi>({
-        isEnabled: (_key, target) => {
-          const projectId = target.kind === "project" ? target.projectId : "";
-          flagsAsked.push(projectId);
-          return Promise.resolve(input.flaggedProjects?.includes(projectId) === true);
-        },
-      }),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>({
-        hasApiKeyPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
-        can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        hasApiKeyPermission: ({ apiKeyId, permission }) => {
+          keysAsked.push(apiKeyId);
+          return Promise.resolve(input.grants.includes(permission));
+        },
+        can: ({ principal, permission, scope }) => {
+          peopleAsked.push(
+            `${principal.type}:${"id" in principal ? principal.id : ""}@${"id" in scope ? scope.id : ""}`,
+          );
+          return Promise.resolve(input.grants.includes(permission));
+        },
+        hasPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        getScope: ({ projectId }) =>
+          Promise.resolve({
+            type: "project",
+            id: projectId ?? PROJECT_ID,
+            teamId: `team-${projectId}`,
+            organizationId: ORGANIZATION_ID,
+          }),
+        canBatchByIds: ({ projects }) =>
+          Promise.resolve({
+            organizationRole: null,
+            teams: new Map(),
+            projects: new Map(
+              projects.map(({ projectId }) => [projectId, input.grants.includes("analytics:view")]),
+            ),
+          }),
         canBatchPermissionsByIds: ({ permissions, teams, projects }) =>
           Promise.resolve({
             organizationRole: null,
@@ -110,6 +143,7 @@ async function appOver(input: {
       }),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
+        findOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
         listByOrganization: ({ limit, projectIds }) => {
           const data = input.listed.filter(({ id }) => !projectIds || projectIds.includes(id));
           return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });
@@ -121,7 +155,14 @@ async function appOver(input: {
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    channels: { judge: createApiFixture<InstantEvalApi>() },
+    channels: {
+      judge: createApiFixture<InstantEvalApi>({
+        isEnabled: ({ projectId }) => {
+          accessAsked.push(projectId);
+          return Promise.resolve(input.enabledProjects?.includes(projectId) === true);
+        },
+      }),
+    },
     repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {
@@ -133,16 +174,17 @@ async function appOver(input: {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
         clickhouseCluster: void 0,
+        installMethod: void 0,
         aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: {} as never,
+    secrets: analyticsTestSecrets(),
   });
 
-  return { app, flagsAsked };
+  return { app, accessAsked, keysAsked, peopleAsked };
 }
 
 async function referenceFor(input: { listed: readonly Project[]; grants: readonly string[] }) {
@@ -230,51 +272,51 @@ describe("AnalyticsModule.describeLangWatchQLSchemaForKey", () => {
 
   describe("given a key that reads more than one project", () => {
     /** @scenario "An eval function is refused for a key that reads more than one project" */
-    it("closes the eval functions without asking either project's flag", async () => {
-      const { app, flagsAsked } = await appOver({
+    it("closes the eval functions without asking either project", async () => {
+      const { app, accessAsked } = await appOver({
         listed: [project("project-a"), project("project-b")],
         grants: ["analytics:view"],
-        flaggedProjects: ["project-a", "project-b"],
+        enabledProjects: ["project-a", "project-b"],
       });
 
       const schema = await app.describeLangWatchQLSchemaForKey({ reach: KEY });
 
       expect(isEvalAvailable(schema)).toBe(false);
-      expect(flagsAsked).toEqual([]);
+      expect(accessAsked).toEqual([]);
     });
   });
 
   describe("given a key that reads one project", () => {
-    /** @scenario "A key that reads one project is judged on that project's own flag" */
-    it("answers with that project's own flag", async () => {
-      const flagged = await appOver({
+    /** @scenario "A key that reads one project is judged on that project's own Instant Evals access" */
+    it("answers with that project's own Instant Evals access", async () => {
+      const enabled = await appOver({
         listed: [project("project-a")],
         grants: ["analytics:view"],
-        flaggedProjects: ["project-a"],
+        enabledProjects: ["project-a"],
       });
-      const unflagged = await appOver({
+      const disabled = await appOver({
         listed: [project("project-c")],
         grants: ["analytics:view"],
       });
 
       expect(
-        isEvalAvailable(await flagged.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
+        isEvalAvailable(await enabled.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
       ).toBe(true);
       expect(
-        isEvalAvailable(await unflagged.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
+        isEvalAvailable(await disabled.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
       ).toBe(false);
-      expect([...flagged.flagsAsked, ...unflagged.flagsAsked]).toEqual(["project-a", "project-c"]);
+      expect([...enabled.accessAsked, ...disabled.accessAsked]).toEqual(["project-a", "project-c"]);
     });
   });
 
   describe("given a key that reads no project at all", () => {
     it("closes the eval functions rather than treating an empty scope as unrestricted", async () => {
-      const { app, flagsAsked } = await appOver({ listed: [], grants: ["analytics:view"] });
+      const { app, accessAsked } = await appOver({ listed: [], grants: ["analytics:view"] });
 
       expect(isEvalAvailable(await app.describeLangWatchQLSchemaForKey({ reach: KEY }))).toBe(
         false,
       );
-      expect(flagsAsked).toEqual([]);
+      expect(accessAsked).toEqual([]);
     });
   });
 });
@@ -295,6 +337,134 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
           projectId: "project-elsewhere",
         }),
       ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+  });
+
+  describe("when an organisation-wide key runs over all projects and the engine fails", () => {
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("names the projects its scope resolved to on the failed-run line", async () => {
+      logged.lines.length = 0;
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: { ...KEY, resolvedProject: undefined },
+          sql: "SELECT count() FROM analytics.traces",
+          projects: "all",
+        }),
+      ).rejects.toBeDefined();
+
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
+      expect(failed).toMatchObject({ projectIds: ["project-a", "project-b"] });
+    });
+  });
+});
+
+const TOKEN: LangWatchQLKeyReach = {
+  kind: "cliAccessToken",
+  userId: "admin-1",
+  organizationId: ORGANIZATION_ID,
+  projectId: "project-a",
+  teamId: "team-project-a",
+};
+
+describe("given a project-bound access token, the hosted MCP's OAuth sign-in", () => {
+  describe("when its person holds analytics:view on the bound project", () => {
+    /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
+    it("opens the reference's LangWatchQL half, judged as the person and never as a key", async () => {
+      const { app, keysAsked, peopleAsked } = await appOver({
+        listed: [project("project-a")],
+        grants: ["analytics:view", "traces:view"],
+      });
+
+      const reference = await app.describeQueryReferenceForKey({ reach: TOKEN });
+
+      expect(reference.lwql.enabled).toBe(true);
+      expect(keysAsked).toEqual([]);
+      expect(new Set(peopleAsked)).toEqual(
+        new Set(["user:admin-1@project-a", `user:admin-1@${ORGANIZATION_ID}`]),
+      );
+    });
+  });
+
+  describe("when its person lacks analytics:view on the bound project", () => {
+    /** @scenario "A project-bound access token runs a LangWatchQL query as its person" */
+    it("closes the reference's LangWatchQL half, as it is closed to that person", async () => {
+      const { app } = await appOver({ listed: [project("project-a")], grants: ["traces:view"] });
+
+      const reference = await app.describeQueryReferenceForKey({ reach: TOKEN });
+
+      expect(reference.lwql.enabled).toBe(false);
+    });
+  });
+
+  describe("when its run names a project other than the bound one", () => {
+    /** @scenario "A project-bound access token reads only the project it is bound to" */
+    it("refuses as not found, though the person can read that project", async () => {
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: TOKEN,
+          sql: "SELECT count() FROM analytics.traces",
+          projectId: "project-b",
+        }),
+      ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+  });
+
+  describe("when it runs over every project it can read and the engine fails", () => {
+    /** @scenario "A project-bound access token reads only the project it is bound to" */
+    it("ran over the bound project alone", async () => {
+      logged.lines.length = 0;
+      const { app, peopleAsked } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: TOKEN,
+          sql: "SELECT count() FROM analytics.traces",
+          projects: "all",
+        }),
+      ).rejects.toBeDefined();
+
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
+      expect(failed).toMatchObject({ projectIds: ["project-a"] });
+      expect(peopleAsked.some((asked) => asked.endsWith("@project-b"))).toBe(false);
+    });
+  });
+});
+
+describe("AnalyticsModule.executeLangWatchQL", () => {
+  describe("when a member's run names projects other than its own and the engine fails", () => {
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("names the projects its scope resolved to on the failed-run line", async () => {
+      logged.lines.length = 0;
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b"), project("project-c")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.executeLangWatchQL({
+          project: { id: "project-a", lwqlKey: "lwql-project-a" },
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: "SELECT count() FROM analytics.traces",
+          projects: ["project-b", "project-c"],
+          userId: "member-1",
+        }),
+      ).rejects.toBeDefined();
+
+      const failed = logged.lines.findLine("warn", "LangWatchQL failed");
+      expect(failed).toMatchObject({ projectIds: ["project-b", "project-c"] });
     });
   });
 });

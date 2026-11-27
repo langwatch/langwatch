@@ -107,6 +107,7 @@ describe("classifyEventLogRowRetention", () => {
       ["ingestion_pull", "lw.obs.ingestion_pull.configured"],
       ["ingestion_pull", "lw.obs.ingestion_pull.disabled"],
       ["trace_project_milestone", "lw.trace.first_trace_recorded"],
+      ["trace_project_milestone", "lw.trace.project_traced"],
       ["evaluation_lifecycle", "lw.evaluation.ran"],
       ["instant_eval_judge_spend", "lw.instant_eval_judge.spend_priced"],
       ["annotation", "lw.annotation.created"],

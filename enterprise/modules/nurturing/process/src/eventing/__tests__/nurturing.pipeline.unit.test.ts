@@ -5,6 +5,7 @@ import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,
   USAGE_REPORT_RECEIVED_EVENT_VERSION,
 } from "@langwatch/enterprise-saas-contract";
+import { SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
@@ -21,6 +22,12 @@ import {
   ONBOARDING_VARIANT_ASSIGNED_EVENT_VERSION,
   type OnboardingVariantAssignedEventData,
 } from "@langwatch/onboarding-contract";
+import {
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
+} from "@langwatch/organization-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -31,6 +38,7 @@ import {
 import {
   USER_AGGREGATE_TYPE,
   USER_DEACTIVATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
   USER_CREATED_EVENT_TYPE,
@@ -46,7 +54,11 @@ import { describe, expect, it, vi } from "vitest";
  */
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
+import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { RecordNurturingSignalCommand } from "../nurturing-signal.commands.ts";
@@ -86,20 +98,30 @@ describe("RecordNurturingSignalCommand", () => {
   });
 });
 
+/** The request URL as a string, whichever shape fetch was handed. */
+function urlOf(input: string | URL | Request): string {
+  return input instanceof Request ? input.url : input.toString();
+}
+
 /** Nurturing's pipeline over memory PostHog and a recording Customer.io, as the app composes it. */
-function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({})) {
+function nurturingOverMemoryPostHog(users: UserApi = peopleWithEmails()) {
   const posthog = MemoryPostHogChannel.create();
   const customerIoFetch = vi.fn(
     async (_url: string | URL | Request, _init?: RequestInit) =>
       new Response(null, { status: 200 }),
   );
   const seen = new Set<string>();
+  const erasedUsers = MemoryNurturingErasedUserRepository.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers,
+    memberFacts: unplacedMemberFacts(),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),
     },
     customerIo: NurturingService.create({
+      users,
       channel: HttpCustomerIoChannel.create({
         config: { customerIoApiKey: "key", customerIoRegion: "us" },
         fetchFn: customerIoFetch,
@@ -109,13 +131,20 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     users,
   });
   const pipeline = buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: (input) => delivery.deliver(input),
-    projectCreated: async () => undefined,
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
+    forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -130,7 +159,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
       await subscriber.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
     }
   };
-  return { posthog, customerIoFetch, subscribers, deliverFact };
+  return { posthog, customerIoFetch, subscribers, deliverFact, erasedUsers };
 }
 
 function userFact(type: string): Event {
@@ -198,7 +227,117 @@ describe("nurturing's userRegistered peer subscriber", () => {
         subscribers
           .filter(({ eventTypes }) => eventTypes.some((type) => type.startsWith("lw.user.")))
           .map(({ eventTypes }) => eventTypes),
-      ).toEqual([[USER_REGISTERED_EVENT_TYPE], [USER_CREATED_EVENT_TYPE]]);
+      ).toEqual([
+        [USER_REGISTERED_EVENT_TYPE],
+        [USER_CREATED_EVENT_TYPE],
+        [USER_ERASED_EVENT_TYPE],
+      ]);
+    });
+  });
+});
+
+/** Organization's fact that user-1 now holds ADMIN in org-1. */
+function memberRoleChangedFact(): Event {
+  return {
+    id: "evt-role-changed",
+    aggregateId: "org-1",
+    aggregateType: "organization",
+    tenantId: createTenantId("org-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+    version: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
+    data: {
+      tenantId: "org-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      occurredAt: 1_000,
+      role: "ADMIN",
+      previousRole: "MEMBER",
+    },
+    idempotencyKey: "org-1:role:user-1:1000",
+  } as Event;
+}
+
+describe("nurturing's memberRoleChanged peer subscriber", () => {
+  describe("when organization records a role change, delivered twice", () => {
+    /** @scenario A redelivered role change is sent once */
+    it("sends one identify with the seat and one group to Customer.io", async () => {
+      const { customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(memberRoleChangedFact());
+      await deliverFact(memberRoleChangedFact());
+      await settle();
+
+      expect(customerIoFetch).toHaveBeenCalledTimes(2);
+      const sent = customerIoFetch.mock.calls.map(([url, init]) => ({
+        path: urlOf(url).replace(/^.*(?=\/(identify|group)$)/, ""),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,
+      }));
+      expect(sent).toContainEqual({
+        path: "/identify",
+        body: expect.objectContaining({
+          userId: "user-1",
+          traits: { seat: "admin", email: "user-1@example.com" },
+        }),
+      });
+      expect(sent).toContainEqual({
+        path: "/group",
+        body: expect.objectContaining({ userId: "user-1", groupId: "org-1" }),
+      });
+    });
+  });
+});
+
+/** Organization's fact that user-1 was admitted to org-1 as a MEMBER. */
+function memberAdmittedFact(): Event {
+  return {
+    id: "evt-admitted",
+    aggregateId: "org-1",
+    aggregateType: "organization",
+    tenantId: createTenantId("org-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+    version: ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION,
+    data: {
+      tenantId: "org-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      occurredAt: 1_000,
+      role: "MEMBER",
+      via: "create_membership",
+    },
+    idempotencyKey: "org-1:member_admitted:user-1:1000",
+  } as Event;
+}
+
+describe("nurturing's memberAdmitted peer subscriber", () => {
+  describe("when organization records an admission, delivered twice", () => {
+    /** @scenario A redelivered admission is sent once */
+    it("sends one identify with the seat and one group to Customer.io", async () => {
+      const { customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(memberAdmittedFact());
+      await deliverFact(memberAdmittedFact());
+      await settle();
+
+      expect(customerIoFetch).toHaveBeenCalledTimes(2);
+      const sent = customerIoFetch.mock.calls.map(([url, init]) => ({
+        path: urlOf(url).replace(/^.*(?=\/(identify|group)$)/, ""),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,
+      }));
+      expect(sent).toContainEqual({
+        path: "/identify",
+        body: expect.objectContaining({
+          userId: "user-1",
+          traits: { seat: "member", email: "user-1@example.com" },
+        }),
+      });
+      expect(sent).toContainEqual({
+        path: "/group",
+        body: expect.objectContaining({ userId: "user-1", groupId: "org-1" }),
+      });
     });
   });
 });
@@ -220,6 +359,8 @@ function createdFact({ backfilled }: { backfilled?: true } = {}): Event {
 /** The person behind user-1, read fresh at delivery and never stored (§9). */
 function jane(): UserApi {
   return createApiFixture<UserApi>({
+    getProfiles: (input) =>
+      peopleWithEmails({ emails: { "user-1": "jane@example.com" } }).getProfiles(input),
     findById: async () => ({
       id: "user-1",
       name: "Jane Doe",
@@ -256,6 +397,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
+          first_name: "Jane",
           createdAt: 1,
         },
       });
@@ -420,7 +562,7 @@ function variantAssignedFact(variant: OnboardingVariantAssignedEventData["varian
 describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
   describe("when onboarding records the guided variant, delivered twice", () => {
     /** @scenario "the variant assignment reaches PostHog once with the person property" */
-    it("tracks exactly one onboarding_variant_assigned and tells Customer.io nothing", async () => {
+    it("tracks exactly one onboarding_variant_assigned and tells Customer.io the variant once", async () => {
       const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
       const fact = variantAssignedFact("guided");
 
@@ -442,7 +584,14 @@ describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
           },
         },
       ]);
-      expect(customerIoFetch).not.toHaveBeenCalled();
+      const bodies = customerIoFetch.mock.calls.map(([, init]) =>
+        typeof init?.body === "string" ? init.body : "",
+      );
+      expect(bodies).toHaveLength(2);
+      for (const body of bodies) {
+        expect(body).toContain('"onboarding_variant":"guided"');
+        expect(body).not.toContain("onboarding_primary_path");
+      }
     });
   });
 
@@ -543,6 +692,18 @@ describe("nurturing's guidedOnboardingTurnFailed peer subscriber", () => {
       });
     });
 
+    /** @scenario "A failed guided turn of an erased user is not tracked" */
+    it("tracks nothing for a user erased before the fact lands", async () => {
+      const { posthog, customerIoFetch, deliverFact, erasedUsers } = nurturingOverMemoryPostHog();
+      await erasedUsers.markErased({ userId: "user-1" });
+
+      await deliverFact(turnFailedFact());
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
+    });
+
     /** @scenario "A redelivered failed-turn fact is tracked once" */
     it("tracks one event for a fact delivered twice, under one uuid per source event", async () => {
       const { posthog, deliverFact } = nurturingOverMemoryPostHog();
@@ -619,10 +780,13 @@ describe("nurturing's usageReportReceived peer subscriber", () => {
     it("sends nothing and claims nothing", async () => {
       const claim = vi.fn(async () => true);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: { claim, release: async () => undefined },
         customerIo: undefined,
         posthog: undefined,
         users: createApiFixture<UserApi>({}),
+        memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
       });
 
       await delivery.deliverUsageReport({
@@ -796,6 +960,50 @@ describe("nurturing's project active day, derived from trace and scenario facts"
           properties: { source: "trace", projectId: "project-1", days_since_signup: 3 },
         },
       ]);
+    });
+  });
+});
+
+describe("nurturing's scenarioRunsThresholdReached peer subscriber", () => {
+  describe("when entitlement records the month's threshold, delivered twice", () => {
+    it("tracks scenario_runs_threshold_reached once for each member", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog(jane());
+      const fact = {
+        ...userFact(SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE),
+        aggregateId: "org-1",
+        tenantId: createTenantId("org-1"),
+        data: {
+          organizationId: "org-1",
+          month: "2026-11",
+          occurredAt: 1_000,
+          runs: 80,
+          maxPerMonth: 100,
+          inGrace: false,
+          graceEndsAt: 500,
+        },
+      } as Event;
+
+      await deliverFact(fact);
+      await deliverFact(fact);
+      await settle();
+
+      const properties = { organizationId: "org-1", runs: 80, limit: 100, month: "2026-11" };
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "scenario_runs_threshold_reached",
+          properties: { ...properties, $groups: { organization: "org-1" } },
+          uuid: expect.any(String),
+          timestamp: expect.anything(),
+        },
+      ]);
+      // The email identify goes out in its own batch first, then the one track.
+      const sent = customerIoFetch.mock.calls.map(([, init]) => {
+        const body = init?.body;
+        return typeof body === "string" ? JSON.parse(body) : body;
+      });
+      expect(JSON.stringify(sent).match(/scenario_runs_threshold_reached/g)).toHaveLength(1);
+      expect(JSON.stringify(sent)).toContain('"runs":80');
     });
   });
 });

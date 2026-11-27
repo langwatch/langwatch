@@ -32,12 +32,13 @@ import {
   SquarePen,
   Waves,
 } from "lucide-react";
-import { Profiler, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Profiler, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   attachedContextToChip,
   type LangyPanelEffect,
   type LangyPanelMode,
+  selectConversationOpenIn,
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
@@ -47,6 +48,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
+import { useLangyImageUpload } from "../../../composer/behavior/use-langy-image-attach.ts";
 import { mergeContextChips } from "../../../context-target/behavior/langy-context-chips.ts";
 import { removeContextChip } from "../../../context-target/behavior/langy-context-target.store.ts";
 import { useLangyContextDropZone } from "../../../context-target/behavior/use-langy-context-drop-zone.ts";
@@ -88,6 +90,7 @@ import {
 import {
   useLangyHistoryError,
   useLangyListError,
+  useReleaseTurnOfLostConversation,
 } from "../../behavior/panel/use-langy-panel-errors.ts";
 import {
   useLangyDevInspector,
@@ -105,6 +108,10 @@ import {
   langyTurnContext,
   useLangyPanelTransport,
 } from "../../behavior/panel/use-langy-panel-transport.ts";
+import {
+  holdQueueForStop,
+  useLangyQueuedFollowUp,
+} from "../../behavior/panel/use-langy-queued-follow-up.ts";
 import {
   useLangyGithubRedrive,
   useLangyOutlivedTurnError,
@@ -154,6 +161,7 @@ import {
   useLangySetupScrollsToTop,
   waitingCardsAnchor,
 } from "./panel/langy-panel-view.tsx";
+import { LangyQueuedMessages } from "./panel/langy-queued-messages.tsx";
 import {
   useLangyCodeAccessReAsk,
   useLangyProposalApply,
@@ -234,7 +242,7 @@ function LangyPanel({
   const isOpen = useLangyStore((s) => s.isOpen);
   const closePanel = useLangyStore((s) => s.closePanel);
   const pickModel = useLangyStore((s) => s.pickModel);
-  const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const activeConversationId = useLangyStore((s) => selectConversationOpenIn(s, projectId));
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
   const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
   const guidedTourRunning = useGuidedTour().useRunning();
@@ -263,6 +271,7 @@ function LangyPanel({
     floating,
     reduceMotion,
     drawerEdgeHeld: placement.drawerEdgeHeld,
+    floatingWidthPx: placement.floatingPanelWidth,
   });
 
   useEffect(() => {
@@ -276,7 +285,9 @@ function LangyPanel({
   });
   const model = useLangyComposerModel({ projectId });
   const makeDefault = useLangyMakeDefault({ resolvedDefault: model.resolvedDefault });
+  const uploadImage = useLangyImageUpload();
   const engine = useLangyChatEngine({ transport });
+  refs.sendStrandedRef.current = () => engine.applyHistoryToEngine([]);
   const isBusy = engine.status === "submitted" || engine.status === "streaming";
   useLangyWarmWorker({
     projectId,
@@ -398,6 +409,10 @@ function LangyPanel({
     retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
   });
+  useReleaseTurnOfLostConversation({
+    errorKinds: [failure.turnError?.kind, historyError.presentation?.kind],
+    stopEngine: engine.stop,
+  });
   useLangyOutlivedTurnError({
     error: engine.error,
     transcriptMessages: history.messages,
@@ -415,6 +430,22 @@ function LangyPanel({
     sendMessage: engine.sendMessage,
     restoreDraftOnFailure,
   });
+  const queue = useLangyQueuedFollowUp({
+    projectId,
+    isBusy,
+    failed: !!failure.turnError,
+    recovering: failure.recovery.isRecovering || failure.recovery.willAutoRecover,
+    send,
+  });
+  const stopTurn = () => {
+    holdQueueForStop();
+    handleStop();
+  };
+  // Stable like `send`: only what the member types or picks here counts as a question asked.
+  const sendFromComposer = useCallback(
+    (text: string) => void send(text, { askedFrom: "composer" }),
+    [send],
+  );
   const navigation = useLangyConversationNavigation({
     projectId,
     isBusy,
@@ -547,13 +578,9 @@ function LangyPanel({
         />
       }
       queuedPrompt={live ? pendingPrompt : null}
-      workingLine={
-        <LangyTurnWorkingLineSlot
-          view={view}
-          activity={activity}
-          waits={waits}
-          hasInlineProgressOwner={hasInlineProgressOwner}
-        />
+      workingLine={null}
+      queuedMessages={
+        <LangyQueuedMessages live={live} paused={queue.paused} onSendNow={queue.sendNow} />
       }
     />
   );
@@ -568,6 +595,7 @@ function LangyPanel({
           floating={floating}
           dockShellClaimed={dockShellClaimed}
           panelHeightPx={inspector.panelHeightPx}
+          panelWidthPx={placement.panelWidthPx}
         />
         <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
         <LangyMakeDefaultDialog
@@ -692,9 +720,10 @@ function LangyPanel({
                           closePanel();
                         },
                         empty: {
-                          panelWidth: placement.floatingPanelWidth,
+                          panelWidth: placement.panelWidthPx,
                           suggestions: emptySuggestions,
-                          onPick: (prompt) => void send(prompt),
+                          // A picked suggestion is the member's question, asked from the composer.
+                          onPick: sendFromComposer,
                         },
                       })}
                       transcript={transcript}
@@ -705,16 +734,30 @@ function LangyPanel({
                         failure={failure}
                         organizationId={organizationId}
                         onGithubConnected={onGithubConnected}
+                        onShareLocalFolder={askCodeAccessAgain}
                       />
                     )}
                   </LangyConversationScroller>
                   {activity.pinnedPlan && (
                     <LangyPinnedPlan floating={floating} plan={activity.pinnedPlan} />
                   )}
+                  <LangyTurnWorkingLineSlot
+                    floating={floating}
+                    view={view}
+                    activity={activity}
+                    waits={waits}
+                    hasInlineProgressOwner={hasInlineProgressOwner}
+                    onStop={stopTurn}
+                  />
                   <LangyComposerNotice
                     floating={floating}
                     presentation={failure.turnError}
                     onDismiss={engine.clearError}
+                  />
+                  <LangyComposerNotice
+                    floating={floating}
+                    presentation={model.unservedDefaultNotice}
+                    onDismiss={model.dismissUnservedDefault}
                   />
                   {view.timeTravel && (
                     <LangyTimeTravelVeil floating={floating} atMs={view.timeTravel.atMs} />
@@ -731,8 +774,7 @@ function LangyPanel({
                         pickModel(picked);
                         makeDefault.offer(picked);
                       }}
-                      onSend={send}
-                      onStop={handleStop}
+                      onSend={sendFromComposer}
                       variant={floating ? "floating" : "sidebar"}
                       disabled={!projectId}
                       contextChips={allContextChips}
@@ -741,6 +783,7 @@ function LangyPanel({
                       onAddChip={chooseChip}
                       awaitingAnswer={waits.awaitingAnswer}
                       terminalConnected={waits.terminalConnected}
+                      uploadImage={uploadImage}
                     />
                   </LangyComposerSlot>
                 </>

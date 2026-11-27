@@ -8,4 +8,6 @@ export class NoopCodingAgentReadMetricsService implements CodingAgentReadMetrics
   private constructor() {}
 
   observeSessionListRead(): void {}
+
+  countSessionIdIndexNotReady(): void {}
 }

@@ -69,3 +69,12 @@ Feature: Group-queue metrics name the pipeline and job behind a stuck or refused
     Then one warning says the tenant started being parked, with its parked group count
     And one info line says it stopped being parked
     And no line is written per parked group
+
+  # gq_group_staging_depth_max cannot name its group (aggregate keys never become
+  # label values), so the deepest group is named in a rate-limited log line instead.
+  @unit
+  Scenario: The deepest staged group over the reporting floor is named in a warning
+    Given a staging-depth rotation whose deepest group is over the reporting floor
+    When the rotation ends
+    Then one warning names that group, its tenant, its depth and whether it is blocked
+    And the next rotation inside the rate limit names it no further

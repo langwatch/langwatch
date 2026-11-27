@@ -12,6 +12,7 @@ import {
   scanLangWatchQLChartValues,
 } from "@langwatch/analytics-contract/visualization";
 import type {
+  LangWatchQLChartCrashContext,
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
   VegaLiteValidationResult,
@@ -46,6 +47,7 @@ export function useLangWatchQLChartModel({
   themeConfig,
   pinnedConfig,
   colorMode,
+  crashContext,
 }: {
   spec: unknown;
   datasets: Readonly<Record<string, LangWatchQLDataset>>;
@@ -53,6 +55,8 @@ export function useLangWatchQLChartModel({
   themeConfig: LangWatchQLVegaConfig;
   pinnedConfig: LangWatchQLVegaConfig;
   colorMode: LangWatchQLVegaColorMode;
+  /** The board and widget a failure to draw is reported with. */
+  crashContext?: LangWatchQLChartCrashContext;
 }): LangWatchQLChartModel {
   // Keyed on the row counts rather than `datasets` itself: a data-only
   // reload produces a new `datasets` object on every render, and keying on
@@ -110,6 +114,7 @@ export function useLangWatchQLChartModel({
     pinnedConfig,
     colorMode,
     enabled: isDrawable,
+    crashContext,
   });
 
   const failures = collectFailures({

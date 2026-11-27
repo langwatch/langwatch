@@ -14,6 +14,10 @@ const experimentRunEventingTargetSchemaDefinition = z.object({
   promptId: z.string().nullable().optional(),
   promptVersion: z.number().nullable().optional(),
   agentId: z.string().nullable().optional(),
+  /** The deploy label an agent target ran at, such as production; absent ran the latest. */
+  agentLabel: z.string().nullable().optional(),
+  /** The agent version the run resolved: the label's version when the run started. */
+  agentVersion: z.number().int().positive().nullable().optional(),
   evaluatorId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   metadata: z

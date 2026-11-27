@@ -35,6 +35,7 @@ export class PrismaScopeGraphRepository
         presenceEnabled: true,
         pricingModel: true,
         ssoProvider: true,
+        createdAt: true,
         members: { where: { userId }, select: { role: true } },
         teams: {
           where: { archivedAt: null },

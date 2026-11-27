@@ -35,6 +35,17 @@ describe("coding-assistant toggles", () => {
     });
   });
 
+  describe("when an admin picks Grok", () => {
+    it("locks the virtual key off, as the server's tile policy does", () => {
+      expect(lockedToggles("grok")).toEqual({ allowVk: false });
+      expect(togglesOnKindChange({ from: "codex", to: "grok" })).toEqual({ allowVk: false });
+    });
+
+    it("switches the virtual key back on when the tile moves off Grok", () => {
+      expect(togglesOnKindChange({ from: "grok", to: "codex" })).toEqual({ allowVk: true });
+    });
+  });
+
   describe("when an admin picks Cursor", () => {
     it("locks direct OTLP off and leaves the bundled plan alone", () => {
       expect(togglesOnKindChange({ from: "codex", to: "cursor" })).toEqual({

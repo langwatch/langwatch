@@ -4,15 +4,20 @@ import type { OrganizationRepositories } from "../organization.repositories.ts";
 import { PrivateClickHouseRoutesRepository } from "../private-clickhouse-routes.repository.ts";
 import { PrivateS3AccountsRepository } from "../private-s3-accounts.repository.ts";
 import { MemoryGroupRepository } from "./memory.group.repository.ts";
+import { MemoryOrganizationAccessNoticeRepository } from "./memory.organization-access-notice.repository.ts";
+import { MemoryOrganizationDeparturesRepository } from "./memory.organization-departures.repository.ts";
 import { MemoryOrganizationInviteRateLimitRepository } from "./memory.organization-invite-rate-limit.repository.ts";
 import { MemoryOrganizationInviteRepository } from "./memory.organization-invite.repository.ts";
 import { MemoryOrganizationMembershipRepository } from "./memory.organization-membership.repository.ts";
+import { MemoryOrganizationSeatPeakRepository } from "./memory.organization-seat-peak.repository.ts";
 import { MemoryOrganizationSeatRepository } from "./memory.organization-seat.repository.ts";
 import { MemoryOrganizationUserDirectoryRepository } from "./memory.organization-user-directory.repository.ts";
 import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "./memory.organization.repository.ts";
 import { MemoryPersonalTeamScopeRepository } from "./memory.personal-team-scope.repository.ts";
 import { MemoryScopeGraphRepository } from "./memory.scope-graph.repository.ts";
+import { MemorySeatHoldRepository } from "./memory.seat-hold.repository.ts";
+import { MemorySeatRequestRepository } from "./memory.seat-request.repository.ts";
 import { MemorySignUpPolicyRepository } from "./memory.sign-up-policy.repository.ts";
 import { MemoryTeamRepository } from "./memory.team.repository.ts";
 
@@ -44,9 +49,14 @@ export function memoryOrganizationRepositories({
     inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
     invite: MemoryOrganizationInviteRepository.create({ memory }),
     seats: MemoryOrganizationSeatRepository.create({ memory }),
+    departures: MemoryOrganizationDeparturesRepository.create({ memory }),
+    seatPeak: MemoryOrganizationSeatPeakRepository.create(),
     userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
     privateClickHouseRoutes: new MemoryPrivateClickHouseRoutesRepository(),
     privateS3Accounts: new MemoryPrivateS3AccountsRepository(),
+    seatHolds: MemorySeatHoldRepository.create({ memory }),
+    seatRequests: MemorySeatRequestRepository.create(),
+    accessNotices: MemoryOrganizationAccessNoticeRepository.create(),
   };
 }
 

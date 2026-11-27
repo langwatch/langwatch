@@ -173,12 +173,7 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
         };
       }
       case "bedrock": {
-        return {
-          access_key: pick("AWS_ACCESS_KEY_ID"),
-          secret_key: pick("AWS_SECRET_ACCESS_KEY"),
-          session_token: pick("AWS_SESSION_TOKEN"),
-          region: pick("AWS_REGION_NAME") || pick("AWS_REGION"),
-        };
+        return bedrockCredentials(pick);
       }
       case "vertex_ai":
       case "vertex": {
@@ -222,6 +217,18 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
       }
     }
   }
+}
+
+/** A managed row's private endpoint rides the Bedrock field; a hosted gateway refuses base_url. */
+function bedrockCredentials(pick: (k: string) => string): Record<string, unknown> {
+  const runtimeEndpoint = pick("AWS_BEDROCK_RUNTIME_ENDPOINT");
+  return {
+    access_key: pick("AWS_ACCESS_KEY_ID"),
+    secret_key: pick("AWS_SECRET_ACCESS_KEY"),
+    session_token: pick("AWS_SESSION_TOKEN"),
+    region: pick("AWS_REGION_NAME") || pick("AWS_REGION"),
+    ...(runtimeEndpoint ? { bedrock_runtime_endpoint: runtimeEndpoint } : {}),
+  };
 }
 
 // Maps ModelProvider.customKeys (UPPER_SNAKE_CASE, from the LiteLLM

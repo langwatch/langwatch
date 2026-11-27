@@ -83,6 +83,9 @@ export type ApiKeyFailureNotice = {
 // (SDK key, .env).
 export type CliCredentialType = "device_session" | "project_api_key";
 
+/** A known app that connects a project through the device flow. */
+export type CliDeviceClient = "laze";
+
 // Device code lookup result: four cases (pending, expired, unknown, failed) not one nullable;
 // screen needs different messages for each.
 export type CliDeviceCodeLookup =
@@ -94,8 +97,10 @@ export type CliDeviceCodeLookup =
       credentialType: CliCredentialType;
       /** Whether the CLI asked for management access (`langwatch login --management`). */
       management: boolean;
+      /** The known app connecting a project, named on the page; null for the CLI. */
+      client: CliDeviceClient | null;
     }
-  | { outcome: "expired" }
+  | { outcome: "expired"; client: CliDeviceClient | null }
   | { outcome: "unknown" }
   | { outcome: "failed"; message: string };
 

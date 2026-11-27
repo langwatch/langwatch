@@ -68,6 +68,10 @@ export class MemoryDataRetentionRepository implements DataRetentionRepository {
       .map((row) => structuredClone(row));
   }
 
+  async findOrganizationIdsWithRules(): Promise<string[]> {
+    return [...new Set(this.#rows.map((row) => row.organizationId))].toSorted();
+  }
+
   async upsertForScope(input: {
     organizationId: string;
     scope: ScopeAssignment;

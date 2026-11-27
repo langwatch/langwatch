@@ -175,7 +175,7 @@ function expectCountedTab({ label, count }: { label: string; count?: number }) {
   expect(tab.textContent).toBe(written);
 }
 
-const ADMIN = new Set(["organization:manage", "sso:view"]);
+const ADMIN = new Set(["organization:manage", "members:view", "sso:view"]);
 const GOVERNANCE_READER = new Set([...ADMIN, "governance:view"]);
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
 
@@ -219,7 +219,7 @@ describe("the directory page", () => {
     it("opens the people tab, listing members and invitations together", () => {
       renderDirectory();
 
-      expect(screen.getByRole("heading", { name: "Directory" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Users" })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /People/ })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByText("Sam")).toBeInTheDocument();
       expect(screen.getByTestId("people-cuts")).toHaveTextContent("Everybody");
@@ -419,11 +419,25 @@ describe("the directory page", () => {
   });
 
   describe("when the reader may see single sign-on only", () => {
+    /** @scenario A reader without the directory view is told which permission it takes */
     it("says which permission the page takes, and draws no tab", () => {
       renderDirectory({ grants: new Set(["sso:view"]) });
 
-      expect(screen.getByText(/organization:manage/)).toBeInTheDocument();
+      expect(screen.getByText(/members:view/)).toBeInTheDocument();
       expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a member who cannot manage the organization opens it", () => {
+    /** @scenario A member who cannot manage the organization reads only the people */
+    it("offers the people tab alone and no invite", () => {
+      renderDirectory({ grants: new Set(["members:view", "organization:view"]) });
+
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs).toHaveLength(1);
+      expect(tabs[0]?.textContent).toMatch(/^People/);
+      expect(screen.queryByRole("button", { name: /Invite people/ })).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("member-row").length).toBeGreaterThan(0);
     });
   });
 });

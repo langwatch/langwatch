@@ -15,6 +15,7 @@ function collect(options: {
   recordFails?: boolean;
   contributionFails?: boolean;
   truncated?: boolean;
+  outputDeclared?: boolean;
 }) {
   const recorded: CanonicalLogRecord[][] = [];
   const contributed: LogTraceContribution[][] = [];
@@ -32,7 +33,8 @@ function collect(options: {
     }),
     extractLogRecordIO: () => ({
       input: "prompt",
-      output: null,
+      output: options.outputDeclared ? "posted reply" : null,
+      outputDeclared: options.outputDeclared ?? false,
       truncated: options.truncated ?? false,
     }),
     recordLogContributions: async (data) => {
@@ -108,6 +110,69 @@ describe("LogRequestCollectionService", () => {
       expect(contributed[0]?.[0]?.liftedAttributes["langwatch.reserved.log_io_truncated"]).toBe(
         true,
       );
+    });
+
+    /** @scenario A declared output is kept over the agent's later closing text */
+    it("carries a declared output to Trace as declared", async () => {
+      const { result, contributed } = collect({
+        accepted: [preparedLog({})],
+        outputDeclared: true,
+      });
+
+      await result;
+      expect(contributed[0]?.[0]).toMatchObject({ output: "posted reply", outputDeclared: true });
+    });
+  });
+
+  // A logs-only agent's trace has no span to name its service, so the drawer would hide Terminal.
+  describe("given a coding agent's log correlated to a trace", () => {
+    it("names the agent's service on the contribution", async () => {
+      const { result, contributed } = collect({
+        accepted: [
+          preparedLog({ providerKind: "grok", resourceAttributes: { "service.name": "grok-cli" } }),
+        ],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes["service.name"]).toBe("grok-cli");
+    });
+
+    it("leaves an application log's service to its spans", async () => {
+      const { result, contributed } = collect({
+        accepted: [
+          preparedLog({
+            providerKind: "generic",
+            resourceAttributes: { "service.name": "checkout" },
+          }),
+        ],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes).not.toHaveProperty("service.name");
+    });
+  });
+
+  describe("given a log-only coding agent's record, its origin stamped by the receiver", () => {
+    /** @scenario "A Grok trace's origin is Coding Agent" */
+    it("carries the resource's origin to the trace, which has no span to carry it", async () => {
+      const { result, contributed } = collect({
+        accepted: [
+          preparedLog({
+            correlationSource: "grok_synthesized",
+            resourceAttributes: { "service.name": "grok-cli", "langwatch.origin": "coding_agent" },
+          }),
+        ],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes["langwatch.origin"]).toBe("coding_agent");
+    });
+
+    it("adds no origin when the resource names none", async () => {
+      const { result, contributed } = collect({ accepted: [preparedLog({})] });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes).not.toHaveProperty("langwatch.origin");
     });
   });
 

@@ -42,6 +42,14 @@ Feature: The CLI reads the way an agent expects
       Then the CLI refuses the expression and names the field
 
     @unit
+    Scenario: Iterating a value that is not a list says what the value is and where a list is
+      Given a result whose "data" field is an object with a key that holds a list
+      When the caller filters it with ".data[]"
+      Then the CLI names the object's keys, names only and never values
+      And it suggests the path to the key that holds a list
+      And it points to real jq in the shell
+
+    @unit
     Scenario: A pipe into a path reads the same as writing the path inline
       Given a result that holds a list of projects
       When the caller filters it with ".data[] | .slug"

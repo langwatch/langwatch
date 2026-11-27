@@ -10,7 +10,7 @@ import json
 from random import random
 from typing import Iterable, TypeVar, Optional
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from langevals_topic_clustering.types import Money, Trace
 
@@ -18,15 +18,30 @@ from langevals_topic_clustering.utils import (
     generate_embeddings,
 )
 from langevals_topic_clustering._logger import get_logger
+from langevals_topic_clustering.refusals import is_auth_refusal
 
 T = TypeVar("T")
+
+# A missing or refused key fails every retry and every batch the same way.
+_retry_unless_refused = retry_if_exception(
+    lambda error: isinstance(error, Exception) and not is_auth_refusal(error)
+)
 
 logger = get_logger("topic_clustering.naming")
 
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
+def cost_of(response) -> float:
+    """A model litellm cannot price costs nothing here, so its names are kept."""
+    try:
+        return completion_cost(response) or 0.0
+    except Exception as e:
+        logger.warning("Could not price the naming call, counting it as zero", error=str(e))
+        return 0.0
+
+
+@retry(retry=_retry_unless_refused, wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def generate_topic_names(
     litellm_params: dict[str, str],
     topic_examples: list[list[str]],
@@ -100,7 +115,7 @@ def generate_topic_names(
             f"Failed to generate topic names for {len(topic_examples)} topics: {e}\n\nExisting: {existing_str}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
         )
 
-    total_cost = completion_cost(response)
+    total_cost = cost_of(response)
     topic_names_dict = json.loads(
         response.choices[0].message.tool_calls[0].function.arguments  # type: ignore
     )
@@ -158,6 +173,8 @@ def generate_topic_names_split(
                 cost["amount"] += cost_["amount"]
                 results += result
             except Exception as e:
+                if is_auth_refusal(e):
+                    raise
                 logger.error("Failed to generate topic names for batch", batch_size=len(batch), error=str(e))
                 results += [None] * len(batch)
             batch = []
@@ -168,13 +185,15 @@ def generate_topic_names_split(
             cost["amount"] += cost_["amount"]
             results += result
         except Exception as e:
+            if is_auth_refusal(e):
+                raise
             logger.error("Failed to generate topic names for final batch", batch_size=len(batch), error=str(e))
             results += [None] * len(batch)
 
     return results, cost
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(2), reraise=True)
+@retry(retry=_retry_unless_refused, wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(2), reraise=True)
 def generate_topic_names_split_and_improve_similar_names(
     litellm_params: dict[str, str],
     embeddings_litellm_params: dict[str, str],
@@ -339,7 +358,7 @@ def improve_name_between_two_topics(
             f"Failed to improve names between {topic_a_name} and {topic_b_name}: {e}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
         )
 
-    total_cost = completion_cost(response)
+    total_cost = cost_of(response)
 
     arguments = json.loads(response.choices[0].message.tool_calls[0].function.arguments)  # type: ignore
     new_topic_a_name = arguments["topic_a"]

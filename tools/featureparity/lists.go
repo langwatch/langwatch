@@ -58,6 +58,7 @@ var (
 		"tools/thuishaven",
 		"tools/herrgen",
 		"tools/ciguard",
+		"tools/waitforchecks",
 		"tools/deployimpact",
 		"tools/operatornotes",
 		"tools/cachesweep",
@@ -68,8 +69,11 @@ var (
 		"tools/ecrtag",
 		"tools/docsdeploy",
 		"tools/chartheap",
+		"tools/charts3region",
+		"tools/newestimage",
 		"tools/suiteweights",
 		"tools/matrixseed",
+		"cmd/matrixseed",
 		"cmd/linkcheck",
 		"tools/docscheck",
 		"cmd/service",
@@ -151,7 +155,6 @@ var (
 		"specs/ai-gateway/wrapper-e2e/gemini.feature",
 		"specs/ai-gateway/wrapper-e2e/opencode.feature",
 		"specs/ai-governance/cli-wrappers/request-increase.feature",
-		"specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
 		"specs/ai-governance/dogfood-seed/scope-runner.feature",
 		"specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
 		"specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
@@ -243,7 +246,6 @@ var (
 		"specs/features/trigger-cli.feature",
 		"specs/features/workflow-cli.feature",
 		"specs/home/onboarding-progress-ui.feature",
-		"specs/home/voice-agents-home-banner.feature",
 		"specs/identity/one-decision-per-write.feature",
 		"specs/identity/org-admin-identity-surface.feature",
 		"specs/langy/langy-agent-service-conventions.feature",
@@ -253,7 +255,6 @@ var (
 		"specs/langy/langy-empty-state-suggestions.feature",
 		"specs/langy/langy-panel-fold-motion.feature",
 		"specs/langy/langy-selfhost-install.feature",
-		"specs/langy/langy-session-key-lifecycle.feature",
 		"specs/langy/langy-shutdown-handoff.feature",
 		"specs/langy/langy-workbench-sidebar.feature",
 		"specs/langy/langy-worker-isolation.feature",
@@ -271,7 +272,6 @@ var (
 		"specs/model-config/anthropic-empty-content.feature",
 		"specs/model-config/litellm-reasoning-params.feature",
 		"specs/model-config/model-parameter-display.feature",
-		"specs/model-config/model-selector-ux.feature",
 		"specs/model-config/unified-reasoning-ui.feature",
 		"specs/model-providers/custom-model-max-tokens.feature",
 		"specs/model-providers/default-provider.feature",
@@ -284,7 +284,6 @@ var (
 		"specs/monitors/workflow-evaluator-checktype.feature",
 		"specs/monitors/workflow-evaluator-mappings.feature",
 		"specs/nlp-go/dataset-block.feature",
-		"specs/nlp-go/http-block.feature",
 		"specs/nlp-go/proxy.feature",
 		"specs/nlp-go/python-removal.feature",
 		"specs/nlp-go/remove-execute-evaluation.feature",
@@ -394,6 +393,10 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		// Reason: left legacyInert when the not-found scenarios were bound: a tool
+		// that cannot start exits 127 with a docs link and no setup written. The
+		// login, env and routing scenarios stay untagged.
+		"specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
 		// Reason: left legacyInert when evaluator get gained name resolution; its
 		// scenarios are enforced. The other CLI scenarios stay untagged.
 		"specs/evaluators/evaluator-cli.feature",
@@ -403,6 +406,10 @@ var (
 		"specs/langy/langy-peek-dock.feature",
 		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/metrics.feature",
+		// Reason: left legacyInert when the blank-key refusal and the worker age
+		// cap were bound to Go tests. The older mint and revoke scenarios describe
+		// what the control plane does and stay untagged.
+		"specs/langy/langy-session-key-lifecycle.feature",
 		"specs/features/analytics-cli.feature",
 		"specs/traces-v2/trace-drawer-shell.feature",
 		"sdks/typescript/specs/cli/daemon.feature",

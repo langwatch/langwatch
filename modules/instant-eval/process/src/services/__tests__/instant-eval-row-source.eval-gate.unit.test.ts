@@ -30,6 +30,7 @@ function passFor({
 }) {
   const asked: LangWatchQLPassInput[] = [];
   const access = InstantEvalAccessService.create({
+    hostedSwitch: { isHostedOff: () => Promise.resolve(false) },
     flags: { isEnabled: () => Promise.resolve(flag) },
     projects: { findOrganizationId: () => Promise.resolve("organization-1") },
     judgesThroughConnect,

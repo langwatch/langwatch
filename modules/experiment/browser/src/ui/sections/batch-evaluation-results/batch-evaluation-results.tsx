@@ -97,6 +97,9 @@ const sidebarRunsOf = (runs: BatchRunSummary[] | undefined): BatchRunSummary[] =
     timestamps: run.timestamps,
     progress: run.progress,
     total: run.total,
+    concurrency: run.concurrency,
+    repeat: run.repeat,
+    targets: run.targets,
     summary: {
       datasetCost: run.summary.datasetCost,
       evaluationsCost: run.summary.evaluationsCost,
@@ -469,7 +472,15 @@ export function BatchEvaluationResults({
   }
 
   return (
-    <HStack align="stretch" width="full" height="full" gap={0} overflow="hidden">
+    <HStack
+      align="stretch"
+      width="full"
+      height="full"
+      flex={1}
+      minHeight={0}
+      gap={0}
+      overflow="hidden"
+    >
       {/* Sidebar - fixed width, doesn't shrink */}
       <Box flexShrink={0}>
         <BatchRunsSidebar
@@ -495,6 +506,8 @@ export function BatchEvaluationResults({
           project={project}
           experiment={experiment}
           shownRunId={sidebarSelectedRun?.runId}
+          shownRunConcurrency={sidebarSelectedRun?.concurrency}
+          shownRunRepeat={sidebarSelectedRun?.repeat}
           data={transformedData}
           charts={{ available: canShowCharts, visible: chartsVisible, onChange: setChartsVisible }}
           displayControls={

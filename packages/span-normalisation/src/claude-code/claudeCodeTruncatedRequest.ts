@@ -1,5 +1,9 @@
 import { isRecord } from "../canonicalGuard.ts";
-import { contentToText, buildToolDefinitionsMessage } from "./claudeCodeContent.ts";
+import {
+  buildToolDefinitionsMessage,
+  contentToText,
+  requestMessageRole,
+} from "./claudeCodeContent.ts";
 
 /** claude appends this marker where it cut an oversized inline body. */
 const CLAUDE_TRUNCATION_MARKER = /\s*\[TRUNCATED - [^\]]*\]\s*$/;
@@ -138,7 +142,7 @@ export class ClaudeCodeTruncatedRequestService {
         continue;
       }
 
-      out.push({ role: typeof role === "string" ? role : "user", content: text });
+      out.push({ role: requestMessageRole({ role, content }), content: text });
     }
 
     return out;

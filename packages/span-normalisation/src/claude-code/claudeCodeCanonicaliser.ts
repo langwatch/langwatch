@@ -7,6 +7,7 @@ import {
 } from "../canonicalAttributes.ts";
 import { markInputAsFresh } from "../canonicalExtraction.ts";
 import { asNumber } from "../canonicalGuard.ts";
+import { asSessionKey, readDeclaredSessionKey } from "../langwatch/langwatchIdentity.ts";
 import { ClaudeCodeResponseService } from "./claudeCodeResponse.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
@@ -17,6 +18,7 @@ export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
 
 /** One tool call; its `.execution` and `.blocked_on_user` children are phases of it, not tools. */
 const CLAUDE_CODE_TOOL_SPAN_NAME = "claude_code.tool";
+const CLAUDE_CODE_SPAN_PREFIX = "claude_code.";
 
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -31,6 +33,7 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   readonly id = "claude-code";
 
   apply(ctx: ExtractorContext): void {
+    if (ctx.span.name.startsWith(CLAUDE_CODE_SPAN_PREFIX)) this.keySession(ctx);
     if (ctx.span.name === CLAUDE_CODE_TOOL_SPAN_NAME) {
       ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule("claude-code/tool");
@@ -167,18 +170,59 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     }
   }
 
+  /**
+   * The conversation is the agent's session: a launcher's `langwatch.session.id` (span, then
+   * resource), else Claude Code's own `session.id`. A conversation it displaces, such as a
+   * launcher's thread, moves to `langwatch.thread.id`; one equal to the session is already kept.
+   */
+  private keySession(ctx: ExtractorContext): void {
+    const session =
+      readDeclaredSessionKey({
+        attributes: ctx.bag.attrs,
+        resourceAttributes: ctx.span.resourceAttributes,
+      }) ?? asSessionKey(ctx.bag.attrs.get("session.id"));
+    const conversation =
+      asString(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]) ??
+      asString(takeAttribute(ctx.bag.attrs, ATTR_KEYS.GEN_AI_CONVERSATION_ID));
+    if (session === null || session === conversation) {
+      if (conversation !== null)
+        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversation);
+      return;
+    }
+    if (conversation !== null) ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, conversation);
+    ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, session);
+    ctx.recordRule("claude-code/session");
+  }
+
   private liftUserPrompt(ctx: LogExtractorContext): void {
     const prompt = asString(takeAttribute(ctx.bag.attrs, "prompt"));
     const sessionId = asString(ctx.bag.attrs.get("session.id"));
 
+    // A launcher that wraps the request declares the request itself; that one is the input.
+    const declared =
+      asString(ctx.out["langwatch.input"]) ?? asString(ctx.bag.attrs.get("langwatch.input"));
+
     let fired = false;
-    if (prompt !== null) {
-      ctx.setAttr("langwatch.input", prompt);
+    if (declared !== null || prompt !== null) {
+      ctx.setAttr("langwatch.input", declared ?? prompt);
       fired = true;
     }
 
-    if (sessionId !== null) {
-      ctx.setAttrIfAbsent("langwatch.thread.id", sessionId);
+    // The record's thread is the agent's session, as a span's conversation is (keySession).
+    // A launcher's declared session wins over any thread the record named itself.
+    const declaredSession = readDeclaredSessionKey({
+      attributes: ctx.bag.attrs,
+      resourceAttributes: ctx.resourceAttributes,
+    });
+    // A subagent span without a session names the subagent as its conversation;
+    // the prompt names the session.
+    if (declaredSession !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, declaredSession);
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, declaredSession);
+      fired = true;
+    } else if (sessionId !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId);
       fired = true;
     }
 

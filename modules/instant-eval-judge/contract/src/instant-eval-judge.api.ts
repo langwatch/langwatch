@@ -12,6 +12,10 @@ import type {
   InstantEvalJudgeRouteRequest,
   InstantEvalJudgeRouting,
 } from "./instant-eval-judge-route.ts";
+import type {
+  InstantEvalScenarioJudgeAnswer,
+  InstantEvalScenarioJudgeCall,
+} from "./instant-eval-scenario-judge.ts";
 
 /**
  * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
@@ -36,15 +40,26 @@ export interface InstantEvalJudgeApi {
    */
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
   /**
+   * One metered scenario judge call, on LangWatch Cloud only: each criterion is routed alone as a
+   * `scenario_judge` question and the call is recorded as one priced fact. A refusal or an
+   * unavailable judge is returned, never thrown, and a verdict is never made up.
+   */
+  judgeScenario(input: InstantEvalScenarioJudgeCall): Promise<InstantEvalScenarioJudgeAnswer>;
+  /**
+   * Whether this install's route table can answer a scenario judge: it names a turn decision
+   * backend an enabled LLM backend can take. A run is refused before it starts where not.
+   */
+  isScenarioJudgeConfigured(): Promise<boolean>;
+  /**
    * Prices and records what an Instant Evals run or judged query spent, under the organization
    * the caller resolved, so no project is looked up (ADR-174 decision 13). Throws when the priced
    * fact cannot be stored, so a run's finish retries onto the same request id.
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
   /**
-   * The rates a judged query's budget hold is priced at: the dearest base input rate a routed call
-   * could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query
-   * re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
+   * An unrouted judged query's hold rates: the dearest base input rate a search or LLM-judge route
+   * could reach (a scenario-only backend is left out), never below the classifier's (ADR-190 d7).
+   * A routed query is held at its cost ceiling instead (ADR-190 d13).
    */
   queryHoldPricing(): Promise<InstantEvalPricing>;
   /**
@@ -57,12 +72,17 @@ export interface InstantEvalJudgeApi {
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
 
 /** The request shapes an own decision model speaks, one channel each (ADR-182 decision 8). */
-export const INSTANT_EVAL_DECISION_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+export const INSTANT_EVAL_DECISION_WIRES = [
+  "openai_decisions",
+  "jev",
+  "cloudflare_jev",
+  "gemini_decisions",
+] as const;
 
 export type InstantEvalDecisionWire = (typeof INSTANT_EVAL_DECISION_WIRES)[number];
 
-/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
-export type InstantEvalDecisionAuthHeader = "bearer" | "api_key";
+/** How the key travels: `Authorization: Bearer`, Azure's `api-key` or Google's `x-goog-api-key`. */
+export type InstantEvalDecisionAuthHeader = "bearer" | "api_key" | "goog_api_key";
 
 /**
  * An organization's own decision model, resolved by the caller from Default models. The judge
@@ -116,10 +136,48 @@ export interface InstantEvalClassification {
   readonly decisionModel?: InstantEvalOwnDecisionModel;
   /** Present when the call is routed; absent, the hosted classifier answers alone, as before. */
   readonly route?: InstantEvalJudgeRouteRequest;
+  /** A routed call's spend cap, shared by every call of one judged query (ADR-190 decision 13). */
+  readonly costCeiling?: InstantEvalJudgeCostCeiling;
 }
 
-/** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
+/**
+ * What a routed judged query may still spend, in our cost. Each send holds its worst case first
+ * and is not sent when that would pass the ceiling, so the query never spends past it.
+ */
+export interface InstantEvalJudgeCostCeiling {
+  /**
+   * Holds a send's worst-case cost, waiting for sends in flight to settle when it fits only then;
+   * false, and nothing is held, when it cannot fit even with nothing held. Rejects on the stop.
+   */
+  hold(nanoUsd: number, signal?: AbortSignal): Promise<boolean>;
+  /** Swaps a send's hold for what it cost: what it billed, or its whole hold with no usage read. */
+  settle(input: { heldNanoUsd: number; costNanoUsd: number }): void;
+}
+
+/**
+ * The model a judge's settings are saved with to be answered by Instant Evals (ADR-174 decision
+ * 11): the id the previous release reads. The -preview ids read the same (ADR-182).
+ */
 export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/instant-evals";
+
+/** The evaluators Instant Evals answers; no other evaluator is offered a LangWatch model. */
+export const INSTANT_EVAL_JUDGE_EVALUATOR_TYPES = [
+  "langevals/llm_boolean",
+  "langevals/llm_score",
+  "langevals/llm_category",
+] as const;
+
+export function isInstantEvalJudgeEvaluatorType(evaluatorType: string | undefined): boolean {
+  return (INSTANT_EVAL_JUDGE_EVALUATOR_TYPES as readonly (string | undefined)[]).includes(
+    evaluatorType,
+  );
+}
+
+/**
+ * Switches LangWatch's hosted judge off for an organization, whatever its plan, switch or license;
+ * its own decision models still run. Read by every caller that would reach the hosted judge.
+ */
+export const INSTANT_EVALS_HOSTED_DISABLED_FLAG = "instant_evals_hosted_disabled";
 
 /** One judge call. A signal stops the classifier, never the record of what it was paid. */
 export interface InstantEvalJudgeCall extends InstantEvalClassification {
@@ -208,6 +266,12 @@ const instantEvalScoreQuestionSchema = z
     instructions: z.string(),
     /** Inclusive bounds. Every whole number between them is a level. */
     range: z.object({ min: z.number(), max: z.number() }).readonly(),
+    /**
+     * Named levels, lowest first, sent to the judge in place of the numbers. The score read back
+     * is then a level index, so `range` must be 0 to `levels.length - 1`; the wire refuses any
+     * other range before a call (`toClassifierQuestions`), as this schema parses nothing.
+     */
+    levels: z.array(z.string().min(1)).min(2).readonly().optional(),
   })
   .readonly();
 
@@ -243,6 +307,8 @@ export const INSTANT_EVAL_SKIP_REASONS = [
   "classifier_key_invalid",
   // An own decision model's provider is down or answered unreadably; retry later (ADR-182).
   "classifier_provider_unavailable",
+  // A judged query's cost ceiling had no room for this send's worst case, so nothing was sent.
+  "query_cost_ceiling",
 ] as const;
 
 export type InstantEvalSkipReason = (typeof INSTANT_EVAL_SKIP_REASONS)[number];
@@ -263,6 +329,8 @@ export interface InstantEvalVerdict {
   readonly label?: string;
   /** Every option's probability, for a category. Sums to one. */
   readonly probabilities?: Readonly<Record<string, number>>;
+  /** A scenario criterion a judge read and could not settle; it carries no probability. */
+  readonly isInconclusive?: true;
 }
 
 /** Everything one classification answered, whether or not it answered. */
@@ -320,6 +388,12 @@ export interface InstantEvalClassifierLimits {
   readonly transcriptFitBytesPerInputToken: number;
   /** Below any judged text measured; the too-large retry cuts at this ratio. */
   readonly retryBytesPerInputToken: number;
+  /**
+   * Tokens the judge bills on every request beyond the text and the questions.
+   * Provisional: read off e2e bills (190 to 220 per row), not yet measured alone.
+   * Must stay under `reserveTokens`, which keeps room for it in every request.
+   */
+  readonly requestOverheadTokens: number;
 }
 
 /** The shipped classifier's caps, measured against the live API. */
@@ -333,4 +407,5 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 200,
 };

@@ -16,13 +16,16 @@ import { readDocsConfig } from "./nav.ts";
 const redirectsSchema = z.record(z.string(), z.string());
 export type Redirects = z.infer<typeof redirectsSchema>;
 
+/* The release job rewrites this one redirect to bust the previous host's cache
+   (.github/scripts/release-docs.sh); it is not an address anyone reads, so the site skips it. */
+const CACHE_BUST_SOURCE = "/ci/cache/busted/";
+
 /** docs.json redirects keyed by source path without a trailing slash. */
 export function readRedirects({ docsRoot }: { docsRoot: string }): Redirects {
   return Object.fromEntries(
-    (readDocsConfig({ docsRoot }).redirects ?? []).map(({ source, destination }) => [
-      source.replace(/\/$/, ""),
-      destination,
-    ]),
+    (readDocsConfig({ docsRoot }).redirects ?? [])
+      .filter(({ source }) => !source.startsWith(CACHE_BUST_SOURCE))
+      .map(({ source, destination }) => [source.replace(/\/$/, ""), destination]),
   );
 }
 

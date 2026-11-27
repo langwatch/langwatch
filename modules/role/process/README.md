@@ -125,11 +125,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:68
+// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:78
 interface Query {
   builtIn?: "true" | "false";
 }
-// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:72
+// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:82
 interface Response {
   roles: {
     id: string;
@@ -152,13 +152,13 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:84
+// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:94
 interface Body {
   name: string;
   description?: string;
   permissions: string[];
 }
-// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:54
+// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:64
 interface Response {
   id: string;
   name: string;
@@ -179,7 +179,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/permissions`, `/api/v1/roles/permissions`; also, undocumented, `/api/roles/2026-08-07/permissions`, `/api/v1/roles/2026-08-07/permissions`, `/api/roles/latest/permissions`, `/api/v1/roles/latest/permissions`.
 
 ```typescript
-// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:118
+// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:128
 interface Response {
   resources: {
     resource: string;
@@ -200,11 +200,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:76
+// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:86
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:64
 ```
 
 #### `PATCH /:id` · `updateRole`
@@ -216,14 +216,14 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
-// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:93
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:86
+// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:103
 interface Body {
   name?: string;
   description?: string | null;
   permissions?: string[];
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:64
 ```
 
 #### `DELETE /:id` · `deleteRole`
@@ -235,8 +235,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
-// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:97
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:86
+// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:107
 interface Response {
   success: true;
 }
@@ -250,7 +250,7 @@ Contract `../contract/src/role.trpc.ts:17`, router `src/transport/role.trpc.ts:1
 
 | Procedure             | Kind     | Gate                                                                                                                               | Input                                  | Output                        |
 | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------- |
-| `role.getAll`         | query    | Permission `organization:manage`                                                                                                   | `roleApiOrganizationInputSchema`       | inline                        |
+| `role.getAll`         | query    | Permission `members:view`                                                                                                          | `roleApiOrganizationInputSchema`       | inline                        |
 | `role.getById`        | query    | Service-authorized: organization:view; the role's organization is loaded by its id, so the check runs there rather than on input   | `roleApiRoleInputSchema`               | `roleSchema`                  |
 | `role.create`         | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                        | `roleApiCreateInputSchema`             | `roleSchema`                  |
 | `role.update`         | mutation | Service-authorized: organization:manage; the role's organization is loaded by its id, so the check runs there rather than on input | `roleApiUpdateInputSchema`             | `roleSchema`                  |

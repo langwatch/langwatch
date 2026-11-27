@@ -164,8 +164,51 @@ describe("the pi canonicaliser", () => {
 
     PiCanonicaliserService.create().apply(ctx);
 
-    expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS]).toBe("max_tokens");
+    expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS]).toEqual(["max_tokens"]);
     expect(ctx.out[ATTR_KEYS.ERROR_TYPE]).toBe("overloaded_error");
+  });
+
+  /** @scenario "pi's stop reason and error type are lifted onto the canonical span" */
+  it("reads a run's error class from the operation key pi declares for its harness spans", () => {
+    const run = createExtractorContext(
+      { "pi.error.type": "provider_unavailable", "pi.ai.error.type": "not_on_a_run" },
+      { name: "pi.harness.run" },
+    );
+    const call = createExtractorContext(
+      { "pi.error.type": "not_on_a_call" },
+      { name: "pi.ai.request" },
+    );
+
+    PiCanonicaliserService.create().apply(run);
+    PiCanonicaliserService.create().apply(call);
+
+    expect(run.out[ATTR_KEYS.ERROR_TYPE]).toBe("provider_unavailable");
+    expect(call.out[ATTR_KEYS.ERROR_TYPE]).toBeUndefined();
+  });
+
+  /** @scenario "The shim's stand-in values are never read as facts" */
+  it("maps none of the eight stand-in values onto a canonical key", () => {
+    const standIns = {
+      "pi.lane.name": "main",
+      "pi.operation.id": "s-1/run/1",
+      "pi.operation.recovery": false,
+      "pi.tool.replay": "never",
+      "pi.tool.recovery": false,
+      "pi.ai.operation": "stream",
+      "pi.ai.streaming": true,
+      "pi.step.attempt": 1,
+    };
+    const { attributes } = canonicaliseWholeChain({
+      name: "pi.ai.request",
+      spanAttributes: { ...standIns, "pi.session.id": "s-1" },
+    });
+
+    // Each stays under pi's own key, unread, and no canonical key gains its value.
+    expect(attributes).toMatchObject(standIns);
+    const canonical = Object.entries(attributes).filter(([key]) => !key.startsWith("pi."));
+    for (const [, value] of canonical) {
+      expect(["main", "s-1/run/1", "never", "stream"]).not.toContain(value);
+    }
   });
 
   /** @scenario "Session, turn and tool identifiers are lifted from pi's harness spans" */

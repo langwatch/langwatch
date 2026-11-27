@@ -95,4 +95,13 @@ describe("normalizeLangyConversationTitle", () => {
       expect(normalizeLangyConversationTitle("")).toBe("");
     });
   });
+
+  describe("given a first message that holds an image chip", () => {
+    /** @scenario A conversation title shows an image by its file name */
+    it("reads the chip as the image's file name", () => {
+      expect(normalizeLangyConversationTitle("What does [▣ pasted-4d80e6.png] show?")).toBe(
+        "What does pasted-4d80e6.png show?",
+      );
+    });
+  });
 });

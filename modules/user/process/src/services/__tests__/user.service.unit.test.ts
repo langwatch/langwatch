@@ -53,16 +53,20 @@ const NOW = fromDate(new Date(42));
 class StubRepository implements UserRepository {
   countUsage = vi.fn(async () => ({ emailDomains: {} }));
   countUsageAmong = vi.fn(async () => ({ emailDomains: {} }));
+  findSignedInSince = vi.fn(async () => []);
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
+  findFirstCreatedId = vi.fn(async (): Promise<string | null> => user.id);
   findBackfillPage = vi.fn(async () => []);
   findMixedCaseAddressPage = vi.fn(async () => []);
   replaceAddress = vi.fn(async () => "replaced" as const);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
+  searchProfiles = vi.fn(async (): Promise<UserFullProfile[]> => []);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
   findByEmailAnyCase = vi.fn(async (): Promise<UserFullProfile[]> => []);
   create = vi.fn(async () => user);
+  appendCreatedFact = vi.fn(async () => undefined);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
   createCredentialUser = vi.fn(async () => ({
@@ -402,6 +406,18 @@ describe("given a company domain a self-hosted install reported", () => {
   });
 });
 
+describe("given the install's first-created account", () => {
+  /** @scenario "The install's first-created account is answered by id" */
+  it("answers yes for that account only, and no when there is none", async () => {
+    const { service, repository } = createService();
+
+    await expect(service.isFirstCreatedAccount({ userId: user.id })).resolves.toBe(true);
+    await expect(service.isFirstCreatedAccount({ userId: "user-later" })).resolves.toBe(false);
+    repository.findFirstCreatedId.mockResolvedValue(null);
+    await expect(service.isFirstCreatedAccount({ userId: user.id })).resolves.toBe(false);
+  });
+});
+
 describe("given a user whose photo came from their identity provider", () => {
   const SSO_PHOTO = "https://cdn.identity.test/photos/ada.png";
 
@@ -624,6 +640,23 @@ describe("findByEmail()", () => {
       repository.findByEmail.mockResolvedValue([]);
 
       await expect(service.findByEmail({ email: "nobody@example.com" })).resolves.toBeNull();
+    });
+  });
+});
+
+describe("setLangyCodeAccessPreference()", () => {
+  describe("given a person who ticks the remember box on the code access card", () => {
+    /** @scenario "The person's record stores and clears the remembered choice" */
+    it("stores GitHub, then clears it, with the choice each call carried", async () => {
+      const { service, repository } = createService();
+
+      await service.setLangyCodeAccessPreference({ id: user.id, preference: "github" });
+      await service.setLangyCodeAccessPreference({ id: user.id, preference: null });
+
+      expect(repository.setLangyCodeAccessPreference.mock.calls).toEqual([
+        [user.id, "github"],
+        [user.id, null],
+      ]);
     });
   });
 });

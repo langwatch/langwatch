@@ -2,9 +2,21 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 )
+
+// DefaultLWQLAccessDir is where a deployment that sets no LWQL_ACCESS_DIR
+// mounts the LangWatchQL access model; a var so tests can move it.
+var DefaultLWQLAccessDir = "/etc/clickhouse-server/lwql"
+
+// LWQLAccessFile is the access model's users file inside that directory.
+const LWQLAccessFile = "lwql-access.yaml"
 
 // Input holds all user-provided configuration, loaded from env vars via struct tags.
 type Input struct {
@@ -14,16 +26,67 @@ type Input struct {
 	RAMBytes     int64  `validate:"gte=536870912"` // min 512MB
 	Replicated   bool   `env:"CH_REPLICATED"`
 	ClusterName  string `env:"CH_CLUSTER" default:"default"`
-	Shard        string `env:"CH_SHARD" default:"shard_01"`
-	Replica      string `env:"CH_REPLICA"`
+	Shard        string `env:"CH_SHARD" alias:"SHARD_NAME" default:"shard_01"`
+	Replica      string `env:"CH_REPLICA" alias:"REPLICA_NAME"`
 	KeeperNodes  string `env:"CH_KEEPER_NODES"`
 	KeeperPort   int    `env:"CH_KEEPER_PORT" default:"9181"`
 	DataNodes    string `env:"CH_DATA_NODES"`
 	DataNodePort int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
-	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
+	Password          string `env:"CLICKHOUSE_PASSWORD"`            // Validate refuses an empty one
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
+
+	// Opt-in: render the real cluster secret (read from ClusterSecretFile by
+	// Load). Off keeps the old from_file attribute ClickHouse ignores, so the
+	// cluster runs with no secret; see the README before enabling it.
+	ClusterSecretEnabled bool `env:"CLICKHOUSE_CLUSTER_SECRET_ENABLED"`
+	ClusterSecret        string
+
+	// Interserver HTTP credentials (replica part fetches); rendered only when
+	// the password file is set. InterserverPassword is read from it by Load.
+	InterserverUser         string `env:"CLICKHOUSE_INTERSERVER_USER" default:"interserver"`
+	InterserverPasswordFile string `env:"CLICKHOUSE_INTERSERVER_PASSWORD_FILE"`
+	InterserverPassword     string
+
+	// Optional access.yaml (ADR-198): users, their tiers and logins. The
+	// sidecar answers token logins on AccessListen and re-renders the users.
+	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
+	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
+	AccessSidecar string `env:"CLICKHOUSE_ACCESS_SIDECAR" default:"embedded" validate:"oneof=embedded external"`
+	// Where dynamic-only mode writes the local admin's per-boot password; a
+	// tmpfs shared with the sidecar. DynamicOnly is read from the access file.
+	AccessBootstrapDir string `env:"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR" default:"/run/clickhouse-access"`
+	DynamicOnly        bool
+	// The tier roles and profiles render with an access file, or with this
+	// for operator-written users that GRANT a tier. Off, no tier_* name exists.
+	AccessTiers bool `env:"CLICKHOUSE_ACCESS_TIERS"`
+
+	// A directory holding the app-rendered LangWatchQL access model (a mounted
+	// Secret). Its two files are linked into users.d and config.d, so an update
+	// to the Secret reaches the running server with no restart. Unset, Load
+	// uses DefaultLWQLAccessDir when the model is mounted there.
+	LWQLAccessDir string `env:"LWQL_ACCESS_DIR"`
+
+	// Unset: the access flags in sql mode, the rendered-mode grants with LWQL_ACCESS_DIR.
+	// true: the flags in both modes. false: neither.
+	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
+
+	// AuditQueryLog pins every setting deciding what reaches system.query_log, so no
+	// session can hide its own queries. MaxConcurrentQueriesForUser is each user's
+	// share of the server's admission limit (0: none). DefaultNetworks limits where
+	// default logs in from; loopback is always added, and set-but-empty refuses start.
+	AuditQueryLog               bool   `env:"CLICKHOUSE_AUDIT_QUERY_LOG"`
+	MaxConcurrentQueriesForUser int    `env:"CLICKHOUSE_MAX_CONCURRENT_QUERIES_FOR_USER"`
+	DefaultNetworks             string `env:"CLICKHOUSE_DEFAULT_NETWORKS"`
+	// MaskedSettings are settings whose values query_masking_rules hide from query
+	// text in every log. Unset: the LangWatchQL capability; set-but-empty: none.
+	MaskedSettings []string
+	// MaskSHA256Hex hides every 64-hex-character run in logged text: the shape of
+	// the LangWatchQL capability, wherever ClickHouse folds it into a log line.
+	MaskSHA256Hex bool `env:"CLICKHOUSE_MASK_SHA256_HEX" default:"true"`
+	// AccessPolicy is the access file's policy block, read once by Load.
+	AccessPolicy *access.Policy
 
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
@@ -42,10 +105,17 @@ type Input struct {
 	LocalDiskKeepFreeBytes    int64  `env:"LOCAL_DISK_KEEP_FREE_BYTES" default:"1073741824"`
 	MaxDataPartSizeBytes      int64  `env:"MAX_DATA_PART_SIZE_BYTES"`
 
+	// No longer read: ClickHouse built no cache from it on the s3 disk. Kept
+	// only so the renderer can warn a deployment that still sets it.
+	RetiredCacheMaxSize string `env:"CACHE_MAX_SIZE"`
+
 	// Logging
 	LogLevel         string `env:"LOG_LEVEL" default:"warning" validate:"oneof=trace debug information warning error"`
 	LogFormat        string `env:"LOG_FORMAT" default:"json"   validate:"oneof=json plain"`
+	LogToFile        bool   `env:"LOG_TO_FILE" default:"true"` // false: console only, no server log files
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
+	// true: error_log, crash_log and the query detail logs get SYSTEM_LOG_TTL_DAYS too.
+	SystemLogTTLAll bool `env:"SYSTEM_LOG_TTL_ALL"`
 
 	// System logs — each log has enable + TTL + optional flush settings
 	EnableQueryLog        bool   `env:"ENABLE_QUERY_LOG" default:"true"`
@@ -71,6 +141,9 @@ type Input struct {
 	EnableProfileLog      bool   `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
 	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
 	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
+
+	// Execution-time cap of the inspect and read tiers' profiles (ADR-198).
+	ReadTierMaxExecutionTime int `env:"READ_TIER_MAX_EXECUTION_TIME" default:"300" validate:"gte=1"`
 
 	// Query limits (0 = unlimited)
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -144,5 +217,109 @@ func Load() (*Input, error) {
 		i.Password = strings.TrimSpace(string(data))
 	}
 
+	if raw, set := os.LookupEnv("CLICKHOUSE_DEFAULT_NETWORKS"); set && len(i.DefaultNetworkList()) == 0 {
+		return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS is set but names no network (%q): unset it, or list the networks default may log in from", raw)
+	}
+	i.MaskedSettings = []string{DefaultMaskedSetting}
+	if raw, set := os.LookupEnv("CLICKHOUSE_MASKED_SETTINGS"); set {
+		i.MaskedSettings = nil
+		for _, name := range strings.Split(raw, ",") {
+			if name = strings.TrimSpace(name); name == "" {
+				continue
+			} else if !maskedSettingRE.MatchString(name) {
+				return nil, fmt.Errorf("CLICKHOUSE_MASKED_SETTINGS: %q is not a setting name", name)
+			}
+			i.MaskedSettings = append(i.MaskedSettings, name)
+		}
+	}
+	for _, n := range i.DefaultNetworkList() {
+		if !isNetwork(n) {
+			return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS: %q is not an IP address or a CIDR network", n)
+		}
+	}
+
+	if i.LWQLAccessDir == "" {
+		if _, err := os.Stat(filepath.Join(DefaultLWQLAccessDir, LWQLAccessFile)); err == nil {
+			i.LWQLAccessDir = DefaultLWQLAccessDir
+		}
+	}
+
+	// The mode decides which passwords are required and which refused.
+	if i.AccessFile != "" {
+		f, err := access.Load(i.AccessFile)
+		if err != nil {
+			return nil, fmt.Errorf("CLICKHOUSE_ACCESS_FILE: %w", err)
+		}
+		i.DynamicOnly = f.DynamicOnly()
+		i.AccessPolicy = &f.Policy
+	}
+
+	for _, f := range []struct {
+		env, path string
+		read      bool
+		dst       *string
+	}{
+		{"CLICKHOUSE_CLUSTER_SECRET_FILE", i.ClusterSecretFile, i.ClusterSecretEnabled, &i.ClusterSecret},
+		{"CLICKHOUSE_INTERSERVER_PASSWORD_FILE", i.InterserverPasswordFile, true, &i.InterserverPassword},
+	} {
+		if f.path == "" || !f.read {
+			continue
+		}
+		secret, err := readSecretFile(f.path)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", f.env, err)
+		}
+		*f.dst = secret
+	}
+
 	return i, nil
+}
+
+// RendersTiers reports whether ch-config writes the tier roles and profiles.
+func (i *Input) RendersTiers() bool {
+	return i.AccessFile != "" || i.AccessTiers
+}
+
+// DefaultNetworkList is CLICKHOUSE_DEFAULT_NETWORKS split on commas, blanks dropped.
+func (i *Input) DefaultNetworkList() []string {
+	var out []string
+	for _, n := range strings.Split(i.DefaultNetworks, ",") {
+		if n = strings.TrimSpace(n); n != "" {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// DefaultMaskedSetting carries the LangWatchQL tenant capability (ADR-198).
+const DefaultMaskedSetting = "custom_api_key_hash"
+
+var maskedSettingRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,99}$`)
+
+// isNetwork accepts what ClickHouse's <ip> takes: an address, or a CIDR network.
+func isNetwork(s string) bool {
+	if _, _, err := net.ParseCIDR(s); err == nil {
+		return true
+	}
+	return net.ParseIP(s) != nil
+}
+
+// GrantsDefaultAccessManagement reports whether ch-config grants the default
+// user access_management and named_collection_control (unset means yes).
+func (i *Input) GrantsDefaultAccessManagement() bool {
+	return i.DefaultUserAccessManagement == nil || *i.DefaultUserAccessManagement
+}
+
+// readSecretFile returns the trimmed content of a mounted secret, refusing an
+// empty one: an empty credential would render as no credential at all.
+func readSecretFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	secret := strings.TrimSpace(string(data))
+	if secret == "" {
+		return "", fmt.Errorf("%s is empty", path)
+	}
+	return secret, nil
 }

@@ -114,7 +114,8 @@ enforces today — the number a customer is charged and refused against right no
 — and records the other one, with the line that states it, in
 `packages/plans/drift.md` and in `PLAN_DISPUTES`. The plans subject to a
 dispute name it in a typed `disputed` field, and a test asserts the dispute
-list is exactly the four the census found, so a fifth drift fails rather than
+list is exactly the recorded one (four from the census, plus
+`growth-seat-member-ceiling` added later), so a new drift fails rather than
 being absorbed.
 
 | Dispute                         | In the catalogue                              | The other value                                                  |
@@ -123,6 +124,7 @@ being absorbed.
 | `pro-volume-below-free`         | Pro 10,000 a month, 5 members                 | Pro 100,000 a month, 10 members; Free is 50,000, above it        |
 | `growth-copy-volume`            | Growth 100,000 a month                        | the pricing page says 200,000                                    |
 | `automation-ceiling-three-ways` | per plan: 50 / 150 / 300 / 500 / 5,000        | buckets of 50 / 500 / 5,000; a test pinning 100 / 1,000 / 10,000 |
+| `growth-seat-member-ceiling`    | seat plans: 20 members, 20 seats              | the plan copy says "Volume discounts above 20 users"             |
 
 Resolving each is a product decision with a customer consequence, so each lands
 in its own commit with the before and after values in the message.
@@ -162,7 +164,7 @@ so the tree typechecks and lints on its own at every step.
 - `PlanCataloguePort`, `ApiPlanCatalogueAdapter`, `TIERED_LADDER`,
   `SEAT_EVENT_LADDER` and `PERSIST_CAP` all go, taking roughly 250 lines of
   wiring with them.
-- The four disputes become visible and decidable rather than latent.
+- The five disputes become visible and decidable rather than latent.
 
 ## Open items
 
@@ -174,10 +176,10 @@ so the tree typechecks and lints on its own at every step.
    it exists to fix. Alex has not ruled; if the split is wanted, the seam is
    `catalogue-data.ts`, and the cloud plans move while the schemas, the read
    API, `applyOverride` and the open-source baseline stay.
-2. **Each of the four disputes**, above.
+2. **Each of the five disputes**, above.
 3. **Whether Free belongs on the ladder.** Free carries no rung today, which is
    the mechanism behind `pro-volume-below-free`; it is recorded there rather
-   than as a fifth dispute.
+   than as a dispute of its own.
 
 ## References
 

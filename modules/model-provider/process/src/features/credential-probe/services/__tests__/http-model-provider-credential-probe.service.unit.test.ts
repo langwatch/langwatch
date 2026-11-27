@@ -1,4 +1,4 @@
-import { RedirectRefusedError } from "@langwatch/egress";
+import { egressRefusalReason, RedirectRefusedError } from "@langwatch/egress";
 import {
   MASKED_KEY_PLACEHOLDER,
   ProviderKeyMissingError,
@@ -9,7 +9,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
-import type { ModelProviderEgress } from "../ssrf-model-provider-egress.service.ts";
+import {
+  SsrfModelProviderEgressService,
+  type ModelProviderEgress,
+} from "../ssrf-model-provider-egress.service.ts";
 
 // Mocks the guarded egress port, not `global.fetch` — the real SSRF fence would make every
 // assertion about DNS. The redirect refusal still uses the egress's real error type.
@@ -17,6 +20,7 @@ const mockFetch = vi.fn();
 const egress: ModelProviderEgress = {
   fetch: (...args: unknown[]) => mockFetch(...args),
   isRedirectRefusal: (error: unknown) => error instanceof RedirectRefusedError,
+  endpointRefusal: (error: unknown) => egressRefusalReason(error) ?? "not_refused",
   assertDestination: async () => {},
 };
 
@@ -74,7 +78,8 @@ describe("validateProviderApiKey", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("skips validation for azure provider", async () => {
+    /** @scenario "An Azure credential with no deployment to ask is not checked" */
+    it("skips validation for an azure credential with no deployment to ask", async () => {
       const result = await validateProviderApiKey("azure", {
         AZURE_OPENAI_API_KEY: "test-key",
         AZURE_OPENAI_ENDPOINT: "https://test.openai.azure.com",
@@ -150,6 +155,109 @@ describe("validateProviderApiKey", () => {
           ELEVENLABS_API_KEY: "sk_test",
         }),
       ).rejects.toBeInstanceOf(ProviderUnreachableError);
+    });
+  });
+
+  describe("when validating an Azure key against a deployment", () => {
+    const azureKeys = {
+      AZURE_OPENAI_API_KEY: "azure-key-1234",
+      AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com/",
+    };
+    const probeAzure = (keys: Record<string, string> = azureKeys) =>
+      HttpModelProviderCredentialProbeService.validateProviderApiKey({
+        provider: "azure",
+        customKeys: keys,
+        model: "gpt-acme",
+        egress,
+      });
+
+    /** @scenario "An Azure key is checked with one chat completion against the chosen deployment" */
+    it("posts a one-token chat completion to the deployment with the api-key header", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      const result = await probeAzure();
+
+      expect(result.outcome).toBe("verified");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0] as [string, Record<string, unknown>];
+      expect(url).toBe(
+        "https://acme.openai.azure.com/openai/deployments/gpt-acme/chat/completions?api-version=2025-04-01-preview",
+      );
+      expect(init).toMatchObject({
+        method: "POST",
+        headers: expect.objectContaining({ "api-key": "azure-key-1234" }),
+      });
+      expect(JSON.parse(init.body as string)).toMatchObject({ max_tokens: 1 });
+      expect(url).not.toContain("azure-key-1234");
+    });
+
+    /** @scenario "An Azure credential is checked at its own api-version" */
+    it("uses the credential's AZURE_OPENAI_API_VERSION when it carries one", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await probeAzure({ ...azureKeys, AZURE_OPENAI_API_VERSION: "2024-10-21" });
+
+      const [url] = mockFetch.mock.calls[0] as [string];
+      expect(url).toContain("?api-version=2024-10-21");
+    });
+
+    /** @scenario "Azure reports a refused key as a bad key" */
+    it.each([401, 403])("reports an invalid key on %i", async (status) => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status });
+
+      expect(codeOf(await probeAzure())).toBe("provider_key_invalid");
+    });
+
+    /** @scenario "Azure reports a missing deployment by its name" */
+    it("names the deployment Azure could not find on a DeploymentNotFound 404", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () =>
+          JSON.stringify({ error: { code: "DeploymentNotFound", message: "No such deployment." } }),
+      });
+
+      const result = await probeAzure();
+
+      expect(codeOf(result)).toBe("provider_deployment_not_found");
+      expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
+        deployment: "gpt-acme",
+      });
+    });
+
+    /** @scenario "A bare Azure 404 does not claim the key works" */
+    it("reports a 404 without Azure's deployment code as a plain refusal", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404, text: async () => "Not Found" });
+
+      expect(codeOf(await probeAzure())).toBe("provider_refused");
+    });
+
+    /** @scenario "Azure answering past authentication proves the credential" */
+    it.each([429, 400])("treats %i as a reachable, accepted credential", async (status) => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status });
+
+      expect((await probeAzure()).outcome).toBe("verified");
+    });
+
+    /** @scenario "An Azure endpoint that does not answer is reported as unreachable" */
+    it("reports an endpoint that never answers as unreachable, naming the endpoint", async () => {
+      mockFetch.mockRejectedValue(new Error("getaddrinfo ENOTFOUND acme.openai.azure.com"));
+
+      await expect(probeAzure()).rejects.toMatchObject({
+        code: "provider_unreachable",
+        meta: expect.objectContaining({ hasConfigurableEndpoint: true }),
+      });
+    });
+
+    /** @scenario "An Azure credential routed through an API gateway is not checked" */
+    it("does not check a credential routed through an API gateway", async () => {
+      const result = await probeAzure({
+        ...azureKeys,
+        AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.example",
+      });
+
+      expect(result).toMatchObject({ outcome: "unchecked", reason: "provider_not_probeable" });
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -1125,6 +1233,46 @@ describe("given a check that never reached the provider", () => {
 
       expect(codeOf(result)).toBe("provider_endpoint_redirected");
       expect(codeOf(result)).not.toBe("provider_unreachable");
+    });
+  });
+
+  describe("given a base URL the outbound policy refuses", () => {
+    // The real fence, not the stand-in: the refusal has to be recognised by the type the
+    // validator actually throws. Both URLs are refused before any DNS lookup.
+    const fenced = (blockLocal: boolean) =>
+      SsrfModelProviderEgressService.create({
+        policy: { blockLocal, allowedHosts: [], verifyTls: true },
+      });
+
+    /** @scenario "A base URL refused by the outbound policy is reported as refused, not as unreachable" */
+    it("reports a load balancer name on amazonaws.com as refused by the policy", async () => {
+      const result = await HttpModelProviderCredentialProbeService.validateProviderApiKey({
+        provider: "openai",
+        customKeys: {
+          OPENAI_API_KEY: "sk-test",
+          OPENAI_BASE_URL: "http://gw-123.eu-central-1.elb.amazonaws.com/v1",
+        },
+        egress: fenced(false),
+      });
+
+      expect(codeOf(result)).toBe("provider_endpoint_refused");
+      expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
+        refusal: "cloud_internal_domain",
+      });
+    });
+
+    /** @scenario "A private base URL refused by the outbound policy names the setting that allows it" */
+    it("reports a private address under blockLocal as a refusal ALLOWED_PROXY_HOSTS can lift", async () => {
+      const result = await HttpModelProviderCredentialProbeService.validateProviderApiKey({
+        provider: "custom",
+        customKeys: { CUSTOM_API_KEY: "sk-test", CUSTOM_BASE_URL: "http://10.0.5.3/v1" },
+        egress: fenced(true),
+      });
+
+      expect(codeOf(result)).toBe("provider_endpoint_refused");
+      expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
+        refusal: "private_address",
+      });
     });
   });
 

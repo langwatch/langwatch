@@ -117,6 +117,23 @@ Feature: Enterprise governance package boundary
     And each mutation and its audit fact commit in one Postgres transaction
     And a platform template is immutable while a cross-organization template is not found
 
+  # A template's OTTL rules are organization configuration: only a caller with
+  # aiTools:manage reads them. The member list already answered them empty;
+  # the single-template read on the console and the MCP get tool did not.
+  @unit
+  Scenario: A member reads one ingestion template without its OTTL rules
+    Given an organization template carries OTTL rules
+    When a member reads that template by id from the console
+    Then the template answers with its OTTL rules empty
+    And an administrator's read of the same template still carries the rules
+
+  @unit
+  Scenario: A project API key's MCP session never reads a template's OTTL rules
+    Given an organization template carries OTTL rules
+    And an MCP session opened with a project API key
+    When it lists the templates and then reads that template by id
+    Then neither answer carries the OTTL rules
+
   @unit
   Scenario: The platform ingestion template catalog reconciles idempotently
     Given retired platform template rows may remain from an earlier release
@@ -195,13 +212,13 @@ Feature: Enterprise governance package boundary
   Scenario: An ingestion source secret is not rotated while an operator acts as another member
     Given an operator acting as a member through impersonation
     When they rotate an ingestion source's secret
-    Then the rotation is refused with permission_denied before the source is read
+    Then the rotation is refused with impersonation_cannot_mint_credential before the source is read
 
   @unit
   Scenario: A personal ingestion key is not minted while an operator acts as another member
     Given an operator acting as a member through impersonation
     When they install or rotate a personal ingestion key
-    Then the mint is refused with permission_denied before any key is created
+    Then the mint is refused with impersonation_cannot_mint_credential before any key is created
 
   Rule: Governance-origin trace activity feeds the KPI rows and the OCSF export, as on main
 

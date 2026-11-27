@@ -66,6 +66,7 @@ const SERVICE_PROVIDER = {
   singleLogoutUrl: "https://app.test/api/auth/sso/saml2/sp/slo/{connectionId}",
   entityId: "https://app.test/api/auth/sso/saml2/sp/metadata/{connectionId}",
   metadataUrl: "https://app.test/api/auth/sso/saml2/sp/metadata/{connectionId}",
+  refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
 };
 
 function renderSection(

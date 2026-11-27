@@ -13,12 +13,9 @@ export const roleTrpcTransport: TrpcRouterDeclaration<RoleApi, typeof roleTrpc> 
   RoleApi,
   roleTrpc,
 )
-  /**
-   * Role definitions are an admin-surface read: every screen that lists them
-   * already requires manage, so a member session cannot reach them directly.
-   */
+  /** Every organization role reads the definitions (Roles & access, read-only); writes manage. */
   .procedure("getAll")
-  .withPermission("organization:manage")
+  .withPermission("members:view")
   .handle(async ({ app, input }) =>
     app.listRoles({ organizationId: input.organizationId, builtIn: false }),
   )

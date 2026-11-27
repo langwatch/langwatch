@@ -432,3 +432,57 @@ describe("createTenantRouter, given organizations recorded as private", () => {
     });
   });
 });
+
+describe("createTenantRouter placementOf", () => {
+  const recordedPrivate: TenantDirectory = {
+    organizationForTenant: async () => "org_private",
+    recordedPrivateDataplaneOf: async () => ({ clickhouseLabel: "eu", s3Label: null }),
+  };
+
+  describe("given an organisation recorded private whose route variable is missing", () => {
+    it("reports it recorded private beside the shared route, and refuses nothing itself", async () => {
+      const router = createTenantRouter({ table: tableOf({}), directory: recordedPrivate });
+
+      await expect(router.placementOf("project_a")).resolves.toEqual({
+        organizationId: "org_private",
+        recordedPrivate: true,
+        route: { kind: "shared" },
+      });
+      await expect(router.route("project_a")).rejects.toBeInstanceOf(PrivateRouteUnavailableError);
+    });
+  });
+
+  describe("given an organisation with its route present", () => {
+    it("reports the private route it resolves to", async () => {
+      const router = createTenantRouter({
+        table: tableOf({ org_private: "http://private.invalid:8123" }),
+        directory: recordedPrivate,
+      });
+
+      await expect(router.placementOf("project_a")).resolves.toEqual({
+        organizationId: "org_private",
+        recordedPrivate: true,
+        route: {
+          kind: "private",
+          organizationId: "org_private",
+          url: "http://private.invalid:8123",
+        },
+      });
+    });
+  });
+
+  describe("given an organisation never recorded private", () => {
+    it("reports the shared route and nothing recorded", async () => {
+      const router = createTenantRouter({
+        table: tableOf({}),
+        directory: directoryOf({ project_a: "org_shared" }),
+      });
+
+      await expect(router.placementOf("project_a")).resolves.toEqual({
+        organizationId: "org_shared",
+        recordedPrivate: false,
+        route: { kind: "shared" },
+      });
+    });
+  });
+});

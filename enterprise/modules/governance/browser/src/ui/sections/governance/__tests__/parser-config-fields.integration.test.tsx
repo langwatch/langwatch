@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { SourceType } from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
-import { ParserConfigFields } from "../governance-inventory.screen.tsx";
+import { ParserConfigFields } from "../inventory/parser-config-fields.tsx";
 
 afterEach(cleanup);
 

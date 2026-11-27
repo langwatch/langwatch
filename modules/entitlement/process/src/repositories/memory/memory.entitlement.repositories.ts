@@ -1,10 +1,12 @@
 import type { EntitlementRepositories } from "../entitlement.repositories.ts";
 import { MemoryBillableEventsMeterRepository } from "./memory.billable-events-meter.repository.ts";
+import { MemoryBillableEventsTtlRepository } from "./memory.billable-events-ttl.repository.ts";
 import { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
 import { MemoryMemberSeatRepository } from "./memory.member-seat.repository.ts";
 import { MemoryOrganizationSpendRepository } from "./memory.organization-spend.repository.ts";
 import { MemoryTenancyRepository } from "./memory.tenancy.repository.ts";
 import { MemoryTraceCountRepository } from "./memory.trace-count.repository.ts";
+import { MemoryUsageCacheRepository } from "./memory.usage-cache.repository.ts";
 import { MemoryUsageMembershipRepository } from "./memory.usage-membership.repository.ts";
 
 export class MemoryEntitlementRepositories {
@@ -21,6 +23,9 @@ export class MemoryEntitlementRepositories {
       tenancy: MemoryTenancyRepository.create({ memory: database }),
       billableEvents,
       traces: MemoryTraceCountRepository.create(),
+      billableEventsTtl: MemoryBillableEventsTtlRepository.create(),
+      usageCounts: MemoryUsageCacheRepository.create(),
+      usageDecisions: MemoryUsageCacheRepository.create(),
     };
   }
 }

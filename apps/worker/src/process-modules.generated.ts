@@ -17,6 +17,7 @@ import { dataPrivacyProcessModule } from "@langwatch/data-privacy-process";
 import { dataRetentionProcessModule } from "@langwatch/data-retention-process";
 import { datasetProcessModule } from "@langwatch/dataset-process";
 import { demoDataProcessModule } from "@langwatch/enterprise-demo-data-process";
+import { digestProcessModule } from "@langwatch/enterprise-digest-process";
 import { enterpriseGatewayProcessModule } from "@langwatch/enterprise-gateway-process";
 import { enterpriseOpsProcessModule } from "@langwatch/enterprise-ops-process";
 import { entitlementProcessModule } from "@langwatch/entitlement-process";
@@ -58,6 +59,7 @@ import { secretProcessModule } from "@langwatch/secret-process";
 import { shareProcessModule } from "@langwatch/share-process";
 import { slackProcessModule } from "@langwatch/slack-process";
 import { ssoProcessModule } from "@langwatch/enterprise-sso-process";
+import { staffAccessProcessModule } from "@langwatch/staff-access-process";
 import { storedObjectProcessModule } from "@langwatch/stored-object-process";
 import { suiteProcessModule } from "@langwatch/suite-process";
 import { topicProcessModule } from "@langwatch/topic-process";
@@ -84,6 +86,7 @@ export const processModules = [
   dataRetentionProcessModule,
   datasetProcessModule,
   demoDataProcessModule,
+  digestProcessModule,
   enterpriseGatewayProcessModule,
   enterpriseOpsProcessModule,
   entitlementProcessModule,
@@ -125,6 +128,7 @@ export const processModules = [
   shareProcessModule,
   slackProcessModule,
   ssoProcessModule,
+  staffAccessProcessModule,
   storedObjectProcessModule,
   suiteProcessModule,
   topicProcessModule,

@@ -70,9 +70,9 @@ function mockTraces(
       blockedByGuardrail: t.blockedByGuardrail ?? false,
     } satisfies TraceAttributedTrace,
   }));
-  const inTenant = (input: { projectId: string; values?: string[] }) =>
+  const inTenants = (input: { projectIds: readonly string[]; values?: string[] }) =>
     rows
-      .filter((r) => r.projectId === input.projectId)
+      .filter((r) => input.projectIds.includes(r.projectId))
       .map((r) => r.trace)
       .filter((t) => !input.values || input.values.includes(t.value));
   const bucketsFor = (subset: TraceAttributedTrace[]): TraceAttributeUsageBucket[] => {
@@ -100,7 +100,7 @@ function mockTraces(
   return {
     findSpendByProjectAndValue: async ({ projectIds }) =>
       projectIds.flatMap((projectId) =>
-        bucketsFor(inTenant({ projectId })).map((b) => ({
+        bucketsFor(inTenants({ projectIds: [projectId] })).map((b) => ({
           projectId,
           value: b.value,
           spentUsd: b.totalUsd,
@@ -108,9 +108,9 @@ function mockTraces(
           lastOccurredAtMs: 0,
         })),
       ),
-    findAttributeUsageBuckets: async (input) => bucketsFor(inTenant(input)),
+    findAttributeUsageBuckets: async (input) => bucketsFor(inTenants(input)),
     findAttributedTraces: async (input) =>
-      inTenant(input)
+      inTenants(input)
         .filter((t) => !input.model || (t.models[0] ?? "unknown") === input.model)
         .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs)
         .slice(0, input.limit),

@@ -92,7 +92,7 @@ export class MemoryLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
     if (receipt.status === PREPARING && receipt.leaseOwner === claimToken) {
       this.store.turnRequests.delete(receiptKey);
     }
-    return { kind: "busy" };
+    return { kind: "busy", conversationId, heldTurnId: active.turnId };
   }
 
   async commit(input: HeldClaim): Promise<void> {

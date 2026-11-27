@@ -8,6 +8,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
+import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rules.ts";
 
 type SignUpData = NurturingSignalOf<"signed_up">["signUpData"];
 
@@ -30,6 +31,19 @@ function pickDefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * The first_name trait for a name that looks like a person's name: its first word, as typed.
+ * Email-like, one-letter and username-like first words (digits, "_" or ".") are not usable
+ * in a greeting, so they yield no trait.
+ */
+export function firstNameTraitOf(name: string | null | undefined): { first_name?: string } {
+  const trimmed = name?.trim();
+  if (!trimmed || trimmed.includes("@")) return {};
+
+  const [first] = trimmed.split(/\s+/);
+  return first && first.length > 1 && !/[\d_.]/.test(first) ? { first_name: first } : {};
+}
+
+/**
  * Decides the identify, group and track calls that identify a new user in Customer.io
  * during onboarding.
  */
@@ -41,6 +55,7 @@ export function fireSignup({
   organizationName,
   signUpData,
   primaryIntent,
+  traces,
 }: {
   userId: string;
   email?: string | null;
@@ -50,12 +65,16 @@ export function fireSignup({
   signUpData?: SignUpData;
   /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
   primaryIntent?: string | null;
+  /** A person already in an organization with traces keeps has_traces true. Null: read failed. */
+  traces: KnownTraces | null;
 }): CioBatchCall[] {
   const traits: Partial<CioPersonTraits> = {
     ...pickDefined({
       email,
       name,
+      ...firstNameTraitOf(name),
       role: signUpData?.yourRole,
+      seat: "admin",
       company_size: signUpData?.companySize,
       signup_usage: signUpData?.usage,
       signup_solution: signUpData?.solution,
@@ -70,7 +89,7 @@ export function fireSignup({
       referrer: signUpData?.referrer,
       primary_intent: primaryIntent?.toLowerCase(),
     }),
-    has_traces: false,
+    ...knownTraceTraits(traces),
     has_evaluations: false,
     has_prompts: false,
     has_simulations: false,
@@ -88,6 +107,7 @@ export function fireSignup({
         name: organizationName,
         ...pickDefined({ company_size: signUpData?.companySize }),
         plan: "free",
+        relationshipAttributes: { seat: "admin" },
       },
     },
     {

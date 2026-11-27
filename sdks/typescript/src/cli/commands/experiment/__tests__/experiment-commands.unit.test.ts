@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
   ExperimentsApiServiceError,
@@ -33,6 +33,7 @@ vi.mock("ora", () => ({
 
 import type * as experimentsApiServiceModule from "@/client-sdk/services/experiments/experiments-api.service";
 
+import { passRateText, rowPassRatesOf } from "../rowPassRates";
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";
 
@@ -55,15 +56,18 @@ const mockProcessExit = () => {
 describe("runExperimentCommand()", () => {
   let mockStartRun: ReturnType<typeof vi.fn>;
   let mockGetRunStatus: ReturnType<typeof vi.fn>;
+  let mockGetRunResults: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockStartRun = vi.fn();
     mockGetRunStatus = vi.fn();
+    mockGetRunResults = vi.fn();
     vi.mocked(ExperimentsApiService).mockImplementation(function () {
       return {
         startRun: mockStartRun,
         getRunStatus: mockGetRunStatus,
+        getRunResults: mockGetRunResults,
       } as unknown as ExperimentsApiService;
     });
     vi.spyOn(console, "log").mockImplementation(noop);
@@ -146,6 +150,88 @@ describe("runExperimentCommand()", () => {
     }
   });
 
+  describe("when --repeat is given", () => {
+    /** @scenario "The experiment run command passes its repeat flag on the run" */
+    it("starts the run with that repeat", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 6 });
+
+      await runExperimentCommand("quality-check", { repeat: "3" });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        repeat: 3,
+      });
+    });
+  });
+
+  describe("when --repeat is not a whole number from 1 to 5", () => {
+    for (const value of ["0", "6", "1.5", "many"]) {
+      /** @scenario "The experiment run command refuses a repeat that is not a whole number from 1 to 5" */
+      it(`refuses "${value}" instead of starting a run`, async () => {
+        await expect(runExperimentCommand("quality-check", { repeat: value })).rejects.toThrow(
+          ProcessExitError,
+        );
+
+        expect(console.error).toHaveBeenCalledWith(
+          expect.stringContaining("--repeat takes a whole number from 1 to 5"),
+        );
+        expect(mockStartRun).not.toHaveBeenCalled();
+      });
+    }
+  });
+
+  describe("when a repeated run is waited for and completes", () => {
+    /** @scenario "A waited repeated run prints the pass rate of every dataset row" */
+    it("prints and returns each dataset row's pass rate over its repetitions", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 6 });
+      mockGetRunStatus.mockResolvedValue({
+        runId: "run_123",
+        status: "completed",
+        progress: 6,
+        total: 6,
+      });
+      const verdicts = [true, false, true, true, true, true];
+      mockGetRunResults.mockResolvedValue({
+        experimentId: "experiment_1",
+        runId: "run_123",
+        projectId: "project_1",
+        repeat: 3,
+        targets: [{ id: "target_a", name: "support-prompt" }],
+        dataset: verdicts.map((_, index) => ({ index, targetId: "target_a", entry: {} })),
+        evaluations: verdicts.map((passed, index) => ({
+          evaluator: "exact",
+          targetId: "target_a",
+          status: "processed",
+          index,
+          passed,
+        })),
+        timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 2 },
+        completeness: {
+          complete: true,
+          dataset: { received: 6, expected: 6 },
+          evaluations: { received: 6, expected: 6 },
+        },
+      });
+
+      const result = await runExperimentCommand("quality-check", { repeat: "3", wait: true });
+      result?.table?.();
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => call.join(" "))
+        .join("\n");
+      expect(printed).toContain("Row 1 · support-prompt:");
+      expect(printed).toContain("2/3 passed (67%)");
+      expect(printed).toContain("3/3 passed (100%)");
+      expect(result?.data).toMatchObject({
+        rowPassRates: [
+          { row: 1, targetId: "target_a", passed: 2, graded: 3, errors: 0, repeat: 3 },
+          { row: 2, targetId: "target_a", passed: 3, graded: 3, errors: 0, repeat: 3 },
+        ],
+      });
+    });
+  });
+
   describe("when a --param pair has no equals sign", () => {
     it("refuses the command instead of starting a run", async () => {
       await expect(
@@ -179,6 +265,181 @@ describe("runExperimentCommand()", () => {
       );
 
       await expect(runExperimentCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when --wait sees the run complete", () => {
+    const failingVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 2, failed: 1, passRate: 66.7 },
+    ];
+    const passingVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 3, failed: 0, passRate: 100 },
+    ];
+    const crashedVerdict = [
+      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+    ];
+    const completedWith = (summary: Record<string, unknown>) => ({
+      runId: "run_123",
+      status: "completed",
+      progress: 3,
+      total: 3,
+      summary: { runId: "run_123", totalCells: 3, completedCells: 3, duration: 900, ...summary },
+    });
+
+    beforeEach(() => {
+      process.exitCode = undefined;
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 3 });
+    });
+
+    afterEach(() => {
+      process.exitCode = undefined;
+    });
+
+    /** @scenario "The CLI leaves a completed run green by default, as before" */
+    it("leaves the job green by default, even with failures", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 1, evaluators: failingVerdict }),
+      );
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    /** @scenario "The CLI fails a waited run on a failed evaluation when asked" */
+    it("prints the document and fails the job on a failed evaluation when opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: failingVerdict }),
+      );
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI opt-in also fails a waited run on an errored cell" */
+    it("fails the job on an errored cell when opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 1, evaluators: passingVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI opt-in fails a waited run whose evaluator crashed" */
+    it("fails the job when an evaluator errored on every row and opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: crashedVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("shows a crashed evaluator's errors and no pass rate in the table summary", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: crashedVerdict }),
+      );
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+      result?.table?.();
+
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toMatch(/exact_match:.*0 passed, 0 failed, .*3 errored.*\(no verdicts\)/);
+    });
+
+    /** @scenario "The CLI opt-in fails a waited run whose summary has no evaluator results" */
+    it("fails the job when opted in and the summary has no evaluator results", async () => {
+      mockGetRunStatus.mockResolvedValue(completedWith({ failedCells: 0 }));
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    const stoppedRun = { runId: "run_123", status: "stopped", progress: 1, total: 3 };
+
+    /** @scenario "The CLI opt-in fails a waited run that was stopped before it completed" */
+    it("fails the job when opted in and the run was stopped", async () => {
+      mockGetRunStatus.mockResolvedValue(stoppedRun);
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "stopped" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI leaves a stopped run's exit code alone by default" */
+    it("leaves a stopped run's exit code alone by default", async () => {
+      mockGetRunStatus.mockResolvedValue(stoppedRun);
+
+      await runExperimentCommand("quality-check", { wait: true });
+
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    /** @scenario "The CLI opt-in leaves a clean run green" */
+    it("leaves a clean run green when opted in", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: passingVerdict }),
+      );
+
+      await runExperimentCommand("quality-check", { wait: true, failOnEvaluatorFailures: true });
+
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it("lists each evaluator's passed and failed counts in the table summary", async () => {
+      mockGetRunStatus.mockResolvedValue(
+        completedWith({ failedCells: 0, evaluators: failingVerdict }),
+      );
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+      const result = await runExperimentCommand("quality-check", { wait: true });
+      result?.table?.();
+
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toMatch(/exact_match:.*2 passed, .*1 failed.*\(66\.7%\)/);
+    });
+
+    /** @scenario "A run that fails on the server fails the job" */
+    it("exits 1 when the server marks the run failed", async () => {
+      mockGetRunStatus.mockResolvedValue({
+        runId: "run_123",
+        status: "failed",
+        progress: 1,
+        total: 3,
+      });
+
+      await expect(runExperimentCommand("quality-check", { wait: true })).rejects.toThrow(
+        ProcessExitError,
+      );
+    });
+  });
+
+  describe("when --fail-on-evaluator-failures is given without --wait", () => {
+    /** @scenario "The evaluator flag without --wait is rejected" */
+    it("rejects the flag before starting a run", async () => {
+      await expect(
+        runExperimentCommand("quality-check", { failOnEvaluatorFailures: true }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(mockStartRun).not.toHaveBeenCalled();
     });
   });
 });
@@ -246,6 +507,49 @@ describe("experimentStatusCommand()", () => {
       await expect(experimentStatusCommand("doc-qa", { runId: "nonexistent" })).rejects.toThrow(
         ProcessExitError,
       );
+    });
+  });
+});
+
+describe("rowPassRatesOf()", () => {
+  describe("given repetitions whose target or evaluator errored and one with no verdict", () => {
+    /** @scenario "An errored repetition is left out of the pass rate and counted as an error" */
+    it("counts the errors apart and leaves them and the ungraded repetition out", () => {
+      const rates = rowPassRatesOf({
+        repeat: 4,
+        results: {
+          dataset: [
+            { index: 0, targetId: "target_a", entry: {} },
+            { index: 1, targetId: "target_a", entry: {}, error: "timed out" },
+            { index: 2, targetId: "target_a", entry: {} },
+            { index: 3, targetId: "target_a", entry: {} },
+          ],
+          evaluations: [
+            {
+              evaluator: "exact",
+              targetId: "target_a",
+              status: "processed",
+              index: 0,
+              passed: true,
+            },
+            { evaluator: "score", targetId: "target_a", status: "processed", index: 2, score: 0.4 },
+            { evaluator: "judge", targetId: "target_a", status: "error", index: 3 },
+          ],
+        },
+      });
+
+      expect(rates).toEqual([
+        {
+          row: 1,
+          targetId: "target_a",
+          targetName: null,
+          passed: 1,
+          graded: 1,
+          errors: 2,
+          repeat: 4,
+        },
+      ]);
+      expect(passRateText(rates[0]!)).toBe("1/1 passed (100%), 2 errors");
     });
   });
 });

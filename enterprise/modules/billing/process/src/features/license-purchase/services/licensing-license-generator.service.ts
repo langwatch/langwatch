@@ -1,4 +1,5 @@
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { toDate, type Instant } from "@langwatch/time";
 
 import { type GeneratedLicense, LicenseGenerator } from "./license-purchase.service.ts";
 
@@ -21,9 +22,12 @@ export class LicensingLicenseGeneratorService extends LicenseGenerator {
     organizationName: string;
     email: string;
     maxMembers: number;
+    expiresAt?: Instant;
   }): Promise<GeneratedLicense> {
+    const { expiresAt, ...licensee } = input;
     const { licenseKey, licenseData } = await this.licensing.generateLicenseKey({
-      ...input,
+      ...licensee,
+      ...(expiresAt ? { expiresAt: toDate(expiresAt) } : {}),
       planType: PURCHASED_LICENSE_PLAN,
     });
     return {

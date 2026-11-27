@@ -5,6 +5,7 @@ import type {
   OpsParkedTenantsPage,
   OpsQueueReconcileOutcome,
   QueueInfo,
+  TenantQueueCount,
 } from "@langwatch/ops-contract";
 
 import type { QueueAuditSink } from "../app/ops.app.ts";
@@ -15,25 +16,15 @@ import type {
   JobEntry,
   QueueRepository,
 } from "../repositories/queue.repository.ts";
-
-/** What an error with no recognizable class name is recorded as. */
-const UNTYPED_ERROR_SHAPE = "untyped_error";
+import { summarizeErrorShapes } from "../rules/queue-error-shape.rules.ts";
 
 /**
- * Reduce raw job errors to something safe to keep in a durable audit row.
+ * Members of each queue set one tenant count reads at most. Group keys are not indexed by
+ * tenant, so pending, blocked and DLQ counts scan; past this they undercount the tenant.
  */
-function summarizeErrorShapes(messages: string[]): string[] {
-  const shapes = new Set<string>();
-  for (const message of messages) {
-    const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
-    shapes.add(named?.[1]?.slice(0, 80) ?? UNTYPED_ERROR_SHAPE);
-    if (shapes.size >= 5) {
-      break;
-    }
-  }
-
-  return [...shapes];
-}
+const TENANT_COUNT_SCAN_BUDGET = 100_000;
+/** Groups per queue whose jobs a tenant count reads for its job total and oldest job. */
+const TENANT_COUNT_JOB_READ_BUDGET = 2_000;
 
 export class QueueService {
   private readonly repository: QueueRepository;
@@ -481,5 +472,17 @@ export class QueueService {
     maxTenants: number;
   }): Promise<OpsParkedTenantsPage> {
     return this.repository.enumerateParkedTenants(input);
+  }
+
+  /** Per queue, the given tenants' groups as counts; queues holding none of them are left out. */
+  async countTenantGroups({ tenantIds }: { tenantIds: string[] }): Promise<TenantQueueCount[]> {
+    const queueNames = await this.repository.discoverQueueNames();
+    const counts = await this.repository.countTenantGroups({
+      queueNames,
+      tenantIds: [...new Set(tenantIds)],
+      scanBudget: TENANT_COUNT_SCAN_BUDGET,
+      jobReadBudget: TENANT_COUNT_JOB_READ_BUDGET,
+    });
+    return counts.toSorted((left, right) => left.queueName.localeCompare(right.queueName));
   }
 }

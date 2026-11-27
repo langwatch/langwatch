@@ -8,8 +8,8 @@ import type { PlanInfo } from "@langwatch/entitlement-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryUsageCacheRepository } from "../../repositories/memory/memory.usage-cache.repository.ts";
 import {
-  InProcessUsageCache,
   type UsageOrganization,
   type UsageVolumeCounter,
   type ProjectUsageCounts,
@@ -23,6 +23,7 @@ const PLAN: PlanInfo = {
   free: false,
   maxMembers: 10,
   maxMembersLite: 10,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 10_000,
   canPublish: true,
   prices: { USD: 0, EUR: 0 },
@@ -51,8 +52,8 @@ function serviceWithCache(now: () => number) {
     eventCounter: new CountingCounter(),
     planResolver: async () => PLAN,
     deployment: { isSaas: true },
-    countCache: new InProcessUsageCache(5 * 60 * 1000, now),
-    decisionCache: new InProcessUsageCache(5 * 60 * 1000, now),
+    countCache: MemoryUsageCacheRepository.create({ ttlMs: 5 * 60 * 1000, now }),
+    decisionCache: MemoryUsageCacheRepository.create({ ttlMs: 5 * 60 * 1000, now }),
   });
   return { service, traceCounter };
 }

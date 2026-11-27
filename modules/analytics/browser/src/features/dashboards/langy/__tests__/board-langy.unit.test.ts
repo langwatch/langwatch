@@ -2,18 +2,23 @@
  * What a board hands Langy, as text the agent reads: the open board, the
  * widgets on it and the period it reads over.
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
+  askAboutStoredBoard,
+  BOARD_QUESTION_ANSWER,
   boardContextChip,
   boardPromptDraft,
   boardQuestion,
   boardSetupDraft,
   boardSubject,
   offersBoardSetup,
+  widgetChartDraft,
+  widgetPromptDraft,
 } from "../model/board-langy.ts";
 
 const PERIOD = {
@@ -58,6 +63,35 @@ describe("the context a board hands Langy", () => {
   });
 });
 
+describe("a question from a board's ask bar", () => {
+  const ask = (board: { id: string; name: string; templateId?: string }) =>
+    boardQuestion({
+      question: "Is our AI saving us time?",
+      board: boardSubject({ board, widgets: [] }),
+      period: PERIOD,
+    });
+
+  /** @scenario "AC264b Langy widgets: a question from a board's ask bar asks for a widget on that board" */
+  it("asks for the answer as a widget on the board, then a sentence", () => {
+    const [board] = ask({ id: "board-9", name: "Agent impact" }).context;
+
+    expect(board?.ref).toContain(BOARD_QUESTION_ANSWER);
+    expect(board?.ref).toContain('dashboard "Agent impact" (id board-9)');
+    expect(board?.label).toBe("Agent impact");
+  });
+
+  /** @scenario "AC264b Langy widgets: a question from a board's ask bar asks for a widget on that board" */
+  it("asks for no widget on a read-only From LangWatch board", () => {
+    const [board] = ask({
+      id: "curated/release",
+      name: "Release check",
+      templateId: "release",
+    }).context;
+
+    expect(board?.ref).not.toContain(BOARD_QUESTION_ANSWER);
+  });
+});
+
 describe("a draft about a board", () => {
   describe("given a template's report drafted for a new board", () => {
     /** @scenario "Langy drafts: a draft records the board it is about" */
@@ -74,7 +108,7 @@ describe("a draft about a board", () => {
   });
 
   describe("given a From LangWatch board", () => {
-    /** @scenario "From LangWatch: a template board asks Langy with the board as context" */
+    /** @scenario "From LangWatch: the ask bar asks Langy for a member who may not create dashboards" */
     it("names it as a read-only template rather than a stored board", () => {
       const request = boardQuestion({
         question: "Can it ship?",
@@ -153,9 +187,117 @@ describe("a board whose widgets show no data", () => {
         'These widgets on my "Agent health" dashboard show no data: "Cost per trace", "Who uses it".',
       );
       expect(request.draft).toContain("the LangWatch SDK call, the setting or the integration");
-      expect(request.draft).toContain("Dashboard period: 2026-09-01T00:00:00Z to");
+      expect(request.draft).not.toContain("2026-09-01T00:00:00Z");
+      expect(request.context[0]?.ref).toContain("2026-09-01T00:00:00Z to");
       expect(request.about).toEqual({ ref: "board-3" });
       expect(request.context[0]?.label).toBe("Agent health");
     });
+  });
+});
+
+describe("an ask made on a new board before it was stored", () => {
+  /** @scenario "AC162e Asking Langy on a new board stores it first" */
+  it("names the stored board's id in its context and in what the draft is about", () => {
+    const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
+    const asked = boardSetupDraft({ emptyWidgetNames: [], board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.context[0]?.ref).toContain('dashboard "Untitled dashboard 3" (id board-9)');
+    expect(told.context[0]?.ref).not.toContain("(id new)");
+    expect(told.context[0]?.key).toBe("dashboard:board-9");
+    expect(told.about).toEqual(asked.about && { ...asked.about, ref: "board-9" });
+    expect(told.draft).toBe(asked.draft);
+  });
+
+  /** @scenario "AC162e Asking Langy on a new board stores it first" */
+  it("leaves a board name that reads like a reference as it was", () => {
+    const board = boardSubject({
+      board: { id: "new", name: 'Review "x" (id new)' },
+      widgets: [{ name: 'dashboard "y" (id new)' }],
+    });
+    const asked = boardSetupDraft({ emptyWidgetNames: [], board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.context[0]?.ref).toContain(
+      'dashboard "Review \\"x\\" (id new)" (id board-9); widgets: dashboard "y" (id new)',
+    );
+  });
+
+  /** @scenario "AC162e Asking Langy on a new board stores it first" */
+  it("leaves a widget's name and queries as they were, and moves only its key", () => {
+    const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
+    const widget = {
+      id: "w-1",
+      name: 'dashboard "y" (id new)',
+      definition: { queries: [{ name: "q", sql: "SELECT 'dashboard \"z\" (id new)'" }] },
+    };
+    const asked = widgetPromptDraft({ widget, board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.context[1]?.ref).toBe(asked.context[1]?.ref);
+    expect(told.context[1]?.key).toBe("dashboard:board-9:widget:w-1");
+    expect(told.context[0]?.ref).toContain('"Untitled dashboard 3" (id board-9)');
+  });
+});
+
+describe("a question asked from a board", () => {
+  /** @scenario "AC264d Langy follow-ups: a question from a board's ask bar names that board as where it came from" */
+  it("names that board as where it was asked", () => {
+    const board = boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] });
+
+    expect(boardQuestion({ question: "Why?", board, period: PERIOD }).askedFrom).toBe(
+      "dashboard:board-9",
+    );
+  });
+
+  /** @scenario "AC264d Langy follow-ups: a question from a board's ask bar names that board as where it came from" */
+  it("names the stored board once a new board is stored", () => {
+    const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
+    const asked = boardQuestion({ question: "Why?", board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.askedFrom).toBe("dashboard:board-9");
+  });
+});
+
+describe("asking about the same board and widget twice", () => {
+  const before = boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] });
+  const after = boardSubject({
+    board: { id: "board-9", name: "Costs" },
+    widgets: [{ name: "Which models does my agent use?" }],
+  });
+  const widget = { name: "Which models does my agent use?", definition: { queries: [] } };
+
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("keys the board as its chip and the widget by its name, whatever each ask's text says", () => {
+    const chip = boardContextChip({ board: after, range: "30d", period: PERIOD });
+    const added = widgetPromptDraft({ widget, board: before, period: PERIOD });
+    const clicked = widgetChartDraft({
+      subject: { kind: "model", label: "gpt-5" },
+      widget,
+      board: after,
+      period: PERIOD,
+    });
+
+    expect(added.context[0]?.ref).not.toBe(clicked.context[0]?.ref);
+    expect(added.context[0]?.key).toBe(chip.id);
+    expect(clicked.context[0]?.key).toBe(chip.id);
+    expect(added.context[1]?.ref).not.toBe(clicked.context[1]?.ref);
+    expect(added.context[1]?.key).toBe(clicked.context[1]?.key);
+  });
+
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("keys two widgets of one name apart, on one board or on two", () => {
+    const other = boardSubject({ board: { id: "board-10", name: "Costs too" }, widgets: [] });
+    const keyOf = ({ id, board }: { id: string; board: typeof after }) =>
+      widgetPromptDraft({ widget: { ...widget, id }, board, period: PERIOD }).context[1]?.key;
+
+    expect(keyOf({ id: "w-1", board: after })).toBe(keyOf({ id: "w-1", board: after }));
+    expect(keyOf({ id: "w-1", board: after })).not.toBe(keyOf({ id: "w-2", board: after }));
+    expect(keyOf({ id: "w-1", board: after })).not.toBe(keyOf({ id: "w-1", board: other }));
   });
 });

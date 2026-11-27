@@ -68,7 +68,8 @@ async function checkControls({ page, base }) {
   await key.waitFor({ state: "visible" });
   assert.equal(await key.getAttribute("type"), "password");
   await page.getByRole("button", { name: "Send request", exact: true }).click();
-  assert.equal(await key.getAttribute("aria-invalid"), "true");
+  /* Send loads the request tools lazily before it validates, so the mark lands a moment later. */
+  await key.and(page.locator('[aria-invalid="true"]')).waitFor({ timeout: 5_000 });
 }
 
 async function checkVariant({ browser, base, width, mode }) {

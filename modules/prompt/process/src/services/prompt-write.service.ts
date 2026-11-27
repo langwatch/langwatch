@@ -295,8 +295,10 @@ export class PromptWriteService {
     // This prevents undefined values from overwriting existing database values
     if (configDataUpdates.prompt !== undefined || configDataUpdates.messages !== undefined) {
       const normalizedUpdate = normalizeSystemMessage(configDataUpdates);
-      configDataUpdates.prompt = normalizedUpdate.prompt;
-      configDataUpdates.messages = normalizedUpdate.messages;
+      if (normalizedUpdate.prompt !== undefined) configDataUpdates.prompt = normalizedUpdate.prompt;
+      if (normalizedUpdate.messages !== undefined) {
+        configDataUpdates.messages = normalizedUpdate.messages;
+      }
     }
 
     const updatedConfig = await this.repository.updateConfigAndCreateVersion({
@@ -339,10 +341,12 @@ export class PromptWriteService {
       organizationId,
     });
 
+    // Read the version this restore wrote, not the latest, which a concurrent save may have moved.
     return this.read.getPromptByIdOrHandle({
       idOrHandle: newVersion.configId,
       projectId: params.projectId,
       organizationId,
+      versionId: newVersion.id,
     });
   }
 
@@ -374,7 +378,7 @@ export class PromptWriteService {
     idOrHandle: string;
     projectId: string;
     organizationId?: string;
-  }): Promise<{ success: boolean }> {
+  }): Promise<{ success: boolean; promptId: string }> {
     const organizationId =
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
@@ -401,7 +405,7 @@ export class PromptWriteService {
       organizationId,
     });
 
-    return result;
+    return { success: result.success, promptId: config.id };
   }
 
   /**

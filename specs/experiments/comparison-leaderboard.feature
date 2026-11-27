@@ -398,6 +398,12 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     Then neither is described as cheaper than the other
 
   @unit
+  Scenario: A pair's cost interval does not move when another variant joins the run
+    Given two variants compared on cost
+    When a third variant is added that was priced on rows the two both missed
+    Then the cost comparison between the first two is unchanged
+
+  @unit
   Scenario: Asking about a pair in either order gives the same answer
     Given any two variants in the run
     When the run is asked which is cheaper, in both orders

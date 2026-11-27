@@ -87,6 +87,21 @@ export const TRACE_NAME_CHANGED_EVENT_VERSION_LATEST = "2026-05-07" as const;
 
 export const TRACE_NAME_CHANGED_EVENT_VERSIONS = [TRACE_NAME_CHANGED_EVENT_VERSION_LATEST] as const;
 
+/** An evaluation's outcome recorded on its trace, so the trace fold copies it (trace ADR-003). */
+export const EVALUATION_OUTCOME_RECORDED_EVENT_TYPE =
+  "lw.obs.trace.evaluation_outcome_recorded" as const;
+export const EVALUATION_OUTCOME_RECORDED_EVENT_VERSION_LATEST = "2026-11-12" as const;
+
+export const EVALUATION_OUTCOME_RECORDED_EVENT_VERSIONS = [
+  EVALUATION_OUTCOME_RECORDED_EVENT_VERSION_LATEST,
+] as const;
+
+/** The longest evaluator name or label an outcome carries; the recorder truncates past it. */
+export const EVALUATION_OUTCOME_TEXT_MAX_LENGTH = 256;
+
+/** The latest evaluation time an outcome may carry: the row's TTL casts it to DateTime (2106). */
+export const EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS = 4_294_967_295_000;
+
 export const TRACE_PROCESSING_EVENT_TYPES = [
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECORDED_EVENT_TYPE,
@@ -99,6 +114,7 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
+  EVALUATION_OUTCOME_RECORDED_EVENT_TYPE,
 ] as const;
 
 export type TraceProcessingEventType = (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
@@ -113,6 +129,8 @@ export const ADD_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.add_annotation" as cons
 export const REMOVE_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.remove_annotation" as const;
 export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE = "lw.obs.trace.bulk_sync_annotations" as const;
 export const CHANGE_TRACE_NAME_COMMAND_TYPE = "lw.obs.trace.change_trace_name" as const;
+export const RECORD_EVALUATION_OUTCOME_COMMAND_TYPE =
+  "lw.obs.trace.record_evaluation_outcome" as const;
 
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
@@ -125,6 +143,7 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
   REMOVE_ANNOTATION_COMMAND_TYPE,
   BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
   CHANGE_TRACE_NAME_COMMAND_TYPE,
+  RECORD_EVALUATION_OUTCOME_COMMAND_TYPE,
 ] as const;
 
 /**
@@ -184,3 +203,109 @@ export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
  * 4 MiB byte budget bounds large previews before this count does.
  */
 export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;
+
+/** A2A v1.0 gRPC and JSON-RPC method names; generic enough to need an A2A context too. */
+export const A2A_V1_METHODS: ReadonlySet<string> = new Set([
+  "SendMessage",
+  "SendStreamingMessage",
+  "GetTask",
+  "ListTasks",
+  "CancelTask",
+  "SubscribeToTask",
+  "GetExtendedAgentCard",
+  "CreateTaskPushNotificationConfig",
+  "GetTaskPushNotificationConfig",
+  "ListTaskPushNotificationConfig",
+  "DeleteTaskPushNotificationConfig",
+]);
+
+/** A2A v0.x JSON-RPC method names; specific enough to stand alone. */
+export const A2A_V0_METHODS: ReadonlySet<string> = new Set([
+  "message/send",
+  "message/stream",
+  "tasks/get",
+  "tasks/cancel",
+  "tasks/resubscribe",
+  "tasks/pushNotificationConfig/set",
+  "tasks/pushNotificationConfig/get",
+  "tasks/pushNotificationConfig/list",
+  "tasks/pushNotificationConfig/delete",
+  "agent/getAuthenticatedExtendedCard",
+]);
+
+/** a2a-sdk (Python) traced method names, by the last dotted segment, to their A2A method. */
+const A2A_SDK_METHODS: Readonly<Record<string, string>> = {
+  send_message: "SendMessage",
+  send_message_streaming: "SendStreamingMessage",
+  get_task: "GetTask",
+  list_tasks: "ListTasks",
+  cancel_task: "CancelTask",
+  subscribe: "SubscribeToTask",
+  resubscribe: "SubscribeToTask",
+  get_extended_agent_card: "GetExtendedAgentCard",
+  create_task_push_notification_config: "CreateTaskPushNotificationConfig",
+  set_task_callback: "CreateTaskPushNotificationConfig",
+  get_task_push_notification_config: "GetTaskPushNotificationConfig",
+  get_task_callback: "GetTaskPushNotificationConfig",
+  list_task_push_notification_configs: "ListTaskPushNotificationConfig",
+  delete_task_push_notification_config: "DeleteTaskPushNotificationConfig",
+  on_message_send: "SendMessage",
+  on_message_send_stream: "SendStreamingMessage",
+  on_get_task: "GetTask",
+  on_list_tasks: "ListTasks",
+  on_cancel_task: "CancelTask",
+  on_subscribe_to_task: "SubscribeToTask",
+  on_resubscribe_to_task: "SubscribeToTask",
+  on_get_extended_agent_card: "GetExtendedAgentCard",
+  on_create_task_push_notification_config: "CreateTaskPushNotificationConfig",
+  on_set_task_push_notification_config: "CreateTaskPushNotificationConfig",
+  on_get_task_push_notification_config: "GetTaskPushNotificationConfig",
+  on_list_task_push_notification_configs: "ListTaskPushNotificationConfig",
+  on_delete_task_push_notification_config: "DeleteTaskPushNotificationConfig",
+};
+
+type A2aRole = "client" | "server" | "unknown";
+
+/** What a span name alone says about an A2A call. */
+export type A2aSpanNameMatch =
+  | { matched: false }
+  | { matched: true; method: string; role: A2aRole };
+
+function a2aSdkRoleOf(path: string): A2aRole {
+  if (path.startsWith("client.") || path.includes("transport")) return "client";
+  if (path.startsWith("server.") || /handler|dispatcher/.test(path)) return "server";
+  return "unknown";
+}
+
+/**
+ * The A2A call a span name alone shows: `a2a.client|server <Method>`, a gRPC
+ * `<pkg>.A2AService/<Method>`, an a2a-sdk dotted name or a v0.x JSON-RPC name.
+ * A bare v1 name such as `SendMessage` is not enough: it needs A2A attributes.
+ */
+export function a2aSpanNameMatch(spanName: string): A2aSpanNameMatch {
+  const name = spanName.trim();
+  const prefixed = /^a2a\.(client|server)\s+(\S+)$/.exec(name);
+  if (prefixed?.[1] && prefixed[2]) {
+    const role = prefixed[1] === "client" ? "client" : "server";
+    return { matched: true, method: prefixed[2], role };
+  }
+  const grpc = /^(?:[\w.]+\.)?A2AService\/(\w+)$/.exec(name)?.[1];
+  if (grpc && A2A_V1_METHODS.has(grpc)) return { matched: true, method: grpc, role: "unknown" };
+  const sdk = /^a2a\.([\w.]+)\.(\w+)$/.exec(name);
+  const sdkMethod = sdk?.[2] ? A2A_SDK_METHODS[sdk[2]] : undefined;
+  if (sdk?.[1] && sdkMethod) {
+    return { matched: true, method: sdkMethod, role: a2aSdkRoleOf(sdk[1]) };
+  }
+  if (A2A_V0_METHODS.has(name)) return { matched: true, method: name, role: "unknown" };
+  return { matched: false };
+}
+
+/** Whether a span's name alone marks it as an A2A call (see `a2aSpanNameMatch`). */
+export function isA2aSpanName(spanName: string): boolean {
+  return a2aSpanNameMatch(spanName).matched;
+}
+
+/** Whether a span's name marks an agent call: an A2A call or a gen_ai `invoke_agent` span. */
+export function isAgentCallSpanName(spanName: string): boolean {
+  return /^invoke_agent(?:\s|$)/.test(spanName.trim()) || isA2aSpanName(spanName);
+}

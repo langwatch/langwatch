@@ -62,3 +62,25 @@ Feature: CLI commands address endpoints the app actually serves
     Given a platform-published ingestion template
     When the CLI clones it into the organization
     Then it posts to /api/governance/ingestion-templates/clone
+
+  # The template commands sent the device access token to the management API
+  # (`/api/v1/governance/ingestion-templates`), which takes an API key and the
+  # project it acts in, so every one of them answered "Session expired". Past
+  # that, `admin-list` read `ingestion_templates` from a route that answers
+  # `{ data: [...] }`, and `archive` typed its answer as `{ ok: true }`; the
+  # route answers `{ archived: true }`.
+  Scenario: Template commands sign in with the login key in its project
+    Given a device login
+    When the CLI reads an ingestion template
+    Then it sends the login key and the project it acts in
+    And not the device access token
+
+  Scenario: Listing templates as an admin returns every row the app answers with
+    Given the admin template list route answers with two templates
+    When the CLI lists ingestion templates as an admin
+    Then it returns both templates
+
+  Scenario: Archiving a template reads the answer the app sends
+    Given an org-authored ingestion template
+    When the CLI archives it
+    Then it reports the template as archived

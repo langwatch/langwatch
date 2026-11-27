@@ -33,6 +33,8 @@ import type {
   SignUpEnrollment,
   SignUpVerificationRequest,
 } from "./front-door.responses.ts";
+import type { PasskeyAssertionOptions, PasskeyAssertionResponse } from "./passkey-assertion.ts";
+import type { SignInFacts } from "./sign-in-facts.ts";
 import type {
   ReleaseHeldAccountResult,
   SaveSignInSecurityInput,
@@ -142,6 +144,30 @@ export interface AuthApi {
   ): Promise<void>;
   /** Clears the claims, returning the session to its own user without ending it; idempotent. */
   stopImpersonation(input: { sessionId: string }): Promise<void>;
+  /** Whether this person has registered at least one passkey. */
+  hasPasskey(input: { userId: string }): Promise<boolean>;
+  /**
+   * The accounts behind exactly one address, matched the way sign-in matches it: ids, method
+   * codes, counts, flags and times for a staff investigation (ADR-202). Empty when there is none.
+   */
+  findSignInFacts(input: Readonly<{ email: string }>): Promise<SignInFacts[]>;
+  /**
+   * The WebAuthn request options for this person's own passkeys over a caller-chosen base64url
+   * challenge, user verification required. Refuses `unknown_credential` when they hold none.
+   */
+  passkeyAssertionOptions(input: {
+    userId: string;
+    challenge: string;
+  }): Promise<PasskeyAssertionOptions>;
+  /**
+   * Verifies a signature over exactly that challenge by one of this person's passkeys, with user
+   * verification, and advances its counter. Throws `passkey_assertion_refused` otherwise.
+   */
+  verifyPasskeyAssertion(input: {
+    userId: string;
+    challenge: string;
+    response: PasskeyAssertionResponse;
+  }): Promise<{ credentialId: string }>;
   /**
    * Whether Better Auth accepts the token. Carries the RAW auth-session id
    * an impersonation starts/stops against; a process with no sign-in door
@@ -393,6 +419,11 @@ export interface AuthApi {
     memberUserIds: readonly string[];
     at: number;
   }): Promise<AuthUsageCount>;
+  /** Which of these people used a browser session at or after `since` (epoch ms). */
+  findSessionUsersSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]>;
 }
 
 /** Which accounts a legacy-access question is about: the connection being

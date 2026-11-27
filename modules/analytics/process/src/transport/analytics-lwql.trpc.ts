@@ -10,10 +10,12 @@ import {
   type LangWatchQLAvailability,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
+  type LangWatchQLManagedPromptVersionFloor,
   type LangWatchQLProtections,
   type LangWatchQLReadableProject,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
+  type LangWatchQLSpanDataFloor,
   type LangWatchQLTimeWindow,
   type LangWatchQLValidationResult,
 } from "@langwatch/analytics-contract";
@@ -49,6 +51,10 @@ export interface AnalyticsLwqlApi {
     projectId: string;
     protections: LangWatchQLProtections;
   }): Promise<LangWatchQLSchema>;
+  /** Where span_metrics' history starts: the span_analytics replay's recorded since. */
+  spanDataFloor(): Promise<LangWatchQLSpanDataFloor>;
+  /** Where LastUsedPromptVersionId is known from: the managed prompt version replay's state. */
+  managedPromptVersionFloor(): Promise<LangWatchQLManagedPromptVersionFloor>;
   /** The organization's live projects this member holds `analytics:view` on. */
   listReadableProjects(input: {
     projectId: string;
@@ -113,6 +119,16 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
     });
   })
 
+  // No rollout gate: dashboards read it, and the floor names no project data.
+  .procedure("spanDataFloor")
+  .withPermission("analytics:view")
+  .handle(({ app }) => app.spanDataFloor())
+
+  // No rollout gate, as for spanDataFloor: dashboards read it, and it names no project data.
+  .procedure("managedPromptVersionFloor")
+  .withPermission("analytics:view")
+  .handle(({ app }) => app.managedPromptVersionFloor())
+
   .procedure("readableProjects")
   .withPermission("analytics:view")
   .handle(async ({ app, input, actor }) => ({
@@ -143,6 +159,9 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       ...(input.sources === undefined ? {} : { sources: input.sources }),
       ...(input.projects === undefined ? {} : { projects: input.projects, userId: actor.id }),
       ...(signal ? { signal } : {}),
+      telemetry: input.telemetry
+        ? { caller: "dashboard_widget", ...input.telemetry }
+        : { caller: "workbench" },
     });
   })
   .build();

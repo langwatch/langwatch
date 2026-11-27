@@ -4,14 +4,21 @@ import { z } from "zod";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
 import type {
+  DocsSessionAvailability,
   DocsSessionKeyMinted,
   DocsSessionRevoked,
   MintDocsSessionKeyInput,
   RevokeDocsSessionKeysInput,
 } from "./api-key.docs-session.ts";
+import type { ApiKeyFacts, ApiKeyFactsInput } from "./api-key.facts.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
+import type {
+  MintStaffAccessKeyInput,
+  RevokeStaffAccessKeyInput,
+  StaffAccessKeyMinted,
+} from "./api-key.staff-access.ts";
 import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
@@ -45,6 +52,17 @@ import type {
   RevokeApiKeyInput,
   UpdateApiKeyInput,
 } from "./api-key.ts";
+import type {
+  BraidSignatureVerdict,
+  CreateSigningKeyInput,
+  FindSigningKeysInput,
+  IssuedSigningKey,
+  ProjectSigning,
+  RevokeSigningKeyInput,
+  RotateSigningKeyInput,
+  SigningKey,
+  VerifyBraidSignatureInput,
+} from "./signing-key.ts";
 
 const apiKeyVisibleProjectsInputSchemaDefinition = z
   .object({
@@ -132,16 +150,25 @@ export interface ApiKeyApi {
    */
   mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string>;
   /**
-   * A docs session key (ADR-185): the member in one project, for at most five minutes and never
-   * past their browser session or the organization's session ceiling. Refuses an operator acting
-   * as the member and a docs origin this deployment does not register.
+   * A docs session key (ADR-185): the member in one project, read-only or with all they hold, for
+   * the 5 to 60 minutes chosen, never past their browser session or the session ceiling. Refuses
+   * an impersonator, an unregistered docs origin and an organization that turned this off.
    */
   mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted>;
+  /** Whether the project's organization lets the docs playground connect (the consent page). */
+  getDocsSessionAvailability(input: { projectId: string }): Promise<DocsSessionAvailability>;
   /**
    * Revokes the one docs key named, or every docs key the named browser sessions minted.
    * Idempotent, and silent about any key that is not a live docs session key.
    */
   revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
+  /**
+   * An approved staff agent's key (ADR-202): ownerless, system-managed, restricted to the staff
+   * bags at organization scope, expiring within the hour. Refuses any other permission.
+   */
+  mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted>;
+  /** Revokes a staff access key and forgets its cached answer. Idempotent; silent on other keys. */
+  revokeStaffAccessKey(input: RevokeStaffAccessKeyInput): Promise<void>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */
   resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -150,6 +177,11 @@ export interface ApiKeyApi {
   markUsed(input: ApiKeyIdInput): void;
   list(input: ApiKeyListInput): Promise<ApiKey[]>;
   listAll(input: ApiKeyListAllInput): Promise<ApiKey[]>;
+  /**
+   * Every key of the organization, system, revoked and staff keys included, as ids, kinds, reach
+   * and times only (ADR-202 ops functions). Live keys first, capped at `API_KEY_FACTS_LIMIT`.
+   */
+  findKeyFactsForOrganization(input: ApiKeyFactsInput): Promise<ApiKeyFacts[]>;
   /**
    * The keys a credential may list: a member's own, or every key in the
    * organization for a service key that holds `organization:manage`.
@@ -266,6 +298,19 @@ export interface ApiKeyApi {
     by: ApiKeyManagementCaller,
   ): Promise<NamedApiKeyBinding[]>;
   /**
+   * What a restricted key bound to every one of these scopes may carry: what the owner (else
+   * the caller) holds at each, by the mint's own resolver, so group grants count. Only an
+   * organization admin may ask about another owner.
+   */
+  listGrantablePermissions(
+    input: {
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    },
+    by: ApiKeyManagementCaller,
+  ): Promise<string[]>;
+  /**
    * One key id resolved to a display name. Answers null identically for an id
    * that does not exist and one in another organization, so it cannot enumerate.
    */
@@ -290,6 +335,14 @@ export interface ApiKeyApi {
     input: { organizationId: string; apiKeyId: string },
     by: ApiKeyManagementCaller,
   ): Promise<void>;
+  /**
+   * Swaps a key's secret for a new one, keeping its id, settings and grants, and answers the new
+   * token once. The old secret is refused at once: there is no grace period.
+   */
+  rotateKey(
+    input: { organizationId: string; apiKeyId: string },
+    by: ApiKeyManagementCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }>;
   listOrganizationProjects(
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
@@ -302,6 +355,18 @@ export interface ApiKeyApi {
     input: { organizationId: string },
     by: ApiKeyManagementCaller,
   ): Promise<ApiKeyUser[]>;
+  /** ADR-201 §4: a project's braid signing keys with their last 24 hours; never a secret. */
+  findSigningKeys(input: FindSigningKeysInput): Promise<SigningKey[]>;
+  /** Whether a project signs its calls, for the braid dialog of whoever braids into it. */
+  findProjectSigning(input: FindSigningKeysInput): Promise<ProjectSigning>;
+  /** Issues a signing key; the answer is the only place its secret is ever returned. */
+  createSigningKey(input: CreateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Issues a replacement; the old key keeps verifying for `SIGNING_KEY_ROTATION_OVERLAP_MS`. */
+  rotateSigningKey(input: RotateSigningKeyInput): Promise<IssuedSigningKey>;
+  /** Ends a key at once, bounded by the lookup cache (`SIGNING_KEY_LOOKUP_CACHE_MS`). */
+  revokeSigningKey(input: RevokeSigningKeyInput): Promise<SigningKey>;
+  /** Span admission's check of one `langwatch.signature`; the secret never leaves this module. */
+  verifyBraidSignature(input: VerifyBraidSignatureInput): Promise<BraidSignatureVerdict>;
 }
 
 export const ApiKeyApi = moduleApi<ApiKeyApi>()("api-key");

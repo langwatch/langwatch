@@ -6,6 +6,7 @@ import { isDispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import { providerWaitOnError } from "../rules/ingestion-pull-cooldown.rules.ts";
+import type { ScheduledListingOutcome } from "./ingestion-pull-listing.service.ts";
 import type { IngestionPullMetricsSink } from "./ingestion-pull-metrics.service.ts";
 
 /** One scheduled pull run, as the worker composition root hands it in. */
@@ -61,6 +62,15 @@ export interface IngestionPullOutcomeChannel {
   }): Promise<void>;
 }
 
+/** Lists a list-only source's agents on its scheduled run; any other source is pulled. */
+export interface IngestionPullScheduledListing {
+  listAgentsOnSchedule(input: {
+    tenantId: string;
+    attempt: number;
+    run: IngestionPullRun;
+  }): Promise<ScheduledListingOutcome>;
+}
+
 export const INGESTION_PULL_MAX_ATTEMPTS = 3;
 export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;
 export const INGESTION_PULL_CONCURRENCY = 4;
@@ -79,18 +89,22 @@ export class IngestionPullService {
   private readonly outcomePort: IngestionPullOutcomeChannel;
   private readonly metrics: IngestionPullMetricsSink;
   private readonly logger: Logger;
+  private readonly scheduledListing: IngestionPullScheduledListing | undefined;
 
   private constructor({
     runPort,
     outcomePort,
     metrics,
+    scheduledListing,
     options = {},
   }: {
     runPort: IngestionPullRunner;
     outcomePort: IngestionPullOutcomeChannel;
     metrics: IngestionPullMetricsSink;
+    scheduledListing?: IngestionPullScheduledListing;
     options?: { maxAttempts?: number; clock?: () => number; logger?: Logger };
   }) {
+    this.scheduledListing = scheduledListing;
     this.runPort = runPort;
     this.outcomePort = outcomePort;
     this.metrics = metrics;
@@ -103,19 +117,22 @@ export class IngestionPullService {
     runPort,
     outcomePort,
     metrics,
+    scheduledListing,
     options = {},
   }: {
     runPort: IngestionPullRunner;
     outcomePort: IngestionPullOutcomeChannel;
     metrics: IngestionPullMetricsSink;
+    scheduledListing?: IngestionPullScheduledListing;
     options?: { maxAttempts?: number; clock?: () => number; logger?: Logger };
   }): IngestionPullService {
-    return new IngestionPullService({ runPort, outcomePort, metrics, options });
+    return new IngestionPullService({ runPort, outcomePort, metrics, scheduledListing, options });
   }
 
   async execute(input: IngestionPullExecution): Promise<void> {
     const startedAt = this.clock();
     await this.recordAbandonmentIfReplacing(input);
+    if (await this.listInsteadOfPulling(input)) return;
 
     let result: IngestionPullRunResult;
     try {
@@ -138,6 +155,49 @@ export class IngestionPullService {
       scheduledFor: input.pull.scheduledFor,
       ...result,
     });
+  }
+
+  /** A list-only source's run is its agent listing: the run settles on the listing's outcome. */
+  private async listInsteadOfPulling(input: IngestionPullExecution): Promise<boolean> {
+    if (!this.scheduledListing) return false;
+    let listed: Awaited<ReturnType<IngestionPullScheduledListing["listAgentsOnSchedule"]>>;
+    try {
+      listed = await this.scheduledListing.listAgentsOnSchedule({
+        tenantId: input.tenantId,
+        attempt: input.attempt,
+        run: input.pull,
+      });
+    } catch (error) {
+      // A thrown listing retries like a thrown pull and settles the run on the final attempt.
+      await this.settleFailedPull({ input, error });
+      return true;
+    }
+    if (listed.outcome === "not_list_only") return false;
+    if (listed.outcome === "refused") {
+      this.metrics.count("failed_final");
+      await this.outcomePort.failed({
+        ...this.failureEnvelope(input),
+        error: `The provider would not list its agents (${listed.reason}).`,
+        errorCode: PULL_REFUSED_ERROR_CODE,
+        retryable: false,
+        retryAfterMs: null,
+      });
+      return true;
+    }
+    this.metrics.count("completed");
+    await this.outcomePort.completed({
+      tenantId: input.tenantId,
+      occurredAt: this.clock(),
+      sourceId: input.pull.sourceId,
+      runId: input.pull.runId,
+      scheduledFor: input.pull.scheduledFor,
+      nextCursor: input.pull.cursor,
+      eventCount: 0,
+      errorCount: 0,
+      completeness: "complete",
+      readThroughAt: null,
+    });
+    return true;
   }
 
   /** On every delivery: the abandonment's idempotency key settles a redelivery onto one write. */

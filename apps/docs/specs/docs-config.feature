@@ -29,8 +29,9 @@ Feature: docs.json stays the single source of truth for both documentation sites
   Scenario: Give agents the site's instructions in every Markdown export
     Given docs.json has Markdown instructions for agents
     When a page's Markdown export is generated
-    Then the instructions open the export under an "Agent Instructions" heading, before the page title
-    And without instructions the export starts with the page title
+    Then the export opens with the page title, and the page's own text comes first
+    And the instructions close the export under an "Agent Instructions" heading, after the page
+    And without instructions the export ends with the page's own text
 
   @unit
   Scenario: Show the authored announcement beside the release update
@@ -62,6 +63,18 @@ Feature: docs.json stays the single source of truth for both documentation sites
     Then no tag loads
     When the reader accepted cookies on langwatch.ai
     Then the tag loads as on any production page
+
+  @unit
+  Scenario: Ask the reader for cookie consent on the docs, sharing the marketing site's choice
+    Given docs.json names a Google Tag Manager container
+    And the reader has not accepted or declined cookies on langwatch.ai
+    When a production page loads
+    Then a cookie notice asks them to accept or decline
+    When they accept
+    Then the notice goes, the choice is stored where the marketing site keeps it, and the tag loads
+    When they decline instead
+    Then the notice goes, the choice is stored, and no tag loads
+    And a reader who already chose on either site, a page with no container, or a local host shows no notice
 
   @unit
   Scenario: Refuse arbitrary code from the tag manager

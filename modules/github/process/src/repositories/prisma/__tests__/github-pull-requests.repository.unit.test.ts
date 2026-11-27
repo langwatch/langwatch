@@ -2,6 +2,7 @@
  * The key a pull request is stored and found under.
  */
 
+import { Prisma } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -166,6 +167,60 @@ describe("PrismaGithubPullRequestsRepository", () => {
         orderBy: { recheckAfter: "asc" },
         take: 50,
       });
+    });
+  });
+
+  describe("when two first writes of one branch's check race", () => {
+    const branchCheck = {
+      organizationId: "organization-1",
+      repositoryHost: "github.com",
+      repositoryFullName: "acme/refunds",
+      headBranch: "feat/Refunds",
+      lastCheckedAt: Temporal.Instant.from("2026-08-02T00:00:00.000Z"),
+      prCount: 1,
+      notFoundAt: null,
+      recheckAfter: null,
+      attempts: 0,
+    };
+    const uniqueViolation = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "test",
+    });
+
+    function racingDatabase(failure: Error) {
+      let upserts = 0;
+      const database = prismaDouble({
+        githubBranchPullRequestCheck: {
+          upsert: async () => {
+            upserts += 1;
+            if (upserts === 1) throw failure;
+            return {};
+          },
+        },
+      });
+      return {
+        upserts: () => upserts,
+        repository: PrismaGithubPullRequestsRepository.create(database),
+      };
+    }
+
+    /** @scenario "Two first writes of the same branch's check both land" */
+    it("retries once when the insert loses on the unique key", async () => {
+      const { upserts, repository } = racingDatabase(uniqueViolation);
+
+      await repository.upsertBranchCheck(branchCheck as never);
+
+      expect(upserts()).toBe(2);
+    });
+
+    /** @scenario "Two first writes of the same branch's check both land" */
+    it("raises any other failure without retrying", async () => {
+      const { upserts, repository } = racingDatabase(new Error("connection reset"));
+
+      await expect(repository.upsertBranchCheck(branchCheck as never)).rejects.toThrow(
+        "connection reset",
+      );
+      expect(upserts()).toBe(1);
     });
   });
 

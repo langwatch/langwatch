@@ -7,12 +7,12 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
 } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
-import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
@@ -30,7 +30,7 @@ import {
 const ALT_SCHEMA = "lwql_alt";
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
-const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const mapped = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .find((view) => view.name === PG_MAPPED_VIEW);
@@ -114,8 +114,8 @@ describe("given the approved views live in a PostgreSQL schema other than public
           insert: () => Promise.reject(new Error("the probe never inserts")),
         },
       });
-      const probe = selfProvisioning.collectionProbe({
-        names: harness.names,
+      const probe = collectionBinding.collectionProbe({
+        collection: lwqlTestNamedCollection(harness.names),
         postgres: {
           endpoint: {
             host: "host.docker.internal",

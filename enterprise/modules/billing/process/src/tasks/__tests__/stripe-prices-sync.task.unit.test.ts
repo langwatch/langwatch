@@ -49,6 +49,12 @@ const createMeterMapping = (
   return meters;
 };
 
+/** The euro usage prices sit on the dollar meters at 0.85 euros per dollar of usage. */
+const EURO_USAGE_PRICE_NAMES: readonly string[] = [
+  "GROWTH_INSTANT_EVAL_EUR",
+  "GROWTH_PII_REDACTION_EUR",
+];
+
 const createRequiredPriceRecords = (
   mapping: StripePriceMap,
   livemode: boolean,
@@ -62,8 +68,8 @@ const createRequiredPriceRecords = (
       active: true,
       livemode,
       product: "prod_demo",
-      unitAmount: 100,
-      currency: "usd",
+      unitAmount: EURO_USAGE_PRICE_NAMES.includes(key) ? 85 : 100,
+      currency: EURO_USAGE_PRICE_NAMES.includes(key) ? "eur" : "usd",
       type: "recurring",
       recurring: { interval: "month", intervalCount: 1 },
       nickname: key,
@@ -331,7 +337,12 @@ describe("syncStripePrices", () => {
       const existing = createStripePricesFile();
       const existingWithoutMeters: StripePricesFile = {
         ...existing,
-        meters: { BILLABLE_EVENTS: undefined, INSTANT_EVAL_USD: undefined },
+        meters: {
+          BILLABLE_EVENTS: undefined,
+          INSTANT_EVAL_USD: undefined,
+          RETENTION_STORAGE_GB: undefined,
+          PII_REDACTION_USD: undefined,
+        },
       };
 
       const resolvedMapping = createPriceMapForEnvironment(existing.mapping, "test");
@@ -378,6 +389,18 @@ describe("syncStripePrices", () => {
 
       const errors = validateMappings(file, "test");
       expect(errors.some((error) => error.includes("references missing price"))).toBe(true);
+    });
+
+    /** @scenario "A mapped euro usage price costs 0.85 of its dollar price" */
+    it("refuses a euro usage price that is not 0.85 of its dollar price", () => {
+      const file = createStripePricesFile();
+      const euroId = file.mapping.GROWTH_PII_REDACTION_EUR?.test ?? "";
+      file.prices[euroId] = { ...file.prices[euroId]!, unitAmount: 100 };
+
+      const errors = validateMappings(file, "test");
+
+      expect(errors).toEqual([expect.stringContaining("GROWTH_PII_REDACTION_EUR")]);
+      expect(validateMappings(file, "live")).toEqual([]);
     });
   });
 });

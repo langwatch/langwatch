@@ -43,6 +43,9 @@
       "path": "../../modules/stored-object/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/staff-access/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/slack/process/tsconfig.build.json"
     },
     {
@@ -157,9 +160,6 @@
       "path": "../../modules/experiment/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/eventing/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/evaluator/process/tsconfig.build.json"
     },
     {
@@ -200,6 +200,9 @@
     },
     {
       "path": "../../enterprise/modules/enterprise-gateway/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/digest/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/demo-data/process/tsconfig.build.json"
@@ -275,6 +278,9 @@
     },
     {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/eventing/tsconfig.build.json"
     }
   ]
 }

@@ -14,7 +14,7 @@ const BROWSER_SRC = path.resolve(import.meta.dirname, "../../..");
 
 /** The per-trace procedures that take the member. */
 const PER_TRACE_CALL =
-  /\b(?:traces\.(?:header|spanTree|spanTreePaginated|spanTreeDelta|spansPaginated|spansDelta|spansFull|spanLangwatchSignals|codingAgentTranscript|spanDetail|resourceInfo|traceEvents|evals|traceLogs|conversationContext|getEvaluations)|evaluations\.getEvaluationInputs)\.(?:useQuery|useInfiniteQuery|useSuspenseQuery|prefetch|fetch|ensureData|setData)\s*\(/g;
+  /\b(?:traces\.(?:agentCallGraph|header|spanTree|spanTreePaginated|spanTreeDelta|spansPaginated|spansDelta|spansFull|spanLangwatchSignals|codingAgentTranscript|spanDetail|resourceInfo|traceEvents|evals|traceLogs|conversationContext|getEvaluations)|evaluations\.getEvaluationInputs)\.(?:useQuery|useInfiniteQuery|useSuspenseQuery|prefetch|fetch|ensureData|setData)\s*\(/g;
 
 /** What a member-naming input mentions. */
 const NAMES_THE_MEMBER = /\b(?:queryArgs|tenantId|tenantArg)\b/;

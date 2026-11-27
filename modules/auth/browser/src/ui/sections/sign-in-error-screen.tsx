@@ -9,6 +9,7 @@ import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { UI_SIGN_OUT_PATH } from "../../behavior/ui-session-client.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
+import { describeProviderRefusal, SEAT_LIMIT_REFUSAL } from "../../model/refused-sign-in-copy.ts";
 import {
   bounceConnectionFrom,
   cutoverSignInRefusal,
@@ -46,12 +47,14 @@ function admittedCopyFor(code: string): { title: string; description: string } |
  * never itself: `?error=` is caller-controlled, and echoing it made this
  * heading a place to put attacker-chosen words under LangWatch branding.
  */
-const errorTitle = (error: string): string => {
+const errorTitle = (error: string, idp: string | null): string => {
   switch (error) {
     case "OAuthAccountNotLinked":
       return "Account already exists";
     case "DIFFERENT_EMAIL_NOT_ALLOWED":
       return "Can't link this account";
+    case "ACCOUNT_LINKED_TO_ANOTHER_USER":
+      return "Already connected to another account";
     case "SSO_PROVIDER_NOT_ALLOWED":
     case "SSO_REQUIRED_BY_ORGANIZATION":
       return "Use your organization's sign-in";
@@ -60,7 +63,9 @@ const errorTitle = (error: string): string => {
     case "state_mismatch":
       return "Your sign-in expired";
     case "access_denied":
-      return "Sign-in was refused";
+      return describeProviderRefusal(idp).title;
+    case "seat_limit_reached":
+      return SEAT_LIMIT_REFUSAL.title;
     default:
       return (
         cutoverSignInRefusal(error)?.title ??
@@ -192,10 +197,12 @@ function SignInErrorDescription({
   error,
   callbackUrl,
   governingConnection,
+  idp,
 }: {
   error: string;
   callbackUrl: string | undefined;
   governingConnection: string | null;
+  idp: string | null;
 }) {
   if (governingConnection) {
     return (
@@ -242,11 +249,26 @@ function SignInErrorDescription({
     return (
       <VStack gap={4} align="stretch">
         <Text>
-          You cannot link an account with a different email address. Please use the same email
-          address as your current account.
+          The account you picked uses a different email from your LangWatch address. Link an account
+          that has your LangWatch address as a verified email, or add that address to it first.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <Link href="/settings/authentication">Back to Settings</Link>
+          <Link href="/settings/security">Back to Settings</Link>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "ACCOUNT_LINKED_TO_ANOTHER_USER") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>
+          The account you picked is already connected to a different LangWatch account. Sign in to
+          that LangWatch account and disconnect it in Settings &gt; Security, or connect a different
+          account here.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/settings/security">Back to Settings</Link>
         </Button>
       </VStack>
     );
@@ -320,10 +342,21 @@ function SignInErrorDescription({
   if (error === "access_denied") {
     return (
       <VStack gap={4} align="stretch">
-        <Text>
-          The sign-in was cancelled, or your identity provider refused it. If you sign in through
-          your company, ask your IT administrator to give you access to the LangWatch app.
+        <Text>{describeProviderRefusal(idp).body}</Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          If you cancelled the sign-in yourself, go back and try again.
         </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/auth/signin">Back to sign in</Link>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "seat_limit_reached") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>{SEAT_LIMIT_REFUSAL.body}</Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
           <Link href="/auth/signin">Back to sign in</Link>
         </Button>
@@ -380,13 +413,15 @@ export function SignInError({ error: rawError }: { error: string }) {
   });
   // The handle on a cause we deliberately did not name, so the person has something to quote.
   const trace = query?.get("trace") ?? null;
+  const idp = query?.get("idp") ?? null;
 
   return (
-    <AuthCard title={errorTitle(error)}>
+    <AuthCard title={errorTitle(error, idp)}>
       <SignInErrorDescription
         error={error}
         callbackUrl={callbackUrl}
         governingConnection={governingConnection}
+        idp={idp}
       />
       {trace && (
         <Text textStyle="monoSm" color="fg.subtle" data-testid="sign-in-error-trace">

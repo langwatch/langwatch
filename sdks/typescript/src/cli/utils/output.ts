@@ -186,7 +186,10 @@ const descend = (value: unknown, key: string): unknown => {
 
 // A minus needs digits after it: `[-]` would otherwise parse as an index of
 // NaN and traverse to null instead of failing like an unsupported expression.
-const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
+const PATH_KEY_SOURCE = "[A-Za-z_][A-Za-z0-9_-]*";
+const SUPPORTED_SEGMENT_RE = new RegExp(`^(${PATH_KEY_SOURCE})?((?:\\[(?:-?\\d+)?\\])*)$`);
+/** A whole key the subset can spell; the hint only suggests these. */
+const PATH_KEY_RE = new RegExp(`^${PATH_KEY_SOURCE}$`);
 
 /**
  * What to do instead, on every refusal. This subset stays small on purpose;
@@ -626,6 +629,32 @@ function errorOutputFormat(format: string): "agents" | "json" | undefined {
   return format === "agents" ? "agents" : "json";
 }
 
+const MAX_NAMED_KEYS = 5;
+const MAX_LIST_HINTS = 3;
+
+const describeNonArray = (value: unknown): string => {
+  if (value === null) return " (it is null)";
+  if (typeof value !== "object") return ` (it is a ${typeof value})`;
+  const keys = Object.keys(value);
+  if (keys.length === 0) return " (it is an empty object)";
+  const shown = keys.slice(0, MAX_NAMED_KEYS).join(", ");
+  return ` (it is an object with keys: ${shown}${keys.length > MAX_NAMED_KEYS ? ", …" : ""})`;
+};
+
+// Names only keys whose value really is a list, so the hint never invents a path.
+const listPathHint = (value: unknown, at: string): string => {
+  if (value === null || typeof value !== "object") return "";
+  const base = at.replace(/\[(?:-?\d+)?\]$/, "");
+  const paths = Object.entries(value)
+    .filter(([key, child]) => Array.isArray(child) && PATH_KEY_RE.test(key))
+    .slice(0, MAX_LIST_HINTS)
+    .map(([key]) => `${base}.${key}[]`);
+  return paths.length > 0 ? `; try ${paths.join(", ")}` : "";
+};
+
+const nonArrayHint = (value: unknown, at: string): string =>
+  `${describeNonArray(value)}${listPathHint(value, at)}.${USE_THE_SHELL}`;
+
 function walkJqPath(value: unknown, rest: PathStep[], path: string, expression: string): unknown {
   const [head, ...tail] = rest;
   if (head === undefined) return value;
@@ -639,7 +668,7 @@ function walkJqPath(value: unknown, rest: PathStep[], path: string, expression: 
     const at = `${path}[${head.index}]`;
     if (!Array.isArray(value)) {
       throw new Error(
-        `Invalid --jq expression "${expression}": "${at}" indexes a value that is not an array`,
+        `Invalid --jq expression "${expression}": "${at}" indexes a value that is not an array${nonArrayHint(value, at)}`,
       );
     }
     // jq counts a negative index from the end, and answers null past either
@@ -651,7 +680,7 @@ function walkJqPath(value: unknown, rest: PathStep[], path: string, expression: 
   const at = `${path}[]`;
   if (!Array.isArray(value)) {
     throw new Error(
-      `Invalid --jq expression "${expression}": "${at}" iterates over a non-array value`,
+      `Invalid --jq expression "${expression}": "${at}" iterates over a non-array value${nonArrayHint(value, at)}`,
     );
   }
   const mapped = value.map((item) => walkJqPath(item, tail, at, expression));

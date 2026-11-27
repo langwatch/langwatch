@@ -1,4 +1,8 @@
-import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import {
+  describeError,
+  isHandledByGlobalHandler,
+  showErrorToast,
+} from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
@@ -8,6 +12,7 @@ import { useCallback } from "react";
 import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import type { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
+import type { JudgeTraceWaitMs } from "../../../../model/judge-trace-wait.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { ParameterFieldError } from "../run-parameters/parameter-suggestions.ts";
 import type { RunScope } from "./run-configuration.ts";
@@ -79,6 +84,8 @@ export type RunDialogSubmitInput = {
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
+  /** The judge's trace wait in milliseconds; null leaves it to the scenario or project. */
+  traceWait: JudgeTraceWaitMs;
   note: string;
   runParameters: RunParameters;
   /** The overrides the suite may remember: everything but the secrets. */
@@ -123,6 +130,7 @@ function parameterErrorOf(error: unknown): ParameterFieldError | null {
 
 /**
  * Shows a coded refusal inside the dialog; anything else becomes a toast.
+ * A refusal a global handler already showed (the upgrade modal) stays quiet.
  */
 function useSurfaceRunError({
   setInlineError,
@@ -133,6 +141,7 @@ function useSurfaceRunError({
 }) {
   return useCallback(
     (error: unknown) => {
+      if (isHandledByGlobalHandler(error)) return;
       const parameterError = parameterErrorOf(error);
       if (parameterError) {
         setParameterError(parameterError);

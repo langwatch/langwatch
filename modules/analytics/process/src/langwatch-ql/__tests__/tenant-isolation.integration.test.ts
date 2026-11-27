@@ -6,6 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
@@ -20,13 +21,14 @@ import {
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const accessAudit = LangWatchQLAccessAuditService.create();
 
-describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 server", () => {
+describe("given the LangWatchQL analytics setup applied to a ClickHouse 26.8 server", () => {
   let harness: LangWatchQLClickHouseHarness;
   /** The restricted identity carrying tenant-a's valid key-hash context. */
   let tenantA: ClickHouseClient;
@@ -148,7 +150,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     it("returns zero rows for a garbage context without erroring", async () => {
       await expectZeroRowsWithControl({
         harness,
-        keyHash: "not-a-real-key-hash",
+        keyHash: UNMAPPED_KEY_HASH,
         table: "traces",
         tenantColumn: "TenantId",
         context: "garbage key context",
@@ -182,52 +184,82 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
   });
 
   describe("when the query text overrides settings", () => {
+    /**
+     * Each override, trailing and in a subquery, sent through the production executor, which
+     * appends tenant-a's capability last. On 26.8 the statement's own clause wins either way, so
+     * the validator refusing any SETTINGS (SETTINGS_CLAUSE) is what keeps the executor's value.
+     */
+    async function overrideOutcomes(
+      overrides: Readonly<Record<string, string>>,
+    ): Promise<Record<string, string>> {
+      const executor = ClickHouseLangWatchQLExecutorRepository.create({
+        connection: {
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        },
+      });
+      const setting = harness.names.tenantSetting;
+      const outcomes: Record<string, string> = {};
+      for (const [label, value] of Object.entries(overrides)) {
+        const own = `SETTINGS ${setting} = '${value}'`;
+        const statements: [string, string][] = [
+          [`trailing ${label}`, `SELECT TenantId FROM ${database}.traces ${own}`],
+          [
+            `subquery ${label}`,
+            `SELECT TenantId FROM (SELECT TenantId FROM ${database}.traces ${own})`,
+          ],
+        ];
+        for (const [name, sql] of statements) {
+          outcomes[name] = await executor
+            .execute({
+              sql,
+              tenantCapability: harness.tenantA.keyHash,
+              projectIds: [harness.tenantA.tenantId],
+            })
+            .then(
+              ({ rows }) =>
+                `rows: ${[...new Set(rows.map((row) => String(row.TenantId)))].toSorted().join(",") || "none"}`,
+              (error: { code?: string }) => `refused: ${error.code}`,
+            );
+        }
+      }
+      await executor.close();
+      return outcomes;
+    }
+
     /** @scenario "Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash" */
-    it("reaches no foreign rows with a guessed tenant setting", async () => {
+    it("returns no tenant-b row for a guessed or an empty override, trailing or in a subquery", async () => {
       const control = await recordSeedControl({
         harness,
         table: "traces",
         tenantColumn: "TenantId",
       });
-
-      const rows = await selectRows<{ TenantId: string }>(
-        tenantA,
-        `SELECT TenantId FROM ${database}.traces ` +
-          `SETTINGS ${harness.names.tenantSetting} = 'guessed-key-hash'`,
-      );
-
       expect(
-        rows,
-        `a guessed key hash returned rows while ${control.tenantB} tenant-b rows exist`,
-      ).toHaveLength(0);
+        control.tenantB,
+        "tenant-b must hold rows for the absence to mean anything",
+      ).toBeGreaterThan(0);
+
+      // "none", not tenant-a's rows: the statement's value applied, and it matches no key.
+      expect(await overrideOutcomes({ guessed: UNMAPPED_KEY_HASH, empty: "" })).toEqual({
+        "trailing guessed": "rows: none",
+        "subquery guessed": "rows: none",
+        "trailing empty": "rows: none",
+        "subquery empty": "rows: none",
+      });
     });
 
     /**
-     * The documented capability boundary, asserted rather than hidden: the key
-     * hash IS the credential, so a caller holding a victim's valid hash reads
-     * the victim's rows. The issue's design says exactly this ("useless without
-     * a victim's valid key"), and the gateway's AST validator rejecting any
-     * SETTINGS clause is the defense-in-depth layer above it. A test that
-     * quietly omitted this would misrepresent what the database layer promises.
+     * The documented capability boundary, asserted rather than hidden: the key hash IS the
+     * credential, so an override carrying a victim's valid hash reads the victim's rows where the
+     * server accepts it. The validator refusing any SETTINGS clause is the layer above this.
      */
     /** @scenario "Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash" */
-    it("does reach the other tenant's rows when the override carries that tenant's real key hash", async () => {
-      await recordSeedControl({
-        harness,
-        table: "traces",
-        tenantColumn: "TenantId",
+    it("reaches tenant-b's rows only with tenant-b's real key hash, the credential itself", async () => {
+      expect(await overrideOutcomes({ "tenant-b": harness.tenantB.keyHash })).toEqual({
+        "trailing tenant-b": `rows: ${harness.tenantB.tenantId}`,
+        "subquery tenant-b": `rows: ${harness.tenantB.tenantId}`,
       });
-
-      const rows = await selectRows<{ TenantId: string }>(
-        tenantA,
-        `SELECT DISTINCT TenantId FROM ${database}.traces ` +
-          `SETTINGS ${harness.names.tenantSetting} = '${harness.tenantB.keyHash}'`,
-      );
-
-      expect(
-        rows.map((row) => row.TenantId),
-        "possession of a valid key hash is the security boundary at the database layer",
-      ).toEqual([harness.tenantB.tenantId]);
     });
 
     /** @scenario "Overriding a pinned setting in query text is rejected by profile constraints" */
@@ -317,6 +349,37 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         query:
           `SELECT TenantId FROM ${database}.traces ` +
           `UNION ALL SELECT TenantId FROM ${database}.spans`,
+      });
+    });
+
+    /** @scenario "Row policy holds across UNION ALL branches" */
+    it.each([
+      // Both sides scoped: only tenant A's ids are common to the two tables.
+      ["INTERSECT", "INTERSECT SELECT TenantId FROM {db}.spans"],
+      // The left side scoped: removing nothing leaves tenant A's ids alone.
+      ["EXCEPT", "EXCEPT SELECT TenantId FROM {db}.spans WHERE TenantId = 'no-such-tenant'"],
+    ])("scopes the sides of %s", async (operator, rightSide) => {
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: "traces",
+        tenantColumn: "TenantId",
+        context: operator,
+        query: `SELECT TenantId FROM ${database}.traces ` + rightSide.replace("{db}", database),
+      });
+    });
+
+    /** @scenario "Row policy holds across UNION ALL branches" */
+    it("scopes every branch of a parenthesised UNION", async () => {
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: "traces",
+        tenantColumn: "TenantId",
+        context: "parenthesised UNION",
+        query:
+          `(SELECT TenantId FROM ${database}.traces) ` +
+          `UNION ALL (SELECT TenantId FROM ${database}.spans)`,
       });
     });
 
@@ -441,8 +504,8 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
   });
 
   describe("when the server's query log is inspected", () => {
-    /** @scenario "Key hash is auditable in the query log without exposing the raw key" */
-    it("records the key hash and never the raw secret", async () => {
+    /** @scenario "The capability never appears in a request URL or a server log" */
+    it("keeps the capability out of the logged settings and the raw secret out of every column", async () => {
       // Pins the construction the audit depends on: only a digest is ever sent.
       // The expected value is written out rather than recomputed, so this stays
       // an independent check — recomputing it here would only restate whatever
@@ -471,19 +534,14 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
       ).toBeGreaterThan(0);
 
       for (const entry of entries) {
+        // ADR-200: the profile pins `log_query_settings = 0`, so the Settings column, which no
+        // masking rule reaches, never holds the capability.
         const settings = entry.Settings as Record<string, string>;
-        expect(
-          settings[harness.names.tenantSetting],
-          "the key hash is what makes a LangWatchQL query auditable",
-        ).toBe(accessAudit.auditedSettingValue(harness.tenantA.keyHash));
+        expect(settings[harness.names.tenantSetting]).toBeUndefined();
 
         // Serialised whole, so the check covers every column rather than the
         // handful someone thought to name.
         const serialised = JSON.stringify(entry);
-        expect(
-          serialised.includes(harness.tenantA.keyHash),
-          "sanity: the hash should be findable in the serialised row",
-        ).toBe(true);
         expect(
           serialised.includes(harness.tenantA.rawSecret),
           "the raw LangWatchQL key reached ClickHouse — only its hash may ever be sent",

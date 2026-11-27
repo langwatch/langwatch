@@ -151,8 +151,11 @@ export class GatewayUsageService {
       return this.emptySummary();
     }
 
-    const buckets = await this.usageBuckets({
+    const projectIds = await this.projects.listIdsByOrganization({
       organizationId: args.organizationId,
+    });
+    const buckets = await this.usageBuckets({
+      projectIds,
       window: args.window,
       virtualKeyIds: args.virtualKeyIds,
     });
@@ -232,28 +235,27 @@ export class GatewayUsageService {
      */
     model?: string;
   }): Promise<VirtualKeyUsageSummary> {
-    // Slices aggregate in ClickHouse; only the 20-row recent list pulls
-    // raw traces, and each tenant's pull carries its own LIMIT.
-    const [buckets, tenantTraces] = await Promise.all([
+    // Slices aggregate in ClickHouse; only the 20-row recent list pulls raw traces.
+    const projectIds = await this.projects.listIdsByOrganization({
+      organizationId: args.organizationId,
+    });
+    const [buckets, recentTraces] = await Promise.all([
       this.usageBuckets({
-        organizationId: args.organizationId,
+        projectIds,
         window: args.window,
         virtualKeyIds: [args.virtualKeyId],
       }),
-      this.acrossTenants(args.organizationId, (projectId) =>
-        this.traces.findAttributedTraces({
-          projectId,
-          attributeKey: VIRTUAL_KEY_ATTRIBUTE,
-          window: spendWindow(args.window),
-          values: [args.virtualKeyId],
-          model: args.model,
-          limit: RECENT_DEBITS_LIMIT,
-        }),
-      ),
+      projectIds.length === 0
+        ? Promise.resolve([])
+        : this.traces.findAttributedTraces({
+            projectIds,
+            attributeKey: VIRTUAL_KEY_ATTRIBUTE,
+            window: spendWindow(args.window),
+            values: [args.virtualKeyId],
+            model: args.model,
+            limit: RECENT_DEBITS_LIMIT,
+          }),
     ]);
-    const recentTraces = tenantTraces
-      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs)
-      .slice(0, RECENT_DEBITS_LIMIT);
 
     const byModel = new Map<string, { totalUsd: bigint; requests: number }>();
     const byDay = new Map<string, { totalUsd: bigint; requests: number }>();
@@ -315,29 +317,22 @@ export class GatewayUsageService {
     return new Map(keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]));
   }
 
-  /** Every tenant's buckets, concatenated: the callers sum them per key, as one query would. */
+  /**
+   * Usage buckets over the org's tenant set in one statement: one read per project fills the
+   * ClickHouse statement queue in an organization with many projects, and the page is refused.
+   */
   private usageBuckets(args: {
-    organizationId: string;
+    projectIds: readonly string[];
     window: UsageWindow;
     virtualKeyIds: string[];
   }) {
-    return this.acrossTenants(args.organizationId, (projectId) =>
-      this.traces.findAttributeUsageBuckets({
-        projectId,
-        attributeKey: VIRTUAL_KEY_ATTRIBUTE,
-        window: spendWindow(args.window),
-        values: args.virtualKeyIds,
-      }),
-    );
-  }
-
-  /** One single-tenant read per project of the org: the tenant set gateway traces can land in. */
-  private async acrossTenants<T>(
-    organizationId: string,
-    read: (projectId: string) => Promise<T[]>,
-  ): Promise<T[]> {
-    const projectIds = await this.projects.listIdsByOrganization({ organizationId });
-    return (await Promise.all(projectIds.map(read))).flat();
+    if (args.projectIds.length === 0) return Promise.resolve([]);
+    return this.traces.findAttributeUsageBuckets({
+      projectIds: args.projectIds,
+      attributeKey: VIRTUAL_KEY_ATTRIBUTE,
+      window: spendWindow(args.window),
+      values: args.virtualKeyIds,
+    });
   }
 
   private averagePerRequest(totalUsd: bigint, requests: number): string {

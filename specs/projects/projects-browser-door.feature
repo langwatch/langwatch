@@ -76,6 +76,15 @@ Feature: The project.* browser namespace is served by the application the compos
     Then it shows no tech stack field and no way to change it
     And saving the page keeps the stored language and framework
 
+  # An older project's ID carries no `project_` prefix and reads like a slug, so the
+  # page shows both and says which one authenticates (#9710).
+  @regression @integration
+  Scenario: The project settings page shows the project ID and the slug apart
+    Given somebody who manages a project
+    When the project settings page opens
+    Then the Project ID row shows the project's ID, says it authenticates API keys, and copies it
+    And right under it a Project slug row shows the slug, says it is not used to authenticate, and copies it
+
   Scenario: A blank storage secret leaves the stored secret unchanged
     Given storage settings with a stored secret
     When the settings form is saved with an endpoint and a key id but a blank secret

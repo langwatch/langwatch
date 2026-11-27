@@ -65,7 +65,7 @@ export class InviteAcceptanceService {
           organizationId: invite.organizationId,
         }));
       if (isCallerRetryingItsOwnAccept) {
-        await this.applyInviteGrants({ userId, invite });
+        await this.completeAcceptance({ userId, invite });
 
         return;
       }
@@ -93,16 +93,17 @@ export class InviteAcceptanceService {
         organizationId: invite.organizationId,
         role: invite.role,
         admission: { inviteId: invite.id, actorUserId: invite.requestedBy ?? null },
+        billingOnly: invite.billingOnly === true,
       });
 
       return true;
     });
 
     if (!claimed) {
-      // The row moved between the caller's read and the claim. If it moved
-      // because THIS user's own concurrent accept won, the grant tail is a
-      // repair, exactly as in the retry path above; anyone else sees the
-      // stale-code refusal.
+      // The row moved between the caller's read and the claim. If THIS user's own concurrent
+      // accept won, that request runs the grant tail; this one writes nothing, so a delayed
+      // request never restores a grant an admin has removed since (ADR-205). Anyone else sees
+      // the stale-code refusal.
       const current = await this.invites
         .getInviteStatus({ inviteId: invite.id })
         .catch((error: unknown) => {
@@ -115,16 +116,28 @@ export class InviteAcceptanceService {
           userId,
           organizationId: invite.organizationId,
         }));
-      if (isCallerRacingItself) {
-        await this.applyInviteGrants({ userId, invite });
-
-        return;
-      }
+      if (isCallerRacingItself) return;
 
       throw new InviteNotFoundError("Invitation is no longer open");
     }
 
+    await this.completeAcceptance({ userId, invite });
+  }
+
+  /** The grant tail, then a person back within their seat hold takes the held seat. */
+  private async completeAcceptance({
+    userId,
+    invite,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
     await this.applyInviteGrants({ userId, invite });
+    await this.deps.seats.takeBackHeldSeat?.({
+      organizationId: invite.organizationId,
+      userId,
+      email: invite.email,
+    });
   }
 
   /**
@@ -246,6 +259,19 @@ export class InviteAcceptanceService {
 
     if (holdsOrganizationBinding(invite.role)) {
       await this.attachOrganizationGrant({ userId, invite, actor });
+    }
+    // Billing only (ADR-205): the Billing grant and no team. The command id makes a retry a no-op.
+    if (invite.billingOnly) {
+      await writer.setBillingRole({
+        organizationId: invite.organizationId,
+        userId,
+        holds: true,
+        caller: { type: "system" },
+        actor,
+        commandId: `billing-only-invite:${invite.id}`,
+        source: "invite",
+      });
+      return;
     }
 
     const teamMembershipData = await this.assignableTeamMemberships(invite);

@@ -1,4 +1,4 @@
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { SESSION_NAME_FACT_KEY, type TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
@@ -11,9 +11,11 @@ import {
   useResourceInfoRead,
   useSpansFullRead,
   useTraceEventsRead,
+  useTraceLogsRead,
 } from "../../../../../behavior/reads/use-trace-detail-reads.ts";
 import { TERMINAL_TOKENS } from "../../../../../model/coding-agent/trace/terminal-palette.ts";
 import { deriveSessionBanner } from "../../../../../model/coding-agent/trace/terminal-session-banner.ts";
+import { promptLineText } from "../../../../../model/coding-agent/trace/terminal-session.ts";
 import { indexToolSpansBySpanId } from "../../../../../model/coding-agent/trace/terminal-tool-spans.ts";
 import { TerminalSkeleton } from "../../../../elements/coding-agent/trace/terminal-skeleton.tsx";
 import { TerminalView } from "../../../../elements/coding-agent/trace/terminal-view.tsx";
@@ -58,7 +60,12 @@ export function TerminalTab({
   // off the resource attributes (the session fold deliberately carries no
   // identity strings, ADR-041).
   const resourceQuery = useResourceInfoRead(turn);
-  const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
+  // A logs-only agent (Grok, ADR-192) names itself only on its log records.
+  const logsQuery = useTraceLogsRead({
+    ...turn,
+    enabled: spansQuery.isSuccess && spansQuery.data.length === 0,
+  });
+  const sessionRow = useCodingAgentSession({ projectId, traceId }).data ?? null;
 
   const toolSpans = useMemo(
     () =>
@@ -69,14 +76,11 @@ export function TerminalTab({
     [spansQuery.data, eventsQuery.data],
   );
 
-  const banner = useMemo(
-    () =>
-      deriveSessionBanner({
-        resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
-        spans: spansQuery.data ?? [],
-      }),
-    [resourceQuery.data, spansQuery.data],
-  );
+  const banner = deriveSessionBanner({
+    resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
+    spans: spansQuery.data ?? [],
+    logs: logsQuery.data ?? [],
+  });
 
   const session = useSessionScrollback({
     projectId,
@@ -96,6 +100,15 @@ export function TerminalTab({
     [session.status, session.earlierCount, session.loadEarlier],
   );
 
+  const promptLine = promptLineText({
+    sessionName,
+    declaredSessionName:
+      sessionRow?.title || resourceQuery.data?.resourceAttributes[SESSION_NAME_FACT_KEY] || null,
+    traceId,
+    spans: spansQuery.data ?? [],
+    entries: session.entries,
+  });
+
   // The loading state has to look like a terminal too — see TerminalSkeleton.
   if (transcriptQuery.isLoading) {
     return <TerminalSkeleton />;
@@ -114,9 +127,9 @@ export function TerminalTab({
       scrollback={scrollback}
       earlierTotals={session.earlierTotals}
       sessionStartAtMs={session.sessionStartAtMs}
-      sessionCostUsd={sessionCostUsd}
+      sessionCostUsd={sessionRow?.costUsd ?? null}
       banner={banner}
-      sessionName={sessionName}
+      promptLine={promptLine}
     />
   );
 }
@@ -124,24 +137,9 @@ export function TerminalTab({
 function TranscriptError() {
   return (
     <VStack align="center" justify="center" height="full" bg={TERMINAL_TOKENS.screenBg}>
-      <Text textStyle="xs" color="fg.error" fontFamily="mono">
+      <Text textStyle="xs" color={TERMINAL_TOKENS.red} fontFamily="mono">
         Couldn&apos;t load this session&apos;s transcript
       </Text>
     </VStack>
   );
-}
-
-/**
- * The whole session's cost for the bottom bar, off the same pre-folded row the Usage
- * tab reads (and the same query, so opening both tabs fetches once).
- */
-function useSessionCostUsd({
-  projectId,
-  traceId,
-}: {
-  projectId: string;
-  traceId: string;
-}): number | null {
-  const sessionQuery = useCodingAgentSession({ projectId, traceId });
-  return sessionQuery.data?.costUsd ?? null;
 }

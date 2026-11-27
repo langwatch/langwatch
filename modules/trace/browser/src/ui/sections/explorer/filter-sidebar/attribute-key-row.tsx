@@ -7,10 +7,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { FacetDisplayState } from "@langwatch/trace-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
-import { type FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useAttributeValues } from "../../../../features/facet/behavior/use-attribute-values.ts";
 import { NoneAttributeRow } from "../../../blocks/explorer/filter-sidebar/none-attribute-row.tsx";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
@@ -41,7 +41,7 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
    */
   displayLabel?: string;
   count: number;
-  getValueState: (attrKey: string, value: string) => FacetValueState;
+  getValueState: (attrKey: string, value: string) => FacetDisplayState;
   noneActive: boolean;
   onToggleValue: (attrKey: string, value: string) => void;
   onToggleNone: () => void;

@@ -57,6 +57,7 @@ function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDep
   const deps: LangyConversationProcessingPipelineDeps = {
     langyConversationProjectionStore: stateStore(),
     langyConversationTurnProjectionStore: stateStore(),
+    langyPullRequestStore: appendStore(),
     langyMessageProjectionStore: appendStore(),
     langyAnalyticsEventProjectionStore:
       appendStore<LangyAnalyticsEventProjectionRecord>(analyticsAppend),
@@ -110,12 +111,13 @@ describe("langy-conversation-processing pipeline shape", () => {
         expect(pipeline.foldProjections.size).toBe(0);
       });
 
-      it("registers messages as a Postgres operational map alongside a separate analytics map", () => {
+      it("registers messages and pull requests as Postgres operational maps beside the analytics map", () => {
         const { pipeline } = buildPipeline();
 
         expect([...pipeline.mapProjections.keys()].toSorted()).toEqual([
           "langyAnalyticsEvent",
           "langyMessageOperational",
+          "langyPullRequests",
         ]);
         // The analytics map is a distinct registration from the message map.
         expect(pipeline.mapProjections.get("langyAnalyticsEvent")?.definition).not.toBe(

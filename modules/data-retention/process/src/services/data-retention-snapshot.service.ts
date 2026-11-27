@@ -5,11 +5,14 @@
  */
 import type {
   ResolvedRetention,
+  RetentionPolicy,
   RetentionPolicySnapshot,
   ScopeAssignment,
 } from "@langwatch/data-retention-contract";
 
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
+import type { RetentionApplyStatusRepository } from "../repositories/retention-apply-status.repository.ts";
+import { storedApplyStatuses } from "../rules/stored-apply-status.rules.ts";
 import type {
   DataRetentionPolicyService,
   RetentionActor,
@@ -21,7 +24,8 @@ type DataRetentionSnapshotServiceOptions = Readonly<{
   retention: Pick<DataRetentionService, "getResolvedForProject" | "listOrganizationRules">;
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
-  policy: Pick<DataRetentionPolicyService, "canConfigureRetention">;
+  policy: Pick<DataRetentionPolicyService, "canConfigureRetention" | "storageBilled">;
+  applyStatus: Pick<RetentionApplyStatusRepository, "findForOrganization">;
 }>;
 
 type OrganizationDirectory = Awaited<
@@ -33,6 +37,13 @@ type RetentionScopeLens = {
   canRead(scopeType: ScopeAssignment["scopeType"], scopeId: string): boolean;
   nameOf(scopeType: ScopeAssignment["scopeType"], scopeId: string): string;
 };
+
+/** A rule row as the stored apply status reads it: its scope and when it was saved. */
+const savedScope = ({ scopeType, scopeId, updatedAt }: RetentionPolicy) => ({
+  scopeType,
+  scopeId,
+  savedAt: updatedAt.getTime(),
+});
 
 export class DataRetentionSnapshotService {
   static create(options: DataRetentionSnapshotServiceOptions): DataRetentionSnapshotService {
@@ -87,6 +98,7 @@ export class DataRetentionSnapshotService {
       projectId,
       effective,
       rules: [],
+      storedApply: [],
       available: {
         organization: null,
         teams: [],
@@ -95,6 +107,7 @@ export class DataRetentionSnapshotService {
           : [],
       },
       canConfigureRetention: false,
+      storageBilled: false,
     };
   }
 
@@ -110,13 +123,21 @@ export class DataRetentionSnapshotService {
     const { directory, permissions, retention, policy } = this.options;
     const userId = actor.userId;
 
-    const [organizationDirectory, rows, canManageOrganization, canConfigureRetention] =
-      await Promise.all([
-        directory.findOrganizationDirectory({ organizationId }),
-        retention.listOrganizationRules({ organizationId }),
-        permissions.canManageOrganization({ userId, organizationId }),
-        policy.canConfigureRetention({ organizationId, actor }),
-      ]);
+    const [
+      organizationDirectory,
+      rows,
+      canManageOrganization,
+      canConfigureRetention,
+      storageBilled,
+      applyRecords,
+    ] = await Promise.all([
+      directory.findOrganizationDirectory({ organizationId }),
+      retention.listOrganizationRules({ organizationId }),
+      permissions.canManageOrganization({ userId, organizationId }),
+      policy.canConfigureRetention({ organizationId, actor }),
+      policy.storageBilled({ organizationId, actor }),
+      this.options.applyStatus.findForOrganization({ organizationId }),
+    ]);
 
     const [teamManage, projectUpdate] = await Promise.all([
       permissions.canManageTeams({
@@ -139,18 +160,27 @@ export class DataRetentionSnapshotService {
       projectUpdate,
     });
 
+    const readableRows = rows.filter((row) => lens.canRead(row.scopeType, row.scopeId));
+    const storedApply = storedApplyStatuses({
+      organizationId,
+      scopes: readableRows.map(savedScope),
+      records: applyRecords,
+      teamOfProject: new Map(
+        organizationDirectory.projects.map((project) => [project.id, project.teamId]),
+      ),
+    });
+
     return {
       projectId,
       effective,
-      rules: rows
-        .filter((row) => lens.canRead(row.scopeType, row.scopeId))
-        .map((row) => ({
-          scopeType: row.scopeType,
-          scopeId: row.scopeId,
-          name: lens.nameOf(row.scopeType, row.scopeId),
-          category: row.category,
-          retentionDays: row.retentionDays,
-        })),
+      storedApply,
+      rules: readableRows.map((row) => ({
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        name: lens.nameOf(row.scopeType, row.scopeId),
+        category: row.category,
+        retentionDays: row.retentionDays,
+      })),
       available: {
         organization: canManageOrganization
           ? { id: organizationId, name: organizationName ?? organizationId }
@@ -163,6 +193,7 @@ export class DataRetentionSnapshotService {
           .map(({ id, name, teamId }) => ({ id, name, teamId })),
       },
       canConfigureRetention,
+      storageBilled,
     };
   }
 

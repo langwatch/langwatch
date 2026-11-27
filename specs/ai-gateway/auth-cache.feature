@@ -124,6 +124,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the next request retries the control plane and succeeds once it recovers
 
     @unit
+    Scenario: a control plane that cannot answer resolve-key tells the client to retry
+      Given the control plane is unreachable, answers 5xx, or sends a body the gateway cannot read
+      When the gateway asks it to resolve a key
+      Then the error is auth_upstream_unavailable and marked retryable
+
+    @unit
     Scenario: config fetch succeeds with zero credentials -> the real no-provider answer stands
       Given the control plane resolves the key successfully
       And the config fetch succeeds carrying an empty credential list
@@ -325,6 +331,14 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the request is rejected with that answer
       And the last known config is discarded
 
+    @unit
+    Scenario: the fallback never serves a rotated old secret past its grace
+      Given the cache evicted a key presented with its old secret after a rotation
+      And the old secret's grace ended while the entry was held as the last known config
+      When the control plane is unreachable on the refetch
+      Then the request is rejected rather than served from the last known config
+      And the last known config is discarded
+
   Rule: Short-lived JWT is refreshed before expiry
 
     @unit @unimplemented
@@ -334,6 +348,324 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the gateway serves from cache immediately (zero added latency)
       And a background goroutine calls /resolve-key for a fresh JWT
       And the replacement bundle is stored in the cache
+
+  Rule: A revoked key is refused from every cache tier, even with the control plane down
+
+    # The change feed delivers VK_REVOKED and VK_DISABLED in one long poll. The
+    # gateway records each in a revocation list kept apart from the key cache,
+    # so no stale-serve window or cache eviction expires it. A denied key is
+    # refused locally, without a control-plane call. VK_ENABLED lifts a denial
+    # at once; otherwise one background recheck per key per interval (30 s,
+    # shared by concurrent requests) lifts it when the control plane confirms
+    # the key. VK_ROTATED is not a denial: the old secret stays valid through
+    # its grace period.
+
+    @unit
+    Scenario: concurrent requests wait for the fail closed key re-check
+      Given fail closed is set and the change feed is silent past the limit
+      And the control plane answers resolve-key slowly
+      When many requests present the same cached key at once
+      Then one key re-check runs and every request waits for it and is served
+
+    @unit
+    Scenario: a fail closed key re-check outlives the request that started it
+      Given fail closed is set and the change feed is silent past the limit
+      When the client that started the key re-check disconnects
+      Then the re-check finishes on its own and the next request is served without a new check
+
+    @unit
+    Scenario: concurrent requests never serve a key after its revocation
+      Given many requests present a cached key at once
+      When the change feed revokes the key and the control plane goes down
+      Then no request that began after the revocation is served
+
+    @unit
+    Scenario: a held session ends on a denied key while the control plane is down
+      Given a voice session holds a key the change feed revoked
+      When its key watch re-reads the key during an outage
+      Then the key reads as revoked and the session ends
+
+    @unit
+    Scenario: a denial that lands during a confirmation is kept
+      Given a key denied once
+      When a second denial lands while a confirmation that began between them is checked
+      Then the second denial stays on the revocation list
+
+    @unit
+    Scenario: re-enabling a key forgets only its own denied credentials
+      Given two disabled keys with denied credentials
+      When one key is re-enabled
+      Then only that key's credentials leave the denied list
+
+    @unit
+    Scenario: a rotation keeps the old secret valid
+      Given a cached key whose old secret is still in its grace period
+      When the change feed reports the key rotated
+      Then a resolve with the old secret still serves the key
+
+    @unit
+    Scenario: the old secret ends when the control plane refuses it after the grace
+      Given a cached old secret past its JWT expiry after a rotation
+      When the control plane refuses the old secret at the end of the grace
+      Then the request with the old secret gets invalid_api_key
+      And the cached copy is gone
+
+    @unit
+    Scenario: fail closed refuses a key that expired during its re-check
+      Given a cached key past the fail-closed limit
+      When the re-check confirms the key but its expiry passes before the config fetch fails
+      Then the request gets virtual_key_expired
+
+    @unit
+    Scenario: fail closed does not serve cached config past its hard cap
+      Given a cached key past the fail-closed limit and past its hard cap
+      When the re-check confirms the key and the config fetch fails
+      Then the request gets a retryable config error, not the cached config
+
+    @unit
+    Scenario: a revoked key is refused while the control plane is down
+      Given a cached key past its JWT expiry
+      When the change feed revokes it
+      And the control plane stops answering
+      Then every request with that key gets virtual_key_revoked, not a retryable error
+
+    @unit
+    Scenario: a disabled key is refused while the control plane is down
+      Given a cached key
+      When the change feed disables it
+      And the control plane stops answering
+      Then every request with that key gets virtual_key_disabled, not a retryable error
+
+    @unit
+    Scenario: a resolve that started before the revocation cannot put the key back
+      Given a resolve-key call is in flight for a key
+      When the change feed revokes the key before that call returns
+      Then the request is refused with virtual_key_revoked
+      And nothing is left in the cache for that key
+
+    @unit
+    Scenario: a flood of credentials on a denied key keeps the denied list bounded
+      Given the change feed revoked a cached key
+      When thousands of different credentials of that key are refused
+      Then the key keeps at most 8 denied credentials
+      And the first denied credential is still refused
+
+    @unit
+    Scenario: a change the in-flight guard cannot track reaches every fetch in flight
+      Given resolve-key calls are in flight
+      When an evict-all event lands or more keys change than the guard tracks
+      Then no answer from those calls is cached
+      And a fetch that starts after the change is cached
+
+    @unit
+    Scenario: a key confirmed after its re-enable serves again
+      Given the change feed disabled a key and then enabled it
+      When the control plane confirms the key
+      Then the request serves
+
+    @unit
+    Scenario: a key re-enabled and re-confirmed keeps serving through a later outage
+      Given the change feed disabled a cached key and then enabled it
+      And the control plane confirmed the key again
+      When the control plane stops answering
+      Then the key serves, not virtual_key_disabled
+
+    @unit
+    Scenario: a denied key is refused locally with at most one recheck per interval
+      Given the change feed disabled a cached key
+      When 1000 requests arrive with that key
+      Then every request gets virtual_key_disabled
+      And the control plane gets at most one call for that key in the interval
+
+    @unit
+    Scenario: a re-enable on the change feed lifts the denial at once
+      Given the change feed disabled a cached key and the key was refused
+      When the change feed enables the key
+      Then the next request serves without waiting for a recheck
+
+    @unit
+    Scenario: the background recheck lifts the denial when the control plane confirms the key
+      Given the change feed disabled a cached key
+      And the re-enable event never arrived
+      When the recheck interval has passed and the control plane confirms the key
+      Then the denial is lifted and the key serves
+      And a later outage does not answer the key with virtual_key_disabled
+
+    @unit @regression
+    Scenario: a denial that lands during a recheck is kept
+      Given the change feed disabled a cached key and the recheck interval has passed
+      When the change feed disables the key again while the recheck waits on the control plane
+      Then the denial survives the recheck and the key stays refused
+
+    @unit
+    Scenario: a normal key keeps serving from cache within the grace window
+      Given a cached key nobody revoked, past its JWT expiry
+      When the control plane stops answering
+      Then the key keeps serving inside the stale-while-error window
+
+    @unit
+    Scenario: fail closed refuses a key nothing re-checked within the limit
+      Given LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is 60
+      And a cached key last confirmed 2 minutes ago
+      When the org's change feed answered within the last 60 seconds
+      Then the key serves
+      When the org's change feed has not answered for 2 minutes
+      Then the key is refused with auth_upstream_unavailable
+
+    @unit
+    Scenario: an outage fallback after a fresh key check passes fail closed
+      Given fail closed is on and the change feed has gone silent
+      And a key whose last known entry was confirmed 2 minutes ago
+      When resolve-key confirms the key but the config fetch times out
+      Then the last known config serves under the fresh key check
+      And the restored entry carries the fresh key check time
+
+    @unit
+    Scenario: fail closed re-checks the key before it refuses
+      Given fail closed is on and the change feed has gone silent
+      And a cached key whose last key check is older than the limit
+      When the control plane still answers key checks
+      Then the key is checked once and served
+      And the next request is served from the cache without another check
+
+    @unit
+    Scenario: fail closed paces its key re-checks during an outage
+      Given fail closed is on and the control plane is down
+      And a cached key whose last key check is older than the limit
+      When many requests arrive within the re-check interval
+      Then the gateway makes one key check and refuses them all
+
+    @unit
+    Scenario: a cache refresh keeps the pace of fail closed re-checks
+      Given fail closed just re-checked a cached key with the control plane
+      When a config refresh replaces the key's cache entry
+      Then the next request inside the re-check interval does not re-check the key again
+
+    @unit
+    Scenario: fail closed keeps the cached config when only the config fetch fails
+      Given fail closed is on and a cached key whose last key check is older than the limit
+      And the control plane confirms the key but its config fetch fails
+      When a request arrives
+      Then the request is served with the cached config
+      And no fail closed refusal is counted
+
+    @unit
+    Scenario: a stale config serve counts the refresh as the fail closed key check
+      Given fail closed is on and the change feed has gone silent
+      And a cached key whose last key check is older than the limit
+      When the cache refresh confirms the key but its config fetch fails
+      Then the request is served with the cached config
+      And the key is checked once, not again for admission
+
+    @unit
+    Scenario: fail closed evicts a key its re-check rejects
+      Given fail closed is on and a cached key whose last key check is older than the limit
+      When the re-check answers that the key is revoked
+      Then the request is refused as revoked
+      And neither the cache nor the last-known store holds the key
+
+    @unit
+    Scenario: fail closed covers a key with no organization
+      Given fail closed is on and the control plane is down
+      And a cached key with no organization and no change feed
+      When its last key check is older than the limit
+      Then the gateway refuses it
+
+    @unit
+    Scenario: fail closed is off by default
+      Given LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS is unset
+      And a cached key last confirmed 3 hours ago with a silent change feed
+      Then the key serves
+
+  Rule: A change-feed backlog refuses a key locally only for the state it ends in
+
+    # A gateway that starts reads its organization's whole change history from
+    # revision 0, and one that reconnects reads what it missed. Both arrive in
+    # full pages of 500 events, so a disable and the enable that undoes it can
+    # sit on different pages. A disable read from a full page still evicts the
+    # key and voids every confirmation that began before it, but it refuses
+    # no credential locally: the next request asks the control plane, and a
+    # request whose answer it voided is asked again once. Once a page
+    # shorter than a full one (or an empty poll) ends the backlog, every key
+    # the backlog left disabled or revoked is refused locally, as a live event
+    # would be. See issue #9754.
+
+    @unit @regression
+    Scenario: a key disabled and re-enabled on different pages of a replayed history keeps serving
+      Given a gateway that just started and cached an active key
+      And its organization's history disables the key on one full page and re-enables it on the next
+      When the replay has read the page with the disable
+      Then the key serves
+      When the page with the enable fails to load
+      Then the key keeps serving
+      When the page with the enable arrives
+      Then the key serves and the control plane going down does not refuse it
+
+    @unit
+    Scenario: a disable at the head of a replayed history is refused once the replay ends
+      Given a gateway that cached an active key and is replaying its organization's history
+      And the history disables the key, re-enables it on a later full page, and disables it again on the last page
+      When the replay has read the first disable
+      Then the key serves after the control plane confirms it
+      When the replay reads the last page and the control plane stops answering
+      Then the key gets virtual_key_disabled, not a retryable error
+
+    @unit
+    Scenario: a disable and an enable on the page that ends a replay never refuse the key between them
+      Given a gateway that cached an active key
+      When the change feed returns a short page that disables the key and then re-enables it
+      Then the disable stays pending while the page is applied
+      And the key serves, and the control plane going down afterwards does not refuse it
+
+    @unit
+    Scenario: a key cached before a reconnect is refused by a disable in the backlog it missed
+      Given two cached keys and a change feed whose poll failed during an outage
+      When the feed reconnects to a backlog of full pages
+      And the backlog disables both keys and re-enables only the first on a later page
+      Then the first key serves throughout the backlog
+      And the second key is not served from its cached copy
+      When the backlog ends and the control plane stops answering
+      Then the second key gets virtual_key_disabled and the first key serves
+
+    @unit @regression
+    Scenario: an answer read before a pending denial is re-asked, not served
+      Given a gateway replaying its organization's history in full pages
+      And a resolve-key call for an active key is in flight
+      When a backlog page disables the key before that call returns
+      Then the gateway asks the control plane again instead of serving the old answer
+      And the request gets the control plane's current answer
+      When that second call fails
+      Then the request gets a retryable auth_upstream_unavailable
+
+    @unit
+    Scenario: a disable that lands while the replay is in flight is refused
+      Given a gateway replaying its organization's history in full pages
+      And a resolve-key call for a key is in flight
+      When a backlog page disables the key before that call returns
+      And the control plane now refuses the key
+      Then that request is asked again and refused with virtual_key_disabled
+      And nothing is cached and the next request is refused by the control plane
+      When the replay ends and the control plane stops answering
+      Then the key gets virtual_key_disabled, not a retryable error
+
+    @unit @regression
+    Scenario: a held session survives an outage between backlog pages
+      Given a voice session holds an active key
+      And a backlog page recorded a pending disable of that key
+      When its key watch re-reads the key while the control plane is down
+      Then the read fails as an outage and the session is not ended as revoked
+
+    @unit @regression
+    Scenario: a stale denied-list entry never refuses a key whose denial is pending
+      Given the denied list still maps a credential to its key after the key left the revocation list
+      When a backlog page records a pending disable of that key
+      Then the next request with that credential asks the control plane and serves
+
+    @unit @regression
+    Scenario: a key that leaves the revocation list leaves the credential index too
+      Given a disabled key whose credential is refused locally
+      When later denials push the key off the bounded revocation list
+      Then the credential no longer maps to that key
 
   Rule: Revocation propagates within 60 seconds via long-poll /changes
 
@@ -611,6 +943,21 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And both cache deadlines move past the old date
 
     @unit
+    Scenario: a config refresh during a rotation grace never extends the old secret
+      Given a cached old secret whose rotation grace ends in a moment
+      When the config refresh answers with the key's own later expiration date
+      And the control plane is unreachable when the grace ends
+      Then the old secret stops being served at the grace end
+      And it is refused as an invalid key, not as an expired one
+
+    @unit
+    Scenario: a config refresh that finds the key inactive evicts it
+      Given a cached key that was disabled or revoked while the gateway missed the event
+      When the config refresh answers that the key is no longer active
+      Then the gateway drops every cached copy of the key
+      And the next request asks the control plane and is refused
+
+    @unit
     Scenario: a config response with no expiration field keeps the date the gateway holds
       Given a cached key that expires in five minutes
       When the config refresh comes from a control plane that sends no expiration field
@@ -738,3 +1085,65 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the change feed reports a new model provider for "acme"
       Then the "acme" key is evicted so its next request sees the new provider
       And the other organization's key stays cached
+
+  Rule: A fetch in flight across a change event does not cache what it read before it
+    The change feed only evicts entries already in the cache. A fetch that began
+    before a key, config or budget change answers after it with what the control
+    plane said before the change. That answer serves the request that made it,
+    and is not cached. Each event stamps the key, project, organization or
+    provider it reaches, so only fetches of those bundles are affected; a
+    budget debit only marks the answer behind.
+
+    @unit @regression
+    Scenario: a revocation during a cold fetch keeps the key out of the cache
+      Given a request for a key misses the cache and asks the control plane
+      When the change feed reports the key revoked before the answer arrives
+      Then the answer is not cached
+
+    @unit @regression
+    Scenario: a config change during a fetch is not hidden by the earlier answer
+      Given a request for a key asks the control plane
+      When the change feed reports a config change for the key before the answer arrives
+      Then the request is answered and the answer is not cached
+      And no denial is recorded
+      And the next request fetches the changed config and caches it
+
+    @unit
+    Scenario: a change to another key does not stop a fetch from caching
+      Given a request for a key asks the control plane
+      When the change feed reports a change to a different key before the answer arrives
+      Then the answer is cached
+
+    @unit
+    Scenario: a budget debit during a fetch caches the answer marked for refresh
+      Given a request for a key asks the control plane
+      When the change feed reports a budget update for its organization before the answer arrives
+      Then the answer is cached and marked behind the update
+
+    @unit @regression
+    Scenario: a burst of budget debits does not stop the cache from filling
+      Given a request for a key asks the control plane
+      When the change feed reports 5000 budget updates before the answer arrives
+      Then the answer is cached and marked behind the updates
+      And a request that starts after the burst caches its answer caught up
+
+    @unit
+    Scenario: a key change during a fetch blocks only that key's publish
+      Given requests for two keys ask the control plane at the same time
+      When the change feed reports a config change for the first key before the answers arrive
+      Then the first key's answer is not cached
+      And the second key's answer is cached
+
+    @unit @regression
+    Scenario: a change during an outage refetch keeps the last known fallback
+      Given a key evicted by a change-feed event is served from its last known config during an outage
+      When a config change for the key lands while the refetch is in flight
+      Then the request is still answered from the last known config
+      And the last known config stays available for the next request
+      And the restored entry is not cached
+
+    @unit @regression
+    Scenario: a rotation during an outage refetch drops the last known fallback
+      Given a key evicted by a change-feed event is served from its last known config during an outage
+      When the key is rotated while the refetch is in flight
+      Then the last known config is not served

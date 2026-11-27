@@ -28,7 +28,7 @@
 # Spans are pi's only signal, so the traces exporter is the only one pointed at
 # LangWatch and the other two are pinned off. Leaving them unset is not the same
 # as switching them off for any OTel SDK that autoconfigures from these names.
-# Our extension reads only the traces names today (pi loads extensions through
+# Our extension reads only the traces names and the content switch today (pi loads extensions through
 # jiti with no @opentelemetry/* module reachable, so it hand-encodes OTLP), but
 # the pins keep the block correct for pi's own exporter when pi ships one.
 # codex omits both names safely because codex ships its own exporter.
@@ -37,9 +37,20 @@
 # speaks. `http/json` is set for gemini alone, whose built-in exporter speaks
 # nothing else; pi has no built-in exporter to accommodate.
 #
-# Every scenario here is bound by a unit test under
+# Message content is switched on with the standard GenAI capture switch, as for
+# copilot: the extension writes prompts, replies and tool arguments only when
+# it is on (pi-extension-install.feature).
+#
+# Most scenarios here are bound by a unit test under
 # sdks/typescript/src/cli/utils/governance/__tests__/ (wrapper-mode,
-# wrapper-path-choice and telemetry-targets).
+# wrapper-path-choice, telemetry-targets and pi-env-block). Four are bound
+# under enterprise/modules/governance:
+#   - the tool policy and the starter tile:
+#     contract/src/__tests__/product-services-contract.unit.test.ts
+#   - the stored pi tile:
+#     process/src/services/__tests__/ai-tool-catalog.service.unit.test.ts
+#   - the tile drawer:
+#     browser/src/features/ai-tools/model/__tests__/coding-assistant-toggles.unit.test.ts
 
 Feature: `langwatch pi` injects the standard OTel env on one path only
 
@@ -133,6 +144,12 @@ Feature: `langwatch pi` injects the standard OTel env on one path only
         | OTEL_LOGS_EXPORTER    | none  |
         | OTEL_METRICS_EXPORTER | none  |
       And neither name is left unset for the SDK to default
+
+    @unit
+    Scenario: Message content capture is switched on for the extension, as for copilot
+      When the env block for pi is built
+      Then it carries OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true, as copilot's does
+      And logout removes that name with the rest of pi's block
 
     @unit
     Scenario: An inherited exporter setting from the parent shell is overridden

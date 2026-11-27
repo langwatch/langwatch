@@ -150,7 +150,9 @@ function fleet({
 }) {
   const world = { now: FIRST_SLOT, converged: false };
   const unconfirmedSince = MemoryLwqlUnconfirmedSinceRepository.create();
-  const postgres = postgresRefuses ? [{ view: "lwql_agents", absent: true }] : [];
+  const postgres = postgresRefuses
+    ? [{ kind: "shared" as const, view: "lwql_agents", absent: true }]
+    : [];
   const checks = Array.from({ length: workers }, () =>
     runLwqlReconvergence({
       probe: () => Promise.resolve("config_store"),
@@ -486,7 +488,7 @@ describe("given a check over the app-owned objects", () => {
   describe("when PostgreSQL refuses its half", () => {
     const refusal = () =>
       Object.assign(new Error("permission denied"), { code: "P2010", meta: { code: "42501" } });
-    const gap = { view: "lwql_agents", absent: true };
+    const gap = { kind: "shared" as const, view: "lwql_agents", absent: true };
 
     /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
     it("alerts with the PostgreSQL message and its SQLSTATE, and still converges ClickHouse", async () => {
@@ -545,6 +547,38 @@ describe("given a check over the app-owned objects", () => {
 
       expect(convergeAppOwned).toHaveBeenCalledTimes(2);
       expect(logCalls.filter((call) => call.level === "error")).toHaveLength(1);
+    });
+  });
+
+  describe("when the scoped-reader group's schema is absent", () => {
+    /** @scenario "Scoped copies exist only where the scoped-reader group does" */
+    it("names the absent schema by its kind in the drift sample, beside each view it names", async () => {
+      const drift: LwqlAppOwnedDrift = {
+        clickHouse: [],
+        postgres: [
+          { kind: "scoped-schema-absent" },
+          { kind: "shared", view: "lwql_agents", absent: true },
+        ],
+        isKeyMapMissing: false,
+      };
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge: () => Promise.resolve(),
+        findDrift: () => Promise.resolve(drift),
+        convergeAppOwned: () => Promise.resolve(),
+        fillKeyMap: () => Promise.resolve(),
+        unconfirmedSince: MemoryLwqlUnconfirmedSinceRepository.create(),
+      })(wakeOnce);
+
+      expect(logCalls).toContainEqual({
+        level: "info",
+        fields: {
+          clickHouseObjects: 0,
+          postgresViews: 2,
+          sample: ["scoped-schema-absent", "lwql_agents"],
+        },
+        message: "lwql reconvergence check found app-owned objects to converge",
+      });
     });
   });
 

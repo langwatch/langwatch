@@ -203,8 +203,8 @@ function runAgainst({
   });
 }
 
-const owner: RunActor = { id: "user_owner", label: "user" };
-const teammate: RunActor = { id: "user_teammate", label: "user" };
+const owner = { id: "user_owner", label: "user" } satisfies RunActor;
+const teammate = { id: "user_teammate", label: "user" } satisfies RunActor;
 
 describe("running against a personal development agent", () => {
   describe("when a teammate starts the run", () => {

@@ -29,7 +29,29 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
+import {
+  attributesWithVerifiedMarks,
+  type VerifiedEntry,
+} from "../features/span/rules/span-verified-mark.rules.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
+
+const nestedValueSchema = z.union([
+  z.object({
+    kvlistValue: z.object({ values: z.array(z.object({ key: z.string(), value: z.unknown() })) }),
+  }),
+  z.object({ arrayValue: z.object({ values: z.array(z.unknown()) }) }),
+]);
+
+/** An OTLP map's or array's children, keyed as normalisation flattens them; none for a scalar. */
+function nestedValuesOf(value: unknown): { key: string; value: unknown }[] {
+  const parsed = nestedValueSchema.safeParse(value);
+  if (!parsed.success) return [];
+  if ("kvlistValue" in parsed.data) return parsed.data.kvlistValue.values;
+  return parsed.data.arrayValue.values.map((child, index) => ({
+    key: String(index),
+    value: child,
+  }));
+}
 import {
   capOversizedAttributes,
   MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
@@ -59,6 +81,14 @@ type TraceSpanContentDropResult = {
 
 export interface TraceSpanContentDrop {
   drop(span: OtlpSpan, projectId: string): Promise<TraceSpanContentDropResult>;
+}
+
+/**
+ * ADR-201 §4: the entries a span's signature verifies, with their signed values; never rejects,
+ * empty when unverified. Reads the span before its first await, so later steps may change it.
+ */
+export interface TraceSpanSignatureVerification {
+  verifiedEntries(input: { span: OtlpSpan; projectId: string }): Promise<VerifiedEntry[]>;
 }
 
 export type TraceSpanSpoolIdentity = {
@@ -109,6 +139,8 @@ export type RecordSpanCommandOptions = {
   tokenEstimation: TraceSpanTokenEstimation;
   contentDrop: TraceSpanContentDrop;
   spool?: TraceSpanSpool;
+  /** Absent, no span is marked verified: the safe direction (ADR-201 §4, no forged mark). */
+  signatures?: TraceSpanSignatureVerification;
 };
 
 /** Turns one prepared raw span into Trace's one durable aggregate event. */
@@ -123,7 +155,8 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   );
 
   private static readonly RESERVED_ATTRIBUTE_PREFIX = "langwatch.reserved.";
-  private static readonly RESERVED_ATTRIBUTE_PASSTHROUGH = new Set([
+  /** Never holds the verified prefix: only verification at ingest writes a mark (ADR-201 §4). */
+  static readonly RESERVED_ATTRIBUTE_PASSTHROUGH: ReadonlySet<string> = new Set([
     "langwatch.reserved.causality_depth",
     "langwatch.reserved.skip_token_accumulation",
   ]);
@@ -206,6 +239,8 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     const resource = commandData.resource ? clonePayload(commandData.resource) : null;
 
     this.stripReservedAttributes(span, resource);
+    // Read off the stripped span before any later step rewrites a signed value.
+    const verifiedEntries = this.verifiedEntriesOf({ span, projectId: command.tenantId });
     this.capAttributes({ span, resource, tenantId, traceId, spanId });
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
@@ -246,6 +281,12 @@ export class EventingRecordSpanAdapter implements CommandHandler<
         "Dropped span content per data-privacy policy",
       );
     }
+
+    // Last, on the span as stored: a signed value redacted, capped or dropped above earns no mark.
+    span.attributes = attributesWithVerifiedMarks({
+      attributes: span.attributes,
+      verified: await verifiedEntries,
+    });
 
     const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
       aggregateType: "trace",
@@ -350,20 +391,56 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     );
   }
 
+  /** Started alongside the other enrichments; a failure leaves the span unverified. */
+  private verifiedEntriesOf({
+    span,
+    projectId,
+  }: {
+    span: OtlpSpan;
+    projectId: string;
+  }): Promise<VerifiedEntry[]> {
+    const { signatures } = this.options;
+    if (!signatures) return Promise.resolve([]);
+    return signatures.verifiedEntries({ span, projectId }).catch((error) => {
+      this.logger.warn({ error }, "Signature verification failed, span stays unverified");
+      return [];
+    });
+  }
+
   private reportNonCriticalFailure(result: PromiseSettledResult<void>, message: string): void {
     if (result.status === "rejected") {
       this.logger.warn({ error: result.reason }, message);
     }
   }
 
+  /**
+   * Whether an attribute lands under the reserved prefix once its nested values are flattened to
+   * dotted keys, as normalisation does: a `langwatch` map holding `reserved.verified.k` forges one.
+   */
+  private static reachesReserved({ path, value }: { path: string; value: unknown }): boolean {
+    const prefix = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX;
+    if (path.startsWith(prefix)) {
+      return !EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(path);
+    }
+    if (!prefix.startsWith(`${path}.`)) return false;
+    const children = nestedValuesOf(value);
+    return children.some((child) =>
+      EventingRecordSpanAdapter.reachesReserved({
+        path: `${path}.${child.key}`,
+        value: child.value,
+      }),
+    );
+  }
+
   private stripReservedAttributes(span: OtlpSpan, resource: OtlpResource | null): void {
     const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] =>
       attributes.filter((attribute) => {
         const reserved =
-          attribute.key.startsWith(EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX) ||
-          attribute.key === TRUNCATED_ATTRIBUTES_KEY;
-        const allowed = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(attribute.key);
-        if (!reserved || allowed) {
+          EventingRecordSpanAdapter.reachesReserved({
+            path: attribute.key,
+            value: attribute.value,
+          }) || attribute.key === TRUNCATED_ATTRIBUTES_KEY;
+        if (!reserved) {
           return true;
         }
 

@@ -2,7 +2,8 @@ import type { Named } from "@langwatch/module";
 /** Contract schemas for the organization feature's tRPC responses. */
 import { z } from "zod";
 
-import { auditChannelSchema } from "./organization.ts";
+import type { OrganizationUserRole } from "./organization.rows.ts";
+import { auditChannelSchema, auditStaffAccessMetadataSchema } from "./organization.ts";
 
 /** A write with nothing else to report. */
 const organizationWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
@@ -44,6 +45,8 @@ const organizationInviteRowSchema = z
     subscriptionId: z.string().nullable(),
     acceptedByUserId: z.string().nullable(),
     acceptedViaIdentifierId: z.string().nullable(),
+    /** The Billing grant and no seat (ADR-205). */
+    billingOnly: z.boolean().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
   })
@@ -119,6 +122,8 @@ const organizationInviteAcceptedSchemaDefinition = z.object({
     organization: z.object({ id: z.string().min(1), name: z.string() }),
   }),
   project: z.object({ slug: z.string().min(1) }).nullable(),
+  /** Billing only (ADR-205): the browser lands them on the plan page, they open no project. */
+  billingOnly: z.boolean().optional(),
 });
 export interface OrganizationInviteAcceptedSchema extends Named<
   typeof organizationInviteAcceptedSchemaDefinition
@@ -253,6 +258,8 @@ const organizationMemberRecordSchemaDefinition = z.object({
   updatedAt: z.date(),
   departmentId: z.string().nullable(),
   disabledAt: z.date().nullable(),
+  /** Billing only (ADR-205): the Billing grant, no team and no seat. */
+  billingOnly: z.boolean().optional(),
   user: z.object({
     id: z.string().min(1),
     name: z.string().nullable(),
@@ -285,6 +292,10 @@ const organizationMemberDirectorySchemaDefinition = z.object({
       updatedAt: z.date(),
       departmentId: z.string().nullable(),
       disabledAt: z.date().nullable(),
+      /** A Billing-only member: the Billing grant, no team and no seat (ADR-205). */
+      billingOnly: z.boolean().optional(),
+      /** Set while the person waits for a full seat; such a row is disabled until admitted. */
+      seatPendingSince: z.date().nullable(),
       user: z.object({
         id: z.string().min(1),
         name: z.string().nullable(),
@@ -358,6 +369,7 @@ const organizationAuditLogEntrySchema = z
     source: z.enum(["platform", "gateway"]),
     targetKind: z.string().nullable(),
     targetId: z.string().nullable(),
+    targetName: z.string().nullable(),
     before: z.unknown(),
     after: z.unknown(),
     actorUserId: z.string().nullable(),
@@ -367,6 +379,7 @@ const organizationAuditLogEntrySchema = z
       .nullable(),
     channel: auditChannelSchema.nullable(),
     apiKeyId: z.string().nullable(),
+    staffAccess: auditStaffAccessMetadataSchema.nullable(),
   })
   .strict();
 
@@ -390,7 +403,7 @@ export type OrganizationAuditLogPage = z.infer<typeof organizationAuditLogPageSc
  * a default membership — rather than an absence.
  */
 export type OrganizationPendingInviteApplied =
-  | Readonly<{ applied: true; inviteId: string }>
+  | Readonly<{ applied: true; inviteId: string; role: OrganizationUserRole }>
   | Readonly<{ applied: false }>;
 
 /** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */
@@ -430,3 +443,81 @@ export interface OrganizationMemberProvenanceByUserSchema extends Named<
 > {}
 export const organizationMemberProvenanceByUserSchema: OrganizationMemberProvenanceByUserSchema =
   organizationMemberProvenanceByUserSchemaDefinition;
+
+/* The 30-day seat hold as the remove dialog and the Users list read it (seat-rotation.feature). */
+/** Removing one member, optionally giving their freed seat to a person waiting for one. */
+const organizationApiRemoveMemberInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  userId: z.string(),
+  /** A person waiting for a full seat; admitted only when the seat frees at once and fits. */
+  giveSeatToUserId: z.string().min(1).nullish(),
+});
+export interface OrganizationApiRemoveMemberInputSchema extends Named<
+  typeof organizationApiRemoveMemberInputSchemaDefinition
+> {}
+export const organizationApiRemoveMemberInputSchema: OrganizationApiRemoveMemberInputSchema =
+  organizationApiRemoveMemberInputSchemaDefinition;
+export type OrganizationApiRemoveMemberInput = z.infer<
+  typeof organizationApiRemoveMemberInputSchema
+>;
+
+/** The removal happened; who got the freed seat, if anyone, and whether giving it failed. */
+const organizationMemberRemovedSchemaDefinition = z
+  .object({
+    success: z.literal(true),
+    seatGivenToUserId: z.string().nullable(),
+    seatHandoverFailed: z.boolean(),
+  })
+  .strict();
+export interface OrganizationMemberRemovedSchema extends Named<
+  typeof organizationMemberRemovedSchemaDefinition
+> {}
+export const organizationMemberRemovedSchema: OrganizationMemberRemovedSchema =
+  organizationMemberRemovedSchemaDefinition;
+export type OrganizationMemberRemoved = z.infer<typeof organizationMemberRemovedSchema>;
+
+/** A person waiting for a full seat. */
+const organizationSeatWaiterSchemaDefinition = z
+  .object({ userId: z.string(), name: z.string().nullable(), email: z.string().nullable() })
+  .strict();
+
+/** What removing a member does to their seat. */
+const organizationSeatRemovalPreviewSchemaDefinition = z
+  .object({
+    /** Whether the member holds a full seat the removal stops them holding. */
+    holdsFullSeat: z.boolean(),
+    /** When the seat frees: null when it frees at once, or when there is no full seat. */
+    seatFreesAt: z.date().nullable(),
+    /** The person waiting longest, offered the seat only when it frees at once. */
+    waiting: organizationSeatWaiterSchemaDefinition.nullable(),
+  })
+  .strict();
+export interface OrganizationSeatRemovalPreviewSchema extends Named<
+  typeof organizationSeatRemovalPreviewSchemaDefinition
+> {}
+export const organizationSeatRemovalPreviewSchema: OrganizationSeatRemovalPreviewSchema =
+  organizationSeatRemovalPreviewSchemaDefinition;
+export type OrganizationSeatRemovalPreview = z.infer<typeof organizationSeatRemovalPreviewSchema>;
+
+/** One seat still held after its person was removed, disabled or demoted. */
+const organizationHeldSeatSchemaDefinition = z
+  .object({
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
+    seatTakenAt: z.date(),
+    seatFreesAt: z.date(),
+    reason: z.enum(["REMOVED", "DISABLED", "DEMOTED"]),
+  })
+  .strict();
+
+/** The organization's held seats, ending soonest first. */
+const organizationHeldSeatsSchemaDefinition = z
+  .object({ heldSeats: z.array(organizationHeldSeatSchemaDefinition) })
+  .strict();
+export interface OrganizationHeldSeatsSchema extends Named<
+  typeof organizationHeldSeatsSchemaDefinition
+> {}
+export const organizationHeldSeatsSchema: OrganizationHeldSeatsSchema =
+  organizationHeldSeatsSchemaDefinition;
+export type OrganizationHeldSeats = z.infer<typeof organizationHeldSeatsSchema>;

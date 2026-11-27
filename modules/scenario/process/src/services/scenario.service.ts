@@ -1,5 +1,7 @@
+import { TestSuiteLimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ScenarioNotFoundError,
+  ScenarioRedTeamConfigError,
   scenarioCreateInputSchema,
   scenarioDuplicateInputSchema,
   scenarioTestSuiteCreateInputSchema,
@@ -46,7 +48,7 @@ import {
 } from "@langwatch/scenario-contract";
 
 import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId } from "../app/scenario.app.ts";
-import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
+import type { ScenarioRepository, TestSuiteCap } from "../repositories/scenario.repository.ts";
 import { ScenarioRunCancellationService } from "./scenario-run-cancellation.service.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 
@@ -89,8 +91,15 @@ export class ScenarioService {
     this.cancellation = ScenarioRunCancellationService.create(options);
   }
 
-  async create(input: ScenarioCreateInput): Promise<Scenario> {
+  async create(
+    input: ScenarioCreateInput,
+    options: { sourceTemplateId?: string } = {},
+  ): Promise<Scenario> {
     const parsed = scenarioCreateInputSchema.parse(input);
+    const kind = parsed.kind ?? "standard";
+    if ((kind === "red_team") !== (parsed.redTeam !== undefined)) {
+      throw new ScenarioRedTeamConfigError({ kind });
+    }
     // No scenario is loose: a create that names no suite files into the
     // project's Default, which is created here on the first such write.
     const testSuiteId =
@@ -103,10 +112,12 @@ export class ScenarioService {
 
     return this.options.repository.create({
       ...parsed,
+      kind,
       ...(fields !== undefined ? { fields } : {}),
       testSuiteId,
       id: this.options.ids.next(),
       actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
+      ...(options.sourceTemplateId ? { sourceTemplateId: options.sourceTemplateId } : {}),
     });
   }
 
@@ -227,9 +238,13 @@ export class ScenarioService {
       parameters: scenarioParameterDefinitionsSchema.nullable().parse(original.parameters),
       simulatorModel: original.simulatorModel,
       judgeModel: original.judgeModel,
+      traceQuietPeriodMs: original.traceQuietPeriodMs,
+      traceWaitTimeoutMs: original.traceWaitTimeoutMs,
       maxTurns: original.maxTurns,
       minTurns: original.minTurns,
       testSuiteId: original.testSuiteId,
+      ...(original.kind ? { kind: original.kind } : {}),
+      ...(original.redTeam ? { redTeam: original.redTeam } : {}),
       lastUpdatedById: parsed.lastUpdatedById ?? null,
     });
   }
@@ -309,13 +324,20 @@ export class ScenarioService {
     return { archived: result.archived, failed };
   }
 
-  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+  /** @throws TestSuiteLimitExceededError when the suite cap is reached under its lock. */
+  async createTestSuite(
+    input: ScenarioTestSuiteCreateInput,
+    cap?: TestSuiteCap,
+  ): Promise<ScenarioTestSuite> {
     const parsed = scenarioTestSuiteCreateInputSchema.parse(input);
+    const id = this.options.testSuiteIds.next();
+    if (!cap) return this.options.repository.createTestSuite({ ...parsed, id });
 
-    return this.options.repository.createTestSuite({
-      ...parsed,
-      id: this.options.testSuiteIds.next(),
-    });
+    const result = await this.options.repository.createCappedTestSuite({ ...parsed, id, cap });
+    if ("current" in result) {
+      throw new TestSuiteLimitExceededError(result.current, cap.max);
+    }
+    return result.testSuite;
   }
 
   findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {

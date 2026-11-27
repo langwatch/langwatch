@@ -1276,7 +1276,6 @@ async function relayOverParkedHandoff({ parkedUnder }: { parkedUnder: string }) 
       organizationId: "organization-1",
     },
     runToken: RUN_TOKEN,
-    permitReserved: false,
   });
   const buffer = fakeBuffer();
   const relay = RedisLangyTurnRelayRepository.create({

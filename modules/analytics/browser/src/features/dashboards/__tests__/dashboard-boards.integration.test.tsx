@@ -7,14 +7,25 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
+import { Toaster, toaster } from "@langwatch/design-system/toaster";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
-import { AGENT_KIND_CHIP_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
+import { afterDraftWrites } from "../behavior/use-draft-board.ts";
+import {
+  AGENT_KIND_CHIP_LABELS,
+  CODING_PICKER_QUESTIONS,
+  PICKER_QUESTIONS,
+  PICKER_SECTIONS,
+  pickerSections,
+} from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
+import { curatedBoardById } from "../model/curated-boards.ts";
+import { finderPool } from "../model/template-library.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -36,6 +47,7 @@ type Board = typeof HOME_BOARD & {
   name: string;
   description: string | null;
   createdById: string | null;
+  myDashboardOfUserId?: string | null;
   isStarred: boolean;
   updatedAt: Date;
 };
@@ -96,12 +108,24 @@ function inMemoryServer({
   boards,
   widgets = [],
   refuseWidgetCreate = false,
+  refuseBoardCreates = 0,
+  refuseBoardUpdates = 0,
+  holdBoardCreates = false,
 }: {
   boards: Board[];
   widgets?: Widget[];
   /** Answers `dashboardWidgets.create` as the server does when the write is rejected. */
   refuseWidgetCreate?: boolean;
+  /** How many `boards.create` calls the server turns away before it makes one. */
+  refuseBoardCreates?: number;
+  /** How many `boards.update` calls the server turns away before it takes one. */
+  refuseBoardUpdates?: number;
+  /** Holds every `boards.create` answer until the test releases them. */
+  holdBoardCreates?: boolean;
 }) {
+  let boardCreatesLeftToRefuse = refuseBoardCreates;
+  let boardUpdatesLeftToRefuse = refuseBoardUpdates;
+  const heldCreates: (() => void)[] = [];
   const state = {
     boards: boards.map((board) => ({ ...board })),
     widgets: [...widgets],
@@ -118,24 +142,38 @@ function inMemoryServer({
       case "boards.getAll":
         return Promise.resolve(state.boards.map((each) => ({ ...each })));
       case "boards.create": {
-        const created: Board = {
-          ...HOME_BOARD,
-          id: `board-new-${state.boards.length + 1}`,
-          name: String(input.name),
-          description: null,
-          createdById: "user-1",
-          isStarred: false,
-          updatedAt: new Date("2026-01-01"),
+        if (boardCreatesLeftToRefuse > 0) {
+          boardCreatesLeftToRefuse -= 1;
+          return Promise.reject(new UiProcedureRefusal("resource_limit_exceeded", 403));
+        }
+        const make = () => {
+          const created: Board = {
+            ...HOME_BOARD,
+            id: `board-new-${state.boards.length + 1}`,
+            name: String(input.name),
+            description: null,
+            createdById: "user-1",
+            isStarred: false,
+            updatedAt: new Date("2026-01-01"),
+          };
+          state.boards.push(created);
+          return { ...created };
         };
-        state.boards.push(created);
-        return Promise.resolve({ ...created });
+        if (!holdBoardCreates) return Promise.resolve(make());
+        return new Promise((resolve) => heldCreates.push(() => resolve(make())));
       }
       case "boards.update": {
+        if (boardUpdatesLeftToRefuse > 0) {
+          boardUpdatesLeftToRefuse -= 1;
+          return Promise.reject(new UiProcedureRefusal("dashboard_not_found", 404));
+        }
         const updated = board(input.dashboardId);
         if (input.name !== void 0) updated.name = input.name as string;
         if (input.description !== void 0) updated.description = input.description as string | null;
         return Promise.resolve({ ...updated });
       }
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
       case "boards.listStarred":
         return Promise.resolve(
           state.boards
@@ -199,7 +237,11 @@ function inMemoryServer({
         return NO_PROCEDURES(call);
     }
   };
-  return { state, answer };
+  /** Answers the held `boards.create` calls, in the order they came. */
+  const releaseBoardCreates = () => {
+    for (const release of heldCreates.splice(0)) release();
+  };
+  return { state, answer, releaseBoardCreates };
 }
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -259,6 +301,7 @@ function openBoard({
   withSidebar = false,
   userId = "user-1",
   permissions,
+  projectPermissions,
   flags = FLAG_ON,
 }: {
   server: ReturnType<typeof inMemoryServer>;
@@ -267,12 +310,15 @@ function openBoard({
   withSidebar?: boolean;
   userId?: string;
   permissions?: string[];
+  /** Grants by project id, which a rename asks of the project that owns the board. */
+  projectPermissions?: Record<string, string[]>;
   flags?: Record<string, boolean>;
 }) {
   const host = new StubAnalyticsHost({
     flags,
     userId,
     permissions,
+    ...(projectPermissions ? { projectPermissions } : {}),
     route: { params: { dashboardId }, query },
   });
   const view = renderDashboards({
@@ -291,6 +337,9 @@ function openBoard({
 const callsTo = (server: ReturnType<typeof inMemoryServer>, path: string) =>
   server.state.calls.filter((call) => call.path === path);
 
+/** The one region "All" lists every widget in. */
+const ALL_WIDGETS = ["All widgets"];
+
 /** The picker's regions, by the name each section carries. */
 async function pickerRegions() {
   const dialog = await screen.findByRole("dialog");
@@ -303,8 +352,11 @@ afterEach(cleanup);
 
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
-    /** @scenario "Boards: every empty board shows one view" */
-    it("shows the ask bar, the suggested questions and the From LangWatch boards to start from", async () => {
+    /**
+     * @scenario "Boards: every empty board shows one view"
+     * @scenario "Only an empty LLM Ops board offers templates"
+     */
+    it("shows the ask bar, the suggested questions and every template with the chips", async () => {
       openBoard({
         server: inMemoryServer({ boards: OWN_BOARDS }),
         flags: LANGY_ON,
@@ -317,25 +369,128 @@ describe("a member's board", () => {
         expect(screen.getByRole("button", { name: question })).toBeInTheDocument();
       }
       const start = within(screen.getByRole("region", { name: "Start from a template" }));
-      expect(start.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-        "/test-project/dashboards/curated/release",
-        "/test-project/dashboards/curated/data",
-        "/test-project/dashboards/curated/breaks",
-        "/test-project/dashboards/templates",
-      ]);
-      expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
+      expect(start.getByRole("group", { name: "Categories" })).toBeInTheDocument();
+      expect(start.getByRole("group", { name: "Agent types" })).toBeInTheDocument();
+      expect(
+        start
+          .getAllByRole("button", { name: /^Use / })
+          .map((each) => each.getAttribute("aria-label")),
+      ).toEqual(finderPool({}).map(({ board }) => `Use ${board.name}`));
+      expect(start.queryByRole("link", { name: "View all templates" })).toBeNull();
+      expect(screen.queryByRole("searchbox")).toBeNull();
       expect(screen.queryByRole("button", { name: /^Add a widget Start/ })).toBeNull();
     });
 
-    describe("when the member opens a From LangWatch card", () => {
-      /** @scenario "Boards: every empty board shows one view" */
-      it("opens that live board", async () => {
+    describe("when the board is homed in Gateway", () => {
+      /** @scenario "Only an empty LLM Ops board offers templates" */
+      it("offers no template, and keeps the ask bar, its questions and Add a widget", async () => {
+        openBoard({
+          server: inMemoryServer({
+            boards: OWN_BOARDS.map((each) => ({ ...each, homeProduct: "gateway" as const })),
+          }),
+          flags: LANGY_ON,
+          permissions: LANGY_MEMBER,
+        });
+
+        expect(
+          await screen.findByRole("button", { name: "Where does my money go?" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "What do you want to know?" }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+        expect(screen.queryByText("Or start from a template")).toBeNull();
+      });
+    });
+
+    describe("when the member uses a template", () => {
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("fills this board with its widgets and its job, keeping the board's own name", async () => {
         const user = userEvent.setup();
-        const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server });
+        const template = curatedBoardById("data")!.card.board;
 
-        await user.click(await screen.findByRole("link", { name: "Release check" }));
+        await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
 
-        expect(host.navigations).toEqual(["/test-project/dashboards/curated/release"]);
+        await waitFor(() => expect(server.state.widgets).toHaveLength(template.widgets.length));
+        expect(server.state.widgets.every(({ dashboardId }) => dashboardId === "board-1")).toBe(
+          true,
+        );
+        expect(callsTo(server, "boards.create")).toEqual([]);
+        expect(callsTo(server, "boards.update").map(({ input }) => input)).toEqual([
+          { projectId: "proj-1", dashboardId: "board-1", description: template.description },
+        ]);
+        expect(host.navigations).toEqual([]);
+        await waitFor(() => expect(screen.queryByText("Or start from a template")).toBeNull());
+      });
+
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("names an untitled board after the template", async () => {
+        const user = userEvent.setup();
+        const untitled = { ...OWN_BOARDS[0]!, name: "Untitled dashboard 1", description: "Mine" };
+        const server = inMemoryServer({ boards: [untitled, OWN_BOARDS[1]!] });
+        openBoard({ server });
+        const template = curatedBoardById("data")!.card.board;
+
+        await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
+
+        await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(1));
+        expect(callsTo(server, "boards.update")[0]?.input).toEqual({
+          projectId: "proj-1",
+          dashboardId: "board-1",
+          name: template.name,
+        });
+      });
+    });
+
+    describe("when the template's widgets cannot be added", () => {
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("leaves the member on the empty board and says so", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
+        const { host } = openBoard({ server });
+
+        await user.click(
+          await screen.findByRole("button", {
+            name: `Use ${curatedBoardById("release")!.card.board.name}`,
+          }),
+        );
+
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({
+              fallbackTitle: "Couldn't add the template to this dashboard",
+            }),
+          ]),
+        );
+        expect(host.navigations).toEqual([]);
+        expect(callsTo(server, "boards.update")).toEqual([]);
+        expect(screen.getByText("Or start from a template")).toBeInTheDocument();
+      });
+
+      /** @scenario "Boards: a template used on an empty board fills that board" */
+      it("takes the widgets back out when the board's description is refused", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardUpdates: 1 });
+        const { host } = openBoard({ server });
+        const template = curatedBoardById("release")!.card.board;
+
+        await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
+
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({
+              fallbackTitle: "Couldn't add the template to this dashboard",
+            }),
+          ]),
+        );
+        const created = callsTo(server, "dashboardWidgets.create");
+        expect(created).toHaveLength(template.widgets.length);
+        await waitFor(() =>
+          expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(template.widgets.length),
+        );
+        expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
       });
     });
 
@@ -378,20 +533,24 @@ describe("a member's board", () => {
 
     describe("when the member browses every section", () => {
       /** @scenario "AC12 Only working questions are offered" */
-      /** @scenario "AC16 The picker offers every catalogue widget that has code, grouped by the question tree" */
-      it("lists every built widget in its own section, and no Blocks section", async () => {
+      /** @scenario "AC16 The picker offers every catalogue widget that has code, most asked-about first" */
+      it("lists every built widget in one ranked list, each tagged with its branch", async () => {
         openPicker();
 
         const dialog = await screen.findByRole("dialog");
-        for (const section of PICKER_SECTIONS) {
-          const listed = within(within(dialog).getByRole("region", { name: section.title }));
-          expect(listed.getAllByRole("button")).toHaveLength(section.questions.length);
-          for (const { question } of section.questions) {
-            const row = listed.getByRole("button", { name: new RegExp(escape(question)) });
-            expect(row, question).toBeEnabled();
-          }
+        expect(await pickerRegions()).toEqual(ALL_WIDGETS);
+        const rows = within(
+          within(dialog).getByRole("region", { name: "All widgets" }),
+        ).getAllByRole("button");
+        expect(rows.map((row) => row.getAttribute("data-widget"))).toEqual(
+          PICKER_QUESTIONS.map(({ id }) => id),
+        );
+        for (const [index, { question, branch }] of PICKER_QUESTIONS.entries()) {
+          expect(rows[index], question).toBeEnabled();
+          expect(rows[index]?.querySelector("[data-branch-tag]")?.textContent, question).toBe(
+            branch.title,
+          );
         }
-        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
         expect(within(dialog).queryByRole("region", { name: "Blocks" })).toBeNull();
       });
     });
@@ -426,8 +585,8 @@ describe("a member's board", () => {
         expect(host.langyAsks).toHaveLength(1);
         const [ask] = host.langyAsks;
         expect(ask?.question).toBeUndefined();
-        expect(ask?.draft?.startsWith(traffic.prompt)).toBe(true);
-        expect(ask?.draft).toContain("Dashboard period:");
+        expect(ask?.draft).toMatch(/^What does ".+" show over the last 30 days\?/);
+        expect(ask?.context[1]?.ref).toContain(`how to answer it: ${traffic.prompt}`);
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
         expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
       });
@@ -475,10 +634,10 @@ describe("a member's board", () => {
           permissions,
         });
 
-        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
+        expect(await pickerRegions()).toEqual(ALL_WIDGETS);
         // One role query for the whole list: a named query per question timed out in CI.
         const rows = within(screen.getByRole("dialog")).getAllByRole("button");
-        for (const { question } of PICKER_SECTIONS.flatMap(({ questions }) => questions)) {
+        for (const { question } of PICKER_QUESTIONS) {
           expect(
             rows.find((button) => button.textContent?.includes(question)),
             question,
@@ -540,19 +699,31 @@ describe("a member's board", () => {
         expect(chip({ row: "Categories", name: "Grow" })).toBeInTheDocument();
         const types = within(screen.getByRole("group", { name: "Agent types" }));
         expect(types.getByRole("button", { name: /^Voice agent\s*\d+$/ })).toBeInTheDocument();
-        expect(types.queryByRole("button", { name: /^Coding agent/ })).toBeNull();
+        expect(
+          types.getByRole("button", {
+            name: new RegExp(`^Coding agent\\s*${CODING_PICKER_QUESTIONS.length}$`),
+          }),
+        ).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "I'll build it myself" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
         expect(dialog.textContent).not.toMatch(/\bblocks?\b/i);
       });
 
-      /** @scenario "AC134 Picker filters: sections are branches in tree order, coloured by trunk" */
-      it("marks each branch section with its trunk, the trunks in order", async () => {
+      /** @scenario "AC134 Picker filters: a category lists its branches as sections, the best-ranked first" */
+      it("lists a picked category's branches as sections, the best-ranked first", async () => {
+        const user = userEvent.setup();
         openPicker();
+        const protect = PICKER_QUESTIONS.filter(({ trunk }) => trunk === "Protect");
 
-        const regions = within(await screen.findByRole("dialog")).getAllByRole("region");
-        expect(regions.map((region) => region.getAttribute("data-trunk"))).toEqual(
-          PICKER_SECTIONS.map(({ trunk }) => trunk),
+        await screen.findByRole("dialog");
+        await user.click(chip({ row: "Categories", name: "Protect" }));
+
+        expect(await pickerRegions()).toEqual(
+          pickerSections({ questions: protect }).map(({ title }) => title),
+        );
+        const regions = within(screen.getByRole("dialog")).getAllByRole("region");
+        expect(regions.every((region) => region.getAttribute("data-trunk") === "Protect")).toBe(
+          true,
         );
       });
     });
@@ -621,7 +792,42 @@ describe("a member's board", () => {
         for (const kind of made.madeFor) {
           expect(row(made.id)).toHaveTextContent(AGENT_KIND_CHIP_LABELS[kind]);
         }
-        expect(row(general.id)?.textContent).toBe(`${general.question}${general.why}`);
+        expect(row(general.id)?.textContent).toBe(
+          `${general.question}${general.branch.title}${general.why}`,
+        );
+      });
+    });
+
+    describe("given the picker opens on a Coding agents board", () => {
+      /** @scenario "Finder: Add a widget offers coding-agent widgets only under the Coding agent chip" */
+      it("starts on the Coding agent chip, listing its built widgets in their own order", async () => {
+        const host = new StubAnalyticsHost({ flags: LANGY_ON, permissions: LANGY_MEMBER });
+        renderDashboards({
+          element: (
+            <BlockPickerDialog
+              board={boardSubject({ board: { id: "board-1", name: "My tokens" }, widgets: [] })}
+              period={{
+                periodStart: Date.UTC(2026, 8, 1),
+                periodEnd: Date.UTC(2026, 8, 8),
+                granularitySeconds: 86_400,
+              }}
+              startingAgentKind="coding"
+              onAddWidgets={() => Promise.resolve(true)}
+              onSkip={() => void 0}
+              onClose={() => void 0}
+            />
+          ),
+          host,
+        });
+
+        await screen.findByRole("dialog");
+        expect(chip({ row: "Agent types", name: AGENT_KIND_CHIP_LABELS.coding })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+        expect(rowButtons().map((row) => row.getAttribute("data-widget"))).toEqual(
+          CODING_PICKER_QUESTIONS.map(({ id }) => id),
+        );
       });
     });
 
@@ -679,9 +885,9 @@ describe("a member's board", () => {
         await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
         await waitFor(() => expect(host.langyAsks).toHaveLength(1));
         expect(server.state.widgets.map(({ name }) => name)).toEqual([traffic.question]);
-        expect(host.langyAsks[0]?.draft?.startsWith(traffic.prompt)).toBe(true);
-        expect(host.langyAsks[0]?.draft).toContain(`This widget:\nName: ${traffic.question}`);
-        expect(host.langyAsks[0]?.draft).toContain("Queries (LangWatchQL):");
+        expect(host.langyAsks[0]?.draft).toContain(`What does "${traffic.question}" show`);
+        expect(host.langyAsks[0]?.context[1]?.ref).toContain(`widget "${traffic.question}"`);
+        expect(host.langyAsks[0]?.context[1]?.ref).toContain("queries (LangWatchQL):");
       });
     });
 
@@ -704,7 +910,7 @@ describe("a member's board", () => {
         ).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Clear search and filters" }));
 
-        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
+        expect(await pickerRegions()).toEqual(ALL_WIDGETS);
         expect(pickerSearch()).toHaveValue("");
       });
     });
@@ -962,6 +1168,124 @@ describe("a member's board", () => {
     });
   });
 
+  describe("given a member who may edit in the project that owns the board", () => {
+    const EDITOR = { "proj-1": ["analytics:update"] };
+
+    describe("when they click the title, type a new name and press Enter", () => {
+      /** @scenario "Boards: clicking the title renames the board" */
+      it("saves the trimmed name in the owning project, says so and shows it as the title", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server, projectPermissions: EDITOR });
+
+        const title = await screen.findByRole("heading", { name: "Weekly review" });
+        await user.click(await within(title).findByRole("button", { name: "Weekly review" }));
+        const field = screen.getByRole("textbox", { name: "Dashboard name" });
+        expect(field).toHaveValue("Weekly review");
+        await user.clear(field);
+        await user.type(field, "  Launch week {Enter}");
+
+        await waitFor(() =>
+          expect(callsTo(server, "boards.update").map((call) => call.input)).toEqual([
+            { projectId: "proj-1", dashboardId: "board-1", name: "Launch week" },
+          ]),
+        );
+        expect(await screen.findByRole("heading", { name: "Launch week" })).toBeInTheDocument();
+        await waitFor(() =>
+          expect(host.successes.map((notice) => notice.title)).toEqual(["Dashboard renamed"]),
+        );
+      });
+    });
+
+    describe("when they leave the name blank or unchanged", () => {
+      /** @scenario "Boards: clicking the title renames the board" */
+      it("saves nothing and shows the title again", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, projectPermissions: EDITOR });
+
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.clear(screen.getByRole("textbox", { name: "Dashboard name" }));
+        await user.keyboard("{Enter}");
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.keyboard("{Enter}");
+
+        expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+        expect(callsTo(server, "boards.update")).toEqual([]);
+      });
+    });
+
+    describe("when they press Escape while renaming", () => {
+      /** @scenario "Boards: Escape cancels a rename from the title" */
+      it("keeps the old name and saves nothing", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, projectPermissions: EDITOR });
+
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), " draft{Escape}");
+
+        expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+        expect(screen.queryByRole("textbox", { name: "Dashboard name" })).toBeNull();
+        expect(callsTo(server, "boards.update")).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a reader who may not rename the board", () => {
+    /** @scenario "Boards: a reader who may not rename sees a plain title" */
+    it("shows the title as plain text without edit rights in the owning project", async () => {
+      openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+
+      const title = await screen.findByRole("heading", { name: "Weekly review" });
+      expect(within(title).queryByRole("button")).toBeNull();
+    });
+
+    /** @scenario "My dashboards made before the mark are marked by a background step" */
+    it("shows an unmarked My dashboard's title as plain text, edit rights or not", async () => {
+      openBoard({
+        server: inMemoryServer({
+          boards: [{ ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard" }],
+        }),
+        dashboardId: "mine",
+        projectPermissions: { "proj-1": ["analytics:update"] },
+      });
+
+      const title = await screen.findByRole("heading", { name: "My dashboard" });
+      expect(within(title).queryByRole("button")).toBeNull();
+    });
+  });
+
+  describe("given the member's own My dashboard, marked theirs", () => {
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("renames it from its title, keeping its mark", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({
+        boards: [
+          { ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard", myDashboardOfUserId: "user-1" },
+        ],
+      });
+      openBoard({
+        server,
+        dashboardId: "mine",
+        projectPermissions: { "proj-1": ["analytics:update"] },
+      });
+
+      const title = await screen.findByRole("heading", { name: "My dashboard" });
+      await user.click(await within(title).findByRole("button", { name: "My dashboard" }));
+      const field = screen.getByRole("textbox", { name: "Dashboard name" });
+      await user.clear(field);
+      await user.type(field, "Team pulse{Enter}");
+
+      await waitFor(() =>
+        expect(callsTo(server, "boards.update").map((call) => call.input)).toEqual([
+          { projectId: "proj-1", dashboardId: "mine", name: "Team pulse" },
+        ]),
+      );
+      expect(await screen.findByRole("heading", { name: "Team pulse" })).toBeInTheDocument();
+    });
+  });
+
   describe("given the member's own My dashboard", () => {
     /** @scenario "Boards: My dashboard has no description placeholder" */
     it("offers no description placeholder", async () => {
@@ -1135,6 +1459,440 @@ describe("a member's board", () => {
         expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
       });
+    });
+  });
+
+  describe("given a member opens a new board with '+'", () => {
+    const TRAFFIC = PICKER_SECTIONS.flatMap(({ questions }) => questions).find(
+      ({ id }) => id === "traffic",
+    )!;
+    const pickTraffic = async (user: ReturnType<typeof userEvent.setup>) =>
+      user.click(await screen.findByRole("button", { name: new RegExp(escape(TRAFFIC.question)) }));
+
+    /** @scenario "AC162 The '+' on Your dashboards opens a new board without storing it" */
+    it("shows a blank, numbered untitled board with the templates, and stores nothing", async () => {
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      openBoard({ server, dashboardId: "new" });
+
+      expect(
+        await screen.findByRole("heading", { name: "Untitled dashboard 1" }),
+      ).toBeInTheDocument();
+      expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+      await waitFor(() => expect(callsTo(server, "boards.getAll").length).toBeGreaterThan(0));
+      expect(callsTo(server, "boards.create")).toEqual([]);
+    });
+
+    /**
+     * @scenario "Boards: a template used on an empty board fills that board"
+     * @scenario "AC162c A new board's first widget stores it once"
+     */
+    it("stores the new board once, under the template's name, holding its widgets", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        dashboardId: "new",
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
+      const template = curatedBoardById("data")!.card.board;
+
+      await user.click(await screen.findByRole("button", { name: `Use ${template.name}` }));
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      expect(host.langyAsks[0]?.context[0]).toMatchObject({ label: template.name });
+      expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
+        { projectId: "proj-1", name: template.name, homeProduct: "llm-ops" },
+      ]);
+      expect(server.state.widgets.every(({ dashboardId }) => dashboardId === "board-new-3")).toBe(
+        true,
+      );
+      expect(server.state.boards.find(({ id }) => id === "board-new-3")?.description).toBe(
+        template.description,
+      );
+      expect(host.navigations).toEqual(["/test-project/dashboards/board-new-3"]);
+    });
+
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("offers a description and the one empty board view, stored at Project with no scope sent", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      openBoard({ server, dashboardId: "new", flags: LANGY_ON, permissions: LANGY_MEMBER });
+
+      expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What do you want to know?" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      expect(callsTo(server, "boards.create")[0]?.input).toEqual({
+        projectId: "proj-1",
+        name: "Untitled dashboard 1",
+        homeProduct: "llm-ops",
+      });
+    });
+
+    /** @scenario "AC162b Leaving a new board unedited stores nothing" */
+    it("stores nothing when the member leaves without an edit", async () => {
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { view } = openBoard({ server, dashboardId: "new", query: { addBlock: "open" } });
+      await screen.findByRole("dialog");
+
+      view.unmount();
+
+      expect(callsTo(server, "boards.create")).toEqual([]);
+      expect(server.state.boards).toHaveLength(OWN_BOARDS.length);
+    });
+
+    /** @scenario "AC162c A new board's first widget stores it once" */
+    it("stores the board once with the picked widget on it, and moves the address to it", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({ server, dashboardId: "new", query: { addBlock: "open" } });
+
+      await pickTraffic(user);
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+      expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
+        { projectId: "proj-1", name: "Untitled dashboard 1", homeProduct: "llm-ops" },
+      ]);
+      expect(server.state.widgets.map(({ dashboardId }) => dashboardId)).toEqual(["board-new-3"]);
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
+    });
+
+    /** @scenario "AC162l A question asked from a new board's ask bar only goes to Langy" */
+    it("asks Langy a question typed in Add a widget, and leaves Add a widget closed", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        dashboardId: "new",
+        query: { addBlock: "open" },
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
+      await screen.findByRole("dialog");
+
+      await user.type(pickerSearch(), "zzz why are my users unhappy{Enter}");
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      expect(host.langyAsks[0]).toMatchObject({
+        question: "zzz why are my users unhappy",
+        askedFrom: "dashboard:board-new-3",
+      });
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores the board with the description the member typed", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Dashboard description" }),
+        "Refund questions{Enter}",
+      );
+
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(1));
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      expect(server.state.boards.at(-1)).toMatchObject({
+        id: "board-new-3",
+        description: "Refund questions",
+      });
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("says why, keeps the board unsaved, and stores it on the next edit", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new", query: { addBlock: "open" } });
+
+      await pickTraffic(user);
+
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+      expect(callsTo(server, "dashboardWidgets.create")).toEqual([]);
+      expect(host.replacements).toEqual([]);
+      expect(screen.getByRole("heading", { name: "Untitled dashboard 1" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Add a description" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Dashboard description" }),
+        "Refunds{Enter}",
+      );
+
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(1));
+      expect(callsTo(server, "boards.create")).toHaveLength(2);
+      expect(server.state.boards.at(-1)).toMatchObject({
+        id: "board-new-3",
+        description: "Refunds",
+      });
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("keeps the board it stored when the description is refused, and stores no second one", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardUpdates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+      expect(readHandledError(host.failures[0]?.error)?.code).toBe("dashboard_not_found");
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
+
+      await user.click(screen.getByRole("button", { name: "Q" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "R{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(2));
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      expect(server.state.boards.at(-1)).toMatchObject({ id: "board-new-3", description: "QR" });
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("sends the same description again when the member confirms it after a refusal", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Dashboard description" }),
+        "Refunds{Enter}",
+      );
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+
+      await user.click(screen.getByRole("button", { name: "Refunds" }));
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(2));
+      await waitFor(() =>
+        expect(server.state.boards.at(-1)).toMatchObject({
+          id: "board-new-3",
+          description: "Refunds",
+        }),
+      );
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("stores the board with no description when the member cleared it after a refusal", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Dashboard description" }),
+        "Refunds{Enter}",
+      );
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+
+      await user.click(screen.getByRole("button", { name: "Refunds" }));
+      await user.clear(screen.getByRole("textbox", { name: "Dashboard description" }));
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(2));
+      await waitFor(() => expect(host.replacements).toHaveLength(1));
+      expect(callsTo(server, "boards.update")).toEqual([]);
+      expect(server.state.boards.at(-1)).toMatchObject({ id: "board-new-3", description: null });
+    });
+
+    /** @scenario "AC162c A new board's first widget stores it once" */
+    it("adds one widget when Save is pressed again while the board is being stored", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      openBoard({ server, dashboardId: "new", query: { editWidget: "new" } });
+      const drawer = await screen.findByRole("dialog");
+
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      fireEvent.click(within(drawer).getByRole("button", { name: "Save" }));
+      server.releaseBoardCreates();
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1));
+      expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "AC162j Edits made while a new board is being stored land on it in the order made" */
+    it("keeps the description given while the first widget's save stores the board", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      openBoard({ server, dashboardId: "new", query: { editWidget: "new" } });
+      const drawer = await screen.findByRole("dialog");
+
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      const redescribe = (button: string, text: string) => {
+        fireEvent.click(screen.getByRole("button", { name: button, hidden: true }));
+        const field = screen.getByRole("textbox", { name: "Dashboard description", hidden: true });
+        fireEvent.change(field, { target: { value: text } });
+        fireEvent.keyDown(field, { key: "Enter" });
+      };
+      redescribe("Add a description", "Refunds");
+      redescribe("Refunds", "Returns");
+      server.releaseBoardCreates();
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(2));
+      expect(callsTo(server, "boards.update").map(({ input }) => input)).toEqual([
+        expect.objectContaining({ description: "Refunds" }),
+        expect.objectContaining({ description: "Returns" }),
+      ]);
+      expect(server.state.boards.at(-1)).toMatchObject({
+        id: "board-new-3",
+        description: "Returns",
+      });
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "AC162j Edits made while a new board is being stored land on it in the order made" */
+    it("lets a rename made once the board is stored wait for the edits queued before it", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      const { host } = openBoard({ server, dashboardId: "new" });
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      await user.click(screen.getByRole("button", { name: "Q" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "R{Enter}");
+
+      server.releaseBoardCreates();
+      await waitFor(() => expect(host.replacements).toHaveLength(1));
+      await afterDraftWrites("board-new-3");
+
+      expect(callsTo(server, "boards.update").map(({ input }) => input)).toEqual([
+        expect.objectContaining({ description: "Q" }),
+        expect.objectContaining({ description: "QR" }),
+      ]);
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("keeps the screen it opened when the first edit of a freshly loaded new board is refused", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const host = new StubAnalyticsHost({
+        flags: FLAG_ON,
+        project: { id: "proj-fresh", slug: "fresh", name: "Fresh", hasFirstMessage: true },
+        route: { params: { dashboardId: "new" }, query: {} },
+      });
+      renderDashboards({ element: <DashboardBoardScreen />, host, answer: server.answer });
+      const title = await screen.findByRole("heading", { name: "Untitled dashboard 1" });
+
+      await user.click(screen.getByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+
+      expect(screen.getByRole("heading", { name: "Untitled dashboard 1" })).toBe(title);
+    });
+
+    /** @scenario "AC162g Opening the new board's address again starts a new unsaved board" */
+    it("leaves a new board opened while the last one was being stored unsaved, where it is", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      const { host } = openBoard({ server, dashboardId: "new", withSidebar: true });
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+
+      await user.click(screen.getByRole("button", { name: "New dashboard" }));
+      server.releaseBoardCreates();
+
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(1));
+      // The stored board is listed once the lists are read again, the new draft still open.
+      await waitFor(() =>
+        expect(screen.getAllByRole("link").map((row) => row.getAttribute("href"))).toContain(
+          "/test-project/dashboards/board-new-3",
+        ),
+      );
+      expect(host.replacements).toEqual([]);
+      expect(screen.getByRole("button", { name: "Add a description" })).toBeInTheDocument();
+      const open = screen
+        .getAllByRole("link")
+        .filter((row) => row.getAttribute("aria-current") === "page");
+      expect(open.map((row) => row.getAttribute("href"))).toEqual(["/test-project/dashboards/new"]);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "Undo: Undo puts the board back as it was, on the server" */
+    it("undoes a widget added to a new board on that board, after another new board opened", async () => {
+      // Toasts the earlier tests offered stay queued in the one toaster; start from none.
+      toaster.remove();
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const host = new StubAnalyticsHost({
+        flags: FLAG_ON,
+        route: { params: { dashboardId: "new" }, query: { editWidget: "new" } },
+      });
+      renderDashboards({
+        element: (
+          <>
+            <SavedDashboardsSection openPath="new" />
+            <DashboardBoardScreen />
+            <Toaster />
+          </>
+        ),
+        host,
+        answer: server.answer,
+      });
+      const drawer = await screen.findByRole("dialog");
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1));
+
+      fireEvent.click(screen.getByRole("button", { name: "New dashboard", hidden: true }));
+      fireEvent.click(await screen.findByRole("button", { name: "Undo", hidden: true }));
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
+      expect(server.state.widgets).toEqual([]);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      toaster.remove();
+    });
+
+    /** @scenario "AC162e Asking Langy on a new board stores it first" */
+    it("stores the board before the widget editor's Langy ask, which names the stored board", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        dashboardId: "new",
+        query: { addBlock: "open" },
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
+
+      await user.click(await screen.findByRole("button", { name: "I'll build it myself" }));
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      const refs = host.langyAsks[0]?.context.map(({ ref }) => ref).join(" ");
+      expect(refs).toContain("(id board-new-3)");
+      expect(refs).not.toContain("(id new)");
+    });
+
+    /** @scenario "AC162g Opening the new board's address again starts a new unsaved board" */
+    it("opens a new unsaved board after the last one was stored, and leaves that one alone", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const first = openBoard({ server, dashboardId: "new", query: { addBlock: "open" } });
+      await pickTraffic(user);
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+      first.view.unmount();
+
+      openBoard({ server, dashboardId: "new", query: { addBlock: "open" } });
+      expect(
+        await screen.findByRole("heading", { name: "Untitled dashboard 2" }),
+      ).toBeInTheDocument();
+      await pickTraffic(user);
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(2));
+      expect(server.state.widgets.map(({ dashboardId }) => dashboardId)).toEqual([
+        "board-new-3",
+        "board-new-4",
+      ]);
     });
   });
 });

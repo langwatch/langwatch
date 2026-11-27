@@ -5,6 +5,7 @@ import type {
   SealedStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import type { ReplayClaimsIndex } from "./replayClaimsIndex.ts";
 import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource.ts";
 import type { ReplayRedis } from "./replayRedis.ts";
 
@@ -129,6 +130,21 @@ export interface ReplayCallbacks {
   onBatchComplete?: (info: BatchCompleteInfo) => void;
   /** Aborted by a worker stop: no batch starts after it, and the run rethrows its reason. */
   signal?: AbortSignal;
+  /** Where a caller keeps the aggregates replay had to page, across runs. */
+  paging?: ReplayPagingLedger;
+}
+
+/**
+ * The aggregates too large for one bulk read, kept by the caller across runs (a step's report):
+ * a listed one pages at once, and one whose paged attempts keep being cut fails by name.
+ */
+export interface ReplayPagingLedger {
+  /** Per aggregate key, the paged attempts that started and never finished. */
+  readonly unfinished: ReadonlyMap<string, number>;
+  /** Kept before the first page is read: past a deadline a cut can no longer be saved. */
+  started(input: { key: string }): Promise<void>;
+  /** The aggregate finished paging; it stays listed, so a later run pages it at once. */
+  finished(input: { key: string }): void;
 }
 
 export interface ReplayResult {
@@ -151,6 +167,8 @@ export interface DiscoveryResult {
  */
 export interface ReplayContext {
   redis: ReplayRedis;
+  /** The queue's claimed-groups index the map/state drain reads (ADR-092). */
+  claims: ReplayClaimsIndex;
   eventSource: ReplayEventSource;
   /** Accumulator options carrying the retention resolver (if wired). */
   accumulatorOpts: { retentionResolver?: RetentionPolicyResolver };

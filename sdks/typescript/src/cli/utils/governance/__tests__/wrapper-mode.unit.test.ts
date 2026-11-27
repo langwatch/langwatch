@@ -840,6 +840,68 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when the config cannot be saved", () => {
+    // A FILE where the config folder belongs fails the save for any user,
+    // root included, which a read-only folder would not.
+    const blockConfigFolder = () => fs.writeFileSync(path.join(tmpHome, ".langwatch"), "");
+    const gatewayOnly = () =>
+      baseCfg({ tool_policies: { claude: { allowVk: true, allowOtelDirect: false } } });
+
+    /** @scenario "A personal virtual key is not minted when the config cannot be saved" */
+    it("refuses before the server issues a personal virtual key", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      blockConfigFolder();
+
+      await expect(
+        resolveWrapperMode(gatewayOnly(), "claude", {
+          ANTHROPIC_BASE_URL: "http://gw.example.com",
+        }),
+      ).rejects.toMatchObject({ code: "config_not_writable" });
+      expect(cliApi.issuePersonalVirtualKey).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An ingest key is not minted when the config cannot be saved" */
+    it("refuses before the server issues an ingest key", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      blockConfigFolder();
+
+      await expect(resolveWrapperMode(baseCfg(), "codex", {})).rejects.toMatchObject({
+        code: "config_not_writable",
+      });
+      expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the server issued a personal virtual key that could not be saved", () => {
+    /** @scenario "A virtual key that could not be saved is reported" */
+    it("says so on stderr, naming the key and the config path", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "vk1",
+        secret: "vk-lw-issued",
+        prefix: "vk-lw-iss",
+      });
+      vi.mocked(configMod.saveConfig).mockImplementation(() => {
+        throw new Error("ENOSPC: no space left on device");
+      });
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        await resolveWrapperMode(
+          baseCfg({ tool_policies: { claude: { allowVk: true, allowOtelDirect: false } } }),
+          "claude",
+          { ANTHROPIC_BASE_URL: "http://gw.example.com" },
+        );
+
+        const written = stderr.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("personal virtual key could not be saved");
+        expect(written).toContain("ENOSPC");
+      } finally {
+        stderr.mockRestore();
+        vi.mocked(configMod.saveConfig).mockReset();
+      }
+    });
+  });
+
   describe("when the cached policy disables the gateway path for a tool", () => {
     /**
      * The admin forced claude onto direct OTLP (allowVk false). A

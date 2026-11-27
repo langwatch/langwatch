@@ -12,6 +12,7 @@ import {
   type CallerVoiceConfig,
 } from "@langwatch/scenario-contract";
 
+import { scenarioRunKindFields } from "../rules/red-team-job.rules.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 
 type FetchProjectResult =
@@ -48,6 +49,8 @@ export class ScenarioExecutionLookupService {
     parameters: RunParameterValues;
     simulatorModel: string | null;
     judgeModel: string | null;
+    traceQuietPeriodMs: number | null;
+    traceWaitTimeoutMs: number | null;
     callerVoice: CallerVoiceConfig;
   }> {
     const scenario = await this.options.scenarios.getById({
@@ -94,10 +97,13 @@ export class ScenarioExecutionLookupService {
         labels: scenario.labels,
         maxTurns: scenario.maxTurns ?? undefined,
         minTurns: scenario.minTurns ?? undefined,
+        ...scenarioRunKindFields(scenario),
       },
       parameters,
       simulatorModel: scenario.simulatorModel ?? null,
       judgeModel: scenario.judgeModel ?? null,
+      traceQuietPeriodMs: scenario.traceQuietPeriodMs ?? null,
+      traceWaitTimeoutMs: scenario.traceWaitTimeoutMs ?? null,
       callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
     };
   }

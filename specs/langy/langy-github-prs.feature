@@ -51,7 +51,7 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     Given the agent backend is completely unreachable
     When I ask Langy to open a PR on "acme/service-x"
     Then Langy tells me it is temporarily unavailable within a few seconds
-    And no daily PR permit is consumed
+    And nothing is counted against my daily pull request cap
 
   @integration
   Scenario: Langy does not retry when the agent rejects the request
@@ -160,6 +160,11 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     When I read that turn back
     Then the card does not say Langy is working on it
 
+  # The cap counts pull requests from the fact of one opening: an answer whose
+  # gh pr create printed a pull request URL, stored as one row per pull request.
+  # A turn spends nothing by starting, so there is nothing to give back when it
+  # opens none. The cap is soft: a turn admitted under it may open more than one
+  # pull request before its answer is stored.
   @integration
   Scenario: Per-user daily PR cap stops runaway loops
     Given I have already opened 20 PRs via Langy today
@@ -167,32 +172,78 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     Then Langy reports the daily cap is reached
     And no pull request is created until the cap resets
 
-  @integration
-  Scenario: Permit must be released on every non-PR exit
-    Given a PR-cap permit has been reserved for the current request
-    When the request errors before any PR is opened
-    Then the permit is released back to the daily counter
-    And the user's remaining daily cap is unchanged
+  @unit
+  Scenario: The daily cap counts pull requests that opened, not turns
+    Given Langy opened 3 pull requests for me today
+    Then 17 of my 20 pull requests for today remain
+
+  @unit
+  Scenario: A code turn that opens no pull request spends nothing of the daily cap
+    Given I ran 25 code turns today with GitHub connected
+    And none of them opened a pull request
+    When I send the next turn
+    Then Langy still gets the GitHub token
+    And my whole daily cap remains
+
+  # A card (code access, repository choice, Try again) answers by starting a
+  # turn. Those turns open nothing, so they spend nothing.
+  @unit
+  Scenario: Clicking a card or Try again spends nothing of the daily cap
+    Given Langy opened 1 pull request for me today
+    And I then clicked cards and "Try again" 25 times
+    When I send the next turn
+    Then Langy still gets the GitHub token
+    And 19 of my 20 pull requests for today remain
+
+  @unit
+  Scenario: Pushing to a pull request already opened does not count again
+    Given Langy opened a pull request for me today
+    When a later turn pushes to that pull request's branch
+    And the answer that opened it is counted a second time
+    Then that pull request counts once against my daily cap
 
   @integration
-  Scenario: Invalid modelOverride must NOT burn a permit
+  Scenario: Invalid modelOverride never reads the daily cap
     Given the project's allowlist excludes the requested model
     When the user asks Langy with that modelOverride
     Then the request fails the allowlist check with 400
-    And no permit was reserved against the daily counter
+    And the daily pull request cap was never read
 
   # ── The API process's own composition ──────────────────────────────────
 
   @unit
-  Scenario: The API process meters the daily pull-request cap on its own Redis
-    Given the API process composed a Redis connection
-    When a turn reserves a pull-request permit
-    Then the permit is spent against that user's day bucket
-    And the turn is told the real per-day cap rather than zero
+  Scenario: The API process counts the daily pull-request cap from the pull requests Langy opened
+    Given Langy opened the per-day maximum of pull requests for a user today
+    When the user sends a turn
+    Then the turn is told the real per-day cap rather than zero
+    And another user's cap is untouched
+
+  @integration
+  Scenario: The daily cap counts a person's pull requests in every project
+    Given Langy opened pull requests for a person in two projects
+    When the daily cap counts that person's pull requests since the day began
+    Then each pull request counts once, whichever project it was opened in
 
   @unit
   Scenario: A deployment with no counter never denies a pull request
-    Given the API process composed no Redis connection
-    When a turn reserves a pull-request permit
-    Then the reservation is allowed
-    And the turn is told nothing was reserved, so it releases nothing
+    Given the pull requests Langy opened cannot be read
+    When a turn reads the daily pull request cap
+    Then the turn is allowed to open a pull request
+
+  # ── What the github skill teaches about the clone ──────────────────────
+
+  # A cloud replay could not run a repository's tests because a Python
+  # dependency was missing, and the clone never had its dependencies installed.
+  @unit
+  Scenario: The github skill installs the clone's dependencies before running its tests
+    When the github skill is read
+    Then it tells Langy to install the repository's dependencies first, with the tool the repository's files name
+    And it names uv sync, uv pip install -r requirements.txt and npm ci among them
+    And when the install fails it tells Langy to run the tests in the repository's CI with gh workflow run
+
+  # The file tools take a path as text, so "$HOME/work/<repo>" used to reach
+  # them literally.
+  @unit
+  Scenario: The github skill gives the file tools the clone's absolute path
+    When the github skill is read
+    Then it tells Langy to give the read, edit and write tools the absolute path pwd prints

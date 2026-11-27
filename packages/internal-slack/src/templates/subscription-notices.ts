@@ -122,3 +122,41 @@ export const subscriptionCancelledNotice = defineNotice({
     },
   },
 });
+
+export const seatRequestedNotice = defineNotice({
+  id: "seat-requested",
+  title: "Seat requested on an account-managed plan",
+  sentWhen:
+    "A person waits for a seat in an organization whose plan only sales can grow; to the subscriptions channel, once per request.",
+  schema: z.object({
+    organizationName: z.string(),
+    plan: z.string(),
+    seats: z.number().int().nonnegative(),
+    requestedSeats: z.number().int().positive(),
+    adminUrl: z.url(),
+  }),
+  compose: (props) => ({
+    tone: "lead",
+    title: "Seat requested",
+    summary: [
+      bold(props.organizationName),
+      " has someone waiting for a seat on ",
+      bold(props.plan),
+      ".",
+    ],
+    fields: [
+      { label: "Seats now", value: count(props.seats) },
+      { label: "Seats needed", value: count(props.requestedSeats) },
+    ],
+    actions: [{ label: ADMIN_BUTTON, url: props.adminUrl, primary: true }],
+  }),
+  fixtures: {
+    "an enterprise licence at its cap": {
+      organizationName: "Acme Robotics",
+      plan: "ENTERPRISE",
+      seats: 25,
+      requestedSeats: 26,
+      adminUrl: "https://app.langwatch.ai/admin#/organizations/organization_acme",
+    },
+  },
+});

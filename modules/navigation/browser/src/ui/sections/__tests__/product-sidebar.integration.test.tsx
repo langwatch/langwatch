@@ -4,7 +4,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,9 +27,13 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
+import { useSidebarWidthStore } from "../../../behavior/sidebar-width.store.ts";
 import { forgetMenuScrollPositions } from "../../../behavior/use-menu-scroll-position.ts";
 import { MENU_WIDTH_EXPANDED } from "../../../model/menu-widths.ts";
-import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import {
+  SHELL_SIDEBAR_WIDTH_EXPANDED,
+  SHELL_SIDEBAR_WIDTH_MAX,
+} from "../../../model/shell-layout.ts";
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 
@@ -176,6 +180,7 @@ beforeEach(() => {
   };
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  useSidebarWidthStore.getState().resetWidth();
   // The menu's places outlive a test, the way they outlive a page change.
   forgetMenuScrollPositions();
 });
@@ -244,7 +249,7 @@ describe("the product sidebar", () => {
   describe("when on a Me page", () => {
     /** @scenario The Me sidebar keeps the personal pages without the Govern group */
     it("shows the personal pages and no Govern group", () => {
-      renderSidebar({ surface: "me", pathname: "/me" });
+      renderSidebar({ surface: "me", pathname: "/coding-agents" });
 
       expect(screen.getByText("My Usage")).toBeInTheDocument();
       expect(screen.getByText("Sessions")).toBeInTheDocument();
@@ -382,6 +387,18 @@ describe("the product sidebar", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(300);
+      });
+    });
+
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
+    it("reveals an entry that sits under the menu's bottom fade", async () => {
+      // Inside the menu's 200px box, but its last pixels are where the fade hides entries.
+      stubMenuLayout({ entryOffsets: { "Virtual keys": 150 }, menuHeight: 200 });
+
+      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(150);
       });
     });
 
@@ -583,6 +600,52 @@ describe("the product sidebar", () => {
       expect(screen.getByTestId("product-sidebar")).toHaveStyle({
         width: SHELL_SIDEBAR_WIDTH_EXPANDED,
       });
+    });
+
+    /** @scenario "Dragging the sidebar's edge widens it and the width is remembered" */
+    it("widens with a drag of its edge, keeps the width and resets on double-click", () => {
+      renderSidebar({ surface: "llm-ops" });
+      const edge = screen.getByRole("separator", { name: "Resize sidebar" });
+      const min = Number.parseInt(SHELL_SIDEBAR_WIDTH_EXPANDED, 10);
+
+      fireEvent.pointerDown(edge, { button: 0, clientX: min, pointerId: 1 });
+      fireEvent.pointerMove(edge, { clientX: min + 100, pointerId: 1 });
+      fireEvent.pointerUp(edge, { clientX: min + 100, pointerId: 1 });
+
+      expect(screen.getByTestId("product-sidebar")).toHaveStyle({ width: `${min + 100}px` });
+      expect(useSidebarWidthStore.getState().rememberedWidth).toBe(min + 100);
+
+      cleanup();
+      renderSidebar({ surface: "gateway" });
+      expect(screen.getByTestId("product-sidebar")).toHaveStyle({ width: `${min + 100}px` });
+
+      const again = screen.getByRole("separator", { name: "Resize sidebar" });
+      fireEvent.pointerDown(again, { button: 0, clientX: 0, pointerId: 2 });
+      fireEvent.pointerMove(again, { clientX: -500, pointerId: 2 });
+      fireEvent.pointerMove(again, { clientX: 2000, pointerId: 2 });
+      fireEvent.pointerUp(again, { clientX: 2000, pointerId: 2 });
+      expect(screen.getByTestId("product-sidebar")).toHaveStyle({
+        width: `${SHELL_SIDEBAR_WIDTH_MAX}px`,
+      });
+
+      fireEvent.doubleClick(again);
+      expect(screen.getByTestId("product-sidebar")).toHaveStyle({
+        width: SHELL_SIDEBAR_WIDTH_EXPANDED,
+      });
+    });
+
+    it("keeps no drag handle on a small screen's hover-out column", () => {
+      renderSidebar({ surface: "llm-ops", isCompact: true });
+
+      expect(screen.queryByRole("separator", { name: "Resize sidebar" })).toBeNull();
+    });
+
+    /** @scenario "A cut-off menu entry shows its full name on hover" */
+    it("names each menu entry in full in its title", () => {
+      renderSidebar({ surface: "gateway", pathname: "/gateway" });
+
+      const link = screen.getByRole("link", { name: "Virtual keys" });
+      expect(link.querySelector('[title="Virtual keys"]')).not.toBeNull();
     });
 
     /** @scenario "The search key cap reads as a quiet hint" */

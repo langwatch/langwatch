@@ -32,6 +32,10 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
   "Get Support": LifeBuoy,
 };
 
+/* The current section reads as a tinted pill with an accent hairline in both themes. */
+const SELECTED_RING =
+  "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-accent-fg) 32%, transparent)";
+
 function SectionGlyph({ title }: { title: string }) {
   const Glyph = SECTION_ICONS[title] ?? Blocks;
   return <Glyph size={18} strokeWidth={1.8} aria-hidden="true" />;
@@ -66,16 +70,10 @@ function AnchorLink({
       textDecoration="none"
       color={selected ? "accent.fg" : "fg"}
       fontWeight={selected ? "600" : "450"}
-      bg={selected ? "docs.raised" : "transparent"}
+      bg={selected ? "accent.subtle" : "transparent"}
       marginBottom="0.5"
-      boxShadow={selected ? "0 1px 3px var(--chakra-colors-docs-shadow)" : void 0}
-      _hover={{
-        bg: selected ? "docs.raised" : "bg.hover",
-        boxShadow: selected
-          ? "0 1px 3px var(--chakra-colors-docs-shadow), inset 0 0 0 1px var(--chakra-colors-border)"
-          : void 0,
-        textDecoration: "none",
-      }}
+      boxShadow={selected ? SELECTED_RING : void 0}
+      _hover={{ bg: selected ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
     >
       <Box
         display="inline-flex"

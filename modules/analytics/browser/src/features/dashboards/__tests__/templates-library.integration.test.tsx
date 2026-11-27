@@ -5,7 +5,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -26,7 +26,6 @@ import {
   TEMPLATE_LIBRARY,
   TEMPLATE_PREVIEW_IDS,
   templatePreviewSrc,
-  templateSections,
 } from "../model/template-library.ts";
 import { TemplatePreview } from "../ui/blocks/template-preview.tsx";
 import TemplatesLibraryScreen from "../ui/sections/templates-library.screen.tsx";
@@ -100,21 +99,19 @@ afterEach(cleanup);
 describe("the templates finder", () => {
   describe("given the release_dashboards flag is off", () => {
     /** @scenario "AC100b Templates library: the library is behind the dashboards gate" */
-    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
     it("shows the not-found page", () => {
       openLibrary({ flags: { release_dashboards: false } });
 
       expect(screen.getByRole("heading", { name: "This page is not here" })).toBeInTheDocument();
-      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 
   describe("given the flag is on", () => {
-    /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
-    it("points back to the old Analytics", () => {
+    /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+    it("shows no old-Analytics banner", () => {
       openLibrary();
 
-      expect(screen.getByTestId("old-analytics-banner")).toBeInTheDocument();
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
 
     /** @scenario "AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view" */
@@ -126,16 +123,30 @@ describe("the templates finder", () => {
   });
 
   describe("given no search and no filters", () => {
-    /** @scenario "AC101 Templates library: every ready template is listed by trunk" */
-    it("lists every ready template once, under its trunk, in trunk order", () => {
+    /** @scenario "AC101 Templates library: All lists one template per job, most needed first" */
+    it("lists every ready template once in one grid, most needed first, with no headings", () => {
       openLibrary();
 
       expect(screen.getByRole("heading", { level: 1, name: "Dashboard templates" })).toBeVisible();
-      const regions = screen.getAllByRole("region");
+      const grid = screen.getByRole("region", { name: "All templates" });
+      expect(within(grid).queryAllByRole("heading", { level: 2 })).toEqual([]);
+      const cards = screen.getAllByRole("article");
+      expect(cards.map((card) => card.getAttribute("data-template"))).toEqual(
+        POOL.map(({ board }) => board.id),
+      );
+      expect(cards[0]?.getAttribute("aria-label")).toBe("My agent at a glance");
+    });
+
+    /** @scenario "AC101 Templates library: All lists one template per job, most needed first" */
+    it("lists a picked category under its heading, in the same order", () => {
+      openLibrary({ query: { trunk: "Protect" } });
+
+      const [section, ...others] = screen.getAllByRole("region");
+      expect(others).toEqual([]);
+      expect(within(section!).getByRole("heading", { level: 2 }).textContent).toBe("Protect");
       expect(
-        regions.map((region) => within(region).getByRole("heading", { level: 2 }).textContent),
-      ).toEqual(templateSections({ templates: POOL }).map(({ key }) => key));
-      expect(screen.getAllByRole("article")).toHaveLength(POOL.length);
+        screen.getAllByRole("article").map((card) => card.getAttribute("data-template")),
+      ).toEqual(POOL.filter(({ trunk }) => trunk === "Protect").map(({ board }) => board.id));
     });
 
     /** @scenario "AC103 Templates library: one category chip and one agent-type chip narrow the finder" */
@@ -195,16 +206,17 @@ describe("the templates finder", () => {
   });
 
   describe("given an address with an agent type picked", () => {
-    /** @scenario "Finder: an agent-type chip finds only the templates made for that type" */
+    /**
+     * @scenario "Finder: an agent-type chip finds only the templates made for that type"
+     * @scenario "Finder: a template adapts to the agent kind instead of listing a copy per kind"
+     */
     it("lists only the templates made for that type, each naming it in its footer", () => {
       openLibrary({ query: { agent: "voice" } });
 
       const voice = finderPool({ agentKind: "voice" });
       const cards = screen.getAllByRole("article");
       expect(cards.map((card) => card.getAttribute("aria-label"))).toEqual(
-        templateSections({ templates: voice }).flatMap(({ items }) =>
-          items.map(({ board }) => board.name),
-        ),
+        voice.map(({ board }) => board.name),
       );
       for (const card of cards) {
         expect(within(card).getByText(AGENT_KIND_CHIP_LABELS.voice)).toBeInTheDocument();
@@ -225,16 +237,11 @@ describe("the templates finder", () => {
     });
   });
 
-  describe("when the member searches and picks chips", () => {
-    /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
-    it("writes the search, the category and the agent type into the address", async () => {
+  describe("when the member picks chips", () => {
+    /** @scenario "AC104 Templates library: the filters are kept in the address" */
+    it("writes the category and the agent type into the address", async () => {
       const user = userEvent.setup();
       const { host } = openLibrary();
-
-      fireEvent.change(screen.getByRole("searchbox", { name: "Search templates" }), {
-        target: { value: "cost" },
-      });
-      expect(host.lastQuery).toMatchObject({ q: "cost" });
 
       await user.click(chip({ row: "Categories", name: "Profit" }));
       expect(host.lastQuery).toMatchObject({ trunk: "Profit" });
@@ -244,16 +251,26 @@ describe("the templates finder", () => {
     });
   });
 
-  describe("given a search that matches no template", () => {
+  describe("given the finder", () => {
+    /** @scenario "AC102 Templates library: the finder has no search box of its own" */
+    it("has no template search box", () => {
+      openLibrary();
+
+      expect(screen.queryByRole("searchbox")).toBeNull();
+      expect(screen.getByRole("group", { name: "Categories" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given filters that match no template", () => {
     /** @scenario "AC105 Templates library: no match says so and offers to clear the filters" */
-    it("says so and clears the search and filters", async () => {
+    it("says so and clears the filters", async () => {
       const user = userEvent.setup();
-      const { host } = openLibrary({ query: { q: "zzz-no-such-template", trunk: "Profit" } });
+      const { host } = openLibrary({ query: { agent: "voice", trunk: "Trust" } });
 
-      expect(screen.getByText("No template matches your search and filters.")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Clear search and filters" }));
+      expect(screen.getByText("No template matches these filters.")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
-      expect(host.lastQuery).toEqual({ q: undefined, trunk: undefined, agent: undefined });
+      expect(host.lastQuery).toEqual({ trunk: undefined, agent: undefined });
     });
   });
 
@@ -280,8 +297,8 @@ describe("the templates finder", () => {
       await waitFor(() => expect(host.langyAsks).toHaveLength(1));
       const [ask] = host.langyAsks;
       expect(ask?.question).toBeUndefined();
-      expect(ask?.draft?.startsWith(READY.reportPrompt!)).toBe(true);
-      expect(ask?.draft).toContain("Dashboard period:");
+      expect(ask?.draft).toBe(READY.reportPrompt);
+      expect(ask?.context[0]?.ref).toContain("period: ");
       expect(ask?.context[0]?.ref).toContain(`dashboard "${READY.name}" (id board-1)`);
       expect(ask?.context[0]?.ref).toContain(READY.widgets[0]!.name);
     });

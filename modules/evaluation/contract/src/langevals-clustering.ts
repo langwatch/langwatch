@@ -4,8 +4,15 @@ import type {
   TopicClusteringResponse,
 } from "@langwatch/topic-contract";
 
-/** One topic-clustering call to langevals; the signal bounds the whole exchange. */
-export type TopicClusteringRequest = Readonly<{ projectId: string; signal: AbortSignal }> &
+/**
+ * One topic-clustering call to langevals; the signal bounds the whole exchange.
+ * `requestKey` names the work so a retry of it reports its provider usage once.
+ */
+export type TopicClusteringRequest = Readonly<{
+  projectId: string;
+  signal: AbortSignal;
+  requestKey?: string;
+}> &
   (
     | Readonly<{ mode: "batch"; params: BatchClusteringParams }>
     | Readonly<{ mode: "incremental"; params: IncrementalClusteringParams }>
@@ -24,6 +31,7 @@ export const LANGEVALS_CLUSTERING_FAILURE_CODES = [
   "model_not_configured",
   "model_provider_auth_failed",
   "model_provider_bad_request",
+  "model_provider_key_missing",
   "model_provider_rate_limited",
 ] as const;
 export type LangevalsClusteringFailureCode = (typeof LANGEVALS_CLUSTERING_FAILURE_CODES)[number];

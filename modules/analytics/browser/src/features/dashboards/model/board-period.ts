@@ -8,10 +8,19 @@ import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   type LangWatchQLAcceptedGranularityStep,
 } from "@langwatch/analytics-contract";
+import { format, Temporal } from "@langwatch/time";
 
 /** "live" is the last hour, rolling, refreshed every minute (dashboards-v2 AC19c). */
-export const BOARD_PERIOD_RANGES = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
-export type BoardPeriodRange = (typeof BOARD_PERIOD_RANGES)[number];
+export const BOARD_PERIOD_PRESETS = ["live", "1h", "24h", "7d", "30d", "90d", "1y"] as const;
+export type BoardPeriodPreset = (typeof BOARD_PERIOD_PRESETS)[number];
+/** A preset, or "custom": a fixed window from a start to an end (dashboards-v2 AC19e). */
+export type BoardPeriodRange = BoardPeriodPreset | "custom";
+
+/** A custom range's start and end, in epoch milliseconds. */
+export interface BoardCustomWindow {
+  readonly from: number;
+  readonly to: number;
+}
 
 export const BOARD_PERIOD_GRAINS = ["auto", "1m", "5m", "1h", "1d", "1w"] as const;
 export type BoardPeriodGrain = (typeof BOARD_PERIOD_GRAINS)[number];
@@ -23,10 +32,10 @@ export interface BoardPeriod {
   readonly granularitySeconds: LangWatchQLAcceptedGranularityStep;
 }
 
-export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodRange = "30d";
+export const DEFAULT_BOARD_PERIOD_RANGE: BoardPeriodPreset = "30d";
 export const DEFAULT_BOARD_PERIOD_GRAIN: BoardPeriodGrain = "auto";
 
-const RANGE_MS: Readonly<Record<BoardPeriodRange, number>> = {
+const RANGE_MS: Readonly<Record<BoardPeriodPreset, number>> = {
   live: 3_600_000,
   "1h": 3_600_000,
   "24h": 86_400_000,
@@ -65,7 +74,7 @@ export function boardWindowEnd({
   pickedAt,
   refreshedAt,
 }: {
-  range: BoardPeriodRange;
+  range: BoardPeriodPreset;
   now: number;
   pickedAt: number;
   refreshedAt?: number;
@@ -75,7 +84,7 @@ export function boardWindowEnd({
 }
 
 /** `[periodStart, periodEnd]` in epoch milliseconds for a range ending at `now`. */
-export function boardPeriodBounds({ range, now }: { range: BoardPeriodRange; now: number }): {
+export function boardPeriodBounds({ range, now }: { range: BoardPeriodPreset; now: number }): {
   periodStart: number;
   periodEnd: number;
 } {
@@ -119,28 +128,97 @@ export function boardPeriodGranularity({
   return fitGranularity({ periodStart, periodEnd, requested: GRAIN_REQUESTED_SECONDS[fixed] });
 }
 
+/** How long a range is: a preset's fixed length, or a custom window's. */
+export function boardRangeSpanMs(reading: BoardRangeReading): number {
+  return reading.range === "custom"
+    ? reading.custom.to - reading.custom.from
+    : RANGE_MS[reading.range];
+}
+
 /**
- * Whether the member may pick `grain` for `range`: LangWatchQL accepts the step, and the
- * range stays within the bucket budget at it. "auto" always fits.
+ * Whether the member may pick `grain` over a range `spanMs` long: LangWatchQL accepts the
+ * step, and the range stays within the bucket budget at it. "auto" always fits.
  */
 export function boardGrainFits({
-  range,
+  spanMs,
   grain,
 }: {
-  range: BoardPeriodRange;
+  spanMs: number;
   grain: BoardPeriodGrain;
 }): boolean {
   if (grain === "auto") return true;
   const seconds = GRAIN_REQUESTED_SECONDS[grain];
   const accepted = (LWQL_ACCEPTED_GRANULARITY_STEPS as readonly number[]).includes(seconds);
-  return accepted && RANGE_MS[range] / 1000 / seconds <= LWQL_GRANULARITY_MAX_BUCKETS;
+  return accepted && spanMs / 1000 / seconds <= LWQL_GRANULARITY_MAX_BUCKETS;
 }
 
-/** Parses a range from an untrusted string (e.g. a URL query value); falls back to the default. */
-export function parseBoardPeriodRange(value: string | undefined): BoardPeriodRange {
-  return (BOARD_PERIOD_RANGES as readonly string[]).includes(value ?? "")
-    ? (value as BoardPeriodRange)
-    : DEFAULT_BOARD_PERIOD_RANGE;
+function epochOf(text: string | undefined): number | undefined {
+  if (!text) return void 0;
+  try {
+    return Temporal.Instant.from(text).epochMilliseconds;
+  } catch {
+    return void 0;
+  }
+}
+
+/** A board's range: a preset, or a custom range with its window. */
+export type BoardRangeReading =
+  | { readonly range: BoardPeriodPreset; readonly custom?: undefined }
+  | { readonly range: "custom"; readonly custom: BoardCustomWindow };
+
+/**
+ * Reads the address's `range`, `from` and `to` (untrusted). A custom range needs two
+ * readable instants, the start first; anything else reads as the default range (AC19g).
+ */
+export function parseBoardRange({
+  range,
+  from,
+  to,
+}: {
+  range?: string;
+  from?: string;
+  to?: string;
+}): BoardRangeReading {
+  if (range === "custom") {
+    const start = epochOf(from);
+    const end = epochOf(to);
+    if (start !== void 0 && end !== void 0 && start < end) {
+      return { range: "custom", custom: { from: start, to: end } };
+    }
+    return { range: DEFAULT_BOARD_PERIOD_RANGE };
+  }
+  return {
+    range: (BOARD_PERIOD_PRESETS as readonly string[]).includes(range ?? "")
+      ? (range as BoardPeriodPreset)
+      : DEFAULT_BOARD_PERIOD_RANGE,
+  };
+}
+
+/** A custom window as the address writes it: ISO instants. */
+export function boardCustomQuery({ from, to }: BoardCustomWindow): { from: string; to: string } {
+  return {
+    from: Temporal.Instant.fromEpochMilliseconds(from).toString(),
+    to: Temporal.Instant.fromEpochMilliseconds(to).toString(),
+  };
+}
+
+/** Refresh re-reads a window only while it ends now or later; a past custom window is done. */
+export function boardRefreshApplies({
+  custom,
+  now,
+}: {
+  custom?: BoardCustomWindow;
+  now: number;
+}): boolean {
+  return !custom || custom.to >= now;
+}
+
+/** A custom window on the pill, in the reader's time zone: "4 Nov - 11 Nov". */
+export function boardCustomInShort({ from, to }: BoardCustomWindow): string {
+  if (format(from, "yyyy-MM-dd") === format(to, "yyyy-MM-dd")) {
+    return `${format(from, "d MMM HH:mm")}-${format(to, "HH:mm")}`;
+  }
+  return `${format(from, "d MMM")} - ${format(to, "d MMM")}`;
 }
 
 /** Parses a grain from an untrusted string (e.g. a URL query value); falls back to the default. */
@@ -148,4 +226,58 @@ export function parseBoardPeriodGrain(value: string | undefined): BoardPeriodGra
   return (BOARD_PERIOD_GRAINS as readonly string[]).includes(value ?? "")
     ? (value as BoardPeriodGrain)
     : DEFAULT_BOARD_PERIOD_GRAIN;
+}
+
+/** Each range as a person says it; Live is the last hour, as its window is. */
+const RANGE_WORDS: Readonly<Record<Exclude<BoardPeriodPreset, "live">, string>> = {
+  "1h": "the last hour",
+  "24h": "the last 24 hours",
+  "7d": "the last 7 days",
+  "30d": "the last 30 days",
+  "90d": "the last 90 days",
+  "1y": "the last year",
+};
+
+const dayInWords = (epochMs: number) =>
+  Temporal.Instant.fromEpochMilliseconds(epochMs)
+    .toZonedDateTimeISO("UTC")
+    .toPlainDate()
+    .toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+/** The board's period as the header reads it ("the last 30 days"), else its first and last day. */
+export function boardPeriodInWords({ periodStart, periodEnd }: BoardPeriod): string {
+  const span = periodEnd - periodStart;
+  const range = (Object.keys(RANGE_WORDS) as (keyof typeof RANGE_WORDS)[]).find(
+    (each) => RANGE_MS[each] === span,
+  );
+  if (range) return RANGE_WORDS[range];
+  return `${dayInWords(periodStart)} to ${dayInWords(periodEnd)}`;
+}
+
+function instantOf(at: string) {
+  try {
+    return Temporal.Instant.from(at);
+  } catch {
+    return void 0;
+  }
+}
+
+/**
+ * A clicked bucket in words: its day, the hour too on an hourly board, or the week it starts.
+ * Undefined when `at` is no instant.
+ */
+export function bucketInWords({
+  at,
+  granularitySeconds,
+}: {
+  at: string;
+  granularitySeconds: number;
+}): string | undefined {
+  const instant = instantOf(at);
+  if (!instant) return void 0;
+  const day = dayInWords(instant.epochMilliseconds);
+  if (granularitySeconds >= 604_800) return `the week of ${day}`;
+  if (granularitySeconds >= 86_400) return day;
+  const time = instant.toZonedDateTimeISO("UTC").toPlainTime().toString().slice(0, 5);
+  return `${day} at ${time} UTC`;
 }

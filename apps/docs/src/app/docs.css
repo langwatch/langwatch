@@ -4,13 +4,12 @@
 @font-face {
   font-family: "Inter";
   src: url("./fonts/Inter-Variable-latin.woff2") format("woff2");
-  font-weight: 100 900;
+  font-weight: 400 700;
   font-style: normal;
   font-display: optional;
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0300-0301, U+0303-0304,
-    U+0308-0309, U+0323, U+2000-201F, U+2021-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
-    U+FEFF, U+FFFD;
+    U+0000-00FF, U+0131, U+0152-0153, U+2000-201F, U+2021-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Inter";
@@ -29,13 +28,19 @@
   font-weight: 400;
   font-style: normal;
   font-display: optional;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+2000-201F, U+2021-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Sentient";
   src: url("./fonts/Sentient-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+2000-201F, U+2021-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "JetBrains Mono";
@@ -44,9 +49,8 @@
   font-style: normal;
   font-display: swap;
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0300-0301, U+0303-0304,
-    U+0308-0309, U+0323, U+2000-201F, U+2021-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
-    U+FEFF, U+FFFD;
+    U+0000-00FF, U+0131, U+0152-0153, U+2000-201F, U+2021-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "JetBrains Mono";
@@ -99,7 +103,7 @@
   font-family: "Sentient Fallback";
   src: local("Charter Roman"), local("Charter-Roman"), local("Georgia");
   font-weight: 100 450;
-  size-adjust: 108.35%;
+  size-adjust: 110%;
   ascent-override: 88.6%;
   descent-override: 29.53%;
   line-gap-override: 7.38%;
@@ -109,12 +113,15 @@
   font-family: "Sentient Fallback";
   src: local("Charter Roman"), local("Charter-Roman"), local("Georgia");
   font-weight: 451 900;
-  size-adjust: 110.35%;
+  size-adjust: 111.97%;
   ascent-override: 87%;
   descent-override: 29%;
   line-gap-override: 7.25%;
   unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026;
 }
+/* The two Sentient faces above are scaled over the site's own headings (2,718 h2 and h3, Charter
+   at 24px), where Sentient sets type; body-copy metrics drew them 1.5% narrow, so a heading's
+   last word could wrap only once the web font arrived. */
 /* Linux has neither Charter nor Georgia; Liberation Serif needs its own scaling. */
 @font-face {
   font-family: "Sentient Fallback Liberation";
@@ -333,12 +340,19 @@ html[data-docs-pointer] :focus-visible,
 .docs-heading + .docs-heading {
   margin-top: 12px;
 }
+/* The link icon follows the last word at every level. Its 30px (6px gap, 24px box) are reserved at
+   the heading's end and cancelled by its end margin, so lines break as if it had no width: it can
+   never wrap onto a line of its own, which a web font a hair wider than its fallback would
+   otherwise trigger, moving everything below. */
+.docs-heading:has(> .docs-anchor) {
+  padding-inline-end: 30px;
+}
 .docs-anchor {
-  position: absolute;
-  inset-inline-start: -24px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
   display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  margin-inline-end: -30px;
   padding: 4px;
   color: var(--chakra-colors-fg-subtle);
   opacity: 0;
@@ -351,12 +365,10 @@ html[data-docs-pointer] :focus-visible,
 .docs-anchor:hover {
   color: var(--chakra-colors-accent-fg);
 }
+/* Touch has no hover to reveal it, so the icon always shows. */
 @media (hover: none) {
   .docs-anchor {
     opacity: 1;
-    position: static;
-    transform: none;
-    margin-inline-start: 6px;
   }
 }
 .docs-prose table {
@@ -539,17 +551,27 @@ figure > .docs-shot {
   min-height: calc(100vh - var(--docs-header-h));
   padding-inline: 24px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "main";
+  grid-template-rows: 1fr auto;
+  grid-template-areas: "main" "footer";
 }
-/* The banners stay pinned above the header; dismissing one shrinks the pinned block. */
+/* The footer sits under the page, not the sidebar, so the page list stays pinned beside it. */
+.docs-layout > .docs-site-footer {
+  grid-area: footer;
+  min-width: 0;
+}
+/* One notice line at a time, pinned above the header: the release update waits behind an
+   announcement the reader can dismiss, and shows beside one they cannot. */
 .docs-shell {
   --docs-banners-h: 0px;
 }
 .docs-shell:has(.docs-top > [data-docs-banner]) {
   --docs-banners-h: 36px;
 }
-.docs-shell:has(.docs-top > [data-docs-banner] ~ [data-docs-banner]) {
+.docs-shell:has(.docs-top > .docs-announcement:not([data-docs-dismissible]) ~ .docs-release-strip) {
   --docs-banners-h: 72px;
+}
+.docs-top > .docs-announcement[data-docs-dismissible] ~ .docs-release-strip {
+  display: none;
 }
 .docs-page-header {
   position: relative;
@@ -619,7 +641,7 @@ figure > .docs-shot {
   .docs-layout {
     padding-inline: 24px 40px;
     grid-template-columns: 280px minmax(0, 1fr);
-    grid-template-areas: "nav main";
+    grid-template-areas: "nav main" "nav footer";
     column-gap: 32px;
   }
   .docs-layout > main {
@@ -634,7 +656,7 @@ figure > .docs-shot {
 @media (min-width: 80rem) {
   .docs-layout[data-has-toc="true"] {
     grid-template-columns: 280px minmax(0, 1fr) 200px;
-    grid-template-areas: "nav main toc";
+    grid-template-areas: "nav main toc" "nav footer footer";
     column-gap: 32px;
   }
 }
@@ -642,8 +664,8 @@ figure > .docs-shot {
   .docs-layout[data-kind="endpoint"] {
     padding-inline-end: 32px;
     grid-template-columns: 248px minmax(0, 1.1fr) minmax(0, 1fr);
-    grid-template-areas: "nav top play" "nav ref play";
-    grid-template-rows: auto 1fr;
+    grid-template-areas: "nav top play" "nav ref play" "nav footer footer";
+    grid-template-rows: auto 1fr auto;
     column-gap: 32px;
   }
 }
@@ -1140,20 +1162,24 @@ figure > .docs-shot {
 .docs-card {
   transition: transform 160ms ease;
 }
-.docs-card:has([data-card-opener]):hover {
-  transform: translateY(-2px);
-}
-.docs-card:has([data-card-opener]):hover .docs-card-arrow {
-  transform: translateX(3px);
-  color: var(--chakra-colors-accent-fg);
-}
-.docs-card:has([data-card-opener]):hover [data-card-variant] {
-  border-color: color-mix(
-    in srgb,
-    var(--chakra-colors-docs-primary) 55%,
-    var(--chakra-colors-border)
-  );
-  box-shadow: 0 6px 18px -8px var(--chakra-colors-docs-shadow-strong);
+/* Pointer hover only: a tap leaves touch screens' :hover stuck, and the lifted layer redrew the
+   card's top hairline unevenly on phones. */
+@media (hover: hover) {
+  .docs-card:has([data-card-opener]):hover {
+    transform: translateY(-2px);
+  }
+  .docs-card:has([data-card-opener]):hover .docs-card-arrow {
+    transform: translateX(3px);
+    color: var(--chakra-colors-accent-fg);
+  }
+  .docs-card:has([data-card-opener]):hover [data-card-variant] {
+    border-color: color-mix(
+      in srgb,
+      var(--chakra-colors-docs-primary) 55%,
+      var(--chakra-colors-border)
+    );
+    box-shadow: 0 6px 18px -8px var(--chakra-colors-docs-shadow-strong);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .docs-shell .docs-card,
@@ -1453,6 +1479,9 @@ figure > .docs-shot {
   .docs-search-dialog[open] {
     animation: none;
   }
+}
+[data-docs-stars][hidden] {
+  display: none;
 }
 .docs-command-bar [hidden] {
   display: none !important;
@@ -2096,6 +2125,25 @@ body {
   height: var(--docs-input-height);
   font-size: 13px;
 }
+#try-it-form input:is([type="checkbox"], [type="radio"]) {
+  height: 18px;
+}
+#try-it-form legend {
+  color: var(--chakra-colors-blue-fg);
+}
+/* A date and time picker, or Omit, true and false, needs the whole row on a phone. */
+@container (max-width: 440px) {
+  .docs-request-field:has(input[type="datetime-local"], .docs-boolean-switch) {
+    grid-column: 1 / -1;
+  }
+}
+/* An optional boolean's Omit, true and false read as one segmented control, not as labels. */
+#try-it-form .docs-boolean-switch label {
+  color: var(--chakra-colors-fg-muted);
+}
+#try-it-form .docs-boolean-switch label:has(input:checked) {
+  color: var(--chakra-colors-fg);
+}
 #try-it-form label {
   color: var(--chakra-colors-blue-fg);
 }
@@ -2279,32 +2327,45 @@ body {
   }
 }
 
-/* A page's opening blocks rise in with a short stagger, on first load and on a page change alike.
-   Opacity and transform only: nothing moves the layout, and 0.01 keeps the text an LCP candidate. */
+/* A page swapped in place rises in with a short stagger, covering the swap; a full load shows its
+   content at once (`data-docs-navigated` is set by the first in-place navigation). Opacity and
+   transform only: nothing moves the layout, and 0.01 keeps the text an LCP candidate. */
 @media (prefers-reduced-motion: no-preference) {
-  #content :is(.docs-page-header > *, .docs-prose > :nth-child(-n + 5)) {
+  :root[data-docs-navigated] #content :is(.docs-page-header > *, .docs-prose > :nth-child(-n + 5)) {
     animation: docs-page-in 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
-  #content .docs-page-header > :nth-child(2) {
+  :root[data-docs-navigated] #content .docs-page-header > :nth-child(2) {
     animation-delay: 20ms;
   }
-  #content .docs-page-header > :nth-child(3) {
+  :root[data-docs-navigated] #content .docs-page-header > :nth-child(3) {
     animation-delay: 50ms;
   }
-  #content .docs-prose > :nth-child(1) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(1) {
     animation-delay: 80ms;
   }
-  #content .docs-prose > :nth-child(2) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(2) {
     animation-delay: 100ms;
   }
-  #content .docs-prose > :nth-child(3) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(3) {
     animation-delay: 120ms;
   }
-  #content .docs-prose > :nth-child(4) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(4) {
     animation-delay: 140ms;
   }
-  #content .docs-prose > :nth-child(5) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(5) {
     animation-delay: 160ms;
+  }
+}
+/* While a followed link's page is fetched the current one dims, after a beat so a page already
+   prefetched swaps in before it shows. */
+.docs-layout[data-docs-loading] #content {
+  opacity: 0.55;
+  transition: opacity 160ms ease 80ms;
+}
+/* Reduced motion keeps the beat but drops the fade. */
+@media (prefers-reduced-motion: reduce) {
+  .docs-layout[data-docs-loading] #content {
+    transition: opacity 0s linear 80ms;
   }
 }
 @keyframes docs-page-in {
@@ -2352,10 +2413,10 @@ body {
   }
 }
 
-/* While the next page loads, the current article steps back; a fast load never shows it. */
+/* While a slow page loads, the current article steps back a little; a load under 300ms never shows it. */
 #content[data-docs-leaving] {
-  opacity: 0.45;
-  transition: opacity 180ms ease 80ms;
+  opacity: 0.85;
+  transition: opacity 180ms ease 300ms;
 }
 
 /* The heading a # link lands on: one orange shimmer across it, then back to normal. */
@@ -2389,7 +2450,15 @@ body {
   }
 }
 
-/* Theme toggle: a sun that pulls in its rays and takes a bite to become the moon. */
+/* The theme menu ticks only the stored choice, which the island marks when the menu opens. */
+.docs-theme-check {
+  visibility: hidden;
+}
+[aria-checked="true"] > .docs-theme-check {
+  visibility: visible;
+}
+
+/* Theme button: a sun that pulls in its rays and takes a bite to become the moon. */
 .docs-theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -2506,7 +2575,6 @@ html[data-docs-theme-change]::view-transition-new(root) {
   }
   :is(
     .docs-theme-toggle,
-    .docs-anchor,
     .docs-site-footer a,
     .docs-release-strip a,
     [data-docs-copy],
@@ -2526,7 +2594,8 @@ html[data-docs-theme-change]::view-transition-new(root) {
    height of the screen; the right rail holds the way out and drops below it on narrow screens. */
 .docs-layout[data-scene] {
   padding-inline: 0;
-  grid-template-areas: "main" "toc";
+  grid-template-rows: 1fr auto auto;
+  grid-template-areas: "main" "toc" "footer";
 }
 .docs-layout[data-scene] > .docs-scene-main {
   grid-area: main;
@@ -2547,7 +2616,7 @@ html[data-docs-theme-change]::view-transition-new(root) {
   .docs-layout[data-scene] {
     padding-inline-start: 24px;
     grid-template-columns: 280px minmax(0, 1fr);
-    grid-template-areas: "nav main" "nav toc";
+    grid-template-areas: "nav main" "nav toc" "nav footer";
     column-gap: 0;
   }
   .docs-scene-aside {
@@ -2557,7 +2626,8 @@ html[data-docs-theme-change]::view-transition-new(root) {
 @media (min-width: 80rem) {
   .docs-layout[data-scene] {
     grid-template-columns: 280px minmax(0, 1fr) 240px;
-    grid-template-areas: "nav main toc";
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "nav main toc" "nav footer footer";
   }
   .docs-scene-aside {
     padding: 40px 24px;
@@ -3395,24 +3465,40 @@ html[data-docs-theme-change]::view-transition-new(root) {
   color: var(--chakra-colors-fg-muted);
 }
 
+/* The playground's JSON body grows with its text, so it and its coloured copy never scroll apart. */
+.docs-body-editor :is(textarea, pre) {
+  tab-size: 2;
+}
+.docs-body-editor textarea {
+  field-sizing: content;
+}
+/* The agent prompt is prose: it wraps instead of scrolling sideways. */
+[data-docs-example="agent"] pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.docs-body-editor:has(textarea[aria-invalid="true"]) {
+  border-color: var(--chakra-colors-border-error);
+}
+
 /* The pasted key field toggles with `hidden`, over Chakra's display classes. */
 [data-docs-manual-key] [hidden],
 [data-docs-manual-key][hidden] {
   display: none !important;
 }
 
-/* The app's session frame sizes itself; this is its room from its first word until it says how tall. */
+/* The app's session frame sizes itself; this is its room from its first word until it says how tall.
+   It takes the page's colour scheme: a frame whose scheme differs from its embedder's is painted on
+   an opaque canvas by the browser, the black band light pages showed under a dark system theme. */
 .docs-session-frame {
   display: block;
-  width: 100%;
   height: 40px;
-  margin: 8px 0;
   border: 0;
-  color-scheme: normal;
+  background: transparent;
+  color-scheme: inherit;
 }
 /* Until the frame first speaks it takes no room: a refused frame shows nothing at all. */
 .docs-session-frame:not([data-docs-frame-ready]) {
   height: 0 !important;
-  margin: 0;
   visibility: hidden;
 }

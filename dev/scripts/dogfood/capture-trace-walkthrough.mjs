@@ -104,7 +104,7 @@ await (async () => {
     await shot(page, "00-post-login");
 
     if (wants("me-home")) {
-      await page.goto(`${BASE}/me`, {
+      await page.goto(`${BASE}/coding-agents`, {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
       });
@@ -129,7 +129,7 @@ await (async () => {
     if (wants("trace-details")) await captureTraceDetails(page);
 
     if (wants("me-configure")) {
-      await page.goto(`${BASE}/me/configure`, {
+      await page.goto(`${BASE}/coding-agents/configure`, {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
       });
@@ -138,7 +138,7 @@ await (async () => {
     }
 
     if (wants("me-sessions")) {
-      await page.goto(`${BASE}/me/sessions`, {
+      await page.goto(`${BASE}/coding-agents/sessions`, {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
       });

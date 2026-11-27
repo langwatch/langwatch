@@ -51,5 +51,13 @@ export const LOCAL_LOG_DIR = ".langwatch/langy-logs";
 /** The one command the code access card tells the developer to run. */
 export const SHARE_CONTROL_COMMAND = "npx langwatch@latest langy --share-control";
 
+/** The command naming who asked, so a terminal signed in as someone else says so. */
+export function shareControlCommand({ email }: { email?: string | null }): string {
+  const asker = email?.trim();
+  if (!asker) return SHARE_CONTROL_COMMAND;
+  const quoted = /^[\w.+@-]+$/.test(asker) ? asker : `'${asker.replaceAll("'", `'\\''`)}'`;
+  return `${SHARE_CONTROL_COMMAND} --as ${quoted}`;
+}
+
 /** How often a long-poll checks its answer while it holds. */
 export const POLL_INTERVAL_MS = 250;

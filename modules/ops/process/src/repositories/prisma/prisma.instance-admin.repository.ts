@@ -1,12 +1,15 @@
-import type {
-  AdminDataResult,
-  AdminListResult,
-  AdminOperationInput,
-  AdminOperationParams,
-  AdminOperationResult,
-  UserWithAdminIncludes,
+import {
+  adminUserSortFieldSchema,
+  type AdminDataResult,
+  type AdminListResult,
+  type AdminOperationInput,
+  type AdminOperationParams,
+  type AdminOperationResult,
+  type AdminUserSortField,
+  type UserWithAdminIncludes,
 } from "@langwatch/ops-contract";
-import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generated";
+import { skipTenantCheck } from "@langwatch/prisma-client";
+import { PlanTypes, Prisma, SubscriptionStatus } from "@langwatch/prisma-client/generated";
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
 import { toAdminUserRow } from "../../rules/admin-user-row.rules.ts";
@@ -31,6 +34,37 @@ const USER_ADMIN_INCLUDE = {
     },
   },
 } as const;
+
+/**
+ * Each users-list column as the SQL it orders by; Status ranks Active, Unverified, Pending SSO,
+ * Deactivated.
+ */
+const USER_ORDER_BY: Record<AdminUserSortField, Prisma.Sql> = {
+  id: Prisma.sql`u."id"`,
+  name: Prisma.sql`NULLIF(lower(u."name"), '')`,
+  email: Prisma.sql`NULLIF(lower(u."email"), '')`,
+  createdAt: Prisma.sql`u."createdAt"`,
+  lastLoginAt: Prisma.sql`u."lastLoginAt"`,
+  organizations: Prisma.sql`(SELECT count(*) FROM "OrganizationUser" ou WHERE ou."userId" = u."id")`,
+  projects: Prisma.sql`(
+    SELECT count(DISTINCT p."id") FROM "OrganizationUser" ou
+    JOIN "Team" t ON t."organizationId" = ou."organizationId" AND t."archivedAt" IS NULL
+    JOIN "Project" p ON p."teamId" = t."id" AND p."archivedAt" IS NULL
+    WHERE ou."userId" = u."id")`,
+  status: Prisma.sql`CASE
+    WHEN u."deactivatedAt" IS NOT NULL THEN 3
+    WHEN u."pendingSsoSetup" THEN 2
+    WHEN u."emailVerified" THEN 0
+    ELSE 1 END`,
+};
+
+// The Back office lists every account on the installation, so the user list has no tenant to pin.
+const USER_LIST_TENANCY = skipTenantCheck({ SKIP_TENANT_CHECK: true });
+
+/** The text a search term matches anywhere inside, with LIKE's wildcards taken literally. */
+function containsPattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+}
 
 /**
  * Private Prisma/React-Admin adapter for the Ops instance admin surface.
@@ -75,15 +109,7 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
 
     switch (resource) {
       case "user":
-        return getListHandler(
-          { method: "getList", resource, params: requestParams },
-          this.database.user,
-          {
-            ...query.where,
-            include: USER_ADMIN_INCLUDE,
-            map: (users: UserWithAdminIncludes[]) => users.map((user) => toAdminUserRow(user)),
-          },
-        );
+        return this.listUsers(params);
       case "organization":
         return getListHandler(
           { method: "getList", resource, params: requestParams },
@@ -115,6 +141,56 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
           this.database.team,
         );
     }
+  }
+
+  /** Users order in SQL across the whole search, then the page's rows load with memberships. */
+  private async listUsers(params: AdminOperationParams): Promise<AdminListResult> {
+    const filter = params.filter ?? {};
+    const query = typeof filter.query === "string" && filter.query ? filter.query : undefined;
+    const ids = Array.isArray(filter.id) ? filter.id.map(String) : undefined;
+    const field = adminUserSortFieldSchema.catch("id").parse(params.sort?.field ?? "id");
+    const direction = params.sort?.order === "DESC" ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    const perPage = params.pagination?.perPage ?? 25;
+    const offset = ((params.pagination?.page ?? 1) - 1) * perPage;
+
+    const conditions: Prisma.Sql[] = [];
+    if (ids) conditions.push(Prisma.sql`u."id" = ANY(${ids}::text[])`);
+    if (query) {
+      const pattern = containsPattern(query);
+      conditions.push(Prisma.sql`(
+        u."id" ILIKE ${pattern} OR u."name" ILIKE ${pattern} OR u."email" ILIKE ${pattern}
+        OR EXISTS (SELECT 1 FROM "OrganizationUser" ou
+          JOIN "Organization" o ON o."id" = ou."organizationId"
+          WHERE ou."userId" = u."id" AND (o."id" ILIKE ${pattern} OR o."name" ILIKE ${pattern}))
+        OR EXISTS (SELECT 1 FROM "OrganizationUser" ou
+          JOIN "Team" t ON t."organizationId" = ou."organizationId"
+          JOIN "Project" p ON p."teamId" = t."id"
+          WHERE ou."userId" = u."id" AND (p."id" ILIKE ${pattern} OR p."name" ILIKE ${pattern})))`);
+    }
+    const where =
+      conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}` : Prisma.empty;
+
+    const [page, counted] = await Promise.all([
+      this.database.$queryRaw<{ id: string }[]>(Prisma.sql`${USER_LIST_TENANCY}
+        SELECT u."id" FROM "User" u ${where}
+        ORDER BY ${USER_ORDER_BY[field]} ${direction} NULLS LAST, u."id" ${direction}
+        LIMIT ${perPage} OFFSET ${offset}`),
+      this.database.$queryRaw<{ total: number }[]>(Prisma.sql`${USER_LIST_TENANCY}
+        SELECT count(*)::int AS total FROM "User" u ${where}`),
+    ]);
+    const pageIds = page.map((row) => row.id);
+    const users: UserWithAdminIncludes[] = await this.database.user.findMany({
+      where: { id: { in: pageIds } },
+      include: USER_ADMIN_INCLUDE,
+    });
+    const byId = new Map(users.map((user) => [user.id, user]));
+    return {
+      data: pageIds.flatMap((id) => {
+        const user = byId.get(id);
+        return user ? [toAdminUserRow(user)] : [];
+      }),
+      total: counted[0]?.total ?? 0,
+    };
   }
 
   private async getOne(
@@ -197,6 +273,7 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     };
   }
 
+  /** An `id` list narrows to those rows; the list handler would hand the array to Prisma as is. */
   private query(
     resource: AdminOperationInput["resource"],
     params: AdminOperationParams,
@@ -205,51 +282,30 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
     where: Record<string, unknown>;
   } {
     const filter = { ...params.filter };
+    const ids = Array.isArray(filter.id) ? filter.id.map(String) : undefined;
+    if (ids) delete filter.id;
+    const searched = this.searchQuery(resource, filter);
+    if (!ids) return searched;
+    const search = (searched.where as { where?: Record<string, unknown> }).where ?? {};
+    return {
+      filter: searched.filter,
+      where: { ...searched.where, where: { ...search, id: { in: ids } } },
+    };
+  }
+
+  private searchQuery(
+    resource: AdminOperationInput["resource"],
+    filter: Record<string, unknown>,
+  ): {
+    filter: Record<string, unknown>;
+    where: Record<string, unknown>;
+  } {
     const query = typeof filter.query === "string" ? filter.query : undefined;
     delete filter.query;
     if (!query) return { filter, where: {} };
 
     const insensitive = { contains: query, mode: "insensitive" as const };
     switch (resource) {
-      case "user":
-        return {
-          filter,
-          where: {
-            where: {
-              OR: [
-                { id: insensitive },
-                { name: insensitive },
-                { email: insensitive },
-                {
-                  orgMemberships: {
-                    some: {
-                      organization: {
-                        OR: [{ id: insensitive }, { name: insensitive }],
-                      },
-                    },
-                  },
-                },
-                {
-                  orgMemberships: {
-                    some: {
-                      organization: {
-                        teams: {
-                          some: {
-                            projects: {
-                              some: {
-                                OR: [{ id: insensitive }, { name: insensitive }],
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        };
       case "subscription": {
         const upperQuery = query.toUpperCase();
         const matchingPlan = Object.values(PlanTypes).find((plan) => plan === upperQuery);
@@ -285,6 +341,7 @@ export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
             },
           },
         };
+      case "user":
       case "team":
         return { filter, where: {} };
     }

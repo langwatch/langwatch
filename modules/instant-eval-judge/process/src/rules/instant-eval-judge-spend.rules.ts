@@ -65,6 +65,8 @@ export function instantEvalJudgeSpendPricedOf({
         costNanoUsd: number;
         routedInputTokens: number;
         pricing: InstantEvalJudgeRoutePricing;
+        /** The spend model of the routed job; absent, the routed LLM judge's. */
+        model?: string | undefined;
       }>
     | undefined;
 }): Readonly<{ priceUsd: number; fact: InstantEvalJudgeSpendPricedEventData }> {
@@ -83,7 +85,9 @@ export function instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
       requestId,
-      model: routed ? INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL : INSTANT_EVAL_SPEND_MODEL,
+      model: routed
+        ? (routed.model ?? INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL)
+        : INSTANT_EVAL_SPEND_MODEL,
       rateVersion: routed
         ? instantEvalJudgeRouteRateVersion({ routePricing: routed.pricing, pricing })
         : instantEvalRateVersion(pricing),

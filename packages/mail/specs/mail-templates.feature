@@ -79,10 +79,56 @@ Feature: The transactional messages LangWatch sends
     And the frame and the card read as one dark surface
 
   @unit
-  Scenario: The studio shows every message at once
-    When the gallery is asked to render every registered template
-    Then it returns one entry for every registered fixture
-    And every entry carries a non-empty subject line and a non-empty rendered body
+  Scenario: The studio opens on the weekly digests, and old links still land
+    Given the studio has two tabs, Weekly digests and All other emails
+    When it opens with no view in its link
+    Then it shows Weekly digests
+    And an old Inspect or Gallery link opens All other emails
+
+  @unit
+  Scenario: The weekly digests sit only on their own tab
+    When the studio builds the All other emails list
+    Then no weekly digest is in it
+    And the automation trigger email stays in it, under Alerts
+
+  @unit
+  Scenario: The studio lists every message under a plain heading
+    When the studio groups the registered templates for its message list
+    Then each template sits under one fixed heading, in the headings' order
+    And a template no heading names sits under Other, last
+
+  @unit
+  Scenario: Digest review lists the digests that send, in the order the sender tries them
+    Given the studio's Weekly digests tab
+    Then it lists plan pressure, scenarios trend, coding-agent week and traces week, in that order
+    And each says who gets it and has a version A that sends today and a slot for a version B
+    And What's new follows them with its fixtures, marked "Not sent yet: nothing feeds it news"
+
+  @unit
+  Scenario: Digest review shows each digest as it would arrive today
+    Given a digest fixture with props the sender does not fill yet
+    When the Weekly digests tab renders it
+    Then those props are left out
+    And the subject starts with the organisation's name, as the sender writes it
+
+  @unit
+  Scenario: The studio's message list can be searched by name
+    Given the studio's message list
+    When a name is typed into the search box
+    Then only the emails whose name holds it, in any case, stay listed
+
+  @unit
+  Scenario: The hosted studio shows the LangWatch wordmark
+    Given the hosted studio only allows images from itself
+    When it shows a rendered email
+    Then the wordmark loads from the studio itself, taken from the app's own images
+
+  @unit
+  Scenario: The arrow keys step through each email's variants before the next email
+    Given an email with more than one variant is open in the studio
+    When the next stop in the message list is asked for
+    Then it is that email's next variant, then the next email under the headings
+    And stepping past either end of the list wraps to the other end
 
   @unit
   Scenario: The studio's shareable link survives a copy-paste
@@ -110,6 +156,14 @@ Feature: The transactional messages LangWatch sends
     When a member is told
     Then the email goes to that member and names the organization and the administrator
     And it says whether a second factor is now needed to open that organization
+
+  @unit
+  Scenario: A platform operator change tells who changed whose role and links to the Operators page
+    Given someone was given or lost the platform operator role
+    When the notice is rendered
+    Then it names the person, who made the change and the installation
+    And a grant says to revoke the role on the Operators page if it was not expected
+    And it links to the Operators page
 
   # A self-hosted operator cannot fix an upgrade step; LangWatch staff on Cloud can.
   # Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
@@ -177,3 +231,16 @@ Feature: The transactional messages LangWatch sends
     When the upgrade alert is rendered
     Then the subject counts the failed steps and names the installation
     And each step shows its id, its release, its attempt, its error and a link that opens that step
+
+  @unit
+  Scenario: Every payment recovery email before the move to Free asks to update the card
+    Given an unpaid renewal reached day 3, day 7 or day 14 of payment recovery
+    When that day's recovery email is rendered
+    Then its button reads "Update card"
+    And none of them reads "Pay now"
+
+  @unit
+  Scenario: The email after the move to Free asks to pay the open invoice
+    Given an unpaid renewal reached day 21 and the organization moved to the Free plan
+    When the paused email is rendered
+    Then its button reads "Pay now"

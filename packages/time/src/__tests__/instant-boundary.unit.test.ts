@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Temporal, fromDate, nowInstant, readableDate, toDate } from "../zoned.ts";
+import { Temporal, fromDate, nowEpochMs, nowInstant, readableDate, toDate } from "../zoned.ts";
 
 const MOMENT_MS = Date.UTC(2026, 5, 15, 10, 30, 0);
 
@@ -12,6 +12,21 @@ describe("nowInstant", () => {
 
       expect(now).toBeInstanceOf(Temporal.Instant);
       expect(Math.abs(now.epochMilliseconds - Date.now())).toBeLessThan(5_000);
+    });
+  });
+});
+
+describe("nowEpochMs", () => {
+  describe("given a caller that only wants the epoch millisecond count", () => {
+    /** @scenario "The clock reads the present moment as epoch milliseconds" */
+    it("reads the system clock between two bounds", () => {
+      const before = Date.now();
+      const now = nowEpochMs();
+      const after = Date.now();
+
+      expect(Number.isInteger(now)).toBe(true);
+      expect(now).toBeGreaterThanOrEqual(before);
+      expect(now).toBeLessThanOrEqual(after);
     });
   });
 });

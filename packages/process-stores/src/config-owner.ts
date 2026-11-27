@@ -64,6 +64,8 @@ export const storesOwner = {
     queueTenantCap: c.env("LANGWATCH_DISPATCH_TENANT_CAP", unsetWhenBlank),
     /** Fleet in-flight budget the tenants share; unset or "0" keeps the fixed cap. */
     queueGlobalBudget: c.env("LANGWATCH_DISPATCH_GLOBAL_BUDGET", unsetWhenBlank),
+    /** A file holding the shared ClickHouse password, re-read while running (ADR-198). */
+    clickhousePasswordFile: c.env("CLICKHOUSE_PASSWORD_FILE", unsetWhenBlank),
     clickhousePool: {
       override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),
       replicas: c.env("CLICKHOUSE_CLIENT_REPLICAS", z.coerce.number().optional()),
@@ -89,6 +91,14 @@ export const storesOwner = {
     },
     objectStorage: {
       backend: c.env("STORED_OBJECTS_BACKEND", z.enum(["s3", "azure", "file"]).optional()),
+      /** Where clients send upload bytes; absent or blank is direct. An org's S3 names its own. */
+      uploads: c.env(
+        "STORED_OBJECTS_UPLOADS",
+        z.preprocess(
+          (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+          z.enum(["direct", "through-langwatch"]).optional(),
+        ),
+      ),
       localRoot: c.env("LANGWATCH_LOCAL_STORAGE_PATH", z.string().optional()),
       s3: {
         bucket: c.env("S3_BUCKET_NAME", z.string().optional()),

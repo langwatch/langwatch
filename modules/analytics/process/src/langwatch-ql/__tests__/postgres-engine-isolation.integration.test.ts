@@ -1,18 +1,33 @@
 /**
  * Isolation proof, part 2: PG-resident data reached via engine tables stays row-policed.
  * @see specs/lwql/api.feature
+ * @see specs/lwql/isolation.feature
+ * @see specs/lwql/postgres-catalog.feature
  * @vitest-environment node
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { LangWatchQLMemberWindow } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  ADMIT_EVERY_PLACEMENT,
+  EVERY_CATALOGUE_PERMISSION,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { scopeLangWatchQL } from "../../rules/langwatch-ql-query-scope.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -23,6 +38,7 @@ import {
   expectZeroRowsWithControl,
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
+  LWQL_CLICKHOUSE_TEST_IMAGE,
   LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
   lwqlTestNamedCollection,
   mapPostgresIntoClickHouse,
@@ -38,56 +54,66 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
   statementsLoggedSince,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
+const lwqlCapability = LangWatchQLCapabilityService.create();
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /** The PostgreSQL-resident half of the shipped catalog, provisioned whole. */
 const POSTGRES_VIEWS = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
 
-describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
-  let harness: LangWatchQLClickHouseHarness;
-  let postgres: LangWatchQLPostgresHarness;
-  /** The restricted identity carrying tenant-a's valid key-hash context. */
-  let tenantA: ClickHouseClient;
-  let database: string;
+/** Where operators read the LangWatchQL access model (ADR-200: the boundary is documented). */
+const ACCESS_MODEL_DOCS = fileURLToPath(
+  new URL("../../../../../../charts/langwatch/README.md", import.meta.url),
+);
 
-  beforeAll(async () => {
-    postgres = await startLangWatchQLPostgres();
-    harness = await startLangWatchQLClickHouse({ suite: "pgengine" });
-    database = harness.names.database;
-    await mapPostgresIntoClickHouse({ harness, postgres });
-    // The LangWatchQL views over the engine tables — the objects a caller names.
-    // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
-    // migrated fact tables this suite does not stand up.
-    await harness.applyAsAdmin(
-      viewProvisioning.setupStatements({
-        names: harness.names,
-        sourceDatabase: harness.factDatabase,
-        views: POSTGRES_VIEWS,
-        dedup: SHIPPED_LWQL_DEDUP,
-      }),
-    );
-    // Grants and row policies come from the single access-model emitter (ADR-159).
-    // `extraViews`, not `views`: every apply re-mints the whole model, so it must
-    // keep the base fixture's grants or the native `traces` reads lose theirs.
-    await harness.applyAccessModel({
-      extraViews: POSTGRES_VIEWS,
-      sourceDatabase: harness.factDatabase,
-    });
-    tenantA = await harness.restrictedClient({
-      keyHash: harness.tenantA.keyHash,
-    });
-  }, 240_000);
+let harness: LangWatchQLClickHouseHarness;
+let postgres: LangWatchQLPostgresHarness;
+/** The restricted identity carrying tenant-a's valid key-hash context. */
+let tenantA: ClickHouseClient;
+let database: string;
 
-  afterAll(async () => {
-    await harness?.stop();
-    await postgres?.stop();
+beforeAll(async () => {
+  postgres = await startLangWatchQLPostgres();
+  harness = await startLangWatchQLClickHouse({
+    suite: "pgengine",
+    image: LWQL_CLICKHOUSE_TEST_IMAGE,
   });
+  database = harness.names.database;
+  await mapPostgresIntoClickHouse({ harness, postgres });
+  // The LangWatchQL views over the engine tables — the objects a caller names.
+  // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
+  // migrated fact tables this suite does not stand up.
+  await harness.applyAsAdmin(
+    viewProvisioning.setupStatements({
+      names: harness.names,
+      sourceDatabase: harness.factDatabase,
+      views: POSTGRES_VIEWS,
+      dedup: SHIPPED_LWQL_DEDUP,
+    }),
+  );
+  // Grants and row policies come from the single access-model emitter (ADR-159).
+  // `extraViews`, not `views`: every apply re-mints the whole model, so it must
+  // keep the base fixture's grants or the native `traces` reads lose theirs.
+  await harness.applyAccessModel({
+    extraViews: POSTGRES_VIEWS,
+    sourceDatabase: harness.factDatabase,
+  });
+  tenantA = await harness.restrictedClient({
+    keyHash: harness.tenantA.keyHash,
+  });
+}, 240_000);
 
+afterAll(async () => {
+  await harness?.stop();
+  await postgres?.stop();
+});
+
+describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
   describe("when the restricted identity carries a valid key-hash context", () => {
     /** @scenario "A PG-resident table is readable through ClickHouse only within the caller's tenant rows" */
     it("reads its own tenant's mapped rows and none of the other tenant's", async () => {
@@ -218,7 +244,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     it("returns zero rows from the mapped table", async () => {
       await expectZeroRowsWithControl({
         harness,
-        keyHash: "not-a-real-key-hash",
+        keyHash: UNMAPPED_KEY_HASH,
         table: PG_MAPPED_TABLE,
         tenantColumn: PG_MAPPED_TENANT_COLUMN,
         context: "garbage key against the mapped table",
@@ -486,7 +512,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     it("scans the whole approved view on PostgreSQL even for a key that can match no row", async () => {
       const before = await postgres.readLog();
       const client = await harness.restrictedClient({
-        keyHash: "not-a-real-key-hash",
+        keyHash: UNMAPPED_KEY_HASH,
       });
       const rows = await selectRows(client, `SELECT count() FROM ${database}.${PG_MAPPED_TABLE}`);
       expect(rows).toHaveLength(1);
@@ -583,7 +609,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
 
       const withoutPredicate = await measure(PG_MAPPED_TABLE, harness.tenantA.keyHash);
       const withPredicate = await measure(PG_MAPPED_VIEW, harness.tenantA.keyHash);
-      const unknownKey = await measure(PG_MAPPED_VIEW, "not-a-real-key-hash");
+      const unknownKey = await measure(PG_MAPPED_VIEW, UNMAPPED_KEY_HASH);
 
       // Control: the unpredicated read must actually have cost something, or
       // "fewer" below is a comparison between two zeroes.
@@ -946,6 +972,285 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         ).toContain(projectWidgetId());
       } finally {
         await deleteBoardSeed();
+      }
+    }, 60_000);
+  });
+
+  describe("when a user granted the source tables has no row policy", () => {
+    /** @scenario "A user with no row policy is the boundary, and it is documented" */
+    it("reads every tenant's rows, and the access-model docs say only the restricted identity is isolated", async () => {
+      const user = `${harness.names.restrictedUser}_no_policy`;
+      const password = "no-policy-reader-password";
+      await harness.applyAsAdmin([
+        `DROP USER IF EXISTS ${user}`,
+        `CREATE USER ${user} IDENTIFIED WITH plaintext_password BY '${password}'`,
+        `GRANT SELECT ON ${harness.factDatabase}.* TO ${user}`,
+        `GRANT SELECT ON ${database}.${PG_MAPPED_TABLE} TO ${user}`,
+      ]);
+      const reader = createClient({
+        url: harness.container.getHttpUrl(),
+        username: user,
+        password,
+      });
+      try {
+        const facts = await recordSeedControl({
+          harness,
+          table: "traces",
+          tenantColumn: "TenantId",
+        });
+        const mapped = await recordSeedControl({
+          harness,
+          table: PG_MAPPED_TABLE,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        });
+        const countOf = async (client: ClickHouseClient, table: string) =>
+          Number(
+            (await selectRows<{ n: string }>(client, `SELECT count() AS n FROM ${table}`))[0]?.n,
+          );
+        const traces = `${harness.factDatabase}.traces`;
+        const mappedTable = `${database}.${PG_MAPPED_TABLE}`;
+
+        expect(facts.tenantB, "tenant B must have source rows to read").toBeGreaterThan(0);
+        expect(mapped.tenantB, "tenant B must have mapped rows to read").toBeGreaterThan(0);
+        // Every tenant's rows, the seeded two among them: the admin's own count of the table.
+        expect(await countOf(reader, traces)).toBe(await countOf(harness.admin, traces));
+        expect(await countOf(reader, traces)).toBeGreaterThanOrEqual(facts.tenantA + facts.tenantB);
+        expect(await countOf(reader, mappedTable)).toBe(await countOf(harness.admin, mappedTable));
+        expect(await countOf(reader, mappedTable)).toBeGreaterThanOrEqual(
+          mapped.tenantA + mapped.tenantB,
+        );
+      } finally {
+        await reader.close();
+      }
+
+      const accessModelDocs = readFileSync(ACCESS_MODEL_DOCS, "utf8");
+      expect(accessModelDocs).toContain(
+        "Only the restricted `langwatch_lwql` identity is isolated by tenant",
+      );
+    });
+  });
+});
+
+describe("given an organization with three projects, two of them readable sibling projects, and one organization-level gateway budget", () => {
+  describe("when a caller reads two sibling projects of one organization in one query", () => {
+    /**
+     * The organization fan-out emits one row per project, so the budget appears once per sibling
+     * the caller reads. tasks#1212: a multi-project SUM must still count it once.
+     */
+    const ORGANIZATION_ID = "lwql-fanout-org";
+    const TEAM_ID = "lwql-fanout-team";
+    const BUDGET_ID = "lwql-fanout-budget";
+    const LIMIT_USD = 250;
+    const SIBLINGS = [1, 2].map((index) => ({
+      id: `lwql-fanout-project-${index}`,
+      lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
+    }));
+    /**
+     * A third project of the same organization, in the key map but never in the caller's key set.
+     */
+    const UNREADABLE = { id: "lwql-fanout-project-3", lwqlKey: "raw-lwql-key-FANOUT-DO-NOT-LOG-3" };
+    const SEEDED = [...SIBLINGS, UNREADABLE];
+    const keyHashes = () =>
+      SEEDED.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
+    const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
+
+    const seedStatements = (): string[] => [
+      `INSERT INTO "Organization" ("id", "name", "slug") ` +
+        `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
+      `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
+        `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
+      `INSERT INTO "Project" ` +
+        `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
+        SEEDED.map(
+          ({ id }) =>
+            `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
+            `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
+        ).join(", "),
+      `INSERT INTO "GatewayBudget" ` +
+        `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
+        `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
+        `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
+        `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
+    ];
+
+    const cleanupStatements = (): string[] => [
+      `DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`,
+      `DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`,
+      `DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`,
+      `DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`,
+    ];
+
+    /** Runs every delete, the key map's too, before asserting, so one failure hides no other. */
+    const deleteSeed = async (): Promise<void> => {
+      const failures: string[] = [];
+      for (const sql of cleanupStatements()) {
+        const result = await postgres.asAdmin(sql);
+        if (result.exitCode !== 0) failures.push(`cleanup failed: ${sql}\n${result.stderr}`);
+      }
+      const quotedHashes = keyHashes().map((hash) => `'${hash}'`);
+      try {
+        await harness.applyAsAdmin([
+          `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
+            "SETTINGS mutations_sync = 2",
+        ]);
+      } catch (error) {
+        failures.push(`key-map cleanup failed: ${String(error)}`);
+      }
+      expect(failures, "seed cleanup left rows behind").toEqual([]);
+    };
+
+    let service: LangWatchQLService;
+
+    const PROTECTIONS = {
+      catalogue: EVERY_CATALOGUE_PERMISSION,
+      canSeeCosts: true,
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: true,
+    };
+
+    const sumBudget = async (
+      projects: typeof SIBLINGS,
+      memberWindows?: readonly LangWatchQLMemberWindow[],
+    ) => {
+      const result = await service.executeForProjects({
+        projects,
+        ...(memberWindows ? { memberWindows } : {}),
+        protections: PROTECTIONS,
+        sql:
+          "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
+          `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+      });
+      return result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) }));
+    };
+
+    const readSiblings = async (sql: string) => {
+      const result = await service.executeForProjects({
+        projects: SIBLINGS,
+        protections: PROTECTIONS,
+        sql,
+      });
+      return result.rows;
+    };
+
+    beforeAll(async () => {
+      service = LangWatchQLService.create({
+        runTelemetry: TEST_RUN_TELEMETRY,
+        placement: ADMIT_EVERY_PLACEMENT,
+        executor: ClickHouseLangWatchQLExecutorRepository.create({
+          connection: {
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          },
+        }),
+        database,
+        views: POSTGRES_VIEWS,
+      });
+      for (const sql of seedStatements()) {
+        const seeded = await postgres.asAdmin(sql);
+        if (seeded.exitCode !== 0) throw new Error(`seeding failed: ${sql}\n${seeded.stderr}`);
+      }
+      await harness.admin.insert({
+        table: keyMapTable(),
+        format: "JSONEachRow",
+        values: SEEDED.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
+      });
+    }, 60_000);
+
+    // A failed cleanup reports as an afterAll error, never in place of a test's own failure.
+    afterAll(async () => {
+      try {
+        // Undefined at runtime when beforeAll failed before creating it.
+        await service?.close();
+      } finally {
+        await deleteSeed();
+      }
+    }, 60_000);
+
+    /** @scenario "An organization-level row is counted once in a multi-project query" */
+    it("sums the organization's budget limit once and counts one budget", async () => {
+      const rows = await sumBudget(SIBLINGS);
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A single project still reads its organization's row once" */
+    it.each(SIBLINGS.map((sibling) => [sibling.id, sibling] as const))(
+      "reads the budget once when %s is the only project in the query",
+      async (_id, sibling) => {
+        const rows = await sumBudget([sibling]);
+        expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+      },
+      60_000,
+    );
+
+    /** @scenario "A multi-project read filters and groups an organization-level row under the lowest project only" */
+    it("puts the budget under the lower project id when filtering or grouping by TenantId", async () => {
+      const [kept, sibling] = SIBLINGS;
+      if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+      const ofBudget = `FROM gateway_budgets WHERE GatewayBudgetId = '${BUDGET_ID}'`;
+      const countUnder = async (tenantId: string) => {
+        const rows = await readSiblings(
+          `SELECT count() AS n ${ofBudget} AND TenantId = '${tenantId}'`,
+        );
+        return rows.map((row) => Number(row.n));
+      };
+      expect(await countUnder(kept.id), "filter on the lower project id").toEqual([1]);
+      expect(await countUnder(sibling.id), "filter on the other project's id").toEqual([0]);
+      const groupSql = `SELECT TenantId AS tenant, count() AS n ${ofBudget} GROUP BY TenantId`;
+      const grouped = (await readSiblings(groupSql)).map((row) => ({
+        tenant: String(row.tenant),
+        n: Number(row.n),
+      }));
+      expect(grouped, `got ${JSON.stringify(grouped)}`).toEqual([{ tenant: kept.id, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
+    it("reads the budget once when only the sibling whose copy is not kept admits it", async () => {
+      // The view keeps the lowest project's copy, here project 1, whose window opens after the
+      // budget was created; project 2 is shared for its whole history and so admits it.
+      const [kept, sibling] = SIBLINGS;
+      if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+      const rows = await sumBudget(SIBLINGS, [
+        { projectId: kept.id, from: Date.parse("2100-01-01T00:00:00.000Z") },
+        { projectId: sibling.id, from: 0 },
+      ]);
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A member window cannot admit a row through a project the caller cannot read" */
+    it("reads nothing when only an unreadable sibling's window would admit the budget", async () => {
+      // Below the service, which drops a window outside the caller's projects: here project 3's
+      // window reaches the predicate, so only the engine table's row policy keeps its copy out.
+      // Both readable siblings open after the budget was created; project 3 would admit it.
+      const opensAfterTheBudget = Date.parse("2100-01-01T00:00:00.000Z");
+      const sql = scopeLangWatchQL({
+        sql:
+          `SELECT sum(LimitUsd) AS total, count() AS n FROM ${database}.gateway_budgets ` +
+          `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+        database,
+        views: POSTGRES_VIEWS,
+        memberWindows: [
+          ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
+          { projectId: UNREADABLE.id, from: 0 },
+        ],
+      });
+      expect(sql, "the window predicate must name the unreadable project").toContain(
+        `TenantId IN ('${UNREADABLE.id}')`,
+      );
+      const reader = await harness.restrictedClient({
+        keyHash: lwqlCapability.tenantCapabilitySet({
+          secrets: SIBLINGS.map(({ lwqlKey }) => lwqlKey),
+        }),
+      });
+      try {
+        const rows = (await selectRows<{ total: unknown; n: unknown }>(reader, sql)).map((row) => ({
+          total: Number(row.total),
+          n: Number(row.n),
+        }));
+        // An aggregate with no GROUP BY answers one row even over no input rows.
+        expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
+      } finally {
+        await reader.close();
       }
     }, 60_000);
   });

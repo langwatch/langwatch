@@ -69,6 +69,7 @@ const viewWith = (live: Connection | null): SsoSetupPageView => ({
     singleLogoutUrl: "https://app/slo",
     entityId: "https://app/entity",
     metadataUrl: "https://app/metadata",
+    refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
   },
 });
 
@@ -149,6 +150,26 @@ describe("given no connection yet", () => {
       "href",
       "/settings/authentication/provider",
     );
+  });
+});
+
+describe("given a self-hosted install with no license", () => {
+  /** @scenario "Each Enterprise page names its feature in the shared lock" */
+  it("says once that single sign-on is part of LangWatch Enterprise and offers the License page", () => {
+    state.view = {
+      ...viewWith(null),
+      enterpriseRequired: true,
+      availability: { available: false, refusal: "license_required" },
+    };
+    renderCard();
+
+    expect(screen.getAllByText("Single sign-on is part of LangWatch Enterprise")).toHaveLength(1);
+    expect(screen.queryByTestId("sso-availability-refusal")).toBeNull();
+    expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
+      "href",
+      "/settings/license",
+    );
+    expect(screen.queryByTestId("single-sign-on-preview-action")).toBeNull();
   });
 });
 

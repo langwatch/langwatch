@@ -45,6 +45,7 @@ export {
   type TrpcRouterMount,
   type TrpcRuntime,
   type TrpcAuditedScope,
+  type TrpcAuditExemption,
   type TrpcAuditTarget,
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimeContext,

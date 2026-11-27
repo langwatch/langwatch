@@ -19,7 +19,7 @@ import {
   type ReplayEventSource,
   ReplayService,
 } from "@langwatch/eventing";
-import { testEventSchema } from "@langwatch/eventing/testing";
+import { testEventSchema, IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -195,6 +195,7 @@ async function bootWorker({ log = identityLog }: { log?: ReplayEvent[] } = {}) {
     processStore: InMemoryProcessStore.createForTesting(),
     replayEngine: () => ({
       service: new ReplayService({
+        claims: IDLE_REPLAY_CLAIMS_INDEX,
         eventSource: new SeededIdentityLog(log),
         redis: memoryRedisDouble({
           script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
@@ -281,7 +282,8 @@ describe("given a worker installing SCIM over identity's connection log", () => 
         signal: new AbortController().signal,
       });
 
-      const committed = saved.find((save) => Object.keys(save).length === 2);
+      // Only the commit between passes saves neither batch progress nor a tenant cursor.
+      const committed = saved.find((save) => !("done" in save) && !("runReplaysThrough" in save));
       expect(committed?.replayedThrough).toEqual(expect.any(String));
       expect(committed?.replayedThrough).not.toBe("1970-01-01T00:00:00Z");
       expect(closed).toEqual(["engine", "engine"]);

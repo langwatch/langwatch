@@ -11,7 +11,12 @@ import {
 } from "@langwatch/topic-contract";
 import { z } from "zod";
 
-import { nextDailySlot, runIdForSlot } from "../rules/topic-clustering-process.rules.ts";
+import {
+  nextDailySlot,
+  runIdForSlot,
+  runWindowFor,
+  walkClusteredItsWindow,
+} from "../rules/topic-clustering-process.rules.ts";
 import type { TopicClusteringProcessingEvent } from "./topic-clustering.events.ts";
 import {
   TopicClusteringRequestedEventSchema,
@@ -52,8 +57,12 @@ export const topicClusteringProcessStateSchema = z.object({
       page: z.number(),
       updatedAtMs: z.number(),
       startedAtMs: z.number().optional(),
+      /** The run's OccurredAt upper bound; the watermark once its last page lands. */
+      untilMs: z.number().optional(),
     })
     .nullable(),
+  /** Traces that occurred before this were read by a finished run; incremental runs skip them. */
+  clusteredThroughMs: z.number().nullable().optional(),
 });
 export type TopicClusteringProcessState = z.infer<typeof topicClusteringProcessStateSchema>;
 
@@ -68,6 +77,7 @@ const topicClusteringProcessEventViewSchema = z.object({
   page: z.number().nullable(),
   hasNextPage: z.boolean(),
   nextSearchAfter: topicClusteringSearchAfterSchema.nullable(),
+  skippedReason: z.string().nullable().optional(),
 });
 type TopicClusteringProcessEventView = z.infer<typeof topicClusteringProcessEventViewSchema>;
 
@@ -122,6 +132,32 @@ function schedulingRef(ctx: Ctx): number {
   return Math.max(ctx.at, ctx.now);
 }
 
+/** A fresh run's state and first-page intent; continuation pages carry the same window. */
+function startRun(
+  state: TopicClusteringProcessState,
+  ctx: Ctx,
+  { runId, refMs }: { runId: string; refMs: number },
+): ProcessEvolution<TopicClusteringProcessState> {
+  const window = runWindowFor({
+    clusteredThroughMs: state.clusteredThroughMs ?? null,
+    startedAtMs: refMs,
+  });
+  return settle(
+    {
+      ...state,
+      currentRun: {
+        runId,
+        page: 1,
+        updatedAtMs: refMs,
+        startedAtMs: refMs,
+        untilMs: window.untilMs,
+      },
+    },
+    refMs,
+    [ctx.intent("run", `run:${runId}:page-1`, { runId, page: 1, searchAfter: null, window })],
+  );
+}
+
 function enabledBase(state: TopicClusteringProcessState, ctx: Ctx): TopicClusteringProcessState {
   return { ...state, projectId: ctx.key, enabled: true };
 }
@@ -139,6 +175,7 @@ export function buildTopicClusteringProcessEventView(
     page: "page" in event.data ? event.data.page : null,
     hasNextPage: "nextSearchAfter" in event.data && event.data.nextSearchAfter != null,
     nextSearchAfter: "nextSearchAfter" in event.data ? (event.data.nextSearchAfter ?? null) : null,
+    skippedReason: "skippedReason" in event.data ? (event.data.skippedReason ?? null) : null,
   };
 }
 
@@ -164,21 +201,7 @@ const handleClusteringRequested: EventHandler<
   // while the UI reported success, which is exactly the state a user presses the button in.
   // Identity comes from business time (`ctx.at`), never the clamped ref: a redelivered
   // request must mint the same runId, or it would start a second run.
-  const runId = `manual-${ctx.at}`;
-  return settle(
-    {
-      ...base,
-      currentRun: { runId, page: 1, updatedAtMs: refMs, startedAtMs: refMs },
-    },
-    refMs,
-    [
-      ctx.intent("run", `run:${runId}:page-1`, {
-        runId,
-        page: 1,
-        searchAfter: null,
-      }),
-    ],
-  );
+  return startRun(base, ctx, { runId: `manual-${ctx.at}`, refMs });
 };
 
 const handleClusteringRunCompleted: EventHandler<
@@ -201,7 +224,12 @@ const handleClusteringRunCompleted: EventHandler<
     return settle(base, refMs);
   }
   if (!view.hasNextPage) {
-    return settle({ ...base, currentRun: null }, refMs);
+    const untilMs = state.currentRun?.untilMs;
+    const clusteredThroughMs =
+      untilMs !== undefined && walkClusteredItsWindow(view.skippedReason)
+        ? Math.max(untilMs, state.clusteredThroughMs ?? untilMs)
+        : (state.clusteredThroughMs ?? null);
+    return settle({ ...base, currentRun: null, clusteredThroughMs }, refMs);
   }
   const nextPage = view.page + 1;
   return settle(
@@ -215,6 +243,7 @@ const handleClusteringRunCompleted: EventHandler<
         // make a walk immortal: every completed page would push the
         // stale-run deadline out and no wake could ever reclaim it.
         startedAtMs: state.currentRun?.startedAtMs ?? state.currentRun?.updatedAtMs ?? refMs,
+        ...(state.currentRun?.untilMs === undefined ? {} : { untilMs: state.currentRun.untilMs }),
       },
     },
     refMs,
@@ -223,6 +252,14 @@ const handleClusteringRunCompleted: EventHandler<
         runId: view.runId,
         page: nextPage,
         searchAfter: view.nextSearchAfter,
+        ...(state.currentRun?.untilMs === undefined
+          ? {}
+          : {
+              window: {
+                sinceMs: state.clusteredThroughMs ?? null,
+                untilMs: state.currentRun.untilMs,
+              },
+            }),
       }),
     ],
   );
@@ -268,21 +305,7 @@ const topicClusteringWake: WakeHandler<TopicClusteringProcessState, TopicCluster
     return settle(state, refMs);
   }
 
-  const runId = runIdForSlot(refMs);
-  return settle(
-    {
-      ...state,
-      currentRun: { runId, page: 1, updatedAtMs: refMs, startedAtMs: refMs },
-    },
-    refMs,
-    [
-      ctx.intent("run", `run:${runId}:page-1`, {
-        runId,
-        page: 1,
-        searchAfter: null,
-      }),
-    ],
-  );
+  return startRun(state, ctx, { runId: runIdForSlot(refMs), refMs });
 };
 
 /**

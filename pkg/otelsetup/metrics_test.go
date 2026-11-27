@@ -3,6 +3,9 @@ package otelsetup
 import (
 	"context"
 	"testing"
+
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
 // metricsEndpointFromTraces strips the normalised /v1/traces suffix the primary
@@ -94,4 +97,39 @@ func TestInstallMetrics_DisabledInstallsNoReader(t *testing.T) {
 	if p.mp != nil {
 		t.Fatal("expected no MeterProvider when metrics are disabled by name")
 	}
+}
+
+type fixedProducer struct{ name string }
+
+func (p fixedProducer) Produce(context.Context) ([]metricdata.ScopeMetrics, error) {
+	return []metricdata.ScopeMetrics{{Metrics: []metricdata.Metrics{{Name: p.name}}}}, nil
+}
+
+// A supplied producer reaches the reader, and a nil one is skipped rather than
+// panicking on the first export.
+// @scenario "a missing producer does not break the metric reader"
+func TestNewMetricReader_PullsProducersAndSkipsNil(t *testing.T) {
+	ctx := context.Background()
+	reader, err := newMetricReader(ctx, metricSink{
+		endpointURL: "http://localhost:1/v1/metrics",
+		producers:   []sdkmetric.Producer{nil, fixedProducer{name: "gateway_probe"}},
+	})
+	if err != nil {
+		t.Fatalf("newMetricReader: %v", err)
+	}
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	t.Cleanup(func() { _ = mp.Shutdown(ctx) })
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	for _, scope := range rm.ScopeMetrics {
+		for _, m := range scope.Metrics {
+			if m.Name == "gateway_probe" {
+				return
+			}
+		}
+	}
+	t.Fatal("producer metrics did not reach the reader")
 }

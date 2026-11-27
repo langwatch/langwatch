@@ -190,6 +190,21 @@ async function readCached({ entry }: { entry: string }): Promise<EncodedVideo | 
   }
 }
 
+/* A poster is often the first screen's largest paint and cannot be responsive, so it is served
+   narrower than the video: 1.4 times the 840px column, sharp enough before play. */
+const POSTER_WIDTH = 1200;
+const POSTER_QUALITY = 70;
+
+/** The cached full-size poster, fitted to `POSTER_WIDTH`; the cache keeps the full one. */
+async function fitPoster({ poster }: { poster: Buffer }) {
+  const { width } = await sharp(poster).metadata();
+  if (width <= POSTER_WIDTH) return poster;
+  return sharp(poster)
+    .resize({ width: POSTER_WIDTH })
+    .webp({ quality: POSTER_QUALITY, effort: 6, smartSubsample: true })
+    .toBuffer();
+}
+
 /**
  * A video's web encodings, read from `cacheDir` when an earlier build encoded the same bytes with
  * the same settings. Null without an ffmpeg that can encode.
@@ -213,7 +228,11 @@ export async function encodeVideo({
   used?.add(digest);
   const entry = cacheDir ? path.join(cacheDir, digest) : null;
   const hit = entry ? await readCached({ entry }) : null;
-  if (hit) return hit;
+  if (hit)
+    return {
+      ...hit,
+      files: { ...hit.files, poster: await fitPoster({ poster: hit.files.poster }) },
+    };
   if (!toolchain) return null;
   const scratch = await mkdtemp(path.join(os.tmpdir(), "docs-video-"));
   try {
@@ -229,7 +248,8 @@ export async function encodeVideo({
         bytes: Buffer.from(JSON.stringify(encoded.record)),
       });
     }
-    return { ...encoded.record, files: encoded.files };
+    const poster = await fitPoster({ poster: encoded.files.poster });
+    return { ...encoded.record, files: { ...encoded.files, poster } };
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }

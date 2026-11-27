@@ -136,7 +136,7 @@ export const temporalOnlyRule = defineRule({
     mintNowMilliseconds: {
       what: "{{name}} reads the current moment as Date epoch milliseconds.",
       why: "One clock: every moment in the product is a Temporal.Instant.",
-      fix: "Call `nowInstant().epochMilliseconds` from @langwatch/time.",
+      fix: "Call `nowEpochMs()` from @langwatch/time when you only need the count; call `nowInstant()` when you need an Instant.",
     },
     constructInstant: {
       what: "{{name}} builds a Date out of a value.",

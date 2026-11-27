@@ -4,7 +4,12 @@
  * Run button's only value source; the built-in `sources` row leads them, as the query runs.
  */
 
-import { effectiveSources, TRACE_SOURCES, type TraceSource } from "@langwatch/analytics-contract";
+import {
+  effectiveSources,
+  readsSourcesParameter,
+  TRACE_SOURCES,
+  type TraceSource,
+} from "@langwatch/analytics-contract";
 import {
   type DashboardWidgetQuery,
   type DashboardWidgetQueryParameterDeclaration,
@@ -13,7 +18,6 @@ import {
 
 import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { readsSourcesParameter } from "../../../dashboards/model/sources-parameter.ts";
 import { queryProjectsView, withoutProjectAt } from "../../model/query-projects.ts";
 import {
   type QueryParameterRowVM,

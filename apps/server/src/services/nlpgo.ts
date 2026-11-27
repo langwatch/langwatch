@@ -2,8 +2,10 @@ import { nowInstant } from "@langwatch/time";
 
 import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
+import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
+import { nlpgoOfflineEnv } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -35,6 +37,8 @@ export async function startNlpgo(
       command: binary,
       args: ["nlpgo"],
       env: {
+        // Defaults first so the user's shell and .env override them.
+        ...nlpgoOfflineEnv({ appRootDir: appRoot() }),
         ...process.env,
         ...envFromFile,
         SERVER_ADDR: `:${ctx.ports.nlp}`,

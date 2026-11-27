@@ -56,6 +56,19 @@ export const ATTR_KEYS = {
   // GenAI agent attributes (OTel semconv)
   GEN_AI_AGENT_VERSION: "gen_ai.agent.version",
 
+  // A2A (Agent2Agent) call attributes, as A2A instrumentations emit them
+  A2A_METHOD: "a2a.method",
+  A2A_CONTEXT_ID: "a2a.context.id",
+  A2A_TASK_ID: "a2a.task.id",
+  A2A_TASK_STATE: "a2a.task.state",
+  A2A_AGENT_NAME: "a2a.agent.name",
+  A2A_AGENT_CARD_NAME: "a2a.agent.card.name",
+  A2A_AGENT_CARD_NAME_SNAKE: "a2a.agent_card.name",
+
+  // RPC attributes (OTel semconv)
+  RPC_METHOD: "rpc.method",
+  RPC_SERVICE: "rpc.service",
+
   // GenAI request attributes (OTel semconv)
   GEN_AI_REQUEST_TOP_K: "gen_ai.request.top_k",
 
@@ -159,6 +172,8 @@ export const ATTR_KEYS = {
   LANGWATCH_RAG_CONTEXTS: "langwatch.rag.contexts",
   LANGWATCH_RAG_CONTEXTS_LEGACY: "langwatch.rag_contexts",
   LANGWATCH_THREAD_ID: "langwatch.thread.id",
+  /** A launcher's own session over the harness sessions it runs (coding agents). */
+  LANGWATCH_SESSION_ID: "langwatch.session.id",
   LANGWATCH_THREAD_ID_LEGACY: "langwatch.thread_id",
   LANGWATCH_THREAD_ID_LEGACY_ROOT: "thread_id",
   LANGWATCH_USER_ID: "langwatch.user.id",

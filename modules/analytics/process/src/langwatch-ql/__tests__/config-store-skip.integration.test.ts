@@ -166,6 +166,12 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         },
         sourceDatabase: harness.factDatabase,
       });
+      // As the provision task does: a collection its config file defines gets no statement.
+      const server = await provisioning(harness.admin).readCollectionState({
+        database: names.database,
+        candidates: [CONFIG_STORE_COLLECTION],
+      });
+      expect(server.configDefined).toEqual([CONFIG_STORE_COLLECTION]);
       const statements = [
         ...accessModel.setupStatements({
           names,
@@ -174,7 +180,6 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
           // replica-store probe.
           includeAppFunctions: false,
         }),
-        ...accessModelDefinition.renderNamedCollectionDdl(definition),
         ...viewProvisioning.setupStatements({
           names,
           sourceDatabase: harness.factDatabase,
@@ -203,25 +208,12 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         ),
         "the config-owned user CREATE was skipped as 495",
       ).toBe(true);
-      // The named-collection code the server raises varies by path/version
-      // (669 doesn't-exist, 670 already-exists, 671 immutable); accept any.
-      const namedCollectionCodes = [
-        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
-        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
-        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
-      ] as number[];
-      expect(
-        skipped.some(
-          (s) => s.kind === "DROP NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
-        ),
-        "the config-owned named collection DROP was skipped as 669/670/671",
-      ).toBe(true);
-      expect(
-        skipped.some(
-          (s) => s.kind === "CREATE NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
-        ),
-        "the config-owned named collection CREATE was skipped as 669/670/671",
-      ).toBe(true);
+      // The config-owned collection is still its file's, untouched.
+      const after = await provisioning(harness.admin).readCollectionState({
+        database: names.database,
+        candidates: [CONFIG_STORE_COLLECTION],
+      });
+      expect(after.configDefined).toEqual([CONFIG_STORE_COLLECTION]);
       // The key-map row policy is not config-owned, so it was created, never
       // skipped — the config-owned user named in its `TO` clause must not
       // launder a missing policy into a tolerated skip.

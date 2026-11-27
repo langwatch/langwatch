@@ -20,6 +20,11 @@ const SAFETY_OMISSIONS: Readonly<Record<string, readonly string[]>> = {
   github_installations: ["accountLogin"], // a user account's GitHub handle
 };
 
+/** Gates the catalogue added for safety on top of the derivation's, by view and source column. */
+const SAFETY_GATES: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  ingestion_templates: { ottlRules: ["aiTools:manage"] }, // organization configuration
+};
+
 type Exposure = readonly (string | readonly string[] | undefined)[];
 const before: Readonly<Record<string, readonly Exposure[]>> = beforeJson;
 const tables: Readonly<Record<string, LwqlTableCatalogue>> = LWQL_POSTGRES_CATALOGUE;
@@ -35,9 +40,15 @@ describe("given the Postgres catalogue beside the derivation it replaced", () =>
   it("exposes each view's names, sources and gates as before, less the safety omissions", () => {
     for (const view of LWQL_POSTGRES_CATALOG) {
       const omitted = SAFETY_OMISSIONS[view.name] ?? [];
-      const expected = (before[view.name] ?? []).filter(
-        ([, source]) => !omitted.includes(String(source)),
-      );
+      const added = SAFETY_GATES[view.name] ?? {};
+      const expected = (before[view.name] ?? [])
+        .filter(([, source]) => !omitted.includes(String(source)))
+        .map(([name, source, gates]) => {
+          const extra = added[String(source)];
+          return extra
+            ? [name, source, [...((gates as string[]) ?? []), ...extra]]
+            : [name, source, gates];
+        });
       expect({ view: view.name, columns: exposure(view) }).toEqual({
         view: view.name,
         columns: expected,

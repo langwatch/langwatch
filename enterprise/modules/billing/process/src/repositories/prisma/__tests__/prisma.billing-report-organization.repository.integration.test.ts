@@ -113,6 +113,7 @@ describe("given organizations on either side of usage-based pricing", () => {
       await prisma.connectedBillingAccount.deleteMany({
         where: { organizationId: { in: createdIds } },
       });
+      await prisma.subscription.deleteMany({ where: { organizationId: { in: createdIds } } });
       await prisma.organization.deleteMany({ where: { id: { in: createdIds } } });
     }
     await prisma.$disconnect();
@@ -162,6 +163,7 @@ describe("given organizations on either side of usage-based pricing", () => {
           stripeCustomerId: `cus_connected_${namespace}`,
           subscriptions: [{ id: "sub_usage" }],
           contract: "connected",
+          growthSeatPeriods: [],
         },
       });
     });
@@ -171,7 +173,12 @@ describe("given organizations on either side of usage-based pricing", () => {
 
       expect(result).toMatchObject({
         outcome: "usage_billed",
-        organization: { id: halfOnboardedId, subscriptions: [], contract: "connected" },
+        organization: {
+          id: halfOnboardedId,
+          subscriptions: [],
+          contract: "connected",
+          growthSeatPeriods: [],
+        },
       });
     });
   });
@@ -183,6 +190,82 @@ describe("given organizations on either side of usage-based pricing", () => {
       expect(result).toEqual({ outcome: "not_usage_billed" });
     });
   });
+
+  describe("when the lookup runs for an organization whose subscription was replaced", () => {
+    /** @scenario "The billing lookup reads every growth-seat period a month can overlap, newest first" */
+    it("reads the live and the ended period, newest start first, and nothing else", async () => {
+      const organizationId = await usageBilledWithSubscriptions("replaced", [
+        { key: "live", status: "ACTIVE", start: "2026-02-15", end: null },
+        { key: "ended", status: "CANCELLED", start: "2025-03-01", end: "2026-02-15" },
+        { key: "no-start", status: "CANCELLED", start: null, end: "2026-01-10" },
+        { key: "pending", status: "PENDING", start: "2026-02-20", end: null },
+      ]);
+
+      const result = await repository.getOrganizationForBilling(organizationId);
+
+      expect(result).toMatchObject({
+        outcome: "usage_billed",
+        organization: {
+          subscriptions: [{ id: `live-${namespace}` }],
+          growthSeatPeriods: [
+            { startMs: Date.parse("2026-02-15"), endMs: null },
+            { startMs: Date.parse("2025-03-01"), endMs: Date.parse("2026-02-15") },
+          ],
+        },
+      });
+    });
+
+    /** @scenario "The billing lookup reads every growth-seat period a month can overlap, newest first" */
+    it("puts a live subscription with no recorded start before every dated one", async () => {
+      const organizationId = await usageBilledWithSubscriptions("undated", [
+        { key: "ended-dated", status: "CANCELLED", start: "2025-03-01", end: "2026-02-15" },
+        { key: "live-undated", status: "ACTIVE", start: null, end: null },
+      ]);
+
+      const result = await repository.getOrganizationForBilling(organizationId);
+
+      expect(result).toMatchObject({
+        outcome: "usage_billed",
+        organization: {
+          growthSeatPeriods: [
+            { startMs: null, endMs: null },
+            { startMs: Date.parse("2025-03-01"), endMs: Date.parse("2026-02-15") },
+          ],
+        },
+      });
+    });
+  });
+
+  /** A usage-billed organization holding the given growth-seat subscriptions. */
+  async function usageBilledWithSubscriptions(
+    label: string,
+    subscriptions: {
+      key: string;
+      status: "ACTIVE" | "CANCELLED" | "PENDING";
+      start: string | null;
+      end: string | null;
+    }[],
+  ): Promise<string> {
+    const organization = await prisma.organization.create({
+      data: {
+        name: `${label} ${namespace}`,
+        slug: `${label}-${namespace}`,
+        pricingModel: "SEAT_EVENT",
+      },
+    });
+    createdIds.push(organization.id);
+    await prisma.subscription.createMany({
+      data: subscriptions.map(({ key, status, start, end }) => ({
+        id: `${key}-${namespace}`,
+        organizationId: organization.id,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+        status,
+        startDate: start === null ? null : new Date(start),
+        endDate: end === null ? null : new Date(end),
+      })),
+    });
+    return organization.id;
+  }
 
   describe("when the lookup runs for an organization that is neither usage billed nor a self-hosted customer", () => {
     /** @scenario "An organization that is neither usage billed nor a self-hosted customer is still skipped" */

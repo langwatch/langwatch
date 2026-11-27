@@ -1,7 +1,7 @@
 /**
  * Answers one LLM judge whose model is Instant Evals through the judge leaf, before any provider
- * lookup (ADR-174 decisions 1, 7, 9, 16). A stream chunk is skipped before the judge is called,
- * and a refusal comes back as an error result, never thrown, so no caller reads it as a skip.
+ * lookup (ADR-174 d1, 7, 9, 16). A stream chunk is skipped before the call, a refusal is an error
+ * result, never thrown. LangWatch's model is routed under the judge router flag (ADR-190).
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
@@ -10,6 +10,7 @@ import {
   instantEvalOwnDecisionModelOf,
   instantEvalUnavailableDecisionModelSkipOf,
   type InstantEvalJudgeApi,
+  type InstantEvalJudgeRouteRequest,
 } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
@@ -31,7 +32,19 @@ type EvaluationJudgingDeps = Readonly<{
   decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
+  /** What the project's organization's flags say about LangWatch's hosted judge. */
+  judgeRouting: EvaluationJudgeRouting;
 }>;
+
+export type EvaluationJudgeRouting = Readonly<{
+  /** The judge router flag (ADR-190 decision 8). */
+  isRouted: (input: { projectId: string }) => Promise<boolean>;
+  /** Whether LangWatch switched its hosted model off for the organization, whatever its plan. */
+  isHostedOff: (input: { projectId: string }) => Promise<boolean>;
+}>;
+
+/** What an LLM-as-judge evaluator asks the router for; the table picks its slot and mode. */
+const LLM_JUDGE_ROUTE: InstantEvalJudgeRouteRequest = { job: "llm_judge" };
 
 export class EvaluationJudgingService {
   private constructor(private readonly deps: EvaluationJudgingDeps) {}
@@ -54,6 +67,8 @@ export class EvaluationJudgingService {
     droppedCategories: string[];
     /** The decision model this judge picked; the resolver weighs it, the guards are unchanged. */
     decisionModel?: string | undefined;
+    /** The judge picked LangWatch Evals (preview), so the router flag decides if it is routed. */
+    isRoutable?: boolean | undefined;
     /** Only a queued monitor command carries one; it becomes the retry key (decision 9). */
     idempotencyKey?: string | undefined;
     guardrailDirection?: GuardrailCheckDirection | undefined;
@@ -77,6 +92,7 @@ export class EvaluationJudgingService {
     guardrailDirection,
     signal,
     decisionModel,
+    isRoutable = false,
   }: {
     projectId: string;
     judge: InstantEvalJudge;
@@ -85,6 +101,7 @@ export class EvaluationJudgingService {
     guardrailDirection?: GuardrailCheckDirection | undefined;
     signal?: AbortSignal | undefined;
     decisionModel?: string | undefined;
+    isRoutable?: boolean | undefined;
   }): Promise<SingleEvaluationResult> {
     const guardrailSkip = instantEvalGuardrailSkipOf({ direction: guardrailDirection });
     if (guardrailSkip.kind === "skipped") return guardrailSkip.result;
@@ -101,6 +118,19 @@ export class EvaluationJudgingService {
     if (resolved.kind === "own_unavailable") {
       return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));
     }
+    // An organization LangWatch keeps on its own models never reaches the hosted judge.
+    if (
+      resolved.kind === "langwatch" &&
+      (await this.deps.judgeRouting.isHostedOff({ projectId }))
+    ) {
+      return instantEvalSkipResultOf("classifier_not_configured");
+    }
+    // Only LangWatch Evals (preview) is routed: never LangWatch Instant (preview), never an own
+    // decision model.
+    const isRouted =
+      isRoutable &&
+      resolved.kind === "langwatch" &&
+      (await this.deps.judgeRouting.isRouted({ projectId }));
     const answer = await this.deps.judges.judge({
       projectId,
       text: request.text,
@@ -110,6 +140,7 @@ export class EvaluationJudgingService {
       ...(resolved.kind === "own"
         ? { decisionModel: instantEvalOwnDecisionModelOf(resolved) }
         : {}),
+      ...(isRouted ? { route: LLM_JUDGE_ROUTE } : {}),
     });
     if (answer.outcome === "refused") {
       return instantEvalRefusalResultOf({ code: answer.code, message: answer.message });

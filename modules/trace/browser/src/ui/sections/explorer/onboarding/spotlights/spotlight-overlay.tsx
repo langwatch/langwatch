@@ -7,6 +7,10 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import {
+  splitTourStep,
+  withTourStep,
+} from "../../../../../model/explorer/onboarding/spotlights/spotlight-fragment.ts";
 import type {
   Spotlight,
   SpotlightContext,
@@ -15,31 +19,28 @@ import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboard
 import { useTraceExplorerTourPreference } from "../hooks/use-trace-explorer-tour-preference.ts";
 
 // ---------------------------------------------------------------------------
-// URL fragment helpers (scoped to sp= prefix so we don't clobber the
-// existing lens/query fragment that useURLSync manages).
+// URL fragment helpers: the step sits beside useURLSync's lens/query state.
 // ---------------------------------------------------------------------------
-
-const SP_PREFIX = "sp=";
 
 export function readSpotlightFragment(): string | null {
   if (typeof window === "undefined") return null;
-  const hash = window.location.hash.slice(1); // strip leading #
-  if (!hash.startsWith(SP_PREFIX)) return null;
-  return decodeURIComponent(hash.slice(SP_PREFIX.length)) || null;
+  const { step } = splitTourStep(window.location.hash);
+  if (!step) return null;
+  try {
+    return decodeURIComponent(step) || null;
+  } catch {
+    return null;
+  }
 }
 
 export function writeSpotlightFragment(id: string | null): void {
   if (typeof window === "undefined") return;
-  if (id === null) {
-    // If there's no other fragment content, remove the hash entirely.
-    const bare = window.location.pathname + window.location.search;
-    window.history.replaceState(null, "", bare);
-  } else {
-    const newHash = `#${SP_PREFIX}${encodeURIComponent(id)}`;
-    const newURL = window.location.pathname + window.location.search + newHash;
-    if (newURL !== window.location.href) {
-      window.history.replaceState(null, "", newURL);
-    }
+  const { rest } = splitTourStep(window.location.hash);
+  const body = id === null ? rest : withTourStep({ rest, step: encodeURIComponent(id) });
+  const newURL = window.location.pathname + window.location.search + (body ? `#${body}` : "");
+  const currentURL = window.location.pathname + window.location.search + window.location.hash;
+  if (newURL !== currentURL) {
+    window.history.replaceState(null, "", newURL);
   }
 }
 

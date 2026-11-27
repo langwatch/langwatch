@@ -103,7 +103,18 @@ export class CodingAgentSessionLogProjection {
     const event = normalizeEventName(this.stateProjection.coerceString(attrs["event.name"]));
     if (event === null) return state;
 
-    const base = this.stateProjection.withIdentity(state, attrs);
+    // A launcher's name (OTEL_RESOURCE_ATTRIBUTES) rides every record and names
+    // an unnamed session; only the context record renames, so a harness rename
+    // is never undone by the next record that still carries the launcher's name.
+    const identified = this.stateProjection.withIdentity(state, attrs);
+    const base =
+      event === LANGWATCH.EVENT.SESSION_CONTEXT || identified.titleSource === "name"
+        ? identified
+        : this.stateProjection.withTitle({
+            state: identified,
+            value: this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.NAME]),
+            source: "name",
+          });
 
     switch (event) {
       case CLAUDE.EVENT.USER_PROMPT:
@@ -361,10 +372,11 @@ export class CodingAgentSessionLogProjection {
       decision: this.stateProjection.coerceString(attrs.decision),
       source: this.stateProjection.coerceString(attrs.source),
     });
+    // A REDIRECT (the human answered instead of approving) is not a refusal, so
+    // it counts as neither. An ABORT (they walked away) is a different act from
+    // a refusal, and NONE is a tool that broke: counting them as failures would
+    // report the human's judgement as the agent's fault.
     if (outcome !== "denied" && outcome !== "aborted") return base;
-    // An ABORT (the human walked away from the prompt) is a different act from
-    // a refusal, and NEITHER is a tool that broke. Counting them as failures
-    // would report the human's judgement as the agent's fault.
     return outcome === "aborted"
       ? { ...base, toolsAborted: base.toolsAborted + 1 }
       : { ...base, toolsDenied: base.toolsDenied + 1 };

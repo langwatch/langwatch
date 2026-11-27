@@ -118,6 +118,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/ops/cloud/licenses`              | `/ops/cloud/licenses` (route table)              | –        | –       | `ops:manage` | –     |
 | `pages/ops/cloud/self-hosted-instances` | `/ops/cloud/self-hosted-instances` (route table) | –        | –       | `ops:manage` | –     |
 | `pages/ops/cloud/bug-reports`           | `/ops/cloud/bug-reports` (route table)           | –        | –       | `ops:manage` | –     |
+| `pages/ops/cloud/seat-use`              | `/ops/cloud/seat-use` (route table)              | –        | –       | `ops:manage` | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

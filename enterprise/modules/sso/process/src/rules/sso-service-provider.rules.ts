@@ -15,6 +15,7 @@ interface SsoServiceProviderAddresses {
   singleLogoutUrl: string;
   entityId: string;
   metadataUrl: string;
+  refusalPageUrl: string;
 }
 
 export function ssoServiceProviderAddresses({
@@ -41,6 +42,8 @@ export function ssoServiceProviderAddresses({
     // organization with two connections to trust two different LangWatches.
     entityId: `${auth}/sso/saml2/sp`,
     metadataUrl: `${auth}/sso/saml2/sp/metadata?providerId=${provider}`,
+    // Where the provider sends a person it refused, e.g. Okta's Application Access Error Page.
+    refusalPageUrl: `${auth}/sso/refused/${provider}`,
   };
 }
 

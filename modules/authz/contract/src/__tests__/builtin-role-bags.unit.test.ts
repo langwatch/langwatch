@@ -188,6 +188,14 @@ describe("given the organization roles", () => {
       expect(grants("lite-member", "annotations:update")).toBe(true);
     });
 
+    /** @scenario "A lite member reads who is in the organization on any project" */
+    it.concurrent("reads the Users page and changes nobody on it", () => {
+      expect(grants("lite-member", "members:view")).toBe(true);
+      for (const permission of ["organization:manage", "seatRequests:manage"]) {
+        expect(grants("lite-member", permission)).toBe(false);
+      }
+    });
+
     /** @scenario "A lite member reads the product, comments on it, and configures nothing" */
     it.concurrent("configures nothing, in the product or the gateway", () => {
       for (const permission of [

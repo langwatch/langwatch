@@ -1,0 +1,175 @@
+---
+title: Agent kill switch
+description: Stop an agent on the platform it runs on, with an approval when you want one, and restore it with one action.
+sidebarTitle: Kill switch
+keywords: kill switch, stop agent, quarantine, Databricks model serving, Amazon Bedrock agents, virtual key, governance, approval
+---
+
+When an agent misbehaves, the kill switch stops it on the targets of its stop plan. LangWatch stops the agent's Databricks model serving endpoint, sets its Amazon Bedrock agent alias to reject invocations, and disables the gateway virtual key its model calls use. A platform that is not in the plan keeps running.
+
+The agent shows as **Quarantined** in the Agents inventory, every step is in the audit log, and your webhook endpoints get a `governance.agent.*` event. **Restore** undoes every change the stop made.
+
+The kill switch works on agents in the [agent registry](/governance/agent-registry) and is part of the Enterprise plan.
+
+## Stop plan
+
+Each agent has a stop plan: the targets a stop acts on. Set it on the Agents page (**Stop plan** in the agent's actions) or with `PUT /api/governance/agents/{agentId}/stop-plan`.
+
+| Target | What a stop does | What a restore does |
+|---|---|---|
+| Databricks model serving endpoint | `POST /api/2.0/serving-endpoints/{name}/config:stop` | `POST /api/2.0/serving-endpoints/{name}/config:start` |
+| Amazon Bedrock agent alias | `UpdateAgentAlias` with `aliasInvocationState: REJECT_INVOCATIONS` | `UpdateAgentAlias` with `aliasInvocationState: ACCEPT_INVOCATIONS` |
+| Gateway virtual key | Disables the key; requests answer `virtual_key_disabled` | Enables the key |
+
+A Databricks target uses the workspace and credentials of a Databricks [ingestion source](/ai-governance/ingestion-sources/index). A Bedrock target uses an AWS connection you add under **AWS connections** on the same screen: an access key pair, a role ARN to assume, or both. The secret access key is stored encrypted and is never shown again.
+
+A Bedrock alias that already rejects invocations, or a virtual key that is already disabled, when the stop starts is left as it is, and a restore leaves it that way too. A Databricks endpoint is always stopped, and a restore starts it again even if it was stopped before: Databricks reports a stopped endpoint and one still deploying the same way, as not ready.
+
+Databricks stops only endpoints that serve custom models and have no update in progress. A stopped endpoint answers `400` to queries.
+
+Bedrock has no conditional update for an alias: a stop or a restore reads the alias and writes back its name, description and routing right after. A deployment to the same alias between those two calls is overwritten, so avoid deploying an alias while you stop or restore it.
+
+## Approval
+
+A stop is applied at once when:
+
+- a person with `governance:manage` presses **Stop** on the Agents page, or
+- a machine credential asks with `severity: "critical"`.
+
+Any other stop from a machine credential waits for an approval. It shows as an approval card on the Agents page and pushes `governance.agent.stop_requested` to your webhook endpoints, so your on-call tool can page someone. A person or key with `governance:manage` approves or denies it. The key that requested a stop cannot approve it.
+
+One agent has at most one open stop. A new request while one is pending approval, stopping, quarantined, failed to stop, restoring or failed to restore answers `409` with code `agent_stop_already_open`; run a failed stop again with [Retry stop](#retry-a-stop). When two people decide one pending stop at once, the first decision wins and the other answers `409` with code `agent_stop_not_pending`.
+
+To make sure a stop acts on the plan you checked, send the plan's target ids as `expectedTargetIds`. If the plan changed since you read it, the stop answers `409` with code `agent_stop_plan_changed` and no target is changed. The Agents page does this for you.
+
+An AWS connection that a stop plan target, or a stop that is not restored yet, still uses cannot be deleted: the delete answers `409` with code `governance_aws_connection_in_use`.
+
+## Status
+
+| Status | Meaning |
+|---|---|
+| `pending_approval` | Waiting for an approval |
+| `denied` | Denied; no target was changed |
+| `stopping` | The worker is applying the targets |
+| `quarantined` | Every target was applied |
+| `stop_failed` | At least one target failed after its retries; the others were applied |
+| `restoring` | The worker is reverting the applied targets |
+| `restored` | Every applied target was reverted |
+| `restore_failed` | At least one target could not be reverted |
+
+Each target is retried with backoff before it is recorded as failed. A failed target carries an error code such as `http_403` or `AccessDeniedException`. Restore reverts only the targets that were applied, so a key that failed to disable is not enabled by a restore.
+
+A deleted resource counts as done once the stop has reached it. When Databricks answers `404` or Bedrock answers `ResourceNotFoundException` for a target the stop already changed, the target is recorded as applied on a stop and as reverted on a restore, with `gone: true` in the stop, the audit row and the webhook body.
+
+A not-found on the stop's first call to a target usually means a wrong region, account or id, so the target is recorded failed with code `target_not_found` and the stop ends `stop_failed`.
+
+## Retry a stop
+
+**Retry stop** in the agent's actions, or `POST /api/governance/agent-stops/{stopId}/retry`, runs the stop again on every target it has not stopped: the ones that failed, the ones a restore turned back on, and targets added to the stop plan since the stop was requested. Targets that are already stopped are not called again.
+
+You can retry a `quarantined`, `stop_failed` or `restore_failed` stop. Any other status answers `409` with code `agent_stop_not_retryable`. The stop goes back to `stopping` and announces its outcome again. On a quarantined stop the action is called **Stop again**.
+
+## Change the plan of a stopped agent
+
+Removing a target from the stop plan also removes it from the agent's open stop, and turns it back on at once if the stop had turned it off: the virtual key is enabled, the serving endpoint started and the alias accepts calls again.
+
+A Bedrock alias or virtual key that was already off before the stop, or a target that no longer exists, is left as it is. A Databricks endpoint is started even if it was stopped before the stop, as a restore does (see above). A target another agent's open stop still holds stays off, as in [Shared targets](#shared-targets).
+
+A stop or restore that only waited on that target finishes: a stop that failed on it becomes `quarantined`, and a restore that failed on it becomes `restored`. A stop waiting for approval whose plan loses every target becomes `restored` at once and announces `governance.agent.restored`, so it no longer blocks a new stop. A later restore does not call a removed target again.
+
+## Shared targets
+
+Two agents can share one gateway virtual key, one Databricks serving endpoint (the same endpoint name in the same workspace, even through two ingestion sources) or one Bedrock alias (the same region, agent id and alias id, even through two AWS connections). Restoring one of them keeps the target off while another agent's open stop still holds it, and records the target as reverted with `keptDisabled: true`.
+
+The last restore turns it back on. A stop waiting for approval holds no target.
+
+A second agent's stop that finds a shared target already off because the first agent's stop turned it off counts it as its own change, so it is not reported as `alreadyStopped`. The same holds when the first agent's restore of it is running or failed, since a later restore may still turn it on, and when a restore kept it off for an agent that has since let it go.
+
+The Restore dialog names the agents that keep a shared target off. For a serving endpoint it names only the agents that reach it through the same ingestion source: an agent reaching it through another source of the same workspace keeps it stopped too, without being named.
+
+## Endpoints
+
+Every route takes an organization API key in `Authorization: Bearer <key>`. Reads need `governance:view`; stops, retries, decisions, restores and plan changes need `governance:manage`. Organization admins hold both.
+
+A stop is readable as soon as its `202` returns: the latest stop route answers it, and another key can approve it right away.
+
+| Method and path | Does |
+|---|---|
+| `GET /api/governance/agents/{agentId}/stop-plan` | Reads the agent's stop plan |
+| `PUT /api/governance/agents/{agentId}/stop-plan` | Replaces the stop plan |
+| `POST /api/governance/agents/{agentId}/stop` | Requests a stop. Body: `{ "reason": "...", "severity": "low" \| "medium" \| "high" \| "critical", "expectedTargetIds": ["..."] }`, `expectedTargetIds` optional. Answers `202` with the stop |
+| `GET /api/governance/agents/{agentId}/stop` | The agent's latest stop |
+| `GET /api/governance/agent-stops` | Stops, filtered by `status` |
+| `POST /api/governance/agent-stops/{stopId}/approve` | Approves a pending stop |
+| `POST /api/governance/agent-stops/{stopId}/deny` | Denies a pending stop |
+| `POST /api/governance/agent-stops/{stopId}/restore` | Restores a quarantined agent |
+| `POST /api/governance/agent-stops/{stopId}/retry` | Runs the stop again on what it has not stopped. Answers `202` with the stop |
+
+Each path also answers under `/api/v1/governance/...`. The routes are in the OpenAPI document under the tag **Governance / Kill Switch**.
+
+## Stop an agent from a trace rule
+
+A [trigger](/features/automations) can stop an agent. Add a **Webhook** action that posts to the stop route, put the API key in a secret header, and shape the body:
+
+```text
+URL      https://app.langwatch.ai/api/governance/agents/<agentId>/stop
+Header   Authorization: Bearer <organization API key with governance:manage>
+Body     {"reason": {{ "Trace rule " | append: trigger.name | append: " matched " | append: match.trace.url | json }}, "severity": "critical"}
+```
+
+The `json` filter quotes the reason, so a trigger name with quotes still sends valid JSON. Use `critical` to stop at once, or `high` to page an approver first.
+
+## Audit log and webhooks
+
+The audit log records `governance.agent.stop_requested`, `governance.agent.stop_approved`, `governance.agent.stop_denied`, `governance.agent.stop_retried`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restore_requested`, `governance.agent.restored` and `governance.agent.restore_failed`, with the agent as the target.
+
+Saving a stop plan, on the Agents page or over REST, records `governance.agent.stop_plan_set`. Each action writes one row, named after the agent, and so does a refused one, with the refusal's code as its error. A milestone row is dated when the milestone was reached.
+
+Adding and removing an AWS connection records `governance.agent.aws_connection_created` and `governance.agent.aws_connection_deleted`, with the connection as the target and no secret in the row.
+
+Webhook endpoints subscribed to `governance.agent.*` receive `governance.agent.stop_requested`, `governance.agent.quarantined`, `governance.agent.stop_failed`, `governance.agent.restored` and `governance.agent.restore_failed`. Each event has the shape of a [registry change event](/governance/agent-registry#change-events) without `sequence`, with `from_version`, `to_version` and `tool` null, plus a `stop` object with the status and every target's outcome.
+
+Delivery is at least once. LangWatch drops a repeat it still remembers, but a milestone announced again later, after its delivery records were pruned, reaches you again. A repeat always carries the same envelope `id`, which is the delivery's idempotency key (derived from the event and the endpoint), and the same `data.id`. Deduplicate on the envelope `id` per endpoint, or on `data.id` across endpoints.
+
+The milestones are webhooks only for now: they are not in the registry's change feed or an agent's `/versions`, because LangWatch 3.25 and earlier refuse a feed event type they do not know. They join the feed in a later release, once every version you can roll back to skips unknown types.
+
+## Permissions on your platforms
+
+### Databricks
+
+The Databricks ingestion source's service principal needs **Can Manage** on each serving endpoint in a stop plan. Listing Genie spaces does not need it.
+
+### AWS
+
+The AWS connection needs this policy, scoped to the aliases in your stop plans:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["bedrock:GetAgentAlias", "bedrock:UpdateAgentAlias"],
+      "Resource": [
+        "arn:aws:bedrock:<region>:<account>:agent/<agentId>",
+        "arn:aws:bedrock:<region>:<account>:agent-alias/<agentId>/<aliasId>"
+      ]
+    }
+  ]
+}
+```
+
+With a role ARN, the role's trust policy must let the connection's principal call `sts:AssumeRole`, and it must require the connection's external id. LangWatch generates the external id when you add the connection and shows it on the connection's row. You can't choose it, so another organisation can't reuse your role through LangWatch.
+
+Add the external id as a condition on the trust policy statement:
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": { "AWS": "<principal that signs for LangWatch>" },
+  "Action": "sts:AssumeRole",
+  "Condition": { "StringEquals": { "sts:ExternalId": "<external id shown on the connection>" } }
+}
+```
+
+LangWatch sends the external id on every `AssumeRole` call. A role connection with no external id is refused with `aws_external_id_missing` before any call to AWS. To fix it, add the connection again and update the trust policy with the new external id.

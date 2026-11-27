@@ -58,3 +58,18 @@ Feature: An evaluation run folds and executes deterministically
     Given a write carrying a retention that is negative or not a whole number of days
     When it is validated
     Then it is refused and nothing is written
+
+  # #9575: deterministic ids keep the KSUID byte layout their row was stored with.
+  @unit
+  Scenario: An evaluation run stored before its id layout was recorded keeps its id on the next write
+    Given an evaluation run row stored without an IdLayout
+    When the run is read back and written again
+    Then its id is derived in the legacy layout, exactly as it was stored
+    And the row records the layout "v1-legacy"
+
+  @unit
+  Scenario: A new evaluation run mints a corrected id and records its layout
+    Given an evaluation run that was never stored
+    When the run is folded and written
+    Then its id is derived in the corrected layout
+    And the row records the layout "v2"

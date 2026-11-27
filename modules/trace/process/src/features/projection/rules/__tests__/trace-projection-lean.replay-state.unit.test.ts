@@ -12,6 +12,7 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
@@ -91,7 +92,6 @@ function replayRedis() {
       calls.push(`pause:${String(pauseKey)}`);
       return 1;
     }),
-    scan: vi.fn(async () => ["0", []] as [string, string[]]),
     srem: vi.fn(async (_key: unknown, pauseKey: unknown) => {
       calls.push(`unpause:${String(pauseKey)}`);
       return 1;
@@ -149,6 +149,7 @@ describe("replayStateProjection", () => {
 
     const ctx: ReplayContext = {
       redis,
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: new EventingClickHouseReplayEventSource({
         clickhouse: client,
         lean: leanReplayEvent,
@@ -229,6 +230,7 @@ describe("replayStateProjection", () => {
     const result = await replayStateProjection({
       ctx: {
         redis,
+        claims: IDLE_REPLAY_CLAIMS_INDEX,
         eventSource: new EventingClickHouseReplayEventSource({
           clickhouse: client,
           lean: leanReplayEvent,
@@ -271,6 +273,7 @@ describe("replayStateProjection", () => {
     const { store } = spyStore();
     const ctx: ReplayContext = {
       redis: forbiddenRedis,
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: new EventingClickHouseReplayEventSource({
         clickhouse: client,
         lean: leanReplayEvent,
@@ -302,6 +305,7 @@ describe("the fold/map engine with state projections", () => {
     const { store } = spyStore();
     const ctx: ReplayContext = {
       redis: forbiddenRedis,
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: new EventingClickHouseReplayEventSource({
         // Scripts nothing: any statement throws, so the guard must fire first.
         clickhouse: clickHouseQueryClientDouble(),

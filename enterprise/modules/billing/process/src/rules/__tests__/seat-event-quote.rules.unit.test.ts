@@ -7,6 +7,7 @@ import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  chargedAmounts,
   QUOTE_VALIDITY_SECONDS,
   quotedAmounts,
   resolveProrationDate,
@@ -23,6 +24,7 @@ describe("quotedAmounts", () => {
       expect(quotedAmounts({ total: 5000, amountDue: 3000 })).toEqual({
         prorationCents: 3000,
         creditAppliedCents: 2000,
+        taxCents: 0,
       });
     });
 
@@ -30,16 +32,68 @@ describe("quotedAmounts", () => {
       expect(quotedAmounts({ total: 5000, amountDue: 5000 })).toEqual({
         prorationCents: 5000,
         creditAppliedCents: 0,
+        taxCents: 0,
       });
+    });
+  });
+
+  describe("when VAT is added on top of the price", () => {
+    /** @scenario "The quote names the tax inside the amount due" */
+    it("reports the tax inside the amount due", () => {
+      expect(quotedAmounts({ total: 2507, amountDue: 2507, tax: 435 })).toEqual({
+        prorationCents: 2507,
+        creditAppliedCents: 0,
+        taxCents: 435,
+      });
+    });
+
+    /** @scenario "Account credit carries its share of the tax" */
+    it("reports only the share of the tax inside what credit leaves to pay", () => {
+      // 1507 of 2507 is charged, so 1507/2507 of the 435 tax: 261.
+      expect(quotedAmounts({ total: 2507, amountDue: 1507, tax: 435 })).toEqual({
+        prorationCents: 1507,
+        creditAppliedCents: 1000,
+        taxCents: 261,
+      });
+    });
+
+    it("reports no tax when credit pays the whole charge", () => {
+      expect(quotedAmounts({ total: 2507, amountDue: 0, tax: 435 }).taxCents).toBe(0);
     });
   });
 
   describe("when the change credits the customer", () => {
     it("reports the signed total and draws no credit down", () => {
-      expect(quotedAmounts({ total: -2500, amountDue: 0 })).toEqual({
+      expect(quotedAmounts({ total: -2500, amountDue: 0, tax: -434 })).toEqual({
         prorationCents: -2500,
         creditAppliedCents: 0,
+        taxCents: 0,
       });
+    });
+  });
+});
+
+describe("chargedAmounts", () => {
+  describe("when a lift back to kept seats carries part of the move", () => {
+    it("takes the lifted seats' share off the tax as well as the total", () => {
+      const amounts = chargedAmounts({
+        preview: { total: 7260, amountDue: 7260, tax: 1260 },
+        lifted: { total: 2420, amountDue: 2420, tax: 420 },
+        share: { added: 3, moved: 4 },
+      });
+
+      expect(amounts).toEqual({ prorationCents: 5647, creditAppliedCents: 0, taxCents: 980 });
+    });
+
+    it("takes the credit's share off the tax above the lifted seats", () => {
+      const amounts = chargedAmounts({
+        preview: { total: 7260, amountDue: 6260, tax: 1260 },
+        lifted: { total: 2420, amountDue: 1420, tax: 420 },
+        share: { added: 3, moved: 4 },
+      });
+
+      // 5647 above the lifted seats, 1000 paid by credit: 4647/5647 of the 980 tax.
+      expect(amounts).toEqual({ prorationCents: 4647, creditAppliedCents: 1000, taxCents: 806 });
     });
   });
 });

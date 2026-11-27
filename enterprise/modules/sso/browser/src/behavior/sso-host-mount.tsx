@@ -71,6 +71,10 @@ class HostServiceSsoHost extends SsoHostApi {
     return this.deps.session.hasPermission(SSO_MANAGE_PERMISSION);
   }
 
+  canManageOrganization(): boolean {
+    return this.deps.session.hasPermission("organization:manage");
+  }
+
   canView(): boolean {
     return this.deps.session.hasPermission(SSO_VIEW_PERMISSION);
   }

@@ -51,6 +51,9 @@
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/digest/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/enterprise-gateway/contract/tsconfig.build.json"
     },
     {
@@ -70,6 +73,9 @@
     },
     {
       "path": "../../auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../auth/client/tsconfig.build.json"
     },
     {
       "path": "../../api-key/client/tsconfig.build.json"

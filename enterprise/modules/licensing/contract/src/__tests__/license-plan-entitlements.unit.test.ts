@@ -16,6 +16,7 @@ const enterprisePlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => ({
   free: false,
   maxMembers: 100,
   maxMembersLite: 50,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 10_000_000,
   canPublish: true,
   prices: { USD: 0, EUR: 0 },

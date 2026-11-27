@@ -109,7 +109,8 @@ describe.skipIf(!toolchain)("encoding a video with ffmpeg", () => {
     expect(Math.abs((encoded?.height ?? 0) - 945)).toBeLessThanOrEqual(1);
     expect(encoded?.webm).toMatch(/^video\/webm; codecs="(av01\.|vp9)/);
     expect(encoded?.mp4).toMatch(/^video\/mp4; codecs="avc1\.64/);
-    expect((await sharp(encoded?.files.poster).metadata()).format).toBe("webp");
+    const poster = await sharp(encoded?.files.poster).metadata();
+    expect([poster.format, poster.width]).toEqual(["webp", 1200]);
     for (const name of ["video.webm", "video.mp4"]) {
       const streams = execFileSync(
         "ffprobe",
@@ -128,6 +129,7 @@ describe.skipIf(!toolchain)("encoding a video with ffmpeg", () => {
     }
     const again = await encodeVideo({ file: source, cacheDir, toolchain: null });
     expect(again?.files.webm.equals(encoded?.files.webm ?? Buffer.alloc(0))).toBe(true);
+    expect((await sharp(again?.files.poster).metadata()).width).toBe(1200);
 
     const page = (poster: string) => `<video${poster} src="/media/videos/wide.mp4"></video>`;
     const publish = async (html: string) =>

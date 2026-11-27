@@ -221,6 +221,7 @@ export class LangWatchQLAccessModelService {
     return (
       `CREATE SETTINGS PROFILE OR REPLACE ${names.settingsProfile}\n` +
       `  SETTINGS ${names.tenantSetting} = '' CHANGEABLE_IN_READONLY,\n` +
+      `           log_comment = '' CHANGEABLE_IN_READONLY,\n` +
       `           readonly = 1 CONST,\n` +
       `           max_execution_time = ${limits.maxExecutionTimeSeconds} CONST,\n` +
       `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST,\n` +
@@ -231,7 +232,15 @@ export class LangWatchQLAccessModelService {
       `           read_overflow_mode = 'throw' CONST,\n` +
       `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
       `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
-      `           result_overflow_mode = 'throw' CONST`
+      `           result_overflow_mode = 'throw' CONST,\n` +
+      `           max_bytes_before_external_group_by = ${limits.maxBytesBeforeExternalGroupBy} CONST,\n` +
+      `           max_bytes_before_external_sort = ${limits.maxBytesBeforeExternalSort} CONST,\n` +
+      `           join_algorithm = '${limits.joinAlgorithm}' CONST,\n` +
+      `           max_bytes_in_join = ${limits.maxBytesInJoin} CONST,\n` +
+      `           log_query_settings = 0 CONST,\n` +
+      `           use_query_cache = 0 CONST,\n` +
+      `           use_query_condition_cache = 0 CONST,\n` +
+      `           allow_introspection_functions = 0 CONST`
     );
   }
 
@@ -315,18 +324,21 @@ export class LangWatchQLAccessModelService {
     names,
     sourceDatabase,
     includeAppFunctions = true,
+    localKeyMap = true,
   }: {
     names: LangWatchQLNames;
     sourceDatabase?: string;
     /** Off where a `CREATE FUNCTION` would reach one replica of several. */
     includeAppFunctions?: boolean;
+    /** Off where the key map is a PostgreSQL-engine table, created with the engine tables. */
+    localKeyMap?: boolean;
   }): string[] {
     this.assertNames(names);
 
     return [
       `CREATE DATABASE IF NOT EXISTS ${names.database}`,
       ...(includeAppFunctions ? appFunctionStatements.functionStatements() : []),
-      this.keyMapTableStatement({ names, sourceDatabase }),
+      ...(localKeyMap ? [this.keyMapTableStatement({ names, sourceDatabase })] : []),
     ];
   }
 }

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no peer: what it checks before each call comes from its own copies of its peers' facts.
 
-Peers call these through the token, declared at `../contract/src/instant-eval-judge.api.ts:20`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval-judge.api.ts:24`; nothing else in this package is public.
 
 #### `isClassifierConfigured`
 
@@ -40,6 +40,22 @@ One metered judge call: cloud only, unknown project, budget, classify, price, pr
 judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
 ```
 
+#### `judgeScenario`
+
+One metered scenario judge call, on LangWatch Cloud only: each criterion is routed alone as a `scenario_judge` question and the call is recorded as one priced fact. A refusal or an unavailable judge is returned, never thrown, and a verdict is never made up.
+
+```typescript
+judgeScenario(input: InstantEvalScenarioJudgeCall): Promise<InstantEvalScenarioJudgeAnswer>;
+```
+
+#### `isScenarioJudgeConfigured`
+
+Whether this install's route table can answer a scenario judge: it names a turn decision backend an enabled LLM backend can take. A run is refused before it starts where not.
+
+```typescript
+isScenarioJudgeConfigured(): Promise<boolean>;
+```
+
 #### `recordSpend`
 
 Prices and records what an Instant Evals run or judged query spent, under the organization the caller resolved, so no project is looked up (ADR-174 decision 13). Throws when the priced fact cannot be stored, so a run's finish retries onto the same request id.
@@ -50,7 +66,7 @@ recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
 
 #### `queryHoldPricing`
 
-The rates a judged query's budget hold is priced at: the dearest base input rate a routed call could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
+An unrouted judged query's hold rates: the dearest base input rate a search or LLM-judge route could reach (a scenario-only backend is left out), never below the classifier's (ADR-190 d7). A routed query is held at its cost ceiling instead (ADR-190 d13).
 
 ```typescript
 queryHoldPricing(): Promise<InstantEvalPricing>;
@@ -99,10 +115,11 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                      | Environment variable                    | Declared at                                       |
 | ------ | ------------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:78`            |
-| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:79`            |
-| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:80`            |
-| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:81`            |
+| secret | `classifierApiKey`        | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:82`            |
+| secret | `hostedDecisionsApiKey`   | `INSTANT_EVAL_DECISIONS_API_KEY`        | `src/app/instant-eval-judge.app.ts:83`            |
+| secret | `llmJudgeAnthropicApiKey` | `INSTANT_EVAL_ANTHROPIC_API_KEY`        | `src/app/instant-eval-judge.app.ts:84`            |
+| secret | `llmJudgeGeminiApiKey`    | `INSTANT_EVAL_GEMINI_API_KEY`           | `src/app/instant-eval-judge.app.ts:85`            |
+| secret | `llmJudgeOpenAiApiKey`    | `INSTANT_EVAL_OPENAI_API_KEY`           | `src/app/instant-eval-judge.app.ts:86`            |
 | config | `classifierBaseUrl`       | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:32` |
 | config | `classifierModel`         | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:40` |
 | config | `globalTokensPerSecond`   | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:42` |

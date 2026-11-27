@@ -151,6 +151,15 @@ describe("EventStoreProducerOnly", () => {
             beforeEventId: "event-1",
           }),
         ],
+        [
+          "probeEventsBefore",
+          store.probeEventsBefore({
+            aggregateId: "aggregate-1",
+            context: readContext,
+            aggregateType: "trace",
+            event: {} as Event,
+          }),
+        ],
       ];
 
       for (const [operation, read] of reads) {

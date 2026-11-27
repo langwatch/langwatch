@@ -130,15 +130,27 @@ function TeamSpendPanel({
   );
 
   const teams = teamsQuery.data ?? [];
-  const isLoading = teamsQuery.isLoading;
+  // `isPending`: until the organization resolves the query is disabled, which
+  // is not loading, yet it has no answer to call an empty window.
+  const isLoading = !orgId || teamsQuery.isPending;
   const isEmpty = !isLoading && teams.length === 0;
   const hasRows = !isLoading && teams.length > 0;
+  const alert = teamsQuery.error ? (
+    <HandledErrorAlert
+      error={teamsQuery.error}
+      fallbackTitle="Couldn't load team activity"
+      onRetry={() => void teamsQuery.refetch()}
+    />
+  ) : null;
+
+  // A failed read with no rows already on screen is only the failure: an
+  // empty card and "0 teams shown" would claim an answer the read never gave.
+  // A failed refresh keeps the rows it had, under the alert.
+  if (teamsQuery.error && !hasRows) return alert;
 
   return (
     <>
-      {teamsQuery.error ? (
-        <HandledErrorAlert error={teamsQuery.error} fallbackTitle="Couldn't load team activity" />
-      ) : null}
+      {alert}
 
       <Card variant="showcase" padding="none" bodyLayout="stack">
         {isLoading && (
@@ -149,11 +161,7 @@ function TeamSpendPanel({
         {isEmpty && (
           <NoDataInfoBlock
             icon={<Users />}
-            title={
-              teamsQuery.error
-                ? "Team activity could not be read."
-                : "No team activity this window."
-            }
+            title="No team activity this window."
             description="Team spend and requests appear here once connected sources report activity."
           />
         )}
@@ -168,9 +176,11 @@ function TeamSpendPanel({
           </ListTable>
         )}
       </Card>
-      <Text fontSize="xs" color="fg.muted">
-        {teams.length} team{teams.length === 1 ? "" : "s"} shown.
-      </Text>
+      {!isLoading && (
+        <Text fontSize="xs" color="fg.muted">
+          {teams.length} team{teams.length === 1 ? "" : "s"} shown.
+        </Text>
+      )}
     </>
   );
 }

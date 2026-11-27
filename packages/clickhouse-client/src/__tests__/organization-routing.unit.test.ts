@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import { ClickHouseConnection, ClickHouseNotConfiguredError } from "../connection.ts";
-import { routingDriver } from "../routingDriver.ts";
+import { CANCELLED_ON_CLIENT_CLOSE, routingDriver } from "../routingDriver.ts";
 import { createTenantRouter, parseRoutingTable } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
 
@@ -63,6 +63,7 @@ describe("organization routing", () => {
       expect(isolated.query).toHaveBeenCalledWith({
         query: sql,
         query_params: { organizationId: "org-private" },
+        clickhouse_settings: CANCELLED_ON_CLIENT_CLOSE,
         format: "JSONEachRow",
       });
     } finally {

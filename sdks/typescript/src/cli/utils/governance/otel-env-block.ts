@@ -154,14 +154,14 @@ export function buildOtelEnvBlock(
         ...base,
       };
     case "pi":
-      // The backend reading this block is our own extension (ADR-188), which
-      // autoconfigures from these names, so logs and metrics are switched off
-      // rather than left unset: unset would start an exporter with nothing to
-      // send. codex omits both names because it ships its own exporter.
+      // Our extension (ADR-188) reads only the traces names. Logs and metrics
+      // are pinned off for pi's own exporter when pi ships one, since unset
+      // would start it. Content capture is on, as for copilot.
       return {
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_LOGS_EXPORTER: "none",
         OTEL_METRICS_EXPORTER: "none",
+        OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=pi",

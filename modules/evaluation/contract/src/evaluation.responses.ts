@@ -7,6 +7,8 @@ import { singleEvaluationResultSchema } from "@langwatch/evaluator-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { evaluationOutcomeCursorSchema } from "./evaluation.queries.ts";
+
 /** Why an evaluator cannot run on this install, in the reader's terms. */
 const evaluatorUnavailabilitySchemaDefinition = z.object({
   /** What is true, in the person's terms. */
@@ -79,3 +81,34 @@ export const evaluatorSettingsSourceSchema = z.enum([
   "monitor-parameters",
 ]);
 export type EvaluatorSettingsSource = z.infer<typeof evaluatorSettingsSourceSchema>;
+
+/**
+ * One finished evaluation's outcome on its trace: `occurredAt` and `lastEventId` are the last
+ * event its run applied, so a peer orders it the way the live event would be ordered.
+ */
+const evaluationOutcomeSchemaDefinition = z.object({
+  evaluationId: z.string(),
+  traceId: z.string(),
+  evaluatorName: z.string().nullable(),
+  isGuardrail: z.boolean(),
+  status: z.enum(["processed", "error", "skipped"]),
+  passed: z.boolean().nullable(),
+  label: z.string().nullable(),
+  occurredAt: z.number().int(),
+  lastEventId: z.string(),
+});
+export interface EvaluationOutcomeSchema extends Named<typeof evaluationOutcomeSchemaDefinition> {}
+export const evaluationOutcomeSchema: EvaluationOutcomeSchema = evaluationOutcomeSchemaDefinition;
+export type EvaluationOutcome = z.infer<typeof evaluationOutcomeSchema>;
+
+/** A page of outcomes; `next` resumes after its last, null once none are left. */
+const evaluationOutcomePageSchemaDefinition = z.object({
+  outcomes: z.array(evaluationOutcomeSchema),
+  next: evaluationOutcomeCursorSchema.nullable(),
+});
+export interface EvaluationOutcomePageSchema extends Named<
+  typeof evaluationOutcomePageSchemaDefinition
+> {}
+export const evaluationOutcomePageSchema: EvaluationOutcomePageSchema =
+  evaluationOutcomePageSchemaDefinition;
+export type EvaluationOutcomePage = z.infer<typeof evaluationOutcomePageSchema>;

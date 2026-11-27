@@ -11,10 +11,10 @@ import {
   modelSelectionFrom,
 } from "../model-selection.ts";
 
-const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
+const BUILT_IN = { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
 
 describe("modelSelectionFrom", () => {
@@ -28,11 +28,34 @@ describe("modelSelectionFrom", () => {
         builtInModels: [BUILT_IN],
       });
 
-      expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-evals"]);
-      expect(selectOptions[0]?.label).toBe("Instant Evals");
+      expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-preview"]);
+      expect(selectOptions[0]?.label).toBe("LangWatch Instant (preview)");
       expect(groupedByProvider).toEqual([
-        { provider: BUILT_IN_MODELS_GROUP_KEY, label: "LangWatch", models: selectOptions },
+        { provider: BUILT_IN_MODELS_GROUP_KEY, label: "Decision models", models: selectOptions },
       ]);
+    });
+  });
+
+  describe("given a built-in model that sets its own line", () => {
+    /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
+    it("shows its own line over the catalogue's for the same id", () => {
+      const line = (description?: string) =>
+        modelSelectionFrom({
+          providers: [],
+          options: [],
+          mode: "chat",
+          featureKey: undefined,
+          builtInModels: [
+            {
+              value: "langwatch/instant-evals",
+              label: "LangWatch Evals (preview)",
+              ...(description ? { description } : {}),
+            },
+          ],
+        }).selectOptions[0]?.subtitle;
+
+      expect(line("Optimized for evals")).toBe("Optimized for evals");
+      expect(line()).toBe("Optimized for search and quick classification");
     });
   });
 
@@ -73,7 +96,7 @@ describe("modelSelectionFrom", () => {
     it("heads that one group once, and the provider's group by its own name", () => {
       const groups = grouped();
 
-      expect(groups.filter((group) => group.label === "LangWatch")).toHaveLength(1);
+      expect(groups.filter((group) => group.label === "Decision models")).toHaveLength(1);
       expect(groups[0]?.models.map((model) => model.value)).toEqual([
         BUILT_IN.value,
         OWN_DECISION_BUILT_IN.value,

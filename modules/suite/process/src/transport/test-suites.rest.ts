@@ -1,5 +1,4 @@
 import {
-  badRequestSchema,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
@@ -15,11 +14,16 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { deriveRunActor, type ScenarioTestSuite } from "@langwatch/scenario-contract";
 import {
+  appliedSuiteTemplateSchema,
+  applySuiteTemplateBodySchema,
   SuiteApi,
   SuiteNotFoundError,
+  suiteTemplateIdParamsSchema,
+  suiteTemplateSchema,
   testSuiteIdParamsSchema,
   testSuiteListQuerySchema,
   testSuiteArchiveResultSchema,
+  testSuiteNotFoundWireSchema,
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
@@ -34,7 +38,7 @@ import {
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
 
-const notFound = documentedResponses({ 404: badRequestSchema });
+const notFound = documentedResponses({ 404: testSuiteNotFoundWireSchema });
 
 /** What a route knows about the project and the person behind the credential. */
 type ProjectContext = z.output<typeof projectRequestContext.schema>;
@@ -182,6 +186,12 @@ async function runTestSuite(params: {
       ...(input.repeatCount !== undefined && { repeatCount: input.repeatCount }),
       ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
       ...(input.judgeModel !== undefined && { judgeModel: input.judgeModel }),
+      ...(input.traceQuietPeriodMs !== undefined && {
+        traceQuietPeriodMs: input.traceQuietPeriodMs,
+      }),
+      ...(input.traceWaitTimeoutMs !== undefined && {
+        traceWaitTimeoutMs: input.traceWaitTimeoutMs,
+      }),
     },
     idempotencyKey: input.idempotencyKey ?? `api-${generate("suite").toString()}`,
     ...(input.parameters !== undefined && { parameters: input.parameters }),
@@ -265,6 +275,53 @@ export function createTestSuitesRest(): Readonly<{
       }),
     )
 
+    .get("/templates", "listSuiteTemplates")
+    .withPermission("scenarios:view")
+    .withOutput(z.array(suiteTemplateSchema))
+    .withDocs({
+      tags: ["Test Suites"],
+      summary: "List suite templates",
+      description:
+        "List the suite templates that ship with LangWatch: archetypes of everyday behaviour tests and red team packs such as the OWASP Top 10 lists. Each carries its full scenario data, so a caller can preview what applying it creates.",
+    })
+    .handle(({ app, scope }) => app.listTemplates({ projectId: scope.id }))
+
+    .post("/templates/:templateId/apply", "applySuiteTemplate")
+    .keepsRecords()
+    .withParams(suiteTemplateIdParamsSchema)
+    .withInput(applySuiteTemplateBodySchema)
+    .withPermission("scenarios:manage")
+    .withAudit("suites.testSuites.applyTemplate")
+    .withOutput(appliedSuiteTemplateSchema)
+    .withStatus(201)
+    .withDocs({
+      tags: ["Test Suites"],
+      summary: "Apply a suite template",
+      description:
+        "Create a test suite from a template, with one scenario per template scenario filled from the fit: the agent's name, its tools and what it must never do. The suite name defaults to the template title. An unknown template id answers 404 suite_template_not_found.",
+      responses: notFound,
+    })
+    .withMiddlewareContext(projectRequestContext, suiteRunOrigin)
+    .handle(({ app, input, scope }, project, origin) =>
+      app.applyTemplate(
+        {
+          projectId: scope.id,
+          templateId: input.templateId,
+          fit: input.fit,
+          ...(input.name !== undefined && { name: input.name }),
+        },
+        {
+          id: project.actorId,
+          label: origin.surface?.toLowerCase() === "cli" ? "cli" : "api",
+        },
+        // A key with no person behind it writes no author: its id is no `User` row.
+        {
+          userId: project.viewerUserId,
+          label: origin.surface?.toLowerCase() === "cli" ? "cli" : "api",
+        },
+      ),
+    )
+
     .get("/:id", "getTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:view")
@@ -334,6 +391,7 @@ export function createTestSuitesRest(): Readonly<{
     .handle(({ app, input, scope }) => archiveTestSuite({ app, id: input.id, projectId: scope.id }))
 
     .post("/:id/run", "runTestSuite")
+    .spends()
     .keepsRecords()
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)

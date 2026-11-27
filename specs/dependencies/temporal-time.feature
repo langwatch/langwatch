@@ -161,6 +161,11 @@ Feature: Date and time arithmetic runs on Temporal
       Then it answers with an instant rather than a Date
 
     @unit
+    Scenario: The clock reads the present moment as epoch milliseconds
+      When a hot path asks only for the current epoch millisecond count
+      Then it answers with the system clock's count without building an instant
+
+    @unit
     Scenario: A Date arriving from a boundary becomes an instant naming the same moment
       Given a Date handed over by a store or an SDK that only speaks Date
       When it is converted at the boundary

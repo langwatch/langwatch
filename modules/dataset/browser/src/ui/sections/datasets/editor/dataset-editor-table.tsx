@@ -96,6 +96,8 @@ export type DatasetEditorController = {
 };
 
 const CHECKBOX_WIDTH_PX = 36;
+/** Below this a column's name and values stop being readable, so the grid scrolls sideways. */
+const MIN_COLUMN_WIDTH_PX = 160;
 /** The grid's id, so the selection bar can return focus to its select-all box. */
 const GRID_ID = "dataset-editor-grid";
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
@@ -532,15 +534,20 @@ function buildTableColumns({
       columnHelper.accessor((row) => row.dataset[column.id], {
         id: `dataset.${column.id}`,
         header: () => (
-          <HStack gap={1}>
-            <ColumnTypeIcon type={column.type} />
-            <Text textStyle="label">{column.name}</Text>
+          <HStack gap={1} minWidth={0}>
+            <Box as="span" display="inline-flex" flexShrink={0}>
+              <ColumnTypeIcon type={column.type} />
+            </Box>
+            <Text textStyle="label" truncate minWidth={0}>
+              {column.name}
+            </Text>
           </HStack>
         ),
         cell: (info) => info.getValue(),
         meta: {
           columnType: "dataset",
           columnId: column.id,
+          columnName: column.name,
           dataType: column.type,
         },
       }) as ColumnDef<DatasetTableRowData>,
@@ -865,6 +872,10 @@ export function DatasetEditorTable({
       store.getState().records.find((r) => r.id === recordId),
     [store],
   );
+  const resolveColumns = useCallback(
+    () => store.getState().columns.map((column) => column.name),
+    [store],
+  );
   const onStatus = useCallback(
     (state: AutosaveState, error?: string) => setAutosave(state, error),
     [setAutosave],
@@ -873,6 +884,7 @@ export function DatasetEditorTable({
     projectId: project?.id,
     pendingSavedChanges,
     resolveFullRecord,
+    resolveColumns,
     clearPendingChange,
     onStatus,
     // After a deletion settles, refresh the server total so the pager reflects
@@ -1078,6 +1090,7 @@ export function DatasetEditorTable({
 
       <Box
         width="full"
+        overflowX="auto"
         overflowY="auto"
         flex={layout.gridFlex}
         maxHeight={layout.gridMaxHeight}
@@ -1096,7 +1109,12 @@ export function DatasetEditorTable({
         }}
       >
         <DatasetTableProvider value={contextValue}>
-          <table ref={tableRef} id={GRID_ID} data-testid="dataset-editor-grid">
+          <table
+            ref={tableRef}
+            id={GRID_ID}
+            data-testid="dataset-editor-grid"
+            style={{ minWidth: CHECKBOX_WIDTH_PX + columns.length * MIN_COLUMN_WIDTH_PX }}
+          >
             <colgroup>
               <col style={{ width: CHECKBOX_WIDTH_PX }} />
               {columns.map((col) => (
@@ -1277,7 +1295,7 @@ function EditorPager({
 
 function HeaderCell({ header }: { header: Header<DatasetTableRowData, unknown> }) {
   return (
-    <th>
+    <th title={header.column.columnDef.meta?.columnName}>
       {header.isPlaceholder
         ? null
         : flexRender(header.column.columnDef.header, header.getContext())}

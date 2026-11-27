@@ -6,8 +6,12 @@ import {
   type GatewayInternalSpendSubmission,
   type GatewayPricedSpend,
   type GatewayPricedSpendResult,
+  type GatewayProviderUsage,
+  type GatewayProviderUsageResult,
+  spendUsageSchema,
   type SpendUsage,
 } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -22,8 +26,10 @@ import {
   asString,
   attributedIdentity,
   pricedSpendCommandData,
+  providerUsageCommandData,
   rejectedRecordIdentity,
 } from "../../../rules/gateway-spend-command.rules.ts";
+import type { GatewayGovernanceEventsService } from "../../../services/gateway-governance-events.service.ts";
 import type {
   GatewayInternalSpendPipeline,
   GatewaySpendCommandSender,
@@ -36,7 +42,11 @@ const logger = createLogger("langwatch:gateway-internal");
 type GatewaySpendCommandIngestMembers = Readonly<{
   spend: GatewayInternalSpendPipeline | undefined;
   store: GatewayInternalStoreRepository;
-  projects: Pick<ProjectApi, "listNamesByIds">;
+  projects: Pick<ProjectApi, "listNamesByIds" | "findWithTeam">;
+  /** The stored provider row a platform call ran on, when its caller did not name one. */
+  providerRows?: Pick<ModelProviderApi, "findRowServingModel" | "getExecutionProviders">;
+  /** Records a key's first admitted request; absent records none. */
+  firstRequests?: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest">;
 }>;
 
 export class GatewaySpendCommandIngestService {
@@ -55,6 +65,8 @@ export class GatewaySpendCommandIngestService {
     await enrichAttributedCommands({
       store: this.members.store,
       projects: this.members.projects,
+      // Only an admission can be a key's first request.
+      firstRequests: perCommand.admitSpend.length > 0 ? this.members.firstRequests : undefined,
       admits: perCommand.admitSpend,
       outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
     });
@@ -74,6 +86,61 @@ export class GatewaySpendCommandIngestService {
     await sender.send(pricedSpendCommandData(input));
 
     return { status: "recorded" } as const;
+  }
+
+  /**
+   * Appends one call LangWatch made with stored provider credentials. Rated here, at the same
+   * seam that prices a drained outcome, and attributed to the project's team and organization so
+   * the debit writer charges every budget it falls under (ADR-193).
+   */
+  async recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult> {
+    const pipeline = this.members.spend;
+    const sender = pipeline?.commands.confirmSpend;
+    if (!pipeline || !sender) return { status: "unavailable" } as const;
+    const project = await this.members.projects.findWithTeam(input.projectId);
+    if (!project) {
+      logger.error(
+        { projectId: input.projectId, requestId: input.requestId, model: input.model },
+        "provider usage not written to the ledger: the project has no team",
+      );
+      return { status: "unattributed" } as const;
+    }
+    const usage = spendUsageSchema.parse(input.usage);
+    const rated = pipeline.rating.rate({ model: input.model, usage });
+    await sender.send(
+      providerUsageCommandData({
+        input,
+        usage,
+        rated,
+        organizationId: project.team.organizationId,
+        teamId: project.team.id,
+        modelProviderId: input.modelProviderId ?? (await this.servingProviderId(input)),
+      }),
+    );
+
+    return { status: "recorded" } as const;
+  }
+
+  /** The row the execution path would pick: the one serving the model, else the provider's. */
+  private async servingProviderId({ projectId, model }: GatewayProviderUsage): Promise<string> {
+    const rows = this.members.providerRows;
+    const [provider = "", ...rest] = model.split("/");
+    const modelName = rest.join("/");
+    if (!rows || !provider || !modelName) return "";
+    try {
+      const serving = await rows.findRowServingModel({
+        projectId,
+        provider,
+        model: modelName,
+      });
+      if (serving) return serving.id;
+      const providers = await rows.getExecutionProviders({ projectId });
+      return providers[provider]?.id ?? "";
+    } catch (error) {
+      // The spend still lands under every budget that covers all providers.
+      logger.warn({ projectId, model, error }, "provider usage could not name its provider row");
+      return "";
+    }
   }
 }
 
@@ -228,6 +295,7 @@ type AttributionVirtualKey = {
   id: string;
   organizationId: string;
   principalUserId: string | null;
+  traceProjectId: string | null;
   lastUsedAt: Instant | null;
 };
 
@@ -251,6 +319,23 @@ async function touchAdmittedVirtualKeys(
   // billing records over it would cost the drainer a retry of records that
   // already appended.
   await store.touchVirtualKeysLastUsed({ virtualKeyIds: staleIds, now });
+}
+
+/**
+ * An admitted key whose `lastUsedAt` is still empty is serving its first request. Best effort
+ * like the touch: the recorder logs its own failure, and its idempotency key makes two batches
+ * that both saw the key unused record it once.
+ */
+async function recordFirstRequests(
+  firstRequests: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest"> | undefined,
+  virtualKeys: AttributionVirtualKey[],
+): Promise<void> {
+  if (!firstRequests) return;
+  await Promise.all(
+    virtualKeys
+      .filter((vk) => vk.lastUsedAt === null)
+      .map((vk) => firstRequests.recordVkFirstRequest(vk)),
+  );
 }
 
 /**
@@ -289,11 +374,13 @@ function reportAttributionGaps({
 async function enrichAttributedCommands({
   store,
   projects: projectDirectory,
+  firstRequests,
   admits,
   outcomes,
 }: {
   store: GatewayInternalStoreRepository;
   projects: Pick<ProjectApi, "listNamesByIds">;
+  firstRequests: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest"> | undefined;
   admits: Record<string, unknown>[];
   outcomes: Record<string, unknown>[];
 }): Promise<void> {
@@ -335,11 +422,9 @@ async function enrichAttributedCommands({
   // a second time, so touching on both would double the writes to say the same
   // thing.
   const admittedKeyIds = new Set(identities.slice(0, admits.length).map((i) => i.virtualKeyId));
-  await touchAdmittedVirtualKeys(
-    store,
-    virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
-    nowInstant(),
-  );
+  const admittedKeys = virtualKeys.filter((vk) => admittedKeyIds.has(vk.id));
+  await recordFirstRequests(firstRequests, admittedKeys);
+  await touchAdmittedVirtualKeys(store, admittedKeys, nowInstant());
 }
 
 /**

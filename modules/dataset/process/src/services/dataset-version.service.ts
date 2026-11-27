@@ -111,6 +111,16 @@ export class DatasetVersionService {
     return this.#writeVersion({ dataset, latest, input });
   }
 
+  /**
+   * Whether the dataset holds any row now. Stops at the first row: one record page
+   * or one chunk, except a legacy single-file dataset, whose file is read whole.
+   */
+  async hasRows(input: { projectId: string; datasetId: string }): Promise<boolean> {
+    const dataset = await this.#readyDataset(input);
+    for await (const _row of this.#currentRows(dataset)) return true;
+    return false;
+  }
+
   /** The versions, newest first, and whether the dataset's layout lets one be restored. */
   async history(input: {
     projectId: string;
@@ -475,8 +485,10 @@ export class DatasetVersionService {
     }
 
     const entries = rows.map((row) => ({ ...row.entry, id: row.id }));
-    await this.deps.records.replaceAll({ datasetId, projectId, entries });
-    await this.deps.content.update({ id: datasetId, projectId, data: { columnTypes: columns } });
+    await this.deps.records.withDatasetLock({ datasetId, projectId }, async (records) => {
+      await records.replaceAll({ datasetId, projectId, entries });
+      await records.setColumnTypes(columns);
+    });
     logger.info({ projectId, datasetId, rows: rows.length }, "Restored a dataset version in place");
   }
 

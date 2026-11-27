@@ -6,7 +6,7 @@
 
 import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -164,7 +164,8 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
           ProviderSlot: "",
           DurationMS: 120,
           Status: "success",
-          OccurredAt: occurredAt,
+          // A Date, as insertDebit writes it: 26.8 reads an unquoted integer here as seconds.
+          OccurredAt: toDate(tzOccurredAt),
           EventTimestamp: occurredAt,
         })),
         format: "JSONEachRow",

@@ -2,6 +2,8 @@ import type { Named } from "@langwatch/module";
 import {
   evaluatorAttachmentsSchema,
   suiteFieldDefinitionsSchema,
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
@@ -20,6 +22,8 @@ const suiteDefinitionFieldsSchema = z
     labels: z.array(z.string()),
     simulatorModel: z.string().nullable().optional(),
     judgeModel: z.string().nullable().optional(),
+    traceQuietPeriodMs: traceQuietPeriodMsSchema.nullable().optional(),
+    traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullable().optional(),
   })
   .strict();
 

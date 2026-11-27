@@ -27,6 +27,26 @@ export class LangWatchQLNotEnabledError extends HandledError {
 }
 
 /**
+ * The organisation's data is on a server LangWatchQL is not provisioned on: its own ClickHouse,
+ * or an install with no access model yet. Refused before any SQL runs (ADR-200).
+ */
+export class LangWatchQLNotProvisionedError extends HandledError {
+  declare readonly code: "lwql_not_provisioned";
+
+  constructor() {
+    super(
+      "lwql_not_provisioned",
+      "LangWatchQL is not provisioned on the server that holds this organisation's data.",
+      {
+        httpStatus: 403,
+        ...remediation("lwql_not_provisioned"),
+      },
+    );
+    this.name = "LangWatchQLNotProvisionedError";
+  }
+}
+
+/**
  * The result is larger than one response carries: refused outright, never cut. Raised from the
  * profile's `max_result_rows` / `max_result_bytes` backstop (TOO_MANY_ROWS_OR_BYTES); the raw
  * driver error rides in `reasons` for the logs only. `customer` fault, 413.
@@ -48,22 +68,22 @@ export class LangWatchQLResultTooLargeError extends HandledError {
 
 /**
  * Executor not provisioned or catalog missing; ACCESS_DENIED is separate
- * ({@link LangWatchQLProvisioningIncompleteError}).
+ * ({@link LangWatchQLProvisioningIncompleteError}). `message` narrows it to one
+ * organization's private ClickHouse; it never carries a URL.
  */
 export class LangWatchQLUnavailableError extends HandledError {
   declare readonly code: "lwql_unavailable";
 
-  constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "lwql_unavailable",
-      "The LangWatchQL analytics SQL API is not available on this deployment.",
-      {
-        httpStatus: 503,
-        fault: "platform",
-        ...remediation("lwql_unavailable"),
-        ...options,
-      },
-    );
+  constructor({
+    message = "The LangWatchQL analytics SQL API is not available on this deployment.",
+    ...options
+  }: { message?: string; reasons?: readonly Error[] } = {}) {
+    super("lwql_unavailable", message, {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("lwql_unavailable"),
+      ...options,
+    });
     this.name = "LangWatchQLUnavailableError";
   }
 }

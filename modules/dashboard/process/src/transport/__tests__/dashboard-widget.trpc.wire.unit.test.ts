@@ -123,7 +123,7 @@ describe("the dashboard widgets tRPC namespace", () => {
           graph: {
             version: 1,
             code: WIDGET.code,
-            queries: WIDGET.queries.map((query) => ({ ...query, sources: ["application"] })),
+            queries: WIDGET.queries,
           },
         }),
       ]);

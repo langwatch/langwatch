@@ -80,6 +80,17 @@ Feature: Composing the join-request ledger in a background worker
     Then the personal project link reaches the expiry mail
     And a requester with no personal project gets no link
 
+  # The personal project may sit in any organization, so the lookup is bounded
+  # by its owner, not by an organization; the tenancy guard admits that read only.
+  @integration
+  Scenario: An expired request tells the requester, with a link to their personal project when they have one
+    Given the organization tenancy guard is in force
+    And a requester who owns a personal project in another organization
+    When their request lapses
+    Then the expiry mail reaches them with a link to that personal project
+    And a requester with no personal project is still told, with no link
+    And a read of teams by owner that is not of personal teams is still refused
+
   @unit
   Scenario: The auto-join notifier reads the same seat census as invitations
     Given an organization on a self-serve plan below its seat ceiling

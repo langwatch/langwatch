@@ -111,4 +111,34 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
       }),
     );
   });
+
+  /** @scenario "A pull run completing after the source is disabled does not re-enable it" */
+  it("writes the delivered-events status only onto a source that is still live", async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = prismaDouble({
+      ingestionPullRunProjection: { upsert: vi.fn().mockResolvedValue(undefined) },
+      ingestionSource: { updateMany },
+    });
+    const prisma = prismaDouble({ $transaction: vi.fn(async (callback) => callback(tx)) });
+    const repository = PrismaIngestionPullRunProjectionRepository.create(prisma);
+
+    await repository.store(storedProjection(), {
+      aggregateId: SOURCE_ID,
+      tenantId: createTenantId(PROJECT_ID),
+    });
+
+    const writes = updateMany.mock.calls.map(
+      ([args]) => args as { where: Record<string, unknown>; data: Record<string, unknown> },
+    );
+    const statusWrites = writes.filter((write) => "status" in write.data);
+    expect(statusWrites).toHaveLength(1);
+    expect(statusWrites[0]?.where).toMatchObject({
+      id: SOURCE_ID,
+      status: { in: ["active", "awaiting_first_event"] },
+    });
+    expect(writes.find((write) => !("status" in write.data))?.data).toMatchObject({
+      pollerCursor: "cursor-2",
+      errorCount: 0,
+    });
+  });
 });

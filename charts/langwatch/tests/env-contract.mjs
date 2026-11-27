@@ -155,6 +155,8 @@ const VALUE_SETS = {
     "autogen.enabled=true",
   ],
   full: ["-f", join(chart, "tests/values-e2e-full.yaml"), "--set", "autogen.enabled=true"],
+  // The PII redaction model on: PII_REDACTION_MODEL_ENDPOINT and its forced flags.
+  pii: ["--set", "autogen.enabled=true", "--set", "piiRedactionModel.enabled=true"],
   // SSO, a forced flag and an operator variable: the branches parity is easiest to lose on.
   sso: [
     "--set",

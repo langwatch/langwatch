@@ -31,6 +31,7 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

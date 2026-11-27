@@ -1,10 +1,15 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  dashboardScopeSchema,
+  dashboardHomeProductSchema,
+  DashboardHomeNeedsOrgScopeError,
   DashboardNotFoundError,
+  dashboardScopeAfterMove,
+  dashboardScopeSchema,
   DashboardScopeAuthorOnlyError,
+  homeAllowsScope,
   isDashboardAuthor,
-  type Dashboard,
+  type Board,
+  type DashboardHomeProduct,
   type DashboardProject,
   type DashboardScope,
   type DashboardScopeImpact,
@@ -22,9 +27,12 @@ type BoardAsk = Readonly<{ projectId: string; dashboardId: string; viewer: Dashb
 /** The most projects one Project chip lists; an organization with more shows its first by name. */
 const MAX_SCOPE_PROJECTS = 500;
 
+const projectOf = ({ id, name, slug }: DashboardProject): DashboardProject => ({ id, name, slug });
+
 /**
- * Changing who sees a board. Only its author does, in the project that owns it; a project
- * administrator is refused like any other member. Spec: dashboards-v2.feature AC174 to AC182.
+ * Changing who sees a board, and the product it is homed in. Only its author changes the scope,
+ * in the project that owns it; a project administrator is refused like any other member.
+ * Spec: dashboards-v2.feature AC174 to AC182; dashboards-organization-area.feature (Move).
  */
 export class DashboardScopeService {
   #repository: BoardRepository;
@@ -53,20 +61,49 @@ export class DashboardScopeService {
     return new DashboardScopeService(options);
   }
 
-  async setScope(input: BoardAsk & { scope: DashboardScope }): Promise<Dashboard> {
+  async setScope(input: BoardAsk & { scope: DashboardScope }): Promise<Board> {
     const scope = dashboardScopeSchema.parse(input.scope);
     const board = await this.#authored(input);
     if (board.scope === scope) return board;
-
-    // Stamped once and kept: it is what lists the board in the organization's other projects.
-    const organizationId =
-      scope === "ORGANIZATION" ? await this.#projects.getOrganizationId(board.projectId) : void 0;
+    if (!homeAllowsScope({ homeProduct: board.homeProduct, scope })) {
+      throw new DashboardHomeNeedsOrgScopeError(board.homeProduct);
+    }
 
     return this.#repository.updateBoard({
       projectId: board.projectId,
       dashboardId: board.id,
-      data: { scope, ...(organizationId === void 0 ? {} : { organizationId }) },
+      data: { scope, ...(await this.#organizationStamp({ board, scope })) },
     });
+  }
+
+  /**
+   * Rehomes a board the member may write here; its owning project never changes. A Project board
+   * leaving LLM Ops becomes Only me in the same write, its author's call alone, as setScope is.
+   */
+  async move(input: BoardAsk & { homeProduct: DashboardHomeProduct }): Promise<Board> {
+    const homeProduct = dashboardHomeProductSchema.parse(input.homeProduct);
+    const board = await this.#access.getWritable(input);
+    if (board.homeProduct === homeProduct) return board;
+
+    const scope = dashboardScopeAfterMove({ board, viewer: input.viewer, homeProduct });
+    if (scope === "author-only") throw new DashboardScopeAuthorOnlyError();
+    return this.#repository.updateBoard({
+      projectId: board.projectId,
+      dashboardId: board.id,
+      data: { homeProduct, ...(scope === board.scope ? {} : { scope }) },
+    });
+  }
+
+  /** Stamped once and kept: it is what lists the board in the organization's other projects. */
+  async #organizationStamp({
+    board,
+    scope,
+  }: {
+    board: Board;
+    scope: DashboardScope;
+  }): Promise<{ organizationId?: string }> {
+    if (scope !== "ORGANIZATION") return {};
+    return { organizationId: await this.#projects.getOrganizationId(board.projectId) };
   }
 
   /** What a narrower scope would take from other members; the author's to read. */
@@ -88,7 +125,7 @@ export class DashboardScopeService {
     const found = await this.#access.findReadable(input);
     const organizationId = found?.board.organizationId ?? null;
     if (!found || found.board.scope !== "ORGANIZATION" || organizationId === null) {
-      throw new DashboardNotFoundError(input.projectId);
+      throw new DashboardNotFoundError({ projectId: input.projectId });
     }
 
     const projectIds = await this.#projects.findLiveNonGovernanceIdsByOrganization({
@@ -106,7 +143,7 @@ export class DashboardScopeService {
     });
 
     const owner = candidates.find(({ id }) => id === found.board.projectId);
-    if (!owner) throw new DashboardNotFoundError(input.projectId);
+    if (!owner) throw new DashboardNotFoundError({ projectId: input.projectId });
     return {
       ownerProject: projectOf(owner),
       projects: candidates
@@ -117,7 +154,7 @@ export class DashboardScopeService {
   }
 
   /** The member's own board, in the project that owns it; anyone else is refused by name. */
-  async #authored(input: BoardAsk): Promise<Dashboard> {
+  async #authored(input: BoardAsk): Promise<Board> {
     const board = await this.#access.getWritable(input);
     if (!isDashboardAuthor({ board, viewer: input.viewer })) {
       throw new DashboardScopeAuthorOnlyError();
@@ -125,5 +162,3 @@ export class DashboardScopeService {
     return board;
   }
 }
-
-const projectOf = ({ id, name, slug }: DashboardProject): DashboardProject => ({ id, name, slug });

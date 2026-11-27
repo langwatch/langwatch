@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
@@ -1073,7 +1073,7 @@ export class EventSourcing {
   }
 
   private globalQueueScore(payload: Record<string, unknown>): number {
-    return readJobRouting(payload)?.score ?? nowInstant().epochMilliseconds;
+    return readJobRouting(payload)?.score ?? nowEpochMs();
   }
 
   private globalQueueSpanAttributes(payload: Record<string, unknown>) {

@@ -14,6 +14,8 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLPostgresGapsService } from "../../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   type LwqlAppOwnedDrift,
@@ -26,7 +28,10 @@ import {
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import type {
+  LwqlProvisioningDatabase,
+  LwqlScopedViewState,
+} from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
@@ -46,11 +51,21 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .map((view) => view.sourceTable);
 const READER_PASSWORD = "reader-reconvergence-secret";
 const converged: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
+/** This suite's PostgreSQL has no scoped-reader group. */
+const NO_GROUP: LwqlScopedViewState = {
+  groupExists: false,
+  scopedSchema: "absent",
+  groupOnShared: [],
+  copies: [],
+};
 
 function repositoryOver(client: ClickHouseClient) {
   return ClickHouseLangWatchQLProvisioningRepository.create({
@@ -160,10 +175,12 @@ describe("given a rendered install whose config store has not mounted the named 
     );
     // Production provisions into the application's own database, which holds the fact tables.
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // A reused container keeps the facts database, so the app-owned objects go first.
+    await harness.dropNamedCollection(collection);
     await harness.applyAsAdmin([
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
       ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
       ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
     ]);
@@ -171,10 +188,10 @@ describe("given a rendered install whose config store has not mounted the named 
 
   afterAll(async () => {
     // A reused container reloads each table at restart; one whose collection is gone never loads.
-    await harness?.applyAsAdmin([
-      ...ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
-      `DROP NAMED COLLECTION IF EXISTS ${collection}`,
-    ]);
+    await harness?.applyAsAdmin(
+      ENGINE_TABLES.map((table) => `DROP TABLE IF EXISTS ${names.database}.${table}`),
+    );
+    await harness?.dropNamedCollection(collection);
     await connection?.closeOnce();
     await Promise.all([harness?.stop(), postgres?.stop()]);
   });
@@ -190,15 +207,15 @@ describe("given a rendered install whose config store has not mounted the named 
         role: postgres.readerRole,
         views,
       });
-      expect(selfProvisioning.findPostgresGaps({ found: granted })).toEqual([]);
+      expect(postgresGaps.findGaps({ found: granted, scoped: NO_GROUP })).toEqual([]);
 
       const absent = await repository.findApprovedViews({
         schema: "public",
         role: "lwql_role_that_does_not_exist",
         views,
       });
-      expect(selfProvisioning.findPostgresGaps({ found: absent })).toEqual(
-        views.map((view) => ({ view, absent: false })),
+      expect(postgresGaps.findGaps({ found: absent, scoped: NO_GROUP })).toEqual(
+        views.map((view) => ({ kind: "shared", view, absent: false })),
       );
     });
   });
@@ -218,8 +235,8 @@ describe("given a rendered install whose config store has not mounted the named 
       const before = await findLwqlAppOwnedDrift({ database: database(), plan: plan() });
       expect(before.clickHouse).toEqual(expect.arrayContaining(ENGINE_TABLES));
       expect(before.postgres).toEqual([
-        { view: dropped, absent: true },
-        { view: revoked, absent: false },
+        { kind: "shared", view: dropped, absent: true },
+        { kind: "shared", view: revoked, absent: false },
       ]);
 
       for (let checks = 0; checks < 2; checks++) {

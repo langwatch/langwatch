@@ -16,7 +16,8 @@ export function storedObjectMetadataOf(value: StoredObjectRecord): StoredObjectM
     mediaType: value.mediaType,
     filename: value.filename,
     mediaTypeVerified: value.mediaTypeVerified,
-    status: value.status,
+    // Bytes still streaming through the process read as the pending upload they are.
+    status: value.status === "uploading" ? "pending" : value.status,
     audiences: [...value.audiences],
     generation: value.generation,
     provenance: {

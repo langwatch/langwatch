@@ -1,12 +1,15 @@
 /**
- * Runs findOtherSessionKind's two-probe SQL against real ClickHouse.
+ * Runs findOtherSessionKind's index read and two-probe SQL against real ClickHouse.
  * @see modules/coding-agent/specs/coding-agent-session-stored.feature
  */
 import { randomUUID } from "node:crypto";
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { vendorQueryClient } from "@langwatch/clickhouse-client/testing";
+import {
+  readyIdIndexedClientDouble,
+  vendorQueryClient,
+} from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -18,7 +21,10 @@ import {
 } from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { CODING_AGENT_ID_INDEXES } from "../clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
-import type { OtherSessionKind } from "../coding-agent-session.repository.ts";
+import {
+  type OtherSessionKind,
+  SessionIdIndexNotReadyError,
+} from "../coding-agent-session.repository.ts";
 
 const clickHouseUrl = testClickHouseUrl();
 const baseMs = Date.now();
@@ -34,27 +40,41 @@ class FixedClock implements CodingAgentClock {
 
 let ch: ClickHouseClient;
 let sessions: CodingAgentSessionClickHouseRepository;
+/** The same repository while the id index's fill has not finished. */
+let unready: CodingAgentSessionClickHouseRepository;
 
-beforeAll(() => {
-  if (clickHouseUrl === null) return;
-  ch = createTestClickHouseClient(clickHouseUrl);
-  sessions = CodingAgentSessionClickHouseRepository.create({
-    clickhouse: vendorQueryClient({
-      vendor: ch,
-      indexes: CODING_AGENT_ID_INDEXES,
-    }) as ClickHouseQueryClient,
+const repositoryOver = (clickhouse: ClickHouseQueryClient) =>
+  CodingAgentSessionClickHouseRepository.create({
+    clickhouse,
     defaultTraceRetentionDays: 30,
     metrics: NoopCodingAgentReadMetricsService.create(),
     clock: new FixedClock(),
   });
+
+beforeAll(async () => {
+  if (clickHouseUrl === null) return;
+  ch = createTestClickHouseClient(clickHouseUrl);
+  const vendor = vendorQueryClient({ vendor: ch, indexes: CODING_AGENT_ID_INDEXES });
+  sessions = repositoryOver(
+    await readyIdIndexedClientDouble({
+      indexes: CODING_AGENT_ID_INDEXES,
+      driver: {
+        execute: async (request) => vendor.query(request),
+        insert: async (request) => vendor.insert(request),
+      },
+    }),
+  );
+  unready = repositoryOver(vendor);
 });
 
 afterAll(async () => {
   if (clickHouseUrl === null) return;
-  await ch.exec({
-    query: "ALTER TABLE coding_agent_sessions DELETE WHERE TenantId IN {tenants:Array(String)}",
-    query_params: { tenants },
-  });
+  for (const table of ["coding_agent_sessions", "coding_agent_sessions_id_index"]) {
+    await ch.exec({
+      query: `ALTER TABLE ${table} DELETE WHERE TenantId IN {tenants:Array(String)}`,
+      query_params: { tenants },
+    });
+  }
   await ch.close();
 });
 
@@ -101,12 +121,25 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions other-session kin
   });
 
   // Row-level probe, no dedup: the older non-auxiliary version still matches. That can only
-  // mistake a helper for main, which reads as "not first" (the safe side).
+  // mistake a helper for main, which reads as "not first" (the safe side). Merges stay stopped
+  // until the probe has read, so a background merge cannot fold the two versions first.
   it("reads a helper whose earlier version was not yet auxiliary as main", async () => {
     const tenantId = tenantFor("refold");
-    await store(tenantId, "h1", false);
-    await store(tenantId, "h1", true);
+    await ch.command({ query: "SYSTEM STOP MERGES coding_agent_sessions" });
+    try {
+      await store(tenantId, "h1", false);
+      await store(tenantId, "h1", true);
 
-    expect(await kindOf(tenantId, ["x"])).toBe("main");
+      expect(await kindOf(tenantId, ["x"])).toBe("main");
+    } finally {
+      await ch.command({ query: "SYSTEM START MERGES coding_agent_sessions" });
+    }
+  });
+
+  /** @scenario "A history check fails closed while the session id index is not ready" */
+  it("refuses rather than scan while the session id index is not ready", async () => {
+    await expect(
+      unready.findOtherSessionKind({ tenantId: tenantFor("main"), excludeSessionIds: ["x"] }),
+    ).rejects.toBeInstanceOf(SessionIdIndexNotReadyError);
   });
 });

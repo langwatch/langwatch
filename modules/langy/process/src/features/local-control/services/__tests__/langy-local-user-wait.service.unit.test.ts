@@ -520,6 +520,123 @@ describe("given a question Langy asked mid-task", () => {
   });
 });
 
+describe("given a stopped turn with two cards waiting on commands", () => {
+  async function twoPermissions() {
+    const first = await startPermission();
+    const second = await service.startPermission({
+      projectId,
+      conversationId,
+      turnId,
+      toolCallId: "toolu_3",
+      callId: "lcall_2",
+      summary: "pnpm lint",
+      pattern: "pnpm *",
+      patterns: ["pnpm *"],
+      reason: "The command is not on the read-only list.",
+      skipOffered: true,
+      workspaceName: "acme-app",
+      hostname: "dev-laptop",
+    });
+    return { first, second };
+  }
+
+  function serviceOver({
+    waitStore = store,
+    send = sendPermission as never,
+  }: {
+    waitStore?: SessionStateStore;
+    send?: never;
+  }) {
+    return UserWaitService.create({
+      waits: LangyLocalUserWaitRedisRepository.create({ store: waitStore }),
+      events,
+      buffer,
+      sendPermission: send,
+      now: () => now,
+      pollIntervalMs: 1,
+    });
+  }
+
+  async function stateOf(waitId: string) {
+    return (await service.getWait(waitId)).state;
+  }
+
+  const sentCallIds = () =>
+    sendPermission.mock.calls.map(([args]) => (args as { callId: string }).callId).toSorted();
+
+  describe("when saving one card as cancelled fails", () => {
+    /** @scenario One card that fails to end on Stop leaves the turn's other cards ending */
+    it("ends the other card, keeps the failed one waiting and answers only the other", async () => {
+      const { first, second } = await twoPermissions();
+      const failing = serviceOver({
+        waitStore: {
+          ...store,
+          async set(key: string, value: string, ttlSeconds: number) {
+            if (key === waitKey(first.waitId) && value.includes('"state":"cancelled"')) {
+              throw new Error("redis connection reset");
+            }
+            return store.set(key, value, ttlSeconds);
+          },
+        },
+      });
+
+      const cancelled = await failing.cancelTurn({ conversationId, turnId });
+
+      expect(cancelled.map((wait) => wait.waitId)).toEqual([second.waitId]);
+      expect(await stateOf(first.waitId)).toBe("pending");
+      expect(await stateOf(second.waitId)).toBe("cancelled");
+      expect(events.ended).toHaveLength(1);
+      expect(events.ended[0]).toMatchObject({ waitId: second.waitId, outcome: "cancelled" });
+      expect(sentCallIds()).toEqual(["lcall_2"]);
+    });
+  });
+
+  describe("when ending one card fails", () => {
+    /** @scenario One card that fails to end on Stop leaves the turn's other cards ending */
+    it("reads both as cancelled and still answers both commands", async () => {
+      const { first, second } = await twoPermissions();
+      const endUserWait = events.endUserWait.bind(events);
+      events.endUserWait = async (data) => {
+        if ((data as { waitId: string }).waitId === first.waitId) {
+          throw new Error("event store down");
+        }
+        return endUserWait(data);
+      };
+
+      const cancelled = await service.cancelTurn({ conversationId, turnId });
+
+      expect(cancelled).toHaveLength(2);
+      expect(await stateOf(first.waitId)).toBe("cancelled");
+      expect(await stateOf(second.waitId)).toBe("cancelled");
+      expect(events.ended).toHaveLength(1);
+      expect(events.ended[0]).toMatchObject({ waitId: second.waitId, outcome: "cancelled" });
+      expect(sentCallIds()).toEqual(["lcall_1", "lcall_2"]);
+    });
+  });
+
+  describe("when answering one command fails", () => {
+    /** @scenario One card that fails to end on Stop leaves the turn's other cards ending */
+    it("still ends both cards and tries the answer for both", async () => {
+      const { first, second } = await twoPermissions();
+      const failingSend = vi.fn(async (args: { callId: string }) => {
+        if (args.callId === "lcall_1") throw new Error("folder unreachable");
+      });
+      const failing = serviceOver({ send: failingSend as never });
+
+      const cancelled = await failing.cancelTurn({ conversationId, turnId });
+
+      expect(cancelled).toHaveLength(2);
+      expect(events.ended.map((e) => (e as { waitId: string }).waitId).toSorted()).toEqual(
+        [first.waitId, second.waitId].toSorted(),
+      );
+      expect(failingSend.mock.calls.map(([args]) => args.callId).toSorted()).toEqual([
+        "lcall_1",
+        "lcall_2",
+      ]);
+    });
+  });
+});
+
 describe("given a card in the turn's pending set that cannot be read", () => {
   it("skips the corrupt member and lists the rest", async () => {
     const permission = await startPermission();

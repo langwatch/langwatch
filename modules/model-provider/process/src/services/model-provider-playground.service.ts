@@ -14,9 +14,11 @@ import {
 import { streamText, type ModelMessage } from "ai";
 
 import { getProjectModelProviders } from "../rules/legacy-model-provider.rules.ts";
+import type { ModelProviderUsageMeteringService } from "./model-provider-usage-metering.service.ts";
 
 type PlaygroundProvider = Readonly<{
   id: string;
+  provider: string;
   enabled: boolean;
   customKeys: Record<string, unknown> | null;
 }>;
@@ -28,12 +30,14 @@ export class ModelProviderPlaygroundService {
   readonly #projects: ProjectApi;
   readonly #executionProxyBaseUrl: string;
   readonly #nlpInternalSecret: string | undefined;
+  readonly #metering: Pick<ModelProviderUsageMeteringService, "metered"> | undefined;
 
   private constructor(options: Parameters<typeof ModelProviderPlaygroundService.create>[0]) {
     this.#modelProviders = options.modelProviders;
     this.#projects = options.projects;
     this.#executionProxyBaseUrl = options.executionProxyBaseUrl;
     this.#nlpInternalSecret = options.nlpInternalSecret;
+    this.#metering = options.metering;
   }
 
   static create(options: {
@@ -43,6 +47,8 @@ export class ModelProviderPlaygroundService {
     executionProxyBaseUrl: string;
     /** The engine hop's shared credential, as the process resolved it. */
     nlpInternalSecret?: string | undefined;
+    /** Writes each completion's usage to the spend ledger; absent writes nothing. */
+    metering?: Pick<ModelProviderUsageMeteringService, "metered">;
   }): ModelProviderPlaygroundService {
     return new ModelProviderPlaygroundService(options);
   }
@@ -78,8 +84,16 @@ export class ModelProviderPlaygroundService {
     });
 
     try {
+      const model = vercelProvider(input.model);
       const result = streamText({
-        model: vercelProvider(input.model),
+        model: this.#metering
+          ? this.#metering.metered(model, {
+              projectId: input.projectId,
+              model: `${chosen.provider.provider}/${input.model.split("/").slice(1).join("/")}`,
+              modelProviderId: chosen.provider.id,
+              featureKey: "playground",
+            })
+          : model,
         system: input.systemPrompt?.trim() ? input.systemPrompt : undefined,
         messages: input.messages as ModelMessage[],
         maxRetries: chosen.provider.customKeys ? 1 : 3,

@@ -253,7 +253,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which needs `ingress.enabled` and `gateway.chartManaged`. The chart-managed gateway Ingress is a second Ingress for `/v1`, `/a2a` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|

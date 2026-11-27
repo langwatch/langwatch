@@ -1,6 +1,6 @@
 /**
- * The server half of `dataRetention.*`: a permission and a handler per procedure the contract
- * already named. A scope write asks the permission its target needs, on the target, at the door.
+ * The server half of `dataRetention.*`. A scope write asks its target's permission at the door;
+ * a length that bills storage asks `subscription:manage` on the organization instead.
  * Spec: modules/data-retention/specs/data-retention-scope-writes.feature
  */
 
@@ -36,6 +36,18 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   .withPermission(WRITE_ON_SCOPE)
   .handle(async ({ app, input, actor }) =>
     app.changeScopeRetention({
+      organizationId: input.organizationId,
+      scope: input.scope,
+      category: input.category,
+      retentionDays: input.retentionDays,
+      userId: actor.id,
+    }),
+  )
+
+  .procedure("setBilledForScope")
+  .withPermission("subscription:manage")
+  .handle(async ({ app, input, actor }) =>
+    app.changeBilledScopeRetention({
       organizationId: input.organizationId,
       scope: input.scope,
       category: input.category,
@@ -99,5 +111,37 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
       scope: input.scope,
       userId: actor.id,
     }),
+  )
+
+  .procedure("getStoredPastRetention")
+  .withPermission(WRITE_ON_SCOPE)
+  .handle(async ({ app, input, actor }) =>
+    app.getStoredPastRetention({
+      projectId: input.projectId,
+      scope: input.scope,
+      userId: actor.id,
+    }),
+  )
+
+  .procedure("applyScopeRetentionToStoredData")
+  .withPermission(WRITE_ON_SCOPE)
+  .handle(async ({ app, input, actor }) => {
+    await app.applyScopeRetentionToStoredData({
+      organizationId: input.organizationId,
+      scope: input.scope,
+      userId: actor.id,
+    });
+  })
+
+  .procedure("getOrganizationStorageEstimate")
+  .withPermission("subscription:upgrade")
+  .handle(async ({ app, input }) =>
+    app.getOrganizationStorageEstimate({ organizationId: input.organizationId }),
+  )
+
+  .procedure("getOrganizationRetention")
+  .withPermission("organization:view")
+  .handle(async ({ app, input }) =>
+    app.getOrganizationRetention({ organizationId: input.organizationId }),
   )
   .build();

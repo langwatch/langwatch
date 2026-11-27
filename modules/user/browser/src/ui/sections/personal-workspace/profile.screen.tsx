@@ -1,6 +1,6 @@
 /**
  * Profile: who I am here, how I get in, where I am signed in, what keys act
- * as me. Four bands, each a narrower kind of "you" than the one above it.
+ * as me, and which emails I get. Five bands, each a narrower kind of "you" than the one above it.
  * Spec: specs/settings/profile.feature
  */
 
@@ -9,6 +9,7 @@ import { Box, Text } from "@langwatch/design-system/primitives";
 import { SETTINGS_BAND_PADDING_Y } from "@langwatch/design-system/settings-section";
 
 import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
+import { EmailPreferencesSection } from "../email-preferences-section.tsx";
 import { PersonalApiKeysSummary } from "../personal-api-keys-summary.tsx";
 import { ProfileDetailsSection } from "../profile-details-section.tsx";
 import { SignInMethodsSummary } from "../sign-in-methods-summary.tsx";
@@ -19,15 +20,16 @@ export default function ProfileScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Profile</PageLayout.Heading>
       </PageLayout.Header>
-      <Box paddingTop={4} width="full">
+      <Box width="full">
         <Text color="fg.muted" paddingBottom={SETTINGS_BAND_PADDING_Y}>
-          Who you are here, how you get in, and where you are signed in.
+          Who you are here, how you get in, where you are signed in, and which emails you get.
         </Text>
 
         <ProfileDetailsSection />
         <SignInMethodsSummary />
         <BrowserSessionsSection />
         <PersonalApiKeysSummary />
+        <EmailPreferencesSection />
       </Box>
     </>
   );

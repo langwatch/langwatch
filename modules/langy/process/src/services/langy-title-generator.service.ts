@@ -5,7 +5,10 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  isPermanentAiCallFailure,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
@@ -70,7 +73,7 @@ export class LangyTitleGeneratorService {
     return (input) => this.generate(input);
   }
 
-  /** Every failure but an unconfigured model throws, so the process outbox retries it. */
+  /** Every failure but a permanent one throws, so the process outbox retries it. */
   async generate(input: {
     projectId: string;
     conversationId: string;
@@ -100,10 +103,10 @@ export class LangyTitleGeneratorService {
 
       return title ? { outcome: "generated", title, model: model.name } : UNCHANGED;
     } catch (error) {
-      if (!isModelNotConfigured(error)) throw error;
+      if (!isPermanentAiCallFailure(error)) throw error;
       logger.warn(
-        { projectId, conversationId },
-        "no cheap model configured for Langy titles — leaving title unchanged",
+        { projectId, conversationId, code: HandledError.isHandled(error) ? error.code : undefined },
+        "Langy title model cannot answer until its settings change, leaving title unchanged",
       );
 
       return UNCHANGED;

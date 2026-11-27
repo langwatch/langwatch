@@ -6,6 +6,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC200
  */
 
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { act, cleanup, screen, within } from "@testing-library/react";
@@ -39,6 +40,7 @@ import {
 } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
+import { catalogueSource } from "../model/widget-source.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -67,7 +69,12 @@ type StoredQuery = {
   projects?: string[] | null;
 };
 /** A stored widget's definition; its query stores no sources, as one saved before them. */
-const GRAPH: { version: 1; code: string; queries: StoredQuery[] } = {
+const GRAPH: {
+  version: 1;
+  code: string;
+  queries: StoredQuery[];
+  source?: DashboardWidgetSource;
+} = {
   version: 1,
   code: "export default function Widget() { return null; }",
   queries: [
@@ -193,6 +200,7 @@ function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET
               sources?: unknown;
               projects?: unknown;
               excludeOrigins?: unknown;
+              telemetry?: unknown;
               granularitySeconds?: number;
               timeWindow?: { start: string; end: string };
             },
@@ -352,6 +360,34 @@ function openBoard({
 const sourcesOf = (runs: ReturnType<ReturnType<typeof boardServer>["runs"]>) =>
   runs.map((run) => run.sources);
 
+describe("given a widget placed on a board", () => {
+  /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+  it("sends the board and the widget with the card's run, for its log line", async () => {
+    const server = openBoard();
+    await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+    expect(server.runs()[0]?.telemetry).toEqual({ dashboardId: BOARD.id, widgetId: WIDGET.id });
+  });
+
+  describe("when the widget was built from a catalogue widget", () => {
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("also sends the catalogue widget it came from as the template", async () => {
+      const fromCatalogue = {
+        ...WIDGET,
+        graph: { ...GRAPH, source: catalogueSource("traffic") },
+      };
+      const server = openBoard({ widgets: [fromCatalogue] });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.runs()[0]?.telemetry).toEqual({
+        dashboardId: BOARD.id,
+        widgetId: WIDGET.id,
+        templateId: "traffic",
+      });
+    });
+  });
+});
+
 describe("given a stored widget whose query stores no sources", () => {
   /** @scenario "AC200f Sources: a query that stores none counts application traces" */
   it("runs the card and the preview with the server's default, and the pills show that set", async () => {
@@ -372,16 +408,17 @@ describe("given a stored widget whose query stores no sources", () => {
   });
 
   /** @scenario "AC200 Sources: each query shows its sources as pills, and the card names them" */
-  it("shows the sources row under Parameters with a built-in badge, and the card's line", async () => {
+  /** @scenario "AC240 Card sources line: a widget counting only the default application source shows no sources line" */
+  it("shows the sources row under Parameters with a built-in badge, and no default line on the card", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     openBoard();
     await screen.findByTestId("sandboxed-frame");
 
-    const footer = screen.getByTestId("widget-card-footer");
+    const footer = screen.queryByTestId("widget-card-footer");
     const drawer = await openEditor(user);
     const row = within(drawer).getByTestId("query-sources");
 
-    expect(footer.textContent).toBe("Sources: application · Project: Test Project");
+    expect(footer).toBeNull();
     expect(within(drawer).getByText("Parameters")).toBeTruthy();
     expect(within(drawer).queryByText(/declared by you/)).toBeNull();
     expect(within(drawer).queryByText("No parameters declared yet.")).toBeNull();
@@ -464,15 +501,14 @@ describe("given a member changes a query's sources in the editor", () => {
     expect(preview).toBe("No sources picked");
     expect(server.updates()[0]?.queries[0]?.sources).toEqual([]);
     await vi.waitFor(() => expect(screen.getByTestId("no-sources-picked")).toBeTruthy());
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-      "No sources picked · Project: Test Project",
-    );
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Pick at least one source.");
     expect(screen.queryByTestId("sandboxed-frame")).toBeNull();
   });
 });
 
 describe("given a member saves only a query's sources and presses Undo", () => {
   /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
+  /** @scenario "AC240c Card sources line: a widget counting more or other sources than the default names them" */
   it("clears a list the query did not store, so it counts application again", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const server = openBoard();
@@ -481,16 +517,17 @@ describe("given a member saves only a query's sources and presses Undo", () => {
     await addSource(user, drawer, "langy");
     await save(user, drawer);
     await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe(
+        "Counts: your app and Langy",
+      ),
+    );
 
     await user.click(await screen.findByRole("button", { name: "Undo" }));
     await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
 
     expect(server.updates()[1]?.queries[0]?.sources).toBeNull();
-    await vi.waitFor(() =>
-      expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-        "Sources: application · Project: Test Project",
-      ),
-    );
+    await vi.waitFor(() => expect(screen.queryByTestId("widget-card-footer")).toBeNull());
   });
 
   /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
@@ -513,17 +550,19 @@ describe("given a member saves only a query's sources and presses Undo", () => {
 
 describe("given a member who may not edit the board", () => {
   /** @scenario "AC200d Sources: only a member who can edit the board changes them" */
-  it("shows the card's sources line and no way into the editor", async () => {
+  it("shows the card's footer and no way into the editor", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    openBoard({ permissions: MEMBER.filter((grant) => grant !== "analytics:update") });
+    const counted = { ...GRAPH.queries[0]!, sources: ["application", "langy"] };
+    openBoard({
+      permissions: MEMBER.filter((grant) => grant !== "analytics:update"),
+      widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [counted] } }],
+    });
     await screen.findByTestId("sandboxed-frame");
 
     await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
     await screen.findByRole("menuitem", { name: "Copy widget id" });
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-      "Sources: application · Project: Test Project",
-    );
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Counts: your app and Langy");
     expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
   });
 });
@@ -541,7 +580,7 @@ describe("given a From LangWatch board", () => {
       });
       const widgets = curatedBoardById("release")?.widgets ?? [];
       renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
-      await screen.findByRole("heading", { name: "Release check" });
+      await screen.findByRole("heading", { name: "Ready to ship?" });
       for (const frame of screen.getAllByTestId("sandboxed-frame")) {
         const widget = widgets.find(
           ({ definition }) => definition.code === frames.get(frame)?.code,
@@ -561,6 +600,32 @@ describe("given a From LangWatch board", () => {
       ).toBe(true);
       cleanup();
     }
+  });
+});
+
+describe("given a From LangWatch board's widget card", () => {
+  /** @scenario "Telemetry: a From LangWatch board's widgets count as dashboard widgets" */
+  it("sends the curated board and the widget's key with its run, so it counts as a widget's", async () => {
+    const server = boardServer();
+    const host = new StubAnalyticsHost({
+      flags: FLAGS,
+      permissions: MEMBER,
+      project: PROJECT,
+      route: { params: { templateId: "release" }, query: {} },
+    });
+    const widgets = curatedBoardById("release")?.widgets ?? [];
+    renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
+    await screen.findByRole("heading", { name: "Ready to ship?" });
+    const frame = screen.getAllByTestId("sandboxed-frame")[0]!;
+    const widget = widgets.find(({ definition }) => definition.code === frames.get(frame)?.code)!;
+
+    await frameRuns({ frame, queryName: widget.definition.queries[0]!.name });
+
+    expect(server.runs()[0]?.telemetry).toEqual({
+      dashboardId: "curated/release",
+      widgetId: widget.key,
+      templateId: widget.key,
+    });
   });
 });
 
@@ -795,11 +860,35 @@ describe("given a member changes a query's projects in the editor", () => {
 
 describe("given a card whose query names projects", () => {
   /** @scenario "AC206 Project: a card reads the board's project unless its query names others" */
-  it("names the board's project while the query stores none", async () => {
+  /** @scenario "A board in a project's own Dashboards names only other projects on its cards" */
+  it("names no project while the query stores none", async () => {
     openBoard();
     await screen.findByTestId("sandboxed-frame");
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toContain("Project: Test Project");
+    expect(screen.queryByTestId("widget-card-footer")).toBeNull();
+  });
+
+  /** @scenario "A widget's card names its projects only where they differ from the board's" */
+  it("names no project for a query storing the board's project alone", async () => {
+    const own = { ...GRAPH.queries[0]!, projects: [HOME_BOARD.projectId] };
+    openBoard({ widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [own] } }] });
+    await screen.findByTestId("sandboxed-frame");
+
+    expect(screen.queryByTestId("widget-card-footer")).toBeNull();
+  });
+
+  /**
+   * @scenario "A widget's card names its projects only where they differ from the board's"
+   * @scenario "A board in a project's own Dashboards names only other projects on its cards"
+   */
+  it("names another project a query stores", async () => {
+    const other = { ...GRAPH.queries[0]!, projects: ["proj-a"] };
+    openBoard({ widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [other] } }] });
+    await screen.findByTestId("sandboxed-frame");
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe("Project: Alpha"),
+    );
   });
 
   /** @scenario "AC207b Project: a query saved with picked projects reads only those projects, in the order picked" */

@@ -80,6 +80,14 @@ Rule: pi's full token taxonomy survives, including what the conventions cannot n
     When the model-call facts are lifted
     Then the reasoning tokens are recorded as their own token type
 
+  # pi's input leaves the cache out, so the cache alone reads zero for a model
+  # that caches nothing. Other agents keep their cache-only figure.
+  @unit
+  Scenario: A pi call's context is its whole prompt, cached or not
+    Given a pi session whose largest call sent 966 fresh input tokens and cached nothing
+    When the session is folded
+    Then the row's peak context is 966 tokens
+
   @unit
   Scenario: A call that reports a total but no breakdown is not double counted
     Given a pi.ai.request span reporting only a total token count

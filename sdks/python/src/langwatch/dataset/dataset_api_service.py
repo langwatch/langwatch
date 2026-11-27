@@ -240,12 +240,15 @@ class DatasetApiService:
         *,
         name: str,
         columns: Optional[List[Dict[str, str]]] = None,
+        entries: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """POST /api/v1/dataset -- create a new dataset."""
+        """POST /api/v1/dataset -- create a new dataset, with its first rows when given."""
         with _tracer.start_as_current_span("dataset.create_dataset"):
             body: Dict[str, Any] = {"name": name}
             if columns is not None:
                 body["columnTypes"] = columns
+            if entries:
+                body["entries"] = entries
 
             response = self._http().post("/api/v1/dataset", json=body)
             _raise_for_api_status(response, operation="create_dataset")

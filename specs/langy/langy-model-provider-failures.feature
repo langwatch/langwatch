@@ -72,6 +72,15 @@ Feature: A turn that the model provider refused says so
       Then it is the provider card saying the provider does not serve that model
       And it offers to open the model settings
 
+    # The gateway writes its generic "provider_error" envelope when it has no
+    # parsed provider body, which names no cause; the status still does.
+    @unit
+    Scenario: A missing model behind the gateway's generic provider error still reads as a missing model
+      Given the provider answers 404 and the gateway forwards its generic "provider_error" envelope
+      When the proxy records the failure
+      Then it carries "provider_error" and "upstream_not_found" as reasons
+      And the customer reads the card saying the provider does not serve that model, with the model settings offered
+
     @unit
     Scenario: Any failure filed under the proxy's upstream code reads as the provider's
       Given a turn that failed with the proxy's upstream code carrying a provider code the client does not classify

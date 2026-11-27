@@ -33,7 +33,7 @@ const authzGrantPlatformOperatorInputSchemaDefinition = z
     caller: authzGrantCallerSchema,
     actor: ledgerActorSchema,
     source: grantEventSourceSchema.optional(),
-    /** A deterministic id (`deriveGrantId`) for a writer that may run twice. */
+    /** A deterministic id (`resolveGrantId`) for a writer that may run twice. */
     grantId: z.string().min(1).optional(),
   })
   .strict();

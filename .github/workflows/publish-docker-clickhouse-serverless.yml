@@ -18,8 +18,10 @@ concurrency:
 jobs:
   extract-version:
     runs-on: ubuntu-latest
+    # The image's release-please component is clickhouse-serverless-image;
+    # clickhouse-serverless@ is the Helm chart's tag, not this image's.
     if: >-
-      startsWith(github.event.release.tag_name, 'clickhouse-serverless@')
+      startsWith(github.event.release.tag_name, 'clickhouse-serverless-image@')
       || github.event_name == 'workflow_dispatch'
     outputs:
       short_hash: ${{ steps.extract_version.outputs.short_hash }}
@@ -36,7 +38,7 @@ jobs:
           echo "short_hash=${SHORT_HASH}" >> $GITHUB_OUTPUT
 
           if [ "${{ github.event_name }}" = "release" ]; then
-            VERSION=${GITHUB_REF#refs/tags/clickhouse-serverless@v}
+            VERSION=${GITHUB_REF#refs/tags/clickhouse-serverless-image@v}
             echo "version=${VERSION}" >> $GITHUB_OUTPUT
             echo "is_release=true" >> $GITHUB_OUTPUT
 

@@ -119,7 +119,7 @@ function GraphCardBody({
         />
 
         <Box flex={1} minHeight={0}>
-          <GraphCardChartArea graph={graph} projectId={projectId} />
+          <GraphCardChartArea graph={graph} projectId={projectId} dashboardId={dashboardId} />
         </Box>
       </Card.Body>
     </Card.Root>
@@ -138,13 +138,22 @@ const chartHeightPx = (rowSpan: number): number =>
  * The card's chart, routed by the row's kind: a placed workbench chart mounts
  * the live LangWatchQL widget, and every other row is a builder graph.
  */
-function GraphCardChartArea({ graph, projectId }: { graph: GraphData; projectId: string }) {
+function GraphCardChartArea({
+  graph,
+  projectId,
+  dashboardId,
+}: {
+  graph: GraphData;
+  projectId: string;
+  dashboardId: string | undefined;
+}) {
   if (graph.kind === WORKBENCH_SQL_CHART_KIND) {
     return (
       <LangWatchQLDashboardWidget
         key={graph.id}
         chartId={graph.id}
         projectId={projectId}
+        {...(dashboardId === undefined ? {} : { dashboardId })}
         {...(graph.granularitySeconds == null
           ? {}
           : { granularitySeconds: graph.granularitySeconds })}

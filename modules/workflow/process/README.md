@@ -402,7 +402,7 @@ Answers at `/api/scenario/execute-sync`.
 ```typescript
 // Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/workflow-execute-sync.rest.ts:28
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:29
 type Response = unknown;
 ```
 
@@ -438,7 +438,7 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 Run a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:84`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:85`.
 
 Answers at `/api/workflows/:workflowId/run`, `/api/v1/workflows/:workflowId/run`.
 
@@ -455,7 +455,7 @@ type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/work
 
 Run a specific workflow version
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:113`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:115`.
 
 Answers at `/api/workflows/:workflowId/:versionId/run`, `/api/v1/workflows/:workflowId/:versionId/run`.
 
@@ -497,13 +497,13 @@ interface Response {
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:38`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:39`.
 
 Answers at `/api/workflows/post_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:41)
-// Response: inline, src/transport/workflow-studio.rest.ts:48
+// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:42)
+// Response: inline, src/transport/workflow-studio.rest.ts:49
 type Response = unknown;
 ```
 
@@ -879,9 +879,9 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                              |
 | ------ | ---------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:503`            |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:504`            |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:505`            |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:504`            |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:505`            |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:506`            |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:123` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:125` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:126` |

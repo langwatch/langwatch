@@ -12,7 +12,6 @@ import type { resolveLangyActivityOwnership } from "../../../../../model/langy-a
 import type { langyPlan } from "../../../../../model/langy-plan.ts";
 import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
 import { StreamingStatusLine } from "../../../../../ui/sections/streaming-status-line.tsx";
-import { LangyDerivedCardView } from "../../../../transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyThinkingLine } from "../../../../transcript/ui/sections/langy-thinking-line.tsx";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
 import type { useLangyLocalWaits } from "../../../behavior/panel/use-langy-local-waits.ts";
@@ -20,6 +19,7 @@ import type { useLangyTranscriptReads } from "../../../behavior/panel/use-langy-
 import type { useLangyTurnFailure } from "../../../behavior/panel/use-langy-turn-failure.ts";
 import { useLangyDevLog } from "../../../behavior/stores/langy-dev-log.ts";
 import { langyToolNarrator } from "../../../model/logic/langy-tool-narrator.ts";
+import { LangyDerivedCardView } from "../derived-cards/langy-derived-card-view.tsx";
 import { LangyGitHubConnectCard } from "../github/langy-git-hub-connect-card.tsx";
 import { LangyError } from "../langy-error.tsx";
 import { LangyLocalPermissionCard } from "../langy-local-permission-card.tsx";
@@ -154,13 +154,20 @@ export function LangyFailureSurface({
   failure,
   organizationId,
   onGithubConnected,
+  onShareLocalFolder,
 }: {
   floating: boolean;
   failure: TurnFailure;
   organizationId: string | undefined;
   onGithubConnected: () => void;
+  onShareLocalFolder: () => void;
 }) {
-  const surface = failureSurface({ failure, organizationId, onGithubConnected });
+  const surface = failureSurface({
+    failure,
+    organizationId,
+    onGithubConnected,
+    onShareLocalFolder,
+  });
   if (!surface) return null;
   // Padded to the message column's own measure, since it sits outside that column.
   return (
@@ -174,10 +181,12 @@ function failureSurface({
   failure,
   organizationId,
   onGithubConnected,
+  onShareLocalFolder,
 }: {
   failure: TurnFailure;
   organizationId: string | undefined;
   onGithubConnected: () => void;
+  onShareLocalFolder: () => void;
 }): ReactNode {
   const { recovery, needsGithubConnect, turnError, onErrorAction } = failure;
   if (recovery.isRecovering && recovery.message) {
@@ -185,7 +194,11 @@ function failureSurface({
   }
   if (needsGithubConnect && organizationId) {
     return (
-      <LangyGitHubConnectCard organizationId={organizationId} onConnected={onGithubConnected} />
+      <LangyGitHubConnectCard
+        organizationId={organizationId}
+        onConnected={onGithubConnected}
+        onShareLocalFolder={onShareLocalFolder}
+      />
     );
   }
   if (!turnError || turnError.render === "composer-notice" || recovery.willAutoRecover) return null;

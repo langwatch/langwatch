@@ -8,9 +8,11 @@ import type {
 import { AuthzGrantNotConfirmedError, newAuthzGrantId } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { readJoinerRole } from "@langwatch/identity-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   CannotRemoveSelfAsLastAdminError,
+  BillingOnlyNoTeamAccessError,
   DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
@@ -25,6 +27,7 @@ import {
   OrganizationSlugTakenError,
   ORGANIZATION_KIND,
   auditImpersonationMetadataSchema,
+  auditTargetNameMetadataSchema,
 } from "@langwatch/organization-contract";
 import type {
   FullyLoadedOrganization,
@@ -33,6 +36,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   User,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type {
   Organization,
   OrganizationIntent,
@@ -44,13 +48,15 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { fromDate, type Instant } from "@langwatch/time";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
   type DeveloperAdmissionVia,
 } from "../../rules/admission-audit.rules.ts";
 import { auditOriginOf } from "../../rules/audit-origin.rules.ts";
+import { extractAuditStaffAccess } from "../../rules/audit-staff-access.rules.ts";
 import {
   isActiveAdmin,
   isAdminDemotion,
@@ -59,6 +65,7 @@ import {
 } from "../../rules/organization-membership.rules.ts";
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
+import { PrismaOrganizationSeatChangeStore } from "./prisma.organization-seat-change.store.ts";
 import {
   customRoleFromRecord,
   organizationFromRecord,
@@ -88,17 +95,22 @@ import type {
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
+  MemberSeatStanding,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
+  AdmitWaitingMemberInput,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
+  UnfinishedSeatAdmission,
+  WaitingMember,
 } from "../organization-membership.repository.ts";
 import type { OrganizationSettingsCipher } from "../organization.repository.ts";
+import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
 
 const logger = createLogger("langwatch:organization:membership-repository");
 
@@ -119,6 +131,29 @@ async function teamNameFor({
     select: { name: true },
   });
   return team?.name ?? teamId;
+}
+
+const unfinishedSeatAdmissionsSchema = z.array(
+  z.object({ organizationId: z.string(), userId: z.string(), grantId: z.string() }),
+);
+
+/**
+ * Same guard as demoting the last admin, locked for the same reason the removal guard locks:
+ * a disable and a removal aimed at the two remaining admins would otherwise both pass. Handled,
+ * so the REST surface answers the stable code rather than an unknown 500.
+ */
+async function assertDisableKeepsAnAdmin({
+  tx,
+  organizationId,
+  role,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  role: OrganizationUserRole;
+}): Promise<void> {
+  if (role !== OrganizationUserRole.ADMIN) return;
+  const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+  if (isLastAdmin({ adminCount: activeAdmins.length })) throw new CannotDisableLastAdminError();
 }
 
 /**
@@ -282,6 +317,68 @@ async function landedInTime(write: () => Promise<unknown>): Promise<boolean> {
     if (error instanceof AuthzGrantNotConfirmedError) return false;
     throw error;
   }
+}
+
+/** What the role change left on the row: when it wrote, and the department it found. */
+type WrittenMembership = { at: Date; departmentId: string | null };
+
+/**
+ * The row is as the role change left it, or only its department moved since: a department
+ * edit takes no seat lock and moves `updatedAt`, but undoes nothing the change wrote.
+ */
+function untouchedSinceOrDepartmentOnly(
+  written: WrittenMembership,
+): Prisma.OrganizationUserWhereInput {
+  const departmentMoved: Prisma.OrganizationUserWhereInput[] =
+    written.departmentId === null
+      ? [{ departmentId: { not: null } }]
+      : [{ departmentId: null }, { departmentId: { not: written.departmentId } }];
+  return {
+    OR: [{ updatedAt: written.at }, { updatedAt: { gt: written.at }, OR: departmentMoved }],
+  };
+}
+
+/** Puts the row and seat hold back as the role change found them, unless a later write moved on. */
+async function restoreMembershipRow({
+  tx,
+  organizationId,
+  userId,
+  role,
+  previous,
+  seatMoved,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  role: OrganizationUserRole;
+  previous: {
+    role: OrganizationUserRole;
+    billingOnly: boolean;
+    written: WrittenMembership | null;
+    fullSeatSince: Date | null;
+    hold: Prisma.SeatHoldGetPayload<object> | null;
+    seatColumns: { fullSeatSince?: Date | null };
+  };
+  seatMoved: boolean;
+}): Promise<void> {
+  const restored = await tx.organizationUser.updateMany({
+    where: {
+      organizationId,
+      userId,
+      role,
+      billingOnly: false,
+      ...(previous.written ? untouchedSinceOrDepartmentOnly(previous.written) : {}),
+      ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
+    },
+    data: {
+      role: previous.role,
+      billingOnly: previous.billingOnly,
+      ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
+    },
+  });
+  if (restored.count === 0 || !seatMoved) return;
+  await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+  if (previous.hold) await tx.seatHold.create({ data: previous.hold });
 }
 
 async function emitScopeBindingPlans({
@@ -673,6 +770,8 @@ async function readMemberSeat({
   const membership = await tx.organizationUser.findUnique({
     where: { userId_organizationId: { userId, organizationId } },
   });
+  // A Billing-only member joins no team (ADR-205); a seat role must be given first.
+  if (membership?.billingOnly) throw new BillingOnlyNoTeamAccessError();
   return membership?.role ?? "no-membership";
 }
 
@@ -924,6 +1023,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return this.#audit;
   }
 
+  #seatChanges: PrismaOrganizationSeatChangeStore | undefined;
+
+  /** Organization's seat changes (ADR-002), committed with the write that moved the seat. */
+  private get seatChanges(): PrismaOrganizationSeatChangeStore {
+    this.#seatChanges ??= PrismaOrganizationSeatChangeStore.create({ database: this.prisma });
+    return this.#seatChanges;
+  }
+
   findPersonalTeamsInScopes(params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string }[]> {
@@ -1051,15 +1158,26 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         );
       }
 
-      await this.prisma.organizationUser.update({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: created.organization.id,
-          },
-        },
-        data: { disabledAt: null },
-      });
+      // The founder's seat is the new organization's first (ADR-002), taken with the enable.
+      await this.prisma.$transaction((transaction) =>
+        this.seatChanges.movingMember({
+          transaction,
+          organizationId: created.organization.id,
+          userId: input.userId,
+          cause: "organization_created",
+          actorUserId: input.userId,
+          write: () =>
+            transaction.organizationUser.update({
+              where: {
+                userId_organizationId: {
+                  userId: input.userId,
+                  organizationId: created.organization.id,
+                },
+              },
+              data: { disabledAt: null },
+            }),
+        }),
+      );
     } catch (error) {
       // A queued append may outlive this request: deleting the committed rows
       // leaves any late projection pointing at an organization never reused.
@@ -1663,6 +1781,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         disabledAt: true,
         createdAt: true,
         updatedAt: true,
+        billingOnly: true,
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -1705,6 +1824,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           disabledAt: true,
           createdAt: true,
           updatedAt: true,
+          billingOnly: true,
           user: { select: { id: true, name: true, email: true } },
         },
         orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
@@ -1782,48 +1902,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return readJoinerRole(organization?.joinerRole);
   }
 
-  async createMembership(input: {
-    organizationId: string;
-    userId: string;
-    pendingAdmissionId: string;
-    via: DeveloperAdmissionVia;
-    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
-    pending: boolean;
-    /** Where a join request was made, for the Developer admission audit row. */
-    origin?: "web" | "cli";
-  }): Promise<OrganizationAdmission> {
+  async createMembership(input: AdmissionWrite): Promise<OrganizationAdmission> {
     const { organizationId, userId, seat, pending } = input;
     try {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.organizationUser.create({
-          data: {
-            userId,
-            organizationId,
-            role: seat,
-            disabledAt: pending ? new Date() : null,
-            pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
-          },
-        });
-        // A Developer gets no grant, so its admission is audited here (ADR-171).
-        if (seat === "DEVELOPER") {
-          await this.audit.append({
-            transaction: tx,
-            fact: {
-              tenantId: organizationId,
-              action: DEVELOPER_ADMISSION_AUDIT_ACTION,
-              userId,
-              organizationId,
-              // The origin says a Developer seat on a Full-seat organisation was
-              // the terminal's doing, not a setting somebody changed.
-              metadata: {
-                seat,
-                via: input.via,
-                ...(input.origin === undefined ? {} : { origin: input.origin }),
-              },
-            },
-          });
-        }
-      });
+      await this.prisma.$transaction((tx) =>
+        writeAdmission({ tx, audit: this.audit, seatChanges: this.seatChanges, input }),
+      );
       return { outcome: "created", seat, pending };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -1837,6 +1921,126 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       }
       throw error;
     }
+  }
+
+  async findSeatStandings({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberSeatStanding[]> {
+    const row = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: {
+        role: true,
+        disabledAt: true,
+        createdAt: true,
+        fullSeatSince: true,
+        seatPendingSince: true,
+        billingOnly: true,
+        user: { select: { email: true, name: true } },
+      },
+    });
+    if (!row) return [];
+    return [
+      {
+        role: row.role,
+        disabledAt: row.disabledAt ? fromDate(row.disabledAt) : null,
+        createdAt: fromDate(row.createdAt),
+        fullSeatSince: row.fullSeatSince ? fromDate(row.fullSeatSince) : null,
+        seatPendingSince: row.seatPendingSince ? fromDate(row.seatPendingSince) : null,
+        email: row.user.email,
+        name: row.user.name,
+        billingOnly: row.billingOnly,
+      },
+    ];
+  }
+
+  async findWaitingMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<WaitingMember[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId, disabledAt: { not: null }, seatPendingSince: { not: null } },
+      select: {
+        userId: true,
+        seatPendingSince: true,
+        user: { select: { email: true, name: true } },
+      },
+      orderBy: { seatPendingSince: "asc" },
+    });
+    return rows.flatMap((row) =>
+      row.seatPendingSince
+        ? [
+            {
+              userId: row.userId,
+              name: row.user.name,
+              email: row.user.email,
+              waitingSince: fromDate(row.seatPendingSince),
+            },
+          ]
+        : [],
+    );
+  }
+
+  async writeSeatHold({ hold }: { hold: SeatHold }): Promise<void> {
+    await this.prisma.$transaction((tx) => writeSeatHold({ tx, hold }));
+  }
+
+  async takeHeldSeat({
+    organizationId,
+    userId,
+    since,
+    holdUserIds,
+  }: {
+    organizationId: string;
+    userId: string;
+    since: Instant;
+    holdUserIds: readonly string[];
+  }): Promise<void> {
+    const userIds = [...new Set([userId, ...holdUserIds])];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organizationUser.updateMany({
+        where: { organizationId, userId },
+        data: { fullSeatSince: toDate(since) },
+      });
+      // A hold another account of theirs kept is taken back with the seat.
+      await this.seatChanges.movingHolds({
+        transaction: tx,
+        organizationId,
+        userIds,
+        cause: "invitation_accepted",
+        actorUserId: null,
+        write: () => tx.seatHold.deleteMany({ where: { organizationId, userId: { in: userIds } } }),
+      });
+    });
+  }
+
+  async findMembershipStates({ userId }: { userId: string }): Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  > {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { userId },
+      select: {
+        organizationId: true,
+        role: true,
+        disabledAt: true,
+        organization: { select: { name: true } },
+      },
+    });
+    return rows.map((row) => ({
+      organizationId: row.organizationId,
+      organizationName: row.organization.name,
+      role: row.role,
+      disabled: row.disabledAt !== null,
+    }));
   }
 
   async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
@@ -1879,7 +2083,18 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // crash between the two leaves orphaned grants, which the no-member branch
     // above revokes on retry; a refusal inside the transaction revokes nothing.
     const archivedTeamIds = await this.prisma.$transaction(async (tx) => {
-      await this.deleteMembershipRow({ tx, organizationId, userId });
+      await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: "removed",
+        actorUserId: actingUserId ?? null,
+        // The hold is written with the removal, so its seat replaces theirs without a peak.
+        write: async () => {
+          await this.deleteMembershipRow({ tx, organizationId, userId });
+          if (input.seatHold) await writeSeatHold({ tx, hold: input.seatHold });
+        },
+      });
       // As main's offboard: a kept group or team row would hand the access back on a rejoin.
       await tx.groupMembership.deleteMany({ where: { userId, group: { organizationId } } });
       await tx.teamUser.deleteMany({ where: { userId, team: { organizationId } } });
@@ -1989,6 +2204,69 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return personalTeamIds;
   }
 
+  async findUnfinishedSeatAdmissions({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<UnfinishedSeatAdmission[]> {
+    // Only a row given a full seat has a seat date and an intent; a fresh joiner has no seat date.
+    const rows = await this.prisma.$queryRaw`
+      ${skipTenantCheck({
+        // The hourly seat hold check finishes admissions in every organization.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "organizationId", "userId", "pendingSsoGrantId" AS "grantId"
+      FROM "OrganizationUser"
+      WHERE "pendingSsoGrantId" IS NOT NULL
+        AND "disabledAt" IS NULL
+        AND "fullSeatSince" IS NOT NULL
+        AND "role"::text = ${OrganizationUserRole.MEMBER}
+      ORDER BY "updatedAt" ASC
+      LIMIT ${limit}
+    `;
+    return unfinishedSeatAdmissionsSchema.parse(rows);
+  }
+
+  async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {
+    const { organizationId, userId, pendingAdmissionId, seat } = input;
+    return this.prisma.$transaction((tx) =>
+      // A held admission's release takes the seat it waited for, its hold's included.
+      this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: "enabled",
+        actorUserId: input.actorUserId ?? null,
+        write: async () => {
+          const admitted = await tx.organizationUser.updateMany({
+            where: {
+              organizationId,
+              userId,
+              disabledAt: { not: null },
+              seatPendingSince: { not: null },
+            },
+            data: {
+              role: OrganizationUserRole.MEMBER,
+              billingOnly: false,
+              disabledAt: null,
+              seatPendingSince: null,
+              pendingSsoGrantId: pendingAdmissionId,
+            },
+          });
+          if (admitted.count === 0) return false;
+          const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
+          if ("fullSeatSince" in seatColumns) {
+            await tx.organizationUser.update({
+              where: { userId_organizationId: { userId, organizationId } },
+              data: seatColumns,
+            });
+          }
+          return true;
+        },
+      }),
+    );
+  }
+
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {
     const { organizationId, userId, disabled } = input;
 
@@ -2002,25 +2280,17 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         throw new MemberNotFoundError(userId);
       }
 
-      // Same guard as demoting the last admin: an organization with no admin
-      // who can sign in cannot be recovered from inside the product. Locked
-      // for the same reason the removal guard locks: a disable and a removal
-      // aimed at the two remaining admins would otherwise both pass.
-      if (disabled && member.role === OrganizationUserRole.ADMIN) {
-        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+      if (disabled) await assertDisableKeepsAnAdmin({ tx, organizationId, role: member.role });
 
-        if (isLastAdmin({ adminCount: activeAdmins.length })) {
-          // Handled rather than a TRPCError: the tRPC boundary maps a 400
-          // HandledError to BAD_REQUEST anyway, and the REST surface answers
-          // the stable code instead of flattening this refusal to an unknown
-          // 500.
-          throw new CannotDisableLastAdminError();
-        }
-      }
-
-      await tx.organizationUser.update({
-        where: { userId_organizationId: { userId, organizationId } },
-        data: { disabledAt: disabled ? new Date() : null },
+      // Disabling gives the seat back (to a hold, if one keeps it); re-enabling takes it.
+      await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: disabled ? "disabled" : "enabled",
+        actorUserId: input.actorUserId ?? null,
+        write: () =>
+          writeMemberDisabled({ tx, organizationId, userId, disabled, seat: input.seat }),
       });
     });
   }
@@ -2037,9 +2307,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // membership transaction has committed.
     const plans: ScopeBindingPlan[] = [];
 
-    // The transaction answers the seat the member held before it, kept so a
-    // failed correction can put it back (see the compensation below).
-    const previousRole = await this.prisma.$transaction(async (tx) => {
+    // The transaction answers the role and seat the member held before it, kept so a
+    // failed correction can put them back (see the compensation below).
+    const previous = await this.prisma.$transaction(async (tx) => {
       const currentMember = await tx.organizationUser.findUnique({
         where: {
           userId_organizationId: {
@@ -2060,14 +2330,35 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         currentRole: currentMember.role,
       });
 
-      await tx.organizationUser.update({
-        where: {
-          userId_organizationId: {
-            userId,
+      const seatMoves = input.seat !== undefined && input.seat.kind !== "unchanged";
+      let written: WrittenMembership | null = null;
+      const previousHold = seatMoves
+        ? await tx.seatHold.findUnique({
+            where: { organizationId_userId: { organizationId, userId } },
+          })
+        : null;
+      const seatColumns = await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: "role_changed",
+        actorUserId: input.currentUserId ?? null,
+        write: async () => {
+          const columns = await applySeatTransition({
+            tx,
             organizationId,
-          },
+            userId,
+            seat: input.seat,
+          });
+          const row = await tx.organizationUser.update({
+            where: { userId_organizationId: { userId, organizationId } },
+            // Any role change ends Billing only; the new role is metered (ADR-205).
+            data: { role, billingOnly: false, ...columns },
+            select: { updatedAt: true, departmentId: true },
+          });
+          written = { at: row.updatedAt, departmentId: row.departmentId };
+          return columns;
         },
-        data: { role },
       });
 
       plans.push(await planOrganizationSeatBinding({ tx, organizationId, userId, role }));
@@ -2142,7 +2433,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         throw new CannotDemoteLastAdminError();
       }
 
-      return currentMember.role;
+      return {
+        role: currentMember.role,
+        billingOnly: currentMember.billingOnly,
+        written,
+        fullSeatSince: currentMember.fullSeatSince,
+        hold: previousHold,
+        seatColumns,
+      };
     });
 
     // The seat has committed and the grants it caps have not. A ledger append
@@ -2162,16 +2460,58 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         }),
       });
     } catch (error) {
-      if (previousRole !== role) {
-        await this.prisma.organizationUser.updateMany({
-          where: { organizationId, userId, role },
-          data: { role: previousRole },
-        });
-      }
+      await this.restoreRoleAndSeat({
+        organizationId,
+        userId,
+        role,
+        previous,
+        actorUserId: input.currentUserId ?? null,
+      });
       throw error;
     }
 
     return { teamsLeftWithoutAdmin };
+  }
+
+  /**
+   * Puts back the role, the Billing-only flag, the seat date and the hold a role change
+   * replaced, only while the membership still stands as that change left it, so a later
+   * change is never undone.
+   */
+  private async restoreRoleAndSeat({
+    organizationId,
+    userId,
+    role,
+    previous,
+    actorUserId,
+  }: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+    actorUserId: string | null;
+    previous: {
+      role: OrganizationUserRole;
+      billingOnly: boolean;
+      written: WrittenMembership | null;
+      fullSeatSince: Date | null;
+      hold: Prisma.SeatHoldGetPayload<object> | null;
+      seatColumns: { fullSeatSince?: Date | null };
+    };
+  }): Promise<void> {
+    const seatMoved = "fullSeatSince" in previous.seatColumns;
+    if (previous.role === role && !previous.billingOnly && !seatMoved) return;
+    await this.prisma.$transaction(async (tx) => {
+      // The seat and its hold go back with the role, so the changes recorded with them are undone.
+      await this.seatChanges.movingMember({
+        transaction: tx,
+        organizationId,
+        userId,
+        cause: "role_changed",
+        actorUserId,
+        write: () =>
+          restoreMembershipRow({ tx, organizationId, userId, role, previous, seatMoved }),
+      });
+    });
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
@@ -2299,10 +2639,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         source: isGateway ? "gateway" : "platform",
         targetKind: log.targetKind,
         targetId: log.targetId,
+        targetName: auditTargetNameMetadataSchema.safeParse(log.metadata).data?.targetName ?? null,
         before: log.before,
         after: log.after,
         actorUserId: actorIds.get(log.id) ?? null,
         actorUser: userMap.get(actorIds.get(log.id) ?? "") ?? null,
+        staffAccess:
+          extractAuditStaffAccess({ action: log.action, metadata: log.metadata }) ?? null,
         ...auditOriginOf({
           metadata: log.metadata,
           action: log.action,
@@ -2392,4 +2735,140 @@ function admittedSeatOf(
     return { seat: "EXTERNAL", pending: row.disabledAt !== null };
   }
   return { seat: "MEMBER", pending: false };
+}
+
+/** Writes or replaces the person's seat hold inside the membership write it comes from. */
+async function writeSeatHold({
+  tx,
+  hold,
+}: {
+  tx: Prisma.TransactionClient;
+  hold: SeatHold;
+}): Promise<void> {
+  const { organizationId, userId, seatTakenAt, heldUntil, ...rest } = hold;
+  const kept = { ...rest, seatTakenAt: toDate(seatTakenAt), heldUntil: toDate(heldUntil) };
+  await tx.seatHold.upsert({
+    where: { organizationId_userId: { organizationId, userId } },
+    create: { id: generate("seathold").toString(), organizationId, userId, ...kept },
+    update: kept,
+  });
+}
+
+/** The disabled flag and the seat transition it carries, written together. */
+async function writeMemberDisabled({
+  tx,
+  organizationId,
+  userId,
+  disabled,
+  seat,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  disabled: boolean;
+  seat: SeatTransition | undefined;
+}): Promise<void> {
+  const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
+  await tx.organizationUser.update({
+    where: { userId_organizationId: { userId, organizationId } },
+    data: {
+      disabledAt: disabled ? new Date() : null,
+      // Enabled is admitted: nobody waits on a seat they hold.
+      ...(disabled ? {} : { seatPendingSince: null }),
+      ...seatColumns,
+    },
+  });
+}
+
+/** Applies a seat transition and answers the membership columns it sets. */
+async function applySeatTransition({
+  tx,
+  organizationId,
+  userId,
+  seat,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  seat: SeatTransition | undefined;
+}): Promise<{ fullSeatSince?: Date | null }> {
+  if (!seat || seat.kind === "unchanged") return {};
+  if (seat.kind === "taken") {
+    await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+    return { fullSeatSince: toDate(seat.since) };
+  }
+  if (seat.hold) await writeSeatHold({ tx, hold: seat.hold });
+  return { fullSeatSince: null };
+}
+
+/** One admission row as `createMembership` writes it. */
+type AdmissionWrite = {
+  organizationId: string;
+  userId: string;
+  pendingAdmissionId: string;
+  via: DeveloperAdmissionVia;
+  seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+  pending: boolean;
+  /** Where a join request was made, for the Developer admission audit row. */
+  origin?: "web" | "cli";
+  seatTakenAt?: Instant;
+  /** The person who admitted them, when one did (an approved join request). */
+  actorUserId?: string | null;
+};
+
+/** Writes the membership row, takes back a held seat, and audits a Developer admission. */
+async function writeAdmission({
+  tx,
+  audit,
+  seatChanges,
+  input,
+}: {
+  tx: Prisma.TransactionClient;
+  audit: PrismaOrganizationAuditStore;
+  seatChanges: PrismaOrganizationSeatChangeStore;
+  input: AdmissionWrite;
+}): Promise<void> {
+  const { organizationId, userId, seat, pending, seatTakenAt } = input;
+  const now = new Date();
+  // A held (pending) admission is created disabled, so it takes no seat yet.
+  await seatChanges.movingMember({
+    transaction: tx,
+    organizationId,
+    userId,
+    cause: "admitted",
+    actorUserId: input.actorUserId ?? null,
+    write: async () => {
+      await tx.organizationUser.create({
+        data: {
+          userId,
+          organizationId,
+          role: seat,
+          disabledAt: pending ? now : null,
+          seatPendingSince: pending ? now : null,
+          fullSeatSince: seatTakenAt ? toDate(seatTakenAt) : null,
+          pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
+        },
+      });
+      // A person back within their hold takes the held seat, not a second one.
+      if (seatTakenAt) await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+    },
+  });
+  // A Developer gets no grant, so its admission is audited here (ADR-171).
+  if (seat !== "DEVELOPER") return;
+  await audit.append({
+    transaction: tx,
+    fact: {
+      tenantId: organizationId,
+      action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+      userId,
+      organizationId,
+      // The origin says a Developer seat on a Full-seat organisation was
+      // the terminal's doing, not a setting somebody changed.
+      metadata: {
+        seat,
+        via: input.via,
+        ...(input.origin === undefined ? {} : { origin: input.origin }),
+      },
+    },
+  });
 }

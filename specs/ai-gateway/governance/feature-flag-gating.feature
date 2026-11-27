@@ -35,7 +35,7 @@ Feature: Governance visibility rides a single feature flag
   Scenario: A default installation enables governance without configuration
     Given a self-hosted installation with no PostHog key and no flag overrides
     When a user logs in and navigates the product
-    Then the governance surfaces render (sidebar Govern section, /me)
+    Then the governance surfaces render (sidebar Govern section, /coding-agents)
     And an AI-tools (device) CLI login approval is not refused by the governance gate
 
   Scenario: The single app flag gates every governance UI surface when off
@@ -44,8 +44,8 @@ Feature: Governance visibility rides a single feature flag
     When they navigate the product
     Then none of the governance surfaces are reachable from the UI:
       | surface                            | path                              |
-      | My Workspace dashboard             | /me                               |
-      | My Workspace settings              | /me/settings                      |
+      | My Workspace dashboard             | /coding-agents                               |
+      | My Workspace settings              | /coding-agents/configure                     |
       | Admin Routing Policies             | /gateway/routing-policies         |
       | Governance overview                | /governance                       |
       | Governance inventory (sources)     | /governance/inventory             |

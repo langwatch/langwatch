@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 
 import type { MeProject, UserAvatarRestParams } from "./user-rest.schemas.ts";
+import type { UserSignInAccount } from "./user-sign-in-account.ts";
 import type { UserBudgetIncreaseRequested, UserHomePagePickerState } from "./user.responses.ts";
 import type {
   UserCodeAccessPreference,
@@ -81,10 +82,22 @@ export interface UserApi {
   ): Promise<UserNotificationPreference>;
   /** Whether the account behind an id holds the platform-operator grant. */
   isOperator(input: { userId: string }): Promise<boolean>;
+  /** Accounts whose id, name or address holds the query, for a platform operator's search. */
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]>;
   /** The account holding an address, matched on its stored lower-cased form, however typed. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
+  /**
+   * The accounts behind one address, matched the way sign-in matches it, as ids, method codes,
+   * flags and times only (ADR-202). Empty when there is none or the text is no address.
+   */
+  findSignInAccounts(input: Readonly<{ email: string }>): Promise<UserSignInAccount[]>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
+  /**
+   * Commits the created fact for an account Better Auth wrote itself (social and single sign-on
+   * sign-up), which never passes a mint here. Keyed by the user, so a repeat records nothing new.
+   */
+  recordCreated(input: UserIdInput): Promise<void>;
   /** Mints an account whose only sign-in method is the passkey about to be registered. */
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
   /**
@@ -154,10 +167,20 @@ export interface UserApi {
   countUsage(): Promise<UserUsageCount>;
   /** The same figures for one organization, counted over the members the caller names. */
   countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
+  /** Which of these people last signed in at or after `since` (epoch ms). */
+  findSignedInSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]>;
   /** Whether anybody with an address on this domain has an account; no address leaves. */
   hasAccountOnDomain(input: { domain: string }): Promise<boolean>;
   /** Whether the installation holds any account at all; false only on a fresh install. */
   hasAnyAccount(): Promise<boolean>;
+  /**
+   * Whether this account is the install's first-created one, deactivated or not. Once the first
+   * account was erased no remaining one is.
+   */
+  isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
 }
 
 export const UserApi = moduleApi<UserApi>()("user");

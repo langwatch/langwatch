@@ -1,10 +1,12 @@
+import { MAX_STATED_SEATS } from "@langwatch/plans";
 import { type Instant, Temporal } from "@langwatch/time";
 
 import type { LicenseMintRequest } from "../services/license-mint.service.ts";
 
 const USAGE =
   "generate-license --org-id <organizationId> [--plan ENTERPRISE|GROWTH|PRO] [--max-members <N>]" +
-  " [--max-members-lite <N>] [--max-messages-per-month <N>] [--expires-at <YYYY-MM-DD>]" +
+  " [--max-members-lite <N>] [--max-members-developer <N>] [--max-messages-per-month <N>]" +
+  " [--expires-at <YYYY-MM-DD>]" +
   " [--email <addr>]";
 
 /** A quota is a whole number; "50GB" or "1.9" is a typo, never 50 or 1. */
@@ -12,6 +14,15 @@ function parseQuota(flag: string, value: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
     throw new Error(`${flag} must be a whole number, got: ${value}\n${USAGE}`);
+  }
+  return parsed;
+}
+
+/** A seat count fits the 32-bit seat column the registry stores it in. */
+function parseSeats(flag: string, value: string): number {
+  const parsed = parseQuota(flag, value);
+  if (parsed > MAX_STATED_SEATS) {
+    throw new Error(`${flag} can be at most ${MAX_STATED_SEATS}, got: ${value}\n${USAGE}`);
   }
   return parsed;
 }
@@ -38,9 +49,13 @@ export function parseGenerateLicenseArgs(args: readonly string[]): LicenseMintRe
     },
     "--plan": (value) => Object.assign(request, { planType: value.toUpperCase() }),
     "--max-members": (value) =>
-      Object.assign(request, { maxMembers: parseQuota("--max-members", value) }),
+      Object.assign(request, { maxMembers: parseSeats("--max-members", value) }),
     "--max-members-lite": (value) =>
-      Object.assign(request, { maxMembersLite: parseQuota("--max-members-lite", value) }),
+      Object.assign(request, { maxMembersLite: parseSeats("--max-members-lite", value) }),
+    "--max-members-developer": (value) =>
+      Object.assign(request, {
+        maxMembersDeveloper: parseSeats("--max-members-developer", value),
+      }),
     "--max-messages-per-month": (value) =>
       Object.assign(request, {
         maxMessagesPerMonth: parseQuota("--max-messages-per-month", value),
@@ -52,7 +67,8 @@ export function parseGenerateLicenseArgs(args: readonly string[]): LicenseMintRe
     const flag = args[index] ?? "";
     const value = args[index + 1];
     const apply = fields[flag];
-    if (apply === undefined || value === undefined) continue;
+    if (apply === undefined) continue;
+    if (value === undefined) throw new Error(`${flag} requires a value\n${USAGE}`);
     apply(value);
     index++;
   }

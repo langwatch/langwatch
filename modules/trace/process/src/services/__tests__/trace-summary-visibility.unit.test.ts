@@ -69,6 +69,38 @@ describe("given a trace summary read with a visibility gate", () => {
     });
   });
 
+  // A logs-only trace (Grok, Cowork) has no span baseline: occurredAt is 0.
+  describe("when a logs-only trace was stored inside the window", () => {
+    it("reads its storage anchor, not the empty span baseline", async () => {
+      const service = makeService({
+        ...makeSummary(0),
+        occurredAt: 0,
+        storageAnchorMs: Date.now() - DAY_MS,
+      });
+      const summary = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
+        visibilityCutoffMs: Date.now() - 14 * DAY_MS,
+      });
+      expect(summary.redactedByVisibilityWindow).toBeUndefined();
+      expect(summary.computedInput).toHaveLength(5000);
+    });
+
+    it("still gates one stored before the cutoff", async () => {
+      const service = makeService({
+        ...makeSummary(0),
+        occurredAt: 0,
+        storageAnchorMs: Date.now() - 20 * DAY_MS,
+      });
+      const summary = await service.getByTraceId({
+        authorization,
+        traceId: "trace-1",
+        visibilityCutoffMs: Date.now() - 14 * DAY_MS,
+      });
+      expect(summary.redactedByVisibilityWindow).toBe(true);
+    });
+  });
+
   describe("when no cutoff is passed (internal callers)", () => {
     it("returns the summary untouched", async () => {
       const service = makeService(makeSummary(40));

@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { generate } from "@langwatch/ksuid";
 
 import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
-import { imageContractArchives, imagePrismaSql } from "../gate/image-tree.ts";
+import { duplicateStep, imageContractArchives, imagePrismaSql } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService, withReinferred } from "../ledger-seed.service.ts";
 import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
@@ -62,6 +62,8 @@ export interface UpgradeRunnerOptions {
     release: string | null;
     steps: readonly ManifestStep[];
     prismaFolders?: readonly string[];
+    /** Its goose files, to name the files behind a step id it declares twice. */
+    gooseFiles?: readonly string[];
   };
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
@@ -593,6 +595,7 @@ export class UpgradeRunnerService {
     this.resolved = [];
     this.held = new Map();
     const retried = [...this.permit.retried].map((name) => `prisma:${name}`);
+    this.refuseDuplicateStepIds();
     await this.runner.clearOperatorRetry({ ids: retried });
     await this.runner.registerSteps({ steps: this.shipped });
     await this.resolveLeftFailures({ signal, runId });
@@ -1079,6 +1082,15 @@ export class UpgradeRunnerService {
     } finally {
       deadline.stop();
     }
+  }
+
+  /** The image's own steps: the released filter would hide a repeat of an id a manifest names. */
+  private refuseDuplicateStepIds(): void {
+    const { steps, gooseFiles = [] } = this.options.image;
+    const duplicate = duplicateStep({ steps, gooseFiles });
+    if (!duplicate) return;
+    const { id, files, message } = duplicate;
+    throw new UpgradeRunFailure("failed", message, { step: id, files });
   }
 
   /**

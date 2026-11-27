@@ -4,12 +4,6 @@
  */
 import type { TypeSegment } from "./typewriter-segment.ts";
 
-/** The first name of the signed-in user, or "there" when the account has none. */
-export function greetingName(fullName: string | null | undefined): string {
-  const first = (fullName ?? "").trim().split(/\s+/)[0] ?? "";
-  return first || "there";
-}
-
 /**
  * Who the value question sets things up for: the organization, unless the
  * user is on their own (or never named one), in which case "you".
@@ -25,9 +19,10 @@ export function setupTarget({
   return usageStyle === "For myself" || !name ? "you" : name;
 }
 
-export function helloSegments(name: string): TypeSegment[] {
+/** A missing name is left out, never filled with a placeholder word. */
+export function helloSegments({ name }: { name: string | undefined }): TypeSegment[] {
   return [
-    { text: `Hello ${name}`, pauseAfter: 650 },
+    { text: name ? `Hello ${name}` : "Hello", pauseAfter: 650 },
     { text: ", I'm Langy 👋", pauseAfter: 750 },
     // The blank line lands before the second sentence types, so the greeting
     // drifts up as it goes: the block is centred on the screen.
@@ -36,9 +31,15 @@ export function helloSegments(name: string): TypeSegment[] {
   ];
 }
 
-export function valueSegments({ name, target }: { name: string; target: string }): TypeSegment[] {
+export function valueSegments({
+  name,
+  target,
+}: {
+  name: string | undefined;
+  target: string;
+}): TypeSegment[] {
   return [
-    { text: `So tell me, ${name},`, pauseAfter: 700 },
+    { text: name ? `So tell me, ${name},` : "So tell me,", pauseAfter: 700 },
     { text: ` what are the most valuable things we can set up for ${target} today?` },
   ];
 }

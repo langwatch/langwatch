@@ -4,7 +4,10 @@ import type { AnalyticsRecencyRepository } from "./analytics-recency.repository.
 import type { AnalyticsSessionsRepository } from "./analytics-sessions.repository.ts";
 import type { AnalyticsRepository } from "./analytics.repository.ts";
 import type { FilterOptionsRepository } from "./filter-options.repository.ts";
+import type { LangWatchQLAccessModelAnswerRepository } from "./langwatch-ql-access-model-answer.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
+import type { LangWatchQLTenantRouting } from "./langwatch-ql-executor.repository.ts";
+import type { LangWatchQLPlacementRepository } from "./langwatch-ql-placement.repository.ts";
 import type { LwqlProvisioningDatabase } from "./langwatch-ql-postgres.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
 import type { LwqlUnconfirmedSinceRepository } from "./langwatch-ql-unconfirmed-since.repository.ts";
@@ -38,6 +41,8 @@ export type LangWatchQlSupply = Readonly<{
   database: () => LwqlProvisioningDatabase;
   /** The fleet's first failure to show the collection loaded, for the check's alert. */
   unconfirmedSince: LwqlUnconfirmedSinceRepository;
+  /** Which ClickHouse a statement's projects live on: shared, or their organization's own. */
+  routeTenantSet: LangWatchQLTenantRouting;
 }>;
 
 /** What the analytics module reads and counts, chosen once at boot. */
@@ -58,5 +63,9 @@ export interface AnalyticsRepositories {
   readonly recency: AnalyticsRecencyRepository;
   /** The per-project window every LangWatchQL execution is counted against. */
   readonly rateLimits: AnalyticsRateLimitRepository;
+  /** Whether a tenant's rows are on the shared server: the LangWatchQL gate asks first. */
+  readonly lwqlPlacement: LangWatchQLPlacementRepository;
+  /** The fleet's last answer to whether the access model is provisioned, kept for minutes. */
+  readonly lwqlAccessModelAnswer: LangWatchQLAccessModelAnswerRepository;
   readonly langWatchQl: LangWatchQlSupply;
 }

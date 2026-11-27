@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,4 +74,39 @@ func TestLoad_FallbackToDetect(t *testing.T) {
 	if input.CPU < 1 {
 		t.Errorf("CPU = %d, want >= 1", input.CPU)
 	}
+}
+
+// @scenario "Dynamic-only mode starts without any password for the default user"
+func TestLoad_ReadsTheModeFromTheAccessFile(t *testing.T) {
+	t.Setenv("CH_CPU", "2")
+	t.Setenv("CH_RAM", "1Gi")
+	for _, tc := range []struct {
+		file string
+		want bool
+	}{
+		{"mode: dynamic-only\nusers: []\n", true},
+		{"users: []\n", false},
+	} {
+		path := filepath.Join(t.TempDir(), "access.yaml")
+		if err := os.WriteFile(path, []byte(tc.file), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("CLICKHOUSE_ACCESS_FILE", path)
+		i, err := Load()
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if i.DynamicOnly != tc.want || i.AccessBootstrapDir != "/run/clickhouse-access" {
+			t.Errorf("%q: DynamicOnly = %v, bootstrap dir %q", tc.file, i.DynamicOnly, i.AccessBootstrapDir)
+		}
+	}
+
+	t.Run("an invalid access file stops Load", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "access.yaml")
+		_ = os.WriteFile(path, []byte("mode: dynamic-only\nusers: [{name: m, tier: inspect, login: {rolling: {dir: /x}}}]\n"), 0o600)
+		t.Setenv("CLICKHOUSE_ACCESS_FILE", path)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "refused in dynamic-only mode") {
+			t.Errorf("Load = %v, want the rolling user refused", err)
+		}
+	})
 }

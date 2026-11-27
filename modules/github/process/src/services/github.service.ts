@@ -17,6 +17,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import type { parseAgentCheckSuiteCompleted } from "../rules/github-check-suite-event.rules.ts";
 import type { GithubHost } from "../rules/github-host.rules.ts";
 import type {
   installErrorHtml,
@@ -32,6 +33,7 @@ import type { BranchMappingRequest } from "./github-branch-demand.service.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
 import type { GithubInstallState } from "./github-install-state.service.ts";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
+import type { GithubPullRequestChecksService } from "./github-pull-request-checks.service.ts";
 import type { GithubPullRequestMappingService } from "./github-pull-request-mapping.service.ts";
 import type { GithubPullRequestStatusService } from "./github-pull-request-status.service.ts";
 
@@ -61,6 +63,8 @@ type GithubServiceDependencies = {
   installState: GithubInstallState;
   installResponse: { successHtml: typeof installSuccessHtml; errorHtml: typeof installErrorHtml };
   pullRequestEvents: { parse: typeof parsePullRequestEvent };
+  checks: Pick<GithubPullRequestChecksService, "applyCheckSuiteCompleted">;
+  checkSuiteEvents: { parse: typeof parseAgentCheckSuiteCompleted };
 };
 
 /**
@@ -81,6 +85,8 @@ export class GithubFeatureService implements GithubApi {
       installState: dependencies.installState,
       installResponse: dependencies.installResponse,
       pullRequestEvents: dependencies.pullRequestEvents,
+      checks: dependencies.checks,
+      checkSuiteEvents: dependencies.checkSuiteEvents,
     });
   }
 
@@ -95,6 +101,8 @@ export class GithubFeatureService implements GithubApi {
     errorHtml: typeof installErrorHtml;
   };
   private readonly pullRequestEvents: { parse: typeof parsePullRequestEvent };
+  private readonly checks: GithubServiceDependencies["checks"];
+  private readonly checkSuiteEvents: GithubServiceDependencies["checkSuiteEvents"];
 
   private constructor({
     installations,
@@ -105,6 +113,8 @@ export class GithubFeatureService implements GithubApi {
     installState,
     installResponse,
     pullRequestEvents,
+    checks,
+    checkSuiteEvents,
   }: {
     installations: GithubInstallationsService;
     mapping: GithubPullRequestMappingService;
@@ -114,6 +124,8 @@ export class GithubFeatureService implements GithubApi {
     installState: GithubInstallState;
     installResponse: { successHtml: typeof installSuccessHtml; errorHtml: typeof installErrorHtml };
     pullRequestEvents: { parse: typeof parsePullRequestEvent };
+    checks: GithubServiceDependencies["checks"];
+    checkSuiteEvents: GithubServiceDependencies["checkSuiteEvents"];
   }) {
     this.installations = installations;
     this.mapping = mapping;
@@ -123,6 +135,8 @@ export class GithubFeatureService implements GithubApi {
     this.installState = installState;
     this.installResponse = installResponse;
     this.pullRequestEvents = pullRequestEvents;
+    this.checks = checks;
+    this.checkSuiteEvents = checkSuiteEvents;
     this.connection = GithubConnectionService.create({
       installations,
       getAppConfig: () => this.getAppConfig(),
@@ -279,6 +293,12 @@ export class GithubFeatureService implements GithubApi {
           "github pull request webhook handling failed",
         );
       }
+      return;
+    }
+
+    if (input.eventType === "check_suite") {
+      const suite = this.checkSuiteEvents.parse(input.payload);
+      if (suite) await this.checks.applyCheckSuiteCompleted(suite);
       return;
     }
 

@@ -17,7 +17,20 @@ export type ModelProviderScopeGraphOrganization = {
   teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
 };
 
+/** What `instantEval.access` answers, narrowed to what the Instant Evals column reads. */
+export type ModelProviderInstantEvalAccess = {
+  /** LangWatch's own model may judge for this project. */
+  hostedReleased: boolean;
+  /** What a refused reader is offered: the switch, an admin, us, or a self-hosted reason. */
+  offer: string;
+};
+
 type BorrowedProcedures = {
+  instantEval: {
+    access: {
+      query: { input: { projectId: string }; output: ModelProviderInstantEvalAccess };
+    };
+  };
   organization: {
     getScopeGraph: {
       query: { input: Record<string, never>; output: ModelProviderScopeGraphOrganization[] };

@@ -9,6 +9,9 @@ import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
 
 const logger = createLogger("langwatch:langy:turn-stop-service");
 
+/** Matches the worker cancel's cap, so a stalled Redis cannot hold Stop's answer. */
+const LOCAL_WORK_CANCEL_TIMEOUT_MS = 3_000;
+
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
@@ -31,7 +34,7 @@ export class LangyTurnStopService {
     turnId: string;
     userId: string;
   }): Promise<void> {
-    const { tokenBuffer, worker, conversations, accessStore } = this.deps;
+    const { tokenBuffer, worker, conversations, accessStore, localWork } = this.deps;
     const isActor = await accessStore.isTurnActor({
       projectId,
       conversationId,
@@ -76,9 +79,46 @@ export class LangyTurnStopService {
       parts: this.deps.finalParts.build({ text: partialText }),
       outcome: "stopped",
     });
-    await Promise.allSettled([
+    // Best-effort, after the terminal. The worker's abort only ends its own polling: the card
+    // and the command the turn left on the developer's machine end here (ADR-129).
+    const settled = await Promise.allSettled([
       tokenBuffer.markEnd({ conversationId, turnId }),
       worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
+      this.capLocalWorkCancel({
+        cancel: localWork.cancelTurn({ conversationId, turnId }),
+        context: { projectId, conversationId, turnId },
+      }),
     ]);
+    for (const outcome of settled) {
+      if (outcome.status !== "rejected") continue;
+      logger.warn(
+        { error: outcome.reason, projectId, conversationId, turnId },
+        "part of the langy stop failed after the stopped terminal was recorded",
+      );
+    }
+  }
+
+  /** Lets Stop answer when the local-work cancel stalls; the cancel itself keeps running. */
+  private async capLocalWorkCancel({
+    cancel,
+    context,
+  }: {
+    cancel: Promise<unknown>;
+    context: { projectId: string; conversationId: string; turnId: string };
+  }): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    const capped = new Promise<"timed-out">((resolve) => {
+      timer = setTimeout(() => resolve("timed-out"), LOCAL_WORK_CANCEL_TIMEOUT_MS);
+    });
+    try {
+      if ((await Promise.race([cancel, capped])) === "timed-out") {
+        logger.warn(
+          { ...context, timeoutMs: LOCAL_WORK_CANCEL_TIMEOUT_MS },
+          "ending the turn's local work timed out; answering the stop anyway",
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }

@@ -51,10 +51,10 @@ func TestPostMessage_SeedsFirstDeliveredMessageOnly(t *testing.T) {
 	w := newSeedWorker(agent)
 	seed := "THE CONVERSATION SO FAR: earlier things were said"
 
-	if err := w.PostMessage(context.Background(), "sys", "what is my name?", seed, ""); err != nil {
+	if err := w.PostMessage(context.Background(), "sys", "what is my name?", seed, "", nil); err != nil {
 		t.Fatalf("first PostMessage: %v", err)
 	}
-	if err := w.PostMessage(context.Background(), "sys", "and my surname?", seed, ""); err != nil {
+	if err := w.PostMessage(context.Background(), "sys", "and my surname?", seed, "", nil); err != nil {
 		t.Fatalf("second PostMessage: %v", err)
 	}
 
@@ -85,7 +85,7 @@ func TestPostMessage_ResumedSessionIsNeverSeeded(t *testing.T) {
 	w.promptDelivered = true
 
 	seed := "THE CONVERSATION SO FAR: earlier things were said"
-	if err := w.PostMessage(context.Background(), "sys", "and my surname?", seed, ""); err != nil {
+	if err := w.PostMessage(context.Background(), "sys", "and my surname?", seed, "", nil); err != nil {
 		t.Fatalf("PostMessage: %v", err)
 	}
 
@@ -104,11 +104,11 @@ func TestPostMessage_FailedFirstPostSeedsAgainOnRetry(t *testing.T) {
 	w := newSeedWorker(agent)
 	seed := "THE CONVERSATION SO FAR: earlier things were said"
 
-	if err := w.PostMessage(context.Background(), "sys", "hello?", seed, ""); err == nil {
+	if err := w.PostMessage(context.Background(), "sys", "hello?", seed, "", nil); err == nil {
 		t.Fatal("first PostMessage should have failed")
 	}
 	agent.postErr = nil
-	if err := w.PostMessage(context.Background(), "sys", "hello again?", seed, ""); err != nil {
+	if err := w.PostMessage(context.Background(), "sys", "hello again?", seed, "", nil); err != nil {
 		t.Fatalf("retry PostMessage: %v", err)
 	}
 
@@ -123,7 +123,7 @@ func TestPostMessage_EmptySeedLeavesPromptBare(t *testing.T) {
 	agent := &seedRecordingAgent{}
 	w := newSeedWorker(agent)
 
-	if err := w.PostMessage(context.Background(), "sys", "hi", "", ""); err != nil {
+	if err := w.PostMessage(context.Background(), "sys", "hi", "", "", nil); err != nil {
 		t.Fatalf("PostMessage: %v", err)
 	}
 	if agent.posts[0].Prompt != "hi" {

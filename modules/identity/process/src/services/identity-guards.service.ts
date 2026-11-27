@@ -156,19 +156,20 @@ export class IdentityGuardsService {
   async attachIdentifier(data: AttachIdentifierCommandData): Promise<IdentityFactInput[]> {
     const { userId, provider, providerAccountId, value, occurredAtMs, commandId, actor } = data;
     const normalizedValue = normalizeIdentifierValue(value);
-    const identifierId = this.identifiers.deriveIdentifierId({
-      userId,
-      provider,
-      providerAccountId,
-      normalizedValue,
-      occurredAtMs,
-    });
     // A fact the heads already carry (i.e. FOLDED, not merely provisional) is
     // not restated: a staged re-run or backfill pass after the first must cost
     // no event_log row. A newborn's heads may hold a provisional row the
     // ledger wrote before staging, so deduping against it — before the fold
     // lands — would leave the log without the event and the address lock held forever.
     const heads = await this.heads.findHeads({ userId });
+    const identifierId = this.identifiers.deriveIdentifierId({
+      userId,
+      provider,
+      providerAccountId,
+      normalizedValue,
+      occurredAtMs,
+      storedIdentifierIds: new Set(Object.keys(heads.identifiers)),
+    });
     if (heads.identifiers[identifierId] && (await this.heads.hasFolded({ userId }))) {
       return [];
     }

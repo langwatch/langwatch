@@ -6,15 +6,13 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:37`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:91`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`TraceApi`)
 
-Public Trace operations shared by process peers after boot composition.
-
-Peers call these through the token, declared at `../contract/src/trace.api.ts:168`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:206`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -59,6 +57,22 @@ The trace's chat messages as JSON: `"both"` answers `{input, output}`, a one-sid
 renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
 ```
 
+#### `getSpanAnalyticsFloor`
+
+Where the span widgets' history starts, from the span_analytics replay's recorded since.
+
+```typescript
+getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
+```
+
+#### `getManagedPromptVersionFloor`
+
+Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+
+```typescript
+getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
+```
+
 #### `renderSpanMessages`
 
 One named span's chat messages as JSON, and whether the trace holds it.
@@ -97,10 +111,12 @@ Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresol
 findNormalizedSpansByTraceId(input: { authorization: Authorization; traceId: string; limit?: number; }): Promise<NormalizedSpan[]>;
 ```
 
-#### `resolveIngestWaitTimeout`
+#### `resolveTraceSettleSettings`
+
+The project's recommended verdict-time trace wait, measured on its own span arrivals.
 
 ```typescript
-resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings>;
 ```
 
 #### `getEvaluationSpans`
@@ -166,7 +182,7 @@ findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
 #### `listTraces`
 
 ```typescript
-listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */ authorization?: Authorization; /** Refuse above this plan bound instead of clamping to the list bound. */ refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax"; }; }): Promise<TracesForProjectResult>;
+listTraces(input: { query: TraceLegacyListInput; protections: unknown; options?: { dateField?: TraceDateField; downloadMode?: boolean; includeSpans?: boolean; resolveBlobs?: boolean; scrollId?: string | null; /** The v1 REST search's compiled query-language filter, ANDed into the read. */ filterWhere?: { sql: string; params: Record<string, unknown> }; /** The proof `filterWhere`'s tenant markers expand into (ADR-177 block C). */ authorization?: Authorization; /** Refuse above this plan bound instead of clamping; a spans read takes the spans bound. */ refuseAbove?: TracePageSizeBound; }; }): Promise<TracesForProjectResult>;
 ```
 
 #### `listTraceSummaries`
@@ -215,12 +231,132 @@ One conversation's turns, oldest first, through the viewer's protections.
 readConversationContextForViewer(input: { projectId: string; conversationId: string; viewerUserId: string; authorization: Authorization; tenantId?: string | undefined; }): Promise<TracesConversationContext>;
 ```
 
+#### `previewBraid`
+
+ADR-201 §7: the reader's trace ids under its proof, then the owner's spans under its own.
+
+```typescript
+previewBraid(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; /** The braid being edited, which the draft replaces in the count; absent for a new braid. */ braidId?: string | undefined; }): Promise<BraidPreview>;
+```
+
+#### `readBraidAttributeKeys`
+
+The owner's span attribute keys over the last 7 days, most frequent first.
+
+```typescript
+readBraidAttributeKeys(input: { authorization: Authorization }): Promise<BraidAttributeKeys>;
+```
+
+#### `readBraidActivity`
+
+Each of the project's braids' spans in the last 24 hours, under the project's own proof.
+
+```typescript
+readBraidActivity(input: { projectId: string; authorization: Authorization; braidIds: readonly string[]; }): Promise<BraidActivity>;
+```
+
+#### `readBraidTestTrace`
+
+One reader trace, the owner's spans marked by the pair's live braids and the draft.
+
+```typescript
+readBraidTestTrace(input: { ownerAuthorization: Authorization; readerAuthorization: Authorization; where?: string | undefined; fromMs: number; traceId: string; /** The braid being edited, which the draft replaces; absent for a new braid. */ braidId?: string | undefined; }): Promise<BraidTestTrace>;
+```
+
 #### `readSpanDetailForViewer`
 
 One span's detail through the viewer's protections; refuses with `SpanNotFoundError`.
 
 ```typescript
-readSpanDetailForViewer(input: { projectId: string; authorization: Authorization; traceId: string; spanId: string; occurredAtMs?: number; viewerUserId: string; }): Promise<SpanDetail>;
+readSpanDetailForViewer(input: { projectId: string; authorization: Authorization; traceId: string; spanId: string; /** A braided span's owner (ADR-201 §5); absent, the reader's own span. */ ownerProjectId?: string | undefined; occurredAtMs?: number; viewerUserId: string; /** The member the drawer named; the route's proof is narrowed to the trace's member inside. */ tenantId?: string | undefined; }): Promise<SpanDetail>;
+```
+
+#### `readTraceHeaderForViewer`
+
+The drawer header, its cost and its `braided` totals gated per owner (ADR-201 §5).
+
+```typescript
+readTraceHeaderForViewer(input: TraceDrawerReadInput & { full?: boolean | undefined }): Promise<TraceHeader>;
+```
+
+#### `readSpansPageForViewer`
+
+One page of a trace's spans, each braided span protected by its owner; audited (§8).
+
+```typescript
+readSpansPageForViewer(input: TraceDrawerReadInput & { limit: number; offset: number }): Promise<{ spans: Span[]; total: number }>;
+```
+
+#### `readSpansSinceForViewer`
+
+A live trace's spans since a start-time mark, protected by owner; audited (§8).
+
+```typescript
+readSpansSinceForViewer(input: TraceDrawerReadInput & { sinceStartTimeMs: number }): Promise<Span[]>;
+```
+
+#### `readSpanTreePageForViewer`
+
+One page of the span tree, each span's cost gated by its owner; audited (§8).
+
+```typescript
+readSpanTreePageForViewer(input: TraceDrawerReadInput & Omit<SpanTreeInput, "canSeeCosts">): Promise<SpanTreePage>;
+```
+
+#### `readSpanTreeDeltaForViewer`
+
+The tree nodes of a live trace newer than a mark, cost gated by owner; audited (§8).
+
+```typescript
+readSpanTreeDeltaForViewer(input: TraceDrawerReadInput & Omit<SpanTreeDeltaInput, "canSeeCosts">): Promise<SpanTreeNode[]>;
+```
+
+#### `readSpanTreeForViewer`
+
+The whole span tree in one answer, each span's cost gated by its owner.
+
+```typescript
+readSpanTreeForViewer(input: TraceDrawerReadInput): Promise<SpanTreeNode[]>;
+```
+
+#### `readSpansFullForViewer`
+
+Every span's detail, protected and described by its owner (ADR-201 §5).
+
+```typescript
+readSpansFullForViewer(input: TraceDrawerReadInput): Promise<SpanDetail[]>;
+```
+
+#### `readAgentCallGraphForViewer`
+
+Agents in one trace, the calls between them and each agent's tokens and cost.
+
+```typescript
+readAgentCallGraphForViewer(input: TraceDrawerReadInput): Promise<AgentCallGraph>;
+```
+
+#### `readSpanResourcesForViewer`
+
+The resource pane, each braided span's resources gated by its owner.
+
+```typescript
+readSpanResourcesForViewer(input: TraceDrawerReadInput): Promise<TraceResourceInfoDto>;
+```
+
+#### `readTraceEventsForViewer`
+
+The drawer timeline, each braided span's events protected by its owner.
+
+```typescript
+readTraceEventsForViewer(input: TraceDrawerReadInput): Promise<DerivedTraceEvent[]>;
+```
+
+#### `readLangwatchSignalsForViewer`
+
+Signal buckets per span, the trace opened and owners grouped as the span tree is.
+
+```typescript
+readLangwatchSignalsForViewer(input: TraceDrawerReadInput): Promise<SpanLangwatchSignals[]>;
 ```
 
 #### `readTraceFacetsForApiKey`
@@ -303,6 +439,14 @@ Every trace of the named threads. `maxTraces` is the ceiling across all of them 
 readThreadsTraces(input: { projectId: string; threadIds: string[]; protections: unknown; withEditOverlay?: boolean; maxTraces?: number; }): Promise<Trace[]>;
 ```
 
+#### `readThreadsTraceIds`
+
+The trace ids of the named threads, one list per thread, oldest first. Reads the trace summaries' keys only: no content, so it needs no protections. `maxTraces` is the ceiling across all of the threads together.
+
+```typescript
+readThreadsTraceIds(input: { projectId: string; threadIds: string[]; maxTraces?: number; }): Promise<ThreadTraceIds[]>;
+```
+
 #### `readSampleTraces`
 
 ```typescript
@@ -333,10 +477,10 @@ resolveViewerProtections(input: { projectId: string; userId: string | null; /** 
 
 #### `resolveApiKeyProtections`
 
-The same redactions for an API-KEY caller: the public branch of every content category, plus the credential's own `cost:view` grant. A legacy project key (`principal: null`) predates RBAC and sees costs.
+The same redactions for a REST credential: an API key reads the public branch of every content category, a project-bound access token (`user` principal) reads as its person. Costs are the credential's own `cost:view` grant; a legacy key (`null`) sees them.
 
 ```typescript
-resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | null; }): Promise<Protections>;
+resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | null; /** The read's proof, folded in for an access token as for its person (ADR-177 decision 9). */ authorization?: Authorization; }): Promise<Protections>;
 ```
 
 #### `findExistingTraceIds`
@@ -385,8 +529,10 @@ isCodingAgentShapedSpan(span: Span): boolean;
 
 #### `enrichSpansFromCodingAgentLogs`
 
+The reader's own spans get their coding-agent log content; a braided span shows as stored.
+
 ```typescript
-enrichSpansFromCodingAgentLogs(input: { projectId: string; traceId: string; spans: Span[]; occurredAtMs?: number; }): Promise<Span[]>;
+enrichSpansFromCodingAgentLogs(input: { projectId: string; traceId: string; spans: OwnedSpan[]; occurredAtMs?: number; }): Promise<OwnedSpan[]>;
 ```
 
 #### `enrichSpanFromCodingAgentLogs`
@@ -410,55 +556,63 @@ getLogsByTraceId(input: { tenantId: string; traceId: string; occurredAtMs?: numb
 #### `readSpanSummaries`
 
 ```typescript
-readSpanSummaries(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<SpanSummaryRow[]>;
+readSpanSummaries(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<SpanSummaryRow[]>;
 ```
 
 #### `readSpans`
 
 ```typescript
-readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; }): Promise<Span[]>;
+readSpans(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; limit?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<OwnedSpan[]>;
 ```
 
 #### `readSpansPage`
 
 ```typescript
-readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; }): Promise<{ spans: Span[]; total: number }>;
+readSpansPage(input: { authorization: Authorization; traceId: string; limit: number; offset: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: OwnedSpan[]; total: number }>;
 ```
 
 #### `readSpansSince`
 
 ```typescript
-readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; }): Promise<Span[]>;
+readSpansSince(input: { authorization: Authorization; traceId: string; sinceStartTimeMs: number; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<OwnedSpan[]>;
 ```
 
 #### `findSpan`
 
 ```typescript
-findSpan(input: { authorization: Authorization; traceId: string; spanId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; }): Promise<Span | null>;
+findSpan(input: { authorization: Authorization; traceId: string; spanId: string; ownerProjectId?: string | undefined; occurredAtMs?: number; visibilityCutoffMs?: number | null; }): Promise<Span | null>;
 ```
 
 #### `readSpanEvents`
 
 ```typescript
-readSpanEvents(input: { authorization: Authorization; traceId: string; spanId: string; occurredAtMs?: number; }): Promise<ElasticSearchEvent[]>;
+readSpanEvents(input: { authorization: Authorization; traceId: string; spanId: string; ownerProjectId?: string | undefined; occurredAtMs?: number; }): Promise<ElasticSearchEvent[]>;
 ```
 
 #### `readLangwatchSignals`
 
 ```typescript
-readLangwatchSignals(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
+readLangwatchSignals(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise< { spanId: string; signals: SpanLangwatchSignals["signals"]; ownerProjectId?: string }[] >;
 ```
 
 #### `readSpanResources`
 
 ```typescript
-readSpanResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<SpanResourceInfo[]>;
+readSpanResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<SpanResourceInfo[]>;
+```
+
+#### `readSpansWithResources`
+
+A trace's spans and their resource rows in one read, audited once for both.
+
+```typescript
+readSpansWithResources(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<{ spans: OwnedSpan[]; resources: SpanResourceInfo[] }>;
 ```
 
 #### `readTraceEvents`
 
 ```typescript
-readTraceEvents(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; }): Promise<DerivedTraceEvent[]>;
+readTraceEvents(input: { authorization: Authorization; traceId: string; occurredAtMs?: number; /** `spans`: the trace view's read, where the proof's braids show owners' spans (ADR-201 §5). */ reads?: "spans" | "traces"; }): Promise<DerivedTraceEvent[]>;
 ```
 
 #### `readTraceEventRollups`
@@ -527,18 +681,18 @@ findSpendByAttributeValue(input: { projectId: string; attributeKey: string; valu
 
 #### `findAttributeUsageBuckets`
 
-The project's traces carrying the attribute (or one of `values`), per value, model and day.
+Traces with the attribute (or one of `values`) across `projectIds`, per value, model, day.
 
 ```typescript
-findAttributeUsageBuckets(input: { projectId: string; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; }): Promise<TraceAttributeUsageBucket[]>;
+findAttributeUsageBuckets(input: { projectIds: readonly string[]; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; }): Promise<TraceAttributeUsageBucket[]>;
 ```
 
 #### `findAttributedTraces`
 
-The project's newest traces carrying the attribute, at most `limit`; `model` is the first.
+Newest traces with the attribute across `projectIds`, at most `limit`; `model` is first.
 
 ```typescript
-findAttributedTraces(input: { projectId: string; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; model?: string; limit: number; }): Promise<TraceAttributedTrace[]>;
+findAttributedTraces(input: { projectIds: readonly string[]; attributeKey: string; window: TraceModelSpendWindow; values?: string[]; model?: string; limit: number; }): Promise<TraceAttributedTrace[]>;
 ```
 
 #### `getAttributedSpendComparison`
@@ -583,10 +737,10 @@ findDailyAttributedSpend(input: { projectId: string; matches: readonly TraceAttr
 
 #### `countAttributedTracesByValue`
 
-Matching traces since `sinceMs`, counted per `valueKey` value among `values`.
+Matching traces since `sinceMs`, counted per `valueKey` value that equals one of `values` or starts with one of `valuePrefixes`.
 
 ```typescript
-countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
+countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; valuePrefixes?: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
 ```
 
 #### `findAttributedTracesBefore`
@@ -644,7 +798,7 @@ translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from
 A legacy `filters` document compiled to parameterized ClickHouse conditions over `trace_summaries ts`; Trace owns the grammar because it owns the tables. `fenced` writes side-table subqueries for a statement read through a proof's fence (ADR-177).
 
 ```typescript
-translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
+translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; window?: { startDate?: number; endDate?: number }; fenced?: boolean; /** Lets a span-type filter read span_analytics where it is complete. */ spanAnalyticsFloor?: SpanAnalyticsFloor | null; }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
 ```
 
 #### `compileExplorerTraceFilter`
@@ -694,7 +848,7 @@ findPromptStudioSpan(input: { projectId: string; spanId: string; protections: un
 #### `readTraceList`
 
 ```typescript
-readTraceList(params: { authorization: Authorization; timeRange: { from: number; to: number }; sort: { columnId: string; direction: "asc" | "desc" }; page?: number; pageSize: number; cursor?: { sortValue: number; traceId: string }; filterWhere?: { sql: string; params: Record<string, unknown> }; visibilityCutoffMs?: number | null; }): Promise<TraceListPage>;
+readTraceList(params: { authorization: Authorization; timeRange: { from: number; to: number }; sort: { columnId: string; direction: "asc" | "desc" }; page?: number; pageSize: number; cursor?: { sortValue: number; traceId: string }; filterWhere?: { sql: string; params: Record<string, unknown> }; visibilityCutoffMs?: number | null; /** Over-plan withholding: later rows are left out and counted on `withheld`. */ withholding?: TraceWithholding; }): Promise<TraceListPage>;
 ```
 
 #### `readSessionGroups`
@@ -772,7 +926,15 @@ authorizationForTrace(input: { authorization: Authorization; traceId: string; te
 #### `readTraceSummary`
 
 ```typescript
-readTraceSummary(input: { authorization: Authorization; traceId: string; /** The member the header named; narrows an aggregate's proof (ADR-177 block F). */ tenantId?: string | undefined; occurredAtMs?: number; visibilityCutoffMs?: number | null; full?: boolean; }): Promise<unknown>;
+readTraceSummary(input: { authorization: Authorization; traceId: string; /** The member the header named; narrows an aggregate's proof (ADR-177 block F). */ tenantId?: string | undefined; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** Refuses a summary the over-plan cutoff withholds (`trace_withheld_over_plan`). */ withholding?: TraceWithholding; full?: boolean; }): Promise<unknown>;
+```
+
+#### `assertTraceNotWithheld`
+
+Throws `trace_withheld_over_plan` when the viewer's plan withholds this trace.
+
+```typescript
+assertTraceNotWithheld(input: { authorization: Authorization; traceId: string; tenantId?: string | undefined; occurredAtMs?: number; protections: Protections; }): Promise<void>;
 ```
 
 #### `isTraceWindowRedacted`
@@ -940,7 +1102,7 @@ canonicalizeSpanAttributes(input: CanonicalizeSpanAttributesInput): Canonicalize
 A log record's input and output, each cut to Trace's 64 KiB projection preview.
 
 ```typescript
-extractLogRecordIO(input: LogRecordReceivedEventData): { input: string | null; output: string | null; truncated: boolean; };
+extractLogRecordIO(input: LogRecordReceivedEventData): { input: string | null; output: string | null; outputDeclared: boolean; truncated: boolean; };
 ```
 
 #### `recordLogContributions`
@@ -1009,6 +1171,22 @@ The project's distinct traces over the last 24 hours.
 countTracesInLastDay(input: { projectId: string }): Promise<number>;
 ```
 
+#### `countIngestionByProject`
+
+A staff investigation's ingestion figures (ADR-202): one row per asked project, zeros when nothing arrived in `[since, until)` (epoch ms). Refusals are counted per UTC day, so a range takes every day it touches.
+
+```typescript
+countIngestionByProject(input: { projectIds: string[]; since: number; until: number; }): Promise<TraceIngestionCount[]>;
+```
+
+#### `findTracePresence`
+
+Whether a trace id is stored in the project, with counts and arrival times only (ADR-202).
+
+```typescript
+findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]>;
+```
+
 #### `hasTraceWithAttribute`
 
 Whether any trace carrying `attribute` landed for the project at or after `sinceMs`.
@@ -1023,6 +1201,14 @@ Rows carrying `attribute` since `sinceMs`, counted per `groupByKey` value, most 
 
 ```typescript
 findTraceCountsByAttribute(input: { projectId: string; sinceMs: number; attribute: TraceAttributeMatch; groupByKey: string; }): Promise<{ value: string; count: number }[]>;
+```
+
+#### `findAgentsSeen`
+
+Distinct `gen_ai.agent.name` values in the project's spans since `sinceMs`, busiest first.
+
+```typescript
+findAgentsSeen(input: { projectId: string; sinceMs: number; limit: number; }): Promise<TraceAgentSeen[]>;
 ```
 
 ## REST transport
@@ -1053,20 +1239,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:275` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:263` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:281`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:269`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:285)
-// Response: inline, src/transport/otlp-ingest.rest.ts:288
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:273)
+// Response: inline, src/transport/otlp-ingest.rest.ts:276
 type Response = unknown;
 ```
 
@@ -1109,11 +1295,11 @@ Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:382`.
 Answers at `/api/trace/:id`.
 
 ```typescript
-// Params: traceLegacyIdParamsSchema, ../contract/src/trace-rest.schemas.ts:152
+// Params: traceLegacyIdParamsSchema, ../contract/src/trace-rest.schemas.ts:159
 interface Params {
   id: string;
 }
-// Query: traceFormatQuerySchema, ../contract/src/trace-rest.schemas.ts:247
+// Query: traceFormatQuerySchema, ../contract/src/trace-rest.schemas.ts:254
 interface Query {
   format?: string;
   llmMode?: string;
@@ -1131,7 +1317,7 @@ Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:407`.
 Answers at `/api/trace/:id/share`.
 
 ```typescript
-type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:152
+type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:159
 // Response: inline, src/transport/trace-legacy.rest.ts:412
 type Response = unknown;
 ```
@@ -1145,7 +1331,7 @@ Permission `traces:share`. Declared at `src/transport/trace-legacy.rest.ts:428`.
 Answers at `/api/trace/:id/unshare`.
 
 ```typescript
-type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:152
+type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:159
 // Response: inline, src/transport/trace-legacy.rest.ts:433
 type Response = unknown;
 ```
@@ -1172,7 +1358,7 @@ Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/tra
 Answers at `/api/thread/:threadId`.
 
 ```typescript
-// Params: traceLegacyThreadParamsSchema, ../contract/src/trace-rest.schemas.ts:162
+// Params: traceLegacyThreadParamsSchema, ../contract/src/trace-rest.schemas.ts:169
 interface Params {
   threadId: string;
 }
@@ -1184,7 +1370,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:307`   |
+| Declared at | `src/transport/traces.rest.ts:310`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1194,26 +1380,43 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:311`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:314`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
-type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:124
-// Response: inline, src/transport/traces.rest.ts:316
+type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
+// Response: inline, src/transport/traces.rest.ts:319
 type Response = unknown;
+```
+
+#### `GET /settle-settings` · `getTraceSettleSettings`
+
+Recommended trace wait for a scenario judge
+
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:341`.
+
+Answers at `/api/traces/settle-settings`, `/api/v1/traces/settle-settings`; also, undocumented, `/api/traces/2026-08-07/settle-settings`, `/api/v1/traces/2026-08-07/settle-settings`, `/api/traces/latest/settle-settings`, `/api/v1/traces/latest/settle-settings`.
+
+```typescript
+// Response: traceSettleSettingsSchema, ../contract/src/trace.queries.ts:76
+interface Response {
+  waitTimeoutMs: number;
+  waitExtensionMs: number;
+  quietPeriodMs: number;
+}
 ```
 
 #### `GET /facets` · `getTraceFacets`
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:338`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:365`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
 ```typescript
-// Query: traceFacetsQuerySchema, ../contract/src/trace-rest.schemas.ts:422
+// Query: traceFacetsQuerySchema, ../contract/src/trace-rest.schemas.ts:430
 interface Query {
   field?: string;
   prefix?: string;
@@ -1222,7 +1425,7 @@ interface Query {
   startDate?: string;
   endDate?: string;
 }
-// Response: traceFacetsResponseSchema, ../contract/src/trace-rest.schemas.ts:447
+// Response: traceFacetsResponseSchema, ../contract/src/trace-rest.schemas.ts:455
 type Response = Record<string, unknown>;
 ```
 
@@ -1230,33 +1433,33 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:371`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:398`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
 ```typescript
-// Params: traceIdParamsSchema, ../contract/src/trace-rest.schemas.ts:237
+// Params: traceIdParamsSchema, ../contract/src/trace-rest.schemas.ts:244
 interface Params {
   traceId: string;
 }
-type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src/trace-rest.schemas.ts:312
+type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src/trace-rest.schemas.ts:319
 ```
 
 #### `PATCH /:traceId/metadata` · `updateTraceMetadata`
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:410`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:437`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
 ```typescript
-type Params = z.infer<typeof traceIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:237
-// Body: traceMetadataBodySchema, ../contract/src/trace-rest.schemas.ts:282
+type Params = z.infer<typeof traceIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:244
+// Body: traceMetadataBodySchema, ../contract/src/trace-rest.schemas.ts:289
 interface Body {
   metadata: Record<string, string | number | boolean | string[] | Record<string, unknown>>;
 }
-// Response: traceMetadataResponseSchema, ../contract/src/trace-rest.schemas.ts:254
+// Response: traceMetadataResponseSchema, ../contract/src/trace-rest.schemas.ts:261
 interface Response {
   traceId: string;
 }
@@ -1266,14 +1469,14 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:436`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:463`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
 ```typescript
-type Params = z.infer<typeof traceIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:237
-type Query = z.infer<typeof traceFormatQuerySchema>; // ../contract/src/trace-rest.schemas.ts:247
-// Response: traceDetailResponseSchema, ../contract/src/trace-rest.schemas.ts:114
+type Params = z.infer<typeof traceIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:244
+type Query = z.infer<typeof traceFormatQuerySchema>; // ../contract/src/trace-rest.schemas.ts:254
+// Response: traceDetailResponseSchema, ../contract/src/trace-rest.schemas.ts:121
 type Response = Record<string, unknown>;
 ```
 
@@ -1297,7 +1500,7 @@ Answers at `/api/events/track`, `/api/v1/events/track`; also, undocumented, `/ap
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:51)
-// Response: trackEventResponseSchema, ../contract/src/trace-rest.schemas.ts:291
+// Response: trackEventResponseSchema, ../contract/src/trace-rest.schemas.ts:298
 interface Response {
   message: "Event tracked";
 }
@@ -1322,7 +1525,7 @@ Answers at `/api/track_event`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/tracked-event.rest.ts:92)
-type Response = z.infer<typeof trackEventResponseSchema>; // ../contract/src/trace-rest.schemas.ts:291
+type Response = z.infer<typeof trackEventResponseSchema>; // ../contract/src/trace-rest.schemas.ts:298
 ```
 
 ## tRPC transport
@@ -1359,7 +1562,7 @@ type Output = z.infer<typeof exportProgressEventSchema>; // ../contract/src/feat
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:667`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1367,16 +1570,16 @@ Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trac
 
 ```typescript
 // sharedTrace.get
-// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:618
+// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:665
 interface Input {
   token: string;
 }
-type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:215
+type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:218
 ```
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:629`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:676`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1385,7 +1588,7 @@ Contract `../contract/src/traces.trpc.ts:629`, router `src/transport/spans.trpc.
 
 ```typescript
 // spans.getAllForTrace
-// Input: traceScopeSchema, ../contract/src/traces.trpc.ts:122
+// Input: traceScopeSchema, ../contract/src/traces.trpc.ts:133
 interface Input {
   projectId: string;
   traceId: string;
@@ -1393,7 +1596,7 @@ interface Input {
 type Output = z.infer<typeof spansForTraceSchema>; // ../contract/src/trace.responses.ts:63
 
 // spans.getForPromptStudio
-// Input: inline, ../contract/src/traces.trpc.ts:636
+// Input: inline, ../contract/src/traces.trpc.ts:683
 interface Input {
   projectId: string;
   spanId: string;
@@ -1433,60 +1636,65 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:179`, router `src/transport/traces.trpc.ts:45`.
+Contract `../contract/src/traces.trpc.ts:190`, router `src/transport/traces.trpc.ts:33`.
 
-| Procedure                              | Kind         | Gate                       | Input                    | Output                             |
-| -------------------------------------- | ------------ | -------------------------- | ------------------------ | ---------------------------------- |
-| `traces.getAllForProject`              | query        | Permission `traces:view`   | `traceListInputSchema`   | `tracesForProjectResultSchema`     |
-| `traces.getById`                       | query        | Permission `traces:view`   | inline                   | `traceSchema`                      |
-| `traces.getEvaluations`                | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getEvaluationsMultiple`        | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getCustomersAndLabels`         | query        | Permission `traces:view`   | `traceFilterInputSchema` | `customersAndLabelsResultSchema`   |
-| `traces.getTracesByThreadId`           | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getTracesWithSpans`            | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getFormattedSpansDigest`       | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getTracesWithSpansByThreadIds` | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getSampleTracesDataset`        | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getSampleTraces`               | query        | Permission `traces:view`   | inline                   | inline                             |
-| `traces.getFieldNames`                 | query        | Permission `traces:view`   | inline                   | `distinctFieldNamesResultSchema`   |
-| `traces.getFieldRedactionStatus`       | query        | Permission `project:view`  | inline                   | `tracesFieldRedactionStatusSchema` |
-| `traces.getAllForDownload`             | mutation     | Permission `traces:view`   | inline                   | `tracesForProjectResultSchema`     |
-| `traces.onTraceUpdate`                 | subscription | Permission `traces:view`   | inline                   | inline                             |
-| `traces.list`                          | query        | Permission `traces:view`   | inline                   | `tracesListPageSchema`             |
-| `traces.listEvents`                    | query        | Permission `traces:view`   | inline                   | `tracesListEventsSchema`           |
-| `traces.newCount`                      | query        | Permission `traces:view`   | inline                   | `tracesNewCountSchema`             |
-| `traces.suggest`                       | query        | Permission `traces:view`   | inline                   | `tracesSuggestSchema`              |
-| `traces.conversationContext`           | query        | Permission `traces:view`   | inline                   | `tracesConversationContextSchema`  |
-| `traces.discover`                      | query        | Permission `traces:view`   | inline                   | `discoverResultSchema`             |
-| `traces.facets`                        | query        | Permission `traces:view`   | inline                   | `discoverResultSchema`             |
-| `traces.onDiscoverUpdate`              | subscription | Permission `traces:view`   | inline                   | inline                             |
-| `traces.facetValues`                   | query        | Permission `traces:view`   | inline                   | `facetValuesResultSchema`          |
-| `traces.aiQuery`                       | mutation     | Permission `traces:view`   | inline                   | `aiQueryResultSchema`              |
-| `traces.aiAction`                      | mutation     | Permission `traces:view`   | inline                   | `aiActionResultSchema`             |
-| `traces.routeSearch`                   | mutation     | Permission `traces:view`   | `routeSearchInputSchema` | `routeSearchResultSchema`          |
-| `traces.header`                        | query        | Permission `traces:view`   | inline                   | `traceHeaderSchema`                |
-| `traces.changeName`                    | mutation     | Permission `traces:update` | inline                   | `tracesChangedNameSchema`          |
-| `traces.changeMetadata`                | mutation     | Permission `traces:update` | inline                   | `traceMetadataResponseSchema`      |
-| `traces.evals`                         | query        | Permission `traces:view`   | inline                   | `tracesEvaluationRunsSchema`       |
-| `traces.traceLogs`                     | query        | Permission `traces:view`   | inline                   | `tracesTraceLogsSchema`            |
-| `traces.spansPaginated`                | query        | Permission `traces:view`   | inline                   | `tracesSpansPageSchema`            |
-| `traces.spansDelta`                    | query        | Permission `traces:view`   | inline                   | `tracesSpansDeltaSchema`           |
-| `traces.spanTreePaginated`             | query        | Permission `traces:view`   | inline                   | `spanTreePageSchema`               |
-| `traces.spanTreeDelta`                 | query        | Permission `traces:view`   | inline                   | `tracesSpanTreeNodesSchema`        |
-| `traces.spanTree`                      | query        | Permission `traces:view`   | inline                   | `tracesSpanTreeNodesSchema`        |
-| `traces.spanLangwatchSignals`          | query        | Permission `traces:view`   | inline                   | `tracesSpanLangwatchSignalsSchema` |
-| `traces.spansFull`                     | query        | Permission `traces:view`   | inline                   | `tracesSpanDetailsSchema`          |
-| `traces.spanDetail`                    | query        | Permission `traces:view`   | inline                   | `spanDetailSchema`                 |
-| `traces.resourceInfo`                  | query        | Permission `traces:view`   | inline                   | `traceResourceInfoSchema`          |
-| `traces.traceEvents`                   | query        | Permission `traces:view`   | inline                   | `tracesTraceEventsSchema`          |
+| Procedure                              | Kind         | Gate                                                                  | Input                           | Output                             |
+| -------------------------------------- | ------------ | --------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |
+| `traces.getAllForProject`              | query        | Permission `traces:view`                                              | `traceListInputSchema`          | `tracesForProjectResultSchema`     |
+| `traces.getById`                       | query        | Permission `traces:view`                                              | inline                          | `traceSchema`                      |
+| `traces.getEvaluations`                | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getEvaluationsMultiple`        | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getCustomersAndLabels`         | query        | Permission `traces:view`                                              | `traceFilterInputSchema`        | `customersAndLabelsResultSchema`   |
+| `traces.getTracesByThreadId`           | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getTracesWithSpans`            | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getFormattedSpansDigest`       | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getTracesWithSpansByThreadIds` | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getSampleTracesDataset`        | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getSampleTraces`               | query        | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.getFieldNames`                 | query        | Permission `traces:view`                                              | inline                          | `distinctFieldNamesResultSchema`   |
+| `traces.getFieldRedactionStatus`       | query        | Permission `project:view`                                             | inline                          | `tracesFieldRedactionStatusSchema` |
+| `traces.getAllForDownload`             | mutation     | Permission `traces:view`                                              | inline                          | `tracesForProjectResultSchema`     |
+| `traces.onTraceUpdate`                 | subscription | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.list`                          | query        | Permission `traces:view`                                              | inline                          | `tracesListPageSchema`             |
+| `traces.listEvents`                    | query        | Permission `traces:view`                                              | inline                          | `tracesListEventsSchema`           |
+| `traces.newCount`                      | query        | Permission `traces:view`                                              | inline                          | `tracesNewCountSchema`             |
+| `traces.suggest`                       | query        | Permission `traces:view`                                              | inline                          | `tracesSuggestSchema`              |
+| `traces.conversationContext`           | query        | Permission `traces:view`                                              | inline                          | `tracesConversationContextSchema`  |
+| `traces.discover`                      | query        | Permission `traces:view`                                              | inline                          | `discoverResultSchema`             |
+| `traces.facets`                        | query        | Permission `traces:view`                                              | inline                          | `discoverResultSchema`             |
+| `traces.onDiscoverUpdate`              | subscription | Permission `traces:view`                                              | inline                          | inline                             |
+| `traces.facetValues`                   | query        | Permission `traces:view`                                              | inline                          | `facetValuesResultSchema`          |
+| `traces.aiQuery`                       | mutation     | Permission `traces:view`                                              | inline                          | `aiQueryResultSchema`              |
+| `traces.aiAction`                      | mutation     | Permission `traces:view`                                              | inline                          | `aiActionResultSchema`             |
+| `traces.routeSearch`                   | mutation     | Permission `traces:view`                                              | `routeSearchInputSchema`        | `routeSearchResultSchema`          |
+| `traces.header`                        | query        | Permission `traces:view`                                              | inline                          | `traceHeaderSchema`                |
+| `traces.changeName`                    | mutation     | Permission `traces:update`                                            | inline                          | `tracesChangedNameSchema`          |
+| `traces.changeMetadata`                | mutation     | Permission `traces:update`                                            | inline                          | `traceMetadataResponseSchema`      |
+| `traces.evals`                         | query        | Permission `traces:view`                                              | inline                          | `tracesEvaluationRunsSchema`       |
+| `traces.traceLogs`                     | query        | Permission `traces:view`                                              | inline                          | `tracesTraceLogsSchema`            |
+| `traces.spansPaginated`                | query        | Permission `traces:view`                                              | inline                          | `tracesSpansPageSchema`            |
+| `traces.spansDelta`                    | query        | Permission `traces:view`                                              | inline                          | `tracesSpansDeltaSchema`           |
+| `traces.spanTreePaginated`             | query        | Permission `traces:view`                                              | inline                          | `spanTreePageSchema`               |
+| `traces.spanTreeDelta`                 | query        | Permission `traces:view`                                              | inline                          | `tracesSpanTreeNodesSchema`        |
+| `traces.spanTree`                      | query        | Permission `traces:view`                                              | inline                          | `tracesSpanTreeNodesSchema`        |
+| `traces.spanLangwatchSignals`          | query        | Permission `traces:view`                                              | inline                          | `tracesSpanLangwatchSignalsSchema` |
+| `traces.spansFull`                     | query        | Permission `traces:view`                                              | inline                          | `tracesSpanDetailsSchema`          |
+| `traces.agentCallGraph`                | query        | Permission `traces:view`                                              | inline                          | `agentCallGraphSchema`             |
+| `traces.spanDetail`                    | query        | Permission `traces:view`                                              | inline                          | `spanDetailSchema`                 |
+| `traces.resourceInfo`                  | query        | Permission `traces:view`                                              | inline                          | `traceResourceInfoSchema`          |
+| `traces.traceEvents`                   | query        | Permission `traces:view`                                              | inline                          | `tracesTraceEventsSchema`          |
+| `traces.braidPreview`                  | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidPreviewInputSchema`       | `braidPreviewSchema`               |
+| `traces.braidAttributeKeys`            | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidAttributeKeysInputSchema` | `braidAttributeKeysSchema`         |
+| `traces.braidActivity`                 | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidActivityInputSchema`      | `braidActivitySchema`              |
+| `traces.braidTestTrace`                | query        | Permission `traces:view`; Entitlement `enterprise` (feature `BRAIDS`) | `braidTestTraceInputSchema`     | `braidTestTraceSchema`             |
 
 ```typescript
 // traces.getAllForProject
-type Input = z.infer<typeof traceListInputSchema>; // ../contract/src/traces.trpc.ts:113
+type Input = z.infer<typeof traceListInputSchema>; // ../contract/src/traces.trpc.ts:124
 type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:202
 
 // traces.getById
-// Input: inline, ../contract/src/traces.trpc.ts:187
+// Input: inline, ../contract/src/traces.trpc.ts:198
 interface Input {
   projectId: string;
   traceId: string;
@@ -1495,24 +1703,24 @@ interface Input {
 type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:855
 
 // traces.getEvaluations
-// Input: inline, ../contract/src/traces.trpc.ts:191
+// Input: inline, ../contract/src/traces.trpc.ts:202
 interface Input {
   projectId: string;
   traceId: string;
   tenantId?: string;
 }
-// Output: evaluationSchema.array().optional() (inline, ../contract/src/traces.trpc.ts:192)
+// Output: evaluationSchema.array().optional() (inline, ../contract/src/traces.trpc.ts:203)
 
 // traces.getEvaluationsMultiple
-// Input: inline, ../contract/src/traces.trpc.ts:195
+// Input: inline, ../contract/src/traces.trpc.ts:206
 interface Input {
   projectId: string;
   traceIds: string[];
 }
-// Output: z.record(z.string(), evaluationSchema.array()) (inline, ../contract/src/traces.trpc.ts:196)
+// Output: z.record(z.string(), evaluationSchema.array()) (inline, ../contract/src/traces.trpc.ts:207)
 
 // traces.getCustomersAndLabels
-type Input = z.infer<typeof traceFilterInputSchema>; // ../contract/src/traces.trpc.ts:101
+type Input = z.infer<typeof traceFilterInputSchema>; // ../contract/src/traces.trpc.ts:112
 // Output: customersAndLabelsResultSchema, ../contract/src/trace-read.contract.ts:219
 interface Output {
   customers: string[];
@@ -1520,51 +1728,51 @@ interface Output {
 }
 
 // traces.getTracesByThreadId
-// Input: inline, ../contract/src/traces.trpc.ts:203
+// Input: inline, ../contract/src/traces.trpc.ts:214
 interface Input {
   projectId: string;
   threadId: string;
 }
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:204)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:215)
 
 // traces.getTracesWithSpans
-// Input: inline, ../contract/src/traces.trpc.ts:208
+// Input: inline, ../contract/src/traces.trpc.ts:219
 interface Input {
   projectId: string;
   traceIds: string[];
   withEditOverlay?: boolean;
 }
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:214)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:225)
 
 // traces.getFormattedSpansDigest
-// Input: inline, ../contract/src/traces.trpc.ts:218
+// Input: inline, ../contract/src/traces.trpc.ts:229
 interface Input {
   projectId: string;
   traceIds: string[];
   withEditOverlay?: boolean;
 }
-// Output: inline, ../contract/src/traces.trpc.ts:224
+// Output: inline, ../contract/src/traces.trpc.ts:235
 type Output = Record<string, string>;
 
 // traces.getTracesWithSpansByThreadIds
-// Input: inline, ../contract/src/traces.trpc.ts:228
+// Input: inline, ../contract/src/traces.trpc.ts:239
 interface Input {
   projectId: string;
   threadIds: string[];
   withEditOverlay?: boolean;
 }
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:234)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:245)
 
 // traces.getSampleTracesDataset
-// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }) (inline, ../contract/src/traces.trpc.ts:237)
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:238)
+// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }) (inline, ../contract/src/traces.trpc.ts:248)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:249)
 
 // traces.getSampleTraces
-// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape, query: z.string(… (inline, ../contract/src/traces.trpc.ts:242)
-// Output: z.object({ ...traceSchema.shape, passesPreconditions: z.boolean() }).array() (inline, ../contract/src/traces.trpc.ts:251)
+// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape, query: z.string(… (inline, ../contract/src/traces.trpc.ts:253)
+// Output: z.object({ ...traceSchema.shape, passesPreconditions: z.boolean() }).array() (inline, ../contract/src/traces.trpc.ts:262)
 
 // traces.getFieldNames
-// Input: inline, ../contract/src/traces.trpc.ts:254
+// Input: inline, ../contract/src/traces.trpc.ts:265
 interface Input {
   projectId: string;
   startDate: number;
@@ -1573,11 +1781,11 @@ interface Input {
 type Output = z.infer<typeof distinctFieldNamesResultSchema>; // ../contract/src/trace-read.contract.ts:232
 
 // traces.getFieldRedactionStatus
-// Input: inline, ../contract/src/traces.trpc.ts:259
+// Input: inline, ../contract/src/traces.trpc.ts:270
 interface Input {
   projectId: string;
 }
-// Output: tracesFieldRedactionStatusSchema, ../contract/src/trace.responses.ts:276
+// Output: tracesFieldRedactionStatusSchema, ../contract/src/trace.responses.ts:278
 interface Output {
   isRedacted: {
     input: boolean;
@@ -1590,23 +1798,23 @@ interface Output {
 }
 
 // traces.getAllForDownload
-// Input: z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape, pageSize: z.numb… (inline, ../contract/src/traces.trpc.ts:264)
+// Input: z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape, pageSize: z.numb… (inline, ../contract/src/traces.trpc.ts:275)
 type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:202
 
 // traces.onTraceUpdate
-// Input: inline, ../contract/src/traces.trpc.ts:277
+// Input: inline, ../contract/src/traces.trpc.ts:288
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/traces.trpc.ts:278
+// Output: inline, ../contract/src/traces.trpc.ts:289
 type Output = unknown;
 
 // traces.list
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, sort: sortSchema, page: z.n… (inline, ../contract/src/traces.trpc.ts:286)
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, sort: sortSchema, page: z.n… (inline, ../contract/src/traces.trpc.ts:297)
 type Output = z.infer<typeof tracesListPageSchema>; // ../contract/src/trace.responses.ts:126
 
 // traces.listEvents
-// Input: inline, ../contract/src/traces.trpc.ts:309
+// Input: inline, ../contract/src/traces.trpc.ts:320
 interface Input {
   projectId: string;
   traceIds: string[];
@@ -1631,14 +1839,14 @@ type Output = Record<
 >;
 
 // traces.newCount
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, since: z.number(), query: z… (inline, ../contract/src/traces.trpc.ts:319)
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, since: z.number(), query: z… (inline, ../contract/src/traces.trpc.ts:330)
 // Output: tracesNewCountSchema, ../contract/src/trace.responses.ts:159
 interface Output {
   count: number;
 }
 
 // traces.suggest
-// Input: inline, ../contract/src/traces.trpc.ts:331
+// Input: inline, ../contract/src/traces.trpc.ts:342
 interface Input {
   projectId: string;
   field: string;
@@ -1651,7 +1859,7 @@ interface Output {
 }
 
 // traces.conversationContext
-// Input: inline, ../contract/src/traces.trpc.ts:347
+// Input: inline, ../contract/src/traces.trpc.ts:358
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1660,23 +1868,23 @@ interface Input {
 type Output = z.infer<typeof tracesConversationContextSchema>; // ../contract/src/trace.responses.ts:189
 
 // traces.discover
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:363)
-type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:165
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:374)
+type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:173
 
 // traces.facets
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:375)
-type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:165
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:386)
+type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:173
 
 // traces.onDiscoverUpdate
-// Input: inline, ../contract/src/traces.trpc.ts:390
+// Input: inline, ../contract/src/traces.trpc.ts:401
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/traces.trpc.ts:391
+// Output: inline, ../contract/src/traces.trpc.ts:402
 type Output = unknown;
 
 // traces.facetValues
-// Input: inline, ../contract/src/traces.trpc.ts:395
+// Input: inline, ../contract/src/traces.trpc.ts:406
 interface Input {
   projectId: string;
   timeRange: {
@@ -1689,7 +1897,7 @@ interface Input {
   limit?: number;
   offset?: number;
 }
-// Output: facetValuesResultSchema, ../contract/src/features/list/trace-list-view.ts:175
+// Output: facetValuesResultSchema, ../contract/src/features/list/trace-list-view.ts:183
 interface Output {
   values: {
     value: string;
@@ -1700,7 +1908,7 @@ interface Output {
 }
 
 // traces.aiQuery
-// Input: inline, ../contract/src/traces.trpc.ts:409
+// Input: inline, ../contract/src/traces.trpc.ts:420
 interface Input {
   projectId: string;
   prompt: string;
@@ -1725,7 +1933,7 @@ type Output =
     };
 
 // traces.aiAction
-// Input: inline, ../contract/src/traces.trpc.ts:420
+// Input: inline, ../contract/src/traces.trpc.ts:431
 interface Input {
   projectId: string;
   prompt: string;
@@ -1754,7 +1962,7 @@ type Input = z.infer<typeof routeSearchInputSchema>; // ../contract/src/features
 type Output = z.infer<typeof routeSearchResultSchema>; // ../contract/src/features/query/trace-search-route.ts:134
 
 // traces.header
-// Input: inline, ../contract/src/traces.trpc.ts:439
+// Input: inline, ../contract/src/traces.trpc.ts:450
 interface Input {
   projectId: string;
   traceId: string;
@@ -1762,10 +1970,10 @@ interface Input {
   full?: boolean;
   tenantId?: string;
 }
-type Output = z.infer<typeof traceHeaderSchema>; // ../contract/src/trace-view.contract.ts:122
+type Output = z.infer<typeof traceHeaderSchema>; // ../contract/src/trace-view.contract.ts:154
 
 // traces.changeName
-// Input: inline, ../contract/src/traces.trpc.ts:451
+// Input: inline, ../contract/src/traces.trpc.ts:462
 interface Input {
   projectId: string;
   traceId: string;
@@ -1778,16 +1986,16 @@ interface Output {
 }
 
 // traces.changeMetadata
-// Input: inline, ../contract/src/traces.trpc.ts:461
+// Input: inline, ../contract/src/traces.trpc.ts:472
 interface Input {
   projectId: string;
   traceId: string;
   metadata: Record<string, string | number | boolean | string[] | Record<string, unknown>>;
 }
-type Output = z.infer<typeof traceMetadataResponseSchema>; // ../contract/src/trace-rest.schemas.ts:254
+type Output = z.infer<typeof traceMetadataResponseSchema>; // ../contract/src/trace-rest.schemas.ts:261
 
 // traces.evals
-// Input: inline, ../contract/src/traces.trpc.ts:471
+// Input: inline, ../contract/src/traces.trpc.ts:482
 interface Input {
   projectId: string;
   traceId: string;
@@ -1796,14 +2004,14 @@ interface Input {
 type Output = z.infer<typeof tracesEvaluationRunsSchema>; // ../contract/src/trace.responses.ts:216
 
 // traces.traceLogs
-// Input: inline, ../contract/src/traces.trpc.ts:481
+// Input: inline, ../contract/src/traces.trpc.ts:492
 interface Input {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   tenantId?: string;
 }
-// Output: tracesTraceLogsSchema, ../contract/src/trace.responses.ts:263
+// Output: tracesTraceLogsSchema, ../contract/src/trace.responses.ts:265
 type Output = {
   spanId: string;
   timeUnixMs: number;
@@ -1817,7 +2025,7 @@ type Output = {
 }[];
 
 // traces.spansPaginated
-// Input: inline, ../contract/src/traces.trpc.ts:491
+// Input: inline, ../contract/src/traces.trpc.ts:502
 interface Input {
   projectId: string;
   traceId: string;
@@ -1829,7 +2037,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpansPageSchema>; // ../contract/src/trace.responses.ts:203
 
 // traces.spansDelta
-// Input: inline, ../contract/src/traces.trpc.ts:503
+// Input: inline, ../contract/src/traces.trpc.ts:514
 interface Input {
   projectId: string;
   traceId: string;
@@ -1840,7 +2048,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpansDeltaSchema>; // ../contract/src/trace.responses.ts:208
 
 // traces.spanTreePaginated
-// Input: inline, ../contract/src/traces.trpc.ts:518
+// Input: inline, ../contract/src/traces.trpc.ts:529
 interface Input {
   projectId: string;
   traceId: string;
@@ -1848,14 +2056,15 @@ interface Input {
   cursor?: {
     startTimeMs: number;
     spanId: string;
+    ownerProjectId?: string | null;
   };
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:42
+type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:50
 
 // traces.spanTreeDelta
-// Input: inline, ../contract/src/traces.trpc.ts:527
+// Input: inline, ../contract/src/traces.trpc.ts:538
 interface Input {
   projectId: string;
   traceId: string;
@@ -1866,7 +2075,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanTreeNodesSchema>; // ../contract/src/trace.responses.ts:224
 
 // traces.spanTree
-// Input: inline, ../contract/src/traces.trpc.ts:537
+// Input: inline, ../contract/src/traces.trpc.ts:548
 interface Input {
   projectId: string;
   traceId: string;
@@ -1876,7 +2085,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanTreeNodesSchema>; // ../contract/src/trace.responses.ts:224
 
 // traces.spanLangwatchSignals
-// Input: inline, ../contract/src/traces.trpc.ts:552
+// Input: inline, ../contract/src/traces.trpc.ts:563
 interface Input {
   projectId: string;
   traceId: string;
@@ -1889,10 +2098,11 @@ type Output = {
   signals: (
     "prompt" | "scenario" | "user" | "thread" | "evaluation" | "rag" | "metadata" | "genai"
   )[];
+  ownerProjectId?: string | null;
 }[];
 
 // traces.spansFull
-// Input: inline, ../contract/src/traces.trpc.ts:567
+// Input: inline, ../contract/src/traces.trpc.ts:578
 interface Input {
   projectId: string;
   traceId: string;
@@ -1901,42 +2111,104 @@ interface Input {
 }
 type Output = z.infer<typeof tracesSpanDetailsSchema>; // ../contract/src/trace.responses.ts:237
 
+// traces.agentCallGraph
+// Input: inline, ../contract/src/traces.trpc.ts:589
+interface Input {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+  tenantId?: string;
+}
+type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:278
+
 // traces.spanDetail
-// Input: inline, ../contract/src/traces.trpc.ts:577
+// Input: inline, ../contract/src/traces.trpc.ts:599
 interface Input {
   projectId: string;
   traceId: string;
   spanId: string;
+  ownerProjectId?: string;
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:246
+type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:297
 
 // traces.resourceInfo
-// Input: inline, ../contract/src/traces.trpc.ts:593
+// Input: inline, ../contract/src/traces.trpc.ts:617
 interface Input {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:305
+type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:358
 
 // traces.traceEvents
-// Input: inline, ../contract/src/traces.trpc.ts:607
+// Input: inline, ../contract/src/traces.trpc.ts:631
 interface Input {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   tenantId?: string;
 }
-// Output: tracesTraceEventsSchema, ../contract/src/trace.responses.ts:258
+// Output: tracesTraceEventsSchema, ../contract/src/trace.responses.ts:260
 type Output = {
   spanId: string;
   timestamp: number;
   name: string;
   attributes: Record<string, string>;
+  ownerProjectId?: string;
 }[];
+
+// traces.braidPreview
+// Input: braidPreviewInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:28
+interface Input {
+  projectId: string;
+  readerProjectId: string;
+  where?: string;
+  fromMs: number;
+  braidId?: string;
+}
+type Output = z.infer<typeof braidPreviewSchema>; // ../contract/src/features/braid/trace-braid.schemas.ts:159
+
+// traces.braidAttributeKeys
+// Input: braidAttributeKeysInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:64
+interface Input {
+  projectId: string;
+}
+// Output: braidAttributeKeysSchema, ../contract/src/features/braid/trace-braid.schemas.ts:74
+interface Output {
+  keys: {
+    key: string;
+    spanCount: number;
+  }[];
+}
+
+// traces.braidActivity
+// Input: braidActivityInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:85
+interface Input {
+  projectId: string;
+  braidIds: string[];
+}
+// Output: braidActivitySchema, ../contract/src/features/braid/trace-braid.schemas.ts:93
+interface Output {
+  activity: {
+    braidId: string;
+    spanCount: number;
+  }[];
+}
+
+// traces.braidTestTrace
+// Input: braidTestTraceInputSchema, ../contract/src/features/braid/trace-braid.schemas.ts:101
+interface Input {
+  projectId: string;
+  readerProjectId: string;
+  where?: string;
+  fromMs: number;
+  braidId?: string;
+  traceId: string;
+}
+type Output = z.infer<typeof braidTestTraceSchema>; // ../contract/src/features/braid/trace-braid.schemas.ts:122
 ```
 
 ## Sockets
@@ -1947,35 +2219,41 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `trace_processing` (aggregate `trace`)
 
-Declared at `src/eventing/trace-processing-projections.pipeline.ts:104`. Events: `spanReceivedEventSchema`, `spanRecordedEventSchema`, `topicAssignedEventSchema`, `logRecordReceivedEventSchema`, `logContributedEventSchema`, `metricDataPointCorrelatedEventSchema`, `originResolvedEventSchema`, `annotationAddedEventSchema`, `annotationRemovedEventSchema`, `annotationsBulkSyncedEventSchema`, `traceNameChangedEventSchema`.
+Declared at `src/eventing/trace-processing-projections.pipeline.ts:132`. Events: `spanReceivedEventSchema`, `spanRecordedEventSchema`, `topicAssignedEventSchema`, `logRecordReceivedEventSchema`, `logContributedEventSchema`, `metricDataPointCorrelatedEventSchema`, `originResolvedEventSchema`, `annotationAddedEventSchema`, `annotationRemovedEventSchema`, `annotationsBulkSyncedEventSchema`, `traceNameChangedEventSchema`, `evaluationOutcomeRecordedEventSchema`.
 
-| Kind                           | Name                                                                                           | Handles | Declared at                                                 |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------- |
-| command                        | –                                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:152` |
-| command                        | `assignTopic`                                                                                  | –       | `src/eventing/trace-processing-projections.pipeline.ts:158` |
-| command                        | `recordLogContribution`                                                                        | –       | `src/eventing/trace-processing-projections.pipeline.ts:159` |
-| command                        | `recordMetricCorrelation`                                                                      | –       | `src/eventing/trace-processing-projections.pipeline.ts:162` |
-| command                        | `resolveOrigin`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:165` |
-| command                        | `addAnnotation`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:166` |
-| command                        | `removeAnnotation`                                                                             | –       | `src/eventing/trace-processing-projections.pipeline.ts:169` |
-| command                        | `bulkSyncAnnotations`                                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:172` |
-| command                        | `changeTraceName`                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:175` |
-| projection payload preparation | `≈ options.prepareEventForProjection`                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:123` |
-| ClickHouse fold projection     | `≈ TraceSummaryFoldProjection.create({ store: options.summaryStore, traceCanonicalisation: o…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:124` |
-| ClickHouse fold projection     | `≈ TraceAnalyticsFoldProjection.create({ store: options.derivedStore, traceCanonicalisation:…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:131` |
-| ClickHouse map projection      | `≈ SpanStorageMapProjection.create({ store: options.spanStore, spanCostService: runtime.span…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:138` |
-| ClickHouse map projection      | `≈ TraceAnalyticsRollupMapProjection.create({ store: options.rollupStore, spanCostService: r…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:145` |
+| Kind                           | Name                                                                                           | Handles                                                                 | Declared at                                                 |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| command                        | –                                                                                              | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:188` |
+| command                        | `assignTopic`                                                                                  | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:194` |
+| command                        | `recordLogContribution`                                                                        | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:195` |
+| command                        | `recordMetricCorrelation`                                                                      | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:198` |
+| command                        | `resolveOrigin`                                                                                | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:201` |
+| command                        | `addAnnotation`                                                                                | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:202` |
+| command                        | `removeAnnotation`                                                                             | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:205` |
+| command                        | `bulkSyncAnnotations`                                                                          | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:208` |
+| command                        | `changeTraceName`                                                                              | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:211` |
+| command                        | `recordEvaluationOutcome`                                                                      | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:212` |
+| peer subscriber                | `evaluationCompletedOutcome`                                                                   | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md) | `src/eventing/trace-processing-projections.pipeline.ts:215` |
+| peer subscriber                | `evaluationReportedOutcome`                                                                    | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)  | `src/eventing/trace-processing-projections.pipeline.ts:235` |
+| projection payload preparation | `≈ options.prepareEventForProjection`                                                          | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:152` |
+| ClickHouse fold projection     | `≈ TraceSummaryFoldProjection.create({ store: options.summaryStore, traceCanonicalisation: o…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:153` |
+| ClickHouse fold projection     | `≈ TraceAnalyticsFoldProjection.create({ store: options.derivedStore, traceCanonicalisation:…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:160` |
+| ClickHouse map projection      | `≈ SpanStorageMapProjection.create({ store: options.spanStore, spanCostService: runtime.span…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:167` |
+| ClickHouse map projection      | `≈ SpanAnalyticsMapProjection.create({ store: options.spanAnalyticsStore, spanCostService: r…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:174` |
+| ClickHouse map projection      | `≈ TraceAnalyticsRollupMapProjection.create({ store: options.rollupStore, spanCostService: r…` | –                                                                       | `src/eventing/trace-processing-projections.pipeline.ts:181` |
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
-Declared at `src/eventing/trace-project-milestones.pipeline.ts:24`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`.
+Declared at `src/eventing/trace-project-milestones.pipeline.ts:28`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`, `traceFailedEventSchema`, `projectTracedEventSchema`.
 
 | Kind      | Name                  | Handles | Declared at                                            |
 | --------- | --------------------- | ------- | ------------------------------------------------------ |
-| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:33` |
-| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:34` |
-| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:35` |
-| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:36` |
+| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:39` |
+| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:40` |
+| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:41` |
+| command   | `recordTraceFailed`   | –       | `src/eventing/trace-project-milestones.pipeline.ts:42` |
+| command   | `recordProjectTraced` | –       | `src/eventing/trace-project-milestones.pipeline.ts:43` |
+| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:44` |
 
 ### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 
@@ -1996,16 +2274,18 @@ Declared at `src/features/ingestion/eventing/trace-ingest-source-billing.pipelin
 
 ## Configuration
 
-| Kind   | Leaf                            | Environment variable                         | Declared at                          |
-| ------ | ------------------------------- | -------------------------------------------- | ------------------------------------ |
-| config | `spanProcessingShards`          | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
-| config | `tokenizer.bpeDirectory`        | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
-| config | `tokenizer.fetchTimeoutMs`      | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
-| config | `tokenizer.disabled`            | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
-| config | `disableCodingAgentSpanFilter`  | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
-| config | `foldCacheTtlSeconds`           | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:35` |
-| config | `publicBaseUrl`                 | `BASE_HOST`                                  | `../contract/src/trace.config.ts:36` |
-| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:38` |
-| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:39` |
+| Kind   | Leaf                             | Environment variable                         | Declared at                          |
+| ------ | -------------------------------- | -------------------------------------------- | ------------------------------------ |
+| config | `spanProcessingShards`           | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:16` |
+| config | `tokenizer.bpeDirectory`         | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:18` |
+| config | `tokenizer.fetchTimeoutMs`       | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:19` |
+| config | `tokenizer.disabled`             | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:23` |
+| config | `disableCodingAgentSpanFilter`   | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:31` |
+| config | `evaluationAnalyticsQuorumReads` | `TRACE_EVALUATION_ANALYTICS_QUORUM_READS`    | `../contract/src/trace.config.ts:39` |
+| config | `otlpTracesMaxBodyBytes`         | `OTLP_TRACES_MAX_BODY_BYTES`                 | `../contract/src/trace.config.ts:47` |
+| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:51` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                                  | `../contract/src/trace.config.ts:52` |
+| config | `objectRetentionConfirmed`       | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:54` |
+| config | `legacySpoolRetentionConfirmed`  | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:55` |
 
 <!-- readme:generated:end -->

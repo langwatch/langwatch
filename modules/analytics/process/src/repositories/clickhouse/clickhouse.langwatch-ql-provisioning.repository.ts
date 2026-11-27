@@ -13,14 +13,17 @@ import {
   type LwqlAccessModelOwner,
   findMissingObjects,
   findStatementTargets,
+  postgresEngineCollection,
   statementKind,
 } from "../../rules/langwatch-ql-config-store.rules.ts";
 import {
   type ClickHouseAdminStatements,
   LangWatchQLProvisioningRepository,
   type LwqlClickHouseInventory,
+  type LwqlCollectionState,
   type LwqlKeyMapInsertRow,
   type LwqlPostgresCredentials,
+  type LwqlRowPolicy,
   type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
   type SkippedProvisioningStatement,
@@ -131,6 +134,56 @@ async function readClickHouseInventory({
 }
 
 /**
+ * Two catalog reads; an unreadable one degrades to empty. A failed read drops the known
+ * bindings, so each engine table then takes the first collection the server holds.
+ */
+async function readLwqlCollectionState({
+  client,
+  database,
+  candidates,
+}: {
+  client: ClickHouseAdminStatements;
+  database: string;
+  candidates: readonly string[];
+}): Promise<LwqlCollectionState> {
+  const read = async (sql: string, params: Readonly<Record<string, unknown>>) => {
+    try {
+      return await client.rows(sql, params);
+    } catch (error) {
+      logger.warn(
+        { error: clickHouseErrorSummary(error) },
+        "lwql provisioning could not read the named collections or engine-table bindings; the known bindings are dropped and each engine table takes the first collection the server holds",
+      );
+      return [];
+    }
+  };
+  const [collections, tables] = await Promise.all([
+    read(
+      "SELECT name, source FROM system.named_collections WHERE has({names:Array(String)}, name)",
+      { names: [...candidates] },
+    ),
+    read(
+      "SELECT name, engine_full FROM system.tables " +
+        "WHERE database = {database:String} AND engine = 'PostgreSQL'",
+      { database },
+    ),
+  ]);
+  const bound: Record<string, string> = {};
+  for (const row of tables) {
+    const engineFull = typeof row.engine_full === "string" ? row.engine_full : "";
+    const binding = postgresEngineCollection(engineFull);
+    if (binding.bound) bound[String(row.name)] = binding.collection;
+  }
+  return {
+    available: collections.map((row) => String(row.name)),
+    bound,
+    configDefined: collections
+      .filter((row) => String(row.source) === "CONFIG")
+      .map((row) => String(row.name)),
+  };
+}
+
+/**
  * Dials PostgreSQL through `postgresql(...)` without reading a row; every value is a query
  * parameter, so no password enters the query text. On a cluster each replica reads with its own
  * collection, and one failing fails the read. Every approved view exposes `TenantId`.
@@ -229,8 +282,18 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   }
 
   /** The deploy task's own admin connection, from its resolved `CLICKHOUSE_URL`. */
-  static open({ url }: { url: string | undefined }): ClickHouseLangWatchQLProvisioningRepository {
-    const client = createClient({ url });
+  static open({
+    url,
+    requestTimeoutMs,
+  }: {
+    url: string | undefined;
+    /** Bounds every request, so one unresponsive server cannot hold a deploy. */
+    requestTimeoutMs?: number;
+  }): ClickHouseLangWatchQLProvisioningRepository {
+    const client = createClient({
+      url,
+      ...(requestTimeoutMs === undefined ? {} : { request_timeout: requestTimeoutMs }),
+    });
     return new ClickHouseLangWatchQLProvisioningRepository(
       {
         async command(statement) {
@@ -272,6 +335,13 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory> {
     return readClickHouseInventory({ client: this.client, ...input });
+  }
+
+  readCollectionState(input: {
+    database: string;
+    candidates: readonly string[];
+  }): Promise<LwqlCollectionState> {
+    return readLwqlCollectionState({ client: this.client, ...input });
   }
 
   /** @param collection Validated as an identifier by `collectionProbe`. */
@@ -335,6 +405,21 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
 
   queryRows(sql: string): Promise<Record<string, unknown>[]> {
     return this.client.rows(sql);
+  }
+
+  async findRowPolicies({ tables }: { tables: readonly string[] }): Promise<LwqlRowPolicy[]> {
+    const rows = await this.client.rows(
+      `SELECT concat(database, '.', table) AS name, apply_to_list, apply_to_all, ` +
+        `length(apply_to_except) > 0 AS has_exceptions FROM system.row_policies ` +
+        `WHERE concat(database, '.', table) IN {tables:Array(String)}`,
+      { tables: [...tables] },
+    );
+    return rows.map((row) => ({
+      table: String(row.name),
+      appliesTo: Array.isArray(row.apply_to_list) ? row.apply_to_list.map(String) : [],
+      appliesToAll: Number(row.apply_to_all) > 0,
+      hasExceptions: Number(row.has_exceptions) > 0,
+    }));
   }
 
   /** @param table Already qualified and validated by `keyMapTableQualifiedName`. */

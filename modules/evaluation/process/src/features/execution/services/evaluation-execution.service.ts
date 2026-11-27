@@ -36,7 +36,10 @@ import type { LangevalsEvaluatorService } from "../../evaluators/services/langev
 import type { WorkflowEvaluationService } from "../../evaluators/services/workflow-evaluation.service.ts";
 import { EvaluationCustomEvaluationService } from "./evaluation-custom-evaluation.service.ts";
 import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
-import { EvaluationJudgingService } from "./evaluation-judging.service.ts";
+import {
+  EvaluationJudgingService,
+  type EvaluationJudgeRouting,
+} from "./evaluation-judging.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
@@ -74,6 +77,8 @@ export interface EvaluationExecutionDeps {
   judges: Pick<InstantEvalJudgeApi, "judge">;
   /** The project's Instant Evals column: LangWatch's classifier or its own model (ADR-182). */
   decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
+  /** Whether an organization's Instant Evals judges go through the judge router (ADR-190). */
+  judgeRouting: EvaluationJudgeRouting;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -121,6 +126,19 @@ type ScoredTrace =
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
+
+type RunEvaluationParams = {
+  projectId: string;
+  evaluatorType: string;
+  data: DataForEvaluation;
+  settings?: Record<string, unknown>;
+  trace?: Trace;
+  workflowId?: string | null;
+  parentCausalityDepth?: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal | undefined;
+  guardrailDirection?: GuardrailCheckDirection | undefined;
+};
 
 export class EvaluationExecutionService {
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
@@ -308,18 +326,25 @@ export class EvaluationExecutionService {
   // Evaluation execution (built-in vs custom/workflow)
   // ---------------------------------------------------------------------------
 
-  private async runEvaluation(params: {
-    projectId: string;
-    evaluatorType: string;
-    data: DataForEvaluation;
-    settings?: Record<string, unknown>;
-    trace?: Trace;
-    workflowId?: string | null;
-    parentCausalityDepth?: number;
-    idempotencyKey?: string;
-    signal?: AbortSignal | undefined;
-    guardrailDirection?: GuardrailCheckDirection | undefined;
+  private answerInstantEval({
+    params,
+    dispatch,
+    droppedCategories,
+  }: {
+    params: RunEvaluationParams;
+    dispatch: Extract<ReturnType<typeof instantEvalJudgeOf>, { kind: "instant_eval" }>;
+    droppedCategories: string[];
   }): Promise<SingleEvaluationResult> {
+    return this.instantEvals.answer({
+      ...params,
+      judge: dispatch.judge,
+      ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
+      ...(dispatch.isRoutable ? { isRoutable: true } : {}),
+      droppedCategories,
+    });
+  }
+
+  private async runEvaluation(params: RunEvaluationParams): Promise<SingleEvaluationResult> {
     const {
       projectId,
       evaluatorType,
@@ -354,18 +379,11 @@ export class EvaluationExecutionService {
     // Before any provider lookup, so a project with no model provider can judge too.
     const dispatch = instantEvalJudgeOf({ evaluatorType: builtInType, settings });
     if (dispatch.kind === "instant_eval") {
-      return this.instantEvals.answer({
-        ...params,
-        judge: dispatch.judge,
-        ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
-        data,
-        droppedCategories,
-      });
+      return this.answerInstantEval({ params, dispatch, droppedCategories });
     }
 
-    // Native (in-process) evaluators skip the analysis service; both they and
-    // the remote ones run through the shared augmenter so redaction or drop at
-    // ingestion never hides a leak from the result.
+    // Native evaluators skip the analysis service; both kinds run through the shared
+    // augmenter so redaction or drop at ingestion never hides a leak from the result.
     if (isNativeEvaluatorType(builtInType)) {
       return this.runNativeEvaluation({
         builtInType,
@@ -388,6 +406,7 @@ export class EvaluationExecutionService {
       settings: settings ?? {},
       env: evaluatorEnv,
       idempotencyKey,
+      projectId,
       signal,
     });
 

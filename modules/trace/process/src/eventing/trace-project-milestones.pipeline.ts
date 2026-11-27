@@ -10,13 +10,17 @@ import type { TraceModule } from "../app/trace.app.ts";
 import {
   RecordFirstTraceCommand,
   RecordMonthTraceIdsCommand,
+  RecordTraceFailedCommand,
+  RecordProjectTracedCommand,
   RecordTraceReceivedCommand,
 } from "./trace-project-milestones.commands.ts";
 import {
   firstTraceRecordedEventSchema,
   monthTraceIdsListedEventSchema,
+  projectTracedEventSchema,
   TRACE_PROJECT_AGGREGATE_TYPE,
   TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
+  traceFailedEventSchema,
   traceReceivedEventSchema,
 } from "./trace-project-milestones.events.ts";
 
@@ -29,10 +33,14 @@ function milestoneCommands(retention?: RetentionPolicyResolver) {
       firstTraceRecordedEventSchema,
       traceReceivedEventSchema,
       monthTraceIdsListedEventSchema,
+      traceFailedEventSchema,
+      projectTracedEventSchema,
     ])
     .withCommand("recordFirstTrace", RecordFirstTraceCommand)
     .withCommand("recordTraceReceived", RecordTraceReceivedCommand)
-    .withCommand("recordMonthTraceIds", RecordMonthTraceIdsCommand);
+    .withCommand("recordMonthTraceIds", RecordMonthTraceIdsCommand)
+    .withCommand("recordTraceFailed", RecordTraceFailedCommand)
+    .withCommand("recordProjectTraced", RecordProjectTracedCommand);
   return retention === undefined ? pipeline : pipeline.withRetention(retention);
 }
 

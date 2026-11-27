@@ -1,3 +1,4 @@
+import { ORGANIZATION_DASHBOARDS_FLAGS } from "@langwatch/analytics-client";
 import { CLIENT_FLAG_STALE_TIME_MS } from "@langwatch/feature-flag-client";
 
 import type { ProductId } from "../model/products.ts";
@@ -8,6 +9,8 @@ import { navigationApi } from "./navigation-api.ts";
  * restated here because `platform/app`'s `useFeatureFlag` (which used to
  * export it) no longer exists.
  */
+
+const [ORGANIZATION_AREA_FLAG] = ORGANIZATION_DASHBOARDS_FLAGS;
 
 /**
  * Product reachability per organization: the org switch needs the TARGET
@@ -22,6 +25,8 @@ export function useProductFlagsByOrganization({
   enabled: boolean;
 }): {
   reachableProductsIn: (organizationId: string) => ProductId[];
+  /** Whether the organization has the Dashboards area (ADR-002): both of its flags on. */
+  hasOrganizationLibraryIn: (organizationId: string) => boolean;
   isLoading: boolean;
 } {
   const queryOptions = {
@@ -43,6 +48,12 @@ export function useProductFlagsByOrganization({
     { flag: "release_dashboards", organizationIds },
     queryOptions,
   );
+  const organizationAreaByOrg = navigationApi.featureFlag.isEnabledForEachOrganization.useQuery(
+    { flag: ORGANIZATION_AREA_FLAG, organizationIds },
+    queryOptions,
+  );
+  const isOn = (read: typeof dashboardsByOrg, organizationId: string) =>
+    read.data?.enabledByOrganizationId?.[organizationId] === true;
 
   return {
     reachableProductsIn: (organizationId: string) => {
@@ -58,7 +69,12 @@ export function useProductFlagsByOrganization({
       }
       return products;
     },
+    hasOrganizationLibraryIn: (organizationId: string) =>
+      isOn(dashboardsByOrg, organizationId) && isOn(organizationAreaByOrg, organizationId),
     isLoading:
-      enabled && (governanceByOrg.isLoading || gatewayByOrg.isLoading || dashboardsByOrg.isLoading),
+      enabled &&
+      [governanceByOrg, gatewayByOrg, dashboardsByOrg, organizationAreaByOrg].some(
+        (read) => read.isLoading,
+      ),
   };
 }

@@ -81,3 +81,28 @@ Feature: ClickHouse backup status metrics are opt-out
     Given a haven stack manages its own ClickHouse
     When the portless overlay is rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to false in it
+
+  @unit
+  Scenario: A named cluster reads every replica's backup history
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When the backup history is read from a replica that did not run the backup
+    Then the table probe and the read both go through all replicas
+    And an unreachable replica does not blank the reading
+
+  @unit
+  Scenario: A cluster the server does not know falls back to the local node
+    Given CLICKHOUSE_CLUSTER names a cluster ClickHouse does not know
+    When the cluster-wide table probe or backup read is refused for the unknown cluster
+    Then the local node is probed and read instead, and the fallback is logged
+
+  @unit
+  Scenario: Any other cluster-wide failure is reported, not hidden
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When the cluster-wide probe or backup read times out, lacks rights or meets a missing table
+    Then the failure is logged and reaches the collector rather than a local answer standing in for it
+
+  @unit
+  Scenario: A cluster name that is not a plain identifier reads the local node
+    Given CLICKHOUSE_CLUSTER holds something that is not a plain identifier
+    When the backup history is read
+    Then only the local node is read

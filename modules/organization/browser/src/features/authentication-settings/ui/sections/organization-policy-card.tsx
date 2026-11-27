@@ -8,7 +8,9 @@ import { VStack } from "@langwatch/design-system/primitives";
 import { useJoinRequests } from "../../../../behavior/use-join-requests.ts";
 import { useTwoStepRequirement } from "../../../../behavior/use-two-step-requirement.ts";
 import type { OrganizationHostApi } from "../../../../model/organization-host.ts";
+import { useDocsPlaygroundPolicy } from "../../behavior/use-docs-playground-policy.ts";
 import { useSignInSecurity } from "../../behavior/use-sign-in-security.ts";
+import { DocsPlaygroundCard } from "../blocks/docs-playground-card.tsx";
 import { JoinPolicyCard } from "../blocks/join-policy-card.tsx";
 import { SessionLimitCard, SignInLockoutCard } from "../blocks/sign-in-security-cards.tsx";
 import { TwoStepRequirementCard } from "../blocks/two-step-requirement-card.tsx";
@@ -26,6 +28,7 @@ export function OrganizationPolicyCard({
   const joinRequests = useJoinRequests({ organizationId, canManage });
   const twoStep = useTwoStepRequirement({ organizationId, canManage });
   const signInSecurity = useSignInSecurity({ host, organizationId });
+  const docsPlayground = useDocsPlaygroundPolicy({ host, organizationId });
 
   if (!canManage) return null;
 
@@ -70,6 +73,13 @@ export function OrganizationPolicyCard({
             onSave={signInSecurity.save}
           />
         </>
+      )}
+      {docsPlayground.show && (
+        <DocsPlaygroundCard
+          sessionsEnabled={docsPlayground.sessionsEnabled}
+          saving={docsPlayground.saving}
+          onChange={docsPlayground.save}
+        />
       )}
     </VStack>
   );

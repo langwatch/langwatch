@@ -100,6 +100,8 @@ export type OrganizationInvite = {
   subscriptionId: string | null;
   acceptedByUserId: string | null;
   acceptedViaIdentifierId: string | null;
+  /** Invites the person who pays: the Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
   createdAt: Instant;
   updatedAt: Instant;
 };
@@ -112,6 +114,10 @@ export type OrganizationUser = {
   updatedAt: Instant;
   departmentId: string | null;
   disabledAt: Instant | null;
+  /** Set while admission keeps the person waiting for a full seat (seat-rotation.feature). */
+  seatPendingSince?: Instant | null;
+  /** A Billing-only member (ADR-205): role EXTERNAL, no team, no seat. */
+  billingOnly?: boolean;
 };
 
 export type User = {

@@ -1,6 +1,11 @@
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
-import type { LangyDerivedCard } from "@langwatch/langy-contract";
+import {
+  type LangyDerivedCard,
+  langyProposalApplied,
+  langyProposalDiscarded,
+} from "@langwatch/langy-contract";
 import { type RefObject, useCallback, useEffect, useState } from "react";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
@@ -10,7 +15,8 @@ import type { LangyProposal, ProposalHandlers } from "../langy-proposal-card.tsx
 
 /**
  * Applies a proposal through the page's own handler for its kind — once: one already applying,
- * applied or discarded is left alone, and a page that cannot carry it out says so.
+ * applied or discarded is left alone, and a page that cannot carry it out says so. Each outcome
+ * is counted once, by kind (`langy.applied.proposal`, `langy.discarded.proposal`).
  */
 export function useLangyProposalApply({
   proposalHandlersRef,
@@ -23,15 +29,26 @@ export function useLangyProposalApply({
   const markProposalApplying = useLangyStore((s) => s.markProposalApplying);
   const markProposalApplied = useLangyStore((s) => s.markProposalApplied);
   const clearProposalApplying = useLangyStore((s) => s.clearProposalApplying);
-  const discard = useLangyStore((s) => s.discardProposal);
+  const discardProposal = useLangyStore((s) => s.discardProposal);
+  const analytics = useUiAnalytics();
+
+  const isSettled = useCallback(
+    (proposalId: string) =>
+      applyingProposalIds.has(proposalId) ||
+      proposalId in appliedOutcomes ||
+      discardedProposalIds.has(proposalId),
+    [appliedOutcomes, applyingProposalIds, discardedProposalIds],
+  );
+  // The kind is the model's text until a page registers a handler for it.
+  const knownKind = useCallback(
+    (proposal: LangyProposal) =>
+      proposalHandlersRef?.current?.[proposal.kind] ? proposal.kind : "other",
+    [proposalHandlersRef],
+  );
 
   const apply = useCallback(
     async (proposalId: string, proposal: LangyProposal) => {
-      const settled =
-        applyingProposalIds.has(proposalId) ||
-        proposalId in appliedOutcomes ||
-        discardedProposalIds.has(proposalId);
-      if (settled) return;
+      if (isSettled(proposalId)) return;
       const handler = proposalHandlersRef?.current?.[proposal.kind];
       if (!handler) {
         showErrorToast({
@@ -45,6 +62,7 @@ export function useLangyProposalApply({
       try {
         const outcome = await handler(proposal.payload);
         markProposalApplied(proposalId, outcome ?? {});
+        analytics.track(langyProposalApplied({ kind: proposal.kind }));
         toaster.create({
           title: "Applied",
           description: proposal.summary,
@@ -58,14 +76,22 @@ export function useLangyProposalApply({
       }
     },
     [
-      appliedOutcomes,
-      applyingProposalIds,
+      analytics,
       clearProposalApplying,
-      discardedProposalIds,
+      isSettled,
       markProposalApplied,
       markProposalApplying,
       proposalHandlersRef,
     ],
+  );
+
+  const discard = useCallback(
+    (proposalId: string, proposal: LangyProposal) => {
+      if (isSettled(proposalId)) return;
+      discardProposal(proposalId);
+      analytics.track(langyProposalDiscarded({ kind: knownKind(proposal) }));
+    },
+    [analytics, discardProposal, isSettled, knownKind],
   );
 
   return { appliedOutcomes, discardedProposalIds, applyingProposalIds, apply, discard };

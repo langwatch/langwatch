@@ -2,12 +2,18 @@ import {
   DASHBOARD_KSUID_RESOURCE,
   dashboardCreateInputSchema,
   dashboardDetailsUpdateSchema,
+  DashboardHomeNeedsOrgScopeError,
+  dashboardHomeProductSchema,
   dashboardIdSchema,
   DashboardNotFoundError,
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  homeAllowsScope,
   MY_DASHBOARD_NAME,
   newDashboardScope,
   projectIdSchema,
-  type Dashboard,
+  type Board,
+  type DashboardHomeProduct,
+  type DashboardScope,
   type BoardSummary,
   type DashboardViewer,
 } from "@langwatch/dashboard-contract";
@@ -70,31 +76,53 @@ export class BoardService {
   }
 
   /** The board the viewer may open here, at home or as the organization's guest. */
-  async getBoard(input: BoardRef): Promise<Dashboard> {
+  async getBoard(input: BoardRef): Promise<Board> {
     const ref = boardRef(input);
     const found = await this.#access.findReadable({ ...ref, viewer: input.viewer });
-    if (!found) throw new DashboardNotFoundError(ref.projectId);
+    if (!found) throw new DashboardNotFoundError({ projectId: ref.projectId });
     return found.board;
   }
 
   /**
-   * A new board at the scope Project. A member's own My dashboard alone starts starred for them,
-   * at Only me (AC160b, AC170); the app refuses it where Dashboards is switched off (AC189).
+   * A new board at the scope Project, homed in LLM Ops unless named. A member's own My dashboard
+   * alone starts starred for them, at Only me (AC160b, AC170); the app refuses it where
+   * Dashboards is switched off (AC189). Project outside LLM Ops is refused before any write.
    */
   async createBoard(input: {
     projectId: string;
     name: string;
     createdById?: string;
-  }): Promise<Dashboard> {
-    const { createdById, ...fields } = input;
+    scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
+  }): Promise<Board> {
+    const { createdById, scope: asked, homeProduct: home, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
+    const homeProduct = dashboardHomeProductSchema.parse(home ?? DEFAULT_DASHBOARD_HOME_PRODUCT);
+    const fallback = newDashboardScope({ name: parsed.name, createdById });
+    const scope = asked ?? fallback;
+    if (!homeAllowsScope({ homeProduct, scope })) {
+      throw new DashboardHomeNeedsOrgScopeError(homeProduct);
+    }
+    // Checked before the write, so a refused scope leaves no board behind.
+    const { organizationId } =
+      scope === fallback
+        ? { organizationId: null }
+        : await this.#access.getScopeStamp({ projectId: parsed.projectId, createdById, scope });
 
+    const myDashboardOfUserId = await this.#newMyDashboardOwner({
+      projectId: parsed.projectId,
+      name: parsed.name,
+      createdById,
+    });
     const board = await this.#repository.createBoard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
       projectId: parsed.projectId,
       name: parsed.name,
       createdById: createdById ?? null,
-      scope: newDashboardScope({ name: parsed.name, createdById }),
+      scope,
+      homeProduct,
+      organizationId,
+      myDashboardOfUserId,
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
     if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {
@@ -110,7 +138,7 @@ export class BoardService {
   /** The board's name and description; an absent field is left as it is. */
   async updateBoard(
     input: BoardRef & { name?: string; description?: string | null },
-  ): Promise<Dashboard> {
+  ): Promise<Board> {
     const ref = boardRef(input);
     await this.#access.getWritable({ ...ref, viewer: input.viewer });
     const details = dashboardDetailsUpdateSchema.parse({
@@ -129,10 +157,26 @@ export class BoardService {
   }
 
   /** The board, its widgets, every star on it and its stale legacy copy (AC199b). */
-  async deleteBoard(input: BoardRef): Promise<Dashboard> {
+  async deleteBoard(input: BoardRef): Promise<Board> {
     const ref = boardRef(input);
     await this.#access.getWritable({ ...ref, viewer: input.viewer });
     return this.#repository.deleteBoard(ref);
+  }
+
+  /**
+   * Who a new board is My dashboard of: its maker, when it takes the default name and they have
+   * none marked in the project yet, so a renamed My dashboard keeps that place (AC163).
+   */
+  async #newMyDashboardOwner(input: {
+    projectId: string;
+    name: string;
+    createdById: string | undefined;
+  }): Promise<string | null> {
+    const { projectId, name, createdById } = input;
+    if (createdById === undefined || name !== MY_DASHBOARD_NAME) return null;
+    const boards = await this.#repository.findBoardsInProjects({ projectIds: [projectId] });
+    const marked = boards.some((board) => board.myDashboardOfUserId === createdById);
+    return marked ? null : createdById;
   }
 
   async #starredIds(input: {

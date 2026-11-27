@@ -15,6 +15,8 @@ Feature: Trace list page size cap
   #     bound (10 000 on every plan, also their default)
   #   - the public REST search routes clamp instead of rejecting, so existing
   #     API clients that ask for more keep working
+  #   - except a search with spans: a short page there reads as the end of an
+  #     export to older clients, so above 100 it is refused, never clamped
   #   - the filtered annotations page needs more than one page of trace ids, so
   #     it follows scrollId, at most 10 pages (the old 10 000-trace ceiling)
   #     and only shows ids once the whole walk finished without a failure
@@ -44,6 +46,28 @@ Feature: Trace list page size cap
   Scenario: Public trace search clamps an oversized page instead of rejecting it
     When the public trace search is called with pageSize 5000
     Then the request is accepted
+
+  @unit
+  Scenario: Public trace search with spans refuses a page above 100 traces
+    When the public trace search asks for spans with pageSize 4000
+    Then the request is refused with 422 "trace_page_size_too_large" naming the bound 100
+    And a page of 100 or fewer keeps the size it asked for
+    And a search with spans that names no pageSize answers pages of 100
+    And a search without spans is never refused, only clamped to the caller's plan bound
+
+  @unit
+  Scenario: Every trace read with spans is held to the spans page bound
+    Given a trace download asks for spans with pageSize 10 000
+    When it is read
+    Then it is refused with "trace_page_size_too_large" naming the spans bound 100
+    And a spans download that names no pageSize answers pages of 100
+
+  @unit
+  Scenario: An operator's spans page bound is the one a spans search answers by
+    Given an operator has set the spans page bound to 10
+    When the public trace search asks for spans with pageSize 11
+    Then the request is refused with "trace_page_size_too_large" naming the bound 10
+    And a search with spans that names no pageSize answers pages of 10
 
   @integration
   Scenario: The filtered annotations list walks trace pages at the cap

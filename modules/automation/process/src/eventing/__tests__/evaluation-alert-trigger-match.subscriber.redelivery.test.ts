@@ -110,7 +110,7 @@ class TestTraceService
     return Promise.reject(new Error("not used by this subscriber"));
   }
 
-  resolveIngestWaitTimeout(): Promise<never> {
+  resolveTraceSettleSettings(): Promise<never> {
     return Promise.reject(new Error("not used by this subscriber"));
   }
 

@@ -32,6 +32,7 @@ import type { ScopeNames } from "../../model/board-scope.ts";
 import { BoardStar } from "../elements/board-star.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
 import { ScopeChoices } from "./board-scope-control.tsx";
+import { SIDEBAR_ROW_ICON_SIZE, sidebarRowIconColor, sidebarRowLook } from "./sidebar-link-row.tsx";
 
 /** Star and order, shared by both kinds of row. */
 export type StarActions = {
@@ -64,6 +65,7 @@ export function SavedDashboardRow({
   href,
   isActive,
   mark,
+  icon,
   actions,
 }: {
   name: string;
@@ -71,12 +73,14 @@ export function SavedDashboardRow({
   isActive: boolean;
   /** The scope mark after the name: a lock or a building, none on a Project board. */
   mark?: ReactNode;
+  /** Stands in for the pin button where the list is already the pinned ones. */
+  icon?: ReactNode;
   actions: SavedDashboardRowActions;
 }) {
   if (actions.isRenaming) return <RenameField name={name} actions={actions} />;
   const { scope, rename, duplicate, remove } = actions;
   return (
-    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark}>
+    <SidebarRow name={name} href={href} isActive={isActive} star={actions} mark={mark} icon={icon}>
       <StarItems name={name} actions={actions} />
       {scope && (
         <>
@@ -173,6 +177,7 @@ function SidebarRow({
   isActive,
   star,
   mark,
+  icon,
   children,
 }: {
   name: string;
@@ -180,6 +185,7 @@ function SidebarRow({
   isActive: boolean;
   star: StarActions;
   mark?: ReactNode;
+  icon?: ReactNode;
   /** The menu's items. */
   children: ReactNode;
 }) {
@@ -195,19 +201,8 @@ function SidebarRow({
     >
       <ChakraLink
         href={href}
-        display="flex"
-        alignItems="center"
-        gap={1.5}
         width="full"
-        borderRadius="lg"
-        paddingX={2}
-        paddingY="3px"
-        textStyle="bodySm"
-        fontWeight={isActive ? "medium" : "normal"}
-        color={isActive ? "fg" : "fg.subtle"}
-        background={isActive ? "border" : "transparent"}
-        textDecoration="none"
-        _hover={{ color: "fg", background: isActive ? "border" : "border/50" }}
+        {...sidebarRowLook({ isActive })}
         aria-current={isActive ? "page" : void 0}
         onClick={(event) => {
           if (opensElsewhere(event)) return;
@@ -215,10 +210,16 @@ function SidebarRow({
           host.navigate(href);
         }}
       >
-        <Box as="span" display="flex" flexShrink={0}>
-          <BoardStar isStarred={star.isStarred} onToggle={star.onToggleStar} size={14} />
+        <Box as="span" display="flex" flexShrink={0} color={sidebarRowIconColor({ isActive })}>
+          {icon ?? (
+            <BoardStar
+              isStarred={star.isStarred}
+              onToggle={star.onToggleStar}
+              size={SIDEBAR_ROW_ICON_SIZE}
+            />
+          )}
         </Box>
-        <Text as="span" truncate minWidth={0}>
+        <Text as="span" truncate minWidth={0} title={name}>
           {name}
         </Text>
         {mark}

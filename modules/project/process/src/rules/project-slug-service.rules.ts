@@ -1,3 +1,5 @@
+import { CODING_AGENTS_SEGMENT, RETIRED_PERSONAL_SEGMENT } from "@langwatch/user-contract";
+
 /**
  * The slug a new project is given. A slug is the project's segment in every URL the customer
  * ever sees, so it has to survive being typed, pasted and linked: ASCII, lowercase, no
@@ -16,11 +18,14 @@ const RESERVED_TOP_LEVEL_ROUTES = new Set([
   "auth",
   "authorize",
   "cli",
+  CODING_AGENTS_SEGMENT,
+  // The organization's Dashboards library (ADR-002 in modules/dashboard).
+  "dashboards",
   "gateway",
   "governance",
   "invite",
   "mcp",
-  "me",
+  RETIRED_PERSONAL_SEGMENT,
   "onboarding",
   "ops",
   "settings",

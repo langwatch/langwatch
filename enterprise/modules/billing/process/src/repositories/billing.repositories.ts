@@ -11,7 +11,10 @@ import type { BillingWebhookOrganizationRepository } from "./billing-webhook-org
 import type { BillingWebhookSubscriptionRepository } from "./billing-webhook-subscription.repository.ts";
 import type { ConnectedBillingRepository } from "./connected-billing.repository.ts";
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
+import type { LicenseRenewalClaimRepository } from "./license-renewal-claim.repository.ts";
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
+import type { OverPlanRepository } from "./over-plan.repository.ts";
+import type { PaymentRecoveryRepository } from "./payment-recovery.repository.ts";
 import type { SeatEventSubscriptionRepository } from "./seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRepository } from "./subscription.repository.ts";
 
@@ -26,9 +29,14 @@ export interface BillingRepositories {
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
   /** Gateway's spend ledger, through gateway's share (round 37 D5). */
   readonly gatewaySpend: BillingGatewaySpendRepository;
+  /** One renewed self-serve licence per paid Stripe invoice. */
+  readonly licenseRenewalClaims: LicenseRenewalClaimRepository;
   readonly organizations: BillingAccountFactsRepository;
   readonly organizationCache: BillingOrganizationCacheRepository;
   readonly organizationPricing: OrganizationPricingRepository;
+  /** The failed payment recovery columns on the Subscription row. */
+  readonly paymentRecovery: PaymentRecoveryRepository;
+  readonly overPlan: OverPlanRepository;
   /** Project's projects, through project's share (round 37 D5, R40). */
   readonly projects: BillingProjectDirectoryRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;

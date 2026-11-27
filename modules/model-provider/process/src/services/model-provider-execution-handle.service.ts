@@ -2,8 +2,10 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   expandLatestAlias,
   isCodexModel,
+  ModelExecutionUnavailableError,
   ModelProviderDisabledError,
   type ModelProviderApi,
+  ModelProviderUnavailableError,
 } from "@langwatch/model-provider-contract";
 import type { LanguageModel } from "ai";
 
@@ -14,11 +16,12 @@ import {
   prepareLitellmParams,
 } from "../rules/legacy-model-provider.rules.ts";
 import type { ModelCostProject } from "./model-provider-project-scope.service.ts";
+import type { ModelProviderUsageMeteringService } from "./model-provider-usage-metering.service.ts";
 
 /**
  * The handle a Codex model executes through, via the AI gateway's Responses endpoint — not this
  * feature's vertical, so a process with no gateway credential passes nothing and the cascade
- * refuses codex models by name; every other provider is unaffected.
+ * refuses codex models as `model_execution_unavailable`; every other provider is unaffected.
  */
 abstract class ModelProviderCodexHandle {
   abstract resolve(input: {
@@ -62,9 +65,11 @@ export type ModelProviderExecutionHandleOptions = {
   nlpInternalSecret?: string | undefined;
   /**
    * Codex's own road, where the process composed one. Absent means codex
-   * models refuse by name — see {@link ModelProviderCodexHandle}.
+   * models are refused with a typed code — see {@link ModelProviderCodexHandle}.
    */
   codexHandles?: ModelProviderCodexHandle;
+  /** Writes each answered call's usage to the spend ledger; absent writes nothing (ADR-193). */
+  metering?: Pick<ModelProviderUsageMeteringService, "metered">;
 };
 
 async function resolveModel({
@@ -194,17 +199,11 @@ export class ModelProviderExecutionHandleService {
     const modelProvider = modelProviders[providerKey];
 
     if (!modelProvider) {
-      throw new Error(
-        `Model provider "${providerKey}" is not configured for this project. ` +
-          "Go to Settings → Model Providers to add it.",
-      );
+      throw new ModelProviderUnavailableError({ providerKey, reason: "not_configured" });
     }
 
     if (!modelProvider.enabled) {
-      throw new Error(
-        `Model provider "${providerKey}" is configured but disabled. ` +
-          "Go to Settings → Model Providers to enable it.",
-      );
+      throw new ModelProviderUnavailableError({ providerKey, reason: "disabled" });
     }
 
     // Codex never goes through the nlpgo chat-completions proxy: the codex
@@ -214,11 +213,7 @@ export class ModelProviderExecutionHandleService {
     // cannot bypass a disconnected or disabled provider row.
     if (isCodexModel(model_)) {
       if (!input.codexHandles) {
-        throw new Error(
-          "Codex models cannot be executed by this process: it composes no AI gateway " +
-            `credential, and "${model_}" has no other road. Configure the gateway, or ` +
-            "choose a model from another provider.",
-        );
+        throw new ModelExecutionUnavailableError({ model: model_, featureKey });
       }
 
       return input.codexHandles.resolve({
@@ -234,13 +229,21 @@ export class ModelProviderExecutionHandleService {
       projectId,
     });
 
-    return handleForParameters({
+    const handle = handleForParameters({
       providerKey,
       model: model_,
       parameters: litellmParams,
       executionProxyBaseUrl: input.executionProxyBaseUrl,
       internalSecret: input.nlpInternalSecret,
     });
+    return input.metering
+      ? input.metering.metered(handle, {
+          projectId,
+          model: model_,
+          modelProviderId: modelProvider.id,
+          featureKey,
+        })
+      : handle;
   }
 
   resolve(input: ModelProviderExecutionHandleInput): Promise<LanguageModel> {

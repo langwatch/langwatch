@@ -3,7 +3,7 @@
  * workbench's tRPC mutation and `POST /api/v1/query`. The ceiling and the
  * accepted steps ARE the published contract, so both doors read one copy.
  */
-import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwatch/authorization";
+import { authzPermissionSchema, type RestKeyDoorPrincipal } from "@langwatch/authorization";
 import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -47,11 +47,11 @@ export const langWatchQLCallerProtections = defineMiddlewareContext(
 );
 
 /**
- * Who an API key is, as the key door resolved it: a legacy project key IS its own project; any
- * other key reaches the projects of its organization it holds `analytics:view` on. Annotated with
- * the framework's type, so the two stop compiling together rather than drifting apart.
+ * Who the key door resolved: a legacy project key IS its own project, an access token is its
+ * person on its bound project alone, and any other key reaches the projects of its organization
+ * it holds `analytics:view` on. Annotated with the framework's type, so the two cannot drift.
  */
-export type LangWatchQLKeyReach = RestKeyCredentialPrincipal;
+export type LangWatchQLKeyReach = RestKeyDoorPrincipal;
 export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discriminatedUnion(
   "kind",
   [
@@ -67,6 +67,17 @@ export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discr
           .strict()
           .optional(),
         isLangySessionKey: z.boolean().optional(),
+        isStaffAccessKey: z.boolean().optional(),
+        staffSpendApproved: z.boolean().optional(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal("cliAccessToken"),
+        userId: z.string().min(1),
+        organizationId: z.string().min(1),
+        projectId: z.string().min(1),
+        teamId: z.string().min(1),
       })
       .strict(),
   ],
@@ -76,6 +87,19 @@ export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discr
 export const langWatchQLKeyReach = defineMiddlewareContext(
   "langWatchQLKeyReach",
   langWatchQLKeyReachSchema,
+);
+
+/**
+ * The client a key's query came from, named by its identity headers: the CLI, an MCP server
+ * (local or hosted), or anything else, which stays `rest_api` so the label stays bounded.
+ */
+export const LWQL_KEY_DOORS = ["rest_api", "cli", "mcp"] as const;
+/** One client a key's query can come from. */
+export type LangWatchQLKeyDoor = (typeof LWQL_KEY_DOORS)[number];
+/** The key door's client, resolved by the process from the request rather than by the handler. */
+export const langWatchQLKeyDoor = defineMiddlewareContext(
+  "langWatchQLKeyDoor",
+  z.enum(LWQL_KEY_DOORS),
 );
 
 export { MAX_LWQL_LENGTH };

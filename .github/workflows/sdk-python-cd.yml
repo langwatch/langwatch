@@ -18,6 +18,8 @@ jobs:
   publish:
     if: startsWith(github.event.release.tag_name, 'python-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.wheel_version.outputs.version }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -41,12 +43,39 @@ jobs:
           cd sdks/python
           uv run python -m build
 
-      - name: Publish package
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
-        with:
-          packages_dir: sdks/python/dist/
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Read the wheel version
+        id: wheel_version
+        run: |
+          wheels=(sdks/python/dist/langwatch-*.whl)
+          if [ "${#wheels[@]}" -ne 1 ] || [ ! -f "${wheels[0]}" ]; then
+            echo "::error::Expected exactly one langwatch wheel, found: ${wheels[*]}"
+            exit 1
+          fi
+          name="$(basename "${wheels[0]}")"
+          version="${name#langwatch-}"
+          version="${version%%-*}"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
+      # A fresh venv in a temp dir, PyPI only: the uv workspace would resolve
+      # langwatch-ksuid locally and hide a dependency PyPI cannot serve.
+      # Retries cover a dependency released minutes ago still propagating.
+      - name: Check the wheel's dependencies resolve on PyPI
+        run: |
+          wheel="$(realpath sdks/python/dist/*.whl)"
+          cd "$(mktemp -d)"
+          uv venv --quiet venv
+          for attempt in 1 2 3 4 5; do
+            if uv pip install --python venv/bin/python --no-config --default-index https://pypi.org/simple --refresh --dry-run "$wheel" > resolve.log 2>&1; then
+              cat resolve.log
+              exit 0
+            fi
+            [ "$attempt" -lt 5 ] || break
+            echo "Attempt $attempt/5 failed; retrying in 60s"
+            sleep 60
+          done
+          cat resolve.log
+          echo "::error::A dependency of langwatch is not on PyPI; release it first (e.g. langwatch-ksuid). See the resolver output above."
+          exit 1
 
       - name: Get version from tag or manifest
         id: get_version
@@ -58,7 +87,26 @@ jobs:
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+      - name: Check the wheel version matches the release version
+        env:
+          WHEEL_VERSION: ${{ steps.wheel_version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          # PEP 440 equality: the wheel says 2.1.0rc1 where the tag says 2.1.0-rc.1
+          if ! uv run --no-project --with packaging python -c 'import os,sys; from packaging.version import Version as V; sys.exit(0 if V(os.environ["WHEEL_VERSION"])==V(os.environ["RELEASE_VERSION"]) else 1)'; then
+            echo "::error::Wheel version $WHEEL_VERSION does not match release version $RELEASE_VERSION"
+            exit 1
+          fi
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        with:
+          packages_dir: sdks/python/dist/
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
       - name: Notify Slack
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
@@ -66,3 +114,29 @@ jobs:
             sdks/python/CHANGELOG.md \
             "Python SDK" \
             "${{ steps.get_version.outputs.version }}"
+
+  # Installs what customers install, from PyPI, once the upload has propagated.
+  verify-published:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install langwatch from PyPI and import it
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if "$RUNNER_TEMP/venv/bin/pip" install --no-cache-dir "langwatch==$VERSION"; then
+              "$RUNNER_TEMP/venv/bin/python" -c "import langwatch"
+              exit 0
+            fi
+            [ "$attempt" -lt 10 ] || break
+            echo "Attempt $attempt/10 failed; retrying in 60s"
+            sleep 60
+          done
+          echo "::error::langwatch==$VERSION does not install from PyPI"
+          exit 1

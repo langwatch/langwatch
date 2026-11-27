@@ -11,7 +11,12 @@ Feature: Permission reads come from the session, and a public page holds none
   The session capability (auth) answers hasPermission and hasOrganizationPermission.
   An organization permission follows the grant the active scope holds, as on main
   (Alex, 2026-10-06, scope knot Q2): the project's grant on a project page, the
-  organization's where no project is chosen, from one grant read.
+  organization's where no project is chosen, from one grant read. On a project page that
+  read also carries the reader's permissions at the organization, decided on the server
+  from the same grant snapshot, and organization permissions add them: a member with no
+  grant on the active project (a Lite Member admitted by domain) still holds the
+  organization floor, such as members:view for the Users page. Project permissions never
+  read them.
   The scope capability (organization) answers which organization, team and project
   this page is about, and answers no permission. A public page (the shared trace)
   mounts an explicit no-session answer: every permission reads as not held there,
@@ -37,6 +42,22 @@ Feature: Permission reads come from the session, and a public page holds none
     When a screen asks the session whether the reader may manage the organization
     Then the answer is no
     And asking the session whether the reader may manage the project answers yes
+
+  @integration
+  Scenario: An organization permission held only at the organization answers yes on a project page
+    Given the reader holds no grant on the active project
+    And the organization grants them members:view
+    When a screen asks the session whether the reader may read the organization's members
+    Then the answer is yes
+    And asking the session for the same permission on the project answers no
+    And the only grant read sent names the active project
+
+  @integration
+  Scenario: The project page's one grant read carries the organization's permissions too
+    Given the reader is on a project page
+    When the session reads what the reader may do
+    Then exactly one grant read is sent, naming the active project
+    And the server answers both the project's and the organization's permissions from one grant snapshot load
 
   @integration
   Scenario: An organization permission is still unanswered while the active project's grants load
@@ -125,6 +146,21 @@ Feature: Permission reads come from the session, and a public page holds none
     When the Agent Testing page decides which actions to offer
     Then no second grant read is sent for that project
     And the actions it offers match the session's answer
+
+  @integration
+  Scenario: A page load reads the person's grants once
+    Given the authorize host is mounted around every page
+    When a project page loads
+    Then the authorize host sends no grant read of its own, leaving the session's read the only one
+    And it reads the person's grants only when a project token is minted, capping the token at them
+    And a failed grant read is reported as that failure, not as missing permissions
+
+  @unit
+  Scenario: Recording a last-seen stamp refetches nothing on the page
+    Given a project page has loaded its reads
+    When the page records the person's last sign-in
+    Then the write is sent
+    And no read on the page is marked stale or fetched again
 
   @integration
   Scenario: A migrated screen answers a signed-in reader the same as before

@@ -7,6 +7,7 @@ import { lintFrameworkModuleContracts } from "./boundaries/framework-module-cont
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
 import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
+import { lintProjectionReplaySoleCaller } from "./boundaries/projection-replay-sole-caller.ts";
 import { lintRestNamespaceOwners } from "./boundaries/rest-namespace-owners.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
@@ -29,6 +30,7 @@ import {
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
 import { lintRerunnableMigrations } from "./persistence/rerunnable-migrations.ts";
+import { lintSpanTableFence } from "./persistence/span-table-fence.ts";
 import { lintUpgradeSignInTables } from "./persistence/upgrade-sign-in-tables.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
@@ -39,6 +41,7 @@ import {
   lintDeletedSpellingsInTeaching,
 } from "./quality/deleted-spellings.ts";
 import { lintDependencyCatalog } from "./quality/dependency-catalog.ts";
+import { lintRuntimeDependencies } from "./quality/runtime-dependencies.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
 import { lintLintRuleSkillPointers, lintTeachingCitations } from "./quality/teaching-citations.ts";
@@ -207,6 +210,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     run: lintPlatformOperatorCalls,
   }),
   definePolicy({
+    id: "projection-replay-sole-caller",
+    spec: "specs/tooling/lint-projection-replay-sole-caller.feature",
+    run: lintProjectionReplaySoleCaller,
+  }),
+  definePolicy({
     id: "rest-namespace-owners",
     spec: "specs/rest-namespace-owners.feature",
     run: lintRestNamespaceOwners,
@@ -220,6 +228,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "eventing-table-access",
     spec: "specs/eventing-table-access.feature",
     run: lintEventingTableAccess,
+  }),
+  definePolicy({
+    id: "span-table-fence",
+    spec: "specs/tooling/lint-span-table-fence.feature",
+    run: lintSpanTableFence,
   }),
   definePolicy({
     id: "id-index-pairing",
@@ -240,6 +253,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "dependency-catalog",
     spec: "specs/dependency-catalog.feature",
     run: lintDependencyCatalog,
+  }),
+  definePolicy({
+    id: "runtime-dependencies",
+    spec: "specs/tooling/lint-runtime-dependencies.feature",
+    run: lintRuntimeDependencies,
   }),
   definePolicy({
     id: "workspace-seams",

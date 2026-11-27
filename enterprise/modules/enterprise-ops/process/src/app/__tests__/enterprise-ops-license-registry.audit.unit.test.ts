@@ -49,6 +49,7 @@ const license: IssuedLicenseView = {
   maxMembers: 10,
   maxMembersLite: 0,
   liteSeatsUnlimited: false,
+  maxMembersDeveloper: null,
   issuedAt: "2026-09-01T00:00:00.000Z",
   expiresAt: "2027-09-01T00:00:00.000Z",
   source: "BACKOFFICE",

@@ -207,6 +207,48 @@ describe("the SSRF address policy", () => {
     });
   });
 
+  describe("given a policy that admits named AWS service hosts", () => {
+    const aws = createSsrfUrlValidator({
+      blockLocal: true,
+      allowedHosts: [],
+      allowAwsServiceHosts: true,
+    });
+    const vpce = "https://vpce-0a1b2c3d-x1y2z3.sqs.eu-west-1.vpce.amazonaws.com/";
+
+    it("admits a VPC endpoint that resolves to a public address and pins it", async () => {
+      resolvesTo({ a: ["52.95.110.10"] });
+
+      await expect(aws(vpce)).resolves.toMatchObject({
+        type: "resolved",
+        resolvedIp: "52.95.110.10",
+      });
+    });
+
+    it("still refuses the same host by default", async () => {
+      resolvesTo({ a: ["52.95.110.10"] });
+
+      await expect(strict(vpce)).rejects.toThrow(/cloud provider internal domains/i);
+    });
+
+    it.each([
+      ["a private address", "10.0.5.3", /private or localhost/i],
+      ["loopback", "127.0.0.1", /private or localhost/i],
+      ["the metadata endpoint", "169.254.169.254", /metadata/i],
+    ])("refuses an AWS host that resolves to %s", async (_, address, error) => {
+      resolvesTo({ a: [address] });
+
+      await expect(aws(vpce)).rejects.toThrow(error);
+    });
+
+    it("keeps refusing EC2 internal names", async () => {
+      resolvesTo({ a: ["52.95.110.10"] });
+
+      await expect(aws("https://ip-10-0-0-1.eu-west-1.compute.internal/")).rejects.toThrow(
+        /cloud provider internal domains/i,
+      );
+    });
+  });
+
   describe("given a destination that is not http or https at all", () => {
     /** @scenario "Only https on the default port is admitted" */
     it("refuses the scheme before anything else is considered", async () => {

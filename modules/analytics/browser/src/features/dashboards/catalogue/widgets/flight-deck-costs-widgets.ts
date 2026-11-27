@@ -4,6 +4,7 @@
  */
 
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
+import { PROMPT_VERSION_NAMES_SQL } from "./change-queries.ts";
 import * as deck from "./flight-deck-code.ts";
 import * as sql from "./flight-deck-costs-queries.ts";
 import type { CatalogueWidgetBuild } from "./index.ts";
@@ -12,6 +13,8 @@ import * as costs from "./running-costs-code.ts";
 const CHART = 6;
 /** A chart under a row of figures. */
 const FIGURES_AND_CHART = 7;
+/** A headline, a chart and a row per source: the chart keeps its height above the rows. */
+const SOURCE_SPLIT = 10;
 /** A row of figure tiles across the board. */
 const TILES = 3;
 
@@ -48,6 +51,7 @@ export const FLIGHT_DECK_COSTS_BUILDS: Readonly<Record<string, CatalogueWidgetBu
     queries: {
       trend: sql.RESOLVED_TREND_SQL,
       changes: sql.CHANGES_SQL,
+      versions: PROMPT_VERSION_NAMES_SQL,
       seen: sql.OUTCOMES_SEEN_SQL,
     },
     width: "half",
@@ -79,7 +83,7 @@ export const FLIGHT_DECK_COSTS_BUILDS: Readonly<Record<string, CatalogueWidgetBu
     code: costs.SPEND_BY_SOURCE_CODE,
     queries: { main: sql.SPEND_BY_SOURCE_SQL },
     width: "half",
-    rows: FIGURES_AND_CHART,
+    rows: SOURCE_SPLIT,
   },
   "cost-waste": {
     code: costs.WASTE_CODE,

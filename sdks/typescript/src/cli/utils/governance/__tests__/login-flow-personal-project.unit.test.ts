@@ -54,14 +54,16 @@ vi.mock("../config", () => ({
   })),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
   displayConfigPath: () => "~/.langwatch/config.json",
+  assertConfigWritable: vi.fn(),
 }));
 
 vi.mock("../../identityNotice", () => ({
   rememberProjectName: vi.fn(),
 }));
 
-import { loadConfig } from "../config";
+import { assertConfigWritable, loadConfig } from "../config";
 import type * as deviceFlowModule from "../device-flow";
+import { startDeviceCode } from "../device-flow";
 import { runUnifiedLoginFlow } from "../login-flow";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
 
@@ -73,6 +75,20 @@ const exchangeResult = (extra: Record<string, unknown> = {}) => ({
   user: { id: "u1", email: "dev@example.com", name: "Dev" },
   organization: { id: "o1", name: "Acme", slug: "acme" },
   ...extra,
+});
+
+describe("runUnifiedLoginFlow (device session) when the config cannot be saved", () => {
+  /** @scenario "A device login does not start when the config cannot be saved" */
+  it("refuses before asking the server for a device code", async () => {
+    vi.mocked(assertConfigWritable).mockImplementationOnce(() => {
+      throw Object.assign(new Error("cannot save"), { code: "config_not_writable" });
+    });
+
+    await expect(runUnifiedLoginFlow({ kind: "device_session" })).rejects.toMatchObject({
+      code: "config_not_writable",
+    });
+    expect(startDeviceCode).not.toHaveBeenCalled();
+  });
 });
 
 describe("runUnifiedLoginFlow (device session) personal-project persistence", () => {

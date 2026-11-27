@@ -117,6 +117,7 @@ export type {
   PeerEvent,
   PeerEventSchema,
   PeerFoldProjectionDeclaration,
+  PeerFoldSubscriberSpec,
   PeerMapProjectionDeclaration,
 } from "./projections/peerProjection.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
@@ -223,6 +224,12 @@ export * from "./projections/replayMarkerCheck.ts";
 export * from "./replay/pMapLimited.ts";
 export * from "./replay/replayConstants.ts";
 export * from "./replay/replayEngine.ts";
+export {
+  EVENT_SOURCING_QUEUE_KEY_NAME,
+  eventSourcingClaimsIndex,
+  type ReplayClaimsIndex,
+  ReplayClaimsIndexNotReadyError,
+} from "./replay/replayClaimsIndex.ts";
 export * from "./replay/replayLog.ts";
 export * from "./replay/replayStatePath.ts";
 export * from "./replay/replayMarkers.ts";

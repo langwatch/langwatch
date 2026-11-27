@@ -199,7 +199,7 @@ function renderInstalledShell(address: string) {
 describe("the installed shell with navigation's presentation provider", () => {
   /** @scenario "The installed shell gives the page and the open drawer the product of the address" */
   it("gives the page, the open drawer and its portalled menu the Me accent on a Me address", async () => {
-    renderInstalledShell("/me/configure?drawer.open=accentProbe");
+    renderInstalledShell("/coding-agents/configure?drawer.open=accentProbe");
 
     expect((await screen.findByTestId("drawer")).textContent).toBe("me|product.me");
     expect(screen.getByTestId("page").textContent).toBe("me|product.me");

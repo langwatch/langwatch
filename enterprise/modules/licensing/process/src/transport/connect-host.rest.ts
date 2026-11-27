@@ -34,16 +34,22 @@ const SYNC_MAX_BODY_BYTES = 4 * 1024;
 /** An activation carries its code in a header, so its body is empty. */
 const ACTIVATE_MAX_BODY_BYTES = 1024;
 
-/** An activation code on the activate path, else a licence token; the framework hands the bearer. */
+/**
+ * An activation code on the activate path, else a licence token; the framework hands the
+ * bearer. Only the sync path admits an expired licence, to collect its waiting renewal.
+ */
 export const connectHostDoor = defineRestDoor("licence_token", {
   needs: LicensingApi,
   identify: async ({ bearer, instanceId, path }, licensing) => {
     const presented = { bearer, instanceId: instanceId ?? undefined };
+    if (path === ACTIVATE_PATH) {
+      const caller = await licensing.verifyActivationCode(presented);
+      return { scope: { tier: "organization", id: caller.organizationId }, session: caller };
+    }
     const caller =
-      path === ACTIVATE_PATH
-        ? await licensing.verifyActivationCode(presented)
+      path === SYNC_PATH
+        ? await licensing.verifyLicenceTokenForSync(presented)
         : await licensing.verifyLicenceToken(presented);
-
     return { scope: { tier: "organization", id: caller.organizationId }, session: caller };
   },
 });

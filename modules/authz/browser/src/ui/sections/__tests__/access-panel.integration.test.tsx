@@ -41,6 +41,9 @@ const { api, state } = vi.hoisted(() => {
       },
     }),
     authz: {
+      listBillingMembers: {
+        useQuery: () => ({ data: [], isLoading: false, isError: false }),
+      },
       listManagedGrants: {
         useQuery: () => ({
           data: state.failed ? undefined : state.assignments,

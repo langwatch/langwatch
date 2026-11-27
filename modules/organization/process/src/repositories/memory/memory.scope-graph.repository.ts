@@ -1,4 +1,5 @@
 import type { ScopeGraphOrganization } from "@langwatch/organization-contract";
+import { toDate } from "@langwatch/time";
 
 import type { OrganizationScopeGraphReader } from "../../services/organization-scope-graph.service.ts";
 import type { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
@@ -59,6 +60,7 @@ export class MemoryScopeGraphRepository implements OrganizationScopeGraphReader 
           presenceEnabled: organization.presenceEnabled,
           pricingModel: "TIERED",
           ssoProvider: null,
+          createdAt: toDate(organization.createdAt),
           members: [{ role: own.role }],
           teams,
         },

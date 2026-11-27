@@ -257,10 +257,6 @@ function VirtualKeysPage() {
         />
 
         <PageLayout.Container>
-          <Text color="fg.muted" marginBottom={6}>
-            Keys your apps call the gateway with: each one carries its own scopes, routing and
-            budget.
-          </Text>
           {listView === "loading" && <ListSkeleton />}
           {listView === "error" && (
             <GatewayErrorPanel

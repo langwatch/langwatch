@@ -55,6 +55,7 @@ export function LangyDevDrawer({
   floating,
   dockShellClaimed,
   panelHeightPx,
+  panelWidthPx,
 }: {
   open: boolean;
   onClose: () => void;
@@ -67,6 +68,8 @@ export function LangyDevDrawer({
    * silhouette EXACTLY the panel's rather than a fixed card of its own.
    */
   panelHeightPx: number | null;
+  /** The panel's width, which the user can drag, so the drawer meets its left edge. */
+  panelWidthPx: number;
 }) {
   const reduceMotion = useReducedMotion();
   const [tab, setTab] = useState<DevTab>("log");
@@ -109,6 +112,7 @@ export function LangyDevDrawer({
     floating,
     dockShellClaimed,
     panelHeightPx,
+    panelWidthPx,
   });
 
   return (

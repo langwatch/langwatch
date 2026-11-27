@@ -3,6 +3,7 @@ export const prismaTableCatalogue = {
   "Account": "Account",
   "AccountCredential": "AccountCredential",
   "Session": "Session",
+  "UserErasure": "UserErasure",
   "User": "User",
   "VerificationToken": "VerificationToken",
   "Identifier": "Identifier",
@@ -26,6 +27,10 @@ export const prismaTableCatalogue = {
   "JoinRequest": "JoinRequest",
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
+  "SeatHold": "SeatHold",
+  "SeatRequest": "SeatRequest",
+  "OrganizationSeatLease": "OrganizationSeatLease",
+  "OrganizationAccessNotice": "OrganizationAccessNotice",
   "Team": "Team",
   "Organization": "Organization",
   "IssuedLicense": "IssuedLicense",
@@ -41,6 +46,9 @@ export const prismaTableCatalogue = {
   "ScimDirectoryUser": "ScimDirectoryUser",
   "ScimSyncState": "ScimSyncState",
   "ScimSsoConnectionView": "ScimSsoConnectionView",
+  "OrganizationSeatPeak": "OrganizationSeatPeak",
+  "OrganizationSeatPeakHolder": "OrganizationSeatPeakHolder",
+  "OrganizationSeatPeakMonth": "OrganizationSeatPeakMonth",
   "Project": "Project",
   "Department": "Department",
   "DepartmentMembershipHistory": "DepartmentMembershipHistory",
@@ -55,6 +63,7 @@ export const prismaTableCatalogue = {
   "DatasetVersionRun": "DatasetVersionRun",
   "Dashboard": "Dashboard",
   "DashboardFavourite": "DashboardFavourite",
+  "DashboardSidebarOrder": "DashboardSidebarOrder",
   "DashboardsV2": "DashboardsV2",
   "DashboardWidget": "DashboardWidget",
   "InsightProjection": "InsightProjection",
@@ -82,6 +91,7 @@ export const prismaTableCatalogue = {
   "LangyTurnRequest": "LangyTurnRequest",
   "LangyActiveTurn": "LangyActiveTurn",
   "LangyConversationTurnProjection": "LangyConversationTurnProjection",
+  "LangyPullRequest": "LangyPullRequest",
   "LangyMessageProjection": "LangyMessageProjection",
   "ProjectSecret": "ProjectSecret",
   "TriggerSent": "TriggerSent",
@@ -96,7 +106,9 @@ export const prismaTableCatalogue = {
   "PinnedTrace": "PinnedTrace",
   "TraceEditOverlay": "TraceEditOverlay",
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
+  "TracePlanLimitRefusal": "TracePlanLimitRefusal",
   "RetentionPolicy": "RetentionPolicy",
+  "RetentionApplyStatus": "RetentionApplyStatus",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
@@ -128,14 +140,29 @@ export const prismaTableCatalogue = {
   "GroupMembership": "GroupMembership",
   "AuthzUserStanding": "AuthzUserStanding",
   "AuthzEngineSwitch": "AuthzEngineSwitch",
+  "AuthzOrganizationPolicy": "AuthzOrganizationPolicy",
+  "AuthzBraidWrite": "AuthzBraidWrite",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
   "Role": "Role",
   "ApiKey": "ApiKey",
+  "SigningKey": "SigningKey",
   "ProjectActiveDay": "ProjectActiveDay",
   "NurturingProject": "NurturingProject",
+  "NurturingUncopiedProject": "NurturingUncopiedProject",
+  "NurturingOrganizationMember": "NurturingOrganizationMember",
+  "NurturingOrganizationCreated": "NurturingOrganizationCreated",
+  "NurturingOrganizationPlan": "NurturingOrganizationPlan",
+  "NurturingVirtualKey": "NurturingVirtualKey",
+  "NurturingErasedUser": "NurturingErasedUser",
   "NurturingOrganization": "NurturingOrganization",
+  "NurturingProjectUsageView": "NurturingProjectUsageView",
+  "NurturingProjectTraceDay": "NurturingProjectTraceDay",
+  "NurturingProjectTraceDayCount": "NurturingProjectTraceDayCount",
+  "NurturingProjectEvaluationDay": "NurturingProjectEvaluationDay",
+  "NurturingPersonalProject": "NurturingPersonalProject",
+  "NurturingTracedProject": "NurturingTracedProject",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
   "VirtualKey": "VirtualKey",
   "VirtualKeyScope": "VirtualKeyScope",
@@ -149,6 +176,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryTeam": "AiToolEntryTeam",
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
+  "GatewayA2ATarget": "GatewayA2ATarget",
   "GatewayConnectUpstream": "GatewayConnectUpstream",
   "GatewayTraceExportKey": "GatewayTraceExportKey",
   "GatewayBudget": "GatewayBudget",
@@ -174,14 +202,27 @@ export const prismaTableCatalogue = {
   "SystemMigrationTenantState": "SystemMigrationTenantState",
   "SystemMigrationEnrollment": "SystemMigrationEnrollment",
   "StoredObject": "StoredObject",
+  "StoredObjectOwner": "StoredObjectOwner",
   "DiscoveredPerson": "DiscoveredPerson",
   "DiscoveredAgent": "DiscoveredAgent",
+  "DiscoveredAgentListing": "DiscoveredAgentListing",
+  "AgentRegistryEntry": "AgentRegistryEntry",
+  "AgentRegistryEvent": "AgentRegistryEvent",
+  "AgentRegistryBaseline": "AgentRegistryBaseline",
+  "AgentRegistrySettings": "AgentRegistrySettings",
+  "AgentStopPlanTarget": "AgentStopPlanTarget",
+  "AgentStopPlan": "AgentStopPlan",
+  "GovernanceAwsConnection": "GovernanceAwsConnection",
+  "AgentStop": "AgentStop",
+  "AgentStopClaim": "AgentStopClaim",
+  "AgentStopTargetPriorState": "AgentStopTargetPriorState",
   "IdentityMatch": "IdentityMatch",
   "GovernanceTenantHistory": "GovernanceTenantHistory",
   "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
   "IdentityMatchSuggestion": "IdentityMatchSuggestion",
   "ConnectedSeatChange": "ConnectedSeatChange",
   "ConnectedStatement": "ConnectedStatement",
+  "LicenseRenewalClaim": "LicenseRenewalClaim",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
@@ -189,7 +230,18 @@ export const prismaTableCatalogue = {
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
   "WebPushVapidKey": "WebPushVapidKey",
-  "SignInProviderMount": "SignInProviderMount"
+  "SignInProviderMount": "SignInProviderMount",
+  "StaffAccessRequester": "StaffAccessRequester",
+  "StaffAccessChallenge": "StaffAccessChallenge",
+  "StaffAccessRequest": "StaffAccessRequest",
+  "StaffAccessEvent": "StaffAccessEvent",
+  "DigestCohortOrganization": "DigestCohortOrganization",
+  "DigestSubscription": "DigestSubscription",
+  "DigestProjectWeek": "DigestProjectWeek",
+  "DigestUserWeek": "DigestUserWeek",
+  "DigestSend": "DigestSend",
+  "DigestSettings": "DigestSettings",
+  "StaffAccessCopyLedger": "StaffAccessCopyLedger"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -247,6 +299,11 @@ export const prismaModelFieldCatalogue = {
     "lastSeenAt",
     "createdAt",
     "updatedAt"
+  ],
+  "UserErasure": [
+    "id",
+    "accountCreatedAt",
+    "erasedAt"
   ],
   "User": [
     "id",
@@ -569,9 +626,59 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "departmentId",
+    "billingOnly",
     "disabledAt",
     "pendingSsoGrantId",
-    "membershipStamp"
+    "membershipStamp",
+    "fullSeatSince",
+    "seatPendingSince"
+  ],
+  "SeatHold": [
+    "id",
+    "organizationId",
+    "userId",
+    "email",
+    "name",
+    "seatTakenAt",
+    "heldUntil",
+    "reason",
+    "createdAt"
+  ],
+  "SeatRequest": [
+    "id",
+    "organizationId",
+    "email",
+    "userId",
+    "name",
+    "status",
+    "source",
+    "idpRefused",
+    "idpKind",
+    "salesNotifiedAt",
+    "openedAt",
+    "resolvedAt",
+    "resolvedByUserId",
+    "seatPendingSince",
+    "createdAt",
+    "updatedAt"
+  ],
+  "OrganizationSeatLease": [
+    "organizationId",
+    "holder",
+    "expiresAt",
+    "createdAt"
+  ],
+  "OrganizationAccessNotice": [
+    "id",
+    "organizationId",
+    "kind",
+    "email",
+    "name",
+    "idp",
+    "dayKey",
+    "idpRefused",
+    "createdAt",
+    "mailedAt"
   ],
   "Team": [
     "id",
@@ -610,6 +717,8 @@ export const prismaModelFieldCatalogue = {
     "privateDataplaneSeenAt",
     "maxSessionDurationDays",
     "mfaRequired",
+    "docsPlaygroundSessionsEnabled",
+    "docsPlaygroundSessionsDisabledAt",
     "lockoutAfterFailedAttempts",
     "lockoutMinutes",
     "sessionIdleTimeoutMinutes",
@@ -654,6 +763,8 @@ export const prismaModelFieldCatalogue = {
     "connectServicesDisabled",
     "instantEvalsEnabledAt",
     "instantEvalsEnabledByUserId",
+    "piiRedactionModelAcceptedAt",
+    "piiRedactionModelAcceptedByUserId",
     "connectLastSyncAt",
     "connectLastSyncError",
     "issuedLicenses",
@@ -681,6 +792,7 @@ export const prismaModelFieldCatalogue = {
     "maxMembers",
     "maxMembersLite",
     "liteSeatsUnlimited",
+    "maxMembersDeveloper",
     "issuedAt",
     "expiresAt",
     "source",
@@ -726,6 +838,7 @@ export const prismaModelFieldCatalogue = {
     "maxMembers",
     "maxMembersLite",
     "liteSeatsUnlimited",
+    "maxMembersDeveloper",
     "licenseTermDays",
     "services",
     "expiresAt",
@@ -858,6 +971,37 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "OrganizationSeatPeak": [
+    "organizationId",
+    "openedAt",
+    "fullSeats",
+    "liteSeats",
+    "developerSeats",
+    "latestChangeAt",
+    "mismatches"
+  ],
+  "OrganizationSeatPeakHolder": [
+    "organizationId",
+    "holderKind",
+    "holderId",
+    "seat",
+    "lastChangedAt",
+    "lastChangeId",
+    "expiresAt",
+    "expiredByFold",
+    "suppressedBy",
+    "restoredByFold"
+  ],
+  "OrganizationSeatPeakMonth": [
+    "organizationId",
+    "month",
+    "fullPeak",
+    "fullPeakAt",
+    "litePeak",
+    "litePeakAt",
+    "fullAtEnd",
+    "liteAtEnd"
+  ],
   "Project": [
     "id",
     "name",
@@ -967,6 +1111,7 @@ export const prismaModelFieldCatalogue = {
     "subscriptionId",
     "acceptedByUserId",
     "acceptedViaIdentifierId",
+    "billingOnly",
     "createdAt",
     "updatedAt"
   ],
@@ -1113,6 +1258,15 @@ export const prismaModelFieldCatalogue = {
     "position",
     "createdAt"
   ],
+  "DashboardSidebarOrder": [
+    "id",
+    "userId",
+    "organizationId",
+    "homeProduct",
+    "dashboardIds",
+    "createdAt",
+    "updatedAt"
+  ],
   "DashboardsV2": [
     "id",
     "projectId",
@@ -1121,6 +1275,8 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "scope",
     "organizationId",
+    "homeProduct",
+    "myDashboardOfUserId",
     "excludedOrigins",
     "createdAt",
     "updatedAt"
@@ -1439,6 +1595,7 @@ export const prismaModelFieldCatalogue = {
     "extraHeaders",
     "customModels",
     "customEmbeddingsModels",
+    "lastListedModelIds",
     "deploymentMapping",
     "rateLimitRpm",
     "rateLimitTpm",
@@ -1554,6 +1711,7 @@ export const prismaModelFieldCatalogue = {
     "PendingHandoffTurnId",
     "RunToken",
     "ArchivedAt",
+    "CiFollowUpsInARow",
     "CreatedAt",
     "UpdatedAt",
     "OccurredAt",
@@ -1606,6 +1764,16 @@ export const prismaModelFieldCatalogue = {
     "AcceptedAt",
     "LastEventId",
     "ProjectionVersion"
+  ],
+  "LangyPullRequest": [
+    "id",
+    "projectId",
+    "RepositoryFullName",
+    "PrNumber",
+    "ConversationId",
+    "UserId",
+    "OpenedAt",
+    "SourceEventId"
   ],
   "LangyMessageProjection": [
     "id",
@@ -1774,6 +1942,12 @@ export const prismaModelFieldCatalogue = {
     "recordedAt",
     "updatedAt"
   ],
+  "TracePlanLimitRefusal": [
+    "projectId",
+    "day",
+    "refusals",
+    "updatedAt"
+  ],
   "RetentionPolicy": [
     "id",
     "organizationId",
@@ -1783,6 +1957,23 @@ export const prismaModelFieldCatalogue = {
     "retentionDays",
     "createdAt",
     "updatedAt"
+  ],
+  "RetentionApplyStatus": [
+    "id",
+    "organizationId",
+    "scopeType",
+    "scopeId",
+    "changedAt",
+    "appliedAt",
+    "raisedAt",
+    "shortenedAt",
+    "shortenedAtByCategory",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
   ],
   "DataPrivacyPolicy": [
     "id",
@@ -2094,12 +2285,17 @@ export const prismaModelFieldCatalogue = {
     "parameters",
     "simulatorModel",
     "judgeModel",
+    "traceQuietPeriodMs",
+    "traceWaitTimeoutMs",
     "maxTurns",
     "minTurns",
     "fields",
     "callerVoice",
     "testSuiteId",
     "testSuite",
+    "kind",
+    "redTeam",
+    "sourceTemplateId",
     "version",
     "versions",
     "lastUpdatedById",
@@ -2134,11 +2330,15 @@ export const prismaModelFieldCatalogue = {
     "labels",
     "simulatorModel",
     "judgeModel",
+    "traceQuietPeriodMs",
+    "traceWaitTimeoutMs",
     "kind",
     "scope",
     "fields",
     "evaluators",
     "testSuiteScenarios",
+    "templateId",
+    "templateVersion",
     "archivedAt",
     "createdAt",
     "updatedAt"
@@ -2160,6 +2360,7 @@ export const prismaModelFieldCatalogue = {
     "maxWorkflows",
     "maxRetentionDays",
     "maxMembersLite",
+    "maxMembersDeveloper",
     "maxTeams",
     "maxPrompts",
     "maxEvaluators",
@@ -2171,6 +2372,27 @@ export const prismaModelFieldCatalogue = {
     "maxDashboards",
     "maxCustomGraphs",
     "maxAutomations",
+    "seatsKept",
+    "seatsKeptUntil",
+    "seatLineQuantity",
+    "seatLineQuantityAt",
+    "seatLineWriteQuantities",
+    "seatLineWriteSince",
+    "seatLineWriteAt",
+    "seatLineWriteAttempts",
+    "seatLineWriteFlaggedAt",
+    "seatRepairQuantity",
+    "seatRepairLiftedQuantity",
+    "seatRepairSince",
+    "seatRepairAttempts",
+    "seatRepairFlaggedAt",
+    "seatLineLeaseToken",
+    "seatLineLeaseUntil",
+    "paymentRecoveryInvoiceId",
+    "paymentRecoveryStartedAt",
+    "paymentRecoveryNoticeDay",
+    "overPlanSince",
+    "overPlanEndedAt",
     "organization",
     "invoices"
   ],
@@ -2230,6 +2452,26 @@ export const prismaModelFieldCatalogue = {
     "lastAppliedEventId",
     "updatedAt"
   ],
+  "AuthzOrganizationPolicy": [
+    "organizationId",
+    "braidsOrganizationAdminsOnly",
+    "braidsEnabled",
+    "updatedByUserId",
+    "updatedAt"
+  ],
+  "AuthzBraidWrite": [
+    "organizationId",
+    "commandId",
+    "grantId",
+    "readerProjectId",
+    "ownerProjectId",
+    "termsKey",
+    "condition",
+    "expiresAt",
+    "replacesGrantId",
+    "createdByUserId",
+    "createdAt"
+  ],
   "RoleBinding": [
     "id",
     "organizationId",
@@ -2266,6 +2508,7 @@ export const prismaModelFieldCatalogue = {
     "expiresAt",
     "maxViews",
     "condition",
+    "replacesGrantId",
     "occurredAt",
     "createdAt",
     "updatedAt",
@@ -2319,6 +2562,20 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "SigningKey": [
+    "id",
+    "organizationId",
+    "projectId",
+    "name",
+    "publicId",
+    "secretCiphertext",
+    "createdByUserId",
+    "createdAt",
+    "rotatedAt",
+    "verifiesUntil",
+    "revokedAt",
+    "lastUsedAt"
+  ],
   "ProjectActiveDay": [
     "id",
     "projectId",
@@ -2328,6 +2585,48 @@ export const prismaModelFieldCatalogue = {
   "NurturingProject": [
     "projectId",
     "organizationId"
+  ],
+  "NurturingUncopiedProject": [
+    "projectId",
+    "firstSeenAt"
+  ],
+  "NurturingOrganizationMember": [
+    "organizationId",
+    "userId",
+    "joinedAt",
+    "leftAt",
+    "returnedAt"
+  ],
+  "NurturingOrganizationCreated": [
+    "organizationId",
+    "createdAt"
+  ],
+  "NurturingOrganizationPlan": [
+    "organizationId",
+    "plan",
+    "occurredAt",
+    "fromCatchUp",
+    "appliedEventIds",
+    "winnerEventId"
+  ],
+  "NurturingVirtualKey": [
+    "virtualKeyId",
+    "organizationId",
+    "name",
+    "occurredAt",
+    "keyCreatedAt",
+    "creatorUserId",
+    "principalUserId",
+    "principalUserIdAt",
+    "purpose",
+    "purposeAt",
+    "disabledAt",
+    "enabledAt",
+    "revokedAt"
+  ],
+  "NurturingErasedUser": [
+    "userIdHash",
+    "erasedAt"
   ],
   "NurturingOrganization": [
     "organizationId",
@@ -2339,7 +2638,52 @@ export const prismaModelFieldCatalogue = {
     "codingAgentTypes",
     "codingActiveDays",
     "codingLastActiveDay",
+    "codingTerminalTypes",
+    "codingRepositoryKeys",
+    "codingFirstDays",
+    "lastTraceAt",
+    "adminAt",
     "updatedAt"
+  ],
+  "NurturingProjectUsageView": [
+    "projectId",
+    "owner",
+    "folded",
+    "appliedEventIds",
+    "projectionVersion",
+    "updatedAt"
+  ],
+  "NurturingProjectTraceDay": [
+    "projectId",
+    "day",
+    "traceCount",
+    "errorCount",
+    "lastTraceAt",
+    "lastFailedTraceAt"
+  ],
+  "NurturingProjectTraceDayCount": [
+    "projectId",
+    "day",
+    "source",
+    "traceCount",
+    "errorCount",
+    "lastTraceAt",
+    "lastFailedTraceAt",
+    "appliedEventIds",
+    "projectionVersion"
+  ],
+  "NurturingProjectEvaluationDay": [
+    "projectId",
+    "day"
+  ],
+  "NurturingPersonalProject": [
+    "projectId",
+    "organizationId",
+    "ownerUserId"
+  ],
+  "NurturingTracedProject": [
+    "projectId",
+    "organizationId"
   ],
   "BillingMeterCheckpoint": [
     "id",
@@ -2566,6 +2910,24 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "createdById",
     "updatedById"
+  ],
+  "GatewayA2ATarget": [
+    "id",
+    "organizationId",
+    "projectId",
+    "name",
+    "agentName",
+    "cardUrl",
+    "upstreamUrl",
+    "encryptedUpstreamHeaders",
+    "restrictToAllowList",
+    "allowedVirtualKeyIds",
+    "blocked",
+    "blockReason",
+    "createdById",
+    "createdAt",
+    "updatedAt",
+    "archivedAt"
   ],
   "GatewayConnectUpstream": [
     "organizationId",
@@ -2942,6 +3304,15 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "StoredObjectOwner": [
+    "tenantId",
+    "objectId",
+    "ownerKind",
+    "ownerId",
+    "retainUntil",
+    "createdAt",
+    "updatedAt"
+  ],
   "DiscoveredPerson": [
     "id",
     "organizationId",
@@ -2971,6 +3342,124 @@ export const prismaModelFieldCatalogue = {
     "lastSeenAt",
     "createdAt",
     "updatedAt"
+  ],
+  "DiscoveredAgentListing": [
+    "id",
+    "organizationId",
+    "ingestionSourceId",
+    "discoveredAgentId",
+    "lastListedAt",
+    "goneAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "AgentRegistryEntry": [
+    "id",
+    "organizationId",
+    "sourceKey",
+    "source",
+    "status",
+    "version",
+    "fingerprint",
+    "entry",
+    "firstSeenAt",
+    "lastSeenAt",
+    "removedAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "AgentRegistryEvent": [
+    "id",
+    "organizationId",
+    "sequence",
+    "type",
+    "entryId",
+    "fromVersion",
+    "toVersion",
+    "payload",
+    "occurredAt",
+    "deliveryRecordedAt"
+  ],
+  "AgentRegistryBaseline": [
+    "organizationId",
+    "baselinedAt"
+  ],
+  "AgentRegistrySettings": [
+    "organizationId",
+    "dormantAfterDays",
+    "updatedAt"
+  ],
+  "AgentStopPlanTarget": [
+    "id",
+    "organizationId",
+    "agentId",
+    "position",
+    "label",
+    "target",
+    "createdAt",
+    "updatedAt"
+  ],
+  "AgentStopPlan": [
+    "organizationId",
+    "agentId",
+    "version",
+    "updatedAt"
+  ],
+  "GovernanceAwsConnection": [
+    "id",
+    "organizationId",
+    "name",
+    "accessKeyId",
+    "encryptedSecretAccessKey",
+    "roleArn",
+    "encryptedExternalId",
+    "createdAt",
+    "updatedAt"
+  ],
+  "AgentStop": [
+    "id",
+    "organizationId",
+    "agentId",
+    "agentName",
+    "status",
+    "severity",
+    "approval",
+    "trigger",
+    "reason",
+    "requestedByUserId",
+    "requestedByApiKeyId",
+    "decidedByUserId",
+    "decidedByApiKeyId",
+    "restoredByUserId",
+    "restoredByApiKeyId",
+    "targets",
+    "requestedAt",
+    "decidedAt",
+    "quarantinedAt",
+    "restoreRequestedAt",
+    "restoredAt",
+    "lastAppliedEventId",
+    "lastAcceptedAt",
+    "lastOccurredAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "AgentStopClaim": [
+    "organizationId",
+    "agentId",
+    "stopId",
+    "claimedAt",
+    "sentAt",
+    "decision",
+    "decisionTakenAt"
+  ],
+  "AgentStopTargetPriorState": [
+    "organizationId",
+    "stopId",
+    "targetId",
+    "wasStopped",
+    "recordedAt"
   ],
   "IdentityMatch": [
     "id",
@@ -3024,6 +3513,15 @@ export const prismaModelFieldCatalogue = {
     "accountId",
     "month",
     "sentAt"
+  ],
+  "LicenseRenewalClaim": [
+    "stripeInvoiceId",
+    "stripeSubscriptionId",
+    "claimToken",
+    "claimedAt",
+    "issuedLicense",
+    "deliveredAt",
+    "licenseId"
   ],
   "InstanceIdentity": [
     "id",
@@ -3119,6 +3617,144 @@ export const prismaModelFieldCatalogue = {
     "mounted",
     "lastAppliedEventId",
     "updatedAt"
+  ],
+  "StaffAccessRequester": [
+    "id",
+    "ownerUserId",
+    "name",
+    "lookupId",
+    "hashedSecret",
+    "expiresAt",
+    "revokedAt",
+    "lastUsedAt",
+    "createdAt"
+  ],
+  "StaffAccessChallenge": [
+    "id",
+    "userId",
+    "purpose",
+    "challenge",
+    "expiresAt",
+    "usedAt",
+    "createdAt"
+  ],
+  "StaffAccessRequest": [
+    "id",
+    "requesterId",
+    "ownerUserId",
+    "scopes",
+    "functions",
+    "organizationId",
+    "organizationName",
+    "counterpartOrganizationId",
+    "counterpartOrganizationName",
+    "copyGrant",
+    "reason",
+    "codeChallenge",
+    "machine",
+    "requestIp",
+    "status",
+    "expiresAt",
+    "approvedAt",
+    "spendApproved",
+    "approvalCredentialId",
+    "approvalSignature",
+    "signedHash",
+    "redeemedAt",
+    "pinnedIp",
+    "apiKeyId",
+    "hashedOpsToken",
+    "opsTokenLookupId",
+    "accessExpiresAt",
+    "revokedAt",
+    "revokedByUserId",
+    "revokeCause",
+    "endAuditedAt",
+    "createdAt"
+  ],
+  "StaffAccessEvent": [
+    "id",
+    "requestId",
+    "at",
+    "method",
+    "path",
+    "operation",
+    "functionName",
+    "functionInput",
+    "rowCount",
+    "permissions",
+    "organizationId",
+    "projectId",
+    "status",
+    "errorCode",
+    "durationMs",
+    "ipAddress",
+    "userAgent"
+  ],
+  "DigestCohortOrganization": [
+    "organizationId",
+    "enrolledBy",
+    "enrolledAt"
+  ],
+  "DigestSubscription": [
+    "userId",
+    "unsubscribedAt",
+    "unsubscribedFromSendId",
+    "updatedAt"
+  ],
+  "DigestProjectWeek": [
+    "id",
+    "projectId",
+    "organizationId",
+    "isoWeek",
+    "state",
+    "occurredAt",
+    "lastEventId",
+    "acceptedAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DigestUserWeek": [
+    "id",
+    "userId",
+    "organizationId",
+    "isoWeek",
+    "state",
+    "occurredAt",
+    "lastEventId",
+    "acceptedAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DigestSend": [
+    "id",
+    "userId",
+    "organizationId",
+    "isoWeek",
+    "templateId",
+    "sentAt",
+    "createdAt"
+  ],
+  "DigestSettings": [
+    "id",
+    "armed",
+    "lastPlannedWeek",
+    "updatedAt"
+  ],
+  "StaffAccessCopyLedger": [
+    "id",
+    "requestId",
+    "sourceOrganizationId",
+    "targetOrganizationId",
+    "kind",
+    "sourceId",
+    "targetId",
+    "sourceProjectId",
+    "targetProjectId",
+    "incomplete",
+    "createdAt"
   ]
 } as const;
 
@@ -3132,6 +3768,7 @@ export const prismaRelationCatalogue = {
   "Session": {
     "user": "User"
   },
+  "UserErasure": {},
   "User": {
     "accounts": "Account",
     "accountCredentials": "AccountCredential",
@@ -3217,6 +3854,10 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "organization": "Organization"
   },
+  "SeatHold": {},
+  "SeatRequest": {},
+  "OrganizationSeatLease": {},
+  "OrganizationAccessNotice": {},
   "Team": {
     "members": "TeamUser",
     "organization": "Organization",
@@ -3277,6 +3918,9 @@ export const prismaRelationCatalogue = {
   "ScimDirectoryUser": {},
   "ScimSyncState": {},
   "ScimSsoConnectionView": {},
+  "OrganizationSeatPeak": {},
+  "OrganizationSeatPeakHolder": {},
+  "OrganizationSeatPeakMonth": {},
   "Project": {
     "team": "Team",
     "checks": "Monitor",
@@ -3350,6 +3994,7 @@ export const prismaRelationCatalogue = {
     "graphs": "CustomGraph"
   },
   "DashboardFavourite": {},
+  "DashboardSidebarOrder": {},
   "DashboardsV2": {},
   "DashboardWidget": {},
   "InsightProjection": {},
@@ -3424,6 +4069,7 @@ export const prismaRelationCatalogue = {
   "LangyTurnRequest": {},
   "LangyActiveTurn": {},
   "LangyConversationTurnProjection": {},
+  "LangyPullRequest": {},
   "LangyMessageProjection": {},
   "ProjectSecret": {
     "project": "Project",
@@ -3479,7 +4125,9 @@ export const prismaRelationCatalogue = {
     "updatedBy": "User"
   },
   "TraceIngestSourceBilling": {},
+  "TracePlanLimitRefusal": {},
   "RetentionPolicy": {},
+  "RetentionApplyStatus": {},
   "DataPrivacyPolicy": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
@@ -3597,6 +4245,8 @@ export const prismaRelationCatalogue = {
   },
   "AuthzUserStanding": {},
   "AuthzEngineSwitch": {},
+  "AuthzOrganizationPolicy": {},
+  "AuthzBraidWrite": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",
@@ -3612,9 +4262,22 @@ export const prismaRelationCatalogue = {
     "organization": "Organization",
     "roleBindings": "RoleBinding"
   },
+  "SigningKey": {},
   "ProjectActiveDay": {},
   "NurturingProject": {},
+  "NurturingUncopiedProject": {},
+  "NurturingOrganizationMember": {},
+  "NurturingOrganizationCreated": {},
+  "NurturingOrganizationPlan": {},
+  "NurturingVirtualKey": {},
+  "NurturingErasedUser": {},
   "NurturingOrganization": {},
+  "NurturingProjectUsageView": {},
+  "NurturingProjectTraceDay": {},
+  "NurturingProjectTraceDayCount": {},
+  "NurturingProjectEvaluationDay": {},
+  "NurturingPersonalProject": {},
+  "NurturingTracedProject": {},
   "BillingMeterCheckpoint": {},
   "VirtualKey": {
     "principalUser": "User",
@@ -3670,6 +4333,7 @@ export const prismaRelationCatalogue = {
   "IngestionTemplate": {
     "organization": "Organization"
   },
+  "GatewayA2ATarget": {},
   "GatewayConnectUpstream": {},
   "GatewayTraceExportKey": {},
   "GatewayBudget": {
@@ -3711,14 +4375,27 @@ export const prismaRelationCatalogue = {
   "SystemMigrationTenantState": {},
   "SystemMigrationEnrollment": {},
   "StoredObject": {},
+  "StoredObjectOwner": {},
   "DiscoveredPerson": {},
   "DiscoveredAgent": {},
+  "DiscoveredAgentListing": {},
+  "AgentRegistryEntry": {},
+  "AgentRegistryEvent": {},
+  "AgentRegistryBaseline": {},
+  "AgentRegistrySettings": {},
+  "AgentStopPlanTarget": {},
+  "AgentStopPlan": {},
+  "GovernanceAwsConnection": {},
+  "AgentStop": {},
+  "AgentStopClaim": {},
+  "AgentStopTargetPriorState": {},
   "IdentityMatch": {},
   "GovernanceTenantHistory": {},
   "ErasedIdentifierSuppression": {},
   "IdentityMatchSuggestion": {},
   "ConnectedSeatChange": {},
   "ConnectedStatement": {},
+  "LicenseRenewalClaim": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
   "SelfHostedInstanceDiagnostic": {},
@@ -3726,7 +4403,18 @@ export const prismaRelationCatalogue = {
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
   "WebPushVapidKey": {},
-  "SignInProviderMount": {}
+  "SignInProviderMount": {},
+  "StaffAccessRequester": {},
+  "StaffAccessChallenge": {},
+  "StaffAccessRequest": {},
+  "StaffAccessEvent": {},
+  "DigestCohortOrganization": {},
+  "DigestSubscription": {},
+  "DigestProjectWeek": {},
+  "DigestUserWeek": {},
+  "DigestSend": {},
+  "DigestSettings": {},
+  "StaffAccessCopyLedger": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

@@ -405,6 +405,7 @@ function contractCases(backend: Backend): void {
         archivedAt: nowInstant(),
       });
       await add("inventory-theirs", backend.theirs());
+      // Id order is the store's collation (Postgres orders "La" before "LZ"), so compare as a set.
       const ids = [kept.id, archived.id].toSorted();
 
       const first = await backend
@@ -416,9 +417,12 @@ function contractCases(backend: Backend): void {
         limit: 5,
       });
 
-      expect([...first, ...second].map((entry) => entry.id)).toEqual(ids);
-      expect(first[0]).toEqual({
-        id: ids[0],
+      const paged = [...first, ...second].map((entry) => entry.id);
+      expect(paged.toSorted()).toEqual(ids);
+      expect(first).toHaveLength(1);
+      expect(second.map((entry) => entry.id)).not.toContain(first[0]?.id);
+      expect([...first, ...second].find((entry) => entry.id === kept.id)).toEqual({
+        id: kept.id,
         projectId: backend.mine(),
         contentLayout: "postgres",
         status: "ready",

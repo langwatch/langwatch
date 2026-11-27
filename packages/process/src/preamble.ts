@@ -15,6 +15,7 @@ import {
   secretLogRedactPaths,
 } from "@langwatch/secrets";
 
+import type { LongRequestBody } from "./lifecycle/request-body-deadline.ts";
 import type { IdIndexRetention } from "./migration/id-index-fill-step.ts";
 import {
   assertGatedRole,
@@ -102,6 +103,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       metrics?: (context: MetricsContext<Owners>) => Metrics | Promise<Metrics>;
       healthPort?: number;
       ownsProcess?: boolean;
+      longRequestBodies?: readonly LongRequestBody[];
       environment?: PreambleEnvironment;
       upgradeGate?: Readonly<{ role: UpgradeGatedRole; gate: UpgradeGateFactory<Owners> }>;
       idIndexRetention?: IdIndexRetention;
@@ -159,6 +161,11 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     }
 
     return new ServerPreamble(this.name, { ...this.state, healthPort: port });
+  }
+
+  /** Routes whose request body may outlast Node's 300s; every other body stays held to it. */
+  withLongRequestBodies(bodies: readonly LongRequestBody[]): ServerPreamble<Owners> {
+    return new ServerPreamble(this.name, { ...this.state, longRequestBodies: bodies });
   }
 
   /** What config and the secrets chain read; only an app's main hands the environment in. */
@@ -280,6 +287,9 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
 
     if (this.state.healthPort !== undefined) {
       boundary.healthPort = this.state.healthPort;
+    }
+    if (this.state.longRequestBodies !== undefined) {
+      boundary.longRequestBodies = this.state.longRequestBodies;
     }
 
     const server = ProcessServer.create(boundary);

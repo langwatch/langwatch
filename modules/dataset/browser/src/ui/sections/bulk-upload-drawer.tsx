@@ -488,7 +488,7 @@ function RowTrailing({
   }
 }
 
-/** The row reports the normalization's verdict in place, once it settles. */
+/** Reports the normalization's verdict for one file, once it settles. */
 function reportPolledStatus({
   onFailed,
   onReady,
@@ -509,40 +509,21 @@ function reportPolledStatus({
   onFailed(statusError ?? undefined);
 }
 
-function BulkFileRow({
+/**
+ * Polls a finalized file's dataset until the server settles it. Rendered outside the drawer, so
+ * a file still reports ready or failed after the drawer is closed mid-upload.
+ */
+function FileStatusWatcher({
   file,
   projectId,
-  onRemove,
-  onCancel,
-  onRetry,
-  onColumns,
-  onName,
   onReady,
   onFailed,
-  onOpen,
 }: {
   file: BulkFile;
   projectId: string;
-  onRemove: () => void;
-  onCancel: () => void;
-  onRetry: () => void;
-  onColumns: (next: DatasetConfirmColumns) => void;
-  onName: (next: string) => void;
   onReady: () => void;
   onFailed: (error?: string) => void;
-  onOpen: () => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  // Only an in-flight PUT is cancellable; a `processing` row is already
-  // finalized (its dataset exists) so it offers neither cancel nor remove.
-  const canCancel = file.status === "uploading";
-  const isProcessing = file.status === "processing";
-  const canRemove = !canCancel && !isProcessing;
-  const hasFailed = file.status === "failed" || file.status === "rejected";
-  const canConfirm = file.status === "pending" && !!file.columnTypes && file.columnTypes.length > 0;
-
-  // Poll the dataset status inline once finalized (no nested container). The
-  // server normalizes off-thread; the row reports ready/failed in place.
   const isPolling = file.status === "processing" && !!file.datasetId;
   const statusQuery = datasetClient.dataset.getById.useQuery(
     { projectId, datasetId: file.datasetId ?? "" },
@@ -563,6 +544,35 @@ function BulkFileRow({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPolling, polledStatus]);
+
+  return null;
+}
+
+function BulkFileRow({
+  file,
+  onRemove,
+  onCancel,
+  onRetry,
+  onColumns,
+  onName,
+  onOpen,
+}: {
+  file: BulkFile;
+  onRemove: () => void;
+  onCancel: () => void;
+  onRetry: () => void;
+  onColumns: (next: DatasetConfirmColumns) => void;
+  onName: (next: string) => void;
+  onOpen: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  // Only an in-flight PUT is cancellable; a `processing` row is already
+  // finalized (its dataset exists) so it offers neither cancel nor remove.
+  const canCancel = file.status === "uploading";
+  const isProcessing = file.status === "processing";
+  const canRemove = !canCancel && !isProcessing;
+  const hasFailed = file.status === "failed" || file.status === "rejected";
+  const canConfirm = file.status === "pending" && !!file.columnTypes && file.columnTypes.length > 0;
 
   const content = (
     <>
@@ -723,107 +733,115 @@ export function BulkUploadDrawer({
   };
 
   return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      size="xl"
-      title="Upload datasets"
-      subtitle="Bring CSV or JSON files into LangWatch to build evaluation sets, review past generations, and turn real data into new test cases."
-      footer={{
-        note: columnsMessage && (
-          <Text role="alert" color="fg.error">
-            {columnsMessage}
-          </Text>
-        ),
-        cancel: { label: "Close", onClick: onClose },
-        secondaryAction: onCreateFromScratch && {
-          label: "Skip, create empty dataset",
-          onClick: onCreateFromScratch,
-          tone: "info",
-        },
-        primaryAction: {
-          label: "Upload all",
-          onClick: upload,
-          "data-testid": "dataset-bulk-upload-submit",
-          disabledReason: unavailableReason,
-        },
-      }}
-    >
-      <VStack align="stretch" gap={4} width="full">
-        <Box
-          as="label"
-          {...dropzoneSurfaceProps(zoneHover)}
-          style={DROPZONE_DOTTED_STYLE}
-          display="block"
-          onDragOver={(e: React.DragEvent) => {
-            e.preventDefault();
-            setZoneHover(true);
+    <>
+      {bulk.files.map((file) => (
+        <FileStatusWatcher
+          key={file.id}
+          file={file}
+          projectId={projectId ?? ""}
+          onReady={() => {
+            bulk.markReady(file.id);
+            onUploaded?.();
+            // Closed mid-upload, the user has moved on: never pull them away.
+            if (open && bulk.files.length === 1) openDataset(file.datasetId);
           }}
-          onDragLeave={(e: React.DragEvent) => {
-            e.preventDefault();
-            setZoneHover(false);
-          }}
-          onDrop={(e: React.DragEvent) => {
-            e.preventDefault();
-            setZoneHover(false);
-            onDropFiles(e.dataTransfer?.files ?? null);
-          }}
-        >
-          <input
-            type="file"
-            multiple
-            accept=".csv,.json,.jsonl"
-            aria-label="Add files for bulk upload"
-            data-testid="dataset-bulk-upload-file"
-            style={SR_ONLY_INPUT}
-            onChange={(e) => {
-              onDropFiles(e.target.files);
-              e.target.value = "";
+          onFailed={(error) => bulk.markFailed(file.id, error)}
+        />
+      ))}
+      <Drawer
+        open={open}
+        onClose={onClose}
+        size="xl"
+        title="Upload datasets"
+        subtitle="Bring CSV or JSON files into LangWatch to build evaluation sets, review past generations, and turn real data into new test cases."
+        footer={{
+          note: columnsMessage && (
+            <Text role="alert" color="fg.error">
+              {columnsMessage}
+            </Text>
+          ),
+          cancel: { label: "Close", onClick: onClose },
+          secondaryAction: onCreateFromScratch && {
+            label: "Skip, create empty dataset",
+            onClick: onCreateFromScratch,
+            tone: "info",
+          },
+          primaryAction: {
+            label: "Upload all",
+            onClick: upload,
+            "data-testid": "dataset-bulk-upload-submit",
+            disabledReason: unavailableReason,
+          },
+        }}
+      >
+        <VStack align="stretch" gap={4} width="full">
+          <Box
+            as="label"
+            {...dropzoneSurfaceProps(zoneHover)}
+            style={DROPZONE_DOTTED_STYLE}
+            display="block"
+            onDragOver={(e: React.DragEvent) => {
+              e.preventDefault();
+              setZoneHover(true);
             }}
-          />
-          <DropzonePrompt multiple />
-        </Box>
-
-        {bulk.counts.total > 0 && (
-          <HStack textStyle="bodySm" color="fg.muted" gap={3} data-testid="bulk-summary">
-            <Text>{bulk.counts.total} files</Text>
-            {bulk.counts.ready > 0 && <Text color="fg.success">{bulk.counts.ready} ready</Text>}
-            {bulk.counts.preparing > 0 && (
-              <Text color="blue.fg">{bulk.counts.preparing} preparing</Text>
-            )}
-            {bulk.counts.queued > 0 && <Text>{bulk.counts.queued} queued</Text>}
-            {bulk.counts.failed > 0 && (
-              <HStack gap={1} color="fg.error">
-                <AlertTriangle size={13} />
-                <Text>{bulk.counts.failed} failed</Text>
-              </HStack>
-            )}
-          </HStack>
-        )}
-
-        <VStack align="stretch" gap={2} width="full">
-          {bulk.files.map((file) => (
-            <BulkFileRow
-              key={file.id}
-              file={file}
-              projectId={projectId ?? ""}
-              onRemove={() => bulk.removeFile(file.id)}
-              onCancel={() => bulk.cancelFile(file.id)}
-              onRetry={() => void bulk.retryFile(file.id)}
-              onColumns={(next) => bulk.setColumnTypes(file.id, next)}
-              onName={(next) => bulk.setName({ id: file.id, name: next })}
-              onReady={() => {
-                bulk.markReady(file.id);
-                onUploaded?.();
-                // Closed mid-upload, the user has moved on: never pull them away.
-                if (open && bulk.files.length === 1) openDataset(file.datasetId);
+            onDragLeave={(e: React.DragEvent) => {
+              e.preventDefault();
+              setZoneHover(false);
+            }}
+            onDrop={(e: React.DragEvent) => {
+              e.preventDefault();
+              setZoneHover(false);
+              onDropFiles(e.dataTransfer?.files ?? null);
+            }}
+          >
+            <input
+              type="file"
+              multiple
+              accept=".csv,.json,.jsonl"
+              aria-label="Add files for bulk upload"
+              data-testid="dataset-bulk-upload-file"
+              style={SR_ONLY_INPUT}
+              onChange={(e) => {
+                onDropFiles(e.target.files);
+                e.target.value = "";
               }}
-              onOpen={() => openDataset(file.datasetId)}
-              onFailed={(error) => bulk.markFailed(file.id, error)}
             />
-          ))}
+            <DropzonePrompt multiple />
+          </Box>
+
+          {bulk.counts.total > 0 && (
+            <HStack textStyle="bodySm" color="fg.muted" gap={3} data-testid="bulk-summary">
+              <Text>{bulk.counts.total} files</Text>
+              {bulk.counts.ready > 0 && <Text color="fg.success">{bulk.counts.ready} ready</Text>}
+              {bulk.counts.preparing > 0 && (
+                <Text color="blue.fg">{bulk.counts.preparing} preparing</Text>
+              )}
+              {bulk.counts.queued > 0 && <Text>{bulk.counts.queued} queued</Text>}
+              {bulk.counts.failed > 0 && (
+                <HStack gap={1} color="fg.error">
+                  <AlertTriangle size={13} />
+                  <Text>{bulk.counts.failed} failed</Text>
+                </HStack>
+              )}
+            </HStack>
+          )}
+
+          <VStack align="stretch" gap={2} width="full">
+            {bulk.files.map((file) => (
+              <BulkFileRow
+                key={file.id}
+                file={file}
+                onRemove={() => bulk.removeFile(file.id)}
+                onCancel={() => bulk.cancelFile(file.id)}
+                onRetry={() => void bulk.retryFile(file.id)}
+                onColumns={(next) => bulk.setColumnTypes(file.id, next)}
+                onName={(next) => bulk.setName({ id: file.id, name: next })}
+                onOpen={() => openDataset(file.datasetId)}
+              />
+            ))}
+          </VStack>
         </VStack>
-      </VStack>
-    </Drawer>
+      </Drawer>
+    </>
   );
 }

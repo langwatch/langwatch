@@ -4,6 +4,14 @@ import type {
   LwqlAccessModelOwner,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 
+/** The collections a server holds and each PostgreSQL engine table's binding. */
+export interface LwqlCollectionState {
+  readonly available: readonly string[];
+  readonly bound: Readonly<Record<string, string>>;
+  /** The `available` ones a config file defines (`source = 'CONFIG'`): no statement writes them. */
+  readonly configDefined?: readonly string[];
+}
+
 /** One key-map row: a project's key hash and the project it resolves to. */
 export interface LwqlKeyMapInsertRow {
   readonly KeyHash: string;
@@ -59,6 +67,14 @@ export interface ClickHouseAdminStatements {
   }): Promise<void>;
 }
 
+/** One row policy: the table it guards and who it applies to. */
+export interface LwqlRowPolicy {
+  readonly table: string;
+  readonly appliesTo: readonly string[];
+  readonly appliesToAll: boolean;
+  readonly hasExceptions: boolean;
+}
+
 /** The admin ClickHouse the access model is provisioned on, over one connection per run. */
 export abstract class LangWatchQLProvisioningRepository {
   abstract runStatements(input: {
@@ -72,6 +88,11 @@ export abstract class LangWatchQLProvisioningRepository {
     relations: readonly string[];
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory>;
+  /** Which candidate collections exist and each engine table's binding; empty where unreadable. */
+  abstract readCollectionState(input: {
+    database: string;
+    candidates: readonly string[];
+  }): Promise<LwqlCollectionState>;
   /**
    * Reads through the `postgresql` table function, which dials with the collection's values as
    * loaded now (never a table's cached pool); with `cluster`, on every replica. Throws on failure.
@@ -98,6 +119,8 @@ export abstract class LangWatchQLProvisioningRepository {
   }): Promise<ConfigStoreLwqlEntity[]>;
   abstract probeOwner(input: { names: LwqlAccessModelIdentity }): Promise<LwqlAccessModelOwner>;
   abstract queryRows(sql: string): Promise<Record<string, unknown>[]>;
+  /** Every row policy on `tables` (`database.table`), as the server holds it. */
+  abstract findRowPolicies(input: { tables: readonly string[] }): Promise<LwqlRowPolicy[]>;
   abstract findKeyMapHashes(input: { table: string; tenantId: string }): Promise<string[]>;
   abstract insertKeyMapRows(input: {
     table: string;

@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
@@ -651,6 +651,36 @@ local function gqRecoverClaimedJobs(claimedKey, jobsKey, dataKey, totalPendingKe
   end
   redis.call("DEL", claimedKey)
   return recovered
+end
+
+-- The tenant's claimed-groups set (ADR-092), beside the claimed record; nil for an untenanted group.
+local function gqTenantClaimsKey(claimedKey, groupId)
+  local slashPos = string.find(groupId, "/", 1, true)
+  if not slashPos or slashPos == 1 then return nil end
+  local keyPrefix = string.sub(claimedKey, 1, #claimedKey - #groupId - 14)
+  return keyPrefix .. "tenant-claims:" .. string.sub(groupId, 1, slashPos - 1)
+end
+
+-- The list must outlive both keys it stands for: the claimed record and the active key.
+local function gqClaimListTtlMs(activeTtlSec)
+  return math.max(${GROUP_KEY_TTL_MS}, (tonumber(activeTtlSec) or 0) * 1000)
+end
+
+local function gqListClaim(claimedKey, groupId, activeTtlSec)
+  local indexKey = gqTenantClaimsKey(claimedKey, groupId)
+  if not indexKey then return end
+  redis.call("SADD", indexKey, groupId)
+  redis.call("PEXPIRE", indexKey, gqClaimListTtlMs(activeTtlSec))
+end
+
+local function gqKeepClaimListed(claimedKey, groupId, activeTtlSec)
+  local indexKey = gqTenantClaimsKey(claimedKey, groupId)
+  if indexKey then redis.call("PEXPIRE", indexKey, gqClaimListTtlMs(activeTtlSec)) end
+end
+
+local function gqUnlistClaim(claimedKey, groupId)
+  local indexKey = gqTenantClaimsKey(claimedKey, groupId)
+  if indexKey then redis.call("SREM", indexKey, groupId) end
 end
 `;
 
@@ -1491,6 +1521,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 redis.call("HSET", claimedKey, "token", claimToken)
               end
               redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
+              gqListClaim(claimedKey, groupId, activeTtlSec)
 
               results[#results + 1] = stagedJobId
               results[#results + 1] = groupId
@@ -1745,6 +1776,7 @@ gqReleaseClaimMarker(string.sub(activeKey, 1, #activeKey - 7) .. ":claim", ARGV[
 
 redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
+gqUnlistClaim(claimedKey, groupId)
 -- The handed-back job is done with, so no worker that handed it back passes the group over any
 -- longer (#9148). A sibling that ran ahead of it leaves the record.
 local groupKeyPrefix = string.sub(activeKey, 1, #activeKey - 7)
@@ -1844,6 +1876,7 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
   if claimToken ~= "" then
     redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
+    gqKeepClaimListed(claimedKey, groupId, activeTtlSec)
   end
   -- Keep the pending-sibling jobs/data keys alive while this group is actively
   -- processing: a long-running active job must not let staged siblings expire
@@ -2772,7 +2805,7 @@ export class GroupStagingScripts {
       jobDataJson,
       String(shouldExtend ? 1 : 0),
       String(shouldReplace ? 1 : 0),
-      String(nowInstant().epochMilliseconds),
+      String(nowEpochMs()),
       String(this.globalConcurrencyBudget),
       // ARGV[11] — appended after globalBudget so no existing index shifts.
       String(shouldSurviveDispatch ? 1 : 0),
@@ -2835,7 +2868,7 @@ export class GroupStagingScripts {
     // Appended after all per-job args: nowMs then globalBudget last, so the Lua
     // reads globalBudget as ARGV[#ARGV] and nowMs as ARGV[#ARGV-1] regardless of
     // job count.
-    args.push(String(nowInstant().epochMilliseconds));
+    args.push(String(nowEpochMs()));
     args.push(String(this.globalConcurrencyBudget));
 
     const result = await stageBatchScript.run(
@@ -3036,7 +3069,7 @@ export class GroupStagingScripts {
         jobName ?? "",
         `${this.keyPrefix}tenant_active_z:`,
         String(this.tenantConcurrencyCap),
-        String(nowInstant().epochMilliseconds),
+        String(nowEpochMs()),
         dropped ? "1" : "",
         claimToken,
         endsRetryChain ? "1" : "",
@@ -3203,7 +3236,7 @@ export class GroupStagingScripts {
         stagedJobId,
         String(activeTtlSec),
         groupId,
-        String(nowInstant().epochMilliseconds),
+        String(nowEpochMs()),
         `${this.keyPrefix}tenant_active_z:`,
         claimToken,
       ],
@@ -3308,7 +3341,7 @@ export class GroupStagingScripts {
         jobDataJson,
         String(retryTtlSec),
         `${this.keyPrefix}tenant_active_z:`,
-        String(nowInstant().epochMilliseconds),
+        String(nowEpochMs()),
         String(attempt),
         String(attemptTtlSec),
         String(this.tenantConcurrencyCap),
@@ -3602,7 +3635,7 @@ export class GroupStagingScripts {
         this.keyPrefix,
         String(LISTED_GROUPS_TTL_SEC),
         String(start),
-        String(nowInstant().epochMilliseconds + LISTED_GROUPS_TTL_SEC * 1000),
+        String(nowEpochMs() + LISTED_GROUPS_TTL_SEC * 1000),
         ...groupIds.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
       );
     }

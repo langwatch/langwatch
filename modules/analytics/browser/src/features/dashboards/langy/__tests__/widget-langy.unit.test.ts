@@ -1,6 +1,6 @@
 /**
- * The draft one widget hands Langy: its prompt or a fallback, the widget itself and the
- * board's window, with long LangWatchQL cut to fit.
+ * The draft one widget hands Langy: a question in the reader's words, with the widget, its
+ * stored prompt, its queries cut to fit and the period's instants in the widget's context.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -9,7 +9,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   boardSubject,
-  MAX_WIDGET_DRAFT_LENGTH,
   widgetAskDraft,
   widgetBuildQuestion,
   widgetMissingDataDraft,
@@ -45,39 +44,53 @@ const widget = ({
   },
 });
 
+const SQL = "SELECT count() FROM trace_metrics_by_minute";
+
 describe("widgetPromptDraft", () => {
   describe("given a widget with a stored prompt, a description and named queries", () => {
-    /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
-    it("drafts the prompt, then the widget, then the window, with the board attached", () => {
+    /**
+     * @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period"
+     * @scenario "AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context"
+     */
+    it("drafts the question in words, with the board and the widget attached", () => {
       const request = widgetPromptDraft({
-        widget: widget({ prompt: PROMPT, description: "Traces per bucket" }),
+        widget: widget({ prompt: PROMPT, description: "Requests per day" }),
         board: BOARD,
         period: PERIOD,
       });
 
       expect(request.question).toBeUndefined();
       expect(request.draft).toBe(
-        [
-          PROMPT,
-          "",
-          "This widget:",
-          "Name: Traffic",
-          "Description: Traces per bucket",
-          "Queries (LangWatchQL):",
-          "- series:",
-          "SELECT count() FROM trace_metrics_by_minute",
-          "",
-          "Dashboard period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z (UTC). " +
-            "Dashboard grain: one bucket per 1 day.",
-        ].join("\n"),
+        'What does "Traffic" show over the last 7 days? Quote the real numbers and tell me ' +
+          "what stands out. If there is no data for the period, say so plainly rather than guessing.",
       );
       expect(request.context).toEqual([
         expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
+        expect.objectContaining({ kind: "dashboard", label: "widget: Traffic" }),
       ]);
+      const ref = request.context[1]?.ref ?? "";
+      expect(ref).toContain("description: Requests per day");
+      expect(ref).toContain(`how to answer it: ${PROMPT}`);
+      expect(ref).toContain("period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z");
+      expect(ref).toContain(`queries (LangWatchQL): series: ${SQL}`);
     });
   });
 
-  describe("given a widget whose queries are longer than the draft allows", () => {
+  describe("given a query with a comment line and spaces inside a literal", () => {
+    /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
+    it("hands Langy the query as the widget runs it", () => {
+      const sql = "SELECT 'a  b' AS label -- why\nFROM trace_metrics";
+      const request = widgetPromptDraft({
+        widget: widget({ queries: [{ name: "main", sql: `  ${sql}\n` }] }),
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.context[1]?.ref).toContain(`queries (LangWatchQL): main: ${sql}`);
+    });
+  });
+
+  describe("given a widget whose queries are longer than its context allows", () => {
     /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
     it("cuts the long query with a marker, keeps the short one whole and stays in bounds", () => {
       const long = `SELECT ${"x, ".repeat(5_000)}1`;
@@ -93,22 +106,22 @@ describe("widgetPromptDraft", () => {
         period: PERIOD,
       });
 
-      expect(request.draft?.length).toBeLessThanOrEqual(MAX_WIDGET_DRAFT_LENGTH);
-      expect(request.draft).toContain("- short:\nSELECT 1\n");
-      expect(request.draft).toMatch(/-- \[truncated: \d+ more characters\]/);
-      expect(request.draft).toContain("Dashboard period:");
+      const ref = request.context[1]?.ref ?? "";
+      expect(ref.length).toBeLessThanOrEqual(4_000);
+      expect(ref).toContain("short: SELECT 1 |");
+      expect(ref).toMatch(/-- \[truncated: \d+ more characters\]/);
     });
   });
 
   describe("given a widget saved without a prompt", () => {
     /** @scenario "AC122 Ask Langy: a widget without a stored prompt gets a fallback" */
-    it("starts with a prompt to answer the widget's name and quote the real numbers", () => {
+    it("asks what the widget shows and to quote the real numbers, with no stored prompt", () => {
       const request = widgetPromptDraft({ widget: widget({}), board: BOARD, period: PERIOD });
 
-      expect(request.draft).toMatch(/^Answer "Traffic" for this dashboard widget/);
+      expect(request.draft).toMatch(/^What does "Traffic" show over the last 7 days\?/);
       expect(request.draft).toContain("Quote the real numbers");
-      expect(request.draft).toContain("Name: Traffic");
-      expect(request.draft).not.toContain("Description:");
+      expect(request.context[1]?.ref).not.toContain("how to answer it");
+      expect(request.context[1]?.ref).not.toContain("description:");
     });
   });
 });
@@ -133,12 +146,12 @@ describe("widgetSetupDraft", () => {
       expect(request.question).toBeUndefined();
       expect(request.draft?.startsWith(opening)).toBe(true);
       expect(request.draft).not.toContain(PROMPT);
-      expect(request.draft).toContain("Name: Traffic");
-      expect(request.draft).toContain("SELECT count() FROM trace_metrics_by_minute");
-      expect(request.draft).toContain("Dashboard period:");
+      expect(request.draft).not.toContain(SQL);
       expect(request.context).toEqual([
         expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
+        expect.objectContaining({ label: "widget: Traffic" }),
       ]);
+      expect(request.context[1]?.ref).toContain(SQL);
     });
   });
 });
@@ -157,12 +170,11 @@ describe("widgetMissingDataDraft", () => {
       expect(request.question).toBeUndefined();
       expect(request.draft?.startsWith("Help me send user ids on my traces.")).toBe(true);
       expect(request.draft).toContain("metadata.user_id");
-      expect(request.draft).toContain("Name: Traffic");
-      expect(request.draft).toContain("SELECT count() FROM trace_metrics_by_minute");
-      expect(request.draft).toContain("Dashboard period:");
+      expect(request.draft).not.toContain(SQL);
       expect(request.about).toEqual({ ref: "board-1" });
       expect(request.context).toEqual([
         expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
+        expect.objectContaining({ label: "widget: Traffic" }),
       ]);
     });
   });
@@ -181,10 +193,10 @@ describe("editor drafts and starting prompts", () => {
     expect(request.question?.startsWith('Edit my "Traffic" widget on my "Weekly review"')).toBe(
       true,
     );
-    expect(request.question).toContain("Name: Traffic");
-    expect(request.question).toContain("Dashboard period:");
+    expect(request.question).not.toContain(SQL);
     expect(request.context).toEqual([
       expect.objectContaining({ kind: "dashboard", label: "Traffic" }),
+      expect.objectContaining({ kind: "dashboard", label: "widget: Traffic" }),
     ]);
     expect(request.context[0]?.ref).toContain('widget "Traffic" (id w-1)');
   });
@@ -199,8 +211,8 @@ describe("editor drafts and starting prompts", () => {
     );
     expect(request.question).toContain("Ask me what I want this widget to show");
     expect(request.question).toContain("save it only when I agree");
-    expect(request.question).toContain("Dashboard period:");
-    expect(request.question).not.toContain("Queries (LangWatchQL):");
+    expect(request.question).not.toContain("SELECT");
+    expect(request.context).toHaveLength(1);
     expect(request.context[0]?.ref).toContain("not saved yet");
     expect(request.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
   });

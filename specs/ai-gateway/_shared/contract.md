@@ -182,8 +182,9 @@ JWT claims (short, hot-path-verified):
   "principal_id":  "user_01HZ... | svc_01HZ...",  // for trace attribution
   "revision":      142,                            // bumped on any mutation
   "vk_expires_at": 1734568790,                     // key's own expiry, null when it has none
+  "secret_valid_until": 1734568500,                // only for a previous secret in its rotation grace
   "iat":           1734567890,
-  "exp":           1734568790,                     // TTL 900s, or vk_expires_at when sooner
+  "exp":           1734568790,                     // TTL 900s, or vk_expires_at / secret_valid_until when sooner
   "iss":           "langwatch-control-plane",
   "aud":           "langwatch-gateway"
 }
@@ -196,6 +197,16 @@ refresh boundary: the gateway caps both auth-cache deadlines at it and refuses
 a request past it with `403 virtual_key_expired`, without a round trip. That is
 what stops a key from serving through the stale-while-error window (§9) after
 its date has passed while the control plane is unreachable.
+
+`secret_valid_until` is sent only when the presented credential is a rotated
+key's previous secret inside its grace. `vk_expires_at` stays the key's own
+date, so a config refresh (§4.2) cannot extend the old secret. The gateway caps
+that entry at `secret_valid_until` on its own field and, past it, refuses the
+old secret with `401 invalid_api_key` without a round trip: the key has not
+expired, only that secret has. A gateway that predates the claim still stops
+re-validating at `exp` (capped at the grace end), where the control plane
+answers `invalid_api_key`; while the control plane is unreachable it may serve
+the old secret for its stale-while-error window (§9).
 
 Errors: `401 invalid_api_key`, `403 virtual_key_revoked`, `403 virtual_key_disabled`, `403 virtual_key_expired`.
 
@@ -815,6 +826,7 @@ Alexis owns the final shape in Prisma schema; this is the agreed surface.
 - `gatewayProviders: view | manage` (gateway-only settings layered on existing ModelProvider)
 - `gatewayCacheRules: view | create | update | delete | manage` (Lane B iter 38 — org-scoped cache-control rule CRUD)
 - `gatewayGuardrails: attach | detach`
+- `gatewayA2aTargets: view | manage` (outbound A2A agents and their sealed upstream headers; viewer, member and admin view, admin manages)
 - `gatewayLogs: view` (per-project access to gateway request logs)
 - `gatewayUsage: view` (cost/usage reports)
 

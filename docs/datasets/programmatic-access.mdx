@@ -95,6 +95,19 @@ info = langwatch.dataset.create_dataset(
 )
 print(f"Created: {info.name} (slug: {info.slug})")
 
+# Create with columns and its first rows in one call
+info = langwatch.dataset.create_dataset(
+    "QA Cases",
+    columns=[
+        {"name": "case_id", "type": "string"},
+        {"name": "input", "type": "string"},
+        {"name": "expected_output", "type": "string"},
+    ],
+    entries=[
+        {"case_id": "c-1", "input": "What is LangWatch?", "expected_output": "An LLM ops platform."},
+    ],
+)
+
 # Create with just a name (columns can be added later)
 info = langwatch.dataset.create_dataset("Simple Dataset")
 ```
@@ -114,6 +127,19 @@ const info = await langwatch.datasets.create({
   ],
 });
 console.log(`Created: ${info.name} (slug: ${info.slug})`);
+
+// Create with columns and its first rows in one call
+const qa = await langwatch.datasets.create({
+  name: "QA Cases",
+  columnTypes: [
+    { name: "case_id", type: "string" },
+    { name: "input", type: "string" },
+    { name: "expected_output", type: "string" },
+  ],
+  entries: [
+    { case_id: "c-1", input: "What is LangWatch?", expected_output: "An LLM ops platform." },
+  ],
+});
 
 // Create with just a name
 const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
@@ -335,6 +361,55 @@ console.log(`Updated: ${record.id}`);
 ```
   </Tab>
 </Tabs>
+
+## Sync Records by a Key Column
+
+Keep a dataset in step with rows held elsewhere, such as files in a Git repository. Name the column
+that identifies a row. A row that already holds an entry's key is updated in place, and the columns
+the entry leaves out keep their values. An entry with a new key is added. A row the entry would not
+change is not written, so a second run with the same rows changes no row.
+
+An upsert never deletes: a row whose key is gone from the source stays in the dataset until you
+delete it.
+
+The SDK refuses, before writing anything, an entry without the key, two entries with the same key,
+or a key that more than one existing row holds.
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+rows = [
+    {"case_id": "c-1", "input": "What is LangWatch?", "expected_output": "An LLM ops platform."},
+    {"case_id": "c-2", "input": "How do I start?", "expected_output": "Install the SDK."},
+]
+
+result = langwatch.dataset.upsert_records("qa-cases", entries=rows, key="case_id")
+print(f"{len(result.created)} created, {len(result.updated)} updated, {result.unchanged} unchanged")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+const rows = [
+  { case_id: "c-1", input: "What is LangWatch?", expected_output: "An LLM ops platform." },
+  { case_id: "c-2", input: "How do I start?", expected_output: "Install the SDK." },
+];
+
+const result = await langwatch.datasets.upsertRecords("qa-cases", rows, { key: "case_id" });
+console.log(`${result.created.length} created, ${result.updated.length} updated`);
+```
+  </Tab>
+</Tabs>
+
+Over the REST API, the same sync reads the rows with `GET /api/v1/dataset/{slugOrId}/records`, sends
+changed rows to `PATCH /api/v1/dataset/{slugOrId}/records/{recordId}` with the id it read, and adds
+new rows with `POST /api/v1/dataset/{slugOrId}/records`. Leave `id` out of new rows: record ids are
+unique across every project, so the platform picks them.
 
 ## Delete Records
 

@@ -32,6 +32,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -79,7 +80,10 @@ function commands(): LangyConversationCommands {
 }
 
 function composition(
-  members: Omit<LangyTurnTechnicalMembers, "tokenBuffer" | "accessStore" | "handoffStore">,
+  members: Omit<
+    LangyTurnTechnicalMembers,
+    "tokenBuffer" | "accessStore" | "handoffStore" | "localWork"
+  >,
 ) {
   const rows = MemoryLangyRepositories.create();
   const turns: LangyTurnTechnicalMembers = {
@@ -87,6 +91,7 @@ function composition(
     tokenBuffer: rows.tokenBuffer.open(),
     accessStore: rows.turnAccess,
     handoffStore: rows.turnHandoff,
+    localWork: { cancelTurn: async () => undefined },
   };
   return {
     commands: commands(),
@@ -130,8 +135,6 @@ describe("LangyPostgresService", () => {
       projects: { findById: vi.fn() },
       worker: null,
       permits: {
-        reserve: vi.fn(),
-        release: vi.fn(),
         check: vi.fn(),
       },
       perDayPrCap: 0,
@@ -290,7 +293,7 @@ function compositionOptions() {
     models: { resolve: vi.fn() },
     projects: { findById: vi.fn() },
     worker: null,
-    permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
+    permits: { check: vi.fn() },
     perDayPrCap: 0,
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
     context: { render: vi.fn(() => null) },
@@ -328,6 +331,7 @@ async function createApp(): Promise<LangyModule> {
       onboarding: createApiFixture<OnboardingApi>(),
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
+      storedObjects: createApiFixture<StoredObjectApi>(),
     },
     config: {
       agentUrl: undefined,

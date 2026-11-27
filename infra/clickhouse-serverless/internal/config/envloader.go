@@ -13,7 +13,7 @@ import (
 )
 
 // loadEnv populates struct fields from environment variables using struct tags.
-// Tags: `env:"VAR_NAME"`, `default:"value"`.
+// Tags: `env:"VAR_NAME"`, `alias:"OLD_NAME"` (read when VAR_NAME is unset), `default:"value"`.
 // Supported types: string, bool, int, int64, float64, *bool.
 func loadEnv(target any) error {
 	v := reflect.ValueOf(target).Elem()
@@ -21,12 +21,10 @@ func loadEnv(target any) error {
 
 	for i := range t.NumField() {
 		field := t.Field(i)
-		envKey := field.Tag.Get("env")
+		envKey, raw, ok := lookupField(field)
 		if envKey == "" {
 			continue
 		}
-
-		raw, ok := os.LookupEnv(envKey)
 		if !ok {
 			raw = field.Tag.Get("default")
 		}
@@ -39,6 +37,24 @@ func loadEnv(target any) error {
 		}
 	}
 	return nil
+}
+
+// lookupField reads a field's env var, then its alias: the name an older
+// image read, so a deployment written for it keeps working unchanged.
+func lookupField(field reflect.StructField) (key, raw string, ok bool) {
+	key = field.Tag.Get("env")
+	if key == "" {
+		return "", "", false
+	}
+	if raw, ok = os.LookupEnv(key); ok {
+		return key, raw, true
+	}
+	if alias := field.Tag.Get("alias"); alias != "" {
+		if raw, ok = os.LookupEnv(alias); ok {
+			return alias, raw, true
+		}
+	}
+	return key, "", false
 }
 
 // validate is a singleton validator that uses env tags for field names.
@@ -88,11 +104,7 @@ func ApplyEnvOverrides(log *zap.Logger, target any) {
 
 	for i := range t.NumField() {
 		field := t.Field(i)
-		envKey := field.Tag.Get("env")
-		if envKey == "" {
-			continue
-		}
-		raw, ok := os.LookupEnv(envKey)
+		envKey, raw, ok := lookupField(field)
 		if !ok {
 			continue
 		}

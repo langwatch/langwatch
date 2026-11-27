@@ -223,6 +223,36 @@ describe("handleCreateEvaluator()", () => {
       expect(result).toContain("langevals/llm_boolean");
     });
   });
+
+  describe("when the tool creates a custom code evaluator", () => {
+    const config = {
+      code: "class Code:\n    def __call__(self, output: str):\n        return {}\n",
+      inputs: [{ identifier: "output", type: "str" }],
+    };
+
+    /** @scenario The MCP tool creates a code evaluator */
+    it("sends the kind and the program unchanged", async () => {
+      mockCreateEvaluator.mockResolvedValue({
+        id: "evaluator_code1",
+        projectId: "proj_1",
+        name: "Exact",
+        slug: "exact",
+        type: "code",
+        config,
+        workflowId: null,
+        copiedFromEvaluatorId: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        fields: [{ identifier: "output", type: "str" }],
+        outputFields: [{ identifier: "passed", type: "bool" }],
+      });
+
+      const result = await handleCreateEvaluator({ name: "Exact", type: "code", config });
+
+      expect(mockCreateEvaluator).toHaveBeenCalledWith({ name: "Exact", type: "code", config });
+      expect(result).toContain("**Kind**: code");
+    });
+  });
 });
 
 describe("handleUpdateEvaluator()", () => {

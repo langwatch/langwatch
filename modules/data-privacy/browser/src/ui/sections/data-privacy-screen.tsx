@@ -9,6 +9,7 @@ import type {
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import { Card } from "@langwatch/design-system/card";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, SkeletonText, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -21,9 +22,16 @@ import {
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
 } from "@langwatch/design-system/scope-filter";
-import { useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import { type InFlight, useInFlight } from "../../behavior/use-in-flight.ts";
+import {
+  type AcceptPiiRedactionModel,
+  usePiiRedactionModelAcceptance,
+} from "../../behavior/use-pii-redaction-model-acceptance.ts";
+import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
+import { apiKeySaveConfirmation, combineSaveConfirmations } from "../../model/audience-api-keys.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -36,11 +44,20 @@ import {
   canWritePrivacyRules,
   ruleMatchesScopeFilter,
 } from "../../model/data-privacy-rule-filter.ts";
+import {
+  awaitsAcceptance,
+  type ModelAcceptance,
+  modelAcceptanceOf,
+  type PiiRedactionModelOffer,
+  piiLevelStepDialog,
+  ruleSaveStep,
+} from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
 import { RemoveRuleConfirmDialog } from "../blocks/remove-rule-confirm-dialog.tsx";
+import { OrganizationPiiLevelSection } from "./organization-pii-level-section.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();
@@ -53,25 +70,23 @@ export default function DataPrivacyScreen() {
 
 function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projectId: string }) {
   const { teamId } = host.scope();
+  const piiRedactionModelOffer = usePiiRedactionModelOffer();
   const utils = dataPrivacyApi.useUtils();
   const snapshotQuery = dataPrivacyApi.dataPrivacy.getSnapshot.useQuery({ projectId });
 
   const available = snapshotQuery.data?.available;
-  const filterAvailable = useMemo(
-    () => ({
-      organization: available?.organization
-        ? { id: available.organization.id, name: available.organization.name }
-        : null,
-      teams: available?.teams.map((team) => ({ id: team.id, name: team.name })) ?? [],
-      projects:
-        available?.projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          teamId: project.teamId,
-        })) ?? [],
-    }),
-    [available],
-  );
+  const filterAvailable = {
+    organization: available?.organization
+      ? { id: available.organization.id, name: available.organization.name }
+      : null,
+    teams: available?.teams.map((team) => ({ id: team.id, name: team.name })) ?? [],
+    projects:
+      available?.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        teamId: project.teamId,
+      })) ?? [],
+  };
 
   const query = host.route().query;
   const scopeFilter = scopeFilterFromAddress({
@@ -91,6 +106,20 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   };
 
   const invalidate = () => utils.dataPrivacy.getSnapshot.invalidate({ projectId });
+  const acceptance = usePiiRedactionModelAcceptance({
+    snapshot: snapshotQuery.data,
+    organizationId: available?.organization?.id ?? host.scope().organizationId ?? null,
+    host,
+    onAccepted: () => void invalidate(),
+  });
+  // One acceptance at a time on the page: the picker and the drawer both wait for it.
+  const acceptanceInFlight = useInFlight();
+  // Accepting is an organization admin's act, the same permission the organization rule needs.
+  const modelAcceptance = modelAcceptanceOf({
+    offer: piiRedactionModelOffer,
+    accepted: acceptance.accepted,
+    canAccept: Boolean(available?.organization),
+  });
 
   const removeForScope = dataPrivacyApi.dataPrivacy.removeForScope.useMutation();
   const [ruleToRemove, setRuleToRemove] = useState<DataPrivacyRule | null>(null);
@@ -146,11 +175,24 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Control what trace content LangWatch stores, who can see it, and how secrets and PII are
           scrubbed, at any scope, inherited down to projects.
         </Text>
+
+        {piiRedactionModelOffer?.kind === "model" && snapshot && (
+          <OrganizationPiiLevelSection
+            model={piiRedactionModelOffer}
+            acceptance={modelAcceptance}
+            onAccept={acceptance.accept}
+            acceptanceInFlight={acceptanceInFlight}
+            host={host}
+            projectId={projectId}
+            snapshot={snapshot}
+            onSaved={() => void invalidate()}
+          />
+        )}
 
         {snapshot && snapshot.rules.length === 0 && (
           <NoPrivacyRules canWrite={canWrite} onAdd={openAdd} />
@@ -175,6 +217,8 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             snapshot={snapshot}
             scopeFilter={scopeFilter}
             currentTeamId={teamId ?? null}
+            piiRedactionModelOffer={piiRedactionModelOffer}
+            strictAwaitsAcceptance={awaitsAcceptance(modelAcceptance)}
           />
         )}
 
@@ -187,6 +231,10 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             editingRule={privacyRuleForAddress(ruleAddress, snapshot.rules)}
             onClose={closeRuleDrawer}
             onSaved={() => void invalidate()}
+            piiRedactionModelOffer={piiRedactionModelOffer}
+            acceptance={modelAcceptance}
+            onAccept={acceptance.accept}
+            accepting={acceptanceInFlight}
           />
         )}
       </VStack>
@@ -201,7 +249,7 @@ function DataPrivacyLoading() {
       <PageLayout.Header>
         <PageLayout.Heading>Data Privacy</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
+      <VStack gap={6} width="full" align="start" aria-busy="true">
         <SkeletonText noOfLines={1} width="md" />
         <Card padding="lg">
           <VStack gap={4} align="stretch">
@@ -215,7 +263,23 @@ function DataPrivacyLoading() {
   );
 }
 
-/** The drawer over the page's snapshot, saving one rule per picked scope. */
+type PendingSave = { scopes: PrivacyScopeEntry[]; config: DataPrivacyConfig };
+
+/** A save waiting on its question belongs to its drawer: closing it, by any route, drops it. */
+function usePendingSave(open: boolean) {
+  const [pending, setPending] = useState<PendingSave | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) setPending(null);
+  }
+  return [pending, setPending] as const;
+}
+
+/**
+ * The drawer over the page's snapshot, saving one rule per picked scope. An admin confirming
+ * Strict's price accepts it first; a reader who cannot accept it is not asked.
+ */
 function PrivacyRuleDrawerMount({
   host,
   projectId,
@@ -224,6 +288,10 @@ function PrivacyRuleDrawerMount({
   editingRule,
   onClose,
   onSaved,
+  piiRedactionModelOffer,
+  acceptance,
+  onAccept,
+  accepting,
 }: {
   host: DataPrivacyHostApi;
   projectId: string;
@@ -232,6 +300,11 @@ function PrivacyRuleDrawerMount({
   editingRule: DataPrivacyRule | null;
   onClose: () => void;
   onSaved: () => void;
+  piiRedactionModelOffer: PiiRedactionModelOffer;
+  acceptance: ModelAcceptance;
+  onAccept: AcceptPiiRedactionModel;
+  /** The page's acceptance in flight, shared with the organization picker. */
+  accepting: InFlight;
 }) {
   const { organizationId, teamId } = host.scope();
   const setForScope = dataPrivacyApi.dataPrivacy.setForScope.useMutation();
@@ -256,36 +329,100 @@ function PrivacyRuleDrawerMount({
       host.failed({ error, fallbackTitle: "Couldn't save the privacy rule" });
     }
   };
+  const [pending, setPending] = usePendingSave(open);
+  // The price of Strict and a key reading restricted content each ask first (ADR-208).
+  const stepFor = (config: DataPrivacyConfig) =>
+    ruleSaveStep({
+      offer: piiRedactionModelOffer,
+      acceptance,
+      before: editingRule?.config,
+      after: config,
+    });
+  const keyAskFor = (config: DataPrivacyConfig) =>
+    apiKeySaveConfirmation({
+      before: editingRule?.config,
+      after: config,
+      options: snapshot.audienceOptions,
+    });
+  // Read live: a save waiting for the subscription's currency asks with its price once it loads.
+  const step = pending ? stepFor(pending.config) : null;
+  const pendingKeyAsk = pending && step?.kind !== "wait" ? keyAskFor(pending.config) : null;
+  const confirmation = combineSaveConfirmations(piiLevelStepDialog(step), pendingKeyAsk);
+  const readingPlan = useInFlight();
+  const readPlanAgain = () => readingPlan.run(() => host.refreshBillingCurrency());
+  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const next = stepFor(config).kind;
+    if (next === "save" && keyAskFor(config) === null) return void save(scopes, config);
+    setPending({ scopes, config });
+    if (next === "wait") void readPlanAgain();
+  };
+  // A waiting save left with nothing to ask (the flag turned off, no key added) saves unasked.
+  const asksNothing = pending !== null && confirmation === null;
+  const savePending = useEffectEvent(() => {
+    if (!pending) return;
+    setPending(null);
+    void save(pending.scopes, pending.config);
+  });
+  useEffect(() => {
+    if (asksNothing) savePending();
+  }, [asksNothing]);
+  // The drawer stays busy from the acceptance to the end of the save it leads to.
+  const acceptThenSave = async (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const organization = available.organization;
+    // Only a prompt that named the price records its acceptance; a key's alone never does.
+    const asksAcceptance =
+      acceptance === "can-accept" && organization !== null && stepFor(config).kind === "ask";
+    if (asksAcceptance && !(await onAccept({ organizationId: organization.id }))) return;
+    await save(scopes, config);
+  };
 
   return (
-    <PrivacyRuleDrawer
-      open={open}
-      editingRule={editingRule}
-      onClose={onClose}
-      available={available}
-      audienceOptions={snapshot.audienceOptions}
-      effectiveTeam={snapshot.effectiveTeam}
-      effectiveOrganization={snapshot.effectiveOrganization}
-      projectId={projectId}
-      isSaving={setForScope.isPending}
-      scopePicker={({ value, onChange }) => (
-        <ScopeChipPicker<ScopeChipPickerScopeType>
-          value={value}
-          onChange={onChange}
-          organizationId={available.organization?.id}
-          organizationName={available.organization?.name}
-          availableTeams={available.teams}
-          availableProjects={available.projects}
-          availableDepartments={available.departments}
-          allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
-          personalScopes
-          currentOrganizationId={organizationId ?? null}
-          currentTeamId={teamId ?? null}
-          currentProjectId={projectId}
-        />
-      )}
-      onSave={save}
-    />
+    <>
+      <ConfirmDialog
+        open={confirmation !== null}
+        onClose={() => setPending(null)}
+        onConfirm={() => {
+          if (step?.kind === "wait") return void readPlanAgain();
+          if (pending) void accepting.run(() => acceptThenSave(pending.scopes, pending.config));
+          setPending(null);
+        }}
+        title={confirmation?.title ?? ""}
+        description={confirmation?.description ?? ""}
+        confirmLabel={confirmation?.confirmLabel}
+        loading={step?.kind === "wait" && readingPlan.inFlight}
+        tone="default"
+      />
+      <PrivacyRuleDrawer
+        open={open}
+        editingRule={editingRule}
+        onClose={onClose}
+        available={available}
+        audienceOptions={snapshot.audienceOptions}
+        effectiveTeam={snapshot.effectiveTeam}
+        effectiveOrganization={snapshot.effectiveOrganization}
+        projectId={projectId}
+        isSaving={setForScope.isPending || accepting.inFlight}
+        piiRedactionModelOffer={piiRedactionModelOffer}
+        piiRedactionModelAwaitsAcceptance={awaitsAcceptance(acceptance)}
+        scopePicker={({ value, onChange }) => (
+          <ScopeChipPicker<ScopeChipPickerScopeType>
+            value={value}
+            onChange={onChange}
+            organizationId={available.organization?.id}
+            organizationName={available.organization?.name}
+            availableTeams={available.teams}
+            availableProjects={available.projects}
+            availableDepartments={available.departments}
+            allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
+            personalScopes
+            currentOrganizationId={organizationId ?? null}
+            currentTeamId={teamId ?? null}
+            currentProjectId={projectId}
+          />
+        )}
+        onSave={saveOrAsk}
+      />
+    </>
   );
 }
 

@@ -5,6 +5,7 @@
  */
 
 import { bucketOf, inPeriod, inPeriodAndPrevious, START } from "./lwql-period.ts";
+import { costByModelSql } from "./model-cost-queries.ts";
 
 /** Cost reads `TotalCost` of each trace, so the completeness report counts the unpriced ones. */
 export const PERIOD_COMPARISON_SQL = `SELECT
@@ -31,26 +32,20 @@ ORDER BY bucket`;
 export const COST_SUMMARY_SQL = `SELECT
   uniqExact(TraceId) AS traces,
   sum(TotalCost) AS cost,
-  countIf(NOT HasError) AS successes,
+  countIf(NOT HasError) AS error_free,
   sum(PromptTokens) AS tokens_in,
   sum(CompletionTokens) AS tokens_out
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}`;
 
-export const COST_BY_MODEL_SQL = `SELECT Model AS model, sum(CostSum) AS cost
-FROM model_usage_by_minute
-WHERE ${inPeriod("BucketStart")}
-  AND Model != ''
-GROUP BY model
-ORDER BY cost DESC
-LIMIT 5`;
+export const COST_BY_MODEL_SQL = costByModelSql({ limit: 5 });
 
 export const FAILURES_SQL = `SELECT
-  coalesce(nullIf(SpanAttributes['exception.type'], ''), nullIf(SpanAttributes['error.type'], ''), 'Unclassified error') AS category,
+  coalesce(nullIf(ErrorType, ''), 'Error with no type') AS category,
   SpanName AS operation,
   min(StartTime) AS first_seen,
   count() AS failures
-FROM spans
+FROM span_metrics
 WHERE ${inPeriod("StartTime")}
   AND StatusCode = 2
 GROUP BY category, operation
@@ -63,12 +58,33 @@ WHERE ${inPeriod("StartedAt")}
   AND ArchivedAt IS NULL
   AND Verdict IS NOT NULL`;
 
-export const SCENARIO_SUITES_SQL = `SELECT ScenarioSetId AS suite, countIf(Verdict = 'success') AS passed, count() AS runs
-FROM simulations
-WHERE ${inPeriod("StartedAt")}
-  AND ArchivedAt IS NULL
-  AND Verdict IS NOT NULL
-GROUP BY suite
+/** A suite's runs carry the set id `__internal__<suite id>__suite`; the suite id, else ''. */
+const SUITE_ID_OF_SET = `if(startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite'),
+      substring(ScenarioSetId, 13, length(ScenarioSetId) - 19), '')`;
+
+/**
+ * The five busiest sets by the name a person knows them by: a suite's own name, "Tests run by
+ * hand" for runs started from the platform, and the set id an SDK run sent, which its author chose.
+ */
+export const SCENARIO_SUITES_SQL = `SELECT r.ScenarioSetId AS suite_id,
+  multiIf(ifNull(any(n.Name), '') != '', any(n.Name),
+    endsWith(r.ScenarioSetId, '__on-platform-scenarios'), 'Tests run by hand',
+    startsWith(r.ScenarioSetId, '__internal__'), 'Untitled test suite',
+    r.ScenarioSetId = '', 'default',
+    r.ScenarioSetId) AS suite,
+  countIf(r.Verdict = 'success') AS passed,
+  count() AS runs
+FROM (
+  SELECT ScenarioSetId, Verdict, ${SUITE_ID_OF_SET} AS suite_key
+  FROM simulations
+  WHERE ${inPeriod("StartedAt")}
+    AND ArchivedAt IS NULL
+    AND Verdict IS NOT NULL
+) AS r
+LEFT JOIN (
+  SELECT SimulationSuiteId, any(Name) AS Name FROM simulation_suites GROUP BY SimulationSuiteId
+) AS n ON n.SimulationSuiteId = r.suite_key
+GROUP BY suite_id
 ORDER BY runs DESC
 LIMIT 5`;
 
@@ -104,12 +120,12 @@ GROUP BY virtual_key
 ORDER BY cost DESC
 LIMIT 5`;
 
-/** A session succeeded when it hit no API, internal or retry-exhausted failure. */
+/** A session ran without an error when it hit no API, internal or retry-exhausted failure. */
 export const CODING_AGENTS_SQL = `SELECT Agent AS agent,
   count() AS sessions,
   sum(InputTokens + OutputTokens) AS tokens,
   sum(CostUsd) AS cost,
-  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS success_rate
+  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS error_free_rate
 FROM coding_sessions
 WHERE ${inPeriod("StartedAt")}
 GROUP BY agent

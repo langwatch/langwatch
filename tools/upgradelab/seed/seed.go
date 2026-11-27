@@ -64,6 +64,13 @@ func (env ShapeEnv) parse(text string) {
 	}
 }
 
+// StepDeclarationGlobs are the repo paths that declare migration steps, the ones coverage.json
+// must cover. ciguard's upgradelab-trigger guard holds go-ci's filters to this same list.
+var StepDeclarationGlobs = []string{
+	"modules/*/process/src/*.module.ts", "enterprise/modules/*/process/src/*.module.ts",
+	"modules/*/process/src/migrations/*.ts", "enterprise/modules/*/process/src/migrations/*.ts",
+}
+
 // Coverage is coverage.json.
 type Coverage struct {
 	Steps            map[string]CoverageEntry `json:"steps"`
@@ -80,13 +87,57 @@ type CoverageEntry struct {
 
 // LoadCoverage reads coverage.json.
 func LoadCoverage() (Coverage, error) {
-	var coverage Coverage
 	data, err := files.ReadFile("coverage.json")
 	if err != nil {
+		return Coverage{}, err
+	}
+	return parseCoverage(data)
+}
+
+// parseCoverage refuses a step listed twice in one section: json.Unmarshal keeps only the last.
+func parseCoverage(data []byte) (Coverage, error) {
+	var coverage Coverage
+	if err := json.Unmarshal(data, &coverage); err != nil {
 		return coverage, err
 	}
-	err = json.Unmarshal(data, &coverage)
-	return coverage, err
+	var sections map[string]json.RawMessage
+	if err := json.Unmarshal(data, &sections); err != nil {
+		return coverage, err
+	}
+	for _, name := range []string{"steps", "systemMigrations"} {
+		if err := refuseDuplicateKeys(name, sections[name]); err != nil {
+			return coverage, err
+		}
+	}
+	return coverage, nil
+}
+
+// refuseDuplicateKeys fails on the first key the JSON object holds twice.
+func refuseDuplicateKeys(section string, object json.RawMessage) error {
+	if len(object) == 0 {
+		return nil
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(object)))
+	if _, err := decoder.Token(); err != nil {
+		return err
+	}
+	seen := map[string]bool{}
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		key, _ := token.(string)
+		if seen[key] {
+			return fmt.Errorf("coverage.json %s lists %q twice; json keeps only the last", section, key)
+		}
+		seen[key] = true
+		var entry json.RawMessage
+		if err := decoder.Decode(&entry); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ProductKind is one kind the old image's tRPC seeds; Unseedable says why a kind has no seed.

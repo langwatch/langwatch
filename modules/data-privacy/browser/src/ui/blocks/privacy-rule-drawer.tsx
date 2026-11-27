@@ -15,13 +15,16 @@ import {
   configToFormState,
   inheritedBaselineForScope,
   inheritFormState,
+  restrictsContentCategory,
   type RuleFormState,
+  withDispositions,
 } from "../../model/data-privacy-rule-config.ts";
 import {
   formHasInvalidPatterns,
   formRestrictsContent,
   ruleHasChange,
 } from "../../model/data-privacy-rule-form.ts";
+import type { PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
 import { AudiencePicker } from "../elements/audience-picker.tsx";
 import { RuleScopeLabel } from "../elements/rule-scope-label.tsx";
 import { ContentDispositionFields } from "./content-disposition-fields.tsx";
@@ -51,6 +54,8 @@ export function PrivacyRuleDrawer({
   effectiveOrganization,
   projectId,
   isSaving,
+  piiRedactionModelOffer = null,
+  piiRedactionModelAwaitsAcceptance = false,
   onSave,
   scopePicker,
 }: {
@@ -63,6 +68,10 @@ export function PrivacyRuleDrawer({
   effectiveOrganization: ResolvedDataPrivacy | null;
   projectId: string;
   isSaving: boolean;
+  /** Shows what the PII level runs and its example; null hides them. */
+  piiRedactionModelOffer?: PiiRedactionModelOffer;
+  /** No organization admin accepted the model's price yet, so Strict is rule-based. */
+  piiRedactionModelAwaitsAcceptance?: boolean;
   onSave: (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => void;
   /** Renders the scope picker in add mode, wired to `value` and `onChange`. */
   scopePicker: (props: {
@@ -131,6 +140,7 @@ export function PrivacyRuleDrawer({
     <Drawer
       open={open}
       onClose={onClose}
+      busy={isSaving}
       title={editingRule ? "Edit privacy rule" : "Add privacy rule"}
       size="md"
       footer={{ primaryAction: { label: "Save", onClick: trySave, loading: isSaving } }}
@@ -167,7 +177,7 @@ export function PrivacyRuleDrawer({
         <ContentDispositionFields
           dispositions={form.dispositions}
           inheritedBaseline={inheritedBaseline}
-          onChange={(dispositions) => update({ dispositions })}
+          onChange={(dispositions) => setForm((current) => withDispositions(current, dispositions))}
         />
 
         <CustomAttributeRules
@@ -183,6 +193,7 @@ export function PrivacyRuleDrawer({
             <AudiencePicker
               audience={form.audience}
               options={audienceOptions}
+              offerApiKeys={restrictsContentCategory(form.dispositions)}
               onChange={(audience) => update({ audience })}
             />
             <Text fontSize="xs" color="fg.muted">
@@ -196,6 +207,8 @@ export function PrivacyRuleDrawer({
         <PiiRedactionFields
           form={form}
           inheritedLevel={inheritedBaseline.pii.level}
+          piiRedactionModelOffer={piiRedactionModelOffer}
+          piiRedactionModelAwaitsAcceptance={piiRedactionModelAwaitsAcceptance}
           onChange={update}
         />
 

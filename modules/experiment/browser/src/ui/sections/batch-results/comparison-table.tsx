@@ -272,11 +272,13 @@ const buildComparisonRows = (comparisonData: ComparisonRunData[]): ComparisonRow
       runColors[run.runId] = run.color;
 
       const row = run.data.rows[i];
-      if (row) {
+      if (row && !row.notInRun) {
         datasetEntries[run.runId] = row.datasetEntry;
         targetsByRun[run.runId] = row.targets;
       }
     }
+    // A position no run holds is padding, not a row; rows keep their dataset index.
+    if (Object.keys(datasetEntries).length === 0) continue;
 
     rows.push({
       index: i,

@@ -279,7 +279,43 @@ Feature: Connect on a self-hosted install
     And it links to the license page
 
   @integration
+  Scenario: A member with no license is told to ask an admin
+    Given an organization with no license
+    When a member who may not manage the organization opens Settings, Connect
+    Then the page says hosted services need a license
+    And it says "Ask an organization admin to activate a license."
+    And it neither tells them to activate a license nor links to the license page
+
+  @integration
   Scenario: The page shows a refusal in place of the hosted services
     Given the hosted service refuses the license
     When an admin opens Settings, Connect
     Then the page says what the refusal means and what to do about it
+
+  @integration
+  Scenario: A revoked license shows its refusal once and every service as unavailable
+    Given LangWatch revoked the license
+    When an admin opens Settings, Connect
+    Then the page says once that the license is no longer active
+    And every hosted service is marked unavailable, with its switch off and disabled
+    And no service reads "On"
+
+  @unit
+  Scenario Outline: Every refusal of the license itself closes the hosted services
+    Given the license is refused with "<code>", live or on the last sync
+    When the Connect page reads the status
+    Then every hosted service is closed
+    And only "connect_license_revoked" reads as revoked by LangWatch
+
+    Examples:
+      | code                           |
+      | connect_license_revoked        |
+      | connect_license_expired        |
+      | connect_license_not_registered |
+      | connect_wrong_instance         |
+
+  @unit
+  Scenario: A refusal that is not about the license leaves the hosted services open
+    Given the last sync failed because LangWatch could not be reached
+    When the Connect page reads the status
+    Then the hosted services are not closed

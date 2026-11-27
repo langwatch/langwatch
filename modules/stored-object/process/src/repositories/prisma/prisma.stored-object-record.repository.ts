@@ -1,8 +1,9 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { skipTenantCheck } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaTables } from "@langwatch/prisma-client/ownership";
 import type {
   StoredObjectDeliveryAudience,
   StoredObjectId,
-  StoredObjectLifecycleStatus,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal, fromDate, toDate, toEpochMs } from "@langwatch/time";
@@ -11,14 +12,30 @@ import type {
   StoredObjectRecord,
   StoredObjectRecordPageQuery,
   StoredObjectRecordRepository,
+  StoredObjectRecordStatus,
   StoredObjectSource,
 } from "../stored-object-record.repository.ts";
 
-export class PrismaStoredObjectRecordRepository
-  extends PrismaRepository.for("StoredObject")
-  implements StoredObjectRecordRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaStoredObjectRecordRepository(prisma));
+/** The model delegate, and raw SQL for the tenant sweep, the guarded transition, the
+ * conditional delete and the audience append. */
+type StoredObjectRecordDatabase = Pick<PrismaClient, "storedObject" | "$queryRaw" | "$executeRaw">;
+
+/**
+ * Declared rather than inherited from `PrismaRepository.for`: the raw SQL here needs
+ * `$queryRaw` and `$executeRaw`, which that base class's model-scoped client has not.
+ */
+export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRepository {
+  static readonly tables = prismaTables("StoredObject", "StoredObjectOwner");
+
+  static create({
+    prisma,
+  }: {
+    prisma: StoredObjectRecordDatabase;
+  }): PrismaStoredObjectRecordRepository {
+    return new PrismaStoredObjectRecordRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: StoredObjectRecordDatabase) {}
 
   async findById(input: {
     tenantId: StoredObjectProjectId;
@@ -39,6 +56,56 @@ export class PrismaStoredObjectRecordRepository
       create: row,
       update: row,
     });
+  }
+
+  async insert(value: StoredObjectRecord): Promise<boolean> {
+    const result = await this.prisma.storedObject.createMany({
+      data: [toRow(value)],
+      skipDuplicates: true,
+    });
+
+    return result.count === 1;
+  }
+
+  /**
+   * SQL, not `updateMany`: Prisma compiles that to an id subquery, and a racing write parked on
+   * the row lock re-checks only the id, so a confirm and the reaper could both win.
+   */
+  async transition(input: {
+    expected: Pick<StoredObjectRecord, "status" | "generation">;
+    next: StoredObjectRecord;
+  }): Promise<boolean> {
+    const row = toRow(input.next);
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "StoredObject"
+         SET "status" = ${row.status},
+             "purpose" = ${row.purpose},
+             "ownerKind" = ${row.ownerKind},
+             "ownerId" = ${row.ownerId},
+             "filename" = ${row.filename},
+             "sha256" = ${row.sha256},
+             "sizeBytes" = ${row.sizeBytes},
+             "mediaType" = ${row.mediaType},
+             "mediaTypeVerified" = ${row.mediaTypeVerified},
+             "storageProvider" = ${row.storageProvider},
+             "storageDestinationId" = ${row.storageDestinationId},
+             "storageProviderRelativeId" = ${row.storageProviderRelativeId},
+             "generation" = ${row.generation},
+             "audiences" = ${JSON.stringify(row.audiences)}::jsonb,
+             "expiresAt" = ${row.expiresAt},
+             "availableAt" = ${row.availableAt},
+             "deletedAt" = ${row.deletedAt},
+             "source" = ${row.source},
+             "legacyFingerprint" = ${row.legacyFingerprint},
+             "createdAt" = ${row.createdAt},
+             "updatedAt" = ${row.updatedAt}
+       WHERE "tenantId" = ${row.tenantId}
+         AND "id" = ${row.id}
+         AND "status" = ${input.expected.status}
+         AND "generation" = ${input.expected.generation}
+    `;
+
+    return updated === 1;
   }
 
   async countActive(input: {
@@ -66,8 +133,35 @@ export class PrismaStoredObjectRecordRepository
       where: {
         tenantId: input.tenantId,
         ...(input.afterId ? { id: { gt: input.afterId } } : {}),
-        ...(input.status ? { status: input.status } : {}),
+        ...(input.status === undefined
+          ? {}
+          : {
+              status: typeof input.status === "string" ? input.status : { in: [...input.status] },
+            }),
+        ...(input.purpose ? { purpose: input.purpose } : {}),
         ...(input.expiresBefore ? { expiresAt: { lte: toDate(input.expiresBefore) } } : {}),
+      },
+      orderBy: { id: "asc" },
+      take: input.limit,
+    });
+
+    return rows.map((row) => fromRow(row));
+  }
+
+  async findReusable(input: {
+    tenantId: StoredObjectProjectId;
+    purpose: string;
+    sha256: string;
+    mediaType: string;
+    limit: number;
+  }): Promise<StoredObjectRecord[]> {
+    const rows = await this.prisma.storedObject.findMany({
+      where: {
+        tenantId: input.tenantId,
+        purpose: input.purpose,
+        sha256: input.sha256,
+        mediaType: input.mediaType,
+        status: "available",
       },
       orderBy: { id: "asc" },
       take: input.limit,
@@ -101,10 +195,83 @@ export class PrismaStoredObjectRecordRepository
     return rows.map((row) => fromRow(row));
   }
 
+  async findTenantsWithExpiredUploads(input: {
+    expiresBefore: Instant;
+    afterTenantId?: StoredObjectProjectId;
+    limit: number;
+  }): Promise<StoredObjectProjectId[]> {
+    const rows = await this.prisma.$queryRaw<{ tenantId: string }[]>`
+      ${skipTenantCheck({
+        // Fleet-wide reap of abandoned uploads; each project is cleaned by its own scoped reads.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT DISTINCT "tenantId"
+        FROM "StoredObject"
+       WHERE "expiresAt" <= ${toDate(input.expiresBefore)}
+         AND (
+           "status" IN ('pending', 'uploading')
+           OR ("status" IN ('failed', 'deleted') AND "storageProvider" IS NOT NULL)
+         )
+         AND "tenantId" > ${input.afterTenantId ?? ""}
+       ORDER BY "tenantId"
+       LIMIT ${input.limit}
+    `;
+
+    return rows.map((row) => row.tenantId as StoredObjectProjectId);
+  }
+
   async delete(input: { tenantId: StoredObjectProjectId; id: StoredObjectId }): Promise<void> {
     await this.prisma.storedObject.deleteMany({
       where: { tenantId: input.tenantId, id: input.id },
     });
+  }
+
+  /** One UPDATE whose NOT EXISTS reads the owner links, so no live link is missed between them. */
+  async markDeletedIfUnheld(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    now: Instant;
+  }): Promise<boolean> {
+    const now = toDate(input.now);
+    const count = await this.prisma.$executeRaw`
+      UPDATE "StoredObject" AS o
+         SET "status" = 'deleted',
+             "generation" = o."generation" + 1,
+             "deletedAt" = ${now},
+             "expiresAt" = ${now},
+             "updatedAt" = ${now}
+       WHERE o."tenantId" = ${input.tenantId}
+         AND o."id" = ${input.id}
+         AND o."status" = 'available'
+         AND NOT EXISTS (
+           SELECT 1
+             FROM "StoredObjectOwner" AS l
+            WHERE l."tenantId" = o."tenantId"
+              AND l."objectId" = o."id"
+              AND (l."retainUntil" IS NULL OR l."retainUntil" > ${now})
+         )
+    `;
+
+    return count > 0;
+  }
+
+  /** A jsonb append conditional on the row: no read-modify-write a delete could overtake. */
+  async addAudience(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    audience: StoredObjectDeliveryAudience;
+    at: Instant;
+  }): Promise<void> {
+    const audience = JSON.stringify([input.audience]);
+    await this.prisma.$executeRaw`
+      UPDATE "StoredObject"
+         SET "audiences" = "audiences" || ${audience}::jsonb,
+             "updatedAt" = ${toDate(input.at)}
+       WHERE "tenantId" = ${input.tenantId}
+         AND "id" = ${input.id}
+         AND "status" = 'available'
+         AND NOT ("audiences" @> ${audience}::jsonb)
+    `;
   }
 }
 
@@ -171,7 +338,7 @@ function fromRow(value: unknown): StoredObjectRecord {
   return {
     tenantId: string(row.tenantId, "tenantId") as StoredObjectProjectId,
     id: string(row.id, "id") as StoredObjectId,
-    status: string(row.status, "status") as StoredObjectLifecycleStatus,
+    status: string(row.status, "status") as StoredObjectRecordStatus,
     purpose: string(row.purpose, "purpose"),
     ownerKind: string(row.ownerKind, "ownerKind"),
     ownerId: string(row.ownerId, "ownerId"),

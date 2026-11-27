@@ -6,7 +6,7 @@
 
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { EMPTY_AST, parse } from "@langwatch/trace-contract";
+import { buildFacetDisplayLookup, EMPTY_AST, parse } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -35,7 +35,14 @@ const buildItem = ({
 });
 
 const renderDrilldown = ({ item = buildItem(), ast = EMPTY_AST, toggleFacet = vi.fn() } = {}) => {
-  renderWithDesignSystem(<EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />);
+  renderWithDesignSystem(
+    <EventDrilldown
+      item={item}
+      ast={ast}
+      displayStates={buildFacetDisplayLookup(ast)}
+      toggleFacet={toggleFacet}
+    />,
+  );
   return { toggleFacet };
 };
 
@@ -137,6 +144,50 @@ describe("EventDrilldown", () => {
         ).toBeInTheDocument();
       });
     });
+
+    describe("when a group in the query makes a vote value optional", () => {
+      /** @scenario "Attribute, metadata and event rows a group makes optional also say in group" */
+      it("names the row in group, neither included nor excluded", () => {
+        renderDrilldown({
+          ast: parse("NOT (event.attribute.event.metrics.vote:-1 AND status:error)"),
+        });
+
+        const row = screen.getByRole("button", {
+          name: "vote thumbs down — in group, click to remove from the group",
+        });
+        expect(row).toHaveAttribute(
+          "title",
+          "Part of a group in the search bar. Click to remove from the group.",
+        );
+        expect(row).toHaveTextContent("in group");
+      });
+
+      it("names a plain vote value in a group with the exclude its click does", () => {
+        renderDrilldown({
+          ast: parse("event.attribute.event.metrics.vote:-1 OR status:error"),
+        });
+
+        expect(
+          screen.getByRole("button", { name: "vote thumbs down — in group, click to exclude" }),
+        ).toHaveAttribute("title", "Part of a group in the search bar. Click to exclude.");
+      });
+
+      it("still toggles that metric value on click", () => {
+        const { toggleFacet } = renderDrilldown({
+          ast: parse("NOT (event.attribute.event.metrics.vote:-1 AND status:error)"),
+        });
+
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "vote thumbs down — in group, click to remove from the group",
+          }),
+        );
+        expect(toggleFacet).toHaveBeenLastCalledWith({
+          field: "event.attribute.event.metrics.vote",
+          value: "-1",
+        });
+      });
+    });
   });
 
   describe("given two metric groups that share a stored value", () => {
@@ -186,6 +237,7 @@ describe("EventDrilldown", () => {
                 eventMetrics,
               }}
               ast={EMPTY_AST}
+              displayStates={new Map()}
               toggleFacet={vi.fn()}
             />,
           );
@@ -241,6 +293,7 @@ describe("EventDrilldown", () => {
           <EventDrilldown
             item={item}
             ast={useFilterStore.getState().ast}
+            displayStates={buildFacetDisplayLookup(useFilterStore.getState().ast)}
             toggleFacet={toggleFacet}
           />
         </DesignSystemProvider>

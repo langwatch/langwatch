@@ -2,6 +2,7 @@ import type { OrganizationUserRole } from "@langwatch/authorization";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   getRoleChangeType,
+  isFullMember,
   type EntitlementApi,
   type Plan,
   type PlanProviderUser,
@@ -9,7 +10,14 @@ import {
 } from "@langwatch/entitlement-contract";
 import { seatsFree, type LimitCheckResult, type LimitType } from "@langwatch/organization-contract";
 
-import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
+import type {
+  OrganizationSeatRepository,
+  SeatLease,
+} from "../repositories/organization-seat.repository.ts";
+import {
+  assertAdditionsNotHeldForPayment,
+  isAdditionsHeldForPayment,
+} from "../rules/payment-hold.rules.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 /**
@@ -31,13 +39,27 @@ type OrganizationSeatDecision = LimitCheckResult;
  * requirement are all one decision — "may this organization make this change on its plan."
  */
 export interface OrganizationSeatLicense {
+  /**
+   * The one way a seat-taking write runs: its seat check and its write go inside `work`, and
+   * no other seat-taking write on the organization runs meanwhile. Taken once per write path,
+   * never from inside another `withSeat` on the same organization.
+   */
+  withSeat<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T>;
+
   /** Whether one more of `resource` fits inside the organization's plan. Answers rather than
-   * throws, since only the caller knows how to turn a refusal into a named error. */
+   * throws, since only the caller knows how to turn a refusal into a named error; an unpaid
+   * invoice's hold throws `member_additions_held_for_payment`. */
   checkLimit(input: {
     organizationId: string;
     resource: LimitType;
     user?: OrganizationPlanUser | undefined;
   }): Promise<OrganizationSeatDecision>;
+
+  /** Whether the member holds a full seat now; asked before a removal or a disable. */
+  holdsFullSeat(input: { organizationId: string; userId: string }): Promise<boolean>;
 
   /**
    * Refuses a role change the organization's seats do not carry. Throws, never a soft answer.
@@ -47,6 +69,8 @@ export interface OrganizationSeatLicense {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
+    /** The member is Billing only now (ADR-205): any new role enters a pool. */
+    currentBillingOnly?: boolean;
     role: string;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void>;
@@ -71,6 +95,13 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     },
   ) {}
 
+  withSeat<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T> {
+    return this.options.memberships.withSeatLock(input);
+  }
+
   async checkLimit(input: {
     organizationId: string;
     resource: LimitType;
@@ -83,13 +114,29 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     }
 
     const { current, free } = await this.seatsFor({ plan, ...input });
+    // A read answers the hold instead of throwing it; seat-taking writes refuse via assertSeatFree.
+    if (isAdditionsHeldForPayment(plan)) {
+      return { allowed: false, limitType: input.resource, current, max, heldForPayment: true };
+    }
     return { allowed: free, limitType: input.resource, current, max };
+  }
+
+  async holdsFullSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const holders = await this.options.memberships.findFullSeatHolderIds(organizationId);
+    return holders.includes(userId);
   }
 
   async assertRoleChangeAllowed(input: {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
+    currentBillingOnly?: boolean;
     role: string;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void> {
@@ -97,27 +144,38 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     // The NEW role's permissions are deliberately not read: a built-in role
     // carries none, and a custom one is gated on the plan by the door, not on
     // a seat. That is the platform's own call, kept.
+    const oldRole = input.currentRole as OrganizationUserRole;
+    const billingOnly = input.currentBillingOnly ?? false;
     const change = getRoleChangeType({
-      oldRole: input.currentRole as OrganizationUserRole,
+      oldRole,
       oldPermissions: input.userPermissions,
+      oldBillingOnly: billingOnly,
       newRole: input.role as OrganizationUserRole,
       newPermissions: undefined,
     });
-    await this.assertSeatForChange({ change, organizationId: input.organizationId, plan });
+    await this.assertSeatForChange({
+      change,
+      wasFull: isFullMember(oldRole, input.userPermissions, { billingOnly }),
+      organizationId: input.organizationId,
+      plan,
+    });
   }
 
   private async assertSeatForChange(input: {
     change: RoleChangeType;
+    /** Whether the member held a full seat before; a Developer moving to Lite did not. */
+    wasFull: boolean;
     organizationId: string;
     plan: Plan;
   }): Promise<void> {
-    // A move onto a Developer seat enters a pool no plan meters (ADR-171).
-    if (
+    // A move onto a Developer seat enters a pool no plan meters (ADR-171), and a demotion from a
+    // full seat is never refused for a full Lite pool: it frees a seat (seat-rotation.feature).
+    const freesOrSkipsCappedSeat =
       input.change === "no-change" ||
       input.change === "to-developer" ||
-      input.plan.overrideAddingLimitations
-    )
-      return;
+      (input.change === "full-to-lite" && input.wasFull);
+    if (freesOrSkipsCappedSeat || input.plan.overrideAddingLimitations) return;
+    assertAdditionsNotHeldForPayment(input.plan);
 
     const resource = input.change === "lite-to-full" ? "members" : "membersLite";
     const max = this.allowance(input.plan, resource);

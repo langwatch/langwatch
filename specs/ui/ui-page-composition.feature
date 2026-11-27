@@ -44,6 +44,13 @@ Feature: One page helper composes every routed page
     Then the router shows the missing permission instead of the screen
 
   @integration
+  Scenario: A declared screen answers its own refusal when its chunk exports Forbidden
+    Given a module declares a screen that requires "workflows:view"
+    And the screen's chunk exports a Forbidden component
+    When a viewer without that grant opens it
+    Then the router shows that Forbidden component, given the missing permission
+
+  @integration
   Scenario: A declared screen that requires a grant opens for a viewer holding it
     Given a module declares a screen that requires "workflows:view"
     When a viewer holding that grant opens it

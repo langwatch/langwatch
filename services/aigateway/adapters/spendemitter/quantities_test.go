@@ -93,6 +93,7 @@ func TestConfirmLeavesATextOnlyPayloadUnchanged(t *testing.T) {
 	for _, key := range []string{
 		"cache_creation_1h_tokens", "input_audio_tokens",
 		"output_audio_tokens", "input_chars", "audio_ms", "reasoning_tokens",
+		"web_search_requests",
 	} {
 		assert.EqualValues(t, 0, usage[key], "%s must default to zero", key)
 	}
@@ -112,4 +113,12 @@ func TestAudioMillisRefusesAnImplausibleDuration(t *testing.T) {
 	assert.Equal(t, 0, audioMillis(-1.5))
 	assert.Equal(t, 0, audioMillis(25*60*60))
 	assert.Equal(t, 0, audioMillis(0))
+}
+
+/** @scenario The confirm command carries every billable quantity, not only token classes */
+func TestConfirmCarriesWebSearchRequests(t *testing.T) {
+	usage := confirmUsage(t, domain.Usage{PromptTokens: 40, CompletionTokens: 9, WebSearchRequests: 3})
+
+	assert.EqualValues(t, 3, usage["web_search_requests"],
+		"searches are priced per query, so the count rides the wire")
 }

@@ -12,9 +12,13 @@ import {
   type InstantEvalQueryJudging,
 } from "@langwatch/instant-eval-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { Trace } from "@langwatch/trace-contract";
+import type { ThreadTraceIds, Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import {
   LangWatchQLHydrationComputeService,
   type LangWatchQLTraceRenderer,
@@ -58,6 +62,7 @@ const JUDGE_LIMITS: ReturnType<InstantEvalApi["getJudgeLimits"]> = {
   fitBytesPerInputToken: 2,
   transcriptFitBytesPerInputToken: 2.4,
   retryBytesPerInputToken: 1.5,
+  requestOverheadTokens: 50,
 };
 
 /** The fit the annoyed question leaves under {@link JUDGE_LIMITS}. */
@@ -127,6 +132,16 @@ class CountingTraceSource implements LangWatchQLTraceSource {
 
     return threadKeys.map((key) => trace({ id: `trace-${key}`, threadId: key }));
   }
+
+  async readThreadTraceIds({
+    threadKeys,
+  }: {
+    threadKeys: readonly string[];
+  }): Promise<readonly ThreadTraceIds[]> {
+    this.reads += 1;
+
+    return threadKeys.map((key) => ({ threadId: key, traceIds: [`trace-${key}`] }));
+  }
 }
 
 /** Answers one column of keys or texts, as the identity UDF leaves them. */
@@ -191,6 +206,8 @@ function serviceOver({
     },
   });
   const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
     executor: new ColumnAnsweringExecutor(column, values),
     database: "analytics",
     hydration,

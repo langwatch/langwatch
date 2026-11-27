@@ -3,9 +3,17 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+import { REMEDIATION_CODES, type RemediationCode, remediation } from "@langwatch/handled-error";
+import { isTipForPeople } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
-import { presentLangyToolError } from "../langy-tool-failure.ts";
+import { CLI_MISSING_KEY_LINES, presentLangyToolError } from "../langy-tool-failure.ts";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const failureDocument = (error: Record<string, unknown>) => JSON.stringify({ ok: false, error });
 
@@ -73,6 +81,75 @@ describe("presentLangyToolError", () => {
     });
   });
 
+  describe("given the server's own permission_denied code", () => {
+    const denied = ({
+      code = "permission_denied",
+      denialReason,
+      permission = "scenarios:manage",
+      message = "Permission denied",
+    }: {
+      code?: string;
+      denialReason?: string;
+      permission?: string;
+      message?: string;
+    }) =>
+      present(
+        failureDocument({
+          code,
+          message,
+          httpStatus: 403,
+          meta: { permission, denialReason },
+          isHandled: true,
+        }),
+      );
+
+    /** @scenario "A failure card says what went wrong in the user's terms" */
+    it.each(["permission_denied", "project_permission_denied"])(
+      "names the missing access for %s",
+      (code) => {
+        expect(denied({ code, denialReason: "no-grant" }).message).toBe(
+          "You can't manage scenarios in this project.",
+        );
+      },
+    );
+
+    /** @scenario "A reader who lost access is told so" */
+    it.each(["no-membership", "membership-disabled"])(
+      "says access was removed for %s",
+      (denialReason) => {
+        const presentation = denied({ denialReason });
+        expect(presentation.message).toBe("You no longer have access to this project.");
+        expect(presentation.detail).toBe(
+          "Ask whoever manages access for your team if you need it back.",
+        );
+      },
+    );
+
+    /** @scenario "A reader who lost access is told so" */
+    it("names the one permission lost when the owner's access was reduced", () => {
+      expect(denied({ denialReason: "owner-ceiling" }).message).toBe(
+        "You can no longer manage scenarios in this project.",
+      );
+    });
+
+    /** @scenario "A reader who lost access is told so" */
+    it("keeps a reduced access to one action when the action has no plain words", () => {
+      expect(denied({ denialReason: "owner-ceiling", permission: "agents:deploy" }).message).toBe(
+        "This action isn't available to you any more in this project.",
+      );
+    });
+
+    /** @scenario "A seat limit keeps the platform's own sentence" */
+    it.each([
+      ["developer-restricted", "This is outside your Developer seat"],
+      ["lite-member-restricted", "This feature is not available for your account"],
+    ])("keeps the server's seat sentence for %s", (denialReason, sentence) => {
+      const presentation = denied({ denialReason, message: sentence });
+      expect(presentation.message).toBe(sentence);
+      expect(presentation.detail).toBe("Ask whoever manages seats for your team if you need it.");
+    });
+  });
+
   describe("given a denial that named no permission", () => {
     /** @scenario "A refused permission reads as a permissions problem" */
     it("still says the access does not cover it, with no invented detail", () => {
@@ -137,6 +214,11 @@ describe("presentLangyToolError", () => {
       expect(presentation.tips).toBeUndefined();
       expect(presentation.docsUrl).toBeUndefined();
     });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("keeps the CLI's own words off the card", () => {
+      expect(present(failure).raw).toBeUndefined();
+    });
   });
 
   describe("given a missing key on the developer's own machine", () => {
@@ -161,6 +243,90 @@ describe("presentLangyToolError", () => {
         expect(presentation.tips).toEqual(["Run `langwatch login` to authenticate"]);
       },
     );
+  });
+
+  describe("given the CLI's text-mode not-logged-in block and no JSON", () => {
+    // Verbatim from sdks/typescript/src/cli/utils/apiKey.ts, headline in chalk red.
+    const cliText = [
+      "\u001b[31mError: you're not logged in, and LANGWATCH_API_KEY is not set.\u001b[39m",
+      "",
+      "Sign in with your browser, interactively:",
+      "  langwatch login",
+      "",
+      "If you have an API key already, either of these works:",
+      "  langwatch login --api-key <key>",
+      "  echo 'LANGWATCH_API_KEY=<key>' >> .env",
+    ].join("\n");
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("reads a sandbox tool's text as Langy's own missing key", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: cliText,
+      });
+      const shown = [presentation.message, presentation.detail, ...(presentation.tips ?? [])].join(
+        " ",
+      );
+
+      expect(presentation.code).toBe("missing_api_key");
+      expect(presentation.message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+      expect(shown).not.toMatch(/log ?in|sign in|api key/i);
+      expect(presentation.tips).toBeUndefined();
+      expect(presentation.raw).toBeUndefined();
+    });
+
+    /** @scenario "Langy's own missing key printed as plain text reads as an internal error" */
+    it("reads the org-key check's text the same way", () => {
+      // Verbatim from checkOrgApiKey in apiKey.ts.
+      const orgKeyText = [
+        "\u001b[31mError: LANGWATCH_API_KEY not found.\u001b[39m",
+        "This command needs an organization-capable API key. Create one at:",
+        "  https://app.langwatch.ai/settings/api-keys",
+        "Then add it to your .env file:",
+        "  echo 'LANGWATCH_API_KEY=<your-key>' >> .env",
+      ].join("\n");
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: orgKeyText,
+      });
+
+      expect(presentation.code).toBe("missing_api_key");
+      expect(presentation.message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+      expect(presentation.raw).toBeUndefined();
+    });
+
+    /** @scenario "A sandbox tool that only echoes the CLI's missing-key line keeps its own words" */
+    it("does not reclassify a line that only contains the CLI's words", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: "log.txt:Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.raw).toContain("log.txt:Error:");
+    });
+
+    /** @scenario "A missing key printed as plain text on the developer's own machine keeps the CLI's own words" */
+    it("keeps the CLI's own sign-in words for a local tool", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "local_bash",
+        errorText: cliText,
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.detail).toBe(
+        "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      );
+      expect(presentation.raw).toContain("langwatch login");
+    });
   });
 
   // The failure the user hit: a free-plan scenario limit, rendered as
@@ -278,8 +444,142 @@ describe("presentLangyToolError", () => {
       ]);
     });
 
+    /** @scenario "A tip written for an API caller is not shown to a person" */
+    it("drops a next step that points an API caller at a meta field", () => {
+      const withMetaTip = failureDocument({
+        code: "trace_not_found",
+        message: "That trace is no longer available",
+        httpStatus: 404,
+        meta: {},
+        isHandled: true,
+        suggestions: [
+          "meta.traceId names the trace that was asked for",
+          "Traces are removed after the retention window",
+        ],
+      });
+      expect(present(withMetaTip, "Loading trace").tips).toEqual([
+        "Traces are removed after the retention window",
+      ]);
+    });
+
     it("shows the code alongside it", () => {
       expect(present(notFound, "Loading dataset").code).toBe("dataset_not_found");
+    });
+  });
+
+  // The wire message of a handled error is its code (#5984), so once the API-caller tips are
+  // hidden the card needs the registry's sentence, or it shows a slug and nothing to do.
+  describe("given a failure whose message is only its code and whose tips name meta", () => {
+    const codesWithCallerTips = REMEDIATION_CODES.filter((code) =>
+      (remediation(code).tips ?? []).some((tip) => !isTipForPeople(tip)),
+    );
+
+    const namedByTheReview: readonly [RemediationCode, RegExp][] = [
+      ["model_not_configured", /Default Models/],
+      ["instant_eval_already_finished", /nothing left to cancel/],
+    ];
+
+    it.each(namedByTheReview)("says what to do about %s", (code, expected) => {
+      const presentation = present(
+        failureDocument({
+          code,
+          message: code,
+          httpStatus: 409,
+          meta: {},
+          isHandled: true,
+          suggestions: remediation(code).tips,
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(expected);
+    });
+
+    /** @scenario "Hiding a tip written for an API caller never leaves a person without a next step" */
+    it.each(codesWithCallerTips)("gives %s a sentence or a tip, not a bare slug", (code) => {
+      const presentation = present(
+        failureDocument({
+          code,
+          message: code,
+          httpStatus: 400,
+          meta: {},
+          isHandled: true,
+          suggestions: remediation(code).tips,
+        }),
+        "Running tool",
+      );
+      expect(presentation.message !== code || (presentation.tips ?? []).length > 0).toBe(true);
+    });
+  });
+
+  describe("given a failure whose message is only its code", () => {
+    const codeOnly = (error: Record<string, unknown>) =>
+      present(failureDocument({ meta: {}, isHandled: true, ...error }), "Running tool");
+
+    it("uses the registered description when the message is empty", () => {
+      const presentation = codeOnly({ code: "query_timeout", message: "", httpStatus: 504 });
+      expect(presentation.message).toBe("Narrow the time range or add a filter, then try again.");
+    });
+
+    it("drops a tip that repeats the description it now shows", () => {
+      const presentation = codeOnly({
+        code: "query_timeout",
+        message: "query_timeout",
+        httpStatus: 504,
+        suggestions: ["Narrow the time range", "Add filters to reduce the amount of data scanned"],
+      });
+      expect(presentation.tips).toEqual(["Add filters to reduce the amount of data scanned"]);
+    });
+
+    it("humanises a code the registry has no entry for, and still names the code", () => {
+      const presentation = codeOnly({
+        code: "made_up_failure",
+        message: "made_up_failure",
+        httpStatus: 400,
+      });
+      expect(presentation.message).toBe("Made up failure");
+      expect(presentation.code).toBe("made_up_failure");
+    });
+
+    it("does not blame the reader when the code and message are both empty", () => {
+      const presentation = codeOnly({ code: "", message: "", httpStatus: 500 });
+      expect(presentation.message).not.toBe("Check your input");
+      expect(presentation.message).not.toBe("");
+    });
+
+    it("reads the reason chain, so a refused key is not told to try again", () => {
+      const presentation = present(
+        failureDocument({
+          code: "llm_upstream_error",
+          message: "llm_upstream_error",
+          httpStatus: 502,
+          meta: {},
+          isHandled: true,
+          reasons: [
+            {
+              kind: "provider_error",
+              retryable: false,
+              reasons: [{ kind: "invalid_api_key", retryable: false }],
+            },
+          ],
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(/refused this key/);
+    });
+
+    it("falls back to the registered title when the code has no description", () => {
+      const presentation = present(
+        failureDocument({
+          code: "api_key_not_found",
+          message: "api_key_not_found",
+          httpStatus: 404,
+          meta: {},
+          isHandled: true,
+        }),
+        "Revoking key",
+      );
+      expect(presentation.message).not.toBe("api_key_not_found");
+      expect(presentation.code).toBe("api_key_not_found");
     });
   });
 
@@ -376,6 +676,164 @@ describe("presentLangyToolError", () => {
     });
   });
 
+  describe("given a sentence printed after a Python warning", () => {
+    const stderr = [
+      "DeprecationWarning: datetime.datetime.utcnow() is deprecated",
+      "✖ Failed to reach the API: socket hang up (ECONNRESET)",
+    ].join("\n");
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("does not take the warning for a stack trace and keeps the sentence", () => {
+      expect(present(stderr).detail).toBe("Failed to reach the API: socket hang up (ECONNRESET)");
+    });
+  });
+
+  describe("given a command on the developer's machine that failed", () => {
+    const ESC = "\u001b";
+    /** How the worker renders a shell result: the exit code, then stdout and stderr. */
+    const shellResult = ({
+      exitCode,
+      stdout,
+      stderr,
+    }: {
+      exitCode: string;
+      stdout: string;
+      stderr: string;
+    }) => `exit code: ${exitCode}\n\nstdout:\n${stdout}\n\nstderr:\n${stderr}`;
+    const presentCommand = (errorText: string) =>
+      presentLangyToolError({
+        title: "Running a command on your machine",
+        errorText,
+        toolName: "local_bash",
+      });
+
+    /** uv's progress bars and colours, a uv warning, two Python warnings, then the traceback. */
+    const uvPythonImportFailure = shellResult({
+      exitCode: "1",
+      stdout: "(empty)",
+      stderr: [
+        `${ESC}[2mResolved ${ESC}[1m42 packages${ESC}[0m ${ESC}[2min 1.21s${ESC}[0m`,
+        `${ESC}[?25l⠙ Preparing packages... (0/3)\r${ESC}[2K⠹ Preparing packages... (1/3)`,
+        `numpy==2.1.3 ${ESC}[32m━━━━━━${ESC}[2m━━━━${ESC}[0m 4.1 MiB/16.0 MiB\r${ESC}[2K${ESC}[1A${ESC}[2K${ESC}[?25h`,
+        `${ESC}[2mInstalled ${ESC}[1m3 packages${ESC}[0m ${ESC}[2min 120ms${ESC}[0m`,
+        `${ESC}[33mwarning${ESC}[0m${ESC}[1m:${ESC}[0m \`VIRTUAL_ENV=/Users/ada/.venv\` does not match the project environment path \`.venv\` and will be ignored`,
+        "/Users/ada/acme-app/.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:345: UserWarning: Valid config keys have changed in V2:",
+        "  warnings.warn(message, UserWarning)",
+        "DeprecationWarning: pkg_resources is deprecated as an API",
+        "Traceback (most recent call last):",
+        '  File "/Users/ada/acme-app/main.py", line 3, in <module>',
+        "    from langwatch import connect_agent",
+        "ImportError: cannot import name 'connect_agent' from 'langwatch' (/Users/ada/acme-app/.venv/lib/python3.13/site-packages/langwatch/__init__.py)",
+      ].join("\n"),
+    });
+
+    /** uv refusing to resolve, with an OSC hyperlink and a warning before the error. */
+    const uvResolutionFailure = shellResult({
+      exitCode: "2",
+      stdout: "",
+      stderr: [
+        `${ESC}[1m${ESC}[33mwarning${ESC}[0m${ESC}[1m:${ESC}[0m No \`requires-python\` value found in the workspace. Defaulting to \`>=3.14\`.`,
+        `  ${ESC}[31m×${ESC}[0m No solution found when resolving dependencies:`,
+        `  ╰─▶ Because all versions of langwatch>=1.4.0 require Python<3.14 and you require ${ESC}]8;;https://pypi.org/project/langwatch/${ESC}\\langwatch>=1.4.0${ESC}]8;;${ESC}\\, we can conclude that your requirements are unsatisfiable.`,
+      ].join("\n"),
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("says the exit code the command stopped with", () => {
+      expect(presentCommand(uvPythonImportFailure).message).toBe(
+        "The command stopped with exit code 1.",
+      );
+      expect(presentCommand(uvResolutionFailure).message).toBe(
+        "The command stopped with exit code 2.",
+      );
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("shows the last error line the command printed, past every warning", () => {
+      expect(presentCommand(uvPythonImportFailure).detail).toBe(
+        "ImportError: cannot import name 'connect_agent' from 'langwatch' (/Users/ada/acme-app/.venv/lib/python3.13/site-packages/langwatch/__init__.py)",
+      );
+      expect(presentCommand(uvResolutionFailure).detail).toBe(
+        "Because all versions of langwatch>=1.4.0 require Python<3.14 and you require langwatch>=1.4.0, we can conclude that your requirements are unsatisfiable.",
+      );
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("keeps the details free of every terminal escape and overwritten progress line", () => {
+      const raw = presentCommand(uvPythonImportFailure).raw ?? "";
+      expect(raw).not.toContain(ESC);
+      expect(raw).not.toContain("\r");
+      expect(raw).not.toContain("Preparing packages");
+      expect(raw).toContain("Resolved 42 packages in 1.21s");
+      expect(raw).toContain("Traceback (most recent call last):");
+      expect(presentCommand(uvResolutionFailure).raw).not.toContain(ESC);
+      expect(presentCommand(uvResolutionFailure).raw).not.toContain("8;;");
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("reads the same way for a folder-bound shell call that arrives named bash", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        errorText: uvPythonImportFailure,
+        toolName: "bash",
+      });
+      expect(presentation.message).toBe("The command stopped with exit code 1.");
+      expect(presentation.detail).toMatch(/^ImportError: cannot import name 'connect_agent'/);
+    });
+
+    it("leaves a sandbox shell failure, which the sandbox writes its own way, on its old card", () => {
+      const sandbox = presentLangyToolError({
+        title: "Running a command",
+        errorText: "ImportError: cannot import name 'x'\n\nCommand exited with code 1",
+        toolName: "bash",
+      });
+      expect(sandbox.message).toBe("This step couldn't be completed.");
+      expect(sandbox.detail).toBeUndefined();
+    });
+
+    it("drops a string sequence's payload, terminated or cut off", () => {
+      const raw =
+        presentCommand(
+          shellResult({
+            exitCode: "1",
+            stdout: "(empty)",
+            stderr: `${ESC}P1$r0m${ESC}\\error: Failed to spawn: \`python3.14\`\n${ESC}]0;uv run main.py`,
+          }),
+        ).raw ?? "";
+      expect(raw).toContain("error: Failed to spawn: `python3.14`");
+      expect(raw).not.toContain(ESC);
+      expect(raw).not.toContain("1$r0m");
+      expect(raw).not.toContain("uv run main.py");
+    });
+
+    it("says the exit code alone when the command printed nothing", () => {
+      const presentation = presentCommand(
+        shellResult({ exitCode: "127", stdout: "(empty)", stderr: "(empty)" }),
+      );
+      expect(presentation.message).toBe("The command stopped with exit code 127.");
+      expect(presentation.detail).toBeUndefined();
+    });
+
+    it("says the command stopped without an exit code when it was killed", () => {
+      const presentation = presentCommand(
+        shellResult({ exitCode: "none", stdout: "(empty)", stderr: "Killed" }),
+      );
+      expect(presentation.message).toBe("The command stopped without an exit code.");
+      expect(presentation.detail).toBe("Killed");
+    });
+
+    it("reads the error from stdout when stderr is empty", () => {
+      const presentation = presentCommand(
+        shellResult({
+          exitCode: "1",
+          stdout: "collected 3 items\nFAILED tests/test_agent.py::test_reply - AssertionError",
+          stderr: "(empty)",
+        }),
+      );
+      expect(presentation.detail).toBe("FAILED tests/test_agent.py::test_reply - AssertionError");
+    });
+  });
+
   describe("given the sandbox's own gh with no login", () => {
     const ghOutput = [
       "To get started with GitHub CLI, please run: gh auth login",
@@ -390,15 +848,18 @@ describe("presentLangyToolError", () => {
       });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
-    it("says the LangWatch GitHub App is not installed", () => {
-      expect(presentGh().title).toBe("Install the GitHub App to continue");
-      expect(presentGh().message).toContain("GitHub App");
+    it("says Langy has no GitHub access here", () => {
+      expect(presentGh().title).toBe("GitHub is not connected");
+      expect(presentGh().message).toBe(
+        "Langy has no GitHub access here, so this step could not run.",
+      );
     });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
-    it("carries the code for a missing GitHub App and points at Settings", () => {
+    it("carries the code for a missing GitHub connection and names no fix of its own", () => {
       expect(presentGh().code).toBe("langy_github_not_connected");
-      expect(presentGh().tips?.join(" ")).toContain("Integrations");
+      expect(presentGh().tips).toBeUndefined();
+      expect(presentGh().message).not.toContain("Install");
     });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
@@ -431,7 +892,7 @@ describe("presentLangyToolError", () => {
       expect(shared.message).not.toContain("GitHub App");
       expect(shared.code).toBeUndefined();
       expect(unmarked.code).toBe("langy_github_not_connected");
-      expect(unmarked.title).toBe("Install the GitHub App to continue");
+      expect(unmarked.title).toBe("GitHub is not connected");
     });
 
     /** @scenario "The developer's own gh keeps its own instruction" */
@@ -489,6 +950,20 @@ describe("presentLangyToolError", () => {
 
       expect(presentation.message).toBe("Analytics storage is temporarily unavailable.");
       expect(presentation.code).toBe("clickhouse_unavailable");
+    });
+  });
+
+  // The lines are copied from the CLI, so a reword there must fail this gate.
+  describe("given the CLI's missing-key lines", () => {
+    /** @scenario "The card's copy of the CLI's missing-key lines matches the CLI" */
+    it("matches the lines the CLI prints in its source", () => {
+      const cliSource = fs.readFileSync(
+        path.resolve(here, "../../../../../../../../../sdks/typescript/src/cli/utils/apiKey.ts"),
+        "utf8",
+      );
+      for (const line of CLI_MISSING_KEY_LINES) {
+        expect(cliSource, line).toContain(JSON.stringify(line));
+      }
     });
   });
 });

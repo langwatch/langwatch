@@ -176,3 +176,19 @@ Feature: Invitation acceptance and role recomputation
     Given an invitation waiting on an address the person has proved
     When the offer reads the invitation
     Then it carries the name of the administrator who sent it
+
+  # invite-creation.service.ts: the members screen used to skip such an address
+  # and answer an empty batch, which the screen reported as sent.
+  @unit
+  Scenario: Inviting an address that already holds a live invitation is refused, not skipped
+    Given "sam" already holds a pending invitation to the organization
+    When an administrator invites "sam" again from the members screen
+    Then the batch is refused as a duplicate invitation naming "sam"
+    And no invitation is written and no mail is sent
+
+  @unit
+  Scenario: A direct invitation replaces one held for an unpaid seat checkout
+    Given "sam" is held as payment-pending on a seat checkout that was never paid
+    When an administrator invites "sam" from the members screen
+    Then a pending invitation is created for "sam" and its mail is sent
+    And the held payment-pending invitation is gone

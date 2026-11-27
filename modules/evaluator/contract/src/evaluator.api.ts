@@ -121,11 +121,16 @@ export interface EvaluatorApi {
 
   /** Creates an evaluator, refusing a code evaluator that carries no program. */
   create(input: EvaluatorCreateInput): Promise<Evaluator>;
-  /** Creates an evaluator against the project's resolved default and embeddings models. */
+  /**
+   * Creates any kind of evaluator for the public API; a built-in one runs on the
+   * project's resolved default and embeddings models.
+   */
   createWithResolvedDefaults(input: {
     projectId: string;
     name: string;
+    type?: "evaluator" | "code" | "workflow";
     config: EvaluatorConfig;
+    workflowId?: string;
     id?: string;
     caller?: EvaluatorCaller;
   }): Promise<Evaluator>;

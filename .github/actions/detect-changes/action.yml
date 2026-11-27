@@ -9,7 +9,8 @@
 # the real jobs always run — required aggregator checks need a concrete
 # result. Exception: with `push-strategy: diff` a push is diffed against its
 # before-commit through dorny/paths-filter instead of force-run, for
-# workflows whose real jobs spend money on live LLM calls.
+# workflows whose real jobs are expensive: live LLM calls, or long runner time
+# such as the docs site's build, browser checks, audit and deploy.
 #
 # Never the files API: it stops at 3,000 files and, past that, gave each
 # workflow a different subset (#7536). On pull requests the base and head
@@ -60,8 +61,8 @@ inputs:
       How push events are treated. 'force' (default) marks every filter
       true so the real jobs always run post-merge. 'diff' diffs the push
       against its before-commit with dorny/paths-filter instead, so
-      workflows whose real jobs spend money (live LLM calls) only run
-      them when the push actually touched relevant paths.
+      workflows whose real jobs are expensive (live LLM calls, or long
+      runner time) only run them when the push actually touched relevant paths.
     required: false
     default: force
 outputs:
@@ -80,9 +81,15 @@ outputs:
   codeql-javascript:
     description: "'true' if code CodeQL analyses as javascript-typescript changed. Used by codeql.yml to build its language matrix: the single `relevant` filter fires on any of six trees and then runs every analyser, so a TypeScript-only change was paying for the Python one."
     value: ${{ steps.filter.outputs.codeql-javascript || steps.sha.outputs.codeql-javascript || steps.force.outputs.codeql-javascript }}
+  codeql-actions:
+    description: "'true' if a workflow or action under .github changed. Used by codeql.yml to add the actions analyser to its matrix."
+    value: ${{ steps.filter.outputs.codeql-actions || steps.sha.outputs.codeql-actions || steps.force.outputs.codeql-actions }}
   codeql-python:
     description: "'true' if code CodeQL analyses as python changed. See codeql-javascript."
     value: ${{ steps.filter.outputs.codeql-python || steps.sha.outputs.codeql-python || steps.force.outputs.codeql-python }}
+  docs-site:
+    description: "'true' if the docs site's content or look changed, or if the event is neither a PR nor a diff-mode push. Used by docs-site.yml to build, browser-test, audit and deploy the site only then; its cheap verify job keeps the wider `relevant` filter."
+    value: ${{ steps.filter.outputs.docs-site || steps.sha.outputs.docs-site || steps.force.outputs.docs-site }}
   heavy:
     description: >-
       "'true' unless this is a draft or a release-please pull request. Gate expensive jobs on
@@ -182,4 +189,6 @@ runs:
         echo "lambda-image=true" >> "$GITHUB_OUTPUT"
         echo "ingest=true" >> "$GITHUB_OUTPUT"
         echo "codeql-javascript=true" >> "$GITHUB_OUTPUT"
+        echo "codeql-actions=true" >> "$GITHUB_OUTPUT"
         echo "codeql-python=true" >> "$GITHUB_OUTPUT"
+        echo "docs-site=true" >> "$GITHUB_OUTPUT"

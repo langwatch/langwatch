@@ -39,6 +39,10 @@ import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  type FeatureFlagTargetDirectory,
+  useFeatureFlagTargetDirectory,
+} from "../../behavior/use-feature-flag-targets.ts";
+import {
   findUnfillableRule,
   newRule,
   rulesToUI,
@@ -48,12 +52,19 @@ import {
   type ScopeKind,
   type UIRule,
 } from "../../model/rule-editing.ts";
+import {
+  isPickedScope,
+  PICKED_TARGET_SCOPES,
+  type PickedScopeKind,
+} from "../../model/rule-targets.ts";
+import { FeatureFlagTargetPicker } from "./feature-flag-target-picker.tsx";
 
 const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string }>({
   items: [
     { value: "EVERYONE", label: "Everyone (default)" },
     { value: "ORGANIZATION", label: "Organization" },
     { value: "PROJECT", label: "Project" },
+    { value: "USER", label: "User" },
     { value: "NEW_USERS", label: "New users" },
     { value: "PERCENTAGE", label: "Percentage of users" },
     { value: "EMAIL_DOMAIN", label: "Email domain" },
@@ -62,17 +73,19 @@ const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string 
 
 const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   EVERYONE: "Applies to every context",
-  ORGANIZATION: "Organization id",
-  PROJECT: "Project ids",
+  ORGANIZATION: "Organization",
+  PROJECT: "Projects",
+  USER: "Users",
   NEW_USERS: "Organization created on or after",
   PERCENTAGE: "Percentage of users",
   EMAIL_DOMAIN: "Email domains",
 };
 
-const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
+/** Scopes that type their target; the picked scopes search for it instead. */
+type TypedScopeKind = Exclude<ScopeKind, PickedScopeKind>;
+
+const SCOPE_FIELD_PLACEHOLDER: Record<TypedScopeKind, string> = {
   EVERYONE: "",
-  ORGANIZATION: "organization_xxxx",
-  PROJECT: "project_xxxx, project_yyyy",
   NEW_USERS: "",
   PERCENTAGE: "50",
   EMAIL_DOMAIN: "acme.com, acme.io",
@@ -80,18 +93,17 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
 
 const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
   EVERYONE: "",
-  ORGANIZATION: "Every organization rule needs an organization id.",
-  PROJECT: "Every project rule needs one or more project ids.",
+  ORGANIZATION: "Every organization rule needs an organization.",
+  PROJECT: "Every project rule needs one or more projects.",
+  USER: "Every user rule needs one or more users.",
   NEW_USERS: "Every new users rule needs a date.",
   PERCENTAGE: "Every percentage rule needs a number between 0 and 100.",
   EMAIL_DOMAIN: "Every email domain rule needs one or more domains, without the @.",
 };
 
 /** The `<input>` type the field's scope needs: a date picker, a number, or free text. */
-const SCOPE_FIELD_INPUT_TYPE: Record<ScopeKind, "date" | "number" | "text"> = {
+const SCOPE_FIELD_INPUT_TYPE: Record<TypedScopeKind, "date" | "number" | "text"> = {
   EVERYONE: "text",
-  ORGANIZATION: "text",
-  PROJECT: "text",
   NEW_USERS: "date",
   PERCENTAGE: "number",
   EMAIL_DOMAIN: "text",
@@ -114,6 +126,9 @@ export function FeatureFlagRulesDialog({
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const wasOpen = useRef(false);
+  // Targets resolve from the rules that seeded the draft, not a refetch that arrived mid-edit.
+  const [seeded, setSeeded] = useState<FeatureFlagRules>(initialRules);
+  const directory = useFeatureFlagTargetDirectory({ rules: seeded, open });
 
   // A small distance threshold on the pointer, so the grip still accepts an
   // ordinary click without the row starting to drag under it. The keyboard
@@ -129,6 +144,7 @@ export function FeatureFlagRulesDialog({
   useEffect(() => {
     if (open && !wasOpen.current) {
       setDraft(rulesToUI(initialRules));
+      setSeeded(initialRules);
       setValidationError(null);
     }
     wasOpen.current = open;
@@ -156,7 +172,7 @@ export function FeatureFlagRulesDialog({
     <Dialog
       open={open}
       onClose={() => onOpenChange(false)}
-      size="lg"
+      size="xl"
       title="Targeting rules"
       description="Rules are evaluated top-to-bottom; the first match wins, and you can drag a rule by its handle to change that order. When no rule matches, the row toggle decides."
       primaryAction={{ label: "Save rules", onClick: () => void save(), loading: saving }}
@@ -186,6 +202,7 @@ export function FeatureFlagRulesDialog({
                 <RuleEditorRow
                   key={rule.id}
                   rule={rule}
+                  directory={directory}
                   onChange={(patch) =>
                     setDraft((current) =>
                       current.map((candidate) =>
@@ -217,10 +234,12 @@ export function FeatureFlagRulesDialog({
 
 function RuleEditorRow({
   rule,
+  directory,
   onChange,
   onRemove,
 }: {
   rule: UIRule;
+  directory: FeatureFlagTargetDirectory;
   onChange: (patch: Partial<UIRule>) => void;
   onRemove: () => void;
 }) {
@@ -239,9 +258,10 @@ function RuleEditorRow({
       zIndex={isDragging ? 1 : void 0}
     >
       <Card variant="nested" padding="sm">
-        <HStack align="flex-end" gap={2}>
+        <HStack align="flex-start" gap={2}>
           <IconButton
             aria-label="Reorder rule"
+            marginTop={5}
             size="sm"
             variant="ghost"
             color="fg.subtle"
@@ -251,7 +271,7 @@ function RuleEditorRow({
           >
             <GripVertical size={14} />
           </IconButton>
-          <Field.Root flexBasis="180px" flexShrink={0}>
+          <Field.Root flexBasis="160px" flexShrink={0}>
             <Field.Label fontSize="xs">Scope</Field.Label>
             <Select.Root
               collection={SCOPE_COLLECTION}
@@ -281,8 +301,8 @@ function RuleEditorRow({
               </Select.Content>
             </Select.Root>
           </Field.Root>
-          <RuleTargetField rule={rule} onChange={onChange} />
-          <Field.Root flexBasis="120px" flexShrink={0}>
+          <RuleTargetField rule={rule} directory={directory} onChange={onChange} />
+          <Field.Root flexBasis="88px" flexShrink={0}>
             <Field.Label fontSize="xs">Enabled</Field.Label>
             <HStack height="32px" alignItems="center">
               <Switch
@@ -293,7 +313,13 @@ function RuleEditorRow({
               <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
             </HStack>
           </Field.Root>
-          <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
+          <IconButton
+            aria-label="Remove rule"
+            size="sm"
+            variant="ghost"
+            marginTop={5}
+            onClick={onRemove}
+          >
             <Trash2 size={14} />
           </IconButton>
         </HStack>
@@ -302,25 +328,44 @@ function RuleEditorRow({
   );
 }
 
-/** What the chosen scope needs beside it: an id, a date, or nothing. */
+/** What the chosen scope needs beside it: picked targets, a date, a number, domains or nothing. */
 function RuleTargetField({
   rule,
+  directory,
   onChange,
 }: {
   rule: UIRule;
+  directory: FeatureFlagTargetDirectory;
   onChange: (patch: Partial<UIRule>) => void;
 }) {
-  const isNewUsers = rule.scopeKind === "NEW_USERS";
+  const scope = rule.scopeKind;
+  const isNewUsers = scope === "NEW_USERS";
+
+  if (isPickedScope(scope)) {
+    const picked = PICKED_TARGET_SCOPES[scope];
+    return (
+      <Field.Root flex={1} minWidth={0}>
+        <Field.Label fontSize="xs">{SCOPE_FIELD_LABEL[rule.scopeKind]}</Field.Label>
+        <FeatureFlagTargetPicker
+          kind={picked.kind}
+          multiple={picked.multiple}
+          target={rule.target}
+          directory={directory}
+          onChange={(target) => onChange({ target })}
+        />
+      </Field.Root>
+    );
+  }
 
   return (
     <Field.Root flex={1}>
       <Field.Label fontSize="xs">{SCOPE_FIELD_LABEL[rule.scopeKind]}</Field.Label>
       <Input
         size="sm"
-        type={SCOPE_FIELD_INPUT_TYPE[rule.scopeKind]}
+        type={SCOPE_FIELD_INPUT_TYPE[scope]}
         fontFamily={isNewUsers ? void 0 : "mono"}
         fontSize="xs"
-        placeholder={SCOPE_FIELD_PLACEHOLDER[rule.scopeKind]}
+        placeholder={SCOPE_FIELD_PLACEHOLDER[scope]}
         value={rule.target}
         disabled={rule.scopeKind === "EVERYONE"}
         onChange={(event) => onChange({ target: event.target.value })}

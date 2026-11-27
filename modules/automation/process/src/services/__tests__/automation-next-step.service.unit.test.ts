@@ -12,6 +12,7 @@ const pro: Plan = {
   free: false,
   maxMembers: 5,
   maxMembersLite: 5,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 10_000,
   canPublish: true,
   prices: { USD: 99, EUR: 99 },

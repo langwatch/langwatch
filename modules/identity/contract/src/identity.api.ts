@@ -110,6 +110,7 @@ import type {
 } from "./features/sso-domain/sso-domain-proof.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
 import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
+import type { RefusedSignInClassification, RefusedSignInInput } from "./refused-sign-in.ts";
 import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
 import type { OrganizationMfaStanding } from "./two-step-verification.ts";
 
@@ -808,6 +809,11 @@ export interface IdentityApi {
   routeSignIn(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision>;
+  /**
+   * Which organization and provider kind turned a sign-in away (`access_denied`); with a known
+   * address, records the refusal with the organization and answers whether it is out of seats.
+   */
+  classifyRefusedSignIn(input: RefusedSignInInput): Promise<RefusedSignInClassification>;
   /** Operations, not properties: a module boundary carries callable members only. */
   guards(): IdentityGuardsApi;
   mfaGuards(): MfaGuardsApi;

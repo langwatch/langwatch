@@ -12,6 +12,7 @@ import {
   type PersonalWorkspace,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
+import { codingAgentsPath } from "@langwatch/user-contract";
 
 type GatewayPersonalBudgetOptions = Readonly<{
   /** The caller's live personal keys in one organization, newest first. */
@@ -104,9 +105,10 @@ export class GatewayPersonalBudgetService {
       limit_usd: scope.limitUsd,
       spent_usd: scope.spentUsd,
     });
+    const requestPath = codingAgentsPath({ page: "budget/request", query: params });
 
     return {
-      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`,
+      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}${requestPath}`,
     };
   }
 }

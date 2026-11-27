@@ -22,6 +22,12 @@ Feature: Enterprise webhook endpoints
     And no webhook-specific entitlement service or plan repository is created
 
   @unit
+  Scenario: A woken endpoint stream flushes whatever its envelopes carry
+    Given an endpoint stream holds buffered envelopes whose data names no organisation
+    When the stream's coalescing delay is up and its wake fires
+    Then the stream asks to flush the endpoint under its own organisation
+
+  @unit
   Scenario: Delivery retry follows the stable ladder
     Given a webhook batch has failed
     Then the next attempt uses the declared retry delay

@@ -308,47 +308,88 @@ describe("InstantEvalJudgeRouterService", () => {
     });
 
     /** @scenario "A backend that is down falls back to its configured fallback" */
-    it("asks the fallback only the questions an LLM primary left unanswered, flagged", async () => {
+    it.each(["openai_responses", "gemini_generate_content"])(
+      "asks the fallback only the questions a %s primary left unanswered, flagged",
+      async (kind) => {
+        const table = syntheticRouteTable({
+          backends: { "llm-b": { kind, model: "llm-model-b", fallbacks: ["decision-b"] } },
+        });
+        const jevAsked: string[] = [];
+        const { classify } = harness({
+          table,
+          llm: (_signal, request) =>
+            request?.question.id === "q2"
+              ? {
+                  outcome: "skipped",
+                  reason: "classifier_provider_unavailable",
+                  inputTokens: 0,
+                  outputTokens: 0,
+                }
+              : llmSays(true),
+          jev: (_signal, asked = []) => {
+            jevAsked.push(...asked.map((question) => question.id));
+            return {
+              verdicts: asked.map((question) => ({ questionId: question.id, probability: 0.2 })),
+              inputTokens: 1000,
+              isTextTruncated: false,
+            };
+          },
+        });
+        const both = [Q, yesNo("q2", "is the user confused")];
+        const judgement = await classify({ ...SHORT, mode: "accurate" }, both);
+        expect(judgement.verdicts).toEqual([
+          { questionId: "q", probability: 1 },
+          { questionId: "q2", probability: 0.2 },
+        ]);
+        expect(jevAsked).toEqual(["q2"]);
+        expect(judgement.routing?.answeredBy).toEqual({ "llm-b": 1, "decision-b": 1 });
+        expect(judgement.routing?.flags).toEqual(
+          expect.arrayContaining([
+            "llm-b_partial:classifier_provider_unavailable",
+            "fallback:llm-b->decision-b",
+          ]),
+        );
+      },
+    );
+
+    /** @scenario "A backend that reasons waits long enough to write its output cap" */
+    it("sends a reasoning leg its own output cap, and an answer cut at it goes to the fallback, both billed", async () => {
       const table = syntheticRouteTable({
         backends: {
-          "llm-b": { kind: "openai_responses", model: "llm-model-b", fallbacks: ["decision-b"] },
+          "llm-b": {
+            kind: "openai_responses",
+            model: "llm-model-b",
+            reasoningEffort: "high",
+            maxOutputTokens: 1_100,
+            fallbacks: ["llm-a"],
+          },
         },
       });
-      const jevAsked: string[] = [];
-      const { classify } = harness({
+      const { classify, llmJudge } = harness({
         table,
+        decisions: () => judged(0.4),
         llm: (_signal, request) =>
-          request?.question.id === "q2"
+          request?.wire === "openai_responses"
             ? {
                 outcome: "skipped",
-                reason: "classifier_provider_unavailable",
-                inputTokens: 0,
-                outputTokens: 0,
+                reason: "classifier_failed",
+                inputTokens: 2000,
+                outputTokens: 1_100,
               }
-            : llmSays(true),
-        jev: (_signal, asked = []) => {
-          jevAsked.push(...asked.map((question) => question.id));
-          return {
-            verdicts: asked.map((question) => ({ questionId: question.id, probability: 0.2 })),
-            inputTokens: 1000,
-            isTextTruncated: false,
-          };
-        },
+            : llmSays(false),
       });
-      const both = [Q, yesNo("q2", "is the user confused")];
-      const judgement = await classify({ ...SHORT, mode: "accurate" }, both);
-      expect(judgement.verdicts).toEqual([
-        { questionId: "q", probability: 1 },
-        { questionId: "q2", probability: 0.2 },
-      ]);
-      expect(jevAsked).toEqual(["q2"]);
-      expect(judgement.routing?.answeredBy).toEqual({ "llm-b": 1, "decision-b": 1 });
-      expect(judgement.routing?.flags).toEqual(
-        expect.arrayContaining([
-          "llm-b_partial:classifier_provider_unavailable",
-          "fallback:llm-b->decision-b",
-        ]),
-      );
+      const judgement = await classify(SHORT);
+      expect(llmJudge.requests[0]).toMatchObject({
+        wire: "openai_responses",
+        reasoningEffort: "high",
+        maxOutputTokens: 1_100,
+        timeoutMs: 22_000,
+      });
+      expect(llmJudge.requests[1]).not.toHaveProperty("maxOutputTokens");
+      expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0 }]);
+      expect(judgement.routing?.flags).toEqual(expect.arrayContaining(["fallback:llm-b->llm-a"]));
+      // decision-a 1000 x 0.1, the cut llm-b 2000 x 1 + 1,100 x 5, llm-a 2000 x 2 + 100 x 8
+      expect(judgement.costNanoUsd).toBe(100_000 + 2_000_000 + 5_500_000 + 4_000_000 + 800_000);
     });
 
     it("rethrows the classifier's own refusal when nothing else answered, as unrouted calls do", async () => {

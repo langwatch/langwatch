@@ -80,12 +80,12 @@ func budgetConfig(spentMicroUSD int64, validUntil time.Time) domain.BundleConfig
 //
 // The fetch instant matters: an entry already fetched past its boundary has
 // asked its question, and the whole point of the one-shot rule is that it does
-// not ask again. Stamping it here rather than leaving storeL1's `now` is what
+// not ask again. Stamping it here rather than leaving seedL1's `now` is what
 // separates "the period ended after we read it" from "the boundary was already
 // behind us". Never later than now, so a period still running does not leave
 // the entry claiming a fetch in the future.
 //
-// budgetRollAckedFor is cleared for the same reason. storeL1 acks a boundary
+// budgetRollAckedFor is cleared for the same reason. seedL1 acks a boundary
 // that had already passed when it built the entry, which is right for a real
 // insert but wrong for the state being staged here: this entry stands for one
 // built while the period was still running, and such an entry starts unacked.
@@ -93,7 +93,7 @@ func seedBudgetEntry(t *testing.T, svc *Service, rawKey string, validUntil time.
 	t.Helper()
 	bundle := freshBundle("vk_budget", time.Now().Add(1*time.Hour))
 	bundle.Config = budgetConfig(5_000_000, validUntil)
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, etag)
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundle, etag)
 	e, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok, "the seeded entry must be in L1")
 
@@ -286,7 +286,7 @@ func TestResolve_NoBudgetBoundary_KeepsConditionalRefresh(t *testing.T) {
 
 	rawKey := "vk-lw-budget-none"
 	bundle := freshBundle("vk_nobudget", time.Now().Add(1*time.Hour))
-	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "42")
+	seedL1(svc, hashKey(domain.PresentedKey{Token: rawKey}), bundle, "42")
 
 	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)

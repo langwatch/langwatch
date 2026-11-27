@@ -7,12 +7,14 @@
 import type {
   InstantEvalClassification,
   InstantEvalJudgeApi,
+  InstantEvalJudgeCostCeiling,
   InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
 import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-judging.channel.ts";
 import { DeterministicInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judging.channel.ts";
 import { InstantEvalDecisionModelJudgeService } from "../instant-eval-decision-model-judge.service.ts";
 
@@ -32,8 +34,18 @@ const REQUEST = {
   questions: [{ id: "annoyed", kind: "boolean" as const, instructions: "Annoyed?" }],
 };
 
+/** A routed query's ceiling; these tests only check it is passed on or dropped, never call it. */
+const CEILING: InstantEvalJudgeCostCeiling = { hold: async () => true, settle: () => undefined };
+
+const ROUTED_REQUEST: InstantEvalClassifyRequest = {
+  ...REQUEST,
+  route: { job: "search" },
+  costCeiling: CEILING,
+};
+
 function harness(resolution: DecisionModelResolution) {
   const hostedCalls: string[] = [];
+  const hostedRequests: InstantEvalClassifyRequest[] = [];
   const ownCalls: InstantEvalClassification[] = [];
   const deterministic = DeterministicInstantEvalJudgeChannel.create();
   const hosted = {
@@ -41,6 +53,7 @@ function harness(resolution: DecisionModelResolution) {
     pricing: deterministic.pricing,
     classify: async (request: Parameters<typeof deterministic.classify>[0]) => {
       hostedCalls.push(request.projectId);
+      hostedRequests.push(request);
       return deterministic.classify(request);
     },
   };
@@ -62,11 +75,11 @@ function harness(resolution: DecisionModelResolution) {
       "ModelProviderApi",
     ),
   });
-  return { judge, hostedCalls, ownCalls };
+  return { judge, hostedCalls, hostedRequests, ownCalls };
 }
 
 describe("InstantEvalDecisionModelJudgeService", () => {
-  describe("when the project runs on LangWatch Instant Preview", () => {
+  describe("when the project runs on LangWatch Instant (preview)", () => {
     it("classifies with the deployment's judge", async () => {
       const { judge, hostedCalls, ownCalls } = harness({ kind: "langwatch" });
 
@@ -92,6 +105,31 @@ describe("InstantEvalDecisionModelJudgeService", () => {
         apiKey: "customer-key",
       });
       expect(await judge.isOwnDecisionModel({ projectId: "proj_1" })).toBe(true);
+    });
+  });
+
+  describe("given a routed query's request", () => {
+    /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+    it("passes the route and the ceiling on to the deployment's judge for LangWatch's model", async () => {
+      const { judge, hostedRequests } = harness({ kind: "langwatch" });
+
+      await judge.classify(ROUTED_REQUEST);
+
+      expect(hostedRequests).toHaveLength(1);
+      expect(hostedRequests[0]?.route).toEqual({ job: "search" });
+      expect(hostedRequests[0]?.costCeiling).toBe(CEILING);
+    });
+
+    /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+    it("sends an own decision model no route and no ceiling", async () => {
+      const { judge, hostedCalls, ownCalls } = harness(OWN);
+
+      await judge.classify(ROUTED_REQUEST);
+
+      expect(hostedCalls).toEqual([]);
+      expect(ownCalls).toHaveLength(1);
+      expect(ownCalls[0]).not.toHaveProperty("route");
+      expect(ownCalls[0]).not.toHaveProperty("costCeiling");
     });
   });
 

@@ -19,6 +19,10 @@ import { useFilterStore, useViewStore } from "../../../../behavior/explorer.stor
 import { type TimeRange } from "../../../../behavior/query.slice.ts";
 import { type LensConfig, getPersistedActiveLensId } from "../../../../behavior/view.slice.ts";
 import { getPresetById } from "../../../../features/explorer/behavior/time-range-presets.ts";
+import {
+  splitTourStep,
+  withTourStep,
+} from "../../../../model/explorer/onboarding/spotlights/spotlight-fragment.ts";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";
@@ -82,7 +86,7 @@ function runsForRestoredQuery({
 
 function readFragment(): string {
   if (typeof window === "undefined") return "";
-  return window.location.hash;
+  return splitTourStep(window.location.hash).rest;
 }
 
 /**
@@ -91,7 +95,10 @@ function readFragment(): string {
  */
 function writeFragment(fragmentBody: string, { asNewEntry }: { asNewEntry: boolean }): void {
   if (typeof window === "undefined") return;
-  const newHash = fragmentBody ? `#${fragmentBody}` : "";
+  // A running tour's step stays in the address beside the bar state.
+  const { step } = splitTourStep(window.location.hash);
+  const body = step ? withTourStep({ rest: fragmentBody, step }) : fragmentBody;
+  const newHash = body ? `#${body}` : "";
   const newURL = `${window.location.pathname}${window.location.search}${newHash}`;
   const currentURL = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (newURL === currentURL) return;

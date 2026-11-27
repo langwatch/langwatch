@@ -2,6 +2,7 @@ import type { SlackNoticeMessage } from "@langwatch/internal-slack";
 
 import type { OrganizationChannels } from "../organization.channels.ts";
 import { SignupAnnouncementChannel } from "../signup-announcement.channel.ts";
+import { MemoryAccessNoticeMailChannel } from "./memory.access-notice-mail.channel.ts";
 import { MemoryOrganizationInviteMailChannel } from "./memory.organization-invite-mail.channel.ts";
 
 /** Sign-up announcements and invites are recorded in-process for a test to read back. */
@@ -12,6 +13,7 @@ export class MemoryOrganizationChannels {
     return {
       signupAnnouncements: MemorySignupAnnouncementChannel.create(),
       inviteMail: MemoryOrganizationInviteMailChannel.create(),
+      accessNoticeMail: MemoryAccessNoticeMailChannel.create(),
     };
   }
 }

@@ -92,3 +92,23 @@ Feature: The gateway registers its own spend pipeline
     When the month's spend is read from the rollup
     Then the request's cost is counted once
     And the crossing it recorded carries that figure
+
+  # ClickHouse 26.8 reads an unquoted integer into DateTime64 as Unix seconds
+  # (ClickHouse #108091), so an epoch-millisecond OccurredAt lands at 9999-12-31.
+  @unit @regression
+  Scenario: A spend ledger row carries OccurredAt as an instant, not epoch milliseconds
+    Given a settled gateway request that occurred at a known instant
+    When the spend fold writes its ledger row to ClickHouse
+    Then the row sends OccurredAt as that instant in ISO form
+
+  @unit @regression
+  Scenario: A budget ledger debit carries OccurredAt as an instant, not epoch milliseconds
+    Given a budget debit that occurred at a known instant
+    When the budget ledger writes the debit to ClickHouse
+    Then the row sends OccurredAt as that instant in ISO form
+
+  @unit @regression
+  Scenario: A pulled-usage ledger row carries OccurredAt as an instant, not epoch milliseconds
+    Given provider usage pulled for a bucket that occurred at a known instant
+    When the budget ledger writes the pulled-usage row to ClickHouse
+    Then the row sends OccurredAt as that instant in ISO form

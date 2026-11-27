@@ -8,13 +8,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { FacetDisplayState } from "@langwatch/trace-contract";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  type FacetItem,
-  type FacetValueState,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { type FacetItem } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value.ts";
 import {
   MAX_EXPANDED_FACETS,
@@ -33,7 +31,7 @@ interface FacetSectionProps {
   icon?: React.ElementType;
   field: string;
   items: FacetItem[];
-  getValueState: (value: string) => FacetValueState;
+  getValueState: (value: string) => FacetDisplayState;
   onToggle: (field: string, value: string) => void;
   /** Force a value to excluded (`NOT field:value`) / back to neutral —
    * drives each row's trailing exclude (`−`) affordance. */
@@ -90,9 +88,9 @@ interface InactiveRowExtras {
  * unless the chevron overrode it, and an override lapses once the filter state
  * it was made against changes.
  */
-function useRowExpansion(getValueState: (value: string) => FacetValueState) {
+function useRowExpansion(getValueState: (value: string) => FacetDisplayState) {
   const [overrides, setOverrides] = useState<
-    Map<string, { open: boolean; against: FacetValueState }>
+    Map<string, { open: boolean; against: FacetDisplayState }>
   >(() => new Map());
   const isRowExpanded = useCallback(
     (value: string) => {
@@ -194,7 +192,7 @@ function useFacetLayout({
   baseItems: FacetItem[];
   searchQuery: string;
   showMore: boolean;
-  getValueState: (value: string) => FacetValueState;
+  getValueState: (value: string) => FacetDisplayState;
 }) {
   return useMemo(() => {
     const filtered = filterAndSortItems({ items: baseItems, searchQuery });

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { socialCardSourcesDigest } from "../features/discovery/compile.ts";
 import { directoryDigest, workspacePackages } from "./build-inputs.ts";
 
 /** Written by build.ts for the prerender: page keys, the cache folder and renderer threads. */
@@ -213,6 +214,7 @@ export async function pageRenderKeys({
     .update(lockfileDigest({ repoRoot }))
     .update(`${process.version} ${process.platform} ${process.arch}`)
     .update(`${path.relative(repoRoot, docsRoot)} ${path.relative(repoRoot, appRoot)}`)
+    .update(socialCardSourcesDigest())
     .digest("hex");
   const keys: Record<string, string> = {};
   for (const slug of slugs) {

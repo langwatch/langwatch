@@ -61,6 +61,7 @@ export type PersonalContext = {
   fullName: string;
   joinedOn: string;
   organizationName: string;
+  /** Empty until the organisation resolves. */
   organizationId: string;
   routingPolicyName: string | null;
   summary: PersonalSummary;
@@ -68,7 +69,7 @@ export type PersonalContext = {
   budgetOverview: PersonalBudgetOverview;
   spendByDay: { day: string; usd: number; billedUsd: number }[];
   spendByTool: { tool: string; usd: number; billedUsd: number }[];
-  /** Personal project the /me recent-activity table reads from + deep-links into. */
+  /** Personal project the /coding-agents recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
   /** Whether the personal project read has answered. */
@@ -103,7 +104,8 @@ export function usePersonalContext(): PersonalContext {
   const userEmail = currentUser?.email ?? "you@example.com";
   const userName = currentUser?.name ?? "You";
   const orgName = organization?.name ?? "Your organization";
-  const orgId = organization?.id ?? "org_unknown";
+  // Empty, never a placeholder id, until the org resolves: callers gate on `!!organizationId`.
+  const orgId = organization?.id ?? "";
 
   const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId: orgId },

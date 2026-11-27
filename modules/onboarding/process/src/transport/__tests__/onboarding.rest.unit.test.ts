@@ -7,6 +7,7 @@ import {
   createRestRuntime,
   canonicalErrorResponse,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import {
   GuidedOnboardingPathUnknownError,
   type OnboardingApi,
@@ -22,7 +23,13 @@ const ORGANIZATION = "organization-1";
 
 type Credential = { organizationId: string; userId: string | null };
 
-function mount(options: { credential?: Credential; onboarding?: Partial<OnboardingApi> } = {}) {
+function mount(
+  options: {
+    credential?: Credential;
+    onboarding?: Partial<OnboardingApi>;
+    permits?: (permission: string) => boolean;
+  } = {},
+) {
   const credential =
     options.credential === undefined
       ? { organizationId: ORGANIZATION, userId: "user-1" }
@@ -32,10 +39,20 @@ function mount(options: { credential?: Credential; onboarding?: Partial<Onboardi
     audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
-      authenticate: () => ({
-        actor: credential.userId ? { type: "user", id: credential.userId } : null,
-        scope: { tier: "project", id: PROJECT },
-      }),
+      /* The project door asks the route's permission of the credential, as the real one does. */
+      authenticate: ({ permission }: { permission: string }) => {
+        if (options.permits && !options.permits(permission)) {
+          throw new PermissionDeniedError({
+            permission: permission as AuthzPermission,
+            scope: { type: "project", id: PROJECT },
+            denialReason: "no-grant",
+          });
+        }
+        return {
+          actor: credential.userId ? { type: "user", id: credential.userId } : null,
+          scope: { tier: "project", id: PROJECT },
+        };
+      },
     },
   } as never).mount(onboardingRest.router(), {
     app: () => app,
@@ -129,6 +146,59 @@ describe("given a project whose organization recorded llmops and gateway", () =>
   });
 });
 
+describe("given Langy's governance opener was answered", () => {
+  describe("when the start is recorded with the project's credential", () => {
+    /** @scenario "the REST route records Langy's start for the project's organization" */
+    it("records the start on the project's organization and refuses an unknown start", async () => {
+      const recordLangyStart = vi.fn(async () => ({
+        paths: ["governance"],
+        donePaths: [],
+        langyStart: "call",
+      }));
+      const { send } = mount({ onboarding: { recordLangyStart: recordLangyStart as never } });
+
+      const response = await send("POST", "/api/onboarding/guided/start/call");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ langyStart: "call" });
+      expect(recordLangyStart).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        userId: "user-1",
+        start: "call",
+      });
+
+      const refused = await send("POST", "/api/onboarding/guided/start/meeting");
+
+      expect(refused.status).toBe(422);
+      await expect(refused.json()).resolves.toMatchObject({ code: "validation_error" });
+      expect(recordLangyStart).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given a key that holds only the project's read permissions", () => {
+  const readOnly = (permission: string) => permission.endsWith(":view");
+
+  /** @scenario "completing a path asks a write permission, so a read-only key cannot" */
+  it("reads the guided state but is refused 403 completing a path, writing nothing", async () => {
+    const getGuidedState = vi.fn(async () => ({ paths: [], donePaths: [], variant: null }));
+    const completePath = vi.fn();
+    const { send } = mount({
+      permits: readOnly,
+      onboarding: {
+        getGuidedState: getGuidedState as never,
+        completePath: completePath as never,
+      },
+    });
+
+    expect((await send("GET", "/api/onboarding/guided")).status).toBe(200);
+    const refused = await send("POST", "/api/onboarding/guided/paths/llmops/complete");
+
+    expect(refused.status).toBe(403);
+    expect(completePath).not.toHaveBeenCalled();
+  });
+});
+
 describe("given a project API key that names no user", () => {
   describe("when it reads the guided onboarding state", () => {
     it("reads the key's organization with no user, as main does", async () => {
@@ -165,10 +235,10 @@ describe("given a project API key that names no user", () => {
   });
 
   describe("given the published API document", () => {
-    it("leaves both guided routes out, because only Langy's CLI calls them", () => {
+    it("leaves every guided route out, because only Langy's CLI calls them", () => {
       const hidden = onboardingRest.router().routes.map((route) => route.docs?.hide);
 
-      expect(hidden).toEqual([true, true]);
+      expect(hidden).toEqual([true, true, true]);
     });
   });
 });

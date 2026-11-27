@@ -33,6 +33,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
+import { CODING_AGENT_ID_INDEXES } from "../clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const PRIVATE_ORGANIZATION = privateRouteOrgId("coding-agent-isolation-private");
@@ -80,11 +81,14 @@ function routedMember({ sharedUrl, privateUrl }: { sharedUrl: string; privateUrl
     router: createTenantRouter({ table, directory }),
     clientFactory: new VendorFactory(),
   });
+  const clickhouse = new ClickHouseQueryClient({
+    tenantGuard: new TenantGuard(),
+    driver: routingDriver(connection),
+  });
+  // Declared as the module's composition declares them, so an `{{idBound}}` marker expands.
+  clickhouse.declareIdIndexes({ indexes: CODING_AGENT_ID_INDEXES });
   const sessions = CodingAgentSessionClickHouseRepository.create({
-    clickhouse: new ClickHouseQueryClient({
-      tenantGuard: new TenantGuard(),
-      driver: routingDriver(connection),
-    }),
+    clickhouse,
     defaultTraceRetentionDays: 30,
     metrics: NoopCodingAgentReadMetricsService.create(),
     clock: { nowMs: () => Date.now() },

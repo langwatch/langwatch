@@ -10,6 +10,7 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -18,7 +19,9 @@ import {
   PayloadTooLargeError,
 } from "../../../channels/langevals.channel.ts";
 import { toLangevalsContexts } from "../../../rules/langevals-contexts.rules.ts";
+import { toLangevalsConversation } from "../../../rules/langevals-conversation.rules.ts";
 import type { EvaluationExecutionMetricsService } from "../../execution/services/evaluation-execution-metrics.service.ts";
+import type { LangevalsProviderSpendService } from "./langevals-provider-spend.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -83,6 +86,8 @@ interface LangevalsEvaluatorInput {
   readonly langevals: LangevalsChannel;
   readonly staging: LangevalsPayloadStaging;
   readonly telemetry?: Pick<EvaluationExecutionMetricsService, "record"> | undefined;
+  /** Where the provider usage an evaluation reports is written; absent writes nothing. */
+  readonly spend?: Pick<LangevalsProviderSpendService, "record"> | undefined;
 }
 
 /** Runs one installed evaluator over the langevals channel: retry, timeout and result mapping. */
@@ -95,12 +100,14 @@ export class LangevalsEvaluatorService {
   private readonly langevals: LangevalsChannel;
   private readonly staging: LangevalsPayloadStaging;
   private readonly telemetry: Pick<EvaluationExecutionMetricsService, "record"> | undefined;
+  private readonly spend: Pick<LangevalsProviderSpendService, "record"> | undefined;
 
   private constructor(input: LangevalsEvaluatorInput) {
     this.config = input.config;
     this.langevals = input.langevals;
     this.staging = input.staging;
     this.telemetry = input.telemetry;
+    this.spend = input.spend;
   }
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
@@ -156,8 +163,10 @@ export class LangevalsEvaluatorService {
 
     const duration = performance.now() - startTime;
     let results: BatchEvaluationResult;
+    let raw: unknown;
     try {
-      results = batchEvaluationResultSchema.parse(await response.json());
+      raw = await response.json();
+      results = batchEvaluationResultSchema.parse(raw);
     } catch (error) {
       this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
       throw new EvaluatorExecutionError("Unexpected response: invalid results", {
@@ -175,7 +184,30 @@ export class LangevalsEvaluatorService {
     }
 
     this.telemetry?.record({ evaluatorType, status: result.status, durationMs: duration });
+    await this.recordProviderUsage({ params, raw, durationMs: duration });
     return result;
+  }
+
+  /** Every result status was billed by the provider, so each one's usage is written. */
+  private async recordProviderUsage({
+    params,
+    raw,
+    durationMs,
+  }: {
+    params: LangevalsEvaluateParams;
+    raw: unknown;
+    durationMs: number;
+  }): Promise<void> {
+    if (!this.spend || !params.projectId || !Array.isArray(raw)) return;
+    const first: unknown = raw[0];
+    if (typeof first !== "object" || first === null || !("usage" in first)) return;
+    await this.spend.record({
+      usage: first.usage,
+      projectId: params.projectId,
+      requestType: "evaluation",
+      requestKey: params.idempotencyKey ?? generate("evaluation").toString(),
+      durationMs,
+    });
   }
 
   private async throwHttpFailure({
@@ -255,7 +287,7 @@ function evaluationBody({
         contexts: toLangevalsContexts(data.contexts),
         expected_contexts: toLangevalsContexts(data.expected_contexts),
         expected_output: convertTo(data.expected_output, "string"),
-        conversation: convertTo(data.conversation, "array"),
+        conversation: toLangevalsConversation(data.conversation),
       },
     ],
     settings: settings ?? {},
@@ -279,6 +311,8 @@ export type LangevalsEvaluateParams = Readonly<{
   settings: Record<string, unknown>;
   env: Record<string, string>;
   idempotencyKey?: string;
+  /** The project whose stored credentials ran the evaluator; its usage is billed there. */
+  projectId?: string;
   /** The caller's cancellation, combined with this client's own timeout. */
   signal?: AbortSignal | undefined;
 }>;

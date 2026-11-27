@@ -790,11 +790,12 @@ type Output = unknown;
 
 ### Pipeline `agent_lifecycle` (aggregate `agent`)
 
-Declared at `src/eventing/agent-lifecycle.pipeline.ts:29`. Events: `agentArchivedEventSchema`.
+Declared at `src/eventing/agent-lifecycle.pipeline.ts:33`. Events: `agentArchivedEventSchema`, `agentChangedEventSchema`.
 
 | Kind    | Name                  | Handles | Declared at                                   |
 | ------- | --------------------- | ------- | --------------------------------------------- |
-| command | `recordAgentArchived` | –       | `src/eventing/agent-lifecycle.pipeline.ts:34` |
+| command | `recordAgentArchived` | –       | `src/eventing/agent-lifecycle.pipeline.ts:38` |
+| command | `recordAgentChanged`  | –       | `src/eventing/agent-lifecycle.pipeline.ts:39` |
 
 ### Pipeline `agent_workflow_fields` (aggregate `global`)
 

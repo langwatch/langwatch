@@ -6,6 +6,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import {
+  accumulateLogTiming,
   type AnnotationAddedEvent,
   type AnnotationRemovedEvent,
   type AnnotationsBulkSyncedEvent,
@@ -36,8 +37,10 @@ import {
   MAX_PROCESSED_SPANS,
   spanStorabilityOf,
   UNSTORABLE_SPAN_SKIPPED,
+  traceFoldReadAnchorMs,
 } from "@langwatch/trace-contract";
 
+import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
@@ -92,7 +95,12 @@ interface LogContribution {
   traceId: string;
   input: string | null;
   output: string | null;
+  /** The record declared its output rather than having it inferred from a response. */
+  outputDeclared?: boolean;
   timeUnixMs: number;
+  correlationSource: LogContributedEvent["data"]["correlationSource"];
+  /** When the platform accepted the record: what its own time is checked against. */
+  acceptedAtMs: number;
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
 }
@@ -137,7 +145,7 @@ export class TraceSummaryFoldProjection
   readonly options = {
     refoldOnOutOfOrder: false,
     trustAbsentMiss: true,
-    readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
+    readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS, anchorOf: traceFoldReadAnchorMs },
     // Folds in arrival order already, so a redriven span folds late, not wrong (§9).
     onExhausted: "dead-letter",
   } as const;
@@ -215,6 +223,8 @@ export class TraceSummaryFoldProjection
       attributes: {},
       // storageAnchorMs frozen on first contribution (ADR-087)
       storageAnchorMs: 0,
+      // A trace never stored mints its id in the corrected layout (#9575)
+      idLayout: "v2",
       // events/costs removed (O(n^2) perf); occurredAt used for first-span detection
       occurredAt: 0,
     };
@@ -291,6 +301,7 @@ export class TraceSummaryFoldProjection
       scopeName: event.data.scopeName,
       body: event.data.body,
       attributes: event.data.attributes,
+      resourceAttributes: event.data.resourceAttributes,
     }).attributes;
 
     return TraceSummaryFoldProjection.applyLogContribution({
@@ -300,7 +311,11 @@ export class TraceSummaryFoldProjection
         traceId: event.data.traceId,
         input: logIO.input,
         output: logIO.output,
+        outputDeclared: logIO.outputDeclared === true,
         timeUnixMs: event.data.timeUnixMs,
+        // Only a record carrying its own trace context reaches this fold here.
+        correlationSource: "wire",
+        acceptedAtMs: event.occurredAt,
         liftedAttributes,
         // A log-only emitter has no per-span markers; the receiver stamps the
         // bundled flag on the log record's resource, so classify the whole
@@ -318,7 +333,10 @@ export class TraceSummaryFoldProjection
         traceId: event.data.traceId,
         input: event.data.input,
         output: event.data.output,
+        outputDeclared: event.data.outputDeclared === true,
         timeUnixMs: event.data.timeUnixMs,
+        correlationSource: event.data.correlationSource,
+        acceptedAtMs: event.occurredAt,
         liftedAttributes: event.data.liftedAttributes,
         nonBillable: event.data.nonBillable,
       },
@@ -477,7 +495,7 @@ export class TraceSummaryFoldProjection
         TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: state.outputFromRootSpan,
-          isExplicit: false,
+          isExplicit: contribution.outputDeclared === true,
           currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
           endTime: contribution.timeUnixMs,
           currentEndTime: outputSpanEndTimeMs,
@@ -485,7 +503,8 @@ export class TraceSummaryFoldProjection
       if (shouldReplace) {
         computedOutput = contribution.output;
         outputSpanEndTimeMs = contribution.timeUnixMs;
-        mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
+        mergedAttributes["langwatch.reserved.output_source"] =
+          contribution.outputDeclared === true ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED;
         delete mergedAttributes["langwatch.reserved.output_is_fallback"];
       }
     }
@@ -521,6 +540,7 @@ export class TraceSummaryFoldProjection
       if (perCallKeys.has(key)) {
         continue;
       }
+      if (LOG_FILL_ONLY_KEYS.has(key) && mergedAttributes[key]) continue;
 
       mergedAttributes[key] = String(value);
     }
@@ -601,10 +621,24 @@ export class TraceSummaryFoldProjection
       models: totals.models,
     });
 
+    // Frozen before the log timing seeds `occurredAt`, so the anchor is the accept time the
+    // analytics fold freezes too: one partition and TTL address for the trace (ADR-071).
+    const { storageAnchorMs } = anchorStorageTime({
+      state,
+      eventOccurredAtMs: contribution.acceptedAtMs,
+    });
+
     return {
       ...state,
+      storageAnchorMs,
       traceId: state.traceId || contribution.traceId,
       ...io,
+      ...accumulateLogTiming({
+        state,
+        correlationSource: contribution.correlationSource,
+        timeUnixMs: contribution.timeUnixMs,
+        acceptedAtMs: contribution.acceptedAtMs,
+      }),
       attributes: mergedAttributes,
       ...totals,
     };

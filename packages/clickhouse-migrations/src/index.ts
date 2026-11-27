@@ -15,6 +15,8 @@ export type {
 
 export {
   appliedMigrationVersions,
+  DIMENSION_COMPAT_PROBE,
+  dimensionCompatSettingFor,
   getMigrateStatus,
   getMigrateVersion,
   migrateDown,

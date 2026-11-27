@@ -66,15 +66,8 @@ packages = ["langevals"]
 
 [tool.uv]
 exclude-newer = "7 days"
-# Emergency exceptions to the 7-day age gate (dev/docs/best_practices/
-# dependency-age-gates.md), each scoped by timestamp to the one patched
-# release a CRITICAL advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
-# closes 28 advisories, three of them critical; certifi 2026.10.19 (uploaded
-# 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
-# those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
-# 2026-10-28): a timestamp here then holds the package back, not forward.
+# uv 0.9.25+ supports the exclude-newer-package emergency exceptions (dev/docs/best_practices/dependency-age-gates.md).
 required-version = ">=0.9.25"
-exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
 override-dependencies = [
   # The langchain family is on the 1.x line, where the advisories affecting it
   # are fixed. Each floor is the highest first-patched version across the
@@ -92,10 +85,9 @@ override-dependencies = [
   # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
   # server-side file read; patched in 0.8.18.
   "langsmith>=0.8.18",
-  # Force a patched strawberry-graphql. The highest fix across its advisories
-  # is 0.327.2 (a HIGH covering <=0.326.0 and a LOW below 0.327.2).
-  # arize-phoenix pins strawberry exactly, so without this the pin decides
-  # the version.
+  # strawberry-graphql: the highest fix across its advisories is 0.327.2 (a
+  # HIGH covering <=0.326.0 and a LOW below 0.327.2). Nothing here pulls it
+  # today; the floor makes any dependency that brings it back take a fixed one.
   "strawberry-graphql>=0.327.2",
   "pydantic-settings>=2.14.2", # security: pydantic-settings advisory (#1517)
   # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
@@ -118,15 +110,18 @@ override-dependencies = [
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
-  # closed in 3.10.1 and 3.10.3.
-  "nltk>=3.10.3",
-  # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
-  # (CRITICAL) and further advisories, all fixed by 1.9.1.
+  # closed in 3.10.1 and 3.10.3, then the critical and high advisories fixed in
+  # 3.10.4 (GHSA-x8q7-6c7m-52gw and others).
+  "nltk>=3.10.4",
+  # authlib: JWS empty-signature validation (CRITICAL) and further advisories,
+  # all fixed by 1.9.1. Nothing here pulls it today; the floor holds if one does.
   "authlib>=1.9.1",
-  # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0.
-  "dnspython>=2.9.0",
-  # pyasn1 decoder DoS on crafted BER/DER input.
-  "pyasn1>=0.6.4",
+  # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0, then GHSA-vvf4-9x63-8xvv,
+  # fixed in 2.9.2.
+  "dnspython>=2.9.2",
+  # pyasn1 decoder DoS on crafted BER/DER input, then the decoder advisories
+  # fixed in 0.6.5.
+  "pyasn1>=0.6.5",
   # aiohttp request smuggling and header-parsing advisories, then no initial
   # request/header timeout and unbounded memory/CPU use (#2851-#2853).
   "aiohttp>=3.14.4",
@@ -134,42 +129,41 @@ override-dependencies = [
   "cryptography>=50.0.0",
   # h2 HTTP/2 control-frame flood DoS.
   "h2>=4.4.1",
-  # setuptools path traversal in PackageIndex.
-  "setuptools>=83.0.0",
+  # setuptools path traversal in PackageIndex, and the advisory covering <84.1.0 (#3203).
+  "setuptools>=84.1.0",
   # torch: deserialization advisory in torch.load.
   "torch>=2.13.0",
-  # tornado: HTTP header and multipart parsing advisories.
-  "tornado>=6.5.9",
+  # tornado: HTTP header, multipart and chunked body advisories (#3331-#3333),
+  # then the triple-slash open redirect covering <=6.6.0 (GHSA-5cjw-f85j-cv6r).
+  "tornado>=6.6.1",
   # httpx2: two advisories fixed in 2.11.0 and one in 2.12.0.
   "httpx2>=2.12.0",
   #
   # NOT fixed here, deliberately:
   #   ragas, diskcache: no patched release exists upstream yet.
-  #   nltk: GHSA-j456-xh4h-cpf2 (high) is fixed in 3.10.4, and 3.10.4 also
-  #   sandboxes the model-artifact paths of GHSA-8mgp-746c-j5xp, which names
-  #   no fix. 3.10.4 (uploaded 2026-10-21) is inside the age gate, neither
-  #   advisory is a 0-day or exploited, and langevals reaches nltk only through
-  #   rouge-score's stemmer. Raise the floor to 3.10.4 from 2026-10-29.
 ]
 
 # Security floors that only need to raise a version. Constraints add to the
 # requirements already in the tree; an override would replace them, extras
 # and upper bounds included.
 constraint-dependencies = [
+  # fastmcp-slim: post-transform component authorization skipped on direct calls (#3202).
+  # Capped below 4: 4.x is a major with its own fixes, and a bare floor lets a relock float onto it.
+  "fastmcp-slim>=3.4.10,<4",
   "fsspec>=2026.6.0", # fsspec advisory covering <2026.6.0
   "datasets>=5.0.1", # datasets advisory covering <5.0.1; 4.x also caps fsspec below its fix
   "mako>=1.4.2", # Mako advisory covering <=1.4.1
   "multidict>=6.9.1", # multidict advisory covering 6.7.0-6.9.0
-  "langgraph-sdk>=0.4.4", # langgraph-sdk advisory covering <=0.4.3
-  # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
-  # openai extra needs openai>=3.8.0, whose jiter requirement every
-  # instructor release (a dependency of the notebooks and tutorials) excludes
-  # with `jiter<0.15`. The advisories fixed in 2.44.0, 2.52.0 and 2.53.0 stay
-  # open until instructor lifts that cap. Without this floor in range the
-  # resolver satisfies a higher one by walking arize-phoenix back to 14.x.
-  "pydantic-ai-slim>=2.30.0",
+  "langgraph-sdk>=0.4.6", # langgraph-sdk advisories covering <=0.4.3 and 0.4.0-0.4.5 (#3301)
+  "langgraph>=1.2.14", # LangGraph SDK v3 streaming identifiers advisory (#3302)
+  "joserfc>=1.7.7", # joserfc advisories covering <1.7.5 (high) and <1.7.6, then JWE recipients and compact JWS size (#3364, #3365)
+  "filelock>=4.2.1", # filelock lock-file advisories covering <=4.2.0 (#3303, #3304)
+  # pydantic-ai-slim advisories covering <2.53.0 (#2770-#2772, #2774, #2775). Nothing
+  # here needs it now; a dependency that pulls it back must take a fixed release.
+  "pydantic-ai-slim>=2.53.0",
   "certifi>=2026.10.19", # certifi advisory covering <2026.10.19 (GHSA-6q48-6c7w-9gw2, critical)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2828)
+  "opentelemetry-api>=1.45.2", # quadratic-time traceparent parsing covering <=1.45.1 (#3465)
 ]
 
 [tool.uv.workspace]

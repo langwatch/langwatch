@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
 import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys.ts";
@@ -289,7 +289,7 @@ export class BlobSweeper {
   }: {
     dryRun?: boolean;
   } = {}): Promise<BlobSweepReport> {
-    const startedAt = nowInstant().epochMilliseconds;
+    const startedAt = nowEpochMs();
     const totals = emptyTally();
     const queues: BlobSweepReport["queues"] = [];
 
@@ -307,7 +307,7 @@ export class BlobSweeper {
       queues,
       totals,
       dryRun,
-      durationMs: nowInstant().epochMilliseconds - startedAt,
+      durationMs: nowEpochMs() - startedAt,
     };
     if (totals.reclaimed > 0 || totals.repaired > 0 || totals.truncated) {
       logger.info(

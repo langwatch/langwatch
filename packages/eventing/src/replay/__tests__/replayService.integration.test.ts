@@ -16,6 +16,7 @@ import type {
   StateProjectionDefinition,
   StateProjectionStore,
 } from "../../projections/stateProjection.types.ts";
+import { eventSourcingClaimsIndex } from "../replayClaimsIndex.ts";
 import { COMPLETED_KEY_PREFIX, CUTOFF_KEY_PREFIX } from "../replayConstants.ts";
 import type {
   CutoffInfo,
@@ -229,7 +230,11 @@ describe("ReplayService", () => {
   });
 
   function serviceOver(events: ReplayEvent[]): ReplayService {
-    return new ReplayService({ eventSource: new MemoryEventSource(events), redis });
+    return new ReplayService({
+      eventSource: new MemoryEventSource(events),
+      redis,
+      claims: eventSourcingClaimsIndex({ redis, isReady: async () => true }),
+    });
   }
 
   function trackMarkers(projectionName: string): void {

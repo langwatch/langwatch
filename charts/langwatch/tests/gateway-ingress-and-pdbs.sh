@@ -130,9 +130,9 @@ test_gateway_host_on_the_app_ingress() {
   else
     ok "gateway no nginx" "no ingress-nginx annotations on an envoy class"
   fi
-  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "2" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
-      && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
-    ok "gateway backend" "/v1 and /health route to the lw-gateway Service"
+  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "3" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
+      && printf '%s\n' "$doc" | grep -q 'path: /a2a$' && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
+    ok "gateway backend" "/v1, /a2a and /health route to the lw-gateway Service"
   else
     fail "gateway backend" "the gateway paths do not route to lw-gateway"
   fi
@@ -189,6 +189,38 @@ test_nginx_settings_on_the_gateway_host() {
     ok "nginx app untouched" "the app Ingress keeps its own annotations"
   else
     fail "nginx app untouched" "the app Ingress lost its annotations"
+  fi
+}
+
+# @scenario "an nginx app Ingress waits longer than an analytics query"
+test_nginx_timeouts_on_the_app_ingress() {
+  local app
+  render appnginx "${APP_INGRESS[@]}" --set ingress.className=nginx \
+    --set-string 'ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout=300'
+  app=$(doc_named appnginx lw-ingress)
+  if printf '%s\n' "$app" | grep -q 'proxy-read-timeout: "120"'; then
+    ok "nginx app timeout" "120s read timeout on the app Ingress"
+  else
+    fail "nginx app timeout" "the nginx app Ingress has no 120s read timeout: $(cat "$tmp/appnginx.err")"
+  fi
+  if printf '%s\n' "$app" | grep -q 'proxy-body-size: 64m'; then
+    ok "nginx app body size" "64m body size on the app Ingress"
+  else
+    fail "nginx app body size" "the nginx app Ingress keeps ingress-nginx's 1m body default"
+  fi
+  if printf '%s\n' "$app" | grep -q 'proxy-send-timeout: "300"'; then
+    ok "nginx app override" "ingress.annotations wins over the app default"
+  else
+    fail "nginx app override" "ingress.annotations did not override the app send timeout"
+  fi
+  render appenvoy "${APP_INGRESS[@]}" --set ingress.className=envoy
+  app=$(doc_named appenvoy lw-ingress)
+  if [ -z "$app" ]; then
+    fail "envoy app timeout" "no lw-ingress rendered: $(cat "$tmp/appenvoy.err")"
+  elif printf '%s\n' "$app" | grep -q 'nginx.ingress.kubernetes.io'; then
+    fail "envoy app timeout" "an envoy app Ingress carries ingress-nginx annotations"
+  else
+    ok "envoy app timeout" "no ingress-nginx annotations on an envoy app Ingress"
   fi
 }
 
@@ -327,6 +359,7 @@ test_redis_receives_sigterm() {
 test_default_install_has_no_ingress
 test_gateway_host_on_the_app_ingress
 test_nginx_settings_on_the_gateway_host
+test_nginx_timeouts_on_the_app_ingress
 test_gateway_host_without_ingress_is_refused
 test_gateway_host_without_gateway_is_refused
 test_retired_gateway_ingress_values_are_refused

@@ -16,6 +16,10 @@ on:
       - ".github/workflows/langwatch-chart.yml"
       - "tools/chartheap/**"
       - "cmd/chartheap/**"
+      - "tools/charts3region/**"
+      - "cmd/charts3region/**"
+      - "tools/chartnumbers/**"
+      - "cmd/chartnumbers/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -37,7 +41,7 @@ on:
       # stage dangling, the build stayed green, and the container would have
       # died on its first import.
       - "infra/docker/Dockerfile"
-      - "infra/docker/Dockerfile.go_service"
+      - "infra/docker/Dockerfile.go-services"
       - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
@@ -54,6 +58,10 @@ on:
       - ".github/workflows/langwatch-chart.yml"
       - "tools/chartheap/**"
       - "cmd/chartheap/**"
+      - "tools/charts3region/**"
+      - "cmd/charts3region/**"
+      - "tools/chartnumbers/**"
+      - "cmd/chartnumbers/**"
       # Where the processes declare what they read. The shutdown deadline must
       # agree with the pod's grace period (workers-shutdown.sh), and every
       # variable the chart sets must still be declared somewhere
@@ -75,7 +83,7 @@ on:
       # stage dangling, the build stayed green, and the container would have
       # died on its first import.
       - "infra/docker/Dockerfile"
-      - "infra/docker/Dockerfile.go_service"
+      - "infra/docker/Dockerfile.go-services"
       - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
@@ -118,6 +126,7 @@ jobs:
       actions: write
     outputs:
       e2e: ${{ steps.e2e-paths.outputs.e2e }}
+      behavioral: ${{ steps.e2e-paths.outputs.behavioral }}
     defaults:
       run:
         working-directory: charts/langwatch
@@ -151,10 +160,18 @@ jobs:
               - "charts/lib/**"
               - ".github/workflows/langwatch-chart.yml"
               - "infra/docker/Dockerfile"
-              - "infra/docker/Dockerfile.go_service"
+              - "infra/docker/Dockerfile.go-services"
               - "infra/clickhouse-serverless/**"
               - ".dockerignore"
               - "pnpm-workspace.yaml"
+            # The behavioral suites read the rendered langwatch chart. A config
+            # declaration or Dockerfile change still runs every render
+            # assertion above, and main runs them on every merge.
+            behavioral:
+              - "charts/langwatch/**"
+              - "charts/lib/**"
+              - ".github/workflows/langwatch-chart.yml"
+              - "pnpm-lock.yaml"
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -185,8 +202,16 @@ jobs:
           render() {
             local name="$1"
             shift
-            if helm template lw . "$@" >/dev/null 2>"${RUNNER_TEMP}/${name}.err"; then
-              echo "ok    ${name}"
+            if helm template lw . "$@" >"${RUNNER_TEMP}/${name}.out" 2>"${RUNNER_TEMP}/${name}.err"; then
+              # Helm reads YAML numbers as float64, so `quote` on 18000000
+              # renders "1.8e+07" and an integer parser refuses it.
+              if grep -nE '"[0-9.]+e[+-][0-9]+"' "${RUNNER_TEMP}/${name}.out" >"${RUNNER_TEMP}/${name}.err"; then
+                echo "FAIL  ${name}: a number rendered in exponent form (pipe it through int64)"
+                sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
+                failed+=("${name}")
+              else
+                echo "ok    ${name}"
+              fi
             else
               echo "FAIL  ${name}"
               sed 's/^/        /' "${RUNNER_TEMP}/${name}.err"
@@ -202,6 +227,7 @@ jobs:
           render ha+ingress+replicated --set autogen.enabled=true -f examples/overlays/size-ha.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/clickhouse-replicated.yaml
           render langy-gvisor --set autogen.enabled=true -f examples/overlays/langy-gvisor.yaml
           render langy-disabled --set autogen.enabled=true -f examples/overlays/langy-disabled.yaml
+          render pii-redaction-model --set autogen.enabled=true --set piiRedactionModel.enabled=true
           render prod+external-ch --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/clickhouse-external.yaml
           render prod+ext-pg+ext-redis --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/postgres-external.yaml -f examples/overlays/redis-external.yaml
 
@@ -229,6 +255,12 @@ jobs:
       - name: "assert the redis-valkey overlay swaps only the image"
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh
+
+      # The PII redaction model: off in every profile, sized in prod/HA, and
+      # PII_REDACTION_MODEL_ENDPOINT on the app and workers only when enabled.
+      - name: "assert the PII redaction model wiring"
+        if: "!cancelled()"
+        run: ./tests/pii-redaction-model.sh
 
       # An install taking existing agent objects over in place needs the
       # chart to render their selector, which can never change on a live
@@ -275,6 +307,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      # A name set in both app and workers extraEnvs must render once on the
+      # workers container: helm upgrade's patch refuses a duplicate env name.
+      - name: "assert workers carry no duplicate extraEnvs name"
+        if: "!cancelled()"
+        run: ./tests/workers-extra-envs.sh
+
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
@@ -297,6 +335,20 @@ jobs:
         if: "!cancelled()"
         working-directory: .
         run: go run ./cmd/chartheap -prove-node infra/docker/Dockerfile
+
+      # Helm loads a values-file number as float64 and prints 1e6 or more as
+      # "1.8e+07", which the agent cannot parse. `--set` never shows it.
+      - name: "assert langyagent numbers render as digits"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/chartnumbers
+
+      # The awsS3 provider's region must reach every container that carries the
+      # S3 settings; without it a keyed client signs for the wrong region.
+      - name: "assert the S3 region reaches every process"
+        if: "!cancelled()"
+        working-directory: .
+        run: go run ./cmd/charts3region
 
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
@@ -330,6 +382,12 @@ jobs:
       - name: "assert ingress is opt-in and disruption budgets allow drains"
         if: "!cancelled()"
         run: ./tests/gateway-ingress-and-pdbs.sh
+
+      # Uploads through LangWatch (#9666): the upload route gets its own
+      # Ingress sized for files, and the upload setting reaches app and workers.
+      - name: "assert the stored-object upload route and setting render"
+        if: "!cancelled()"
+        run: ./tests/stored-object-uploads-ingress.sh
 
       # Argo CD renders with no cluster access and as revision 1 every time.
       # With autogen off and operator Secrets the render must be stable, take
@@ -403,10 +461,13 @@ jobs:
   behavioral:
     name: "behavioral (rendered-output assertions)"
     # Skipped on a draft or release-please PR, like the e2e legs below, unless labelled
-    # `ci:full`. No `changes` gate to read `heavy` from, so the check is inline.
+    # `ci:full`, and on a pull request that changes neither the chart nor the
+    # modules these suites test (render's behavioral filter).
+    needs: render
     if: >-
       (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || needs.render.outputs.behavioral == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older cache copies.
     permissions:
@@ -516,7 +577,7 @@ jobs:
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
-        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go_service ../..
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go-services --target gateway ../..
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}

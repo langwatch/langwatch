@@ -8,6 +8,7 @@ import type { AuthSessionCacheRepository } from "../../repositories/auth-session
 import type {
   AuthSessionRepository,
   BrowserSessionRecord,
+  LapsedImpersonation,
   SessionExpiry,
   StoredBrowserSession,
 } from "../../repositories/auth-session.repository.ts";
@@ -59,6 +60,7 @@ const LIVE_SESSION: StoredBrowserSession = {
 class Sessions implements AuthSessionRepository {
   countSignedInUsers = vi.fn().mockResolvedValue(0);
   countSignedInUsersAmong = vi.fn().mockResolvedValue(0);
+  findSessionUsersSince = vi.fn().mockResolvedValue([]);
   stored: StoredBrowserSession | null = LIVE_SESSION;
   records: readonly BrowserSessionRecord[] = [];
   readonly deletedAll = vi.fn().mockResolvedValue(2);
@@ -106,6 +108,14 @@ class Sessions implements AuthSessionRepository {
   async writeImpersonation(): Promise<void> {}
 
   async clearImpersonation(): Promise<void> {}
+
+  async findLapsedImpersonations(): Promise<readonly LapsedImpersonation[]> {
+    return [];
+  }
+
+  async clearLapsedImpersonation(): Promise<boolean> {
+    return false;
+  }
 
   async findAmrForSession(): Promise<string[]> {
     return [];

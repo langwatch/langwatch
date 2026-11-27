@@ -12,6 +12,7 @@ import { z } from "zod";
 import { bodyText, bodyType } from "../rules/canonical-log-correlation.rules.ts";
 import {
   canonicalPayloadParts,
+  logRedactionRecordKey,
   serializeCanonicalPayload,
 } from "../rules/canonical-log-payload.rules.ts";
 import { collectStringRefs, type StringRef } from "../rules/canonical-log-strings.rules.ts";
@@ -29,6 +30,8 @@ export interface LogRedaction {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      /** The record's own key, which the PII redaction model's priced request is derived from. */
+      recordKey?: string;
     },
     piiRedactionLevel: LogPiiRedactionLevel,
     tenantId?: string,
@@ -157,6 +160,7 @@ export class CanonicalLogService {
         redaction,
         piiRedactionLevel: args.piiRedactionLevel,
         tenantId: args.tenantId,
+        recordKey: logRedactionRecordKey({ log: logRecord, acceptedAt }),
       });
       tally.accepted.push(
         CanonicalLogService.buildRecord({
@@ -202,6 +206,7 @@ export class CanonicalLogService {
     redaction: LogRedactionService;
     piiRedactionLevel: PIIRedactionLevel;
     tenantId: string;
+    recordKey: string;
   }) {
     const refs: StringRef[] = [];
     collectStringRefs({
@@ -221,7 +226,13 @@ export class CanonicalLogService {
       ),
     );
     await args.redaction.redactLog(
-      { body: "", attributes, resourceAttributes: {}, attributeNames },
+      {
+        body: "",
+        attributes,
+        resourceAttributes: {},
+        attributeNames,
+        recordKey: args.recordKey,
+      },
       args.piiRedactionLevel,
       args.tenantId,
     );

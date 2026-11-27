@@ -10,6 +10,8 @@ export type MemoryOrganizationUsage = Readonly<{
   currentMonthCost: number;
   /** The projects the organization owns, and what each has spent this month. */
   projectCosts: Readonly<Record<string, number>>;
+  /** A project's name by id; absent, the project is named by its id. */
+  projectNames?: Readonly<Record<string, string>>;
   /** The rollup the spend reader answers, per user allowed to see it. */
   spendByUserId: Readonly<Record<string, readonly ProjectSpendRollup[]>>;
   /** Organization's columns entitlement reads; absent reads as the schema's default. */

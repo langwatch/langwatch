@@ -18,13 +18,15 @@ import {
 } from "../../../model/directory-tabs.ts";
 import { useOrganizationHost, type OrganizationHostApi } from "../../../model/organization-host.ts";
 import { PermissionAlert } from "../../elements/permission-alert.tsx";
+import { SeatRequestsCard } from "../seat-requests-card.tsx";
 import DepartmentsScreen from "./departments.screen.tsx";
 import GroupsScreen from "./groups.screen.tsx";
 import MembersScreen from "./members.screen.tsx";
 import TeamsScreen from "./teams.screen.tsx";
 
-/** Every tab reads membership, so the page takes the permission the tabs take. */
-const DIRECTORY_PERMISSION = "organization:manage";
+/** Every role reads who is here; the other tabs and every edit stay with a manager. */
+const DIRECTORY_PERMISSION = "members:view";
+const MANAGE_PERMISSION = "organization:manage";
 
 export default function DirectoryScreen() {
   const host = useOrganizationHost();
@@ -64,7 +66,7 @@ function Directory({
   return (
     <>
       <PageLayout.Header description="Who is in this organization, how they got here, and which system says so.">
-        <PageLayout.Heading>Directory</PageLayout.Heading>
+        <PageLayout.Heading>Users</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={3} width="full" align="stretch">
         {/* The status band reads what the directory has been doing: sso:view. */}
@@ -76,6 +78,7 @@ function Directory({
 
         <DirectoryTabs
           organizationId={organizationId}
+          canManage={host.hasOrganizationPermission(MANAGE_PERMISSION)}
           tab={tab}
           onSelectTab={selectTab}
           departmentCount={departmentsShown ? department.departments.length : undefined}
@@ -88,36 +91,52 @@ function Directory({
 /** Only the open tab is mounted: a closed tab holds no read open behind it. */
 function DirectoryTabs({
   organizationId,
+  canManage,
   tab,
   onSelectTab,
   departmentCount,
 }: {
   organizationId: string;
+  canManage: boolean;
   tab: DirectoryTab;
   onSelectTab: (next: string) => void;
   /** Undefined where the Departments tab is not offered to this reader. */
   departmentCount: number | undefined;
 }) {
-  const counts = useDirectoryTabCounts({ organizationId, enabled: true });
+  const counts = useDirectoryTabCounts({ organizationId, enabled: canManage });
+  const people = {
+    value: "people",
+    label: "People",
+    count: counts.people,
+    content: (
+      <VStack paddingTop={3} gap={3} align="stretch">
+        <SeatRequestsCard />
+        <MembersScreen />
+      </VStack>
+    ),
+  };
+  if (!canManage) {
+    return (
+      <ContentTabs
+        label="Users"
+        value="people"
+        onValueChange={({ value }) => onSelectTab(value)}
+        mount="active"
+        body="flush"
+        items={[people]}
+      />
+    );
+  }
 
   return (
     <ContentTabs
-      label="Directory"
+      label="Users"
       value={tab}
       onValueChange={({ value }) => onSelectTab(value)}
       mount="active"
       body="flush"
       items={[
-        {
-          value: "people",
-          label: "People",
-          count: counts.people,
-          content: (
-            <Box paddingTop={3}>
-              <MembersScreen />
-            </Box>
-          ),
-        },
+        people,
         {
           value: "teams",
           label: "Teams & projects",

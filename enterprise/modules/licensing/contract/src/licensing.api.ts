@@ -22,6 +22,7 @@ import type {
 } from "./connect-install.ts";
 import type {
   ConnectService,
+  IssuedLicenseChain,
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
@@ -129,12 +130,14 @@ export interface LicensingApi {
     id: string;
     operatorId: string;
     reason: string;
+    unusedOnly?: boolean;
   }): Promise<IssuedLicenseView>;
   /** Signs a replacement for a license, held until the install presents it. */
   reissueLicense(input: {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the new term ends. */
     expiresAt: string;
@@ -155,6 +158,8 @@ export interface LicensingApi {
     operatorId: string;
   }): Promise<IssuedLicenseView>;
   getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
+  /** The reissue chain the license belongs to, the newest first. */
+  getIssuedLicenseChain(input: { id: string }): Promise<IssuedLicenseChain>;
   listIssuedLicenses(
     input: {
       page: number;
@@ -170,6 +175,8 @@ export interface LicensingApi {
   }): Promise<ConnectCredentialResolution>;
   /** The `licence_token` door's check on a sync bearer; a refusal throws its code. */
   verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
+  /** The sync door's check: as above, but an expired license may collect its waiting renewal. */
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
   /** The door's check on an activation bearer: looked up, never claimed (W02-ACTIVATE-DOOR). */
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller>;
   /** One daily sync from the install its door verified; a refusal throws its code. */
@@ -244,6 +251,10 @@ export interface LicensingApi {
 
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
+  /** Full member seats an organization uses now: active members and live invitations. */
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number>;
+  /** Developer seats an organization uses now: Developer members and live invitations. */
+  countDevelopersInUse(input: { organizationId: string }): Promise<number>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats>;
   /** Every seat change that raised a linked license, oldest first; one customer's when named. */

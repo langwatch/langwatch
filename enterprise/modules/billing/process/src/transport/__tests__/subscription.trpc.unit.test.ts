@@ -28,8 +28,17 @@ const findLastNonCancelledSubscription =
 const previewProration = vi.fn<BillingSubscriptionApi["previewProration"]>();
 const notifyProspective = vi.fn<BillingSubscriptionApi["notifyProspective"]>();
 const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
+const developerSeats = vi.fn<BillingSubscriptionApi["developerSeats"]>();
+const previewDeveloperSeats = vi.fn<BillingSubscriptionApi["previewDeveloperSeats"]>();
+const setDeveloperSeats = vi.fn<BillingSubscriptionApi["setDeveloperSeats"]>();
+const paymentRecovery = vi.fn<BillingSubscriptionApi["paymentRecovery"]>();
+const paymentRecoveryDetails = vi.fn<BillingSubscriptionApi["paymentRecoveryDetails"]>();
+const paymentRecoveryPayLink = vi.fn<BillingSubscriptionApi["paymentRecoveryPayLink"]>();
 
 const billing: BillingSubscriptionApi = {
+  paymentRecovery,
+  paymentRecoveryDetails,
+  paymentRecoveryPayLink,
   getOrCreateCustomerId,
   updateSubscriptionItems,
   createOrUpdateSubscription,
@@ -38,6 +47,9 @@ const billing: BillingSubscriptionApi = {
   previewProration,
   notifyProspective,
   listInvoices,
+  developerSeats,
+  previewDeveloperSeats,
+  setDeveloperSeats,
 };
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
@@ -75,11 +87,17 @@ describe("given the mounted subscription router", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "addTeamMemberOrEvents",
         "create",
+        "developerSeats",
         "getLastSubscription",
         "listInvoices",
         "manage",
+        "paymentRecovery",
+        "paymentRecoveryDetails",
+        "paymentRecoveryPayLink",
+        "previewDeveloperSeats",
         "previewProration",
         "prospective",
+        "setDeveloperSeats",
       ]);
     });
 
@@ -94,11 +112,17 @@ describe("given the mounted subscription router", () => {
       expect(kinds).toEqual({
         addTeamMemberOrEvents: "mutation",
         create: "mutation",
+        developerSeats: "query",
         getLastSubscription: "query",
         listInvoices: "query",
         manage: "mutation",
+        paymentRecovery: "query",
+        paymentRecoveryDetails: "query",
+        paymentRecoveryPayLink: "mutation",
+        previewDeveloperSeats: "query",
         previewProration: "query",
         prospective: "mutation",
+        setDeveloperSeats: "mutation",
       });
     });
   });
@@ -106,20 +130,101 @@ describe("given the mounted subscription router", () => {
 
 describe("given a caller who may read the organization but not manage it", () => {
   describe("when a change to what the organization pays is asked for", () => {
-    it("refuses the change and still answers the read", async () => {
+    /** @scenario "A Billing member approves seat requests but cannot invite" */
+    it("refuses the change and the invoices, and still answers the read", async () => {
       const viewer = routerFor((permission) => permission === "organization:view").createCaller({
         actor: { id: "user_ana" },
         email: "ana@acme.com",
       });
 
-      listInvoices.mockResolvedValue([]);
+      findLastNonCancelledSubscription.mockResolvedValue(null);
 
       await expect(
         viewer.create({ organizationId: ORGANIZATION, baseUrl: "https://app", plan: "PRO" }),
       ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
-      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).resolves.toEqual([]);
+      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).rejects.toMatchObject({
+        cause: { code: "permission_denied" },
+      });
+      await expect(
+        viewer.getLastSubscription({ organizationId: ORGANIZATION }),
+      ).resolves.toBeNull();
       expect(createOrUpdateSubscription).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("given an organization with an open recovery case", () => {
+  describe("when a member without subscription management asks for the case details", () => {
+    /** @scenario "Only people who can manage the subscription read the recovery case" */
+    it("refuses the details and the pay link, and still answers whether it is paused", async () => {
+      const viewer = routerFor((permission) => permission === "organization:view").createCaller({
+        actor: { id: "user_ana" },
+        email: "ana@acme.com",
+      });
+      paymentRecovery.mockResolvedValue({ state: "paused" });
+
+      await expect(
+        viewer.paymentRecoveryDetails({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(
+        viewer.paymentRecoveryPayLink({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(viewer.paymentRecovery({ organizationId: ORGANIZATION })).resolves.toEqual({
+        state: "paused",
+      });
+      expect(paymentRecoveryDetails).not.toHaveBeenCalled();
+      expect(paymentRecoveryPayLink).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a member who may upgrade but not manage the organization", () => {
+  const member = routerFor(
+    (permission) => permission === "organization:view" || permission === "subscription:upgrade",
+  ).createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+  /** @scenario "A Member starts a checkout for an organization without a subscription" */
+  it("starts a checkout", async () => {
+    createOrUpdateSubscription.mockResolvedValue({ url: "https://checkout" });
+
+    await expect(
+      member.create({
+        organizationId: ORGANIZATION,
+        baseUrl: "https://app",
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        membersToAdd: 2,
+      }),
+    ).resolves.toEqual({ url: "https://checkout" });
+  });
+
+  /** @scenario "A Member cannot open the billing portal" */
+  it("is refused the billing portal", async () => {
+    await expect(
+      member.manage({ organizationId: ORGANIZATION, baseUrl: "https://app" }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(createBillingPortalSession).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A Member cannot change the seats of a live subscription" */
+  it("is refused a seat change on the live subscription", async () => {
+    await expect(
+      member.addTeamMemberOrEvents({
+        organizationId: ORGANIZATION,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        upgradeMembers: true,
+        upgradeTraces: false,
+        totalMembers: 1,
+        totalTraces: 0,
+      }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(updateSubscriptionItems).not.toHaveBeenCalled();
+  });
+
+  it("is refused a Developer seat change", async () => {
+    await expect(
+      member.setDeveloperSeats({ organizationId: ORGANIZATION, quantity: 2 }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(setDeveloperSeats).not.toHaveBeenCalled();
   });
 });
 
@@ -143,6 +248,7 @@ describe("when a first checkout is started", () => {
       organizationId: ORGANIZATION,
     });
     expect(createOrUpdateSubscription).toHaveBeenCalledWith({
+      startedByUserId: "user_ana",
       organizationId: ORGANIZATION,
       baseUrl: "https://app",
       plan: "PRO",

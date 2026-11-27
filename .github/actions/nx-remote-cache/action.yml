@@ -1,0 +1,62 @@
+# Turns on the Nx remote cache in S3 (specs/ci/nx-remote-cache.feature) for the rest of
+# the job. Main and same-repository pull requests assume their own role by OIDC, so the
+# job needs `id-token: write`; any other event, or a role that cannot be assumed, leaves
+# Nx on its local cache. The role's credentials reach only the cache server, never a step.
+name: nx-remote-cache
+description: Point Nx at the shared S3 task cache when this event may use it.
+
+inputs:
+  account-id:
+    description: The lw-dev AWS account id (secret NX_CACHE_AWS_ACCOUNT_ID). Empty leaves Nx on its local cache.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Pick the cache role
+      id: role
+      shell: bash
+      env:
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+        SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        ACTOR: ${{ github.actor }}
+        ACCOUNT_ID: ${{ inputs.account-id }}
+      run: |
+        role=""
+        if [ -z "$ACCOUNT_ID" ]; then
+          echo "arn=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "::add-mask::$ACCOUNT_ID"
+        if [ "$REF" = refs/heads/main ] && [ "$EVENT" = push ]; then
+          role="arn:aws:iam::$ACCOUNT_ID:role/langwatch-nx-cache-ci-main"
+        elif [ "$EVENT" = pull_request ] && [ "$SAME_REPO" = true ] && [ "$ACTOR" != "dependabot[bot]" ]; then
+          role="arn:aws:iam::$ACCOUNT_ID:role/langwatch-nx-cache-ci-pr"
+        fi
+        echo "arn=$role" >> "$GITHUB_OUTPUT"
+
+    - name: Assume the cache role
+      id: aws
+      if: steps.role.outputs.arn != ''
+      continue-on-error: true
+      uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      with:
+        role-to-assume: ${{ steps.role.outputs.arn }}
+        role-session-name: nx-cache-${{ github.run_id }}-${{ github.run_attempt }}
+        role-duration-seconds: 10800
+        aws-region: eu-central-1
+        output-credentials: true
+        output-env-credentials: false
+        retry-max-attempts: 2
+
+    - name: Start the cache server
+      if: steps.aws.outcome == 'success'
+      shell: bash
+      env:
+        NX_CACHE_AWS_ACCESS_KEY_ID: ${{ steps.aws.outputs.aws-access-key-id }}
+        NX_CACHE_AWS_SECRET_ACCESS_KEY: ${{ steps.aws.outputs.aws-secret-access-key }}
+        NX_CACHE_AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
+        NX_CACHE_AWS_CREDENTIAL_EXPIRATION: ${{ steps.aws.outputs.aws-expiration }}
+      run: node dev/nx/remote-cache/launch.mjs

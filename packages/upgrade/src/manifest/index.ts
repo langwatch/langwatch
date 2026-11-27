@@ -12,6 +12,7 @@ export type { ManifestStep, ReleaseManifest, ReleaseVersion } from "./manifest.t
 export { loadReleases, parseManifests, RELEASES_DIRECTORY } from "./manifest-loader.ts";
 export {
   gooseStepId,
+  isPrismaMigrationFolder,
   ownerFromTables,
   prismaStepId,
   stampRelease,

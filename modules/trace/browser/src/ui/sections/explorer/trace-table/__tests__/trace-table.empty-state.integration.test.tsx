@@ -55,6 +55,10 @@ let mockGrouping: "flat" | "by-conversation" = "flat";
 // rewrites when the server refused it as too complex.
 const mockFilterState = {
   queryText: "",
+  // The debounced copy the eval chips are resolved from; no run is registered.
+  debouncedQueryText: "",
+  debouncedTimeRange: { from: 1_000, to: 2_000 },
+  evalRuns: {} as Record<string, string>,
   timeRange: { from: Date.now() - 3600000, to: Date.now(), label: "Last 1h" },
   clearAll: vi.fn(),
   setTimeRange: vi.fn(),
@@ -92,6 +96,7 @@ vi.mock("../../../../../behavior/explorer.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
+      projectId: "proj-1",
       sort: { columnId: "timestamp", direction: "desc" },
     }),
   useExplorerStore: (selector: (s: unknown) => unknown) =>
@@ -162,9 +167,21 @@ vi.mock("../query-breakdown-chips.tsx", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
+import { resolveInstantEvalChips } from "@langwatch/trace-contract";
 import type React from "react";
 
+import { useInstantEvalRunStore } from "../../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import { TraceTable } from "../trace-table.tsx";
+
+/** The query's chips, as the table resolves them. */
+function chipsOf(queryText: string) {
+  return resolveInstantEvalChips({
+    queryText,
+    lensId: "all-traces",
+    window: mockFilterState.debouncedTimeRange,
+    runsByKey: {},
+  }).chips;
+}
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 
@@ -176,6 +193,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGrouping = "flat";
   mockFilterState.queryText = "";
+  mockFilterState.debouncedQueryText = "";
+  mockFilterState.evalRuns = {};
+  useInstantEvalRunStore.setState({ typedQuestions: {} });
   mockTraceListResult = {
     data: [],
     totalHits: 0,
@@ -277,8 +297,73 @@ describe("<TraceTable /> empty-state gating", () => {
   });
 });
 
+describe("<TraceTable /> pending NOT eval chip", () => {
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it.each([
+    ['NOT eval:"the user is annoyed"', "typed", true],
+    ['status:error AND NOT eval:"the user is annoyed"', "typed", true],
+    ['NOT eval.trace:"the user is annoyed"', "never typed", true],
+    ['eval:"the user is annoyed" AND NOT status:error', "typed", false],
+    ["NOT eval:my_evaluator", "never typed", false],
+  ])(
+    "with %s %s here, shows the not-judged state instead of rows: %s",
+    (queryText, typed, notJudged) => {
+      mockFilterState.debouncedQueryText = queryText;
+      if (typed === "typed") {
+        for (const { question } of chipsOf(queryText)) {
+          useInstantEvalRunStore.getState().markTyped({ projectId: "proj-1", question });
+        }
+      }
+      mockTraceListResult = {
+        ...mockTraceListResult,
+        data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
+        totalHits: 1,
+      };
+
+      renderTable();
+
+      expect(screen.queryByTestId("empty-filter-state") !== null).toBe(notJudged);
+      expect(screen.queryByTestId("trace-lens-body") !== null).toBe(!notJudged);
+    },
+  );
+
+  /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+  it("shows a chip a NOT reaches across an OR as not judged, even with its run registered", () => {
+    const queryText = 'NOT eval:"the user is annoyed" OR status:error';
+    mockFilterState.debouncedQueryText = queryText;
+    mockFilterState.evalRuns = Object.fromEntries(
+      chipsOf(queryText).map((chip) => [chip.key, "run-1"]),
+    );
+    mockTraceListResult = {
+      ...mockTraceListResult,
+      data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
+      totalHits: 1,
+    };
+
+    renderTable();
+
+    expect(screen.getByTestId("empty-filter-state")).toBeInTheDocument();
+  });
+});
+
 describe("<TraceTable /> failed-read gating", () => {
   describe("given the server refused the query as too complex", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("shows the failure and its fix, not the not-judged state, under a pending NOT chip", () => {
+      mockFilterState.queryText = 'NOT eval.trace:"the user is annoyed" AND one two three';
+      mockFilterState.debouncedQueryText = mockFilterState.queryText;
+      mockTraceListResult = {
+        ...mockTraceListResult,
+        isError: true,
+        error: { data: { error: { code: "filter_too_complex", httpStatus: 422 } } },
+      };
+
+      renderTable();
+
+      expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Search it as one phrase" })).toBeInTheDocument();
+    });
+
     /** @scenario "A sentence past the term ceiling offers to search it as one phrase" */
     it("offers a one-click fix that requotes the bare words and searches again", () => {
       mockFilterState.queryText =

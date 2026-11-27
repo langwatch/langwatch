@@ -8,8 +8,8 @@ import { MissingValue } from "../ui/elements/cells/missing-value.tsx";
 
 /**
  * How often the session had to throw context away, and how often it had to
- * pay for a cache it had already built. A session that did neither says so
- * with the same placeholder every other absent value uses.
+ * pay for a cache it had already built, both at one size. A session that did
+ * neither says so with the same placeholder every other absent value uses.
  */
 export const CompactionsCell: React.FC<{ row: SessionListRow }> = ({ row }) => {
   if (row.compactions === 0 && row.cacheRebuildCount === 0) {
@@ -43,7 +43,7 @@ export const CompactionsCell: React.FC<{ row: SessionListRow }> = ({ row }) => {
           </Text>
         ) : null}
         {row.cacheRebuildCount > 0 ? (
-          <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
+          <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
             {row.cacheRebuildCount}{" "}
             {row.cacheRebuildCount === 1 ? "cache rebuild" : "cache rebuilds"}
           </Text>

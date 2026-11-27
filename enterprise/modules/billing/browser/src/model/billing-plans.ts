@@ -1,5 +1,6 @@
 /** Billing plan constants; pricing from Stripe catalog. */
 
+import { getGrowthRetentionLabel } from "@langwatch/data-retention-contract";
 import {
   Currency,
   formatPrice,
@@ -23,27 +24,46 @@ export const currencySymbol: Record<Currency, string> = {
   [Currency.USD]: "$",
 };
 
+/** Beside a Cloud price: the provider adds VAT on top where the buyer owes it. */
+export const EXCLUDING_VAT = "excl. VAT";
+
+/** The events a Growth plan includes each month before overage. */
+export const GROWTH_INCLUDED_EVENTS = 200_000;
+
+/** What each further 100,000 events costs on Growth, in cents of the currency. */
+export const growthOverageCentsPer100k = (currency: Currency): number =>
+  currency === Currency.EUR ? 500 : 600;
+
 /** Returns the per-100K events pricing string for the given currency. */
 const growthEventsPricingString = (currency: Currency): string =>
-  currency === Currency.EUR
-    ? "\u20AC5 per additional 100,000 events"
-    : "$6 per additional 100,000 events";
+  `${formatPrice({ cents: growthOverageCentsPer100k(currency), currency })} per additional 100,000 events`;
+
+/** What one GB a month of storage beyond the retention Growth includes costs, in cents. */
+export const retentionStorageCentsPerGb = (currency: Currency): number =>
+  currency === Currency.EUR ? 300 : 400;
 
 const growthRetentionPricingString = (currency: Currency): string =>
   currency === Currency.EUR
-    ? "30 days retention (+ custom at \u20AC3/GB)"
-    : "30 days retention (+ custom at $4/GB)";
+    ? "90 days retention (+ custom at \u20AC3/GB)"
+    : "90 days retention (+ custom at $4/GB)";
+
+/** The retention line: what the organization keeps when known, else the 90 days Growth includes. */
+export const growthRetentionFeature = (retentionDays?: number): string => {
+  if (retentionDays === undefined) return "90 days retention";
+  if (retentionDays === 0) return "Unlimited retention";
+  return `${getGrowthRetentionLabel(retentionDays)} retention`;
+};
 
 /**
  * Growth plan features for upgrade block.
  * Accepts a currency so the events pricing line is accurate.
  */
-export const getGrowthFeatures = (currency: Currency): string[] => [
-  "Up to 20 core users",
-  "200,000 events included",
+export const getGrowthFeatures = (currency: Currency, retentionDays?: number): string[] => [
+  "Volume discounts above 20 users",
+  `${formatNumber(GROWTH_INCLUDED_EVENTS)} events included`,
   growthEventsPricingString(currency),
   "Unlimited lite users",
-  "30 days retention",
+  growthRetentionFeature(retentionDays),
   "Unlimited evals",
   "Private Slack support",
 ];
@@ -56,7 +76,7 @@ export const FREE_PLAN_FEATURES = [
   "50,000 events included",
   "14 days data retention",
   "2 users",
-  "3 scenarios, 3 simulations, 3 custom evals",
+  "3 scenarios, 3 custom evals, 100 scenario runs a month",
   "Community support",
 ];
 
@@ -69,7 +89,7 @@ export const getGrowthPlanFeatures = (currency: Currency): string[] => [
   "200,000 events included",
   growthEventsPricingString(currency),
   growthRetentionPricingString(currency),
-  "Up to 20 core users (volume discount available)",
+  "Volume discounts above 20 users",
   "Unlimited lite users",
   "Unlimited evals, simulations and prompts",
   "Slack support",

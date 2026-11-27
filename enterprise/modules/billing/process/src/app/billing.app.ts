@@ -7,16 +7,22 @@ import {
   billingConfig,
   BillingPriceCatalogue,
   billingSecrets,
+  stripePricesFile,
   type BillingServerConfig,
   type BillingAuditRecordedEventData,
   type BillingStaff,
   type BillingDisplayInvoice,
   type ConnectedAddCommitRequest,
+  type DeveloperSeatQuote,
+  type DeveloperSeats,
   type Currency,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
   type CurrencyRequest,
   type DetectedCurrency,
+  type PaymentRecoveryDetails,
+  type PaymentRecoveryPayLink,
+  type PaymentRecoverySummary,
   type ConnectedBillingAccountView,
   type ConnectedBillingOverview,
   ConnectedBillingUnavailableError,
@@ -27,6 +33,8 @@ import {
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ResourceLimitNotifierInput,
+  type RetentionStorageOutcome,
+  type RetentionStorageReport,
   type SubscriptionPlanInput,
   type BillingPricingModel,
 } from "@langwatch/enterprise-billing-contract";
@@ -46,8 +54,10 @@ import type { BillingSubscriptionNotifier } from "../channels/billing-subscripti
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import type { PaymentRecoveryEmailChannel } from "../channels/payment-recovery-email.channel.ts";
 import { SlackBillingSubscriptionNotifierChannel } from "../channels/slack/slack.billing-subscription-notifier.channel.ts";
 import { SlackBillingWebhookHostChannel } from "../channels/slack/slack.billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
@@ -63,8 +73,10 @@ import { ConnectedSeatChangeService } from "../features/connected-billing/servic
 import { ConnectedUsageCeilingService } from "../features/connected-billing/services/connected-usage-ceiling.service.ts";
 import { LicensePurchaseDeliveryService } from "../features/license-purchase/services/license-purchase-delivery.service.ts";
 import { LicensePurchaseService } from "../features/license-purchase/services/license-purchase.service.ts";
+import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import { priceLineOf } from "../rules/price-line.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
   planLimitCooldown,
@@ -72,25 +84,42 @@ import {
   resourceLimitCooldown,
 } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
+import type { LicensePurchaseHandler } from "../services/billing-license-webhook.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
+import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
-import {
-  EEWebhookService,
-  type LicensePurchaseHandler,
-} from "../services/billing-stripe-webhook.service.ts";
+import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
+import {
+  DeveloperSeatService,
+  type DevelopersInUseCounter,
+} from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { OverPlanService } from "../services/over-plan.service.ts";
+import {
+  PaymentRecoveryService,
+  type PaymentRecoverySweepOutcome,
+} from "../services/payment-recovery.service.ts";
+import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
+import { RetentionStorageBillingService } from "../services/retention-storage-billing.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import {
+  type SeatLineRepairOutcome,
+  SeatLineRepairService,
+} from "../services/seat-line-repair.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
-import { BillingSubscriptionService } from "../services/subscription.service.ts";
+import {
+  BillingSubscriptionService,
+  type SeatsInUseCounter,
+} from "../services/subscription.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -114,7 +143,12 @@ type BillingSetup = FeatureSetup<
 /** The license registry's view of a customer's terms and seats. */
 type ConnectedLicensing = Pick<
   LicensingApi,
-  "getContractTerms" | "raiseContractCommit" | "getConnectedSeats" | "findSeatChanges"
+  | "getContractTerms"
+  | "raiseContractCommit"
+  | "getConnectedSeats"
+  | "findSeatChanges"
+  | "countFullSeatsInUse"
+  | "countDevelopersInUse"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -135,8 +169,19 @@ type StripeWebhookComposition = Readonly<{
   host: BillingWebhookHost;
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
+  /** Delivers a renewed licence subscription's next term, as a purchase is; absent without the key. */
+  licenseRenewal?: Pick<LicensePurchaseService, "mintRenewal" | "sendRenewal">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
+  /** Failed payment recovery's mail and links; absent, a failed renewal opens no case. */
+  recovery?: PaymentRecoveryComposition;
+}>;
+
+type PaymentRecoveryComposition = Readonly<{
+  emails: PaymentRecoveryEmailChannel;
+  publicBaseUrl: string;
+  /** Billing role holders are told too; absent, admins only. */
+  billingMembers?: Pick<AuthzApi, "listBillingMembers">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -148,6 +193,9 @@ type SubscriptionComposition = Readonly<{
 type SubscriptionDoor = Readonly<{
   customers: CustomerService;
   subscriptions: BillingSubscriptionService;
+  seatLines: SeatLineRepairService;
+  developerSeats: DeveloperSeatService;
+  retentionStorage: RetentionStorageBillingService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -199,7 +247,7 @@ export class BillingModule
     };
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices, stamps);
     const lifecycle = BillingLifecycleAnnouncerService.create({
-      subscriptions: setup.repositories.webhookSubscriptions,
+      subscriptions: setup.repositories.subscriptions,
       organizations: setup.repositories.organizations,
       resourceLimitAlerts,
       planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
@@ -211,6 +259,7 @@ export class BillingModule
       repositories: setup.repositories,
       config: setup.config,
       peers: setup.dependencies,
+      billingRoles: setup.dependencies.authorization,
       stripe,
       usageReporting: () =>
         StripeUsageReportingBuilder.create({
@@ -225,6 +274,12 @@ export class BillingModule
         host: SlackBillingWebhookHostChannel.create({ notices }),
         licenses: setup.dependencies.licensing,
         licensePurchase,
+        licenseRenewal: licensePurchase,
+        recovery: {
+          emails: channels.paymentRecoveryEmail,
+          publicBaseUrl: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+          billingMembers: setup.dependencies.authorization,
+        },
       },
       subscription: {
         notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
@@ -332,6 +387,7 @@ export class BillingModule
     webhook,
     subscription,
     lifecycle,
+    billingRoles,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -344,10 +400,13 @@ export class BillingModule
       | "organizationPricing"
       | "webhookSubscriptions"
       | "webhookOrganizations"
+      | "licenseRenewalClaims"
       | "seatEventSubscriptions"
       | "organizations"
       | "gatewaySpend"
       | "projects"
+      | "paymentRecovery"
+      | "overPlan"
     >;
     config: Pick<
       BillingServerConfig,
@@ -368,6 +427,8 @@ export class BillingModule
     subscription?: SubscriptionComposition;
     /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
     lifecycle?: BillingLifecycleAnnouncerService;
+    /** Hands the Billing role to a checkout's starter; absent where a suite composes none. */
+    billingRoles?: CheckoutBillingRoles;
   }): BillingModule {
     const { isSaas, nodeEnvironment } = config;
     const repository = repositories.connectedBilling;
@@ -383,13 +444,24 @@ export class BillingModule
       facts,
       licensing: peers.licensing,
     });
+    const subscriptionPlans = SaaSPlanProviderService.create({
+      subscriptions: repositories.subscriptions,
+      isSaas,
+    });
+    const overPlan = isSaas
+      ? OverPlanService.create({
+          marks: repositories.overPlan,
+          organizations: repositories.organizations,
+          isOnFree: async (organizationId) =>
+            (await subscriptionPlans.getActivePlan(organizationId)).free,
+          ...(lifecycle ? { facts: lifecycle } : {}),
+        })
+      : void 0;
     const gate = {
       authorization: peers.authorization,
       overview,
-      subscriptionPlans: SaaSPlanProviderService.create({
-        subscriptions: repositories.subscriptions,
-        isSaas,
-      }),
+      subscriptionPlans,
+      overPlan,
       isSaas,
       resourceLimitAlerts,
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
@@ -400,6 +472,7 @@ export class BillingModule
         usageWarnings,
         nodeEnvironment,
         usageReporting: isSaas ? usageReporting : void 0,
+        stripeSubscriptions: stripe?.channels.subscriptions,
       }),
     };
     if (!stripe) {
@@ -409,8 +482,25 @@ export class BillingModule
         connected: void 0,
         stripeWebhook: BillingModule.#undispatchedWebhook(),
         subscriptions: void 0,
+        paymentRecovery: void 0,
       });
     }
+
+    const recovery = webhook?.recovery;
+    const paymentRecovery =
+      webhook && recovery && isSaas
+        ? PaymentRecoveryService.create({
+            recoveries: repositories.paymentRecovery,
+            subscriptions: repositories.webhookSubscriptions,
+            organizations: repositories.organizations,
+            ...(recovery.billingMembers ? { billingMembers: recovery.billingMembers } : {}),
+            invoices: stripe.channels.invoices,
+            emails: recovery.emails,
+            alerts: webhook.host,
+            publicBaseUrl: recovery.publicBaseUrl,
+            ...(overPlan ? { overPlan } : {}),
+          })
+        : void 0;
 
     const invoicing = stripe.channels.connectedInvoicing;
     const { licensing } = peers;
@@ -441,8 +531,12 @@ export class BillingModule
             licensePaymentLinkId: config.licensePaymentLinkId,
             connectedBilling: billing,
             announcer: lifecycle,
+            billingRoles,
+            paymentRecovery,
+            overPlan,
           })
         : BillingModule.#undispatchedWebhook(),
+      paymentRecovery,
       subscriptions:
         subscription && isSaas
           ? BillingModule.#composeSubscriptions({
@@ -450,6 +544,7 @@ export class BillingModule
               stripe,
               nodeEnvironment,
               repositories,
+              seatsInUse: licensing,
             })
           : void 0,
       connected: {
@@ -490,18 +585,21 @@ export class BillingModule
     stripe,
     nodeEnvironment,
     repositories,
+    seatsInUse,
   }: {
     subscription: SubscriptionComposition;
     stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
+    seatsInUse: SeatsInUseCounter & DevelopersInUseCounter;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
     >;
   }): SubscriptionDoor {
-    const prices = BillingPriceCatalogue.create(
+    const catalogue = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
-    ).prices;
+    );
+    const { prices } = catalogue;
     const stripeErrors = StripeErrorTranslatorService.create();
     const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
     return {
@@ -521,6 +619,26 @@ export class BillingModule
         }),
         notifier: subscription.notifier,
         stripeErrors,
+        seatsInUse,
+      }),
+      seatLines: SeatLineRepairService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
+      }),
+      developerSeats: DeveloperSeatService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
+        unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
+        seatsInUse,
+      }),
+      retentionStorage: RetentionStorageBillingService.create({
+        subscriptions: repositories.seatEventSubscriptions,
+        stripeSubscriptions,
+        meters: stripe.channels.meters,
+        prices,
+        isMeterProvisioned: catalogue.meters.RETENTION_STORAGE_GB !== undefined,
       }),
     };
   }
@@ -552,7 +670,19 @@ export class BillingModule
     totalTraces: number;
     quotedAt?: number;
   }): Promise<{ success: boolean }> {
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      // The seat drawer always sends upgradeMembers; only more seats than today are held.
+      adding: () => this.#addsSeats({ ...input, newTotalSeats: input.totalMembers }),
+    });
     return this.#subscriptionDoor.subscriptions.updateSubscriptionItems(input);
+  }
+
+  async #addsSeats(input: { organizationId: string; newTotalSeats: number }): Promise<boolean> {
+    const current = await this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
+      input.organizationId,
+    );
+    return input.newTotalSeats > (current?.maxMembers ?? 0);
   }
 
   async createOrUpdateSubscription(input: {
@@ -564,6 +694,8 @@ export class BillingModule
     customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
+    startedByUserId?: string;
+    retentionDays?: number;
   }): Promise<{ url: string | null }> {
     return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
   }
@@ -586,7 +718,35 @@ export class BillingModule
     organizationId: string;
     newTotalSeats: number;
   }): Promise<unknown> {
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      adding: () => this.#addsSeats(input),
+    });
     return this.#subscriptionDoor.subscriptions.previewProration(input);
+  }
+
+  async developerSeats(input: { organizationId: string }): Promise<DeveloperSeats> {
+    return this.#subscriptionDoor.developerSeats.developerSeats(input);
+  }
+
+  async previewDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+  }): Promise<DeveloperSeatQuote> {
+    return this.#subscriptionDoor.developerSeats.previewDeveloperSeats(input);
+  }
+
+  async setDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+    quotedAt?: number;
+  }): Promise<{ success: boolean }> {
+    const developerSeats = this.#subscriptionDoor.developerSeats;
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      adding: async () => input.quantity > (await developerSeats.developerSeats(input)).quantity,
+    });
+    return developerSeats.setDeveloperSeats(input);
   }
 
   async notifyProspective(input: {
@@ -608,6 +768,7 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     customerEmail: string | null;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
     const customerId = await this.getOrCreateCustomerId({
@@ -615,6 +776,12 @@ export class BillingModule
       organizationId: input.organizationId,
     });
     return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
+  }
+
+  /** Off Cloud, or where no payment provider is composed, nothing is billed for storage. */
+  async recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome> {
+    if (!this.#subscriptions) return { line: "skipped", reportedGbMonths: null };
+    return this.#subscriptions.retentionStorage.record(input);
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -631,19 +798,40 @@ export class BillingModule
     licensePaymentLinkId,
     connectedBilling,
     announcer,
+    billingRoles,
+    paymentRecovery,
+    overPlan,
   }: {
+    paymentRecovery: PaymentRecoveryService | undefined;
+    overPlan: OverPlanService | undefined;
     announcer: BillingLifecycleAnnouncerService | undefined;
+    /** The Billing role a completed checkout hands its starter. */
+    billingRoles: CheckoutBillingRoles | undefined;
     webhook: StripeWebhookComposition;
     isSaas: boolean;
     stripe: BillingStripe;
     nodeEnvironment: string | undefined;
-    repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
+    repositories: Pick<
+      BillingRepositories,
+      "webhookSubscriptions" | "webhookOrganizations" | "licenseRenewalClaims"
+    >;
     licensePaymentLinkId: string | undefined;
     connectedBilling: ConnectedBillingService;
   }): StripeWebhookReceiptService {
     const prices = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
     ).prices;
+    const renewalIssuer = webhook.licenseRenewal;
+    const licenseRenewal =
+      licensePaymentLinkId && renewalIssuer
+        ? LicenseRenewalService.create({
+            licensePaymentLinkId,
+            subscriptions: repositories.webhookSubscriptions,
+            stripeSubscriptions: stripe.channels.subscriptions,
+            claims: repositories.licenseRenewalClaims,
+            issuer: renewalIssuer,
+          })
+        : undefined;
     const events = EEWebhookService.create({
       subscriptionRepository: repositories.webhookSubscriptions,
       organizationRepository: repositories.webhookOrganizations,
@@ -652,9 +840,13 @@ export class BillingModule
       licensePaymentLinkId,
       licenses: webhook.licenses,
       licensePurchaseHandler: webhook.licensePurchase,
+      ...(licenseRenewal ? { licenseRenewal } : {}),
       host: webhook.host,
       connectedBilling,
+      ...(billingRoles ? { billingRoles } : {}),
       ...(announcer ? { announcer } : {}),
+      ...(paymentRecovery ? { recovery: paymentRecovery } : {}),
+      ...(overPlan ? { overPlan } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -693,8 +885,12 @@ export class BillingModule
   readonly #reporting: BillingReportingPipeline;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
+  readonly #paymentRecovery: PaymentRecoveryService | undefined;
+  readonly #overPlan: OverPlanService | undefined;
 
   private constructor({
+    paymentRecovery,
+    overPlan,
     stripeWebhook,
     subscriptions,
     connected,
@@ -707,6 +903,9 @@ export class BillingModule
     resourceLimitAlerts,
     lifecycle,
   }: {
+    paymentRecovery: PaymentRecoveryService | undefined;
+    /** The over-plan state; absent off LangWatch Cloud, where no plan carries it. */
+    overPlan: OverPlanService | undefined;
     lifecycle: BillingLifecycleAnnouncerService | undefined;
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
@@ -730,10 +929,22 @@ export class BillingModule
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
+    this.#paymentRecovery = paymentRecovery;
+    this.#overPlan = overPlan;
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
     return this.#resourceLimitAlerts.notifyResourceLimitReached(input);
+  }
+
+  notifySalesOfSeatRequest(input: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void> {
+    return this.#resourceLimitAlerts.notifySalesOfSeatRequest(input);
   }
 
   getPricingModel(input: {
@@ -763,6 +974,20 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
+  }
+
+  /** The Customer.io plan resync for one organization, for the customer-io-plan-resync task. */
+  async catchUpCustomerIoPlan({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ members: number }> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle.customerIoPlanCaughtUp({ organizationId, isDryRun });
   }
 
   /** Records billing's pricing-model fact, for the tiered-free-to-seat-event hand-run task. */
@@ -802,8 +1027,8 @@ export class BillingModule
   connectReporting(
     reportUsageForMonth: EventingCommandSender<ReportUsageForMonthCommandData>,
   ): void {
-    this.#reporting.connectSelfDispatch(async (data) => {
-      await reportUsageForMonth.send(data);
+    this.#reporting.connectSelfDispatch(async (data, options) => {
+      await reportUsageForMonth.send(data, options);
     });
   }
 
@@ -814,6 +1039,7 @@ export class BillingModule
     usageWarnings,
     usageReporting,
     nodeEnvironment,
+    stripeSubscriptions,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -824,6 +1050,8 @@ export class BillingModule
     usageWarnings: UsageWarningService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
+    /** Absent where no Stripe key is held: nothing reports there, so the PII month waits. */
+    stripeSubscriptions: StripeSubscriptionsChannel | undefined;
   }): BillingReportingPipeline {
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
@@ -834,6 +1062,17 @@ export class BillingModule
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
+    const piiRedactionSpend = PiiRedactionSpendQueryService.create({
+      isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
+      listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      findPiiRedactionModelAcceptedAtMs: (input) =>
+        repositories.reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
+      sumSpendNanoUsdByRequestType: (input) =>
+        repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
+    });
+    const catalogue = () =>
+      BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment));
+    const meters = () => catalogue().meters;
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
       gateway: repositories.gatewaySpend,
@@ -847,9 +1086,22 @@ export class BillingModule
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
-      isInstantEvalMeterProvisioned: () =>
-        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters
-          .INSTANT_EVAL_USD !== undefined,
+      isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
+      queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
+      isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
+      subscriptionPriceLine: async ({ stripeCustomerId, prices, billingMonth }) =>
+        stripeSubscriptions === void 0
+          ? { carried: false }
+          : priceLineOf({
+              subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
+                customerId: stripeCustomerId,
+              }),
+              prices: prices.map((priceName) => ({
+                priceName,
+                priceId: catalogue().prices[priceName],
+              })),
+              billingMonth,
+            }),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {
@@ -866,9 +1118,12 @@ export class BillingModule
   }: SubscriptionPlanInput): Promise<PlanInfo> {
     const plan = await this.#subscriptionPlans.getActivePlan(organizationId);
     const impersonatorId = user?.impersonator?.id;
+    const state =
+      plan.free && this.#overPlan ? await this.#overPlan.getState({ organizationId }) : undefined;
 
     return {
       ...plan,
+      ...(state?.kind === "over_plan" ? { overPlan: state.overPlan } : {}),
       overrideAddingLimitations:
         !!impersonatorId &&
         (await this.#authorization.can({
@@ -883,6 +1138,7 @@ export class BillingModule
     input: { organizationId: string },
     staff: BillingStaff,
   ): Promise<ConnectedBillingOverview> {
+    if (!this.#isSaas) throw new ConnectedBillingUnavailableError();
     await this.#record({
       staff,
       action: "connectedBilling.get",
@@ -1014,6 +1270,49 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle;
+  }
+
+  /** Puts back seat lines Stripe refused to roll back; nothing where no subscription door is composed. */
+  async repairSeatLines(): Promise<SeatLineRepairOutcome> {
+    if (!this.#subscriptions) return { repaired: 0, pending: 0, failed: 0, flagged: 0 };
+    return this.#subscriptions.seatLines.repairSeatLines();
+  }
+
+  /** Sends each open recovery case's notice that is due; nothing where recovery is not composed. */
+  async sweepPaymentRecovery(): Promise<PaymentRecoverySweepOutcome> {
+    // The over-plan marks end on the same hourly pass; a mark only records what the plan read
+    // already answers, so a late end hides nothing.
+    const overPlan = await this.#overPlan?.sweep();
+    if (!this.#paymentRecovery) return { notified: 0, closed: 0, failed: overPlan?.failed ?? 0 };
+    const recovery = await this.#paymentRecovery.sweep();
+    return { ...recovery, failed: recovery.failed + (overPlan?.failed ?? 0) };
+  }
+
+  async paymentRecovery(input: { organizationId: string }): Promise<PaymentRecoverySummary> {
+    if (!this.#paymentRecovery) return { state: "none" };
+    return this.#paymentRecovery.summary(input);
+  }
+
+  async paymentRecoveryDetails(input: { organizationId: string }): Promise<PaymentRecoveryDetails> {
+    if (!this.#paymentRecovery) {
+      return {
+        state: "none",
+        startedAt: null,
+        accessStopsAt: null,
+        invoiceNumber: null,
+        amountDue: null,
+        currency: null,
+        card: null,
+      };
+    }
+    return this.#paymentRecovery.details(input);
+  }
+
+  async paymentRecoveryPayLink(input: { organizationId: string }): Promise<PaymentRecoveryPayLink> {
+    if (!this.#paymentRecovery) {
+      return { url: `${DEFAULT_PUBLIC_BASE_URL}/settings/subscription`, isFallback: true };
+    }
+    return this.#paymentRecovery.payLink(input);
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

@@ -34,12 +34,12 @@ export function isLoggedClientError(code: string | undefined): boolean {
   return !QUIET_CODES.has(code ?? "");
 }
 
-/** Answers a request the parser refused the way Node's default handler would, then closes. */
+/** Answers the way Node's default handler would, then closes: no more of the body is read. */
 export function answerClientError({ code, socket }: { code: string | undefined; socket: Duplex }) {
   if (!socket.writable) {
     socket.destroy();
     return;
   }
   const status = CLIENT_ERROR_STATUS_LINES[code ?? ""] ?? "400 Bad Request";
-  socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
+  socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`, () => socket.destroy());
 }

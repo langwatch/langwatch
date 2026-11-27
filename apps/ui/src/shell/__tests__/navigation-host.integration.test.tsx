@@ -27,7 +27,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import UiAppChrome from "../ui-app-chrome";
 import { loadUiRootHostServices } from "../ui-root-host-services";
@@ -131,7 +131,7 @@ class SignedInSession extends UiSession {
       },
     };
   }
-  hasPermission(): boolean {
+  hasPermission(_permission: string): boolean {
     return false;
   }
   isSettled(): boolean {
@@ -191,6 +191,7 @@ function renderChrome(
     path: "/my-project/traces",
     pattern: "/:project/traces",
   },
+  page: ReactNode = <HostProbe />,
 ) {
   return render(
     <MemoryRouter initialEntries={[address.path]}>
@@ -201,7 +202,7 @@ function renderChrome(
           <UiDesignSystemShell>
             <Routes>
               <Route element={<UiAppChrome rootHostServices={ROOT} process={PROCESS} />}>
-                <Route path={address.pattern} element={<HostProbe />} />
+                <Route path={address.pattern} element={page} />
               </Route>
             </Routes>
           </UiDesignSystemShell>
@@ -244,6 +245,31 @@ class UserSession extends SignedInSession {
   }
   override currentUser(): UiActor {
     return { id: this.id, name: "Ada", email: "ada@example.com", image: null };
+  }
+}
+
+/** Nobody is signed in, and the session has settled saying so. */
+class SignedOutSession extends UiSession {
+  currentUser(): null {
+    return null;
+  }
+  snapshot(): UiSessionSnapshot {
+    return {
+      session: { status: "anonymous", user: null },
+      scope: { status: "ready", organization: void 0, team: void 0, project: void 0 },
+      permissions: {
+        status: "ready",
+        isLoading: false,
+        can: () => false,
+        canInOrganization: () => false,
+      },
+    };
+  }
+  hasPermission(): boolean {
+    return false;
+  }
+  isSettled(): boolean {
+    return true;
   }
 }
 
@@ -413,29 +439,6 @@ describe("the application chrome", () => {
   });
 
   describe("when nobody is signed in on a page that needs a session", () => {
-    class SignedOutSession extends UiSession {
-      currentUser(): null {
-        return null;
-      }
-      snapshot(): UiSessionSnapshot {
-        return {
-          session: { status: "anonymous", user: null },
-          scope: { status: "ready", organization: void 0, team: void 0, project: void 0 },
-          permissions: {
-            status: "ready",
-            isLoading: false,
-            can: () => false,
-            canInOrganization: () => false,
-          },
-        };
-      }
-      hasPermission(): boolean {
-        return false;
-      }
-      isSettled(): boolean {
-        return true;
-      }
-    }
     class SignedOutScope extends UiScope {
       activeScope(): UiActiveScope {
         return { organizationId: null, projectId: null };
@@ -473,9 +476,26 @@ describe("the application chrome", () => {
         }
       }
       const reload = vi.fn();
-      vi.spyOn(window, "location", "get").mockReturnValue(
-        Object.create(window.location, { reload: { value: reload } }),
-      );
+      // A plain object: jsdom's Location getters refuse a receiver made by Object.create.
+      const real = window.location;
+      const location: Location = {
+        ancestorOrigins: real.ancestorOrigins,
+        hash: real.hash,
+        host: real.host,
+        hostname: real.hostname,
+        href: real.href,
+        origin: real.origin,
+        pathname: real.pathname,
+        port: real.port,
+        protocol: real.protocol,
+        search: real.search,
+        assign: vi.fn(),
+        replace: vi.fn(),
+        reload,
+        toString: () => real.href,
+      };
+      const spied = vi.spyOn(window, "location", "get").mockReturnValue(location);
+      onTestFinished(() => spied.mockRestore());
 
       render(
         <MemoryRouter initialEntries={["/my-project/traces"]}>
@@ -554,6 +574,54 @@ describe("the application chrome", () => {
       await waitFor(() =>
         expect(screen.getByTestId("probe").getAttribute("data-project")).toBe("demo-project"),
       );
+    });
+  });
+
+  describe("when the workspace is still resolving", () => {
+    /** Draws the host's waiting screen, the one the boot report reads its reason from. */
+    function WaitingProbe() {
+      const host = useOptionalNavigationHost();
+      return <div data-testid="waiting">{host?.waiting()}</div>;
+    }
+    function reasonDrawn(): string | null {
+      return (
+        screen
+          .getByTestId("waiting")
+          .querySelector("[data-loading-reason]")
+          ?.getAttribute("data-loading-reason") ?? null
+      );
+    }
+    class HangingRpc extends GraphRpc {
+      constructor(private readonly hangs: (path: string) => boolean) {
+        super();
+      }
+      override query(path: string): Promise<unknown> {
+        return this.hangs(path) ? new Promise(() => void 0) : super.query(path);
+      }
+    }
+    class OrganizationViewerSession extends SignedInSession {
+      override hasPermission(permission: string): boolean {
+        return permission === "organization:view";
+      }
+    }
+
+    /** @scenario "The loading screen names what the workspace is waiting on" */
+    it.each([
+      { waitingOn: "session", services: { session: new SettlingSession() } },
+      { waitingOn: "sign-in", services: { session: new SignedOutSession() } },
+      { waitingOn: "organizations", services: { rpc: new HangingRpc(() => true) } },
+      {
+        waitingOn: "plan",
+        services: {
+          session: new OrganizationViewerSession(),
+          rpc: new HangingRpc((path) => path === "plan.getActivePlan"),
+        },
+      },
+      { waitingOn: "workspace", services: {} },
+    ])("names $waitingOn on its loading screen", async ({ waitingOn, services }) => {
+      renderChrome({ ...HOST_SERVICES, ...services }, undefined, <WaitingProbe />);
+
+      await waitFor(() => expect(reasonDrawn()).toBe(waitingOn));
     });
   });
 });

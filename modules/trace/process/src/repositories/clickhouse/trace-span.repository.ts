@@ -1,8 +1,10 @@
-import type { Authorization } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
   type IdBoundOptions,
   tenantScope,
+  tenantScopeForLatestVersion,
+  tenantScopeWithConditions,
 } from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -15,12 +17,22 @@ import {
 import { z } from "zod";
 
 import {
+  braidedOwnerOf,
+  readsBraidedSpans,
+} from "../../features/braid/rules/braided-span-owner.rules.ts";
+import { spanTreeAgentMarksOf } from "../../rules/agent-call-graph.rules.ts";
+import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
-import { chString, chStringMap } from "./stored-span-row.mapper.ts";
+import {
+  AGENT_MARK_ATTRIBUTES_SELECT,
+  chString,
+  chStringMap,
+  validateSpanKind,
+} from "./stored-span-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
 /** Where a tree read is bounded by the stored_spans id index (id-index plan §4). */
@@ -60,6 +72,9 @@ const spanSummaryRowSchema = z.looseObject({
   DurationMs: numeric,
   UpdatedAtMs: numeric,
   StatusCode: numeric.nullable(),
+  AgentAttributes: chStringMap.optional(),
+  AgentSpanKind: numeric.optional(),
+  TenantId: chString.optional(),
 });
 
 const spanSummaryRowsSchema = z.array(spanSummaryRowSchema);
@@ -93,8 +108,13 @@ const summarySelect = `
   DurationMs,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs,
-  StatusCode
+  StatusCode,
+  ${AGENT_MARK_ATTRIBUTES_SELECT}
 `;
+
+/** A braided read names each span's owner; a read without braids keeps today's statement. */
+const summarySelectFor = (authorization: Authorization): string =>
+  readsBraidedSpans(authorization) ? `${summarySelect},\n  TenantId` : summarySelect;
 
 /** The dedup election under the proof's fence; the tree reads never name a tenant (ADR-177). */
 // ID_BOUND_SKIP: a dedup subquery fragment; its statement carries the marker.
@@ -102,7 +122,7 @@ const fencedDedupInTuple = (extraInnerWhere: string): string => `
   (TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
     FROM ${STORED_SPANS_TABLE}
-    WHERE ${tenantScope("StartTime")}
+    WHERE ${tenantScopeForLatestVersion("StartTime")}
       AND TraceId = {traceId:String}
       ${extraInnerWhere}
     GROUP BY TenantId, TraceId, SpanId
@@ -131,6 +151,8 @@ type EvaluationEventRow = z.infer<typeof evaluationEventRowSchema>;
 const ingestLagRowSchema = z.looseObject({
   P95LagMs: numeric.nullable(),
   SampleCount: numeric,
+  P95ArrivalGapMs: numeric.nullable().optional(),
+  ArrivalGapSampleCount: numeric.optional(),
 });
 
 const ingestLagRowsSchema = z.array(ingestLagRowSchema);
@@ -225,32 +247,51 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     authorization: Authorization;
   }): Promise<TraceIngestLagSample | null> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    // Per span first, so a span stored twice before a merge counts once, at its first arrival.
     const result = await client.query({
       query: `
         SELECT
-          quantile(0.95)(SpanLagMs) AS P95LagMs,
-          count() AS SampleCount
+          quantileIf(0.95)(SpanLagMs, SpanLagMs >= 0) AS P95LagMs,
+          countIf(SpanLagMs >= 0) AS SampleCount,
+          quantileIf(0.95)(MaxArrivalGapMs, SpanCount >= 2) AS P95ArrivalGapMs,
+          countIf(SpanCount >= 2) AS ArrivalGapSampleCount
         FROM (
           SELECT
             TraceId,
-            dateDiff('millisecond', max(EndTime), max(CreatedAt)) AS SpanLagMs
-          FROM stored_spans
-          WHERE ${tenantScope("StartTime")}
-            AND StartTime >= now() - INTERVAL 7 DAY
+            dateDiff('millisecond', max(SpanEnd), max(LastArrival)) AS SpanLagMs,
+            count() AS SpanCount,
+            arrayMax(arrayDifference(arraySort(groupArray(FirstArrivalMs)))) AS MaxArrivalGapMs
+          FROM (
+            SELECT
+              TraceId,
+              SpanId,
+              max(EndTime) AS SpanEnd,
+              max(CreatedAt) AS LastArrival,
+              toUnixTimestamp64Milli(min(CreatedAt)) AS FirstArrivalMs
+            FROM stored_spans
+            WHERE ${tenantScope("StartTime")}
+              AND StartTime >= now() - INTERVAL 7 DAY
+            GROUP BY TraceId, SpanId
+          )
           GROUP BY TraceId
         )
-        WHERE SpanLagMs >= 0
       `,
       format: "JSONEachRow",
     });
     const rows = ingestLagRowsSchema.parse(await result.json());
     const row = rows[0];
+    const sampleCount = Number(row?.SampleCount ?? 0);
     const p95LagMs = Number(row?.P95LagMs ?? Number.NaN);
-    if (!Number.isFinite(p95LagMs)) return null;
+    if (sampleCount === 0 || !Number.isFinite(p95LagMs)) return null;
+    const arrivalGapSampleCount = Number(row?.ArrivalGapSampleCount ?? 0);
+    const p95ArrivalGapMs = Number(row?.P95ArrivalGapMs ?? Number.NaN);
 
     return {
       p95LagMs,
-      sampleCount: Number(row?.SampleCount ?? 0),
+      sampleCount,
+      p95ArrivalGapMs:
+        arrivalGapSampleCount > 0 && Number.isFinite(p95ArrivalGapMs) ? p95ArrivalGapMs : null,
+      arrivalGapSampleCount,
     };
   }
 
@@ -280,15 +321,15 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     sinceUpdatedAtMs: number;
     occurredAtMs?: number;
   }): Promise<TraceSpanSummaryRecord[]> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
     // `UpdatedAt` is not the partition key, so the trace-id marker bounds the
     // read from below only: a live trace can run past any upper bound.
     const sinceFilter = "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const result = await client.query({
       query: `
-        SELECT ${summarySelect}
+        SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })} AND TraceId = {traceId:String}
           ${STORED_SPANS_ID_BOUND}
           ${sinceFilter}
           AND ${fencedDedupInTuple(`${STORED_SPANS_ID_BOUND} ${sinceFilter}`)}
@@ -309,7 +350,7 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     });
     return spanSummaryRowsSchema
       .parse(await result.json())
-      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row, input.authorization));
   }
 
   private async queryPage(
@@ -322,31 +363,45 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     },
     idBound: IdBoundOptions | undefined,
   ): Promise<TraceSpanPage> {
-    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const client = this.clickhouse.as(input.authorization, { reads: "spans" });
+    const cursorTenant = input.cursor
+      ? ClickHouseTraceSpanRepository.cursorTenantOf({
+          authorization: input.authorization,
+          cursor: input.cursor,
+        })
+      : null;
+    const cursorTuple =
+      cursorTenant === null
+        ? "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
+        : "(toUnixTimestamp64Milli(StartTime), SpanId, TenantId) > ({cursorStart:Int64}, {cursorSpan:String}, {cursorTenant:String})";
     const cursor = input.cursor
-      ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
+      ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND ${cursorTuple}`
       : "";
     // A cursor page is bounded by the cursor's own start, so it reads no index.
     const timeFilter = idBound === undefined ? "" : STORED_SPANS_ID_BOUND;
+    // The row past a page may be an owner's, read before any audit: under a braid none is read,
+    // and a full page offers the next one (ADR-201 §8, v1.18).
+    const peeks = !readsBraidedSpans(input.authorization);
     const result = await client.query({
       // ID_BOUND_SKIP: a first page carries the marker in timeFilter; a cursor page, its cursor.
       query: `
-        SELECT ${summarySelect}
+        SELECT ${summarySelectFor(input.authorization)}
         FROM ${STORED_SPANS_TABLE}
-        WHERE ${tenantScope("StartTime")} AND TraceId = {traceId:String}
+        WHERE ${tenantScopeWithConditions("StartTime", { traceId: "traceId" })} AND TraceId = {traceId:String}
           ${timeFilter}
           ${cursor}
           AND ${fencedDedupInTuple(timeFilter)}
-        ORDER BY StartTimeMs ASC, SpanId ASC
+        ORDER BY StartTimeMs ASC, SpanId ASC, TenantId ASC
         LIMIT {limit:UInt32}
       `,
       query_params: {
         traceId: input.traceId,
-        limit: input.limit + 1,
+        limit: peeks ? input.limit + 1 : input.limit,
         ...(input.cursor
           ? {
               cursorStart: Math.trunc(input.cursor.startTimeMs),
               cursorSpan: input.cursor.spanId,
+              ...(cursorTenant === null ? {} : { cursorTenant }),
             }
           : {}),
       },
@@ -354,11 +409,28 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       ...(idBound === undefined ? {} : { idBound }),
     });
     const rows = spanSummaryRowsSchema.parse(await result.json());
-    const mapped = rows.map((row) => ClickHouseTraceSpanRepository.mapSummary(row));
+    const mapped = rows.map((row) =>
+      ClickHouseTraceSpanRepository.mapSummary(row, input.authorization),
+    );
     return {
       rows: mapped.slice(0, input.limit),
-      hasMore: mapped.length > input.limit,
+      hasMore: peeks ? mapped.length > input.limit : mapped.length >= input.limit,
     };
+  }
+
+  /**
+   * The tenant a cursor's last span sits in, so one span id held by two tenants is two positions.
+   * Null when the read spans no braid or the cursor predates braids: those page as before.
+   */
+  private static cursorTenantOf({
+    authorization,
+    cursor,
+  }: {
+    authorization: Authorization;
+    cursor: SpanTreeCursor;
+  }): string | null {
+    if (!readsBraidedSpans(authorization) || cursor.ownerProjectId === undefined) return null;
+    return cursor.ownerProjectId ?? ownProjectIdReadBy(authorization);
   }
 
   private async resolveTraceOccurredAtMs(
@@ -461,7 +533,23 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     };
   }
 
-  private static mapSummary(row: SpanSummaryRow) {
+  /** The tree's summary columns, for a statement of the module's own reading the same nodes. */
+  static readonly summarySelect: string = summarySelect;
+
+  /** Rows selected with `summarySelect`, mapped as the tree maps them. */
+  static summaryRecordsOf({
+    rows,
+    authorization,
+  }: {
+    rows: unknown;
+    authorization: Authorization;
+  }): TraceSpanSummaryRecord[] {
+    return spanSummaryRowsSchema
+      .parse(rows)
+      .map((row) => ClickHouseTraceSpanRepository.mapSummary(row, authorization));
+  }
+
+  private static mapSummary(row: SpanSummaryRow, authorization: Authorization) {
     const explicitCost = ClickHouseTraceSpanRepository.numberOrNull(row.Cost);
     const cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
 
@@ -483,6 +571,12 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
       cacheCreationTokens: ClickHouseTraceSpanRepository.numberOrNull(row.CacheCreationTokens),
       updatedAtMs: Number(row.UpdatedAtMs),
       costInput: ClickHouseTraceSpanRepository.costInputOf(row),
+      ...spanTreeAgentMarksOf({
+        name: row.SpanName,
+        attributes: row.AgentAttributes ?? {},
+        kind: row.AgentSpanKind == null ? null : validateSpanKind(Number(row.AgentSpanKind)),
+      }),
+      ...braidedOwnerOf({ authorization, tenantId: row.TenantId }),
     };
   }
 

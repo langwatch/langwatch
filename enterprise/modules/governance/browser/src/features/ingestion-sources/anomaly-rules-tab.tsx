@@ -507,7 +507,7 @@ export function AnomalyRulesTab() {
   return (
     <EnterpriseLockedSurface
       featureName="Anomaly Rules"
-      description="Anomaly Rules let your governance team define thresholds that page on-call when ingestion drifts. Available on Enterprise plans."
+      description="Set thresholds that page on-call when ingestion drifts."
     >
       <VStack align="stretch" gap={6} width="full">
         {!canRead && (

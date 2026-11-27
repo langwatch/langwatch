@@ -3,8 +3,8 @@ import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What a completed Stripe checkout does to our records: linking the subscription, persisting
- * the currency the buyer chose, approving the invites the payment was pending on, and setting
- * the annual billing threshold.
+ * the currency the buyer chose, approving the invites the payment was pending on, setting
+ * the annual billing threshold, and giving the Billing role to whoever started it.
  */
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
@@ -17,10 +17,15 @@ import type { BillingWebhookSubscriptionRepository } from "../repositories/billi
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
+  BillingStarterRoleService,
+  type CheckoutBillingRoles,
+} from "./billing-starter-role.service.ts";
+import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { SupersededPlanRetirementError } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 
@@ -28,6 +33,8 @@ const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 type BillingCheckoutCompletionOptions = {
+  /** Absent where no authz is composed: the checkout then grants no role. */
+  billingRoles?: CheckoutBillingRoles;
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
   stripeSubscriptions: Pick<
@@ -60,6 +67,7 @@ export class BillingCheckoutCompletionService {
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly host: BillingWebhookHost;
   private readonly announcer: BillingCheckoutCompletionOptions["announcer"];
+  private readonly starterRole: BillingStarterRoleService | undefined;
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
   private readonly lifecycle: BillingSubscriptionLifecycleService;
 
@@ -68,6 +76,9 @@ export class BillingCheckoutCompletionService {
     this.organizationRepository = options.organizationRepository;
     this.host = options.host;
     this.announcer = options.announcer;
+    this.starterRole = options.billingRoles
+      ? BillingStarterRoleService.create({ billingRoles: options.billingRoles })
+      : undefined;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
       subscriptions: options.stripeSubscriptions,
       prices: options.itemCalculator.prices,
@@ -120,6 +131,11 @@ export class BillingCheckoutCompletionService {
     }
 
     if (organizationId) {
+      await this.starterRole?.grantToStarter({
+        organizationId,
+        startedByUserId: checkoutSession.metadata?.startedByUserId ?? null,
+        eventId: event.id,
+      });
       await this.announcer?.checkoutCompleted({
         organizationId,
         subscriptionId,
@@ -159,16 +175,21 @@ export class BillingCheckoutCompletionService {
       throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
     }
 
-    await this.lifecycle.syncInvoicePaymentSuccess({
-      subscriptionId,
-      throwOnMissing: true,
-    });
-
-    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
-
     // A failed follow-up still lets the plan land, then fails the delivery so
     // Stripe redelivers it: every step here is safe to repeat.
     const failures: unknown[] = [];
+    try {
+      await this.lifecycle.syncInvoicePaymentSuccess({
+        subscriptionId,
+        throwOnMissing: true,
+      });
+    } catch (err) {
+      if (!(err instanceof SupersededPlanRetirementError)) throw err;
+      failures.push(err);
+    }
+
+    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
+
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
       try {

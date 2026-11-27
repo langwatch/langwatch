@@ -6,6 +6,7 @@ export {
   type DispatchableMessage,
   type DispatchReport,
   type IntentHandler,
+  isOutboxRetryRefused,
   OutboxDispatcherService,
   type OutboxDispatcherServiceOptions,
   ProcessOutboxWorker,

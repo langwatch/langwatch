@@ -6,6 +6,7 @@
 import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
+  fitsGridWidthIssue,
 } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardWidgetCodeSchema,
@@ -21,14 +22,9 @@ import { z } from "zod";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 
-const fitsGridWidth = {
-  message: "gridColumn + colSpan must not exceed the grid's columns",
-  path: ["colSpan"],
-};
-
 const dashboardWidgetLayoutSchema = chartGridPlacementSchema.refine(
   fitsChartGridWidth,
-  fitsGridWidth,
+  fitsGridWidthIssue,
 );
 
 const placementShape = {
@@ -124,7 +120,7 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
         ...projectScopeSchema.shape,
         graphId: z.string(),
       })
-      .refine(fitsChartGridWidth, fitsGridWidth),
+      .refine(fitsChartGridWidth, fitsGridWidthIssue),
   )
   .withOutput(dashboardWidgetTrpcSuccessSchema)
 

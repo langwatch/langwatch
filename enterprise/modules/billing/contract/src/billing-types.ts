@@ -276,3 +276,38 @@ export const NOTIFICATION_TYPES = {
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
+
+/** Developer seats on a Growth subscription, as the Manage seats drawer reads them. */
+const developerSeatsSchemaDefinition = z.object({
+  /** False while no price is configured: nothing about Developer seats is offered. */
+  available: z.boolean(),
+  /** Developer seats the subscription bills now. */
+  quantity: z.number().int().nonnegative(),
+  /** Per seat per billing period, in the currency's minor unit; null while unavailable. */
+  unitAmountCents: z.number().int().nonnegative().nullable(),
+  currency: z.string(),
+  billingInterval: z.string(),
+  /** When the period already invoiced ends, epoch milliseconds; null when unknown. */
+  periodEndsAt: z.number().nullable(),
+});
+export interface DeveloperSeatsSchema extends Named<typeof developerSeatsSchemaDefinition> {}
+export const developerSeatsSchema: DeveloperSeatsSchema = developerSeatsSchemaDefinition;
+export type DeveloperSeats = z.infer<typeof developerSeatsSchema>;
+
+const developerSeatQuoteSchemaDefinition = z.object({
+  amountDueCents: z.number(),
+  formattedAmountDue: z.string(),
+  /** Of `amountDueCents`, the tax (VAT added on top); zero when none is charged. */
+  taxCents: z.number(),
+  /** Seats times the seat price, before any tax. */
+  formattedRecurringTotal: z.string(),
+  billingInterval: z.string(),
+  /** The instant this quote priced, sent back on confirm so the charge matches it. */
+  quotedAt: z.number(),
+});
+export interface DeveloperSeatQuoteSchema extends Named<
+  typeof developerSeatQuoteSchemaDefinition
+> {}
+export const developerSeatQuoteSchema: DeveloperSeatQuoteSchema =
+  developerSeatQuoteSchemaDefinition;
+export type DeveloperSeatQuote = z.infer<typeof developerSeatQuoteSchema>;

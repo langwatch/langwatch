@@ -116,8 +116,16 @@ export abstract class NavigationHost {
   /** Fail-closed grant check. */
   abstract hasPermission(permission: string): boolean;
 
+  /** Fail-closed grant check across the whole organization, as an organization page asks it. */
+  abstract hasOrganizationPermission(permission: string): boolean;
+
   /** Fail-closed flag check, with the pending state kept. */
   abstract featureFlag(flag: ReleaseFlagToken): NavigationFlagReading;
+
+  /** The organisation already has braids, as authz answers it; false while unanswered. */
+  braidsPresent(): boolean {
+    return false;
+  }
 
   /**
    * What the application shows while a navigation decision is still being

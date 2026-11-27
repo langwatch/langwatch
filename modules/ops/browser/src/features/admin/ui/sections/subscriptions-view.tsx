@@ -23,6 +23,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
 import { AdminDate, EmptyCell, dateInputToISO, formatDate } from "../elements/admin-cells.tsx";
+import { PendingLimitsNotice } from "../elements/pending-limits-notice.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 
 /** The controls a failed submit can land on; wrappers that carry the state are skipped. */
@@ -39,6 +40,7 @@ interface AdminSubscription {
   lastPaymentFailedDate: string | null;
   maxMembers: number | null;
   maxMembersLite: number | null;
+  maxMembersDeveloper: number | null;
   maxTeams: number | null;
   maxProjects: number | null;
   maxWorkflows: number | null;
@@ -54,6 +56,13 @@ interface AdminSubscription {
   maxDashboards: number | null;
   maxCustomGraphs: number | null;
   maxAutomations: number | null;
+  /** The seat quantity billing could not put back at Stripe, flagged once its retries ran out. */
+  seatRepairQuantity?: number | null;
+  /** The seat quantity the last seat change set; a pending write is settled back to it. */
+  seatLineQuantity?: number | null;
+  /** Set once a Stripe seat line write left pending could not be settled after its retries. */
+  seatLineWriteFlaggedAt?: string | null;
+  seatRepairFlaggedAt?: string | null;
   organization?: { id: string; name: string; slug: string };
   createdAt: string;
 }
@@ -78,6 +87,7 @@ const LIMIT_FIELDS: {
 }[] = [
   { key: "maxMembers", label: "Max members", group: "Members" },
   { key: "maxMembersLite", label: "Max lite members", group: "Members" },
+  { key: "maxMembersDeveloper", label: "Max developer members", group: "Members" },
   { key: "maxTeams", label: "Max teams", group: "Members" },
 
   { key: "maxProjects", label: "Max projects", group: "Resources" },
@@ -182,9 +192,12 @@ export default function SubscriptionsView() {
                   </Badge>
                 </ListTable.Cell>
                 <ListTable.Cell>
-                  <Badge size="sm" colorPalette={statusColor[sub.status]}>
-                    {sub.status}
-                  </Badge>
+                  <HStack gap={1} wrap="wrap">
+                    <Badge size="sm" colorPalette={statusColor[sub.status]}>
+                      {sub.status}
+                    </Badge>
+                    <SeatRepairBadge subscription={sub} />
+                  </HStack>
                 </ListTable.Cell>
                 <ListTable.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</ListTable.Cell>
                 <ListTable.Cell>
@@ -224,9 +237,30 @@ export default function SubscriptionsView() {
   );
 }
 
+/** The seat count a flagged seat line should bill: the lift's way back, else the last change's. */
+function flaggedSeatLineQuantity(subscription: AdminSubscription): number | null {
+  if (subscription.seatRepairFlaggedAt) return subscription.seatRepairQuantity ?? null;
+  if (subscription.seatLineWriteFlaggedAt) {
+    return subscription.seatLineQuantity ?? subscription.maxMembers;
+  }
+  return null;
+}
+
+/** Billing's flag for a seat line Stripe still bills wrong after its repair retries. */
+function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) {
+  const quantity = flaggedSeatLineQuantity(subscription);
+  if (quantity == null) return null;
+  return (
+    <Badge size="sm" colorPalette="red">
+      Seat line needs repair: {quantity} {quantity === 1 ? "seat" : "seats"}
+    </Badge>
+  );
+}
+
 type LimitKey =
   | "maxMembers"
   | "maxMembersLite"
+  | "maxMembersDeveloper"
   | "maxTeams"
   | "maxProjects"
   | "maxWorkflows"
@@ -423,6 +457,11 @@ function SubscriptionDrawer({
               />
             </Field.Root>
           </HStack>
+
+          <PendingLimitsNotice
+            status={form.status}
+            hasLimits={LIMIT_FIELDS.some((f) => form[f.key as LimitKey].trim() !== "")}
+          />
 
           {GROUPED_LIMITS.map(([group, fields]) => (
             <VStack key={group} gap={3} align="stretch">

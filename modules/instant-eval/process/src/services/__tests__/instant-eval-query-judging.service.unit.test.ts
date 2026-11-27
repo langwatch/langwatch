@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";
+import { InstantEvalGatewayBudgetExceededError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
@@ -110,6 +111,9 @@ function harness({
   concurrency,
   recordJudgeSpend,
   holdPricing = INSTANT_EVAL_PRICING,
+  gatewayRefusal,
+  isSearchRouted = false,
+  isOwnDecisionModel = false,
 }: {
   judge?: ScriptedJudge;
   spentNanoUsd?: number;
@@ -119,8 +123,15 @@ function harness({
   recordJudgeSpend?: (input: InstantEvalJudgeSpendRecord) => Promise<void>;
   /** What the judge says a query's hold is priced at: its dearest reachable rate. */
   holdPricing?: InstantEvalPricing;
+  /** What a gateway budget set to block refuses with, once it is reached. */
+  gatewayRefusal?: Error;
+  /** Whether the project's search router flag is on. */
+  isSearchRouted?: boolean;
+  /** Whether the project judges on its own decision model rather than LangWatch's. */
+  isOwnDecisionModel?: boolean;
 } = {}) {
   const events: string[] = [];
+  const gatewayAsked: { projectId: string; inFlightUsd?: number }[] = [];
   const priced: InstantEvalJudgeSpendRecord[] = [];
   const records: InstantEvalJudgedSpend[] = [];
   const reservations = MemoryInstantEvalBudgetReservationsRepository.create({ now: () => AT });
@@ -162,6 +173,12 @@ function harness({
         await budget.release(input);
       },
     },
+    gatewayBudget: {
+      assertWithinGatewayBudget: async (input) => {
+        gatewayAsked.push(input);
+        if (gatewayRefusal) throw gatewayRefusal;
+      },
+    },
     spend: {
       recordSpend: async (record) => {
         records.push(record);
@@ -170,10 +187,12 @@ function harness({
     },
     holdPricing: async () => holdPricing,
     queryTokenBudget,
+    searchRouting: { isRouted: async () => isSearchRouted },
+    ownModels: { isOwnDecisionModel: async () => isOwnDecisionModel },
     now: () => AT,
   });
 
-  return { service, judge, events, priced, records };
+  return { service, judge, events, priced, records, gatewayAsked };
 }
 
 async function refusalOf(run: () => Promise<unknown>): Promise<Record<string, unknown>> {
@@ -566,6 +585,34 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
     });
   });
 
+  describe("given a project whose gateway budget set to block is reached", () => {
+    /** @scenario "A judged query is refused once a blocking budget is reached" */
+    it("refuses with instant_eval_gateway_budget_exceeded before anything is held or judged", async () => {
+      const { service, judge, events, gatewayAsked } = harness({
+        gatewayRefusal: new InstantEvalGatewayBudgetExceededError({
+          budgetId: "budget-1",
+          scope: "organization",
+          window: "month",
+          limitUsd: 100,
+          spentUsd: 100,
+        }),
+      });
+
+      const refusal = await refusalOf(() =>
+        service.judgeQuery({
+          projectId: "project-1",
+          judgements: [booleanCall("annoyed")],
+          rows: [{ annoyed: "one" }],
+        }),
+      );
+
+      expect(refusal.code).toBe("instant_eval_gateway_budget_exceeded");
+      expect(gatewayAsked).toEqual([{ projectId: "project-1" }]);
+      expect(events).toEqual([]);
+      expect(judge.requests).toHaveLength(0);
+    });
+  });
+
   describe("given a free organization under its budget", () => {
     /** @scenario "A judged query holds its ceiling while it judges" */
     it("holds the whole query token budget's price first and releases it once recorded", async () => {
@@ -614,6 +661,154 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
 
       expect(judged.rows).toEqual([{ annoyed: 0.9 }]);
       expect(events.filter((event) => event.startsWith("release"))).toEqual([]);
+    });
+  });
+
+  describe("given the search router flag", () => {
+    const query = {
+      projectId: "project-1",
+      judgements: [booleanCall("annoyed")],
+      rows: [{ annoyed: "one" }, { annoyed: "two" }],
+    };
+
+    /** @scenario "With the search router flag off a judged query sends no route" */
+    it("sends no route and no ceiling while the flag is off, and holds at the hold rate", async () => {
+      const { service, judge, events } = harness({ queryTokenBudget: 1_000 });
+
+      await service.judgeQuery(query);
+
+      expect(judge.requests).toHaveLength(2);
+      for (const request of judge.requests) {
+        expect(request).not.toHaveProperty("route");
+        expect(request).not.toHaveProperty("costCeiling");
+      }
+      const hold = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 1_000 }) });
+      expect(events[0]).toBe(`reserve ${hold} with 0 judged`);
+    });
+
+    /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+    it("sends the search route and one shared ceiling, held at the ceiling times the markup", async () => {
+      const judge = new ScriptedJudge(async ({ request }) => ({
+        verdicts: request.questions.map((question) => ({
+          questionId: question.id,
+          probability: 1,
+        })),
+        inputTokens: TOKENS_PER_TEXT,
+        costNanoUsd: 7_000,
+        isTextTruncated: false,
+      }));
+      const { service, events, records } = harness({ judge, isSearchRouted: true });
+
+      await service.judgeQuery(query);
+
+      expect(judge.requests.map((request) => request.route)).toEqual([
+        { job: "search" },
+        { job: "search" },
+      ]);
+      const [first, second] = judge.requests;
+      expect(first?.costCeiling).toBeDefined();
+      expect(second?.costCeiling).toBe(first?.costCeiling);
+      // 4,000,000 budget tokens at 0.15 per million is a 0.60 USD ceiling, 0.78 at the markup.
+      expect(events[0]).toBe("reserve 0.78 with 0 judged");
+      // One record, priced from the summed routed cost.
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({
+        inputTokens: 2 * TOKENS_PER_TEXT,
+        costNanoUsd: 14_000,
+        routedInputTokens: 2 * TOKENS_PER_TEXT,
+      });
+    });
+
+    /** @scenario "A project on its own decision model is not held at the routed ceiling" */
+    it("sends no route for a project on its own decision model, so a free organization under 0.78 USD left still runs", async () => {
+      // 0.50 USD of the 1 USD free budget is left: the 0.2184 hold fits, the 0.78 ceiling does not.
+      const { service, judge, events } = harness({
+        isSearchRouted: true,
+        isOwnDecisionModel: true,
+        spentNanoUsd: 0.5 * NANO,
+      });
+
+      const judged = await service.judgeQuery(query);
+
+      expect(judged.rows).toEqual([{ annoyed: 0.9 }, { annoyed: 0.9 }]);
+      for (const request of judge.requests) {
+        expect(request).not.toHaveProperty("route");
+        expect(request).not.toHaveProperty("costCeiling");
+      }
+      const hold = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 4_000_000 }) });
+      expect(events[0]).toBe(`reserve ${hold} with 0 judged`);
+    });
+
+    /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */
+    it("stops sending once the query's ceiling holds no more, so it never spends past it", async () => {
+      // Each send holds and bills 0.40 USD: the second does not fit a 0.60 USD ceiling.
+      const sendNanoUsd = 400_000_000;
+      const judge = new ScriptedJudge(async ({ request }) => {
+        const ceiling = request.costCeiling;
+        if (!ceiling || !(await ceiling.hold(sendNanoUsd))) {
+          return {
+            verdicts: [],
+            skippedReason: "query_cost_ceiling",
+            inputTokens: 0,
+            isTextTruncated: false,
+          };
+        }
+        ceiling.settle({ heldNanoUsd: sendNanoUsd, costNanoUsd: sendNanoUsd });
+        return {
+          verdicts: request.questions.map((question) => ({
+            questionId: question.id,
+            probability: 1,
+          })),
+          inputTokens: TOKENS_PER_TEXT,
+          costNanoUsd: sendNanoUsd,
+          isTextTruncated: false,
+        };
+      });
+      const { service, records } = harness({ judge, isSearchRouted: true, concurrency: 1 });
+
+      const judged = await service.judgeQuery(query);
+
+      expect(judged.rows).toEqual([{ annoyed: 1 }, { annoyed: null }]);
+      expect(judged.skipped).toEqual({ query_cost_ceiling: 1 });
+      expect(records[0]).toMatchObject({ costNanoUsd: sendNanoUsd });
+    });
+
+    /** @scenario "A send that fits only once sends in flight settle waits for them" */
+    it("skips no row of many long rows judged at once while their real cost stays under the ceiling", async () => {
+      // A long row on the search route holds about 0.0076 USD and bills about 0.0024 USD: 128 holds
+      // at once pass the 0.60 USD ceiling, while the 200 rows' real cost (0.48 USD) does not.
+      const worstNanoUsd = 7_600_000;
+      const billedNanoUsd = 2_400_000;
+      const judge = new ScriptedJudge(async ({ request }) => {
+        const ceiling = request.costCeiling;
+        if (!ceiling || !(await ceiling.hold(worstNanoUsd))) {
+          return {
+            verdicts: [],
+            skippedReason: "query_cost_ceiling",
+            inputTokens: 0,
+            isTextTruncated: false,
+          };
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        ceiling.settle({ heldNanoUsd: worstNanoUsd, costNanoUsd: billedNanoUsd });
+        return {
+          verdicts: request.questions.map((question) => ({
+            questionId: question.id,
+            probability: 1,
+          })),
+          inputTokens: TOKENS_PER_TEXT,
+          costNanoUsd: billedNanoUsd,
+          isTextTruncated: false,
+        };
+      });
+      const { service } = harness({ judge, isSearchRouted: true, concurrency: 128 });
+      const rows = Array.from({ length: 200 }, (_, at) => ({ annoyed: `row ${at}` }));
+
+      const judged = await service.judgeQuery({ ...query, rows });
+
+      expect(judge.requests).toHaveLength(200);
+      expect(judged.skipped ?? {}).toEqual({});
+      expect(judged.rows.every((row) => row.annoyed === 1)).toBe(true);
     });
   });
 

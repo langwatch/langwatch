@@ -3,6 +3,7 @@ import type { EvaluationServerConfig } from "@langwatch/evaluation-contract";
 import type { EvaluationChannels } from "../evaluation.channels.ts";
 import { NullLangevalsChannel } from "../null.langevals.channel.ts";
 import { MemoryLangevalsChannel } from "./memory.langevals.channel.ts";
+import { MemoryProviderSpendChannel } from "./memory.provider-spend.channel.ts";
 
 /** Without an endpoint every evaluation answers skipped; with one, a test scripts the answers. */
 export class MemoryEvaluationChannels {
@@ -13,6 +14,7 @@ export class MemoryEvaluationChannels {
       langevals: config.langevalsEndpoint
         ? MemoryLangevalsChannel.create()
         : NullLangevalsChannel.create(),
+      spend: MemoryProviderSpendChannel.create(),
     };
   }
 }

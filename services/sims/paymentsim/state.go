@@ -245,11 +245,11 @@ type Meter struct {
 
 // meterEvent is one accepted meter event.
 type meterEvent struct {
-	EventName  string `json:"event_name"`
-	Identifier string `json:"identifier"`
-	Customer   string `json:"customer"`
-	Value      int64  `json:"value"`
-	Timestamp  int64  `json:"timestamp"`
+	EventName  string  `json:"event_name"`
+	Identifier string  `json:"identifier"`
+	Customer   string  `json:"customer"`
+	Value      float64 `json:"value"`
+	Timestamp  int64   `json:"timestamp"`
 }
 
 // idem is one remembered idempotent answer.
@@ -463,12 +463,24 @@ type catalogFile struct {
 
 // catalogMeterEvents names the event each catalog meter counts; the file holds ids only.
 var catalogMeterEvents = map[string]string{
-	"BILLABLE_EVENTS":  "langwatch_billable_events",
-	"INSTANT_EVAL_USD": "langwatch_instant_eval_usd",
+	"BILLABLE_EVENTS":      "langwatch_billable_events",
+	"INSTANT_EVAL_USD":     "langwatch_instant_eval_usd",
+	"PII_REDACTION_USD":    "langwatch_pii_redaction_usd",
+	"RETENTION_STORAGE_GB": "langwatch_retention_storage_gb",
 }
 
-// catalogMetered are priced per unit yet metered; the file does not say so.
-var catalogMetered = map[string]bool{"CONNECTED_HOSTED_USAGE_QUARTERLY": true}
+// catalogMetered are priced per unit yet metered, on the named meter; the file does not say so.
+var catalogMetered = map[string]string{
+	"CONNECTED_HOSTED_USAGE_QUARTERLY": "BILLABLE_EVENTS",
+	"GROWTH_INSTANT_EVAL_USD":          "INSTANT_EVAL_USD",
+	"GROWTH_INSTANT_EVAL_EUR":          "INSTANT_EVAL_USD",
+	"GROWTH_PII_REDACTION_USD":         "PII_REDACTION_USD",
+	"GROWTH_PII_REDACTION_EUR":         "PII_REDACTION_USD",
+	"RETENTION_STORAGE_EUR_MONTHLY":    "RETENTION_STORAGE_GB",
+	"RETENTION_STORAGE_EUR_ANNUAL":     "RETENTION_STORAGE_GB",
+	"RETENTION_STORAGE_USD_MONTHLY":    "RETENTION_STORAGE_GB",
+	"RETENTION_STORAGE_USD_ANNUAL":     "RETENTION_STORAGE_GB",
+}
 
 // seedCatalog puts every mapped price and meter of mode in the account under its
 // real id, so the product's price catalog resolves against paymentsim unchanged.
@@ -486,7 +498,6 @@ func (st *state) seedCatalog(raw []byte, mode string, now time.Time) error {
 			}
 		}
 	}
-	billable := file.Meters["BILLABLE_EVENTS"][mode]
 	for name, ids := range file.Mapping {
 		id := ids[mode]
 		detail, ok := file.Prices[id]
@@ -498,8 +509,11 @@ func (st *state) seedCatalog(raw []byte, mode string, now time.Time) error {
 		seed.Product = deref(detail.Product)
 		if r := detail.Recurring; r != nil {
 			seed.Interval, seed.IntervalCount = r.Interval, r.IntervalCount
-			if detail.UnitAmount == nil || catalogMetered[name] {
-				seed.UsageType, seed.Meter = "metered", billable
+			if meter, metered := catalogMetered[name]; metered || detail.UnitAmount == nil {
+				if !metered {
+					meter = "BILLABLE_EVENTS"
+				}
+				seed.UsageType, seed.Meter = "metered", file.Meters[meter][mode]
 			}
 		}
 		if _, err := st.seedPrice(seed, now.Unix()); err != nil {

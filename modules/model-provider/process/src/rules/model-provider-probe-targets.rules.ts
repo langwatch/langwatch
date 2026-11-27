@@ -1,3 +1,5 @@
+import { DEFAULT_AZURE_API_VERSION } from "@langwatch/model-provider-contract";
+
 /**
  * The documented API root and default endpoint of every provider the probe
  * knows how to reach.
@@ -24,7 +26,7 @@ export const providerApiRoots: Record<string, string> = {
 /**
  * Authentication strategy for API key validation.
  */
-export type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs";
+export type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs" | "azure";
 
 /**
  * Providers that use non-standard auth. All others default to bearer auth.
@@ -37,6 +39,7 @@ export const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
   // with the deprecated registry entry.
   google_agent_platform: "gemini",
   elevenlabs: "elevenlabs",
+  azure: "azure",
 };
 
 /**
@@ -56,12 +59,59 @@ export const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
 });
 
 /**
+ * The smallest chat completion that still proves an Azure key, endpoint and deployment.
+ */
+export const AZURE_PROBE_BODY = JSON.stringify({
+  messages: [{ role: "user", content: "ping" }],
+  max_tokens: 1,
+});
+
+/** Azure has no models route: its probe asks one deployment, so it needs a model to name. */
+export const PROBE_NEEDS_MODEL: ReadonlySet<string> = new Set(["azure"]);
+
+/**
+ * Azure statuses that prove the key and deployment were accepted: Azure authenticates and
+ * resolves the deployment before it rate-limits (429) or reads the body (400, e.g. a
+ * reasoning deployment refusing `max_tokens`).
+ */
+const AZURE_REACHABLE_STATUSES: ReadonlySet<number> = new Set([400, 429]);
+
+/** A refusal that still proves the credential: the provider got past auth to say it. */
+export function isReachableRefusal({
+  provider,
+  status,
+}: {
+  provider: string;
+  status: number;
+}): boolean {
+  return provider === "azure" && AZURE_REACHABLE_STATUSES.has(status);
+}
+
+/** One deployment's chat-completions route, at the credential's api-version or the default. */
+export function azureChatCompletionsUrl({
+  endpoint,
+  deployment,
+  apiVersion,
+}: {
+  endpoint: string;
+  deployment: string;
+  /** The row's AZURE_OPENAI_API_VERSION, so the check runs where execution will. */
+  apiVersion?: string;
+}): string {
+  const root = endpoint.trim().replace(/\/+$/, "");
+  const version = apiVersion?.trim() || DEFAULT_AZURE_API_VERSION;
+  return (
+    `${root}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions` +
+    `?api-version=${encodeURIComponent(version)}`
+  );
+}
+
+/**
  * Providers we will not probe, and must not pretend to have probed.
  */
 export const NOT_PROBEABLE: ReadonlySet<string> = new Set([
   "bedrock",
   "vertex_ai",
-  "azure",
   "azure_safety",
   // Decision model providers have no models list to probe (ADR-182).
   "inception",

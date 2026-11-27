@@ -204,6 +204,8 @@ interface IOViewerProps {
   spanId?: string;
   /** Span type — `llm` enables the Playground affordance. */
   spanType?: string;
+  /** A span braided in from another project: its annotate and playground actions are off. */
+  isBraided?: boolean;
 }
 
 export const IOViewer = memo(function IOViewer({
@@ -213,6 +215,7 @@ export const IOViewer = memo(function IOViewer({
   traceId,
   spanId,
   spanType,
+  isBraided,
 }: IOViewerProps) {
   // Translate-to-English swaps the content feeding the whole viewer pipeline, so every
   // format (pretty/chat/json/markdown) renders the translated variant; Copy follows
@@ -328,6 +331,7 @@ export const IOViewer = memo(function IOViewer({
           fieldAnchor={fieldAnchor}
           originalContent={originalContent}
           copyText={content}
+          isBraided={isBraided}
         />
       </HStack>
 

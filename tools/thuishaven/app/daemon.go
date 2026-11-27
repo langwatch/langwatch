@@ -220,6 +220,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			endSamples()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
+			o.capClickHouseLogs()
 			o.stopColimaIfIdle(ctx)
 		}
 	}
@@ -283,8 +284,8 @@ func (o *Orchestrator) reapStack(s domain.Stack, dead, stale bool) {
 	if !s.PortlessDisabled {
 		o.removeStackRoutes(s.Slug, s.Services)
 	}
-	o.store.RemoveStack(s.Slug)
 	removeKeeperPlan(s.WorktreeDir, s.Slug)
+	o.store.RemoveStack(s.Slug)
 	reason := "launcher died"
 	if timedOut {
 		reason = "heartbeat stale past the idle TTL"

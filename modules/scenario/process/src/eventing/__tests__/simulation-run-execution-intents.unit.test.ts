@@ -92,6 +92,9 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
   recordHooks(): Promise<void> {
     throw new Error("recordHooks unexpectedly called in simulation intent tests");
   }
+  recordRedTeamReport(): Promise<void> {
+    throw new Error("recordRedTeamReport unexpectedly called in simulation intent tests");
+  }
 }
 
 function executionService(submit: (job: ScenarioExecutionJob) => void): ScenarioExecutionService {

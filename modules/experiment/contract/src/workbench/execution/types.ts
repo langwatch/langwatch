@@ -13,6 +13,7 @@ import {
   type TargetConfig,
   targetConfigSchema,
   MAX_CONCURRENCY,
+  MAX_RUN_REPEAT,
 } from "../../experiment-workbench.ts";
 
 /**
@@ -250,13 +251,15 @@ export const abortExperimentRunResponseSchema: AbortExperimentRunResponseSchema 
 const runInputsBodySchemaDefinition = z
   .object({
     data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
-    dataset_id: z.string().optional(),
+    dataset_id: z.string().min(1, "dataset_id must not be empty").optional(),
     /** The version of the saved dataset to run; overrides the version the experiment pins. */
     dataset_version: z.number().int().positive().optional(),
     parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     row_indices: z.array(z.number().int().nonnegative()).optional(),
     /** Cells in flight at once for this run only; never saved to the experiment. */
     concurrency: z.number().int().min(1).max(MAX_CONCURRENCY).optional(),
+    /** How many times every dataset row runs against every target in this run. */
+    repeat: z.number().int().min(1).max(MAX_RUN_REPEAT).optional(),
   })
   .refine((b) => !(b.data && b.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",

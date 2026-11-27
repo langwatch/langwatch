@@ -13,7 +13,12 @@ vi.mock("../../../behavior/use-reachable-products.ts", () => ({
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
+    boards: { resolve: { useQuery: () => ({ data: undefined, isError: false }) } },
     governance: { resolveHome: { useQuery: () => ({ data: undefined, isError: false }) } },
+    // The organization's Dashboards library asks its flags; no organization, no answer.
+    featureFlag: {
+      isEnabledForEachOrganization: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
     identity: {
       myTestArrival: { useQuery: () => ({ data: { testing: false }, isLoading: false }) },
     },

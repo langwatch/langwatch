@@ -119,6 +119,21 @@ export class MemoryOrganizationLicenseRepository implements OrganizationLicenseR
     this.own.set(organizationId, { license: { ...license }, updatedAt: nowInstant() });
   }
 
+  async replaceLicense({
+    organizationId,
+    license,
+    replacing,
+  }: Readonly<{
+    organizationId: string;
+    license: StoredLicense;
+    replacing: string | null;
+  }>): Promise<boolean> {
+    const held = this.licenseOf(organizationId);
+    if (held === void 0 || held.licenseKey !== replacing) return false;
+    this.own.set(organizationId, { license: { ...license }, updatedAt: nowInstant() });
+    return true;
+  }
+
   async clearLicense({ organizationId }: Readonly<{ organizationId: string }>): Promise<void> {
     this.own.set(organizationId, {
       license: { licenseKey: null, expiresAt: null, validatedAt: null },

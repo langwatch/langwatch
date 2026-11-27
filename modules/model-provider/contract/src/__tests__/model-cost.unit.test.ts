@@ -213,15 +213,17 @@ describe("estimateCost", () => {
   });
 
   describe("when characters, seconds and tokens all arrive together", () => {
-    it("sums every term", () => {
-      const mixed: ModelCostRate = {
-        model: "mixed/model",
-        regex: "^mixed\\/model$",
-        inputCostPerToken: 0.000004,
-        outputCostPerToken: 0.000016,
-        inputCostPerCharacter: 0.000015,
-        inputCostPerSecond: 0.0001,
-      };
+    const mixed: ModelCostRate = {
+      model: "mixed/model",
+      regex: "^mixed\\/model$",
+      inputCostPerToken: 0.000004,
+      outputCostPerToken: 0.000016,
+      inputCostPerCharacter: 0.000015,
+      inputCostPerSecond: 0.0001,
+    };
+
+    /** @scenario "A span with tokens and a duration is charged for its tokens only" */
+    it("charges the tokens only, never the characters or seconds on top", () => {
       expect(
         estimateCost({
           llmModelCost: mixed,
@@ -230,7 +232,30 @@ describe("estimateCost", () => {
           inputCharacters: 4000,
           audioSeconds: 30,
         }),
-      ).toBeCloseTo(100 * 0.000004 + 20 * 0.000016 + 4000 * 0.000015 + 30 * 0.0001, 10);
+      ).toBeCloseTo(100 * 0.000004 + 20 * 0.000016, 10);
+    });
+
+    it("charges characters over seconds when the rate has no token rate", () => {
+      const noTokens: ModelCostRate = {
+        model: "speech/model",
+        regex: "^speech\\/model$",
+        inputCostPerCharacter: 0.000015,
+        inputCostPerSecond: 0.0001,
+      };
+      expect(
+        estimateCost({ llmModelCost: noTokens, inputCharacters: 4000, audioSeconds: 30 }),
+      ).toBeCloseTo(4000 * 0.000015, 10);
+    });
+
+    it("charges seconds when seconds are the only unit priced", () => {
+      const perSecond: ModelCostRate = {
+        model: "whisper/model",
+        regex: "^whisper\\/model$",
+        inputCostPerSecond: 0.0001,
+      };
+      expect(
+        estimateCost({ llmModelCost: perSecond, inputTokens: 100, audioSeconds: 30 }),
+      ).toBeCloseTo(30 * 0.0001, 10);
     });
   });
 
@@ -848,5 +873,29 @@ describe("deriveCacheWrite1hRate", () => {
     it("derives nothing for a model that is not cache-priced at all", () => {
       expect(deriveCacheWrite1hRate(ANTHROPIC, { inputCostPerToken: 0.000005 })).toBeUndefined();
     });
+  });
+});
+
+describe("computeCost web search pricing", () => {
+  /** @scenario "the cost arithmetic prices each web search call" */
+  it("adds each web search call at the per-query rate to the token cost", () => {
+    const cost = estimateCostUnderOneRate({
+      rate: {
+        model: "test/search",
+        regex: "^test/search$",
+        inputCostPerToken: 1e-6,
+        outputCostPerToken: 2e-6,
+        webSearchCostPerQuery: 0.01,
+      },
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      cacheCreation1hTokens: 0,
+      inputAudioTokens: 0,
+      outputAudioTokens: 0,
+      webSearchRequests: 2,
+    });
+    expect(cost).toBeCloseTo(100 * 1e-6 + 50 * 2e-6 + 2 * 0.01, 12);
   });
 });

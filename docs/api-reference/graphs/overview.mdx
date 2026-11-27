@@ -6,3 +6,18 @@ description: "Manage custom analytics graphs within dashboards. Create, update, 
 ## Intro
 
 Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations.
+
+## Size
+
+A graph created with `POST /api/graphs` (also served at `/api/v1/graphs`) without `colSpan` or `rowSpan` is four columns wide and three rows tall (4x3), the same size Reports creates. If only one of the two is sent, the other takes its default: `colSpan: 2` alone gives 2x3.
+
+Placement fields must be whole numbers within the grid. Fractional numbers are refused.
+
+| Field | Range |
+| --- | --- |
+| `gridColumn` | 0 to 7 |
+| `gridRow` | 0 to 2000000000 |
+| `colSpan` | 1 to 8 |
+| `rowSpan` | 1 to 20 |
+
+`gridColumn` plus `colSpan` must not exceed 8. A size read from the API can be posted back unchanged.

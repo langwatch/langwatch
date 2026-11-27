@@ -1,10 +1,13 @@
-import type {
-  GovernanceIngestionSource,
-  NormalizedPullEvent,
-  PullResult,
-  PulledUsageObservedEventData,
+import {
+  ingestionSourceIsLive,
+  type GovernanceIngestionSource,
+  type NormalizedPullEvent,
+  type PullResult,
+  type PulledUsageObservedEventData,
+  SECURITY_LAKE_ADAPTER_ID,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
-import { isDispatchError } from "@langwatch/eventing";
+import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import {
   type InternalProject,
   type InternalProjectQuery,
@@ -202,7 +205,7 @@ export class IngestionPullWorkerService {
       throw new Error(`IngestionSource ${input.sourceId} not found`);
     }
 
-    if (source.status !== "active" && source.status !== "awaiting_first_event") {
+    if (!ingestionSourceIsLive(source)) {
       this.diagnostics.info("IngestionSource not active, skipping", {
         ingestionSourceId: source.id,
         status: source.status,
@@ -250,7 +253,7 @@ export class IngestionPullWorkerService {
     const readThrough = pullReadThrough({ result, nowMs: this.now() });
     return {
       nextCursor: result.cursor,
-      eventCount: result.events.length,
+      eventCount: result.events.length + (result.writtenCount ?? 0),
       errorCount: result.errorCount,
       completeness: result.completeness ?? "complete",
       ...(result.unreadPage === true ? { unreadPage: true as const } : {}),
@@ -271,13 +274,19 @@ export class IngestionPullWorkerService {
     if (typeof adapterId !== "string") {
       throw new Error("IngestionSource has no pullConfig.adapter");
     }
-
-    const adapter = this.registry.getById(adapterId);
-
-    const validatedConfig = adapter.validateConfig(pullConfig);
+    // The Security Lake reader runs only for the source its own entitled routes created.
+    if (adapterId === SECURITY_LAKE_ADAPTER_ID && source.sourceType !== SECURITY_LAKE_SOURCE_TYPE) {
+      throw new DispatchError({
+        message: `${SECURITY_LAKE_ADAPTER_ID}: source type ${source.sourceType} may not run this adapter`,
+        retryable: false,
+        customerMessage: SECURITY_LAKE_ADAPTER_REFUSED_MESSAGE,
+      });
+    }
 
     let result: PullResult;
     try {
+      const adapter = this.registry.getById(adapterId);
+      const validatedConfig = adapter.validateConfig(pullConfig);
       result = await this.withDeadline((signal, deadlineAt) =>
         adapter.runOnce(
           {
@@ -424,6 +433,10 @@ export class IngestionPullWorkerService {
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/** Shown on a source that names the Security Lake reader without being a Security Lake source. */
+export const SECURITY_LAKE_ADAPTER_REFUSED_MESSAGE =
+  "This source cannot read Security Lake. Add a Security Lake source from the Security Lake page instead.";
 
 /**
  * A refusal no retry changes that carries the customer's remediation sentence: what the

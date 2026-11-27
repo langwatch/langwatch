@@ -5,6 +5,7 @@ import {
   baseSpanSchema,
   SHARE_MAX_FULL_SPANS,
   TraceNotFoundError,
+  TraceWithheldOverPlanError,
   type Protections,
   type Span,
   type SpanResourceInfo,
@@ -102,6 +103,7 @@ type Setup = {
   resolved?: ShareWithProject | Error;
   archived?: boolean;
   missingTrace?: boolean;
+  withheldTrace?: boolean;
   spans?: Span[];
   resources?: SpanResourceInfo[];
   cached?: unknown;
@@ -128,6 +130,9 @@ function setup(options: Setup = {}) {
     readTraceSummary: async (input) => {
       calls.cutoffs.push(input.visibilityCutoffMs);
       if (options.missingTrace) throw new TraceNotFoundError(TRACE_ID);
+      if (options.withheldTrace) {
+        throw new TraceWithheldOverPlanError({ traceId: TRACE_ID, members: 13, maxMembers: 2 });
+      }
       return summary();
     },
     readSpanSummaries: async () => [],
@@ -252,6 +257,16 @@ describe("TraceSharedReadService", () => {
       await expect(service.getSharedTrace(ANONYMOUS)).rejects.toMatchObject({
         code: "share_link_not_found",
       });
+    });
+
+    /** @scenario "A shared link to a withheld trace reads as a missing link" */
+    it("answers a trace withheld over plan like a bad token, without the plan counts", async () => {
+      const { service } = setup({ withheldTrace: true });
+
+      const failure = await service.getSharedTrace(ANONYMOUS).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({ code: "share_link_not_found" });
+      expect(JSON.stringify(failure)).not.toMatch(/maxMembers/);
     });
   });
 

@@ -63,6 +63,7 @@ export function spendSteps({
             input_image_tokens: 0,
             output_image_tokens: 0,
             image_count: 0,
+            web_search_requests: 0,
           },
           cost_nano_usd: 4_262_500,
           rate_version: "rates-1",

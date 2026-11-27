@@ -30,6 +30,14 @@ Feature: The task launcher
     And the launcher returns a non-zero exit code
     And the host's close function is awaited exactly once
 
+  @regression @unit
+  Scenario: A task whose file write fails leaves no staged temporary file
+    Given a task that writes its output to a staged temporary file and renames it over the target
+    And the rename over the target fails
+    When the task runs
+    Then the task fails
+    And no staged temporary file is left beside the target
+
   @unit
   Scenario: A task whose infrastructure handle is absent refuses by name
     Given a TaskHostPort composed without a ClickHouse handle

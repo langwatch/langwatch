@@ -89,7 +89,13 @@ const STICKY_HEADER = {
 /** Leading select and expand columns stick left, the action column right; headers sit above all. */
 const PINNED = {
   "& [data-pin]": { position: "sticky", zIndex: 1 },
-  "& [data-pin=end]": { right: 0, width: "1%", whiteSpace: "nowrap", textAlign: "end" },
+  "& [data-pin=end]": {
+    right: 0,
+    width: "1%",
+    whiteSpace: "nowrap",
+    textAlign: "end",
+  },
+  "& td[data-pin=end]": { boxShadow: "inset 1px 0 0 var(--chakra-colors-border-muted)" },
   "& [data-pin=start]": { left: 0 },
   "& [data-pin=start] ~ [data-pin=start]": { left: "48px" },
   "& td[data-pin]": {

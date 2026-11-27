@@ -18,6 +18,13 @@
     {{- fail "ingress.gateway.host is set but gateway.chartManaged is false, so there is no gateway Service in this release to route to. Clear ingress.gateway.host, or set gateway.chartManaged=true." }}
   {{- end }}
 {{- end }}
+{{- $uploadsSwitch := ((.Values.ingress | default dict).uploads | default dict).enabled }}
+{{- if not (or (kindIs "invalid" $uploadsSwitch) (kindIs "bool" $uploadsSwitch)) }}
+  {{- fail (printf "ingress.uploads.enabled is %q; use true, false, or leave it unset (on for className nginx)." (toString $uploadsSwitch)) }}
+{{- end }}
+{{- if and (eq $uploadsSwitch true) (not .Values.ingress.enabled) }}
+  {{- fail "ingress.uploads.enabled is true but ingress.enabled is not true, so no Ingress would carry the upload route. Set ingress.enabled=true, or unset ingress.uploads.enabled." }}
+{{- end }}
 {{- if .Values.ingress.enabled }}
 {{- $blockedPaths := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
 {{- /*
@@ -76,6 +83,20 @@
     {{- end }}
   {{- end }}
 {{- end }}
+{{- /*
+  ingress-nginx cuts a response at 60 s by default, the same as an analytics
+  query's own limit, so with className nginx the app Ingress waits 120 s. Its
+  1m body default would refuse a trace export carrying a recording, so the body
+  size follows the trace receiver's 64 MiB default. ingress.annotations override these.
+*/}}
+{{- $appAnnotations := dict }}
+{{- if eq (toString .Values.ingress.className) "nginx" }}
+{{- $appAnnotations = dict
+      "nginx.ingress.kubernetes.io/proxy-read-timeout" "120"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" "120"
+      "nginx.ingress.kubernetes.io/proxy-body-size" "64m" }}
+{{- end }}
+{{- $appAnnotations = mergeOverwrite $appAnnotations (deepCopy (.Values.ingress.annotations | default dict)) }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -84,9 +105,9 @@ metadata:
   labels:
     {{- .Values.ingress.labels | toYaml | nindent 4 }}
   {{- end }}
-  {{- if .Values.ingress.annotations }}
+  {{- with $appAnnotations }}
   annotations:
-    {{- .Values.ingress.annotations | toYaml | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   {{- with .Values.ingress.className }}
@@ -132,6 +153,73 @@ spec:
               {{- end }}
           {{- end }}
     {{- end }}
+{{- /*
+  Uploads (#9666) stream up to 5 GiB and ingress-nginx sizes per Ingress, so the route gets
+  its own; on for className nginx unless switched. Annotations: the app's minus rewrites and
+  server-snippet (host-scoped), the upload settings, then ingress.uploads.annotations.
+*/}}
+{{- $uploadsPath := "/api/stored-objects/uploads" }}
+{{- $uploadsBlocked := false }}
+{{- range $blockedPaths }}
+  {{- if hasPrefix (printf "%s/" .) (printf "%s/" $uploadsPath) }}{{ $uploadsBlocked = true }}{{ end }}
+{{- end }}
+{{- /* A host whose own paths already route the upload path keeps it: a repeat is rejected. */}}
+{{- $uploadsHosts := list }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- $owned := false }}
+  {{- range $host.http.paths }}
+    {{- $p := trimSuffix "/" (toString .path) }}
+    {{- if eq $p $uploadsPath }}{{ $owned = true }}{{ end }}
+  {{- end }}
+  {{- if not $owned }}{{ $uploadsHosts = append $uploadsHosts $host.host }}{{ end }}
+{{- end }}
+{{- $uploadsClass := toString (.Values.ingress.className | default "") }}
+{{- $uploadsOn := ternary $uploadsSwitch (eq $uploadsClass "nginx") (kindIs "bool" $uploadsSwitch) }}
+{{- if and $uploadsOn (not $uploadsBlocked) $uploadsHosts }}
+{{- $uploadsRoute := (.Values.ingress.uploads | default dict) }}
+{{- $uploadsAnnotations := omit (deepCopy $appAnnotations) "nginx.ingress.kubernetes.io/rewrite-target" "nginx.ingress.kubernetes.io/use-regex" "nginx.ingress.kubernetes.io/app-root" "nginx.ingress.kubernetes.io/server-snippet" }}
+{{- /* An ingress-nginx class by name (nginx, nginx-internal) gets the settings; others none. */}}
+{{- if contains "nginx" $uploadsClass }}
+{{- $uploadsAnnotations = mergeOverwrite $uploadsAnnotations (dict
+      "nginx.ingress.kubernetes.io/proxy-request-buffering" "off"
+      "nginx.ingress.kubernetes.io/proxy-body-size" "5121m"
+      "nginx.ingress.kubernetes.io/proxy-read-timeout" "3600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" "3600") }}
+{{- end }}
+{{- $uploadsAnnotations = mergeOverwrite $uploadsAnnotations (deepCopy ($uploadsRoute.annotations | default dict)) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-uploads-ingress
+  {{- if .Values.ingress.labels }}
+  labels:
+    {{- .Values.ingress.labels | toYaml | nindent 4 }}
+  {{- end }}
+  {{- with $uploadsAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $uploadsClass }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- /* No tls: ingress-nginx serves each host's certificate from the app
+         Ingress, and a second tls entry would have cert-manager issue it twice. */}}
+  rules:
+    {{- range $uploadsHosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: {{ $uploadsPath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}-app
+                port:
+                  number: {{ $.Values.app.service.port | default 5560 }}
+    {{- end }}
+{{- end }}
 {{- end }}
 
 {{- if and .Values.ingress.enabled $gwRoute.host }}
@@ -182,9 +270,16 @@ spec:
     - host: {{ $gwRoute.host | quote }}
       http:
         paths:
-          {{- /* Only the client API and the status endpoint. The probes,
-                 /metrics, /debug and /internal stay in-cluster. */}}
+          {{- /* Only the client API, the A2A proxy and the status endpoint.
+                 The probes, /metrics, /debug and /internal stay in-cluster. */}}
           - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-gateway
+                port:
+                  number: {{ $gwPort }}
+          - path: /a2a
             pathType: Prefix
             backend:
               service:

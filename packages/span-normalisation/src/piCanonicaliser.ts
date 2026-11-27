@@ -65,7 +65,7 @@ export class PiCanonicaliserService implements AttributeCanonicaliser {
     extractModelToBoth({ ctx, sourceKey: "pi.ai.model", ruleId: `${this.id}:model` });
 
     this.liftTokens(ctx);
-    this.liftOutcome(ctx);
+    this.liftOutcome(ctx, spanName);
     this.liftIdentifiers(ctx);
 
     // `pi.ai.usage.cost` is deliberately never read. pi's self-reported figure
@@ -85,17 +85,21 @@ export class PiCanonicaliserService implements AttributeCanonicaliser {
   }
 
   /** How the call ended: pi's stop reason and, when it failed, the error it names. */
-  private liftOutcome(ctx: ExtractorContext): void {
+  private liftOutcome(ctx: ExtractorContext, spanName: string): void {
     const stopReason = ctx.bag.attrs.get("pi.ai.response.stop_reason");
     if (
       isNonEmptyString(stopReason) &&
       ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS] === void 0
     ) {
-      ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS, stopReason);
+      // A list, as the convention and every other producer spell it.
+      ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS, [stopReason]);
       ctx.recordRule(`${this.id}:response.stop_reason`);
     }
 
-    const errorType = ctx.bag.attrs.get("pi.ai.error.type") ?? ctx.bag.attrs.get("pi.error.type");
+    // Each key on the span pi declares it for: a model call's error class, or a
+    // harness operation's (pi-agent-core `dist/harness/telemetry.js:68` and `:156`).
+    const errorKey = spanName === "pi.ai.request" ? "pi.ai.error.type" : "pi.error.type";
+    const errorType = ctx.bag.attrs.get(errorKey);
     if (isNonEmptyString(errorType) && ctx.out[ATTR_KEYS.ERROR_TYPE] === void 0) {
       ctx.setAttr(ATTR_KEYS.ERROR_TYPE, errorType);
       ctx.recordRule(`${this.id}:error.type`);

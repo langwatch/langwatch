@@ -55,6 +55,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
@@ -63,7 +66,6 @@
       "ignoredDependencies": [
         "@langwatch/config",
         "@langwatch/feature-flag-client",
-        "@langwatch/user-contract",
         "@langwatch/vitest-config"
       ]
     }

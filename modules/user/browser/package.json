@@ -24,6 +24,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
+    "@langwatch/auth-client": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
@@ -31,6 +32,7 @@
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-digest-contract": "workspace:*",
     "@langwatch/enterprise-gateway-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/error-views": "workspace:*",

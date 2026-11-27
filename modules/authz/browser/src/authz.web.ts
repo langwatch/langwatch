@@ -1,12 +1,13 @@
 /**
- * What a browser installs when it installs authz: the Roles & access settings
- * page, whose Access tab /settings/role-bindings now redirects to.
+ * What a browser installs when it installs authz: the Roles & access page and the project and
+ * organisation Braids pages (ADR-201 §9; read-only with Remove while `release_braids` is off).
  */
 
 import { authzWebConfigSchema } from "@langwatch/authz-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 import { authzApi } from "./behavior/authz-api.ts";
+import { RoleDetailDrawerToken } from "./model/role-detail-drawer.ts";
 
 export const authzWeb = defineBrowserModule("authz")
   .withConfig({ authz: authzWebConfigSchema }, ({ authz }) => authz)
@@ -15,6 +16,10 @@ export const authzWeb = defineBrowserModule("authz")
     requires: ["AuthzHostApi"],
     mounts: { AuthzHostApi: { load: () => import("./behavior/authz-host-mount.tsx") } },
   })
+  /** The settings menu's Braids entry while `release_braids` is off (Alex, 2026-11-18). */
+  .withCapabilities({
+    braidsPresence: { load: () => import("./behavior/braids-presence.ts") },
+  })
   .withScreens({
     // Placed by the application's settings table until a settings anchor
     // accepts declared routes; the loader is this module's either way.
@@ -22,7 +27,29 @@ export const authzWeb = defineBrowserModule("authz")
       path: "/settings/roles",
       within: "settings",
       label: "Roles & access",
-      requires: "organization:manage",
+      // Every role reads it; its edits ask organization:manage on their own.
+      requires: "members:view",
+      requiresAt: "organization",
       load: () => import("./ui/sections/roles.screen.tsx"),
     },
+    "pages/settings/braids": {
+      path: "/settings/braids",
+      within: "settings",
+      label: "Braids",
+      requires: "project:view",
+      load: () => import("./ui/sections/braids/braids.screen.tsx"),
+    },
+    "pages/settings/organization-braids": {
+      path: "/settings/organization-braids",
+      within: "settings",
+      label: "Braids",
+      requires: "organization:manage",
+      load: () => import("./ui/sections/braids/organization-braids.screen.tsx"),
+    },
+  })
+  /** What one role can do: `?drawer.open=roleDetail&drawer.role=<key or id>`. */
+  .drawer(RoleDetailDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/role-detail-drawer.tsx")).RoleDetailDrawer,
+    }),
   });

@@ -77,7 +77,7 @@ function janesTwoMachines() {
     legacyGrants: LegacyApiKeyGrantService.create({
       authz,
       grants,
-      deriveBindingId: vi.fn(),
+      resolveBindingId: vi.fn(),
       diagnostics: createTestLogger().logger,
     }),
     tokens: ApiKeyTokenService.create("pepper"),

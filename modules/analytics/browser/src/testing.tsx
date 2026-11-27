@@ -29,6 +29,8 @@ export type StubAnalyticsHostOptions = {
   /** The signed-in member; "user-1" unless a test says otherwise. */
   userId?: string | undefined;
   permissions?: readonly string[];
+  /** Grants in projects other than the one in scope, by project id; none unless named. */
+  projectPermissions?: Readonly<Record<string, readonly string[]>>;
   /** Whether the grants have arrived; settled unless a test says otherwise. */
   settled?: boolean;
   /** A flag named here answers its value, `undefined` included; any other is off. */
@@ -88,6 +90,10 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
 
   hasPermission(permission: string): boolean {
     return (this.options.permissions ?? ANALYTICS_MEMBER_PERMISSIONS).includes(permission);
+  }
+
+  hasPermissionIn({ projectId, permission }: { projectId: string; permission: string }): boolean {
+    return (this.options.projectPermissions?.[projectId] ?? []).includes(permission);
   }
 
   isSettled(): boolean {

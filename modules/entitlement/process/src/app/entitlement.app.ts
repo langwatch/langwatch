@@ -19,6 +19,8 @@ import {
   type ResolvePlanInput,
   type SendUsageLimitWarningInput,
   type UsageLimitWarning,
+  type UsageMonthBreakdown,
+  type OrganizationUsageLimits,
   type UsageStats,
   type PricingModel,
   PlanLimitExceededError,
@@ -37,7 +39,11 @@ import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
-import { CountMonthCommand } from "../eventing/usage.commands.ts";
+import {
+  CountMonthCommand,
+  CountScenarioRunsCommand,
+  RecordScenarioRunGraceEndedCommand,
+} from "../eventing/usage.commands.ts";
 import {
   buildUsagePipeline,
   type UsagePipelineDefinition,
@@ -45,14 +51,17 @@ import {
 } from "../eventing/usage.pipeline.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { coreBaselinePlan } from "../rules/plan-baseline.rules.ts";
+import { usageLimitsOf } from "../rules/usage-limits.rules.ts";
 import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
+import { ScenarioRunCapService } from "../services/scenario-run-cap.service.ts";
 import { SelfServePlanCatalogueService } from "../services/self-serve-plan-catalogue.service.ts";
 import { SubscriptionPlanService } from "../services/subscription-plan.service.ts";
 import { TraceUsageService } from "../services/trace-usage.service.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 import { UsageService, type UsageCounter } from "../services/usage-enforcement.service.ts";
+import { UsageMonthBreakdownService } from "../services/usage-month-breakdown.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
 import { UsageWarningService, type UsageWarning } from "../services/usage-warning.service.ts";
 
@@ -101,9 +110,17 @@ export type EntitlementInfrastructure = Readonly<{
   counter: UsageCounter;
   /** The approaching-limit mail, over the deployment's gateway. */
   warnings: UsageWarning;
+  /** The cloud Free scenario run cap; absent on self-hosted, where no plan caps runs. */
+  scenarioRuns?: ScenarioRunCapService;
 }>;
 
 const logger = createLogger("langwatch:usage");
+
+/** Self-hosted registers the commands with nothing to count: no plan caps runs there. */
+const noScenarioRunCap = {
+  computeMonthCount: async () => undefined,
+  isCapped: async () => false,
+};
 
 /** Organization stores the per-file dataset limit in MiB; the bounds are in bytes. */
 const BYTES_PER_MEBIBYTE = 1024 * 1024;
@@ -127,10 +144,13 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
  */
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "billing">;
 
-/** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
+/**
+ * The repositories the app reads directly. Most meters reach it through its usage pipeline; the
+ * billable-events meter is read directly for the month breakdown.
+ */
 type EntitlementReadRepositories = Pick<
   EntitlementRepositories,
-  "membership" | "seats" | "spend" | "tenancy"
+  "membership" | "seats" | "spend" | "tenancy" | "billableEvents"
 >;
 
 /** The usage pipeline over the senders its process manager and subscriber call back through. */
@@ -147,9 +167,11 @@ export class EntitlementModule implements EntitlementApiContract {
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
+  #month: UsageMonthBreakdownService;
   #counter: UsageCounter;
   #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
+  #scenarioRuns: ScenarioRunCapService | undefined;
   #spend: EntitlementRepositories["spend"];
   #tenancy: EntitlementRepositories["tenancy"];
   #pricing: EntitlementCallerLookup["billing"];
@@ -176,8 +198,15 @@ export class EntitlementModule implements EntitlementApiContract {
       seats: repositories.seats,
       counter: infrastructure.counter,
       plans: this.#plans,
+      ...(infrastructure.scenarioRuns ? { scenarioRuns: infrastructure.scenarioRuns } : {}),
     });
+    this.#scenarioRuns = infrastructure.scenarioRuns;
     this.#counter = infrastructure.counter;
+    this.#month = UsageMonthBreakdownService.create({
+      counter: infrastructure.counter,
+      meter: repositories.billableEvents,
+      tenancy: repositories.tenancy,
+    });
     this.#nextStep = PlanNextStepService.create({
       catalogue: SelfServePlanCatalogueService.create(),
     });
@@ -209,6 +238,7 @@ export class EntitlementModule implements EntitlementApiContract {
       tenancy: repositories.tenancy,
       meter: repositories.billableEvents,
       traceMeter: repositories.traces,
+      caches: { counts: repositories.usageCounts, decisions: repositories.usageDecisions },
     });
     const warnings = UsageWarningService.create({
       // The module is built below; the warning records only once its pipeline is connected.
@@ -239,14 +269,28 @@ export class EntitlementModule implements EntitlementApiContract {
         })
       : undefined;
 
+    const scenarioRuns = config.isSaas
+      ? ScenarioRunCapService.create({
+          meter: repositories.billableEvents,
+          plans,
+          now: () => nowInstant().epochMilliseconds,
+        })
+      : undefined;
+
     const entitlement: EntitlementModule = new EntitlementModule({
       repositories,
-      infrastructure: { ...sources, counter, warnings },
+      infrastructure: { ...sources, counter, warnings, scenarioRuns },
       dependencies,
       config,
       usagePipeline: (send) =>
         buildUsagePipeline({
           countMonth: CountMonthCommand.create({ counting }),
+          countScenarioRuns: CountScenarioRunsCommand.create({
+            runs: scenarioRuns ?? noScenarioRunCap,
+          }),
+          recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
+            runs: scenarioRuns ?? noScenarioRunCap,
+          }),
           traceUsage,
           billableEventsMeter,
           projects: repositories.tenancy,
@@ -337,6 +381,16 @@ export class EntitlementModule implements EntitlementApiContract {
     return this.#usage.getUsageStats(input.organizationId, user);
   }
 
+  async getUsageLimits(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationUsageLimits> {
+    return usageLimitsOf(await this.#usage.getUsageStats(input.organizationId, undefined));
+  }
+
+  getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown> {
+    return this.#month.getMonthBreakdown(input);
+  }
+
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
     return this.#warnings.sendWarning(input);
   }
@@ -360,6 +414,14 @@ export class EntitlementModule implements EntitlementApiContract {
       maxMessagesPerMonth: result.maxMessagesPerMonth,
       activePlanName: result.planName,
     });
+  }
+
+  async assertScenarioRunAllowed(input: {
+    organizationId: string;
+    shouldCountRun?: boolean | undefined;
+    runKey?: { projectId: string; deduplicationKey: string } | undefined;
+  }): Promise<void> {
+    await this.#scenarioRuns?.assertRunAllowed(input);
   }
 
   /** The daily warning sweep this module's worker hosts, over the warning it composed. */
@@ -391,6 +453,9 @@ export class EntitlementModule implements EntitlementApiContract {
       countMonth: (data) => commands.countMonth.send(data),
       recordLimitDecision: (data) => commands.recordLimitDecision.send(data),
       recordUsageWarning: (data) => commands.recordUsageWarning.send(data),
+      countScenarioRuns: (data) => commands.countScenarioRuns.send(data),
+      recordScenarioRunsThreshold: (data) => commands.recordScenarioRunsThreshold.send(data),
+      recordScenarioRunGraceEnded: (data) => commands.recordScenarioRunGraceEnded.send(data),
     };
   }
 

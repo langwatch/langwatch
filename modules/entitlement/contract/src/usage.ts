@@ -63,6 +63,23 @@ export interface SeatLimitInfoSchema extends Named<typeof seatLimitInfoSchemaDef
 export const seatLimitInfoSchema: SeatLimitInfoSchema = seatLimitInfoSchemaDefinition;
 export type SeatLimitInfo = z.infer<typeof seatLimitInfoSchema>;
 
+/**
+ * A capped plan's scenario runs this UTC month. `graceEndsAt` is null before the first run;
+ * while the grace runs, `inGrace` is true and the cap is not applied.
+ */
+const scenarioRunUsageSchemaDefinition = z
+  .object({
+    current: z.number().nullable(),
+    max: z.number(),
+    inGrace: z.boolean(),
+    graceEndsAt: z.number().nullable(),
+    message: z.string(),
+  })
+  .strict();
+export interface ScenarioRunUsageSchema extends Named<typeof scenarioRunUsageSchemaDefinition> {}
+export const scenarioRunUsageSchema: ScenarioRunUsageSchema = scenarioRunUsageSchemaDefinition;
+export type ScenarioRunUsage = z.infer<typeof scenarioRunUsageSchema>;
+
 /** One organization's usage for the current period, and the plan it is measured against. */
 const usageStatsSchemaDefinition = z
   .object({
@@ -78,13 +95,77 @@ const usageStatsSchemaDefinition = z
     maxMonthlyUsageLimit: z.number(),
     membersCount: z.number(),
     membersLiteCount: z.number(),
-    /** Developer seats (ADR-171): shown beside the metered seats, never capped. */
+    /** Developer seats (ADR-171), measured against the plan's `maxMembersDeveloper`. */
     membersDeveloperCount: z.number(),
     messageLimitInfo: messageLimitInfoSchema,
     seatLimitInfo: seatLimitInfoSchema,
     usageUnit: usageUnitSchema,
+    /** Null on a plan with no scenario run cap. */
+    scenarioRuns: scenarioRunUsageSchema.nullable(),
   })
   .strict();
 export interface UsageStatsSchema extends Named<typeof usageStatsSchemaDefinition> {}
 export const usageStatsSchema: UsageStatsSchema = usageStatsSchemaDefinition;
 export type UsageStats = z.infer<typeof usageStatsSchema>;
+
+/** One UTC day's count this month: `date` is `YYYY-MM-DD`. */
+const usageDaySchemaDefinition = z.object({ date: z.string(), count: z.number() }).strict();
+export interface UsageDaySchema extends Named<typeof usageDaySchemaDefinition> {}
+export const usageDaySchema: UsageDaySchema = usageDaySchemaDefinition;
+export type UsageDay = z.infer<typeof usageDaySchema>;
+
+/** One project's share of the month, named as the limit email names it. */
+const projectUsageShareSchemaDefinition = z
+  .object({ projectId: z.string(), name: z.string(), count: z.number() })
+  .strict();
+export interface ProjectUsageShareSchema extends Named<typeof projectUsageShareSchemaDefinition> {}
+export const projectUsageShareSchema: ProjectUsageShareSchema = projectUsageShareSchemaDefinition;
+export type ProjectUsageShare = z.infer<typeof projectUsageShareSchema>;
+
+/** The kinds of billable event the usage page counts apart, in the order it shows them. */
+export const USAGE_CATEGORIES = [
+  "spans",
+  "logs",
+  "metrics",
+  "evaluations",
+  "experiments",
+  "scenarios",
+] as const;
+export const usageCategorySchema = z.enum(USAGE_CATEGORIES);
+export type UsageCategory = z.infer<typeof usageCategorySchema>;
+
+/** One kind's distinct billable events this month. */
+const usageCategoryCountSchemaDefinition = z
+  .object({ category: usageCategorySchema, count: z.number() })
+  .strict();
+export interface UsageCategoryCountSchema extends Named<
+  typeof usageCategoryCountSchemaDefinition
+> {}
+export const usageCategoryCountSchema: UsageCategoryCountSchema =
+  usageCategoryCountSchemaDefinition;
+export type UsageCategoryCount = z.infer<typeof usageCategoryCountSchema>;
+
+/**
+ * The usage page's month: each UTC day, each kind (`USAGE_CATEGORIES` order, zeros included) and
+ * each project, busiest first. `days` and `byCategory` are null for a traces meter or a failed
+ * read (`is*Unavailable` marks it); `projects` is null when the counting store could not answer.
+ */
+const usageMonthBreakdownSchemaDefinition = z
+  .object({
+    /** `YYYY-MM-DD`: the first day of next month, when the count starts again. */
+    resetsOn: z.string(),
+    days: usageDaySchema.array().nullable(),
+    /** True when the organization is metered by day but the daily read failed. */
+    isDailyUnavailable: z.boolean(),
+    projects: projectUsageShareSchema.array().nullable(),
+    byCategory: usageCategoryCountSchema.array().nullable(),
+    /** True when the organization is metered in events but the per-kind read failed. */
+    isByCategoryUnavailable: z.boolean(),
+  })
+  .strict();
+export interface UsageMonthBreakdownSchema extends Named<
+  typeof usageMonthBreakdownSchemaDefinition
+> {}
+export const usageMonthBreakdownSchema: UsageMonthBreakdownSchema =
+  usageMonthBreakdownSchemaDefinition;
+export type UsageMonthBreakdown = z.infer<typeof usageMonthBreakdownSchema>;

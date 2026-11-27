@@ -75,6 +75,7 @@ function buildService(
       },
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
     installEnvironment: {},
   };
 

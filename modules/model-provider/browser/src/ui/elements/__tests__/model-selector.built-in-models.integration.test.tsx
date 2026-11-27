@@ -3,6 +3,7 @@
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { findDecisionModel } from "@langwatch/model-provider-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -35,12 +36,12 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 import { LLMModelDisplay } from "../llm-model-display.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
-const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
+const BUILT_IN = { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
-const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Cloudflare Clef" };
+const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Clef" };
 
 afterEach(() => {
   cleanup();
@@ -77,7 +78,7 @@ describe("<ModelSelector/>", () => {
         );
 
         const listbox = screen.getByRole("listbox", { hidden: true });
-        expect(within(listbox).getByText("Instant Evals")).toBeInTheDocument();
+        expect(within(listbox).getByText("LangWatch Instant (preview)")).toBeInTheDocument();
         expect(screen.queryByTestId("no-models-configured-callout")).not.toBeInTheDocument();
       });
     });
@@ -107,8 +108,42 @@ describe("<ModelSelector/>", () => {
       );
 
       const listbox = screen.getByRole("listbox", { hidden: true });
-      expect(within(listbox).getAllByText("LangWatch")).toHaveLength(1);
+      expect(within(listbox).getAllByText("Decision models")).toHaveLength(1);
       expect(within(listbox).getByText("OpenAI")).toBeInTheDocument();
+    });
+  });
+
+  describe("given decision models the server titles from the catalogue", () => {
+    /** @scenario "The picker names a decision model by its catalogue title, an LLM by its id" */
+    it("titles each Decisions row Decisions API with its catalogue line, and leaves the LLM as its id", () => {
+      storedProviders.current = [STORED_OPENAI];
+      const decisionModels = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map(
+        (id) => ({ value: id, label: findDecisionModel(id)?.label ?? id }),
+      );
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model=""
+          options={["openai/gpt-6-luna"]}
+          onChange={() => undefined}
+          builtInModels={decisionModels}
+        />,
+      );
+
+      const listbox = screen.getByRole("listbox", { hidden: true });
+      const rows = within(listbox).getAllByRole("option", { hidden: true });
+      const rowFor = (value: string) => rows.find((row) => row.dataset.value === value);
+      const openai = rowFor("openai/decisions:gpt-6-luna");
+      const azure = rowFor("azure/decisions:gpt-6-luna");
+      for (const row of [openai, azure]) {
+        expect(row).toHaveTextContent("Decisions API");
+        expect(row).not.toHaveTextContent("(gpt-6-luna)");
+        expect(row?.querySelector("svg, img")).not.toBeNull();
+      }
+      expect(openai).toHaveTextContent("OpenAI's Decisions API, on your OpenAI key.");
+      const llm = rowFor("openai/gpt-6-luna");
+      expect(llm?.textContent).toBe("gpt-6-luna");
+      expect(within(llm!).queryByTestId("model-option-subtitle")).not.toBeInTheDocument();
     });
   });
 
@@ -183,11 +218,61 @@ describe("<LLMModelDisplay/>", () => {
   describe("given a chosen built-in model", () => {
     it("shows its label and asks for no update", async () => {
       renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-preview" builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a judge stored with an earlier LangWatch model id", () => {
+    it("shows the renamed model's label and asks for no update", async () => {
+      renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(screen.queryByText("langwatch/instant-evals")).not.toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the judge picker's one hosted model on the written id", () => {
+    const ROUTER_OFF = [{ value: "langwatch/instant-evals", label: "LangWatch Instant (preview)" }];
+    const ROUTER_ON = [
+      { value: "langwatch/instant-evals", label: "LangWatch Evals (preview)" },
+      { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" },
+    ];
+
+    /** @scenario "A judge stored with the earlier id shows as LangWatch Instant (preview) where routing is off" */
+    it("names a judge on langwatch/instant-evals LangWatch Instant (preview) with the router flag off", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={ROUTER_OFF} />,
+      );
+
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A judge saved on the old id shows LangWatch Evals (preview) where routing is on" */
+    it("names a judge on langwatch/instant-evals LangWatch Evals (preview) with the router flag on", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={ROUTER_ON} />,
+      );
+
+      expect(await screen.findByText("LangWatch Evals (preview)")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A judge on the LangWatch Instant (preview) id keeps its name where routing is on" */
+    it("names a judge on langwatch/instant-preview LangWatch Instant (preview) with the router flag on", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-preview" builtInModels={ROUTER_ON} />,
+      );
+
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(screen.queryByText("LangWatch Evals (preview)")).not.toBeInTheDocument();
     });
   });
 

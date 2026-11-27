@@ -323,7 +323,15 @@ export class SuiteRunService {
     scenarioConfigs,
     activeTargets,
   }: {
-    suite: Pick<Suite, "id" | "repeatCount" | "simulatorModel" | "judgeModel">;
+    suite: Pick<
+      Suite,
+      | "id"
+      | "repeatCount"
+      | "simulatorModel"
+      | "judgeModel"
+      | "traceQuietPeriodMs"
+      | "traceWaitTimeoutMs"
+    >;
     parsed: Pick<
       SuiteRunInput,
       "projectId" | "idempotencyKey" | "batchRunId" | "parameters" | "note" | "actor"
@@ -353,6 +361,8 @@ export class SuiteRunService {
       actor: parsed.actor,
       simulatorModel: suite.simulatorModel,
       judgeModel: suite.judgeModel,
+      traceQuietPeriodMs: suite.traceQuietPeriodMs,
+      traceWaitTimeoutMs: suite.traceWaitTimeoutMs,
     });
   }
 

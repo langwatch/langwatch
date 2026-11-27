@@ -3,13 +3,17 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { OrganizationRepositories } from "../organization.repositories.ts";
 import type { OrganizationSettingsCipher } from "../organization.repository.ts";
 import { PrismaGroupRepository } from "./prisma.group.repository.ts";
+import { PrismaOrganizationAccessNoticeRepository } from "./prisma.organization-access-notice.repository.ts";
 import { PrismaOrganizationInviteRepository } from "./prisma.organization-invite.repository.ts";
 import { PrismaOrganizationMembershipRepository } from "./prisma.organization-membership.repository.ts";
+import { PrismaOrganizationSeatPeakRepository } from "./prisma.organization-seat-peak.repository.ts";
 import { PrismaOrganizationSeatRepository } from "./prisma.organization-seat.repository.ts";
 import { PrismaOrganizationUserDirectoryRepository } from "./prisma.organization-user-directory.repository.ts";
 import { PrismaOrganizationRepository } from "./prisma.organization.repository.ts";
 import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 import { PrismaScopeGraphRepository } from "./prisma.scope-graph.repository.ts";
+import { PrismaSeatHoldRepository } from "./prisma.seat-hold.repository.ts";
+import { PrismaSeatRequestRepository } from "./prisma.seat-request.repository.ts";
 import { PrismaSignUpPolicyRepository } from "./prisma.sign-up-policy.repository.ts";
 import { PrismaTeamRepository } from "./prisma.team.repository.ts";
 
@@ -24,7 +28,7 @@ export const PostgresOrganizationRepositories = {
     encryption: OrganizationSettingsCipher;
   }): Omit<
     OrganizationRepositories,
-    "inviteRateLimit" | "privateClickHouseRoutes" | "privateS3Accounts"
+    "inviteRateLimit" | "privateClickHouseRoutes" | "privateS3Accounts" | "departures"
   > => ({
     organization: PrismaOrganizationRepository.create({ database: prisma, cipher: encryption }),
     team: PrismaTeamRepository.create(prisma),
@@ -40,6 +44,10 @@ export const PostgresOrganizationRepositories = {
     signUpPolicy: PrismaSignUpPolicyRepository.create(prisma),
     invite: PrismaOrganizationInviteRepository.create({ database: prisma }),
     seats: PrismaOrganizationSeatRepository.create(prisma),
+    seatPeak: PrismaOrganizationSeatPeakRepository.create(prisma),
     userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),
+    seatHolds: PrismaSeatHoldRepository.create(prisma),
+    seatRequests: PrismaSeatRequestRepository.create(prisma),
+    accessNotices: PrismaOrganizationAccessNoticeRepository.create(prisma),
   }),
 };

@@ -7,6 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
@@ -48,7 +52,12 @@ type RunInput = Partial<Parameters<LangWatchQLService["executeForProjects"]>[0]>
 
 async function run(input: RunInput) {
   const executor = new RecordingExecutor();
-  const service = LangWatchQLService.create({ executor, database: "analytics" });
+  const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    placement: ADMIT_EVERY_PLACEMENT,
+    executor,
+    database: "analytics",
+  });
   const result = await service.executeForProjects({
     projects: [{ id: "project-1", lwqlKey: "key-1" }],
     protections: {
@@ -60,7 +69,7 @@ async function run(input: RunInput) {
     ...input,
   });
 
-  return { result, request: executor.requests[0] };
+  return { result, request: executor.requests[0], requests: executor.requests };
 }
 
 const refusalOf = (input: RunInput) => run(input).catch((error: unknown) => error);
@@ -134,7 +143,7 @@ describe("given a statement that does not read the sources parameter", () => {
     expect(result.params).not.toHaveProperty("dashboard_context_sources");
     expect(result.diagnostics).toContainEqual({
       code: "SOURCES_IGNORED",
-      message: "This query doesn't read {dashboard_context_sources}, so it counts every origin.",
+      message: "This query doesn't read the sources you picked, so they change nothing it counts.",
     });
   });
 
@@ -373,7 +382,12 @@ describe("given the validation the insight gate asks for", () => {
     canSeeCapturedOutput: true,
   };
   const validate = (sql: string) =>
-    LangWatchQLService.create({ executor: null, database: "analytics" }).validate({
+    LangWatchQLService.create({
+      runTelemetry: TEST_RUN_TELEMETRY,
+      placement: ADMIT_EVERY_PLACEMENT,
+      executor: null,
+      database: "analytics",
+    }).validate({
       projectId: "project-1",
       protections: PROTECTIONS,
       sql,
@@ -474,6 +488,62 @@ describe("given a key for a group project", () => {
     expect(result.params?.dashboard_context_projects).toEqual(["A", "B"]);
     expect(request?.sql).toContain(`TenantId = 'B' AND OccurredAt >= fromUnixTimestamp64Milli`);
     expect(request?.sql).toContain(`TenantId IN ('A')`);
+  });
+});
+
+describe("given member windows the run reads and its completeness report counts", () => {
+  const TRACES_IN_PERIOD =
+    "SELECT count() AS n FROM analytics.traces " +
+    "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} " +
+    "AND OccurredAt < {dashboard_context_period_end:DateTime}";
+  const READERS = [
+    { id: "project-a", lwqlKey: "ka" },
+    { id: "project-b", lwqlKey: "kb" },
+  ];
+  const from = Date.parse("2026-02-02T00:00:00.000Z");
+  /** The statement, then its completeness report: both must be scoped alike. */
+  const sentSql = async (memberWindows: RunInput["memberWindows"]) => {
+    const { requests } = await run({
+      sql: TRACES_IN_PERIOD,
+      projects: READERS,
+      timeWindow: WINDOW,
+      ...(memberWindows ? { memberWindows } : {}),
+    });
+    expect(requests).toHaveLength(2);
+    return requests.map((request) => request.sql);
+  };
+
+  /** @scenario "A member window for a project the caller cannot read is dropped" */
+  it("builds no predicate from a window naming a project outside the caller's", async () => {
+    for (const sql of await sentSql([
+      { projectId: "project-a", from },
+      { projectId: "project-b", from: 0 },
+      { projectId: "project-c", from: 0 },
+    ])) {
+      expect(sql).not.toContain("project-c");
+      expect(sql).toContain("TenantId IN ('project-b')");
+      expect(sql).toContain(
+        `TenantId = 'project-a' AND OccurredAt >= fromUnixTimestamp64Milli(toInt64(${from}))`,
+      );
+    }
+  });
+
+  /** @scenario "A project with no member window reads nothing once windows are given" */
+  it("reads nothing of a project that has no window", async () => {
+    for (const sql of await sentSql([{ projectId: "project-a", from: 0 }])) {
+      expect(sql).toContain("TenantId IN ('project-a')");
+      expect(sql).not.toContain("project-b");
+    }
+  });
+
+  /** @scenario "A read where every project has its own whole-history window is left as written" */
+  it("sends both as written when each project has its own whole-history window", async () => {
+    for (const sql of await sentSql([
+      { projectId: "project-a", from: 0 },
+      { projectId: "project-b", from: 0 },
+    ])) {
+      expect(sql).not.toContain("project-");
+    }
   });
 });
 

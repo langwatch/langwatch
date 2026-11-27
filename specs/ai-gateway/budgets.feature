@@ -3,9 +3,8 @@ Feature: AI Gateway — Budgets
   # Four scenarios below are bound to budget.service.unit.test.ts. The
   # remaining @unimplemented scenarios are split between two unbindable
   # categories: (1) gateway data-plane behaviour (HTTP 402 at admission,
-  # enforcement bucket-spend reads, monthly window reset, timezone
-  # handling), implemented in Go and out of scope for the TS parity
-  # check; and (2) UI page-level rendering
+  # enforcement bucket-spend reads, monthly window reset), implemented in
+  # Go and out of scope for the TS parity check; and (2) UI page-level rendering
   # (budget detail drawer, banners, list columns, audit history) — needs
   # component-test fixtures against the Gateway settings pages. All
   # aspirational pending those harnesses.
@@ -434,6 +433,15 @@ Feature: AI Gateway — Budgets
     And a window ending at exactly that instant excludes it
 
   @integration
+  Scenario: Usage is read across an organization's projects in one statement
+    Given requests for one key that landed in two projects of the organization
+    When usage is read over the organization's projects
+    Then both requests are counted, each once
+    And a request in a project outside that set is not counted
+    # One statement per project fills the ClickHouse statement queue in an
+    # organization with many projects, and the Usage page is refused.
+
+  @integration
   Scenario: A re-projected trace is counted once, at its latest cost
     Given a trace whose cost was written once and then corrected
     When spend is read before the two writes have been merged
@@ -558,11 +566,46 @@ Feature: AI Gateway — Budgets
     And the next_reset_at is advanced to 2026-06-01T00:00Z
     And a "budget.window.reset" event is recorded
 
-  @integration @unimplemented
-  Scenario: Daily and weekly windows honor org-configured timezone
-    Given organization "acme" has timezone "Europe/Amsterdam"
-    When the daily budget resets
-    Then the reset fires at 00:00 Europe/Amsterdam, not UTC
+  # A budget's timezone moves its calendar boundaries to local midnight. The
+  # enforcement read, the bundle the gateway enforces on, and the period the
+  # API, CLI and UI report all take it from one function, so they agree.
+
+  @unit
+  Scenario: Day, week and month windows roll at midnight in the budget's timezone
+    Given a budget with window "day" and timezone "Europe/Amsterdam"
+    When the clock reads 2026-07-15T21:30Z
+    Then its current period started at 2026-07-14T22:00Z, which is 00:00 in Amsterdam
+    And its next reset is 2026-07-15T22:00Z, not 2026-07-16T00:00Z
+    And a "week" budget in that zone starts on Monday 00:00 Amsterdam time
+    And a "month" budget in that zone starts on the 1st at 00:00 Amsterdam time
+
+  @unit
+  Scenario: A local-midnight boundary stays at midnight across a daylight saving change
+    Given a budget with window "day" and timezone "America/New_York"
+    When the clocks spring forward on 2026-03-08
+    Then that day's period lasts 23 hours and the next one starts at 00:00 New York time
+    And when the clocks fall back on 2026-11-01 that day's period lasts 25 hours
+    And a "week" or "month" period spanning the change still starts and ends at local midnight
+
+  @unit
+  Scenario: Minute and hour windows roll on UTC whatever the budget's timezone
+    Given a budget with window "hour" and timezone "Asia/Kolkata"
+    When the clock reads 2026-07-15T10:45Z
+    Then its current period started at 2026-07-15T10:00Z, not 10:30Z
+    And its spend is still served from the calendar rollup
+
+  @unit
+  Scenario: A budget with no usable timezone rolls on UTC
+    Given a budget whose timezone is empty, missing or not a known IANA zone
+    Then its windows roll at 00:00 UTC exactly as before
+    And its spend is still served from the calendar rollup
+
+  @unit
+  Scenario: Spend for a non-UTC budget is read from its local period start
+    Given a budget with window "day" and timezone "Asia/Tokyo"
+    When spend is read for it
+    Then the read is floored at 00:00 Tokyo time rather than served from the UTC rollup
+    And a reset inside that local day floors the read at the reset instant until the next local midnight
 
   # ============================================================================
   # Anchored budget cycles

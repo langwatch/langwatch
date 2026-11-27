@@ -1,26 +1,31 @@
 /**
- * The self-provision advisory lock under a real Postgres: the lock transaction runs on real
- * connections, the ClickHouse side is the real repository over a recording port, and the
- * Postgres DDL is skipped so the shared test database keeps no LangWatchQL views.
+ * The self-provision advisory lock in a Postgres database of its own: the key is global per
+ * database, so a shared one lets a sibling suite's converge hold it mid-assertion. A native server
+ * gets a throwaway database; otherwise a container. ClickHouse is a recording port; DDL is skipped.
  * @see specs/lwql/api.feature
  * @vitest-environment node
  */
 
+import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
+  type PrismaConnection,
   PrismaConnectionService,
   PrismaQueryGuard,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { afterAll, describe, expect, it } from "vitest";
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatchQLProductionProvisioningService } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { TEST_POSTGRES_IMAGE } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
@@ -31,13 +36,36 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-const databaseUrl = process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({
-      guard: new AllowTestQueries(),
-      logger: createLogger("lwql-provision-lock-test"),
-    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
-  : null;
+const nativeDatabaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+let container: StartedPostgreSqlContainer | null = null;
+let server: PrismaConnection | null = null;
+let ownDatabase: string | null = null;
+let databaseUrl = "";
+let connection: PrismaConnection | null = null;
+
+function connect(url: string): PrismaConnection {
+  return PrismaConnectionService.create({
+    guard: new AllowTestQueries(),
+    logger: createLogger("lwql-provision-lock-test"),
+  }).connect(PrismaConfigService.create().resolve({ databaseUrl: url, log: ["error"] }));
+}
+
+/** A database no other suite uses: a fresh one on the native server, or a container. */
+async function ownPostgres(): Promise<string> {
+  if (!nativeDatabaseUrl) {
+    container = await new PostgreSqlContainer(TEST_POSTGRES_IMAGE)
+      .withLabels({ "langwatch.test": "true", "langwatch.test.type": "integration" })
+      .withStartupTimeout(120_000)
+      .start();
+    return container.getConnectionUri();
+  }
+  ownDatabase = `lwql_lock_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  server = connect(nativeDatabaseUrl);
+  await server.client.$executeRawUnsafe(`CREATE DATABASE "${ownDatabase}"`);
+  const url = new URL(nativeDatabaseUrl);
+  url.pathname = `/${ownDatabase}`;
+  return url.toString();
+}
 
 /** The key the task's lock hashes; the task keeps it private, so the probe names it too. */
 const LOCK_KEY_PROBE =
@@ -51,7 +79,7 @@ const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 function client() {
-  if (connection === null) throw new Error("DATABASE_URL is required for the lock tests");
+  if (connection === null) throw new Error("the lock suite's Postgres has not started");
   return connection.client;
 }
 
@@ -119,11 +147,21 @@ function podPlan({
   };
 }
 
+beforeAll(async () => {
+  databaseUrl = await ownPostgres();
+  connection = connect(databaseUrl);
+}, 180_000);
+
 afterAll(async () => {
   await connection?.closeOnce();
+  if (server && ownDatabase) {
+    await server.client.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${ownDatabase}" WITH (FORCE)`);
+  }
+  await server?.closeOnce();
+  await container?.stop();
 });
 
-describe.skipIf(!databaseUrl)("LangWatchQL self-provision lock", () => {
+describe("LangWatchQL self-provision lock", () => {
   describe("given two pods run the convergence at the same time", () => {
     /** @scenario "Concurrent self-provision runs are serialized by the advisory lock" */
     it("never overlaps the two locked bodies and finishes one before the other starts", async () => {
@@ -180,7 +218,14 @@ describe.skipIf(!databaseUrl)("LangWatchQL self-provision lock", () => {
       release();
       await Promise.all(holders);
 
-      expect(await tryKey()).toBe(true);
+      // Other suites on the shared database take the same key, so poll it for a while; a lock
+      // that outlived the holder's transaction would keep it held for the whole budget.
+      let acquired = await tryKey();
+      for (const deadline = Date.now() + 10_000; !acquired && Date.now() < deadline;) {
+        await delay(20);
+        acquired = await tryKey();
+      }
+      expect(acquired).toBe(true);
     });
   });
 });

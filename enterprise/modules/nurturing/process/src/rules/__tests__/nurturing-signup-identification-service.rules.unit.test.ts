@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fireOrganizationCreated,
+  firstNameTraitOf,
   fireSignup,
 } from "../nurturing-signup-identification-service.rules.ts";
 
@@ -15,11 +16,24 @@ const SIGNUP = {
   name: "Jane Doe",
   organizationId: "org-1",
   organizationName: "Acme Corp",
+  traces: { hasTraces: false, lastTraceAt: null },
 };
 
 afterEach(() => vi.useRealTimers());
 
 describe("fireSignup", () => {
+  describe("given a sign-up whose name is an email address", () => {
+    describe("when the sign-up is identified", () => {
+      /** @scenario "A sign-up with an email-like or one-letter name sends no first name" */
+      it("sends no first_name", () => {
+        const calls = fireSignup({ ...SIGNUP, name: "jane@acme.com", signUpData: {} });
+
+        const { traits } = calls[0] as { traits: Record<string, unknown> };
+        expect(traits).not.toHaveProperty("first_name");
+      });
+    });
+  });
+
   describe("given a sign-up at a moment with milliseconds", () => {
     describe("when the sign-up is identified", () => {
       /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -37,6 +51,7 @@ describe("fireSignup", () => {
   describe("given a person completing onboarding with their role and company size", () => {
     describe("when the onboarding flow completes", () => {
       /** @scenario "New signup identifies user with traits in Customer.io" */
+      /** @scenario "A sign-up is identified with the first name when the name looks like one" */
       it("decides to identify them with email, name, role and company size", () => {
         const calls = fireSignup({
           ...SIGNUP,
@@ -49,6 +64,7 @@ describe("fireSignup", () => {
           traits: {
             email: "jane@example.com",
             name: "Jane Doe",
+            first_name: "Jane",
             role: "engineer",
             company_size: "11-50",
             has_traces: false,
@@ -57,7 +73,17 @@ describe("fireSignup", () => {
         });
       });
 
-      /** @scenario "New signup associates user with organization via group call" */
+      /** @scenario "A founder who signs up is identified with seat admin" */
+      it("decides to identify the founder with seat admin", () => {
+        const calls = fireSignup(SIGNUP);
+
+        expect(calls[0]).toMatchObject({ type: "identify", traits: { seat: "admin" } });
+      });
+
+      /**
+       * @scenario "New signup associates user with organization via group call"
+       * @scenario "The sign-up path keeps its calls"
+       */
       it("decides to associate them with their organization by name", () => {
         const calls = fireSignup({ ...SIGNUP, signUpData: { companySize: "11-50" } });
 
@@ -66,6 +92,17 @@ describe("fireSignup", () => {
           userId: "user-1",
           groupId: "org-1",
           traits: { name: "Acme Corp", company_size: "11-50", plan: "free" },
+        });
+      });
+
+      /** @scenario "A founder who signs up is linked to their organization as admin" */
+      it("decides to link the founder to their organization as admin", () => {
+        const calls = fireSignup(SIGNUP);
+
+        expect(calls[1]).toMatchObject({
+          type: "group",
+          groupId: "org-1",
+          traits: { name: "Acme Corp", relationshipAttributes: { seat: "admin" } },
         });
       });
 
@@ -173,6 +210,31 @@ describe("fireSignup", () => {
         ]) {
           expect(traits).not.toHaveProperty(key);
         }
+      });
+    });
+  });
+});
+
+describe("firstNameTraitOf", () => {
+  describe("given a name", () => {
+    describe("when its first word is read", () => {
+      /** @scenario "A sign-up with an email-like or one-letter name sends no first name" */
+      it.each([
+        ["Jane Doe", { first_name: "Jane" }],
+        ["Cher", { first_name: "Cher" }],
+        ["  Ana  Maria Lopez ", { first_name: "Ana" }],
+        ["jane doe", { first_name: "jane" }],
+        ["jane@acme.com", {}],
+        ["", {}],
+        ["   ", {}],
+        [null, {}],
+        ["J", {}],
+        ["J Doe", {}],
+        ["jdoe42", {}],
+        ["j_doe", {}],
+        ["jane.doe", {}],
+      ])("decides %j yields %j", (name, expected) => {
+        expect(firstNameTraitOf(name)).toEqual(expected);
       });
     });
   });

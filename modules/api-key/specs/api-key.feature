@@ -9,7 +9,7 @@ Feature: API key lifecycle
   Scenario: No API key is minted while an operator acts as another member
     Given an operator acting as a member of an organization
     When the session asks to create a personal or a service API key
-    Then permission_denied is returned with status 403
+    Then impersonation_cannot_mint_credential is returned with status 403
     And no key is minted and no token is returned
 
   @unit

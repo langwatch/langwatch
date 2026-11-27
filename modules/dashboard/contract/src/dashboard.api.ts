@@ -11,15 +11,20 @@ import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  Board,
   BoardSummary,
   Dashboard,
+  DashboardHomeProduct,
+  DashboardProject,
   DashboardScope,
   DashboardScopeImpact,
   DashboardScopeProjects,
+  DashboardSidebarOrder,
   DashboardSourcePresence,
   DashboardStar,
   DashboardSummary,
   DashboardViewer,
+  OrganizationBoard,
   StarredDashboard,
 } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
@@ -94,6 +99,29 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
   }): Promise<BoardSummary[]>;
+  /**
+   * Every board the member may see across the organization, for the `/dashboards` library
+   * (ADR-002). Boards of a project with Dashboards off are left out; `dashboards_not_enabled`
+   * when no project of the organization has it on.
+   */
+  findBoardsInOrganization(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard[]>;
+  /**
+   * One board of the organization, by the same rule as `findBoardsInOrganization`, for the
+   * org-level board pages (ADR-002); `dashboard_not_found` for any board that list leaves out.
+   */
+  getBoardInOrganization(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+    dashboardId: string;
+  }): Promise<OrganizationBoard>;
+  /** The projects with Dashboards on where the member may create a board, by name (ADR-002). */
+  findStoreProjects(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardProject[]>;
   /** Where a reader opens each of these Dashboards boards, keyed by board id. */
   getBoardLinks(input: {
     projectId: string;
@@ -104,13 +132,19 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /**
-   * A Dashboards board at the scope Project; `createdById` is its author, absent for a project
-   * credential. A member's own My dashboard starts starred for them, at Only me (AC160b, AC170).
-   * `dashboards_not_enabled` while `release_dashboards` is off (AC189).
+   * A Dashboards board at `scope` (else Project) in `homeProduct` (else LLM Ops), in one write;
+   * `createdById` is its author. A member's own My dashboard starts starred at Only me (AC160b,
+   * AC170). Refuses `dashboards_not_enabled` (AC189), `dashboard_home_needs_org_scope` (ADR-002).
    */
-  createBoard(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
+  createBoard(input: {
+    projectId: string;
+    name: string;
+    createdById?: string;
+    scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
+  }): Promise<Board>;
   /**
    * The board's name and description, an absent field left as it is; `dashboards_not_enabled`
    * while `release_dashboards` is off.
@@ -121,7 +155,7 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /**
    * The board, its widgets, every star on it and its stale legacy copy (AC199b);
    * `dashboards_not_enabled` while `release_dashboards` is off.
@@ -130,7 +164,18 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
+  /**
+   * Rehomes a board in the project that owns it, the owner unchanged. A Project board leaving
+   * LLM Ops becomes Only me; anyone but its author is refused (ADR-002, decision 8).
+   * Answers the board as the organization's library lists it for this member.
+   */
+  moveBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    homeProduct: DashboardHomeProduct;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard>;
 
   /** The member's stars for this project, boards and templates, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
@@ -151,6 +196,19 @@ export interface DashboardApi {
     userId: string;
     stars: DashboardStar[];
   }): Promise<{ success: true }>;
+  /** The member's own order of a product sidebar's Dashboards section; none stored is empty. */
+  getSidebarOrder(input: {
+    organizationId: string;
+    userId: string;
+    homeProduct: DashboardHomeProduct;
+  }): Promise<DashboardSidebarOrder>;
+  /** Replaces the member's own order of a product sidebar's Dashboards section. */
+  setSidebarOrder(input: {
+    organizationId: string;
+    userId: string;
+    homeProduct: DashboardHomeProduct;
+    dashboardIds: readonly string[];
+  }): Promise<{ success: true }>;
   /** Where a reader opens each of these dashboards, keyed by dashboard id. */
   getDashboardLinks(input: {
     projectId: string;
@@ -163,7 +221,7 @@ export interface DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /** Dashboards area: how many other members starred the author's board. */
   getDashboardScopeImpact(input: {
     projectId: string;

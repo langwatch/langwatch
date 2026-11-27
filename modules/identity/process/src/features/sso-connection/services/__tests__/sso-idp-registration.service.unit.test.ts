@@ -69,6 +69,25 @@ describe("registering an OpenID Connect provider", () => {
     ).rejects.toMatchObject({ code: "sso_issuer_unreachable" });
   });
 
+  it("blames the outbound proxy setting, not the issuer, when the proxy is misconfigured", async () => {
+    const badProxy: SsoIssuerDiscoveryChannel = {
+      discover: async () => ({ reachable: false, reason: "proxy_misconfigured" }),
+    };
+    await expect(
+      serviceOver(badProxy).validateOidcRegistration({
+        protocol: "oidc",
+        issuer: "https://login.acme.okta.com",
+        clientId: "client",
+        clientSecret: "secret",
+      }),
+    ).rejects.toMatchObject({
+      code: "sso_issuer_unreachable",
+      reasons: [
+        { message: expect.stringMatching(/outbound proxy setting is not a valid proxy URL/) },
+      ],
+    });
+  });
+
   /** @scenario "An OpenID Connect registration without a client id is refused before anything is written" */
   it("refuses a registration with a blank client id", async () => {
     await expect(

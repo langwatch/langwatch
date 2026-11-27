@@ -29,6 +29,8 @@ import { z } from "zod";
 import {
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
+  RecordMemberAdmittedCommand,
+  RecordMemberRoleChangedCommand,
   RecordMembersInvitedCommand,
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
@@ -106,6 +108,36 @@ describe("organization's lifecycle pipeline", () => {
     expect(invited.idempotencyKey).toBe("org_acme:invited:invite_1,invite_2");
     expect(accepted.idempotencyKey).toBe("org_acme:invite_1:accepted");
     expect(chosen.idempotencyKey).toBe(`user_admin:integration_method:${AT}`);
+  });
+
+  it("records a role change on the organization, keyed on the member and its moment", () => {
+    const roleChanged = only(
+      new RecordMemberRoleChangedCommand().handle(
+        command({
+          ...envelope,
+          userId: "user_ben",
+          role: "ADMIN",
+          previousRole: "MEMBER",
+          changedByUserId: "user_ana",
+        }),
+      ),
+    );
+
+    expect(roleChanged.type).toBe("lw.organization.member_role_changed");
+    expect(roleChanged.aggregateId).toBe("org_acme");
+    expect(roleChanged.idempotencyKey).toBe(`org_acme:member_role_changed:user_ben:${AT}`);
+  });
+
+  it("records an admission on the organization, keyed on the member and its moment", () => {
+    const admitted = only(
+      new RecordMemberAdmittedCommand().handle(
+        command({ ...envelope, userId: "user_ben", role: "MEMBER", via: "create_membership" }),
+      ),
+    );
+
+    expect(admitted.type).toBe("lw.organization.member_admitted");
+    expect(admitted.aggregateId).toBe("org_acme");
+    expect(admitted.idempotencyKey).toBe(`org_acme:member_admitted:user_ben:${AT}`);
   });
 
   it("keys an integration method by the person who chose it", () => {
@@ -268,6 +300,67 @@ describe("given a peer's member fact reaches organization", () => {
       });
     });
     expect(memberFacts.recordMemberErased).toHaveBeenCalledTimes(2);
+    await eventing.close();
+  });
+
+  /** @scenario "Offboarded and erased departures carry the seat type from the fact" */
+  it("passes the seat type an offboarding or an erasure read, and none from an older fact", async () => {
+    const { eventing, memberFacts, peer } = hearing();
+    const offboarded = {
+      ...stamp,
+      id: "event-offboarded-seat",
+      type: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
+      createdAt: HEARD_LATER,
+      occurredAt: HEARD_LATER,
+      data: {
+        tenantId: "user_gone",
+        organizationId: "org_acme",
+        userId: "user_gone",
+        offboardedByUserId: null,
+        occurredAt: AT,
+        heldFullSeat: false,
+      },
+    };
+    const erased = {
+      ...stamp,
+      id: "event-erased-seat",
+      type: USER_ERASED_EVENT_TYPE,
+      createdAt: HEARD_LATER,
+      occurredAt: HEARD_LATER,
+      data: {
+        tenantId: "user_gone",
+        userId: "user_gone",
+        occurredAt: AT,
+        organizationIds: ["org_acme", "org_beta"],
+        fullSeatOrganizationIds: ["org_beta"],
+      },
+    };
+    const erasedBeforeSeatType = {
+      ...erased,
+      id: "event-erased-before-seat-type",
+      data: {
+        tenantId: "user_gone",
+        userId: "user_gone",
+        occurredAt: AT,
+        organizationIds: ["org_old"],
+      },
+    };
+    await peer.service.storeEvents([offboarded, erased, erasedBeforeSeatType], { tenantId });
+
+    await vi.waitFor(() => {
+      expect(memberFacts.recordMemberOffboarded).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_acme", heldFullSeat: false }),
+      );
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_acme", heldFullSeat: false }),
+      );
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_beta", heldFullSeat: true }),
+      );
+      expect(memberFacts.recordMemberErased).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_old", heldFullSeat: undefined }),
+      );
+    });
     await eventing.close();
   });
 

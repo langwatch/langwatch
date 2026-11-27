@@ -45,6 +45,7 @@ type EndpointInput = {
 
 const FAMILY_LABELS: Record<string, string> = {
   gateway: "Gateway",
+  ocsf: "OCSF SIEM",
 };
 
 function familyLabel(family: string): string {
