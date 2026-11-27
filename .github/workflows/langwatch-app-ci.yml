@@ -129,6 +129,11 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'package.json'
               - '.npmrc'
+              # nx.json and the Nx plugins define every target CI runs here (the
+              # typecheck, the lint runner, inputs and outputs), so an edit to them
+              # has to run the checks it changes.
+              - 'nx.json'
+              - 'dev/nx/**'
               # The runtime-dependencies policy reads the image's install list and
               # the peers its pnpmfile strips; an edit to either must run the lint.
               - 'infra/docker/prune-runtime-tree.sh'
