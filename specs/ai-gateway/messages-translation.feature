@@ -250,6 +250,30 @@ Feature: Anthropic Messages translation: reaching non-Anthropic providers from a
     Then the cache points carry no ttl, so Bedrock does not refuse the request
 
   @bdd @messages-translation @unit
+  Scenario: Adaptive thinking stays adaptive for Claude 5 models on Bedrock
+    Given the virtual key resolves to a Claude 5 model on Bedrock, such as global.anthropic.claude-opus-5-5
+    And a /v1/messages request carries thinking type adaptive and an output_config effort
+    When the gateway translates the request to Converse, over the public or a private endpoint
+    Then additionalModelRequestFields carries thinking type adaptive with a summarized display
+    And output_config carries the caller's effort
+    And no budget_tokens reaches Bedrock, which Claude 5 refuses
+
+  @bdd @messages-translation @unit
+  Scenario: A thinking budget for a Claude 5 model on Bedrock becomes adaptive thinking
+    Given the virtual key resolves to a Claude 5 model on Bedrock
+    And a /v1/messages request carries thinking type enabled with budget_tokens
+    When the gateway translates the request to Converse
+    Then additionalModelRequestFields carries thinking type adaptive
+    And output_config carries the effort the budget maps to
+
+  @bdd @messages-translation @unit
+  Scenario: Claude models Bifrost already maps keep the vendored thinking conversion
+    Given the virtual key resolves to Opus 4.7 or an older Claude model on Bedrock
+    When the gateway translates a thinking request to Converse
+    Then the vendored conversion's thinking block is sent unchanged
+    And no raw request body is set for it
+
+  @bdd @messages-translation @unit
   Scenario: Hour-long cache writes on the translated lane are counted apart
     Given a translated provider reports cache writes split by lifetime
     When the gateway reads the usage

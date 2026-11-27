@@ -373,8 +373,30 @@ func (m bedrockFieldMapper) applyExplicitThinkingBudget(ctx context.Context) err
 			"reason": fmt.Sprintf("reasoning.max_tokens must be >= %d for anthropic", anthropicMinimumThinkingBudget),
 		})
 	}
+	if claudeMajorVersion(m.model) >= 5 {
+		maxTokens := bedrockDefaultCompletionMaxTokens
+		if m.params.MaxCompletionTokens != nil {
+			maxTokens = *m.params.MaxCompletionTokens
+		}
+		m.applyAdaptiveThinking(bfproviderutils.GetReasoningEffortFromBudgetTokens(budget, anthropicMinimumThinkingBudget, maxTokens))
+		return nil
+	}
 	m.fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
 	return nil
+}
+
+// applyAdaptiveThinking writes adaptive thinking with the effort in
+// output_config. Claude 5 and Opus 4.7+ omit the thinking text unless asked,
+// so they default to a summarized display.
+func (m bedrockFieldMapper) applyAdaptiveThinking(effort string) {
+	thinking := map[string]any{"type": "adaptive"}
+	if m.params.Reasoning.Display != nil && *m.params.Reasoning.Display != "" {
+		thinking["display"] = *m.params.Reasoning.Display
+	} else if claudeMajorVersion(m.model) >= 5 || bfanthropic.IsOpus47Plus(m.model) {
+		thinking["display"] = "summarized"
+	}
+	m.fields["thinking"] = thinking
+	setOutputConfig(m.fields, "effort", bfanthropic.MapBifrostEffortToAnthropic(effort))
 }
 
 // applyThinkingEffort derives the thinking budget from reasoning_effort:
@@ -388,9 +410,8 @@ func (m bedrockFieldMapper) applyThinkingEffort(ctx context.Context) error {
 	if effort == "" || effort == "none" {
 		return nil
 	}
-	if bfanthropic.SupportsAdaptiveThinking(m.model) {
-		m.fields["thinking"] = map[string]any{"type": "adaptive"}
-		setOutputConfig(m.fields, "effort", bfanthropic.MapBifrostEffortToAnthropic(effort))
+	if claudeTakesAdaptiveThinking(m.model) {
+		m.applyAdaptiveThinking(effort)
 		return nil
 	}
 	maxTokens := bfproviderutils.GetMaxOutputTokensOrDefault(m.model, bedrockDefaultCompletionMaxTokens)

@@ -163,7 +163,7 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 		return r.dispatchMessagesTranslatedBedrockVPCE(ctx, bfCtx, bfReq, model, cred, endpoint)
 	}
 
-	if err := carryBedrockCacheTTL(bfCtx, bfReq, req.Body); err != nil {
+	if err := prepareBedrockConverseBody(bfCtx, bfReq, req.Body); err != nil {
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
@@ -251,7 +251,7 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 		return r.dispatchMessagesTranslatedBedrockVPCEStream(ctx, bfCtx, bfReq, req, model, cred, endpoint)
 	}
 
-	if err := carryBedrockCacheTTL(bfCtx, bfReq, req.Body); err != nil {
+	if err := prepareBedrockConverseBody(bfCtx, bfReq, req.Body); err != nil {
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 

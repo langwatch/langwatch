@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,6 +11,7 @@ import (
 	brdocument "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	brtypes "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
+	"github.com/bytedance/sonic"
 
 	bfbedrock "github.com/maximhq/bifrost/core/providers/bedrock"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
@@ -142,6 +144,7 @@ func converseInputFromResponsesRequest(
 	if err != nil {
 		return nil, err
 	}
+	keepResponsesThinkingAdaptive(vendored, &slim)
 
 	input := &bedrockruntime.ConverseInput{
 		ModelId:         aws.String(bedrockModelID(model, cred)),
@@ -151,9 +154,28 @@ func converseInputFromResponsesRequest(
 		ToolConfig:      mapBedrockToolConfig(chatReq.Params),
 	}
 	if fields := vendored.AdditionalModelRequestFields; fields != nil && fields.Len() > 0 {
-		input.AdditionalModelRequestFields = brdocument.NewLazyDocument(fields.ToMap())
+		plain, err := plainRequestFields(fields)
+		if err != nil {
+			return nil, err
+		}
+		input.AdditionalModelRequestFields = brdocument.NewLazyDocument(plain)
 	}
 	return input, nil
+}
+
+// plainRequestFields turns the vendored fields into plain maps. The aws-sdk
+// document encoder reads struct fields, so a nested OrderedMap (the
+// output_config Bifrost writes) would reach the wire as an empty object.
+func plainRequestFields(fields *bfschemas.OrderedMap) (map[string]any, error) {
+	encoded, err := sonic.Marshal(fields)
+	if err != nil {
+		return nil, fmt.Errorf("encode bedrock request fields: %w", err)
+	}
+	var plain map[string]any
+	if err := sonic.Unmarshal(encoded, &plain); err != nil {
+		return nil, fmt.Errorf("decode bedrock request fields: %w", err)
+	}
+	return plain, nil
 }
 
 // convertBedrockInferenceConfig maps the vendored conversion's inference
