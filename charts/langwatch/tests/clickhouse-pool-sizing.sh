@@ -46,7 +46,15 @@ default_worker=$(render_component workers)
 expect_env "default app fleet" "$default_app" CLICKHOUSE_CLIENT_REPLICAS 2
 expect_env "default worker fleet" "$default_worker" CLICKHOUSE_CLIENT_REPLICAS 2
 expect_env "default nodes" "$default_app" CLICKHOUSE_SERVER_NODES 1
-expect_env "default budget" "$default_app" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 300
+# The bundled image's own cap at the default 2 CPUs: min(2 * 25, 200).
+expect_env "default budget" "$default_app" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 50
+
+for cpu_case in "4:100" "1500m:50" "500m:25" "16:200"; do
+  cpu="${cpu_case%%:*}"
+  want="${cpu_case##*:}"
+  sized=$(render_component app --set-string clickhouse.cpu="$cpu")
+  expect_env "managed cpu $cpu" "$sized" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES "$want"
+done
 
 managed=$(render_component app \
   --set app.replicaCount=3 \

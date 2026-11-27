@@ -70,6 +70,35 @@ describe("waitForClickHouseReady", () => {
     });
   });
 
+  describe("given ClickHouse refuses the first checks for want of a query slot", () => {
+    describe("when a slot frees", () => {
+      /** @scenario "A ClickHouse with every query slot taken is waited for" */
+      it("retries until the ping succeeds", async () => {
+        const clock = fakeClock();
+        let attempts = 0;
+
+        await waitForClickHouseReady({
+          displayUrl: redactUrl(SERVER_URL),
+          waitSeconds: 180,
+          ping: async () => {
+            attempts += 1;
+            if (attempts < 3) {
+              throw Object.assign(new Error("Too many simultaneous queries. Maximum: 50."), {
+                code: "202",
+                type: "TOO_MANY_SIMULTANEOUS_QUERIES",
+              });
+            }
+          },
+          now: clock.now,
+          sleep: clock.sleep,
+          log: () => undefined,
+        });
+
+        expect(attempts).toBe(3);
+      });
+    });
+  });
+
   describe("given ClickHouse refuses every connection", () => {
     describe("when the configured wait passes", () => {
       /** @scenario "A ClickHouse that never comes up fails after the wait" */

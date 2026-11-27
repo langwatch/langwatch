@@ -111,6 +111,7 @@ export {
 } from "./pool.ts";
 export type { BackoffInput, TransientClassificationInput } from "./resilience.ts";
 export {
+  isServerBusy,
   isTransientClickHouseError,
   jitteredBackoffMs,
   QUERY_CAUSE_FIELD,

@@ -57,6 +57,9 @@
       "path": "../clickhouse-migrations/tsconfig.build.json"
     },
     {
+      "path": "../clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../vitest-config/tsconfig.build.json"
     }
   ]

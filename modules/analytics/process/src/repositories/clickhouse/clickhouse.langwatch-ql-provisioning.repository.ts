@@ -1,4 +1,5 @@
 import { createClient } from "@clickhouse/client";
+import { runWithRetry } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -281,14 +282,20 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     return new ClickHouseLangWatchQLProvisioningRepository(statements, () => Promise.resolve());
   }
 
-  /** The deploy task's own admin connection, from its resolved `CLICKHOUSE_URL`. */
+  /**
+   * The deploy task's own admin connection, from its resolved `CLICKHOUSE_URL`. Statements and
+   * reads are idempotent, so a busy server (202) or a dropped connection is retried with backoff.
+   */
   static open({
     url,
     requestTimeoutMs,
+    retry = {},
   }: {
     url: string | undefined;
     /** Bounds every request, so one unresponsive server cannot hold a deploy. */
     requestTimeoutMs?: number;
+    /** The retry policy's knobs; a test pins the sleep. */
+    retry?: Parameters<typeof runWithRetry>[1];
   }): ClickHouseLangWatchQLProvisioningRepository {
     const client = createClient({
       url,
@@ -297,16 +304,18 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     return new ClickHouseLangWatchQLProvisioningRepository(
       {
         async command(statement) {
-          await client.command({ query: statement });
+          await runWithRetry(() => client.command({ query: statement }), retry);
         },
         async rows(sql, params) {
-          const result = await client.query({
-            query: sql,
-            format: "JSONEachRow",
-            // In the body: ClickHouse logs a request's URL, query parameters included, at trace.
-            ...(params ? { query_params: { ...params }, use_multipart_params: true } : {}),
-          });
-          return result.json<Record<string, unknown>>();
+          return runWithRetry(async () => {
+            const result = await client.query({
+              query: sql,
+              format: "JSONEachRow",
+              // In the body: ClickHouse logs a request's URL, query parameters included, at trace.
+              ...(params ? { query_params: { ...params }, use_multipart_params: true } : {}),
+            });
+            return result.json<Record<string, unknown>>();
+          }, retry);
         },
         async insert({ table, rows, settings }) {
           await client.insert({

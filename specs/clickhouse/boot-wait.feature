@@ -33,6 +33,12 @@ Feature: Migrations wait for a ClickHouse that is still starting
     And it succeeds on the retry within the wait
 
   @unit
+  Scenario: A ClickHouse with every query slot taken is waited for
+    Given ClickHouse refuses the first checks as TOO_MANY_SIMULTANEOUS_QUERIES (202)
+    When a slot frees before the wait passes
+    Then the check succeeds instead of failing the migration
+
+  @unit
   Scenario: A server that answers with an error is not retried
     Given ClickHouse answers the check with an authentication failure
     When the migration step checks the server

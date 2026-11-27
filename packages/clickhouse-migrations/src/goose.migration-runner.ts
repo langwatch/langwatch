@@ -2,6 +2,7 @@ import { execFile, spawnSync } from "node:child_process";
 import * as path from "node:path";
 
 import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
+import { isServerBusy } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:clickhouse:migrations");
@@ -353,9 +354,9 @@ export interface WaitForClickHouseDeps {
 }
 
 /**
- * Pings until ClickHouse answers or `waitSeconds` pass. Only a failure to
- * connect is retried: a server that answers with an error, such as refused
- * credentials, fails on the first attempt.
+ * Pings until ClickHouse answers or `waitSeconds` pass. Only a failed connect
+ * or a server with every query slot taken (202) is retried: any other answer,
+ * such as refused credentials, fails on the first attempt.
  */
 export async function waitForClickHouseReady({
   ping,
@@ -453,7 +454,7 @@ function throwUnlessRetryable({
 }): void {
   const reason = describeError(error);
   const cause = error instanceof Error ? error : undefined;
-  if (!isConnectionError(error)) {
+  if (!isConnectionError(error) && !isServerBusy(error)) {
     throw new MigrationError(
       `ClickHouse at ${displayUrl} failed the connection check: ${reason}`,
       "preflight",

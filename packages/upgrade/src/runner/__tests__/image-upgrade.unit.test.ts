@@ -34,6 +34,43 @@ describe("the upgrade's ClickHouse reader", () => {
   });
 });
 
+describe("the upgrade's ClickHouse reader on a busy server", () => {
+  const busy = () =>
+    new ClickHouseError({
+      message: "Too many simultaneous queries. Maximum: 50.",
+      code: "202",
+      type: "TOO_MANY_SIMULTANEOUS_QUERIES",
+    });
+  const noWait = { sleep: () => Promise.resolve(), random: () => 0 };
+
+  /** @scenario "The upgrade's ClickHouse reads wait out a server with every query slot taken" */
+  it("retries a read the server refused for want of a slot until the server answers", async () => {
+    let calls = 0;
+    // The third answer is a database goose has not created yet, which reads as no rows.
+    const query: ClickHouseClient["query"] = () => {
+      calls += 1;
+      if (calls < 3) return Promise.reject(busy());
+      return Promise.reject(
+        new ClickHouseError({ message: "no db", code: "81", type: "UNKNOWN_DATABASE" }),
+      );
+    };
+
+    const reader = sqlReader({ client: { query }, retry: noWait });
+
+    await expect(reader.queryRows("SELECT 1")).resolves.toEqual([]);
+    expect(calls).toBe(3);
+  });
+
+  /** @scenario "The upgrade's ClickHouse reads wait out a server with every query slot taken" */
+  it("fails the read when the server stays busy past the retry budget", async () => {
+    const query: ClickHouseClient["query"] = () => Promise.reject(busy());
+
+    const reader = sqlReader({ client: { query }, retry: { ...noWait, maxAttempts: 3 } });
+
+    await expect(reader.queryRows("SELECT 1")).rejects.toMatchObject({ code: "202" });
+  });
+});
+
 describe("the upgrade task's closing lines", () => {
   const done = upgradeOutcome({ code: "done", message: "upgraded to 3.21.0", runId: "run_1" });
 

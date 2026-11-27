@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

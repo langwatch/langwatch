@@ -186,6 +186,14 @@ Feature: The upgrade command
     Then the read finds no rows instead of failing
     And any other ClickHouse error still fails the read
 
+  @unit
+  Scenario: The upgrade's ClickHouse reads wait out a server with every query slot taken
+    Given a ClickHouse server busy with a worker's traffic
+    And it refuses a read as TOO_MANY_SIMULTANEOUS_QUERIES (202)
+    When the upgrade reads from it
+    Then the read is retried with backoff and answers once a slot frees
+    And a server that stays busy past the retry budget still fails the read
+
   @integration
   Scenario: A second run is a no-op
     Given a database the upgrade has already brought to the image's release
@@ -247,6 +255,12 @@ Feature: The upgrade command
     Given the tasks process holds no event log
     When the upgrade asks for its upcast steps
     Then it receives none
+
+  @unit
+  Scenario: LangWatchQL provisioning waits out a ClickHouse with every query slot taken
+    Given a ClickHouse server busy with a worker's traffic
+    When it refuses a provisioning statement or read as TOO_MANY_SIMULTANEOUS_QUERIES (202)
+    Then the provisioning retries it with backoff instead of failing the reconciler "langwatchql"
 
   # LangWatchQL's boot convergence only logs a refused DDL (ADR-159); the upgrade's reconciler must not.
   @unit
