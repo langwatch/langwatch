@@ -145,12 +145,11 @@ describe("judgePreviewLeafCallOf", () => {
       it("reads a criteria block with \\r\\n line ends as one with \\n", () => {
         const request = sdkVerdictRequestFor(["The agent offers a refund", "The agent apologises"]);
         const [system, ...rest] = request.messages;
+        const prompt = system!.content;
+        if (typeof prompt !== "string") throw new Error("the SDK's system prompt is plain text");
         const call = judgePreviewLeafCallOf({
           ...request,
-          messages: [
-            { ...system!, content: String(system!.content).replace(/\n/g, "\r\n") },
-            ...rest,
-          ],
+          messages: [{ ...system!, content: prompt.replace(/\n/g, "\r\n") }, ...rest],
         });
 
         expect(call.criteria.map((criterion) => criterion.text)).toEqual([
