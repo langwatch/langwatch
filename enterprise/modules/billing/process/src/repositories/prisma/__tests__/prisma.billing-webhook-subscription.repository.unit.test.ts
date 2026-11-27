@@ -129,13 +129,17 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
     it("rethrows, so the delivery is retried rather than acknowledged", async () => {
       const { adapter } = compose({
         repository: repositoryDouble({
-          activate: vi.fn(() => Promise.reject(new Error("connection refused"))),
+          activate: vi.fn(() =>
+            Promise.reject(
+              Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }),
+            ),
+          ),
         } as Partial<BillingSubscriptionRepository>),
       });
 
-      await expect(adapter.activate({ id: "subscription-1" })).rejects.toThrow(
-        "connection refused",
-      );
+      await expect(adapter.activate({ id: "subscription-1" })).rejects.toMatchObject({
+        code: "ECONNREFUSED",
+      });
     });
   });
 

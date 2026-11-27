@@ -502,8 +502,11 @@ describe("given a tiered organization upgrading to Growth seats", () => {
       pricingModel: "SEAT_EVENT",
     });
 
-    await deliverTogether(running, [subscriptionActive()]);
-    await deliverTogether(running, [paymentSucceeded("in_renewal")]);
+    const [activation] = await deliverTogether(running, [subscriptionActive()]);
+    const [renewal] = await deliverTogether(running, [paymentSucceeded("in_renewal")]);
+
+    expect(activation?.status).toBe("ok");
+    expect(renewal?.status).toBe("ok");
 
     expect(rowOf(running, GROWTH_ROW)?.startDate).toEqual(started);
   });
