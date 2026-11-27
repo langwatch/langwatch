@@ -264,8 +264,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
     return { success: true as const, teamsLeftWithoutAdmin };
   })
 
-  /** A role change that needs one more full seat: validated, charged, then written. */
-  /** Charges a seat and changes a role, so it needs both to manage the members and the plan. */
+  /** A role change that needs one more full seat: validated, charged, then written; needs both. */
   .procedure("changeMemberRoleWithSeat")
   .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission(["organization:manage", "subscription:manage"])

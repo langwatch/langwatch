@@ -2019,7 +2019,7 @@ type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/g
 
 ### `invite`
 
-Contract `../contract/src/invite.trpc.ts:30`, router `src/transport/invite.trpc.ts:14`.
+Contract `../contract/src/invite.trpc.ts:31`, router `src/transport/invite.trpc.ts:14`.
 
 | Procedure                              | Kind     | Gate                                                                                                                                  | Input                                     | Output                                          |
 | -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
@@ -2046,7 +2046,7 @@ interface Input {
 }
 
 // invite.checkInvites
-// Input: inline, ../contract/src/invite.trpc.ts:41
+// Input: inline, ../contract/src/invite.trpc.ts:42
 interface Input {
   organizationId: string;
   invites: {
@@ -2090,7 +2090,7 @@ interface Output {
 }
 
 // invite.myPendingInvitation
-// Input: inline, ../contract/src/invite.trpc.ts:77
+// Input: inline, ../contract/src/invite.trpc.ts:78
 type Input = Record<string, unknown>;
 // Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:162
 interface Output {
@@ -2098,7 +2098,7 @@ interface Output {
 }
 
 // invite.pendingForMe
-// Input: inline, ../contract/src/invite.trpc.ts:82
+// Input: inline, ../contract/src/invite.trpc.ts:83
 type Input = Record<string, unknown>;
 // Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:201
 type Output = {

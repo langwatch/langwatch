@@ -35,6 +35,14 @@ export class MemoryBlockedSeatChangeRepository extends BlockedSeatChangeReposito
       .map(({ notifiedAt: _notifiedAt, ...row }) => row);
   }
 
+  async findWaitingFor(
+    input: Parameters<BlockedSeatChangeRepository["findWaitingFor"]>[0],
+  ): Promise<BlockedSeatChange[]> {
+    return (await this.findWaiting()).filter(
+      (row) => row.organizationId === input.organizationId && row.userId === input.userId,
+    );
+  }
+
   async markNotified(
     input: Parameters<BlockedSeatChangeRepository["markNotified"]>[0],
   ): Promise<void> {

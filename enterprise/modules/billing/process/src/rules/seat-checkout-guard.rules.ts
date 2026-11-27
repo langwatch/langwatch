@@ -1,4 +1,4 @@
-import { isTieredPlan } from "@langwatch/enterprise-billing-contract";
+import { isTieredPlan, PlanTypes } from "@langwatch/enterprise-billing-contract";
 
 /**
  * Whether a live plan stops a new seat checkout. A paid checkout supersedes a linked tiered plan
@@ -15,5 +15,5 @@ export function blocksSeatCheckout(
  * checks one out, adopts it or closes it on its own; its seats change through support.
  */
 export function isCustomDeal(row: { plan?: string; customLimits?: boolean }): boolean {
-  return row.customLimits === true || row.plan === "ENTERPRISE";
+  return row.customLimits === true || row.plan === PlanTypes.ENTERPRISE;
 }

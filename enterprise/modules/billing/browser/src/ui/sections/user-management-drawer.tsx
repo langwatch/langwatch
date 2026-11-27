@@ -36,7 +36,6 @@ import {
   developerSeatHint,
   developerSeatMinimum,
   developerTargetWithin,
-  dueTodayCents,
   FREE_SEAT_CHIP,
   freeSeatPlan,
   isBillingStuck,
@@ -51,7 +50,7 @@ import {
   type SeatPrice,
   seatChangeToast,
   seatConfirm,
-  seatsAddedNotice,
+  seatsAddedNoticeOf,
   snapDeveloperTarget,
 } from "../../model/seat-purchase.ts";
 import {
@@ -1030,33 +1029,13 @@ function useGrowthSeats({
     priceFailed: pendingReason === PRICE_FAILED,
     priceError: seatQuote.error ?? developerQuote.error,
     shownConfirm,
-    addedNoticeFor: (emails: string[]) => addedNoticeOf({ plan, emails }),
+    addedNoticeFor: (emails: string[]) => seatsAddedNoticeOf({ plan, emails }),
     openConfirm: (emails: string[]) =>
       setShownConfirm(seatConfirm({ plan, emails, todayMs: nowInstant().epochMilliseconds })),
     closeConfirm: () => setShownConfirm(undefined),
     commitFor: (emails: string[]) =>
       commitOf({ plan, emails, day, developerQuotedAt: developerQuote.data?.quotedAt }),
   };
-}
-
-/** What the banner says once added seats are paid; undefined when no full seat is added. */
-function addedNoticeOf({
-  plan,
-  emails,
-}: {
-  plan: GrowthSeatPlan;
-  emails: string[];
-}): AddedNotice | undefined {
-  const added = plan.seats - plan.paid;
-  if (added <= 0) return undefined;
-  return seatsAddedNotice({
-    added,
-    dueCents: dueTodayCents({ delta: added, quote: plan.quote, devDelta: 0, developerDueCents: 0 }),
-    seats: plan.seats,
-    inUse: plan.inUse + emails.length,
-    emails,
-    price: plan.price,
-  });
 }
 
 /** The change the confirm commits: full seats, Developer seats, and who to invite after. */

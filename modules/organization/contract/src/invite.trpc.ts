@@ -19,6 +19,7 @@ import {
   organizationApiAcceptInviteInputSchema,
   organizationApiCreateInvitesInputSchema,
   organizationApiInviteScopeSchema,
+  organizationApiMemberRoleSchema,
   organizationApiScopeSchema,
   organizationApiSeatCheckoutInputSchema,
   organizationSeatCheckoutRedirectSchema,
@@ -44,7 +45,7 @@ export const inviteTrpc = defineTrpcContract("invite")
         .array(
           z.object({
             email: z.string().email(),
-            role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
+            role: organizationApiMemberRoleSchema,
           }),
         )
         .min(1)

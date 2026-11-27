@@ -110,6 +110,23 @@ describe("given an admin's seat change was refused for two live subscriptions", 
     ]);
   });
 
+  it("keeps the same attempt by another admin, or in another organization, beside it", async () => {
+    const { changes, service, roleChange } = world();
+    const attempt = { kind: "role_change", memberName: "Jane Doe", role: "Admin" } as const;
+
+    await roleChange();
+    await roleChange("user_other_admin");
+    await service.record({ organizationId: "org_other", userId: "user_admin", attempt, seats: 1 });
+
+    expect(
+      (await changes.findWaiting()).map(({ organizationId, userId }) => [organizationId, userId]),
+    ).toEqual([
+      [ORG, "user_admin"],
+      [ORG, "user_other_admin"],
+      ["org_other", "user_admin"],
+    ]);
+  });
+
   describe("when the organization is back on one subscription", () => {
     /** @scenario "The admin hears once that billing is fixed" */
     it("emails that admin once with what finishing the change costs now", async () => {

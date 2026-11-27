@@ -19,6 +19,7 @@ import {
   seatChangeToast,
   seatConfirm,
   seatsAddedNotice,
+  seatsAddedNoticeOf,
   upgradeMinimumHint,
   upgradeTotal,
 } from "../seat-purchase.ts";
@@ -386,6 +387,61 @@ describe("seatsAddedNotice()", () => {
         price: EUR,
       }).body,
     ).toBe("Paid €24.17. You have 4 full seats. Invite sent to qux@acme.example.");
+  });
+});
+
+describe("seatsAddedNoticeOf()", () => {
+  const quote = {
+    amountDueCents: 2417,
+    formattedAmountDue: "€24.17",
+    formattedCreditApplied: null,
+    formattedRecurringTotal: "€116",
+    billingInterval: "month" as const,
+    quotedAt: 1,
+    appliesAt: null,
+    keptSeats: null,
+    formattedKeptRecurringTotal: null,
+  };
+
+  /** @scenario "Adding full and Developer seats in one confirm names both in the banner" */
+  it("names the Developer seats added and adds their charge to what was paid", () => {
+    expect(
+      seatsAddedNoticeOf({
+        plan: growth({
+          seats: 4,
+          quote,
+          developer: { current: 0, target: 2, unitCents: 500 },
+          developerDueCents: 833,
+        }),
+        emails: [],
+      }),
+    ).toEqual({
+      title: "1 seat and 2 developer seats added",
+      body: "Paid €32.50. You have 4 full seats, 1 free.",
+    });
+  });
+
+  it("says nothing of Developer seats that were lowered, and charges nothing for them", () => {
+    expect(
+      seatsAddedNoticeOf({
+        plan: growth({
+          seats: 4,
+          quote,
+          developer: { current: 3, target: 1, unitCents: 500 },
+          developerDueCents: 0,
+        }),
+        emails: [],
+      }),
+    ).toEqual({ title: "1 seat added", body: "Paid €24.17. You have 4 full seats, 1 free." });
+  });
+
+  it("shows no banner when no full seat is added", () => {
+    expect(
+      seatsAddedNoticeOf({
+        plan: growth({ developer: { current: 0, target: 2, unitCents: 500 } }),
+        emails: [],
+      }),
+    ).toBeUndefined();
   });
 });
 

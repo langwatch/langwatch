@@ -54,13 +54,11 @@ export class BlockedSeatChangeService {
   }): Promise<boolean> {
     try {
       const key = attemptKey(input.attempt);
-      const waiting = await this.options.changes.findWaiting();
-      const known = waiting.some(
-        (change) =>
-          change.organizationId === input.organizationId &&
-          change.userId === input.userId &&
-          attemptKey(change.attempt) === key,
-      );
+      const waiting = await this.options.changes.findWaitingFor({
+        organizationId: input.organizationId,
+        userId: input.userId,
+      });
+      const known = waiting.some((change) => attemptKey(change.attempt) === key);
       if (!known) await this.options.changes.record(input);
       return true;
     } catch (error) {

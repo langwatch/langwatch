@@ -23,6 +23,7 @@ import { MemoryBillingOrganizationRepository } from "../../repositories/memory/m
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemoryPaymentRecoveryRepository } from "../../repositories/memory/memory.payment-recovery.repository.ts";
+import { MemorySeatEventSubscriptionRepository } from "../../repositories/memory/memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "../../repositories/memory/memory.subscription.repository.ts";
 import { BillingLifecycleAnnouncerService } from "../../services/billing-lifecycle-announcer.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
@@ -59,6 +60,7 @@ function licensedAt(commitUsdCents: number) {
         lastSyncAt: "2026-11-02T00:00:00Z",
         managedVirtualKeyId: null,
       }),
+      countFullSeatsInUse: async () => 0,
       findSeatChanges: async () => [
         {
           licenseRowId: "license-2",
@@ -164,6 +166,7 @@ function billingApp({
     organizations: MemoryBillingOrganizationRepository.create(store),
     subscriptions: MemoryBillingSubscriptionRepository.create(store),
     paymentRecovery: MemoryPaymentRecoveryRepository.create(store),
+    seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
   };
   const stripe = withStripe ? stripeTwins({ webhookSecret }) : void 0;
   const { lifecycle, audited } = lifecycleRecording();
@@ -202,7 +205,7 @@ function billingApp({
       },
     },
   });
-  return { app, asked: registry.asked, audited, repositories, stripe };
+  return { app, asked: registry.asked, audited, repositories, stripe, store };
 }
 
 const renewal = (commitUsdCents: number) => ({
@@ -623,6 +626,64 @@ describe("the seat price BillingModule quotes", () => {
 
       expect(await save(6)).toMatchObject({ code: "seats_held_for_payment" });
       expect(await save(4)).not.toMatchObject({ code: "seats_held_for_payment" });
+    });
+  });
+});
+
+describe("a seat change refused for two live subscriptions", () => {
+  describe("given a seat-billed organization with two live subscriptions of 5 seats", () => {
+    async function twoLive() {
+      const world = billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+      const { subscriptions } = world.repositories;
+      const acme = world.store.organizations.get(ACME);
+      if (acme) world.store.organizations.set(ACME, { ...acme, pricingModel: "SEAT_EVENT" });
+      for (const stripeSubscriptionId of ["sub_live_1", "sub_live_2"]) {
+        const row = await subscriptions.createPending({
+          organizationId: ACME,
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
+        });
+        await subscriptions.updateStatus({ id: row.id, status: "ACTIVE" });
+        await subscriptions.updateQuantities({
+          id: row.id,
+          maxMembers: 5,
+          maxMessagesPerMonth: null,
+        });
+        await subscriptions.linkStripeId({ id: row.id, stripeSubscriptionId });
+      }
+      const save = (change: { upgradeMembers: boolean; totalMembers: number }) =>
+        world.app
+          .updateSubscriptionItems({
+            organizationId: ACME,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+            upgradeTraces: !change.upgradeMembers,
+            totalTraces: 0,
+            requestedBy: { userId: "user_admin" },
+            ...change,
+          })
+          .catch((error: unknown) => error);
+      return { ...world, save };
+    }
+
+    /** @scenario "A refused seat change that buys no seat is not kept" */
+    it("keeps the seats added, and nothing for fewer seats or the same seats", async () => {
+      const { repositories, save } = await twoLive();
+
+      expect(await save({ upgradeMembers: true, totalMembers: 4 })).toMatchObject({
+        code: "subscription_ambiguous",
+      });
+      expect(await save({ upgradeMembers: true, totalMembers: 5 })).toMatchObject({
+        code: "subscription_ambiguous",
+      });
+      expect(await repositories.blockedSeatChanges.findWaiting()).toEqual([]);
+
+      await save({ upgradeMembers: true, totalMembers: 7 });
+      expect(await repositories.blockedSeatChanges.findWaiting()).toEqual([
+        expect.objectContaining({
+          userId: "user_admin",
+          seats: 2,
+          attempt: { kind: "seat_purchase", seats: 2 },
+        }),
+      ]);
     });
   });
 });

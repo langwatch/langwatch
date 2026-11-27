@@ -95,7 +95,7 @@ export class SeatPurchaseService {
     return {
       kind: "charge",
       newTotalSeats,
-      formattedSeatPrice: quote.formattedSeatPrice ?? "",
+      formattedSeatPrice: quote.formattedSeatPrice,
       formattedAmountDue: quote.formattedAmountDue,
       formattedRecurringTotal: quote.formattedRecurringTotal,
       billingInterval: quote.billingInterval,

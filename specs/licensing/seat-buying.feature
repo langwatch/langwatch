@@ -200,6 +200,14 @@ Feature: Buying seats
       And the confirm closes and Manage seats reads "1 seat added" and "Paid €24.17. You have 4 full seats. Invite sent to qux@acme.example."
       And its button reads "Done", which closes Manage seats
 
+    @unit
+    Scenario: Adding full and Developer seats in one confirm names both in the banner
+      Given a Developer seat price of €5 a month is configured
+      And Manage seats raises the full seats from 3 to 4 and the Developer seats from 0 to 2
+      When I confirm and the change is paid
+      Then Manage seats reads "1 seat and 2 developer seats added"
+      And it reads "Paid €32.50", the full seat and the Developer seats charged today together
+
     @integration
     Scenario: Paying for a seat with nobody to invite leaves it free
       Given "ACME" has a Growth subscription for 3 seats with 3 in use
@@ -318,6 +326,13 @@ Feature: Buying seats
       When Manage seats records the attempt for 2 seats
       Then a seat purchase of 2 seats is kept for that administrator
       And someone without subscription:manage is refused
+
+    @unit
+    Scenario: A refused seat change that buys no seat is not kept
+      Given "ACME" bills 5 seats on two live subscriptions
+      When an administrator's change to 4 seats or to 5 seats is refused for that
+      Then nothing is kept for that administrator, so no seat price is emailed later
+      And a refused change to 7 seats is kept as a purchase of 2 seats
 
     @integration
     Scenario: The confirm keeps its question while the invite after a payment is sent

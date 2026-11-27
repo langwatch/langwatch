@@ -28,8 +28,26 @@ export class PrismaBlockedSeatChangeRepository extends BlockedSeatChangeReposito
   }
 
   async findWaiting(): Promise<BlockedSeatChange[]> {
+    return this.waiting({ notifiedAt: null });
+  }
+
+  async findWaitingFor(
+    input: Parameters<BlockedSeatChangeRepository["findWaitingFor"]>[0],
+  ): Promise<BlockedSeatChange[]> {
+    return this.waiting({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      notifiedAt: null,
+    });
+  }
+
+  private async waiting(where: {
+    organizationId?: string;
+    userId?: string;
+    notifiedAt: null;
+  }): Promise<BlockedSeatChange[]> {
     const rows = await this.prisma.blockedSeatChange.findMany({
-      where: { notifiedAt: null },
+      where,
       orderBy: { createdAt: "asc" },
     });
     return rows.flatMap((row) => {

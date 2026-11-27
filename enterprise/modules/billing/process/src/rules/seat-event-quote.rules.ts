@@ -177,7 +177,7 @@ export type SeatEventProrationQuote = {
   /** Seats times the seat price, before any tax. */
   formattedRecurringTotal: string;
   /** One seat's price per billing period, before any tax. */
-  formattedSeatPrice?: string;
+  formattedSeatPrice: string;
   billingInterval: string;
   /** The instant this quote priced, in epoch seconds, sent back on confirm. */
   quotedAt: number;

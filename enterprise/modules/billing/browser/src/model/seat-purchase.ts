@@ -707,9 +707,37 @@ function addLead({ paid, seats, delta }: { paid: number; seats: number; delta: n
   return `You go from ${paid} to ${seats} full seats. ${ready} free to use at once.`;
 }
 
+/** The banner once a confirm that adds full seats is paid; undefined when it adds none. */
+export function seatsAddedNoticeOf({
+  plan,
+  emails,
+}: {
+  plan: GrowthSeatPlan;
+  emails: string[];
+}): { title: string; body: string } | undefined {
+  const added = plan.seats - plan.paid;
+  if (added <= 0) return undefined;
+  const devDelta = plan.developer ? plan.developer.target - plan.developer.current : 0;
+  return seatsAddedNotice({
+    added,
+    developerAdded: Math.max(0, devDelta),
+    dueCents: dueTodayCents({
+      delta: added,
+      quote: plan.quote,
+      devDelta,
+      developerDueCents: plan.developerDueCents,
+    }),
+    seats: plan.seats,
+    inUse: plan.inUse + emails.length,
+    emails,
+    price: plan.price,
+  });
+}
+
 /** The banner at the top of Manage seats once added seats are paid for. */
 export function seatsAddedNotice({
   added,
+  developerAdded = 0,
   dueCents,
   seats,
   inUse,
@@ -717,6 +745,8 @@ export function seatsAddedNotice({
   price,
 }: {
   added: number;
+  /** Developer seats the same confirm added. */
+  developerAdded?: number;
   dueCents: number | undefined;
   seats: number;
   /** Full seats held after the change, the people just invited included. */
@@ -731,8 +761,10 @@ export function seatsAddedNotice({
     emails.length === 0
       ? ""
       : ` ${emails.length === 1 ? "Invite" : "Invites"} sent to ${joinEmails(emails)}.`;
+  const developerPart =
+    developerAdded > 0 ? ` and ${plural(developerAdded, "developer seat")}` : "";
   return {
-    title: `${plural(added, "seat")} added`,
+    title: `${plural(added, "seat")}${developerPart} added`,
     body: `${paidPart}You have ${seats} full seats${freePart}.${invites}`,
   };
 }

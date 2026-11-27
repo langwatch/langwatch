@@ -28,8 +28,12 @@ describe.skipIf(!DB_URL)("refused seat changes on Postgres", () => {
   const prisma = connection.client;
   const changes = PrismaBlockedSeatChangeRepository.create(prisma);
 
+  const otherOrganizationId = `${organizationId}_other`;
+
   afterAll(async () => {
-    await prisma.blockedSeatChange.deleteMany({ where: { organizationId } });
+    await prisma.blockedSeatChange.deleteMany({
+      where: { organizationId: { in: [organizationId, otherOrganizationId] } },
+    });
     await prisma.$disconnect();
   });
 
@@ -51,6 +55,30 @@ describe.skipIf(!DB_URL)("refused seat changes on Postgres", () => {
         seats: 1,
       }),
     ]);
+
+    await changes.record({
+      organizationId: otherOrganizationId,
+      userId: "user_admin",
+      attempt: { kind: "seat_purchase", seats: 2 },
+      seats: 2,
+    });
+    await changes.record({
+      organizationId,
+      userId: "user_other_admin",
+      attempt: { kind: "seat_purchase", seats: 2 },
+      seats: 2,
+    });
+    expect(
+      (await changes.findWaitingFor({ organizationId, userId: "user_admin" })).map(
+        (each) => each.attempt,
+      ),
+    ).toEqual([{ kind: "role_change", memberName: "Jane Doe", role: "Admin" }]);
+    await changes.markNotified({
+      organizationId,
+      userId: "user_other_admin",
+      createdUpTo: nowInstant(),
+      at: nowInstant(),
+    });
 
     const [told] = await mine();
     await new Promise((resolve) => setTimeout(resolve, 5));

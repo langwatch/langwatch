@@ -673,6 +673,13 @@ Feature: Seat requests when an organization is over its seat limit
       Then the request is approved
 
     @integration
+    Scenario: A return while the payment is still being asked about is not lost
+      Given an approval waits on its Stripe page
+      And the administrator comes back to the window twice while the first ask is still out
+      When that ask answers that the payment is still open and the payment has landed since
+      Then it asks once more by itself and the request is approved
+
+    @integration
     Scenario: An approval waiting on its Stripe page stops waiting once the request is answered elsewhere
       Given an approval waits on its Stripe page
       And another administrator declines the request

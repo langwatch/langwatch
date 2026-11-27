@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { readHandledError } from "./handled-error-form.tsx";
 import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
+import { askOnReturn, paymentAsker } from "./payment-asker.ts";
 import { reportUnexpected } from "./report-unexpected.ts";
 
 /** An approval waiting on the Stripe page its seat charge opened, in the organization it began. */
@@ -66,25 +67,15 @@ function useWaitForSeatPayment({
   });
   const paymentRef = waiting?.paymentRef;
   useEffect(() => {
-    if (paymentRef === undefined) return;
-    let live = true;
-    let asking = false;
-    const ask = async () => {
-      const current = latest.current.waiting;
-      if (asking || !live || !current) return;
-      asking = true;
-      const settled = await askPaid({ complete: latest.current.complete, waiting: current });
-      asking = false;
-      if (!live || settled.status === "waiting") return;
-      live = false;
-      latest.current.onSettled(settled, current);
-    };
-    const onFocus = () => void ask();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      live = false;
-      window.removeEventListener("focus", onFocus);
-    };
+    const current = latest.current.waiting;
+    if (paymentRef === undefined || !current) return;
+    return askOnReturn(
+      paymentAsker({
+        ask: () => askPaid({ complete: latest.current.complete, waiting: current }),
+        isSettled: (settled) => settled.status !== "waiting",
+        onSettled: (settled) => latest.current.onSettled(settled, current),
+      }),
+    );
   }, [paymentRef]);
 }
 

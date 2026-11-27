@@ -147,9 +147,9 @@ import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhoo
 import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
 
-/** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
 const logger = createLogger("langwatch:billing:app");
 
+/** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
 const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
@@ -784,11 +784,14 @@ export class BillingModule
     items,
     requestedBy,
   }: {
-    items: { organizationId: string; totalMembers: number };
+    items: { organizationId: string; upgradeMembers: boolean; totalMembers: number };
     requestedBy: { userId: string; attempt?: BlockedSeatChangeAttempt };
   }): Promise<void> {
+    if (!items.upgradeMembers) return;
     const billed = await this.#subscriptionDoor.seatEvents.billedSeats(items.organizationId);
-    const seats = Math.max(1, items.totalMembers - billed);
+    const seats = items.totalMembers - billed;
+    // Fewer seats, or as many, buy nothing, so there is no price to email the admin later.
+    if (seats <= 0) return;
     await this.recordBlockedSeatChange({
       organizationId: items.organizationId,
       userId: requestedBy.userId,

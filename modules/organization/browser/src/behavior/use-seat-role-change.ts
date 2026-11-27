@@ -16,6 +16,7 @@ import type { OrganizationUserRole } from "../model/prisma-types.ts";
 import { readHandledError } from "./handled-error-form.tsx";
 import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
+import { askOnReturn, paymentAsker } from "./payment-asker.ts";
 import { reportUnexpected } from "./report-unexpected.ts";
 
 export type SeatRoleFlow =
@@ -182,50 +183,6 @@ export type SeatRoleSettled =
   | { status: "applied" | "failed"; reason: null }
   | { status: "seat_only"; reason: string };
 
-/**
- * One ask at a time until the change settles. A return while an ask is out asks again once that
- * one answers, so no return is lost; nothing is reported after stop.
- */
-function paymentAsker({
-  ask,
-  onSettled,
-}: {
-  ask: () => Promise<{ status: SeatRoleChangeStatus; reason: string | null }>;
-  onSettled: (answer: {
-    status: Exclude<SeatRoleChangeStatus, "waiting">;
-    reason: string | null;
-  }) => void;
-}) {
-  let live = true;
-  let asking = false;
-  let askAgain = false;
-  const next = async (): Promise<void> => {
-    if (!live) return;
-    if (asking) {
-      askAgain = true;
-      return;
-    }
-    asking = true;
-    const answer = await ask();
-    asking = false;
-    if (!live) return;
-    if (answer.status !== "waiting") {
-      live = false;
-      onSettled({ status: answer.status, reason: answer.reason });
-      return;
-    }
-    if (!askAgain) return;
-    askAgain = false;
-    await next();
-  };
-  return {
-    ask: next,
-    stop: () => {
-      live = false;
-    },
-  };
-}
-
 /** While a change waits on its payment: asks each time the admin comes back to this window. */
 function useWaitForPayment({
   organizationId,
@@ -247,21 +204,20 @@ function useWaitForPayment({
   const role = waiting?.role;
   useEffect(() => {
     if (changeId === undefined || role === undefined) return;
-    const asker = paymentAsker({
-      ask: () =>
-        askPaid({ completeChange: latest.current.completeChange, organizationId, changeId }),
-      onSettled: ({ status, reason }) =>
-        latest.current.onSettled(
-          status === "seat_only" ? { status, reason: reason ?? "" } : { status, reason: null },
-          role,
-        ),
-    });
-    const onFocus = () => void asker.ask();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      asker.stop();
-      window.removeEventListener("focus", onFocus);
-    };
+    return askOnReturn(
+      paymentAsker({
+        ask: () =>
+          askPaid({ completeChange: latest.current.completeChange, organizationId, changeId }),
+        isSettled: (answer) => answer.status !== "waiting",
+        onSettled: ({ status, reason }) => {
+          if (status === "waiting") return;
+          latest.current.onSettled(
+            status === "seat_only" ? { status, reason: reason ?? "" } : { status, reason: null },
+            role,
+          );
+        },
+      }),
+    );
   }, [changeId, role, organizationId]);
 }
 

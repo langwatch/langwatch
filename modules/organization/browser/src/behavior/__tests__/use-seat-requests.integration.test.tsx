@@ -264,6 +264,39 @@ describe("useSeatRequests approve", () => {
       expect(screen.queryByText(`Waiting on ${REQUEST.id}`)).toBeNull();
     });
 
+    /** @scenario "A return while the payment is still being asked about is not lost" */
+    it("asks again once the ask in flight answers waiting, then approves", async () => {
+      state.open = stripeSeats();
+      answer("seatRequest.approveWithSeat", {
+        status: "payment_required",
+        url: "https://invoice.stripe.example/i/1",
+        paymentRef: "ref-1",
+      });
+      let answerFirst: (value: SeatApprovalCompletion) => void = () => {};
+      const first = new Promise<SeatApprovalCompletion>((resolve) => {
+        answerFirst = resolve;
+      });
+      state.answers["seatRequest.completeSeatApproval"] = [
+        first,
+        { status: "approved", outcome: "promoted" },
+      ];
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+      await screen.findByText(`Waiting on ${REQUEST.id}`);
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+        window.dispatchEvent(new Event("focus"));
+      });
+      expect(named("seatRequest.completeSeatApproval")).toHaveLength(1);
+      await act(async () => answerFirst({ status: "waiting" }));
+
+      await waitFor(() => expect(host.successes).toHaveLength(1));
+      expect(named("seatRequest.completeSeatApproval")).toHaveLength(2);
+      expect(host.successes[0]).toEqual(expect.objectContaining({ title: "Lena has a full seat" }));
+    });
+
     describe("when a second approval is pressed while the first waits on its payment", () => {
       it("refuses it, so the first approval is still finished once paid", async () => {
         const other: SeatRequest = { ...REQUEST, id: "seat-request-2", name: "Omar" };
