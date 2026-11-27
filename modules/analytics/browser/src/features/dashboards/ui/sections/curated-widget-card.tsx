@@ -23,7 +23,7 @@ import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
 import { chartAsks, type WidgetCardLangy } from "./board-widget-card.tsx";
-import { WidgetLangyView, widgetViewChartHeightPx } from "./widget-langy-view.tsx";
+import { WidgetLangyView } from "./widget-langy-view.tsx";
 
 export function CuratedWidgetCard({
   widget,
@@ -32,6 +32,7 @@ export function CuratedWidgetCard({
   boardName,
   projectId,
   projectSlug,
+  colSpan,
   rowSpan,
   timeWindow,
   granularitySeconds,
@@ -51,6 +52,7 @@ export function CuratedWidgetCard({
   boardName: string;
   projectId: string;
   projectSlug: string;
+  colSpan: number;
   rowSpan: number;
   timeWindow: { start: number; end: number };
   granularitySeconds: BoardPeriod["granularitySeconds"];
@@ -157,7 +159,6 @@ export function CuratedWidgetCard({
     </WidgetCardShell>
   );
   if (!isViewOpen || !langyOnData) return card;
-  const viewHeightPx = widgetViewChartHeightPx(widgetBodyHeightPx(rowSpan));
   return (
     <>
       {card}
@@ -167,8 +168,9 @@ export function CuratedWidgetCard({
         footer={footer}
         actions={actionRow}
         onClose={() => setViewOpen(false)}
-        chartHeightPx={viewHeightPx}
-        chart={frame({ maxHeight: viewHeightPx, onCard: false })}
+        colSpan={colSpan}
+        rowSpan={rowSpan}
+        chart={({ heightPx }) => frame({ maxHeight: heightPx, onCard: false })}
       />
     </>
   );

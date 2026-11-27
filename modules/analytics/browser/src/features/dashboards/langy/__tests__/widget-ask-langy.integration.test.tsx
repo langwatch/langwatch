@@ -8,7 +8,16 @@
 
 import { useInPlaceDrawerOpen } from "@langwatch/browser-host/drawer";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { DIALOG_COMPANION_ATTR, useCompanionDialogOpen } from "@langwatch/design-system/dialog";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -100,7 +109,24 @@ function openBoard({
   return host;
 }
 
-afterEach(cleanup);
+/** A stand-in for the Langy panel, outside the dialog as Langy is. */
+function langyPanel() {
+  const panel = document.createElement("aside");
+  panel.setAttribute(DIALOG_COMPANION_ATTR, "");
+  const field = document.createElement("textarea");
+  field.setAttribute("aria-label", "Message Langy");
+  panel.append(field);
+  document.body.append(panel);
+  return field;
+}
+
+/** Past the frame the dialog waits before it listens for Escape and clicks outside it. */
+const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+
+afterEach(() => {
+  cleanup();
+  for (const panel of document.querySelectorAll(`[${DIALOG_COMPANION_ATTR}]`)) panel.remove();
+});
 
 describe("Ask Langy on a widget card", () => {
   describe("given Langy is on and the member may start a conversation", () => {
@@ -141,8 +167,8 @@ describe("Ask Langy on a widget card", () => {
         expect(request?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
       });
 
-      /** @scenario "AC121b Ask Langy: clicking opens the widget large beside Langy" */
-      it("opens the widget large in a drawer, and closing it leaves the board", async () => {
+      /** @scenario "AC121b Ask Langy: clicking opens the widget in a centred dialog shaped like its card" */
+      it("opens the widget in a dialog Langy stays above, and Escape closes it", async () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
         openBoard({ server: inMemoryServer() });
 
@@ -152,15 +178,63 @@ describe("Ask Langy on a widget card", () => {
         expect(view).toHaveTextContent("Traces per bucket");
         expect(within(view).getByTestId("widget-langy-view-chart")).toBeInTheDocument();
         expect(within(view).getAllByTitle("Custom chart").length).toBeGreaterThan(0);
-        // Langy rides beside any open drawer, so the view counts as one while it shows.
+        expect(view).not.toHaveTextContent("in the panel beside it");
+        // Langy lifts above the dialog's backdrop, and is no drawer's companion that moves aside.
+        const besideDialog = renderHook(() => useCompanionDialogOpen());
         const drawerOpen = renderHook(() => useInPlaceDrawerOpen());
-        expect(drawerOpen.result.current).toBe(true);
+        expect(besideDialog.result.current).toBe(true);
+        expect(drawerOpen.result.current).toBe(false);
+        await settle();
 
         await user.keyboard("{Escape}");
 
         await waitFor(() => expect(screen.queryByRole("dialog", { name: "Traffic" })).toBeNull());
-        expect(drawerOpen.result.current).toBe(false);
+        expect(besideDialog.result.current).toBe(false);
         expect(screen.getByRole("button", { name: ASK_TRAFFIC })).toBeInTheDocument();
+      });
+
+      /** @scenario "AC121f Ask Langy: the widget stays in Langy's context after the dialog closes" */
+      it("tells Langy nothing new when the dialog closes, so the widget stays in its context", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const host = openBoard({ server: inMemoryServer() });
+        await user.click(await screen.findByRole("button", { name: ASK_TRAFFIC }));
+        await screen.findByRole("dialog", { name: "Traffic" });
+        await settle();
+        const screensAtAsk = [...host.langyScreens];
+
+        await user.keyboard("{Escape}");
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "Traffic" })).toBeNull());
+
+        // Langy drops a seed and its context only when the screen moves off what it is about.
+        expect(host.langyScreens).toEqual(screensAtAsk);
+        expect(host.langyScreens.at(-1)).toEqual(host.langyAsks[0]?.about);
+        expect(host.langyAsks).toHaveLength(1);
+      });
+
+      /** @scenario "AC121d Ask Langy: Langy stays usable above the widget dialog" */
+      it("stays open while the member types, clicks and presses Escape in Langy, and closes on the blurred board", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const field = langyPanel();
+        openBoard({ server: inMemoryServer() });
+        await user.click(await screen.findByRole("button", { name: ASK_TRAFFIC }));
+        const view = await screen.findByRole("dialog", { name: "Traffic" });
+        await settle();
+
+        await user.click(field);
+        await user.type(field, "why so many?");
+        await user.keyboard("{Escape}");
+        await settle();
+
+        expect(field).toHaveFocus();
+        expect(field).toHaveValue("why so many?");
+        expect(screen.getByRole("dialog", { name: "Traffic" })).toBe(view);
+
+        const board = view.closest<HTMLElement>("[data-part='positioner']");
+        if (!board) throw new Error("the dialog stands on no positioner");
+        await waitFor(() => {
+          fireEvent.pointerDown(board);
+          expect(screen.queryByRole("dialog", { name: "Traffic" })).toBeNull();
+        });
       });
     });
   });

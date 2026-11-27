@@ -1,3 +1,4 @@
+import { DIALOG_COMPANION_ATTR, useCompanionDialogOpen } from "@langwatch/design-system/dialog";
 import { Box, chakra } from "@langwatch/design-system/primitives";
 import { clampWidth, ResizeHandle } from "@langwatch/design-system/resize-handle";
 import { motion } from "motion/react";
@@ -107,7 +108,7 @@ function useLangyPanelDrag({
 /**
  * The panel itself: one fixed surface that morphs between dock, floating card and drawer
  * companion (`layout="position"`), slides to a peek, and owns its own scrolling. Dialogs, drawers
- * and command surfaces can always cover it.
+ * and command surfaces can always cover it, except a companion dialog, which it stays above.
  */
 export function LangyPanelFrame({
   panelRef,
@@ -139,6 +140,7 @@ export function LangyPanelFrame({
   const { floating, reduceMotion, isDrawerCompanion } = placement;
   const touchable = (isOpen || peek.peeking) && !peek.dismissed;
   const markPanelShown = useLangyStore((s) => s.markPanelShown);
+  const besideDialog = useCompanionDialogOpen();
   // The free edge is the one facing the page: left, unless the card dodged to the left corner.
   const edge = placement.floatingDodgesDrawer ? "right" : "left";
   const sizing = floating ? "floating" : "sidebar";
@@ -163,7 +165,7 @@ export function LangyPanelFrame({
       layout={resizing ? false : "position"}
       position="fixed"
       width={`${widthPx}px`}
-      zIndex={isDrawerCompanion ? 1600 : 1200}
+      zIndex={isDrawerCompanion || besideDialog ? 1600 : 1200}
       background={isDrawerCompanion ? "bg.card/80" : "bg.card"}
       borderStyle="solid"
       borderColor={isContextDropOver ? "purple.emphasized" : "border"}
@@ -182,7 +184,7 @@ export function LangyPanelFrame({
       data-tour="langy-panel"
       {...peekDataAttributes({ peek, mode: placement.panelMode, turnActive })}
       // The home page's send measures this closed panel's composer through it.
-      {...{ [PANEL_ROOT_ATTR]: "" }}
+      {...{ [PANEL_ROOT_ATTR]: "", [DIALOG_COMPANION_ATTR]: "" }}
       transformOrigin={floating ? "bottom right" : "right center"}
       initial={false}
       animate={panelMotionState({ isOpen, peekDismissed: peek.dismissed, peeking: peek.peeking })}

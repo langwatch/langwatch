@@ -157,6 +157,7 @@ function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
         boardName="Running costs"
         projectId="proj-1"
         projectSlug="test-project"
+        colSpan={4}
         rowSpan={4}
         timeWindow={{ start: PERIOD.periodStart, end: PERIOD.periodEnd }}
         granularitySeconds={PERIOD.granularitySeconds}

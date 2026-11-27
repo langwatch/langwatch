@@ -421,4 +421,5 @@ Feature: A dashboard widget frame shows what its queries report
     Scenario: A short widget stays short beside Langy
       Given a widget whose card is short, such as a row of numbers
       When the member asks Langy about it
-      Then the widget beside Langy grows with its card, up to a cap, and trails no empty gap
+      Then the widget in the Ask Langy dialog keeps its card's shape, so it stays short and wide
+        and trails no empty gap

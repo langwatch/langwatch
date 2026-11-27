@@ -453,8 +453,8 @@ describe("given a member opens a From LangWatch board", () => {
 
   describe("when Langy is available", () => {
     /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
-    /** @scenario "AC121b Ask Langy: clicking opens the widget large beside Langy" */
-    it("gives every widget an Ask Langy button that drafts that widget's prompt and opens it large", async () => {
+    /** @scenario "AC121b Ask Langy: clicking opens the widget in a centred dialog shaped like its card" */
+    it("gives every widget an Ask Langy button that drafts that widget's prompt and opens it in a dialog", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = openCurated({ templateId: "release" });
       const names = curatedBoardById("release")?.widgets.map(({ name }) => name) ?? [];

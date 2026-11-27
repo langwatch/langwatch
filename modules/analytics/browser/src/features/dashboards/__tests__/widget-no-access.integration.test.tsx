@@ -248,6 +248,7 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
             boardName="Running costs"
             projectId="proj-1"
             projectSlug="test-project"
+            colSpan={4}
             rowSpan={4}
             timeWindow={{ start: 1_000, end: 2_000 }}
             granularitySeconds={3600}

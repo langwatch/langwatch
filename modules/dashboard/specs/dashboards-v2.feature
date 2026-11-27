@@ -1846,19 +1846,50 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Changed (2026-11-24): the queries and the period's instants moved out of the draft into
     # the widget's context (AC247)
 
-  @integration
-  Scenario: AC121b Ask Langy: clicking opens the widget large beside Langy
+  @unit @integration
+  Scenario: AC121b Ask Langy: clicking opens the widget in a centred dialog shaped like its card
     Given a widget card on a saved board or a From LangWatch board, with Langy available
     When the member clicks its "Ask Langy" button
-    Then a drawer opens with the widget's chart drawn large over the board's period,
-      under its name and description, with its Langy actions and its sources line
-    And Langy rides beside it as it rides beside the trace drawer: a docked panel pops up as the
-      drawer's floating companion, a floating panel hops to the left out of its way
-    And the draft about the widget and the widget's context stay in Langy while it pops up
-    And clicking a bar, point or row in the large chart drafts Langy about that value, as on the card
-    And closing the drawer leaves the board as it was, and a docked panel returns to its dock
-    # Changed (2026-11-25): the drawer opened from the left beside a docked Langy; it now counts as
-    # an open drawer for Langy, so Langy pops up beside it (specs/langy/langy-panel-layout.feature)
+    Then a dialog opens in the middle of the room the window leaves beside a docked Langy, with the
+      board blurred behind it, and the widget's chart over the board's period under its name and
+      description, with its Langy actions and its sources line under the chart
+    And the chart keeps its card's shape, its columns by its rows, grown to read
+    And the dialog is never wider or taller than that room
+    And no line under the chart tells the member where to ask
+    # Changed (2026-11-27): the chart opened in a drawer Langy rode beside; the owner asked for a
+    # centred dialog shaped like the card, with Langy left where it is
+
+  @unit
+  Scenario: AC121c Ask Langy: in a room smaller than the smallest readable chart, the dialog scrolls
+    Given a window too small for the widget's chart at its smallest readable size
+    When the member clicks its "Ask Langy" button
+    Then the dialog fills the room and the chart keeps that smallest size, scrolling inside the dialog
+
+  @integration
+  Scenario: AC121d Ask Langy: Langy stays usable above the widget dialog
+    Given the widget dialog is open, with Langy docked or floating
+    Then Langy shows above the blurred board, where it was, and a floating Langy does not move aside
+    And typing in Langy, clicking in it and pressing Escape in it leave the dialog open
+    And Escape elsewhere, the dialog's close button and a click on the blurred board close it
+
+  @integration
+  Scenario: AC121e Ask Langy: clicking a value in the dialog drafts Langy about it, as on the card
+    Given the widget dialog is open
+    When the member clicks a bar, point or row in its chart
+    Then Langy drafts about that value with the board and the widget, and the dialog stays open
+
+  @integration
+  Scenario: AC121f Ask Langy: the widget stays in Langy's context after the dialog closes
+    Given the member asked Langy about a widget and closed its dialog
+    Then Langy still lists the widget as context, as "widget:" and its name
+    And the member's next message carries that widget's context
+
+  @unit
+  Scenario: AC121g Ask Langy: each chart asked about is one entry the member can remove
+    Given the member asked Langy about one chart, then about another
+    Then Langy lists both widgets as context
+    And removing one takes it out of the composer and out of the next message's context
+    And asking about the same chart twice lists it once
 
   @unit
   Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback
@@ -2983,7 +3014,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 199: "Dashboards and Analytics Reports keep their boards apart" (changed on 2026-10-15: Dashboards v2 moves onto DashboardsV2 and DashboardWidget) → Scenario: AC199 Split: Dashboards and Analytics Reports each list and open only their own boards; Scenario: AC199b Split: a Dashboards delete removes the board and its stale copy, and keeps every Reports chart; Scenario: AC199c Legacy board: Langy saves a chart only onto a board made in Analytics Reports; Scenario: AC199d Split: a Reports delete leaves the Dashboards area unchanged; Scenario: AC199e Split: each existing board lands in Dashboards, Reports or both by what it holds; Scenario: AC199f Split: a copied board and widget keep their ids; Scenario: AC199h Split: the LangWatchQL views leave out the stale copies; Scenario: AC199i Split: a board made in Analytics Reports is not pinned and not Only me; Scenario: AC199j Split: a Reports write refuses the id of a board only Dashboards holds; Scenario: AC199k Split: a saved workbench chart is placed only on a Reports board; Scenario: AC199l Split: the public API reads Dashboards boards apart from the Reports boards; Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden; Scenario: AC199n Split: the public API creates, renames and deletes Dashboards boards; Scenario: AC199o Split: a member's REST create follows the board scope rules; Scenario: AC199p Split: a board's widgets are a sub-resource of the board; Scenario: AC199q Split: /api/v1/dashboards is not there while Dashboards is off; Scenario: Split: /api/v1/dashboards stays shut when the Dashboards flag cannot be read; Scenario: AC199r Split: the Reports boards answer at /api/v1/analytics/reports; Scenario: AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards; Scenario: AC199t The MCP widget tools use only the board routes; Scenario: AC199u Split: /api/v1/dashboards answers by the API version the caller names; Scenario: AC199v Split: /api/dashboards answers as /api/v1/dashboards, deprecated; Scenario: AC199w Names: the SDKs call the Dashboards API dashboards and the Reports API analytics reports; Scenario: AC199x Names: the CLI has one dashboard tree and no old command names; Scenario: AC199y Names: the project-path dashboards read answers at /analytics/dashboards; Scenario: AC199z Names: Langy opens a Dashboards board in Dashboards and a report in Analytics Reports
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts pinned) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, pinned for them; Scenario: AC160c A member who unpins My dashboard keeps it unpinned; Scenario: AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name; Scenario: AC161c Pinned shows only when the member has pins, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A pin can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
-  # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC121b Ask Langy: clicking opens the widget large beside Langy; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first; Scenario: AC126b Langy context: the open board is listed once, and a widget says what Langy reads; Scenario: AC126c Langy context: a board and a widget asked about again are still listed once
+  # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC121b Ask Langy: clicking opens the widget in a centred dialog shaped like its card; Scenario: AC121c Ask Langy: in a room smaller than the smallest readable chart, the dialog scrolls; Scenario: AC121d Ask Langy: Langy stays usable above the widget dialog; Scenario: AC121e Ask Langy: clicking a value in the dialog drafts Langy about it, as on the card; Scenario: AC121f Ask Langy: the widget stays in Langy's context after the dialog closes; Scenario: AC121g Ask Langy: each chart asked about is one entry the member can remove; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first; Scenario: AC126b Langy context: the open board is listed once, and a widget says what Langy reads; Scenario: AC126c Langy context: a board and a widget asked about again are still listed once
   # AC 130-139: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for; Scenario: AC139 Picker copy: a widget is named by its question in plain words; Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
   # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id; Scenario: AC242 Widget cards speak the reader's words: no request-internal terms on any card face; Scenario: AC242b Model usage: each model's share is of the requests that call a model; Scenario: AC242c Widget cards: a narrow card wraps its title to a second line; Scenario: AC242d Widget cards: the chart fits between the title and the footer
   # AC 166b-166e: "The data completeness card counts each field against the requests it applies to" (owner, 2026-11-24) → Scenario: AC166b Data health: model name and cost count only the requests that call a model; Scenario: AC166c Data health: conversation id and user id rows show only for chat agents; Scenario: AC166d Data health: the headline names what is missing; Scenario: AC166e Data health: each gap asks Langy its own question and links to the fix
