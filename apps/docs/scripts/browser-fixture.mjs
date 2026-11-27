@@ -4,6 +4,23 @@ import { chromium } from "playwright";
 
 import { startPreview } from "../src/site/preview-server.ts";
 
+// A copy control sets data-copied once its clipboard write resolves, so wait for a fresh
+// one after act (a click by default), then read once and report a rejected read's cause.
+export async function copyAndRead(page, button, act = () => button.click()) {
+  const node = await button.elementHandle();
+  await page.waitForFunction((element) => element.dataset.copied === undefined, node);
+  await act();
+  await page.waitForFunction((element) => element.dataset.copied === "true", node);
+  const read = await page.evaluate(() =>
+    navigator.clipboard.readText().then(
+      (value) => ({ value }),
+      (error) => ({ error: String(error) }),
+    ),
+  );
+  if ("error" in read) throw new Error(`the clipboard read failed after the copy: ${read.error}`);
+  return read.value;
+}
+
 export async function withPreviewBrowser({ outDir, run }) {
   const server = await startPreview({ outDir, port: 0 });
   let browser;

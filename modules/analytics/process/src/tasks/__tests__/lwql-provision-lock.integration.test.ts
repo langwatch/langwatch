@@ -218,7 +218,14 @@ describe("LangWatchQL self-provision lock", () => {
       release();
       await Promise.all(holders);
 
-      expect(await tryKey()).toBe(true);
+      // Other suites on the shared database take the same key, so poll it for a while; a lock
+      // that outlived the holder's transaction would keep it held for the whole budget.
+      let acquired = await tryKey();
+      for (const deadline = Date.now() + 10_000; !acquired && Date.now() < deadline;) {
+        await delay(20);
+        acquired = await tryKey();
+      }
+      expect(acquired).toBe(true);
     });
   });
 });

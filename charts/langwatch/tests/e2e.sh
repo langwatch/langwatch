@@ -92,6 +92,19 @@ require("http")
 ' "$port" "$path" "$token" 2>/dev/null | tr -d '\r' | tail -1
 }
 
+# http_probe, retried for up to 60s while the port refuses the connection. A
+# pod is Ready once /healthz answers, which can be before the metrics listener
+# on 9464 binds. Any answer, including a refusal by the auth gate, returns at once.
+http_probe_listening() {
+  local result attempts=0
+  result=$(http_probe "$@")
+  while [[ "$result" == "ERR ERR" && $attempts -lt 30 ]]; do
+    sleep 2; attempts=$((attempts + 1))
+    result=$(http_probe "$@")
+  done
+  echo "$result"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: chart install
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1439,7 +1452,7 @@ test_metrics_plain_key() {
   # The gate: no credential and a wrong credential are both refused, and
   # neither leaks samples.
   assert_eq "Worker /metrics rejects an unauthenticated scrape" \
-    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics)" "401 no-samples"
+    "$(http_probe_listening "deploy/${RELEASE}-workers" 9464 /metrics)" "401 no-samples"
   assert_eq "Worker /metrics rejects the wrong key" \
     "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics wrong-key)" \
     "401 no-samples"
@@ -1452,7 +1465,7 @@ test_metrics_plain_key() {
 
   # The app tier carries the same gate on its own registry.
   assert_eq "App /metrics rejects an unauthenticated scrape" \
-    "$(http_probe "deploy/${RELEASE}-app" 9464 /metrics)" "401 no-samples"
+    "$(http_probe_listening "deploy/${RELEASE}-app" 9464 /metrics)" "401 no-samples"
   assert_eq "App /metrics serves samples to an authenticated scrape" \
     "$(http_probe "deploy/${RELEASE}-app" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
@@ -1476,7 +1489,7 @@ test_metrics_secret_key() {
 
   # The value really made it out of the Secret and into the auth gate.
   assert_eq "Worker /metrics serves samples using the Secret-delivered key" \
-    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")" \
+    "$(http_probe_listening "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
 
   # The Secret is deliberately left in place: the live release still

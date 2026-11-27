@@ -4,7 +4,7 @@ import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
 
-import { withPreviewBrowser } from "./browser-fixture.mjs";
+import { copyAndRead, withPreviewBrowser } from "./browser-fixture.mjs";
 
 const { values } = parseArgs({
   options: { "out-dir": { type: "string" }, screenshots: { type: "string" } },
@@ -105,10 +105,8 @@ await it("copies supported agent commands on Observability and Coding Agents pag
           const launcher = page.locator(".docs-layout .docs-agent-launcher");
           for (const agent of ["claude", "codex", "copilot", "gemini", "opencode"]) {
             await launcher.getByLabel("Coding agent").selectOption(agent);
-            const button = launcher.getByRole("button");
-            await button.click();
-            await page.waitForFunction(
-              (expected) => navigator.clipboard.readText().then((text) => text === expected),
+            assert.equal(
+              await copyAndRead(page, launcher.getByRole("button")),
               `npx langwatch ${agent}`,
             );
           }
@@ -135,13 +133,15 @@ await it("copies Markdown with Alt Shift C and leaves editable controls alone", 
       try {
         const page = await context.newPage();
         await page.goto(base + "coding-agents/overview");
+        // The shortcut's listener ships in the toc island: wait until it has loaded,
+        // not just started.
         await page.waitForFunction(() =>
-          Boolean(document.querySelector("script[data-island=toc]")),
+          Boolean(document.querySelector("script[data-island=toc][data-loaded]")),
         );
-        await page.keyboard.press("Alt+Shift+c");
         const markdown = await readFile(path.join(outDir, "coding-agents/overview.md"), "utf8");
-        await page.waitForFunction(
-          (expected) => navigator.clipboard.readText().then((text) => text === expected),
+        const pageCopy = page.locator("[data-docs-page-copy]").first();
+        assert.equal(
+          await copyAndRead(page, pageCopy, () => page.keyboard.press("Alt+Shift+c")),
           markdown,
         );
         await page.locator(".docs-layout .docs-agent-launcher select").focus();
