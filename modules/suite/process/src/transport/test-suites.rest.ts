@@ -391,6 +391,7 @@ export function createTestSuitesRest(): Readonly<{
     .handle(({ app, input, scope }) => archiveTestSuite({ app, id: input.id, projectId: scope.id }))
 
     .post("/:id/run", "runTestSuite")
+    .spends()
     .keepsRecords()
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)

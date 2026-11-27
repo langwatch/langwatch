@@ -15,11 +15,11 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /** Ceiling history: 1,540 `pnpm ensure:built` (#8795); 1,561-1,569 ADR-185, -190, -192, -188,
- * agent/evaluator versions; 1,570 `dataset-version.ts`; 1,576 seat requests; 1,578 Langy, Grok;
- * 1,583 trace-limit cache, coalescer, entitlements, client faults; 1,585 seat peak; 1,589 braids;
- * 1,592 agent registry; 1,593 docs playground; 1,594 http-mux; 1,595 payments; 1,600 SIEM, kill
- * switch, agents, run wait, Lake; 1,606 A2A, span, floor, settings; 1,607 models; 1,613 digest. */
-const CEILING = 1_613;
+ * agent/evaluator versions; 1,570 dataset versions; 1,576 seat requests; 1,578 Langy, Grok; 1,583
+ * trace-limit cache, coalescer, entitlements, telemetry; 1,585 seat peak; 1,589 braids; 1,592-1,595
+ * agent registry, docs playground, http-mux, payments; 1,600-1,607 SIEM, kill switch, agents, run
+ * wait, Lake, A2A, span, floor, settings, models; 1,629 staff-access; 1,635 digest. */
+const CEILING = 1_635;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 What a plan allows, and what has been used and spent against it. One capability, because the allowance a banner quotes and the reading a usage panel shows have to be the same answer.
 
-Peers call these through the token, declared at `../contract/src/entitlement.api.ts:21`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/entitlement.api.ts:22`; nothing else in this package is public.
 
 #### `getActivePlan`
 
@@ -34,6 +34,14 @@ This month day by day and project by project, for the usage page.
 
 ```typescript
 getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown>;
+```
+
+#### `getUsageLimits`
+
+The plan's code and each limit it sets with its count: a staff investigation read (ADR-202). Codes and numbers only, never a plan's display name or a price.
+
+```typescript
+getUsageLimits(input: Readonly<{ organizationId: string }>): Promise<OrganizationUsageLimits>;
 ```
 
 #### `assertWithinUsageLimit`

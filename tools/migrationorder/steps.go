@@ -368,8 +368,9 @@ type declaration struct {
 }
 
 // declaringFiles finds the non-test files under StepRoots on ref that hold a
-// step id as a quoted literal, the form defineMigrationStep({ id }) takes, and
-// those naming idIndexMethod, which declares its id without quoting it.
+// step id as a quoted literal outside a comment, the form
+// defineMigrationStep({ id }) takes, and those naming idIndexMethod, which
+// declares its id without quoting it; a doc comment naming a step declares nothing.
 func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]declaration, error) {
 	quoted, err := r.quotedDeclarations(ctx, ref, ids)
 	if err != nil {
@@ -384,7 +385,8 @@ func (r Repo) declaringFiles(ctx context.Context, ref string, ids []string) ([]d
 	return slices.Compact(found), nil
 }
 
-// quotedDeclarations finds the files on ref holding a step id in any quote style.
+// quotedDeclarations finds the files on ref holding a step id in any quote
+// style on a line that is not a comment.
 func (r Repo) quotedDeclarations(ctx context.Context, ref string, ids []string) ([]declaration, error) {
 	var patterns []string
 	for _, id := range ids {
@@ -398,9 +400,7 @@ func (r Repo) quotedDeclarations(ctx context.Context, ref string, ids []string) 
 	}
 	var found []declaration
 	for _, line := range lines {
-		if d, ok := parseDeclaration(ref, line); ok {
-			found = append(found, d)
-		}
+		found = append(found, parseDeclarations(ref, line, ids)...)
 	}
 	return found, nil
 }
@@ -414,21 +414,21 @@ func (r Repo) idIndexDeclarations(ctx context.Context, ref string, ids []string)
 	}
 	var found []declaration
 	for _, line := range lines {
-		d, ok := parseDeclaration(ref, line)
+		file, _, ok := splitGrepLine(ref, line)
 		if !ok {
 			continue
 		}
 		for _, id := range ids {
-			found = append(found, declaration{id: id, path: d.path})
+			found = append(found, declaration{id: id, path: file})
 		}
 	}
 	return found, nil
 }
 
-// grep returns `git grep -o` lines for the fixed patterns under StepRoots
-// on ref; no match is no lines, not an error.
+// grep returns `git grep` lines for the fixed patterns under StepRoots on
+// ref; no match is no lines, not an error.
 func (r Repo) grep(ctx context.Context, ref string, patterns []string) ([]string, error) {
-	args := []string{"grep", "-o", "-F", "--full-name"}
+	args := []string{"grep", "-F", "--full-name"}
 	for _, pattern := range patterns {
 		args = append(args, "-e", pattern)
 	}
@@ -442,16 +442,42 @@ func (r Repo) grep(ctx context.Context, ref string, patterns []string) ([]string
 	return lines(out), nil
 }
 
-// parseDeclaration reads one `git grep -o` line, <ref>:<path>:<quoted id>,
-// skipping test files, which may name a step without declaring it.
-func parseDeclaration(ref, line string) (declaration, bool) {
+// splitGrepLine reads one `git grep` line, <ref>:<path>:<content>, skipping
+// test files, which may name a step without declaring it.
+func splitGrepLine(ref, line string) (file, content string, ok bool) {
 	rest, ok := strings.CutPrefix(line, ref+":")
 	if !ok {
-		return declaration{}, false
+		return "", "", false
 	}
-	file, match, ok := strings.Cut(rest, ":")
+	file, content, ok = strings.Cut(rest, ":")
 	if !ok || strings.Contains(file, "/__tests__/") || strings.Contains(file, ".test.") {
-		return declaration{}, false
+		return "", "", false
 	}
-	return declaration{id: strings.Trim(match, "\"'`"), path: file}, true
+	return file, content, true
+}
+
+// parseDeclarations reads one `git grep` line into the step ids it quotes,
+// skipping test files and comment lines.
+func parseDeclarations(ref, line string, ids []string) []declaration {
+	file, content, ok := splitGrepLine(ref, line)
+	if !ok || isCommentLine(content) {
+		return nil
+	}
+	var found []declaration
+	for _, id := range ids {
+		for _, quote := range []string{`"`, `'`, "`"} {
+			if strings.Contains(content, quote+id+quote) {
+				found = append(found, declaration{id: id, path: file})
+				break
+			}
+		}
+	}
+	return found
+}
+
+// isCommentLine reports whether a source line is a line or block comment.
+func isCommentLine(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	return strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") ||
+		strings.HasPrefix(trimmed, "*")
 }

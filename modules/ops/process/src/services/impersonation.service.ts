@@ -1,4 +1,4 @@
-import type { AuthApi } from "@langwatch/auth-contract";
+import { type AuthApi, IMPERSONATION_WINDOW_MS } from "@langwatch/auth-contract";
 import {
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
@@ -8,6 +8,7 @@ import {
   type StopImpersonationInput,
   type AdminAuditRequest,
 } from "@langwatch/ops-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import type {
@@ -16,16 +17,21 @@ import type {
 } from "../repositories/impersonation.repository.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
 
-const IMPERSONATION_TTL_MS = 60 * 60 * 1_000;
-
 export abstract class AdminAuditSink {
   abstract record(input: {
     userId: string;
+    /** The customer organization whose audit log shows the row; absent on operator-only acts. */
+    organizationId?: string | undefined;
     action: string;
+    /** What the row is about; auth matches a window's end to its start by the session. */
+    target?: { kind: string; id: string } | undefined;
     args: Record<string, unknown>;
     req: AdminAuditRequest;
   }): Promise<void>;
 }
+
+/** Which organizations a person belongs to, asked of organization so each one sees the act. */
+export type ImpersonationMemberships = Pick<OrganizationApi, "organizationIdsForMember">;
 
 /** The session's {actor, subject} claims are auth's (D06); ops asks for them through its peer. */
 export type ImpersonationSessions = Pick<
@@ -36,6 +42,7 @@ export type ImpersonationSessions = Pick<
 interface ImpersonationServiceOptions {
   repository: ImpersonationRepository;
   sessions: ImpersonationSessions;
+  memberships: ImpersonationMemberships;
   access: AdminAccess;
   audit: AdminAuditSink;
   now?: (() => Instant) | undefined;
@@ -44,6 +51,7 @@ interface ImpersonationServiceOptions {
 export class ImpersonationService {
   private readonly repository: ImpersonationRepository;
   private readonly sessions: ImpersonationSessions;
+  private readonly memberships: ImpersonationMemberships;
   private readonly access: AdminAccess;
   private readonly audit: AdminAuditSink;
   private readonly now: () => Instant;
@@ -51,12 +59,14 @@ export class ImpersonationService {
   private constructor(deps: {
     repository: ImpersonationRepository;
     sessions: ImpersonationSessions;
+    memberships: ImpersonationMemberships;
     access: AdminAccess;
     audit: AdminAuditSink;
     now: () => Instant;
   }) {
     this.repository = deps.repository;
     this.sessions = deps.sessions;
+    this.memberships = deps.memberships;
     this.access = deps.access;
     this.audit = deps.audit;
     this.now = deps.now;
@@ -66,6 +76,7 @@ export class ImpersonationService {
     return new ImpersonationService({
       repository: options.repository,
       sessions: options.sessions,
+      memberships: options.memberships,
       access: options.access,
       audit: options.audit,
       now: options.now ?? nowInstant,
@@ -90,19 +101,27 @@ export class ImpersonationService {
       target,
     });
 
-    await this.audit.record({
-      userId: input.impersonatorUserId,
-      action: "admin/impersonate",
-      args: { userIdToImpersonate: target.id, reason: input.reason },
-      req: input.req,
-    });
+    // Taken before the start rows are written, so auth finds them inside the window it reads.
+    const expiresAt = this.now().add({ milliseconds: IMPERSONATION_WINDOW_MS });
+    const organizationIds = await this.memberships.organizationIdsForMember({ userId: target.id });
+    // One row per organization so each customer reads it in their own audit log.
+    for (const organizationId of organizationIds.length > 0 ? organizationIds : [undefined]) {
+      await this.audit.record({
+        userId: input.impersonatorUserId,
+        organizationId,
+        action: "admin/impersonate",
+        target: { kind: "session", id: input.sessionId },
+        args: { userIdToImpersonate: target.id, reason: input.reason },
+        req: input.req,
+      });
+    }
 
     await this.sessions.startImpersonation({
       sessionId: input.sessionId,
       actorUserId: input.impersonatorUserId,
       subjectUserId: target.id,
       reason: input.reason,
-      expiresAt: this.now().add({ milliseconds: IMPERSONATION_TTL_MS }),
+      expiresAt,
     });
   }
 

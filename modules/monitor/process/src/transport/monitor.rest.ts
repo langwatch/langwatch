@@ -134,6 +134,7 @@ export function createMonitorsRest(): Readonly<{
       // hierarchy, so no existing caller loses access. Deletion stays on
       // `:manage` below, where the destructive line sits.
       .post("/", "postApiMonitors")
+      .spends()
       .keepsRecords()
       .withAudit("monitors.create")
       .withInput(monitorRestCreateInputSchema)
@@ -170,6 +171,7 @@ export function createMonitorsRest(): Readonly<{
       )
 
       .patch("/:id", "patchApiMonitorsById")
+      .spends()
       .withAudit("monitors.update")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
@@ -195,6 +197,7 @@ export function createMonitorsRest(): Readonly<{
 
       // Enabling or disabling changes the monitor that already exists — an `:update`.
       .post("/:id/toggle", "postApiMonitorsByIdToggle")
+      .spends()
       .withAudit("monitors.toggle")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
