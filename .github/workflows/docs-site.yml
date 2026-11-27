@@ -32,6 +32,7 @@ on:
       - "sdks/typescript/**"
       - ".github/actions/docs-media-encoders/**"
       - ".github/actions/playwright-chromium/**"
+      - ".github/actions/apt-ubuntu-sources/**"
       - "dev/tests/e2e-stack/**"
       - "packages/oxlint-rules/**"
       - "packages/architecture-enforcer/oxlint.architecture.jsonc"
@@ -89,6 +90,7 @@ jobs:
               - 'packages/time/**'
               - '.github/workflows/docs-site.yml'
               - '.github/actions/playwright-chromium/**'
+              - '.github/actions/apt-ubuntu-sources/**'
               - 'cmd/docsdeploy/**'
               - 'tools/docsdeploy/**'
             relevant:
@@ -105,6 +107,7 @@ jobs:
               - 'sdks/typescript/**'
               - '.github/actions/docs-media-encoders/**'
               - '.github/actions/playwright-chromium/**'
+              - '.github/actions/apt-ubuntu-sources/**'
               - 'dev/tests/e2e-stack/**'
               - 'packages/oxlint-rules/**'
               - 'packages/architecture-enforcer/oxlint.architecture.jsonc'

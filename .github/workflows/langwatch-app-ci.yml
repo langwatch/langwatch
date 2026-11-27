@@ -1118,6 +1118,8 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
+      - uses: ./.github/actions/apt-ubuntu-sources
+
       # Each browser lane runs `playwright install --with-deps chromium` in its own
       # script (browser-test-lane.md), and the first one on a shard spent ~17s
       # downloading Chromium. Cached by Playwright version, that install finds the

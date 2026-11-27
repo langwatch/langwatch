@@ -7,6 +7,7 @@ description: Restore the cached Playwright Chromium and install it with its syst
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/apt-ubuntu-sources
     - name: Read the Playwright version
       id: playwright
       shell: bash

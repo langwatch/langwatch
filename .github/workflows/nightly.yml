@@ -506,6 +506,8 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      - uses: ./head/.github/actions/apt-ubuntu-sources
+
       - name: Datastore clients and redis-server
         run: |
           sudo apt-get update -q
