@@ -37,6 +37,14 @@ Feature: Upgrade modal when a call is refused by the licence
     And the workbench turns view only for the rest of the visit
 
   @integration
+  Scenario: A workbench save refused at a plan limit names the limit in the save status
+    Given I am in the experiment workbench on a plan at one of its limits
+    When an autosave is refused for that limit and the upgrade modal opened
+    Then the save status says the plan's limit refused the save
+    And no second error toast says the save failed
+    And the workbench stays editable
+
+  @integration
   Scenario: A refusal the licence does not explain is left to the screen
     Given a call fails for a reason unrelated to the licence
     When the licensing reader reads it

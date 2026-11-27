@@ -283,6 +283,43 @@ describe("Autosave evaluation state", () => {
       expect(toastCreate).not.toHaveBeenCalled();
       expect(captureException).not.toHaveBeenCalled();
     });
+
+    /** @scenario "A workbench save refused at a plan limit names the limit in the save status" */
+    it("names the plan limit in the status line, shows no toast and keeps the workbench editable", async () => {
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+      // The tRPC failure a save gets at a plan limit: FORBIDDEN with the limit on `data.cause`.
+      const refusal = Object.assign(new Error("limit reached"), {
+        data: {
+          code: "FORBIDDEN",
+          cause: { limitType: "experiments", current: 3, max: 3 },
+        },
+      });
+      markHandledGlobally(refusal);
+      mockMutateAsync.mockRejectedValueOnce(refusal);
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue({ datasetId: "test-data", row: 0, columnId: "input", value: "over limit" });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      const status = useEvaluationsV3Store.getState().ui.autosaveStatus;
+      expect(status.evaluation).toBe("error");
+      expect(status.evaluationError).toBe("Not saved: your plan's limit refused this save");
+      expect(useWorkbenchAccessRefusal.getState().refused).toBe(false);
+      expect(toastCreate).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   // Dataset records, prompt text and run results are customer content. The

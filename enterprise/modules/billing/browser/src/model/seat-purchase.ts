@@ -824,7 +824,7 @@ function fullSeatsLine({
 }
 /** The members page with one member's drawer open, where their role is changed. */
 export function memberAddress(userId: string): string {
-  return `/settings/members?drawer.open=person&drawer.userId=${encodeURIComponent(userId)}`;
+  return `/settings/directory?tab=people&drawer.open=person&drawer.userId=${encodeURIComponent(userId)}`;
 }
 /** Whether a refusal says billing is held on our side: two live subscriptions for one org. */
 export function isBillingStuck(error: unknown): boolean {

@@ -100,7 +100,7 @@ const newInviteRow = (): InviteRow => ({
 });
 
 /** A typed address that belongs to someone already in the organization. */
-export type MemberRefusal = { userId: string; message: string };
+type MemberRefusal = { userId: string; message: string };
 
 /** The members of the organization by lowercased address. */
 function membersByEmailOf(users: SubscriptionUser[]): Map<string, SubscriptionUser> {

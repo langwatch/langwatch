@@ -1095,7 +1095,7 @@ describe("<SubscriptionPage/> buying seats", () => {
 
       fireEvent.click(within(refusal).getByRole("button", { name: "Change their role instead" }));
       expect(host.navigations).toEqual([
-        "/settings/members?drawer.open=person&drawer.userId=user-1",
+        "/settings/directory?tab=people&drawer.open=person&drawer.userId=user-1",
       ]);
     });
 
