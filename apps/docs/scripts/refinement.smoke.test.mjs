@@ -132,8 +132,9 @@ await it("copies Markdown with Alt Shift C and leaves editable controls alone", 
       try {
         const page = await context.newPage();
         await page.goto(base + "coding-agents/overview");
+        // The shortcut's listener ships in the toc island: wait until it has loaded, not just started.
         await page.waitForFunction(() =>
-          Boolean(document.querySelector("script[data-island=toc]")),
+          Boolean(document.querySelector("script[data-island=toc][data-loaded]")),
         );
         await page.locator("[data-docs-page-copy]:not([disabled])").first().waitFor();
         await page.keyboard.press("Alt+Shift+c");
