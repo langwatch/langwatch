@@ -19,6 +19,10 @@ export const storedRetentionStampSchema = z.object({
 });
 export type StoredRetentionStamp = z.infer<typeof storedRetentionStampSchema>;
 
+/** `deferred`: rows kept longer under a shorter save left unapplied; else `unexpected`. */
+export const retentionDriftKindSchema = z.enum(["unexpected", "deferred"]);
+export type RetentionDriftKind = z.infer<typeof retentionDriftKindSchema>;
+
 export function retentionDriftWindows({ nowMs }: { nowMs: number }): RetentionDriftWindow[] {
   return SAMPLE_AGES_DAYS.map((age) => {
     const toMs = nowMs - age * DAY_MS;
@@ -37,4 +41,24 @@ export function driftedStamps({
   return stamps
     .filter((stamp) => stamp.rows > 0 && stamp.retentionDays !== expectedDays)
     .toSorted((left, right) => left.retentionDays - right.retentionDays);
+}
+
+/** Whether a stamp keeps rows longer than the period; 0 keeps forever. */
+const keepsLonger = ({ stampDays, periodDays }: { stampDays: number; periodDays: number }) =>
+  periodDays !== 0 && (stampDays === 0 || stampDays > periodDays);
+
+/** Deferred only when every drifted stamp keeps rows longer and a shorter save awaits its apply. */
+export function retentionDriftKind({
+  expectedDays,
+  found,
+  deferredShortening,
+}: {
+  expectedDays: number;
+  found: readonly StoredRetentionStamp[];
+  deferredShortening: boolean;
+}): RetentionDriftKind {
+  const allLonger = found.every((stamp) =>
+    keepsLonger({ stampDays: stamp.retentionDays, periodDays: expectedDays }),
+  );
+  return deferredShortening && allLonger ? "deferred" : "unexpected";
 }
