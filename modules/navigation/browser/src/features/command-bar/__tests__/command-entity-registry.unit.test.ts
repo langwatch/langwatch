@@ -72,6 +72,13 @@ describe("given an agent found in the command bar", () => {
         "/acme/agents?drawer.open=agentWorkflowEditor&drawer.agentId=agent_3",
       );
     });
+
+    /** @scenario "A Scenario Connector found by name opens the connector editor" */
+    it("addresses the connector editor for a connector agent", () => {
+      expect(agentPath({ projectSlug: "acme", agentId: "agent_7", type: "connector" })).toBe(
+        "/acme/agents?drawer.open=agentConnectorEditor&drawer.agentId=agent_7",
+      );
+    });
   });
 
   describe("when nothing can hold it open", () => {

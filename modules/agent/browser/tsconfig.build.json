@@ -39,6 +39,12 @@
       "path": "../../scenario/client/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/client/tsconfig.build.json"
     },
     {

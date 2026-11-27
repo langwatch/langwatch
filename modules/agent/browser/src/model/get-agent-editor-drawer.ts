@@ -20,6 +20,6 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawer {
       // platform shows a connected agent rather than editing it.
       throw new Error(`Unhandled agent type: ${type} — connected agents are registered from code`);
     case "connector":
-      throw new Error(`Unhandled agent type: ${type} — connector agents have no editor yet`);
+      return "agentConnectorEditor";
   }
 }

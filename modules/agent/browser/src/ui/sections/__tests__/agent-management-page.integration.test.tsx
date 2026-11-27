@@ -176,7 +176,7 @@ class TestAgentPageComposition implements AgentPageComposition {
 }
 
 class TestNavigation implements AgentManagementNavigation {
-  openEditor(): void {}
+  openEditor(_agent: WireAgentWithFields): void {}
 
   openTypeSelector(): void {}
 
@@ -330,28 +330,59 @@ describe("AgentManagementPage", () => {
   });
 
   describe("given the project has a connector agent", () => {
-    /** @scenario "A connector agent's card offers no editor until one exists" */
-    it("offers no open or edit action on its card, while an HTTP agent keeps both", async () => {
-      renderPage(new TestAgentBrowser(), new TestLifecycle(), [
-        {
-          ...wireAgent,
-          id: "agent_connector",
-          type: "connector",
-          config: {
-            call: {
-              language: "python",
-              code: "def call(message, rows, state):\n    return message",
-            },
-            secretNames: [],
-          },
-        },
-        { ...wireAgent, id: "agent_http" },
-      ]);
+    /** @scenario "A connector agent's card opens its editor" */
+    it("opens the editor for the connector from its card's open and edit actions", async () => {
+      const opened: string[] = [];
+      class RecordingNavigation extends TestNavigation {
+        override openEditor(agent: WireAgentWithFields): void {
+          opened.push(agent.id);
+        }
+      }
+      class ActingCard extends TestCard {
+        override render(props: AgentCardRenderInput): ReactNode {
+          return (
+            <div>
+              <button type="button" onClick={props.onClick}>
+                Open {props.agent.name}
+              </button>
+              <button type="button" onClick={props.onEdit}>
+                Edit {props.agent.name}
+              </button>
+            </div>
+          );
+        }
+      }
+      renderWithDesignSystem(
+        <AgentManagementPage
+          data={{
+            projectId: "project_1",
+            agents: new TestAgentBrowser(),
+            items: [
+              {
+                ...wireAgent,
+                id: "agent_connector",
+                name: "Shop connector",
+                type: "connector",
+                config: {
+                  call: { language: "python", code: "class Code: ..." },
+                  secretNames: [],
+                },
+              },
+            ],
+            isLoading: false,
+          }}
+          navigation={new RecordingNavigation()}
+          feedback={new TestFeedback()}
+          lifecycle={new TestLifecycle()}
+          composition={new TestAgentPageComposition()}
+          card={new ActingCard()}
+        />,
+      );
 
-      await screen.findAllByText("Delete agent");
+      fireEvent.click(await screen.findByText("Open Shop connector"));
+      fireEvent.click(screen.getByText("Edit Shop connector"));
 
-      expect(screen.getAllByText("Open agent")).toHaveLength(1);
-      expect(screen.getAllByText("Edit agent")).toHaveLength(1);
+      expect(opened).toEqual(["agent_connector", "agent_connector"]);
     });
   });
 

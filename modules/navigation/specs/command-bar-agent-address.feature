@@ -30,6 +30,11 @@ Feature: The command bar opens the agent it found
     Then its address opens the workflow editor on that agent
 
   @unit
+  Scenario: A Scenario Connector found by name opens the connector editor
+    Given a search hit for a connector agent
+    Then its address opens the connector editor on that agent
+
+  @unit
   Scenario: An agent with no editor lands on the agents list
     Given a search hit for a signature agent
     Then its address is the agents list and names no drawer

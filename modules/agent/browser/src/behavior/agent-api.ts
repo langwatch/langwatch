@@ -1,5 +1,6 @@
 import type { agentTrpc } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap, type ModuleApi } from "@langwatch/api/web";
+import type { secretTrpc } from "@langwatch/secret-contract";
 import type { workflowTrpc } from "@langwatch/workflow-contract";
 
 /** Model-provider's procedures this package still calls until a kit or capability offers them. */
@@ -14,6 +15,7 @@ type BorrowedProcedures = {
 
 export type AgentApiMap = ContractApiMap<typeof agentTrpc> &
   ContractApiMap<typeof workflowTrpc> &
+  ContractApiMap<typeof secretTrpc> &
   BorrowedProcedures;
 
 export const agentApi: ModuleApi<AgentApiMap> = createModuleApi<AgentApiMap>();

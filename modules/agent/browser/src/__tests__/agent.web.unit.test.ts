@@ -16,6 +16,7 @@ describe("the agent browser declaration", () => {
       "agentCodeEditor",
       "agentConnectFromCode",
       "agentConnectedDetail",
+      "agentConnectorEditor",
       "agentHistory",
       "agentHttpEditor",
       "agentList",

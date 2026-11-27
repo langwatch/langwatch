@@ -9,7 +9,6 @@ import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { CopyButton } from "@langwatch/design-system/copy-button";
-import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { VariablesSection } from "@langwatch/design-system/variable-mapping";
 import { WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
@@ -32,10 +31,8 @@ import { offeredOutputTypes, outputsFromEditor } from "../../model/code-agent-ou
 import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
 import { ScenarioMappingSection } from "../blocks/scenario-mapping-section.tsx";
 import { TargetAgentLabelField } from "../elements/target-agent-label-field.tsx";
-import {
-  WorkflowCodeEditorModal,
-  type WorkflowCodeEditorModalHost,
-} from "../elements/workflow/code/workflow-code-editor.tsx";
+import { CodeEditorModalHost } from "../elements/workflow/code/code-editor-modal-host.tsx";
+import { WorkflowCodeEditorModal } from "../elements/workflow/code/workflow-code-editor.tsx";
 import { AgentCodeEditorDrawer } from "./agent-code-editor-drawer.tsx";
 import { AgentHttpEditorDrawer } from "./agent-http-editor-drawer.tsx";
 import { AgentListDrawer } from "./agent-list-drawer.tsx";
@@ -169,26 +166,6 @@ export function RoutedAgentHttpEditorDrawer({ agentId, onSave }: AgentEditorDraw
     />
   );
 }
-
-const CodeEditorModalHost: WorkflowCodeEditorModalHost = ({ open, onRequestClose, children }) => (
-  <Dialog.Root
-    open={open}
-    onOpenChange={({ open: nextOpen }) => !nextOpen && onRequestClose()}
-    closeOnEscape={false}
-  >
-    <Dialog.Content
-      margin="8"
-      minWidth="calc(100vw - 64px)"
-      height="calc(100vh - 64px)"
-      display="flex"
-      flexDirection="column"
-      overflow="hidden"
-      positionerProps={{ zIndex: 1502 }}
-    >
-      {children}
-    </Dialog.Content>
-  </Dialog.Root>
-);
 
 export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: AgentEditorDrawerProps) {
   const { close, goBack } = useRoutedDrawer();
