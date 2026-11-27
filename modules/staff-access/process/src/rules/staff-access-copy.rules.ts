@@ -149,22 +149,24 @@ export function copyItem(
   };
 }
 
-type PromptSetting =
-  | "temperature"
-  | "maxTokens"
-  | "topP"
-  | "frequencyPenalty"
-  | "presencePenalty"
-  | "seed"
-  | "topK"
-  | "minP"
-  | "repetitionPenalty"
-  | "reasoning"
-  | "verbosity"
-  | "promptingTechnique"
-  | "demonstrations"
-  | "responseFormat"
-  | "parameters";
+/** The model settings a version carries as they are; the two that can name a dataset are apart. */
+const PLAIN_PROMPT_SETTINGS = [
+  "temperature",
+  "maxTokens",
+  "topP",
+  "frequencyPenalty",
+  "presencePenalty",
+  "seed",
+  "topK",
+  "minP",
+  "repetitionPenalty",
+  "reasoning",
+  "verbosity",
+  "responseFormat",
+  "parameters",
+] as const satisfies readonly (keyof VersionedPrompt)[];
+type PlainPromptSetting = (typeof PLAIN_PROMPT_SETTINGS)[number];
+type PromptSetting = PlainPromptSetting | "promptingTechnique" | "demonstrations";
 export type PromptVersionFields = Pick<
   VersionedPrompt,
   "prompt" | "messages" | "inputs" | "outputs" | "model"
@@ -198,26 +200,20 @@ export function promptFields(version: VersionedPrompt): PromptVersionFields {
     inputs: version.inputs,
     outputs: version.outputs,
     model: version.model,
-    ...(version.temperature === undefined ? {} : { temperature: version.temperature }),
-    ...(version.maxTokens === undefined ? {} : { maxTokens: version.maxTokens }),
-    ...(version.topP === undefined ? {} : { topP: version.topP }),
-    ...(version.frequencyPenalty === undefined
-      ? {}
-      : { frequencyPenalty: version.frequencyPenalty }),
-    ...(version.presencePenalty === undefined ? {} : { presencePenalty: version.presencePenalty }),
-    ...(version.seed === undefined ? {} : { seed: version.seed }),
-    ...(version.topK === undefined ? {} : { topK: version.topK }),
-    ...(version.minP === undefined ? {} : { minP: version.minP }),
-    ...(version.repetitionPenalty === undefined
-      ? {}
-      : { repetitionPenalty: version.repetitionPenalty }),
-    ...(version.reasoning === undefined ? {} : { reasoning: version.reasoning }),
-    ...(version.verbosity === undefined ? {} : { verbosity: version.verbosity }),
+    ...plainSettings(version),
     ...(version.promptingTechnique === undefined
       ? {}
       : { promptingTechnique: techniqueWithoutDatasetLink(version.promptingTechnique) }),
     ...inlineDemonstrations(version.demonstrations),
-    ...(version.responseFormat === undefined ? {} : { responseFormat: version.responseFormat }),
-    ...(version.parameters === undefined ? {} : { parameters: version.parameters }),
   };
+}
+
+function plainSettings(
+  version: VersionedPrompt,
+): Partial<Pick<VersionedPrompt, PlainPromptSetting>> {
+  const settings: Partial<Pick<VersionedPrompt, PlainPromptSetting>> = {};
+  for (const key of PLAIN_PROMPT_SETTINGS) {
+    if (version[key] !== undefined) Object.assign(settings, { [key]: version[key] });
+  }
+  return settings;
 }

@@ -164,6 +164,30 @@ describe("given a pending copy target request", () => {
   });
 });
 
+describe("given a pending copy source request", () => {
+  beforeEach(() => {
+    backend.approval = approvalView({
+      scopes: ["copy:source"],
+      organizationId: "org_acme",
+      organizationName: "ACME",
+      counterpartOrganizationId: "org_globex",
+      counterpartOrganizationName: "Globex",
+      typedNameRequired: { withSpend: true, withoutSpend: true },
+    });
+  });
+
+  /** @scenario "The approval page shows the other organization and the target grant" */
+  it("shows the copy leaving this organization and lists nothing it may create", () => {
+    renderPage();
+
+    expect(screen.getByText("Copy from this organization")).toBeInTheDocument();
+    expect(screen.getByTestId("staff-access-copy-direction")).toHaveTextContent(
+      "From ACME into Globex",
+    );
+    expect(screen.queryByTestId("staff-access-copy-grant")).not.toBeInTheDocument();
+  });
+});
+
 describe("given a pending support request", () => {
   beforeEach(() => {
     backend.approval = approvalView({
