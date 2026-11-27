@@ -8,6 +8,7 @@ import {
   ACCOUNT_USAGE_RESETS_AT_ATTRIBUTE,
   ACCOUNT_USAGE_WINDOW_ATTRIBUTE,
   AGENT_ACCOUNT_ID_KEYS,
+  RESOURCE_AGENT_ACCOUNT_ID_FACT,
   type CodingAgentAccountColumns,
   type ContributionFacts,
   NO_ACCOUNT_COLUMNS,
@@ -18,9 +19,14 @@ type FactValue = ContributionFacts[string] | undefined;
 
 /**
  * Where an account's id comes from, first match wins: the launcher's own id, then the ids the
- * agents send themselves (Claude Code's account uuid, Codex's account id). Never an email.
+ * agents send themselves (Claude Code's account uuid, Codex's account id), on the record and
+ * then on the resource. Never an email.
  */
-const ACCOUNT_KEY_FACTS = [ACCOUNT_ID_ATTRIBUTE, ...AGENT_ACCOUNT_ID_KEYS];
+const ACCOUNT_KEY_FACTS = [
+  ACCOUNT_ID_ATTRIBUTE,
+  ...AGENT_ACCOUNT_ID_KEYS,
+  RESOURCE_AGENT_ACCOUNT_ID_FACT,
+];
 
 /**
  * The account columns one row carries; a row with no account id carries none of them. A reading

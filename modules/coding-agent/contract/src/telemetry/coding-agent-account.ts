@@ -36,6 +36,12 @@ export const CODING_AGENT_ACCOUNT_KEYS: readonly string[] = [
 /** The agents' own account ids, used as the account key when no launcher names one. */
 export const AGENT_ACCOUNT_ID_KEYS: readonly string[] = ["user.account_uuid", "user.account_id"];
 
+/**
+ * The agent's own account id when only the resource carries it. Only the account columns read
+ * this key, so a resource never sets the session's user.
+ */
+export const RESOURCE_AGENT_ACCOUNT_ID_FACT = "langwatch.account.resource_agent_account_id";
+
 /** The account facts a resource carries, for the keys the record itself left unset. */
 export function resourceAccountFacts({
   facts,
@@ -46,11 +52,19 @@ export function resourceAccountFacts({
 }): Record<string, string | number> {
   const lifted: Record<string, string | number> = {};
   if (resourceAttributes === null) return lifted;
-  for (const key of [...CODING_AGENT_ACCOUNT_KEYS, ...AGENT_ACCOUNT_ID_KEYS]) {
-    if (facts[key] !== undefined) continue;
+  for (const key of CODING_AGENT_ACCOUNT_KEYS) {
     const value = resourceAttributes[key];
-    if (typeof value === "string" && value.trim() !== "") lifted[key] = value;
-    else if (typeof value === "number" && Number.isFinite(value)) lifted[key] = value;
+    if (facts[key] === undefined && isUsableValue(value)) lifted[key] = value;
   }
+  if (AGENT_ACCOUNT_ID_KEYS.some((key) => facts[key] !== undefined)) return lifted;
+  const agentAccountIds = AGENT_ACCOUNT_ID_KEYS.map((key) => resourceAttributes[key]).filter(
+    isUsableValue,
+  );
+  if (agentAccountIds.length > 0) lifted[RESOURCE_AGENT_ACCOUNT_ID_FACT] = agentAccountIds[0]!;
   return lifted;
+}
+
+function isUsableValue(value: unknown): value is string | number {
+  if (typeof value === "string") return value.trim() !== "";
+  return typeof value === "number" && Number.isFinite(value);
 }

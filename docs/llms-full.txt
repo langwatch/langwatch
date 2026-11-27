@@ -30954,7 +30954,7 @@ A value on the record wins over the same attribute on the resource. The percent 
 
 ### Chart your accounts
 
-The `coding_session_events` view carries the account on every row as `AccountId`, `AccountName`, `AccountSource`, `AccountUsagePercent`, `AccountUsageWindow`, `AccountUsageResetsAt`, `AccountUsageReadAt` and `AccountLimitedUntil`. Rows with no account have an empty `AccountId`.
+The `coding_session_events` view carries the account as `AccountId`, `AccountName`, `AccountSource`, `AccountUsagePercent`, `AccountUsageWindow`, `AccountUsageResetsAt`, `AccountUsageReadAt` and `AccountLimitedUntil`. They are set on `model_call` and `rate_limit` rows only. Other rows, and calls that named no account, have an empty `AccountId`.
 
 This widget query sums each account's tokens over the dashboard's period and keeps its newest name and usage figure:
 

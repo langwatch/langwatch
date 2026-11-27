@@ -32,6 +32,13 @@ Feature: Subscription account usage in coding agent telemetry
     Then the account is the agent's user.account_uuid, else its user.account_id
 
   @unit
+  Scenario: a resource account id never names the session's user
+    Given only OTEL_RESOURCE_ATTRIBUTES carries the agent's user.account_uuid or user.account_id
+    When its facts are lifted
+    Then the row's account is that id
+    And the session's user stays unset
+
+  @unit
   Scenario: an email address never names the account
     Given a record that carries only user.email
     When its row is written

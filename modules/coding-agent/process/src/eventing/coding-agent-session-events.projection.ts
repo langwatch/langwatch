@@ -255,7 +255,7 @@ export class CodingAgentSessionEventsMapProjection
       repositoryOwner: event.data.repositoryOwner ?? "",
       repositoryName: event.data.repositoryName ?? "",
       branch: event.data.branch ?? "",
-      // The account a call ran on, and what it last reported, for the subscription-account read.
+      // The account a call or rate limit ran on, and the usage it reported with it.
       ...(ACCOUNT_STAMPED_KINDS.has(eventKind) ? accountColumnsOf(facts) : NO_ACCOUNT_COLUMNS),
     };
   }

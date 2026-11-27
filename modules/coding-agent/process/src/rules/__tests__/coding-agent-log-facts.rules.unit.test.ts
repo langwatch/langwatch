@@ -16,6 +16,8 @@ import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it } from "vitest";
 
 import { ClaudeAnswersTraceCanonicalisation } from "../../__tests__/fixtures/trace-canonicalisation.fixture.ts";
+import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
+import { accountColumnsOf } from "../coding-agent-account.rules.ts";
 import { liftLogContribution } from "../coding-agent-log-facts.rules.ts";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
@@ -667,7 +669,7 @@ describe("liftLogContribution", () => {
       expect(facts["langwatch.account.usage.window"]).toBe("five_hour");
     });
 
-    it("lifts the agent's own account id from the resource as the fallback key", () => {
+    it("uses the agent's own account id from the resource as the account key", () => {
       const { lift, dispatched } = makeLift();
 
       lift(
@@ -677,9 +679,58 @@ describe("liftLogContribution", () => {
         }),
       );
 
-      expect(dispatched[0]!.facts["user.account_uuid"]).toBe(
+      expect(accountColumnsOf(dispatched[0]!.facts).accountId).toBe(
         "5a6b7c8d-0000-4000-8000-000000000001",
       );
+    });
+
+    /** @scenario a resource account id never names the session's user */
+    it("leaves the session's user unset when only the resource carries the agent's account id", () => {
+      const { lift, dispatched } = makeLift();
+      const stateProjection = CodingAgentSessionStateProjection.create();
+
+      lift(
+        canonicalLogRecord({
+          attributes: { "event.name": "claude_code.api_request", "session.id": "sess-uuid" },
+          resourceAttributes: {
+            "user.account_uuid": "5a6b7c8d-0000-4000-8000-000000000001",
+            "user.account_id": "acct-from-resource",
+          },
+        }),
+      );
+
+      const facts = dispatched[0]!.facts;
+      expect(facts["user.account_uuid"]).toBeUndefined();
+      expect(facts["user.account_id"]).toBeUndefined();
+      const session = stateProjection.withIdentity(
+        stateProjection.createInitCodingAgentSession(),
+        facts,
+      );
+      expect(session.userId).toBeNull();
+    });
+
+    it("keeps the record's own account uuid as both the session's user and the account key", () => {
+      const { lift, dispatched } = makeLift();
+      const stateProjection = CodingAgentSessionStateProjection.create();
+
+      lift(
+        canonicalLogRecord({
+          attributes: {
+            "event.name": "claude_code.api_request",
+            "session.id": "sess-uuid",
+            "user.account_uuid": "record-uuid",
+          },
+          resourceAttributes: { "user.account_uuid": "resource-uuid" },
+        }),
+      );
+
+      const facts = dispatched[0]!.facts;
+      const session = stateProjection.withIdentity(
+        stateProjection.createInitCodingAgentSession(),
+        facts,
+      );
+      expect(session.userId).toBe("record-uuid");
+      expect(accountColumnsOf(facts).accountId).toBe("record-uuid");
     });
   });
 });
