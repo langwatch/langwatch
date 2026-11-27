@@ -24,7 +24,9 @@ import {
   RoutingPolicyModelNotConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
+  RoutingPolicyProviderOutOfScopeError,
   RoutingPolicyProviderRequiredError,
+  RoutingPolicyProviderScopeError,
   RoutingPolicyScopeRequiredError,
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
@@ -212,7 +214,7 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
   }
 }
 
-/** The three routing-policy guards as handled errors; anything else stays unknown (ADR-045). */
+/** The routing-policy guards as handled errors; anything else stays unknown (ADR-045). */
 function asHandledRoutingPolicyError(error: unknown): unknown {
   if (error instanceof RoutingPolicyMustHaveProviderError) {
     return new RoutingPolicyProviderRequiredError();
@@ -222,6 +224,9 @@ function asHandledRoutingPolicyError(error: unknown): unknown {
   }
   if (error instanceof RoutingPolicyModelMustBeConcreteError) {
     return new RoutingPolicyModelNotConcreteError(error.field, error.value);
+  }
+  if (error instanceof RoutingPolicyProviderScopeError) {
+    return new RoutingPolicyProviderOutOfScopeError();
   }
   return error;
 }
