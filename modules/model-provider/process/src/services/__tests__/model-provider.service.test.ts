@@ -809,6 +809,10 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
       (field) => typeof field === "string" && field.length > 0 && field !== "••••",
     );
   }
+  /** This suite's rows hold invented key names, so every provider here counts as keyed. */
+  hasUsableCredentials(): boolean {
+    return true;
+  }
   assertCredentialsCanBeSaved(input: {
     storedCredentialsUnreadable: boolean;
     incoming: Record<string, unknown> | null;

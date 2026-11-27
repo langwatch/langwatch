@@ -195,6 +195,31 @@ describe("useProviderFormSubmit()", () => {
     });
   });
 
+  describe("given the save is refused because the provider would be switched on with no key", () => {
+    it("asks for the key beside the credential fields instead of in a toast", async () => {
+      mockUpdateMutateAsync.mockRejectedValueOnce({
+        data: {
+          error: {
+            code: "model_provider_credentials_required",
+            httpStatus: 400,
+            meta: { provider: "openai" },
+          },
+        },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(result.current.errors.customKeysRoot).toContain("Add the API key");
+      expect(result.current.errors.customKeysRoot).toContain("nothing was saved");
+      expect(mockToasterCreate).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given useAsDefaultProvider is true and provider is azure", () => {
     describe("when projectDefaultModel belongs to a different provider (openai/gpt-5.2)", () => {
       beforeEach(async () => {

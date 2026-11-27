@@ -158,15 +158,16 @@ function modelImportToast({
   };
 }
 
-/** A save refused for its base URL belongs beside the credential fields, not in a toast. */
-function isRefusedEndpoint(error: unknown): boolean {
+/** A save refused for its base URL or a missing key belongs beside the credential fields. */
+function isCredentialRefusal(error: unknown): boolean {
   const handled = readHandledError(error);
+  if (handled?.code === "model_provider_credentials_required") return true;
   return (
     handled?.code === "model_provider_invalid" && handled.meta?.reason === "endpoint_not_allowed"
   );
 }
 
-/** A refused base URL is shown beside the credential fields; anything else is a toast. */
+/** A credential refusal is shown beside the credential fields; anything else is a toast. */
 function reportSaveFailure({
   error,
   setErrors,
@@ -176,7 +177,7 @@ function reportSaveFailure({
   setErrors: (errors: { customKeysRoot?: string }) => void;
   showErrorToast: ReturnType<typeof useShowErrorToast>;
 }): void {
-  if (isRefusedEndpoint(error)) {
+  if (isCredentialRefusal(error)) {
     setErrors({
       customKeysRoot: describeError({ error, fallbackTitle: "That provider can't be saved" }),
     });

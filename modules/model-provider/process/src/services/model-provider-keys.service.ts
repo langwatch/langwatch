@@ -23,6 +23,14 @@ export abstract class ModelProviderCredentialPolicy {
   }): Record<string, unknown>;
   abstract toMaskedKeys(value: Record<string, unknown> | null): Record<string, unknown> | null;
   abstract hasUsableReplacement(value: Record<string, unknown> | null): boolean;
+  /**
+   * Whether the provider's registry key schema is met by what `readValue` finds for each of
+   * its credential fields: the stored value, or whatever stands in for one.
+   */
+  abstract hasUsableCredentials(input: {
+    provider: string;
+    readValue: (key: string) => string | null;
+  }): boolean;
   abstract assertCredentialsCanBeSaved(input: {
     provider: string;
     incoming: Record<string, unknown> | null;
@@ -131,6 +139,18 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
     return Object.values(value ?? {}).some(
       (field) => typeof field === "string" && field.length > 0 && field !== MASKED_KEY_PLACEHOLDER,
     );
+  }
+
+  hasUsableCredentials(input: {
+    provider: string;
+    readValue: (key: string) => string | null;
+  }): boolean {
+    const found = [...credentialKeys(providerDefinition(input.provider))].flatMap((key) => {
+      const value = input.readValue(key);
+      return value === null ? [] : [[key, value] as const];
+    });
+
+    return getKeysNormalizer(input.provider).validate(Object.fromEntries(found));
   }
 
   assertCredentialsCanBeSaved(input: {

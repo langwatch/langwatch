@@ -8,8 +8,11 @@ import {
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
+import { UnavailableModelProviderCredentialProbeService } from "../../features/credential-probe/services/unavailable-model-provider-credential-probe.service.ts";
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
 import { ModelProviderKeysService } from "../model-provider-keys.service.ts";
+import { RegistryModelProviderCatalogService } from "../registry-model-provider-catalog.service.ts";
+import { UnmanagedModelProviderGatewayService } from "../unmanaged-model-provider-gateway.service.ts";
 
 function serviceWith(
   options: {
@@ -41,10 +44,12 @@ function serviceWith(
     getAnchorOrganizationId: async () => "organization-1",
     getOrganizationIdForScopes: async () => "organization-1",
   };
-  const catalog = {
-    exists: () => true,
-    pickProviderDeprecation: () => null,
-  };
+  const catalog = RegistryModelProviderCatalogService.create({
+    managed: UnmanagedModelProviderGatewayService.create(),
+    probe: UnavailableModelProviderCredentialProbeService.create(),
+    systemProviderEnvironment: {},
+    isSaas: false,
+  });
   const ids = {
     generate: () => "provider-1",
   };
@@ -120,6 +125,7 @@ describe("ModelProviderCommandService.upsert — skip-permissions patterns", () 
           provider: "openai",
           enabled: true,
           scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+          customKeys: { OPENAI_API_KEY: "sk-invented" },
           langySkipPermissionsModels: ["gpt-5.*", "^claude-opus-5"],
         } as never);
 
@@ -165,6 +171,7 @@ describe("ModelProviderCommandService.upsert — the list that reaches the repos
           provider: "openai",
           enabled: true,
           scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+          customKeys: { OPENAI_API_KEY: "sk-invented" },
           langySkipPermissionsModels: ["^gpt-9$", "^gpt-10$"],
         } as never);
 

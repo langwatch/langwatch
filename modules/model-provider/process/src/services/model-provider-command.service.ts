@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsRequiredError,
   ModelProviderDeprecatedError,
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
@@ -84,6 +85,7 @@ export class ModelProviderCommandService {
       organizationId,
       routingHandle,
     });
+    this.assertCanBeSwitchedOn({ provider, existing });
     // Before the write and outside any transaction: this asks the provider over the network.
     const imported = await this.options.modelImport?.importIntoSave({ provider, existing });
     const saved = await this.saveProvider(imported?.provider ?? provider, existing, routingHandle);
@@ -423,6 +425,31 @@ export class ModelProviderCommandService {
     });
     await this.options.catalog.assertEndpointAllowed(input.provider, merged);
     return merged;
+  }
+
+  /**
+   * A create or an enable flip that would leave the row on with nothing to authenticate with.
+   * The deployment's own settings and a managed provider count; a row already on is left alone.
+   */
+  private assertCanBeSwitchedOn(input: {
+    provider: ModelProvider;
+    existing: ModelProvider | null;
+  }): void {
+    const { provider, existing } = input;
+    if (!provider.enabled || existing?.enabled) return;
+
+    const { catalog, credentialPolicy } = this.options;
+    const managed = catalog.isManagedProvider({
+      organizationId: provider.organizationId,
+      provider: provider.provider,
+    });
+    if (managed) return;
+
+    const usable = credentialPolicy.hasUsableCredentials({
+      provider: provider.provider,
+      readValue: (key) => catalog.pickExecutionValue({ customKeys: provider.customKeys, key }),
+    });
+    if (!usable) throw new ModelProviderCredentialsRequiredError({ provider: provider.provider });
   }
 
   private headersForWrite(

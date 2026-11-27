@@ -1746,6 +1746,11 @@ const presentations = {
       return `${where} of the allowed models list is not a valid pattern. Correct it and save again. Nothing was saved.`;
     },
   },
+  model_provider_credentials_required: {
+    title: "This provider needs its API key",
+    describe: () =>
+      "It can't be switched on without credentials, so nothing was saved. Add the API key, then save again.",
+  },
   model_provider_credentials_unreadable: {
     title: "This provider needs its credentials again",
     describe: () =>

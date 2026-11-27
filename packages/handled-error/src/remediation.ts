@@ -990,6 +990,15 @@ const registry = {
     docsPath: "/self-hosting/configuration/environment-variables",
   },
 
+  model_provider_credentials_required: {
+    tips: [
+      "Send the provider's credential in customKeys with the save, for example OPENAI_API_KEY for openai",
+      "A provider whose endpoint needs no key can be saved with its base URL instead, for example OPENAI_BASE_URL",
+      "Saving the provider with enabled false stores it without credentials; switch it on once they are added",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
   model_provider_unavailable: {
     tips: [
       "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",
