@@ -15548,6 +15548,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

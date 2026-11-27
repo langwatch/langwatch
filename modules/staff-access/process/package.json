@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

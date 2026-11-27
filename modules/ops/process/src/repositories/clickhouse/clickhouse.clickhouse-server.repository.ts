@@ -1,13 +1,20 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseServerHealth } from "@langwatch/ops-contract";
 import { CLICKHOUSE_QUERY_ERROR_MAX_PROJECTS } from "@langwatch/ops-contract";
 
 import { querySourceExpression } from "../../rules/clickhouse-query-source.rules.ts";
-import { isPlainClusterName, isUnknownClusterError } from "../../rules/cluster-name.rules.ts";
+import {
+  clusterReadSettings,
+  clusterSystemTable,
+  readAcrossClusterOrLocal,
+} from "../../rules/cluster-name.rules.ts";
 import {
   ClickHouseServerRepository,
   type ClickHouseQueryErrorRow,
 } from "../clickhouse.server.repository.ts";
+
+const logger = createLogger("langwatch:ops:clickhouse-server");
 
 /** The most groups one read answers: a window with more is a fire, read a narrower one. */
 const MAX_ERROR_GROUPS = 10_000;
@@ -19,6 +26,8 @@ type Row = Record<string, unknown>;
  * column, and every read is limited to the app's own database. Never a statement's text.
  */
 export class ClickHouseClickHouseServerRepository extends ClickHouseServerRepository {
+  private warnedUnknownCluster = false;
+
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();
   }
@@ -63,7 +72,7 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
               groupUniqArrayArray(${CLICKHOUSE_QUERY_ERROR_MAX_PROJECTS})(arrayFilter(id -> id != '',
                 splitByChar(',', extract(log_comment, '^lwql:project=([A-Za-z0-9_,-]*)$')))) AS project_ids,
               toUnixTimestamp64Milli(max(event_time_microseconds)) AS last_at
-            FROM ${systemTable({ cluster: target, table: "query_log" })}
+            FROM ${clusterSystemTable({ cluster: target, table: "query_log" })}
             WHERE event_date >= toDate(fromUnixTimestamp64Milli({sinceMs:Int64}))
               AND event_time_microseconds >= fromUnixTimestamp64Milli({sinceMs:Int64})
               AND event_time_microseconds < fromUnixTimestamp64Milli({untilMs:Int64})
@@ -113,7 +122,7 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
         sql: `SELECT uniqExact(hostName()) AS nodes,
           maxIf(value, metric = 'MemoryResident') AS resident,
           maxIf(value, metric = 'OSMemoryTotal') AS total
-        FROM ${systemTable({ cluster, table: "asynchronous_metrics" })}
+        FROM ${clusterSystemTable({ cluster, table: "asynchronous_metrics" })}
         WHERE metric IN ('MemoryResident', 'OSMemoryTotal')`,
       }).then(firstRow),
       this.read({
@@ -121,23 +130,23 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
         sql: `SELECT count() AS tables, countIf(is_readonly) AS readonly,
           countIf(is_session_expired) AS expired, max(absolute_delay) AS max_delay,
           max(queue_size) AS max_queue
-        FROM ${systemTable({ cluster, table: "replicas" })} WHERE database = currentDatabase()`,
+        FROM ${clusterSystemTable({ cluster, table: "replicas" })} WHERE database = currentDatabase()`,
       }).then(firstRow),
       this.read({
         cluster,
         sql: `SELECT count() AS running, max(elapsed) AS longest
-        FROM ${systemTable({ cluster, table: "merges" })} WHERE database = currentDatabase()`,
+        FROM ${clusterSystemTable({ cluster, table: "merges" })} WHERE database = currentDatabase()`,
       }).then(firstRow),
       this.read({
         cluster,
         sql: `SELECT uniqExact(table, mutation_id) AS pending
-        FROM ${systemTable({ cluster, table: "mutations" })} WHERE database = currentDatabase() AND is_done = 0`,
+        FROM ${clusterSystemTable({ cluster, table: "mutations" })} WHERE database = currentDatabase() AND is_done = 0`,
       }).then(firstRow),
       this.read({
         cluster,
         sql: `SELECT count() AS disks, sum(total_space) AS total, sum(free_space) AS free,
           min(if(total_space = 0, 1, free_space / total_space)) AS lowest
-        FROM ${systemTable({ cluster, table: "disks" })}`,
+        FROM ${clusterSystemTable({ cluster, table: "disks" })}`,
       }).then(firstRow),
       this.read({
         cluster,
@@ -150,7 +159,7 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
             FROM (
               SELECT hostName() AS node, table, partition_id, count() AS parts,
                 sum(bytes_on_disk) AS bytes
-              FROM ${systemTable({ cluster, table: "parts" })}
+              FROM ${clusterSystemTable({ cluster, table: "parts" })}
               WHERE database = currentDatabase() AND active
               GROUP BY node, table, partition_id
             )
@@ -196,7 +205,7 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
   private async hasQueryLog({ cluster }: { cluster: string | undefined }): Promise<boolean> {
     const [row] = await this.read({
       cluster,
-      sql: `SELECT count() AS present FROM ${systemTable({ cluster, table: "tables" })}
+      sql: `SELECT count() AS present FROM ${clusterSystemTable({ cluster, table: "tables" })}
         WHERE database = 'system' AND name = 'query_log'`,
     });
     return numberOf(row?.present) > 0;
@@ -215,14 +224,17 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
       tenantId: "",
       sql,
       ...(params === undefined ? {} : { params }),
-      settings: clusterSettings(cluster),
+      settings: clusterReadSettings({ cluster }),
       // System tables carry no tenant column: these are the server's own log and health.
       SKIP_TENANT_CHECK: true,
     });
     return result.rows;
   }
 
-  /** Across the cluster, or on the local node when ClickHouse does not know the cluster. */
+  /**
+   * Across the cluster, or on the local node when ClickHouse does not know the cluster; that
+   * degradation is logged once per streak. Any other failure is thrown.
+   */
   private async orLocal<T>({
     cluster,
     read,
@@ -230,14 +242,19 @@ export class ClickHouseClickHouseServerRepository extends ClickHouseServerReposi
     cluster: string | undefined;
     read: (cluster: string | undefined) => Promise<T>;
   }): Promise<T> {
-    const name = plainClusterName(cluster);
-    if (!name) return read(void 0);
-    try {
-      return await read(name);
-    } catch (error) {
-      if (!isUnknownClusterError(error)) throw error;
-      return read(void 0);
+    const result = await readAcrossClusterOrLocal({ cluster, read });
+    if (result.fellBack) {
+      // Once per streak: the setting stays wrong until an operator fixes it.
+      const level = this.warnedUnknownCluster ? "debug" : "warn";
+      this.warnedUnknownCluster = true;
+      logger[level](
+        { cluster, error: result.cause },
+        "ClickHouse does not know the configured cluster; reading the local node's system tables",
+      );
+    } else if (result.cluster !== undefined) {
+      this.warnedUnknownCluster = false;
     }
+    return result.answer;
   }
 }
 
@@ -252,20 +269,4 @@ function textOf(value: unknown): string {
 function numberOf(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-/** The trusted cluster name, or an empty string where none is named or it is not plain. */
-function plainClusterName(cluster: string | undefined): string {
-  const name = cluster?.trim() ?? "";
-  return isPlainClusterName(name) ? name : "";
-}
-
-function systemTable({ cluster, table }: { cluster: string | undefined; table: string }): string {
-  const name = plainClusterName(cluster);
-  return name ? `clusterAllReplicas('${name}', system.${table})` : `system.${table}`;
-}
-
-/** One unreachable replica must not blank the reading the others can still answer. */
-function clusterSettings(cluster: string | undefined): Record<string, number> {
-  return plainClusterName(cluster) ? { skip_unavailable_shards: 1 } : {};
 }

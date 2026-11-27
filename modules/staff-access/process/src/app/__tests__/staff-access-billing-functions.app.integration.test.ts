@@ -71,13 +71,13 @@ describe("the billing ops functions", () => {
         billing: cloudBilling(asked),
         scopes: ["org:metadata"],
         functions: ["org.billing"],
-        organizationId: "org_initech",
+        organization: "globex",
       });
 
       const { output } = await call("org.billing");
 
       expect(output).toMatchObject({
-        organizationId: "org_initech",
+        organizationId: "org_globex",
         subscriptionId: null,
         plan: "none",
         state: "none",
@@ -95,7 +95,6 @@ describe("the billing ops functions", () => {
         billing: cloudBilling(asked),
         scopes: ["ops:read"],
         functions: ["billing.subscriptions"],
-        organizationId: null,
       });
 
       const { output } = await call("billing.subscriptions", { since: "2026-11-01T00:00:00Z" });
@@ -131,7 +130,6 @@ describe("the billing ops functions", () => {
         billing: cloudBilling(asked),
         scopes: ["ops:read"],
         functions: ["billing.subscriptions"],
-        organizationId: null,
       });
 
       await expect(
@@ -147,7 +145,6 @@ describe("the billing ops functions", () => {
         billing: cloudBilling(asked),
         scopes: ["ops:read"],
         functions: ["billing.stripe_prices"],
-        organizationId: null,
       });
 
       const first = await call("billing.stripe_prices", { limit: 1 });
@@ -177,7 +174,6 @@ describe("the billing ops functions", () => {
         billing: selfHostedBilling(),
         scopes: ["ops:read"],
         functions: ["billing.stripe_prices", "billing.subscriptions"],
-        organizationId: null,
       });
       const org = await caller({
         billing: selfHostedBilling(),
@@ -192,7 +188,9 @@ describe("the billing ops functions", () => {
       await expect(codeOf(platform.call("billing.stripe_prices"))).resolves.toBe(
         "billing_facts_unavailable",
       );
-      const trail = await org.repositories.events.findByRequest({ requestId: "request_1" });
+      const trail = await org.repositories.events.findByRequest({
+        requestId: org.session.requestId,
+      });
       expect(trail).toEqual([
         expect.objectContaining({
           functionName: "org.billing",

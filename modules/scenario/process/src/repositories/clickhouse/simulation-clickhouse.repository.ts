@@ -1531,8 +1531,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     const [routingTenant] = tenantIds;
     if (routingTenant === undefined) return [];
     const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
-    const window = `StartedAt >= fromUnixTimestamp64Milli(toInt64({since:String}))
-         AND StartedAt < fromUnixTimestamp64Milli(toInt64({until:String}))`;
+    const windowOf = (alias: string) =>
+      `${alias}StartedAt >= fromUnixTimestamp64Milli(toInt64({since:String}))
+         AND ${alias}StartedAt < fromUnixTimestamp64Milli(toInt64({until:String}))`;
     const client = await this.getClient(routingTenant);
     const result = await client.query({
       query: `SELECT t.TenantId AS ProjectId,
@@ -1541,13 +1542,13 @@ export class SimulationClickHouseRepository extends SimulationRepository {
               toString(countIf(t.Status IN ('FAILED', 'ERROR'))) AS Failed
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId IN (${placeholders})
-         AND t.${window}
+         AND ${windowOf("t.")}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
            FROM ${TABLE_NAME}
            WHERE TenantId IN (${placeholders})
-             AND ${window}
+             AND ${windowOf("")}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        GROUP BY t.TenantId`,

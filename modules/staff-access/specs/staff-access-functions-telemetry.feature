@@ -63,6 +63,24 @@ Feature: Telemetry ops functions
     Then it answers at least one node and one disk with free space and resident memory
     And the table is listed with its active parts
 
+  @unit
+  Scenario: A named cluster reads the query log and health of every replica
+    Given the ClickHouse cluster setting names a plain cluster
+    When ops reads failed statements or the server's health
+    Then each statement reads clusterAllReplicas over that cluster and skips unavailable shards
+
+  @unit
+  Scenario: Any other cluster-wide failure of the server reads is reported, not hidden
+    Given a cluster-wide read refused for missing rights
+    When ops reads failed statements or the server's health
+    Then the refusal is thrown and the local node is never read
+
+  @integration
+  Scenario: A cluster ClickHouse does not know reads the local node's query log and health
+    Given the ClickHouse cluster setting names a cluster the server does not know
+    When ops reads failed statements and the server's health
+    Then both answer from the local node's system tables
+
   @unimplemented
   Scenario: api.service_errors counts our own service errors by route
     Given the platform's own service traces were stored somewhere the platform can query

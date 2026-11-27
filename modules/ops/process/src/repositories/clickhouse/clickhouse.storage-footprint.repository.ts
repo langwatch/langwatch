@@ -1,7 +1,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
-import { isPlainClusterName, isUnknownClusterError } from "../../rules/cluster-name.rules.ts";
+import {
+  clusterReadSettings,
+  clusterSystemTable,
+  readAcrossClusterOrLocal,
+} from "../../rules/cluster-name.rules.ts";
 import {
   type BackupStatusRow,
   StorageFootprintRepository,
@@ -121,22 +125,19 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
     cluster: string | undefined;
     read: (cluster: string | undefined) => Promise<T>;
   }): Promise<{ answer: T; cluster: string | undefined }> {
-    if (!plainClusterName(cluster)) return { answer: await read(void 0), cluster: void 0 };
-    try {
-      const answer = await read(cluster);
-      this.warnedUnknownCluster = false;
-      return { answer, cluster };
-    } catch (error) {
-      if (!isUnknownClusterError(error)) throw error;
+    const result = await readAcrossClusterOrLocal({ cluster, read });
+    if (result.fellBack) {
       // Once per streak: the setting stays wrong until an operator fixes it.
       const level = this.warnedUnknownCluster ? "debug" : "warn";
       this.warnedUnknownCluster = true;
       logger[level](
-        { cluster, error },
+        { cluster, error: result.cause },
         "ClickHouse does not know the configured cluster; reading the local node's backup log",
       );
-      return { answer: await read(void 0), cluster: void 0 };
+    } else if (result.cluster !== undefined) {
+      this.warnedUnknownCluster = false;
     }
+    return { answer: result.answer, cluster: result.cluster };
   }
 
   private async readBackupRows({ cluster }: { cluster: string | undefined }) {
@@ -153,10 +154,10 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
           count() as cnt,
           maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
           argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-        FROM ${backupLogSource(cluster)}
+        FROM ${clusterSystemTable({ cluster, table: "backup_log" })}
         GROUP BY status
       `,
-      settings: clusterSettings(cluster),
+      settings: clusterReadSettings({ cluster }),
       // System.backup_log carries no tenant column: this is the instance's backup history.
       SKIP_TENANT_CHECK: true,
     });
@@ -167,33 +168,12 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
   private async hasBackupLog({ cluster }: { cluster?: string | undefined }): Promise<boolean> {
     const result = await this.clickhouse.query<{ present: string }>({
       tenantId: "",
-      sql: `SELECT count() AS present FROM ${systemTablesSource(cluster)}
+      sql: `SELECT count() AS present FROM ${clusterSystemTable({ cluster, table: "tables" })}
         WHERE database = 'system' AND name = 'backup_log'`,
-      settings: clusterSettings(cluster),
+      settings: clusterReadSettings({ cluster }),
       // System.tables carries no tenant column: this asks what the server has.
       SKIP_TENANT_CHECK: true,
     });
     return Number.parseInt(result.rows[0]?.present ?? "0", 10) > 0;
   }
-}
-
-/** The trusted cluster name, or an empty string where none is named or it is not plain. */
-function plainClusterName(cluster: string | undefined): string {
-  const name = cluster?.trim() ?? "";
-  return isPlainClusterName(name) ? name : "";
-}
-
-function backupLogSource(cluster: string | undefined): string {
-  const name = plainClusterName(cluster);
-  return name ? `clusterAllReplicas('${name}', system.backup_log)` : "system.backup_log";
-}
-
-function systemTablesSource(cluster: string | undefined): string {
-  const name = plainClusterName(cluster);
-  return name ? `clusterAllReplicas('${name}', system.tables)` : "system.tables";
-}
-
-/** One unreachable replica must not blank the reading the others can still answer. */
-function clusterSettings(cluster: string | undefined): Record<string, number> {
-  return plainClusterName(cluster) ? { skip_unavailable_shards: 1 } : {};
 }

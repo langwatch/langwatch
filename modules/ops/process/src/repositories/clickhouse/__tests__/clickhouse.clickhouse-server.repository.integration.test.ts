@@ -127,4 +127,24 @@ describe("ClickHouseClickHouseServerRepository against ClickHouse", () => {
       });
     });
   });
+
+  describe("when the cluster setting names a cluster the server does not know", () => {
+    /** @scenario "A cluster ClickHouse does not know reads the local node's query log and health" */
+    it("answers both reads from the local node's system tables", async () => {
+      const cluster = "lw_no_such_cluster";
+
+      const groups = await repository.findQueryErrors({
+        sinceMs: startedAt,
+        untilMs: Date.now() + 60_000,
+        cluster,
+      });
+      const health = await repository.findHealth({ cluster });
+
+      expect(groups.find((row) => row.projectIds.includes(project))).toMatchObject({
+        code: 241,
+      });
+      expect(health.nodes).toBeGreaterThanOrEqual(1);
+      expect(health.tables.find((row) => row.table === "ops_server_probe")).toBeDefined();
+    });
+  });
 });

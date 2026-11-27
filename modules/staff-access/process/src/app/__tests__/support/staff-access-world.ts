@@ -13,6 +13,7 @@ import {
   PasskeyAssertionRefusedError,
 } from "@langwatch/auth-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -26,7 +27,9 @@ import {
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import type { OpsApi, OpsPlatformOperator } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type {
   StaffAccessApprovalChoice,
   StaffAccessDoorSession,
@@ -90,9 +93,12 @@ export type StaffAccessWorld = ReturnType<typeof staffAccessWorld>;
 export function staffAccessWorld({
   repositories,
   publicBaseUrl = "https://app.langwatch.test",
+  billing = createApiFixture<BillingApi>({}),
 }: {
   repositories: StaffAccessRepositories;
   publicBaseUrl?: string;
+  /** Billing as the billing functions read it; every operation is unconfigured by default. */
+  billing?: BillingApi;
 }) {
   const state = {
     at: Temporal.Instant.from("2026-11-02T10:00:00Z") as Instant,
@@ -328,6 +334,8 @@ export function staffAccessWorld({
 
   const app = StaffAccessModule.create({
     repositories,
+    resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     config: { publicBaseUrl },
     dependencies: {
       ops,
@@ -415,9 +423,10 @@ export function staffAccessWorld({
       }),
       instantEvals: activityPeers.instantEvals(state.activityAsks),
       scenarios: activityPeers.scenarios(state.activityAsks, [ACME.id]),
+      billing,
     },
     now: () => state.at,
-  } as Parameters<typeof StaffAccessModule.create>[0]);
+  });
 
   const operator = (userId: string) => ({ actor: { type: "user", id: userId } });
   const requesterSession = (requester: { requesterId: string; ownerUserId: string }) => ({
@@ -706,6 +715,8 @@ function peoplePlan({ organizationId }: { organizationId: string }) {
   };
 }
 
+type StaffAccessOpsSession = Extract<StaffAccessDoorSession, { kind: "ops" }>;
+
 /** The code a promise rejects with, for asserting on codes rather than prose. */
 export async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
   try {
@@ -721,15 +732,22 @@ export async function redeemedSession({
   world,
   scopes,
   functions,
+  organization,
 }: {
   world: StaffAccessWorld;
   scopes: Parameters<typeof requestBody>[0]["scopes"];
   functions: string[];
-}): Promise<StaffAccessDoorSession> {
+  /** The organization's slug; ACME's by default. */
+  organization?: string;
+}): Promise<StaffAccessOpsSession> {
   const agent = await world.enrol();
   const { requestId } = await world.app.createRequest({
     session: agent.session,
-    body: requestBody({ scopes, functions }),
+    body: requestBody({
+      scopes,
+      functions,
+      ...(organization === undefined ? {} : { organization }),
+    }),
   });
   await world.approve({ choice: { requestId, spendApproved: false } });
   const answer = await world.app.redeem({
@@ -742,5 +760,5 @@ export async function redeemedSession({
   });
   ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
   const identified = await Promise.resolve(world.app.staffAccessDoor.identify?.({ request }));
-  return identified?.session as StaffAccessDoorSession;
+  return identified?.session as StaffAccessOpsSession;
 }
