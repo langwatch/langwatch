@@ -201,7 +201,12 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     resolve: {
       query: {
         input: { organizationId: string; dashboardId: string };
-        output: { homeProduct: BoardHomeProduct; scope: string };
+        output: {
+          homeProduct: BoardHomeProduct;
+          scope: string;
+          /** The owning project, named only where the reader may read it. */
+          project: { id: string; slug: string } | null;
+        };
       };
     };
   };

@@ -81,7 +81,12 @@ export const TEST_ORGANIZATION_ID = "organization-1";
  * or in two.
  */
 export function createDashboardTestProjects(
-  input: Readonly<{ slug?: string; organizations?: Readonly<Record<string, string>> }> = {},
+  input: Readonly<{
+    slug?: string;
+    organizations?: Readonly<Record<string, string>>;
+    /** Personal projects, each by the user who owns it. */
+    personalOwners?: Readonly<Record<string, string>>;
+  }> = {},
 ): ProjectApi {
   const slug = input.slug ?? "project-one";
   const organizationOf = (projectId: string) =>
@@ -92,8 +97,8 @@ export function createDashboardTestProjects(
     slug: `slug-${id}`,
     teamId: TEST_TEAM_ID,
     organizationId: organizationOf(id),
-    isPersonal: false,
-    ownerUserId: null,
+    isPersonal: input.personalOwners?.[id] !== undefined,
+    ownerUserId: input.personalOwners?.[id] ?? null,
     kind: "application",
   });
   return createApiFixture<ProjectApi>({

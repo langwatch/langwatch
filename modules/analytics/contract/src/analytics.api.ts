@@ -169,6 +169,15 @@ export interface AnalyticsApi {
    */
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
   /**
+   * Admits a statement for a run about to start: the placement gate, then the project's route,
+   * then the statement judged against the route's database. A saved statement uses
+   * `validateLangWatchQL`, which needs no route.
+   * @throws the gate's or the route's own refusal when either refuses.
+   */
+  validateLangWatchQLForRun(
+    input: LangWatchQLValidationInput,
+  ): Promise<LangWatchQLAcceptedStatement>;
+  /**
    * The judged columns a hydration plan asks for, in the catalogue's own
    * vocabulary. Derived here because the catalogue is LangWatchQL's: which
    * option of an eval function is its threshold, range or list is its answer.

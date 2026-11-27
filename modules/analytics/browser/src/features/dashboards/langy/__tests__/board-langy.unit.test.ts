@@ -243,6 +243,27 @@ describe("an ask made on a new board before it was stored", () => {
   });
 });
 
+describe("a question asked from a board", () => {
+  /** @scenario "AC264d Langy follow-ups: a question from a board's ask bar names that board as where it came from" */
+  it("names that board as where it was asked", () => {
+    const board = boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] });
+
+    expect(boardQuestion({ question: "Why?", board, period: PERIOD }).askedFrom).toBe(
+      "dashboard:board-9",
+    );
+  });
+
+  /** @scenario "AC264d Langy follow-ups: a question from a board's ask bar names that board as where it came from" */
+  it("names the stored board once a new board is stored", () => {
+    const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
+    const asked = boardQuestion({ question: "Why?", board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.askedFrom).toBe("dashboard:board-9");
+  });
+});
+
 describe("asking about the same board and widget twice", () => {
   const before = boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] });
   const after = boardSubject({

@@ -301,3 +301,14 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       And BLOCK_LOCAL_HTTP_CALLS is "true"
       When the TS validator processes "http://10.0.5.3/"
       Then the validation fails with an SSRF block error
+
+  Rule: A refusal names its reason
+    A caller explains a refused destination to the person who configured it.
+    It reads the reason the policy refused it, never the message text.
+
+    @unit
+    Scenario: The address policy refusal carries the reason it was refused
+      Given a destination on a cloud internal domain, a private address, a .local name or a metadata endpoint
+      When the address policy refuses it
+      Then the refusal names that reason, so a caller can tell which setting, if any, lifts it
+

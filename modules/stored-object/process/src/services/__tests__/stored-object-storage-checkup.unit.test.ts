@@ -14,6 +14,7 @@ import {
   MemoryStoredObjectFiles,
   MemoryStoredObjectStorage,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
@@ -32,6 +33,7 @@ function serviceOver({
 }): StoredObjectService {
   return StoredObjectService.create({
     records: MemoryStoredObjectRecordRepository.create(),
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
     permissions: new GrantedStoredObjectPermissions(),
     storage,
     signer: StoredObjectUploadSignerService.create({

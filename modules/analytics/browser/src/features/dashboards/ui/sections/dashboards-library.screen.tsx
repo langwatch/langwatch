@@ -1,33 +1,43 @@
 /**
- * `/dashboards`, the organization's Dashboards library (ADR-002): every board the member can see,
- * by home product; the one place a board moves between products. Every board opens at
- * `/dashboards/<id>`; `?new=1` opens the create dialog. dashboards-organization-area.feature
+ * `/dashboards`, the organization's Dashboards library (ADR-002): one table of every board the
+ * member can see, searched and filtered; the one place a board moves between products. A board
+ * opens at `/dashboards/<id>`; `?new=1` opens the create dialog. dashboards-organization-area
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import type { DashboardHomeProduct, DashboardScope } from "@langwatch/dashboard-contract";
+import { FilterChips } from "@langwatch/design-system/filter-chips";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { TableToolbar } from "@langwatch/design-system/table-toolbar";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LayoutDashboard, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useLibraryCreateDialog } from "../../behavior/use-library-create-dialog.ts";
-import { useLibraryShowMore } from "../../behavior/use-library-show-more.ts";
+import { useLibraryFilters } from "../../behavior/use-library-filters.ts";
 import { useOrganizationLibrary } from "../../behavior/use-organization-library.ts";
 import {
-  groupHeading,
+  LIBRARY_OWNER_CHOICES,
+  LIBRARY_SHARING_CHOICES,
+  type LibraryOwnerFilter,
+} from "../../model/library-filters.ts";
+import {
   LIBRARY_HEADER,
   type LibraryBoard,
-  type LibraryGroup,
-  libraryGroups,
   namesInProduct,
 } from "../../model/organization-library.ts";
-import { PRODUCT_BOARDS_SHOWN_MAX } from "../../model/product-dashboards.ts";
+import { LIBRARY_COLUMNS } from "../blocks/library-row.tsx";
 import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
 import { LibraryBoardRow } from "./library-board-rows.tsx";
 import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
+
+const LIBRARY_DOCS = "https://docs.langwatch.ai/features/dashboards";
 
 export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
@@ -45,7 +55,6 @@ export default function DashboardsLibraryScreen() {
 
   // A copy goes to the store project too, so with none nothing is copied.
   const duplicates = mayCreate ? { onDuplicate: library.duplicateBoard } : {};
-  const groups = libraryGroups({ boards: library.boards });
   const newButton = mayCreate ? (
     <Button size="sm" colorPalette="teal" onClick={createDialog.open}>
       <Plus size={14} aria-hidden />
@@ -57,10 +66,10 @@ export default function DashboardsLibraryScreen() {
   ) : null;
 
   return (
-    <Box width="full" maxWidth="960px" marginX="auto" paddingX={6} paddingY={8}>
+    <Box width="full" maxWidth="1120px" marginX="auto" paddingX={6} paddingY={8}>
       <LibraryHeader action={newButton} />
       <LibraryBody
-        groups={groups}
+        boards={library.boards}
         loadError={loadError}
         hasList={library.hasList}
         newButton={newButton}
@@ -79,15 +88,15 @@ export default function DashboardsLibraryScreen() {
   );
 }
 
-/** The groups, or why there are none: a failed read with a list held keeps the rows. */
+/** The table, or why there is none: a failed read with a list held keeps the rows. */
 function LibraryBody({
-  groups,
+  boards,
   loadError,
   hasList,
   newButton,
   handlers,
 }: {
-  groups: LibraryGroup[];
+  boards: readonly LibraryBoard[];
   loadError: ReactNode;
   hasList: boolean;
   newButton: ReactNode;
@@ -95,7 +104,7 @@ function LibraryBody({
 }) {
   if (loadError && !hasList) return <>{loadError}</>;
   // An empty list beside a failed store read still says the failure, or creation vanishes unsaid.
-  if (groups.length === 0) {
+  if (boards.length === 0) {
     return (
       <VStack align="stretch" gap={6}>
         {loadError}
@@ -109,12 +118,131 @@ function LibraryBody({
     );
   }
   return (
-    <VStack align="stretch" gap={6}>
+    <VStack align="stretch" gap={4}>
       {loadError}
-      {groups.map((group) => (
-        <ProductGroup key={group.product} group={group} {...handlers} />
-      ))}
+      <LibraryTable boards={boards} handlers={handlers} />
     </VStack>
+  );
+}
+
+/** The toolbar's search and filters over the one table of boards. */
+function LibraryTable({
+  boards,
+  handlers,
+}: {
+  boards: readonly LibraryBoard[];
+  handlers: BoardHandlers;
+}) {
+  const host = useAnalyticsHost();
+  const view = useLibraryFilters({ boards, userId: host.userId() });
+  const { filters } = view;
+  return (
+    <VStack align="stretch" gap={3}>
+      <TableToolbar
+        search={{
+          value: filters.search,
+          onChange: (search) => view.change({ search }),
+          placeholder: "Search dashboards",
+          ariaLabel: "Search dashboards",
+        }}
+        filters={
+          <HStack gap={3} wrap="wrap">
+            <FilterChips
+              groupLabel="Filter dashboards by product"
+              value={filters.product}
+              items={view.productChips}
+              countNoun={{ singular: "dashboard", plural: "dashboards" }}
+              colorPalette="teal"
+              onChange={(product) =>
+                view.change({ product: product as DashboardHomeProduct | "all" })
+              }
+            />
+            <LabelledChoice label="Created by">
+              <SegmentedControl
+                size="xs"
+                aria-label="Created by"
+                value={filters.owner}
+                items={[...LIBRARY_OWNER_CHOICES]}
+                onValueChange={({ value }) =>
+                  view.change({ owner: (value ?? "anyone") as LibraryOwnerFilter })
+                }
+              />
+            </LabelledChoice>
+            <LabelledChoice label="Shared with">
+              <SegmentedControl
+                size="xs"
+                aria-label="Shared with"
+                value={filters.sharing}
+                items={[...LIBRARY_SHARING_CHOICES]}
+                onValueChange={({ value }) =>
+                  view.change({ sharing: (value ?? "any") as DashboardScope | "any" })
+                }
+              />
+            </LabelledChoice>
+          </HStack>
+        }
+        summary={view.summary}
+        onClearFilters={view.isFiltered ? view.clear : void 0}
+      />
+      {view.rows.length === 0 ? (
+        <NoDataInfoBlock
+          size="line"
+          title="No dashboards match these filters"
+          action={{ label: "Clear filters", onClick: view.clear }}
+          next={[{ kind: "docs", label: "Read about dashboards", href: LIBRARY_DOCS }]}
+        />
+      ) : (
+        <ListTable aria-label="Dashboards" scroll="x" scrollLabel="Dashboards" minWidth="48rem">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.SortHeader
+                sorted={view.sort?.column === "name" ? view.sort.direction : false}
+                onSort={() => view.sortBy("name")}
+              >
+                Name
+              </ListTable.SortHeader>
+              {(["product", "whoSees", "owner"] as const).map((column) => (
+                <ListTable.ColumnHeader key={column} width={LIBRARY_COLUMNS[column].width}>
+                  {LIBRARY_COLUMNS[column].label}
+                </ListTable.ColumnHeader>
+              ))}
+              <ListTable.SortHeader
+                width={LIBRARY_COLUMNS.updated.width}
+                sorted={view.sort?.column === "updated" ? view.sort.direction : false}
+                onSort={() => view.sortBy("updated")}
+              >
+                {LIBRARY_COLUMNS.updated.label}
+              </ListTable.SortHeader>
+              <ListTable.ActionHeader label="Dashboard actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {view.rows.map((board) => (
+              <LibraryBoardRow
+                key={board.id}
+                board={board}
+                {...(handlers.onDuplicate
+                  ? { onDuplicate: () => handlers.onDuplicate?.(board) }
+                  : {})}
+                onMove={() => handlers.onMove(board)}
+                onDelete={() => handlers.onDelete(board)}
+              />
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      )}
+    </VStack>
+  );
+}
+
+function LabelledChoice({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <HStack gap={2}>
+      <Text as="span" textStyle="xs" color="fg.muted" aria-hidden>
+        {label}
+      </Text>
+      {children}
+    </HStack>
   );
 }
 
@@ -173,6 +301,7 @@ function LibraryDialogs({
           projectName={storeProject.name}
           organizationName={organizationName}
           mayShare={library.mayShare}
+          projectChoice={{ projects: library.storeProjects, initial: storeProject }}
           isCreating={library.isCreating}
           onCreate={library.createBoard}
           onClose={onCloseNewDialog}
@@ -194,56 +323,3 @@ type BoardHandlers = {
   onMove: (board: LibraryBoard) => void;
   onDelete: (board: LibraryBoard) => void;
 };
-
-function ProductGroup({
-  group,
-  onDuplicate,
-  onMove,
-  onDelete,
-}: BoardHandlers & { group: LibraryGroup }) {
-  const { showsAll, toggle } = useLibraryShowMore(group.product);
-  const shown = showsAll ? group.boards : group.boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
-  const hidden = group.boards.length - shown.length;
-  return (
-    <VStack as="section" aria-label={group.label} align="stretch" gap={2}>
-      <Text as="h2" textStyle="eyebrow" color="fg.subtle" paddingX={1}>
-        {groupHeading(group)}
-      </Text>
-      <VStack
-        as="ul"
-        align="stretch"
-        gap={0}
-        margin={0}
-        padding={0}
-        borderWidth="1px"
-        borderRadius="xl"
-        background="bg"
-        css={{ "& > li + li": { borderTopWidth: "1px", borderColor: "border" } }}
-      >
-        {shown.map((board) => (
-          <LibraryBoardRow
-            key={board.id}
-            board={board}
-            {...(onDuplicate ? { onDuplicate: () => onDuplicate(board) } : {})}
-            onMove={() => onMove(board)}
-            onDelete={() => onDelete(board)}
-          />
-        ))}
-        {group.boards.length > PRODUCT_BOARDS_SHOWN_MAX && (
-          <Box as="li" listStyleType="none">
-            <Button
-              variant="plain"
-              size="sm"
-              width="full"
-              justifyContent="flex-start"
-              color="fg.muted"
-              onClick={toggle}
-            >
-              {hidden > 0 ? `Show ${hidden} more` : "Show less"}
-            </Button>
-          </Box>
-        )}
-      </VStack>
-    </VStack>
-  );
-}

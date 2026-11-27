@@ -5,7 +5,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -237,16 +237,11 @@ describe("the templates finder", () => {
     });
   });
 
-  describe("when the member searches and picks chips", () => {
-    /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
-    it("writes the search, the category and the agent type into the address", async () => {
+  describe("when the member picks chips", () => {
+    /** @scenario "AC104 Templates library: the filters are kept in the address" */
+    it("writes the category and the agent type into the address", async () => {
       const user = userEvent.setup();
       const { host } = openLibrary();
-
-      fireEvent.change(screen.getByRole("searchbox", { name: "Search templates" }), {
-        target: { value: "cost" },
-      });
-      expect(host.lastQuery).toMatchObject({ q: "cost" });
 
       await user.click(chip({ row: "Categories", name: "Profit" }));
       expect(host.lastQuery).toMatchObject({ trunk: "Profit" });
@@ -256,16 +251,26 @@ describe("the templates finder", () => {
     });
   });
 
-  describe("given a search that matches no template", () => {
+  describe("given the finder", () => {
+    /** @scenario "AC102 Templates library: the finder has no search box of its own" */
+    it("has no template search box", () => {
+      openLibrary();
+
+      expect(screen.queryByRole("searchbox")).toBeNull();
+      expect(screen.getByRole("group", { name: "Categories" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given filters that match no template", () => {
     /** @scenario "AC105 Templates library: no match says so and offers to clear the filters" */
-    it("says so and clears the search and filters", async () => {
+    it("says so and clears the filters", async () => {
       const user = userEvent.setup();
-      const { host } = openLibrary({ query: { q: "zzz-no-such-template", trunk: "Profit" } });
+      const { host } = openLibrary({ query: { agent: "voice", trunk: "Trust" } });
 
-      expect(screen.getByText("No template matches your search and filters.")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Clear search and filters" }));
+      expect(screen.getByText("No template matches these filters.")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
-      expect(host.lastQuery).toEqual({ q: undefined, trunk: undefined, agent: undefined });
+      expect(host.lastQuery).toEqual({ trunk: undefined, agent: undefined });
     });
   });
 

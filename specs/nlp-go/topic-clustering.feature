@@ -108,6 +108,33 @@ Feature: Topic clustering runs on langevals
     Then it answers with a 4xx carrying a stable code and fixed copy
     And the provider's own words, which can quote the key, are not in the answer
 
+  # litellm raises a missing key as a server, connection or generic API error,
+  # so a project whose provider had no key saved failed every run as ours, after
+  # one embedding call per trace. No key is checked before a call: litellm finds
+  # keys under several names and in cloud credentials, so only its own failure
+  # says the key is missing.
+  @unit
+  Scenario: A model provider with no API key is answered as the customer's to fix
+    Given a batch or incremental clustering run whose embeddings or naming model has no API key anywhere litellm looks
+    When the run reaches the first call to that model
+    Then langevals answers with a 422 carrying the model_provider_key_missing code
+    And the embeddings step makes no per-trace calls after the first one fails for its key
+    And the naming step makes no retries after its call fails for its key
+
+  @unit
+  Scenario: A run that names no topic needs no key for the naming model
+    Given an incremental run whose traces all match existing topics, or a batch run whose traces form no topic
+    And the naming model has no API key
+    When langevals answers
+    Then it answers with the assignments and makes no naming call
+
+  @unit
+  Scenario: A key that arrives in the request is used, never refused
+    Given langevals has no provider keys of its own
+    And the request carries an API key, an endpoint, or Bedrock or Vertex credentials for its models
+    When langevals answers
+    Then it runs, and each model call carries the credentials from the request
+
   @unit
   Scenario: A failure of ours is still answered as a server error
     Given a batch or incremental clustering run that fails for any other reason

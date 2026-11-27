@@ -56,7 +56,7 @@ const call = {
   projectId: PROJECT_ID,
   texts: ["a".repeat(1_000)],
   recordKey: "trace-1:span-1",
-  durationMs: 1_000,
+  callDurationsMs: [1_000],
 };
 
 describe("PiiRedactionSpendService", () => {

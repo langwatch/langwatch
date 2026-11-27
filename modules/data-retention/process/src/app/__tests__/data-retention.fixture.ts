@@ -200,7 +200,7 @@ export function createDataRetentionTestApp(
     platformDefaultRetentionDays?: number;
   }> = {},
 ): DataRetentionModule {
-  return DataRetentionModule.create({
+  const app = DataRetentionModule.create({
     repositories: input.repositories ?? {
       ...MemoryDataRetentionRepositories.create(),
       directory: input.directory ?? MemoryRetentionDirectory.create(),
@@ -221,4 +221,7 @@ export function createDataRetentionTestApp(
     // No handle is ever resolved through it in these tests.
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
+  // A test that asserts on the facts connects its own recorder over this one.
+  app.connectFacts({ recordRetentionAppliedToExistingData: { send: async () => {} } });
+  return app;
 }

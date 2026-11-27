@@ -9,7 +9,6 @@
 * **automations:** one automation flow: wizard composer, Slack connections, always-on webhooks and API parity ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
 * **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
 * **query:** self-describing LangWatchQL door + whoami --json ([#8085](https://github.com/langwatch/langwatch/issues/8085)) ([#8113](https://github.com/langwatch/langwatch/issues/8113)) ([5b17bde](https://github.com/langwatch/langwatch/commit/5b17bde8e2497714d489504d13d8306393be429c))
-* **sdk:** list the Slack connections a project can use, through GET /api/slack-connections, langwatch slack-connection list, Python list_slack_connections and Go SlackConnections ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
 * **traces-v2:** enter to search, a routed search bar, instant evals in the filter bar, Langy in sync with the explorer ([#8234](https://github.com/langwatch/langwatch/issues/8234)) ([a4db9f8](https://github.com/langwatch/langwatch/commit/a4db9f83d4483804a113640cda81072d0fbc11e1))
 * webinar learnings, connected agent scope, scenario names, search hints, deep links, judge and Langy fixes ([#8236](https://github.com/langwatch/langwatch/issues/8236)) ([2054720](https://github.com/langwatch/langwatch/commit/2054720f391a2fcec60b86870a98d87345ccf6ee))
 
@@ -118,11 +117,8 @@
 ### Bug Fixes
 
 - **docs:** repair SKILL.md downloads and restore SSR on skills directory pages ([#5946](https://github.com/langwatch/langwatch/issues/5946)) ([6114d40](https://github.com/langwatch/langwatch/commit/6114d4091d6826d8088f1c3a6190ffc4da178bfc))
-- **langy:** hoist release_langy_enabled flag hook above early returns (React [#310](https://github.com/langwatch/langwatch/issues/310)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
 - **langy:** red-team + expanded scenario coverage, fix root causes found along the way ([#5986](https://github.com/langwatch/langwatch/issues/5986)) ([48ccc7d](https://github.com/langwatch/langwatch/commit/48ccc7daa9fd5324b44779c6887247eb19c3d632))
-- **security:** bump hono&gt;=4.12.25 and langsmith&gt;=0.8.18 ([5dd4178](https://github.com/langwatch/langwatch/commit/5dd41782beee86ce4333c255d0914357a4e9716d))
 - **security:** bump hono&gt;=4.12.25 and langsmith&gt;=0.8.18 (Dependabot [#1500](https://github.com/langwatch/langwatch/issues/1500), [#1516](https://github.com/langwatch/langwatch/issues/1516)) ([#5211](https://github.com/langwatch/langwatch/issues/5211)) ([5dd4178](https://github.com/langwatch/langwatch/commit/5dd41782beee86ce4333c255d0914357a4e9716d))
-- **security:** raise js-yaml and dompurify override floors (langwatch, skills, mastra example) ([bc79476](https://github.com/langwatch/langwatch/commit/bc79476fd684208745f4afb083fd5faa954ea79d))
 - **security:** raise js-yaml and dompurify override floors across JS workspaces ([#5364](https://github.com/langwatch/langwatch/issues/5364)) ([bc79476](https://github.com/langwatch/langwatch/commit/bc79476fd684208745f4afb083fd5faa954ea79d))
 - **security:** raise python-sdk bleach and onnx transitive floors ([#5542](https://github.com/langwatch/langwatch/issues/5542)) ([6abdc66](https://github.com/langwatch/langwatch/commit/6abdc6608ca8414a789e81e2b3c6f2aa42e03095))
 
@@ -145,7 +141,6 @@
 
 ### Bug Fixes
 
-- **skills/scenarios:** clarify per-adapter "how does this connect to my agent?" ([c6b514f](https://github.com/langwatch/langwatch/commit/c6b514f2116e7458634d8c57dcb1c91508df7669))
 - **skills/scenarios:** clarify per-adapter how to connect the user's agent (voice section) ([#4505](https://github.com/langwatch/langwatch/issues/4505)) ([c6b514f](https://github.com/langwatch/langwatch/commit/c6b514f2116e7458634d8c57dcb1c91508df7669))
 
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/skills@v0.4.1...skills@v0.5.0) (2026-06-02)
@@ -158,13 +153,11 @@
 ### Bug Fixes
 
 - **deps:** bump hono to &gt;=4.12.18 across the monorepo (closes 22 alerts) ([#4457](https://github.com/langwatch/langwatch/issues/4457)) ([3e062b5](https://github.com/langwatch/langwatch/commit/3e062b50b44730e3e9b320b186d63a1a4ff993b8))
-- **deps:** bump hono to &gt;=4.12.18 and @hono/node-server to &gt;=1.19.13 across the monorepo ([3e062b5](https://github.com/langwatch/langwatch/commit/3e062b50b44730e3e9b320b186d63a1a4ff993b8))
 - **deps:** bump protobufjs to &gt;=7.5.6 in skills and mastra example ([#4014](https://github.com/langwatch/langwatch/issues/4014)) ([bf4908c](https://github.com/langwatch/langwatch/commit/bf4908cc12dda98bf039be684265f36e9bda1742))
 - **deps:** bump protobufjs to clear CVE-2026-41242 across JS workspaces ([#3612](https://github.com/langwatch/langwatch/issues/3612)) ([f2f2c37](https://github.com/langwatch/langwatch/commit/f2f2c37a4dc2011e7463752e952172b6225c2b6d))
 - **deps:** bump uuid to &gt;=11.1.1 across the monorepo (closes 7 alerts) ([#4470](https://github.com/langwatch/langwatch/issues/4470)) ([f22706b](https://github.com/langwatch/langwatch/commit/f22706b523526875ecd639d54c1e392d27cbcfae))
 - **deps:** bump vitest to &gt;=4.1.0 across the monorepo (closes 9 CRITICAL alerts) ([#4495](https://github.com/langwatch/langwatch/issues/4495)) ([6f90ef4](https://github.com/langwatch/langwatch/commit/6f90ef48ae5b9436742bbda5d4bef21ea904db82))
 - **deps:** patch high-severity npm vulnerabilities (fast-xml-builder, fast-uri) ([#3928](https://github.com/langwatch/langwatch/issues/3928)) ([2eb205b](https://github.com/langwatch/langwatch/commit/2eb205ba86e1ebd4c7f078c8dba746dd9f50b919))
-- **deps:** upgrade langsmith sdk security floors ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
 - **deps:** upgrade LangSmith SDK security floors ([#4041](https://github.com/langwatch/langwatch/issues/4041)) ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
 - **prompts:** lossless structured-output and parameter sync between platform and local yaml ([#4068](https://github.com/langwatch/langwatch/issues/4068)) ([c3c5941](https://github.com/langwatch/langwatch/commit/c3c59417c916e4aaaba453723cb9f527834efbb8))
 - **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
@@ -173,10 +166,7 @@
 ### Miscellaneous
 
 - **deps:** bump liquidjs to &gt;=10.26.0 (RCE GHSA-gf2q-c269-pqgc) in typescript-sdk, skills, mcp-server ([#4340](https://github.com/langwatch/langwatch/issues/4340)) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
-- **deps:** bump liquidjs to &gt;=10.26.0 in typescript-sdk, skills, mcp-server (GHSA-gf2q-c269-pqgc) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
-- release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
 - release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
-- scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
 - **security:** add dependency age gates ([#3523](https://github.com/langwatch/langwatch/issues/3523)) ([78f5b20](https://github.com/langwatch/langwatch/commit/78f5b2059228748d19fb4bf74118c9bee6c474f9))
 - **skills:** single-footer shadow Release-As 0.5.0 ([475f598](https://github.com/langwatch/langwatch/commit/475f598fcd0a2b9175ae021335a56568a6995894))
 

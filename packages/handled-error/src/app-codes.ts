@@ -721,6 +721,7 @@ export const APP_ERROR_CODES = [
   "protocol_invalid",
   "provider_deployment_not_found",
   "provider_endpoint_redirected",
+  "provider_endpoint_refused",
   "provider_key_invalid",
   "provider_key_missing",
   "provider_key_restricted",

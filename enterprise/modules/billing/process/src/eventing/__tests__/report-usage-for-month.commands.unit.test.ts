@@ -151,17 +151,26 @@ function previousBillingMonth(): [string, number] {
   ];
 }
 
+type GrowthSeatPeriod = { startMs: number | null; endMs: number | null };
+
+/** One live Cloud subscription from `usageBilledSinceMs`, unless `growthSeatPeriods` is given. */
 function usageBilledOrg({
   id = "org-1",
   stripeCustomerId = "cus_123",
   hasSubscription = true,
   contract = "cloud" as const,
+  usageBilledSinceMs = null,
+  growthSeatPeriods,
 }: {
   id?: string;
   stripeCustomerId?: string | null;
   hasSubscription?: boolean;
   contract?: "cloud" | "connected";
+  usageBilledSinceMs?: number | null;
+  growthSeatPeriods?: GrowthSeatPeriod[];
 } = {}) {
+  const live = contract === "cloud" && hasSubscription;
+
   return {
     outcome: "usage_billed" as const,
     organization: {
@@ -169,6 +178,8 @@ function usageBilledOrg({
       stripeCustomerId,
       subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
       contract,
+      growthSeatPeriods:
+        growthSeatPeriods ?? (live ? [{ startMs: usageBilledSinceMs, endMs: null }] : []),
     },
   };
 }
@@ -197,6 +208,42 @@ async function createHandler({
     errorReporter: errorReporter as any,
     connectedUsageCeiling: mockConnectedUsageCeiling,
   });
+}
+
+const UPGRADED_ON_10_FEBRUARY_MS = Date.UTC(2026, 1, 10, 13);
+
+/** Reports February over a real checkpoint store; by default the upgrade was on the 10th. */
+async function reportFebruary({
+  reportedTotal,
+  windowTotal,
+  usageBilledSinceMs = UPGRADED_ON_10_FEBRUARY_MS,
+  growthSeatPeriods,
+}: {
+  reportedTotal: number | null;
+  windowTotal: number;
+  usageBilledSinceMs?: number;
+  growthSeatPeriods?: GrowthSeatPeriod[];
+}) {
+  const store = MemoryBillingStore.create();
+  const checkpoints = MemoryBillingCheckpointRepository.create(store);
+  const at = { organizationId: "org-1", billingMonth: "2026-02" };
+  const meter = "langwatch_instant_eval_usd";
+  if (reportedTotal !== null) {
+    await checkpoints.confirm({ ...at, meter, lastReportedTotal: reportedTotal });
+  }
+  mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+    usageBilledOrg({ usageBilledSinceMs, growthSeatPeriods }),
+  );
+  mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: windowTotal });
+  mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+  const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+  await handler.handle(makeCommand());
+
+  return {
+    events: mockReportUsageDelta.mock.calls.flatMap(([input]) => input.events),
+    checkpoint: await checkpoints.findCheckpoint({ ...at, meter }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -939,6 +986,144 @@ describe("ReportUsageForMonthCommand", () => {
         organizationId: "org-1",
         billingMonth: "2026-02",
         lastReportedTotal: 15_000,
+      });
+    });
+  });
+
+  describe("given a usage-billed subscription that started on 10 February", () => {
+    /** @scenario "Free use before an upgrade mid-month is not reported" */
+    it("reads the month from the subscription's start and sends only the spend since", async () => {
+      const { events, checkpoint } = await reportFebruary({
+        reportedTotal: null,
+        windowTotal: 5_000,
+      });
+
+      expect(mockQueryInstantEvalSpendTotal).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        usageBilledSinceMs: UPGRADED_ON_10_FEBRUARY_MS,
+      });
+      expect(events).toEqual([
+        expect.objectContaining({
+          eventName: "langwatch_instant_eval_usd",
+          identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:0:to:5000",
+          value: 0.5,
+        }),
+      ]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 5_000, pendingReportedTotal: null });
+    });
+
+    /** @scenario "A month already reported is not lowered by the subscription window" */
+    it("sends nothing and keeps the checkpoint when the window reads less than was reported", async () => {
+      const { events, checkpoint } = await reportFebruary({
+        reportedTotal: 15_000,
+        windowTotal: 5_000,
+      });
+
+      expect(events).toEqual([]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 15_000, pendingReportedTotal: null });
+      expect(mockSelfDispatch).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        {
+          organizationId: "org-1",
+          billingMonth: "2026-02",
+          meter: "langwatch_instant_eval_usd",
+          measured: 5_000,
+          reported: 15_000,
+        },
+        "the subscription window read less than was reported; keeping the reported total",
+      );
+    });
+
+    /** @scenario "A month already reported is not lowered by the subscription window" */
+    it("reports spend past the reported total as a positive delta", async () => {
+      const { events, checkpoint } = await reportFebruary({
+        reportedTotal: 15_000,
+        windowTotal: 20_000,
+      });
+
+      expect(events).toEqual([
+        expect.objectContaining({
+          identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:15000:to:20000",
+          value: 0.5,
+        }),
+      ]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 20_000, pendingReportedTotal: null });
+    });
+  });
+
+  describe("given a subscription replaced by a new one on 15 February after February was reported", () => {
+    const REPLACED_STARTED_MS = Date.UTC(2025, 5, 15);
+    const REPLACED_ON_15_FEBRUARY_MS = Date.UTC(2026, 1, 15, 9);
+
+    /** @scenario "A subscription replaced mid-month keeps the month's window" */
+    it("reads from the replaced subscription's start and sends the spend since as a positive delta", async () => {
+      const { events, checkpoint } = await reportFebruary({
+        reportedTotal: 15_000,
+        windowTotal: 20_000,
+        growthSeatPeriods: [
+          { startMs: REPLACED_ON_15_FEBRUARY_MS, endMs: null },
+          { startMs: REPLACED_STARTED_MS, endMs: REPLACED_ON_15_FEBRUARY_MS },
+        ],
+      });
+
+      expect(mockQueryInstantEvalSpendTotal).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        usageBilledSinceMs: REPLACED_STARTED_MS,
+      });
+      expect(events).toEqual([
+        expect.objectContaining({
+          eventName: "langwatch_instant_eval_usd",
+          identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:15000:to:20000",
+          value: 0.5,
+        }),
+      ]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 20_000, pendingReportedTotal: null });
+    });
+  });
+
+  describe("given a usage-billed subscription older than the month", () => {
+    /** @scenario "A subscription older than the month reports the whole month" */
+    it("passes its start through and still sends a lower corrected total", async () => {
+      const startedAtMs = Date.UTC(2025, 5, 15);
+      const { events, checkpoint } = await reportFebruary({
+        reportedTotal: 15_000,
+        windowTotal: 12_000,
+        usageBilledSinceMs: startedAtMs,
+      });
+
+      expect(mockQueryInstantEvalSpendTotal).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        usageBilledSinceMs: startedAtMs,
+      });
+      expect(events).toEqual([
+        expect.objectContaining({
+          identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:15000:to:12000",
+          value: -0.3,
+        }),
+      ]);
+      expect(checkpoint).toMatchObject({ lastReportedTotal: 12_000 });
+    });
+  });
+
+  describe("given a usage-billed organization with no recorded subscription start", () => {
+    /** @scenario "A subscription with no recorded start reports the whole month" */
+    it.each([
+      { case: "a subscription with no start date", lookup: usageBilledOrg() },
+      { case: "a connected account", lookup: usageBilledOrg({ contract: "connected" }) },
+    ])("asks for the whole month for $case", async ({ lookup }) => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(lookup);
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockQueryInstantEvalSpendTotal).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        usageBilledSinceMs: null,
       });
     });
   });

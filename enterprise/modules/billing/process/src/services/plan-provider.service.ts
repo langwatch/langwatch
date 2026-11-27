@@ -86,6 +86,8 @@ export class SaaSPlanProviderService extends BillingService {
         maxScenarios: undefined,
         maxScenarioSets: undefined,
         maxEvaluators: undefined,
+        maxScenarioRunsPerMonth: undefined,
+        scenarioRunGraceDays: undefined,
         overrideAddingLimitations,
       };
     }

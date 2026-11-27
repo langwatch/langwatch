@@ -23,6 +23,12 @@ export const PII_REDACTION_SPEND_MODEL = "pii-redaction-model";
  */
 export const PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS = 8_000;
 
+/**
+ * Above this many characters a batch goes to Presidio even where splitting is on; from
+ * 8,001 up to this, it is split across calls (ADR-207).
+ */
+export const PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS = 32_000;
+
 /** The published price: 0.00005 dollars per 100 characters sent to the model. */
 export const PII_REDACTION_NANO_USD_PER_CHARACTER = 500;
 

@@ -1,5 +1,6 @@
 import {
   ProviderEndpointRedirectedError,
+  ProviderEndpointRefusedError,
   ProviderUnreachableError,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
@@ -256,6 +257,29 @@ function redirectedFailure(context: ProbeContext): RankedFailure {
 }
 
 /**
+ * The outbound policy refused the base URL, so nothing was sent. Definitive: every other auth
+ * shape goes to the same base URL and is refused the same way.
+ */
+function endpointRefusedFailure(err: unknown, context: ProbeContext, egress: ModelProviderEgress) {
+  const reason = egress.endpointRefusal(err);
+  if (reason === "not_refused") return undefined;
+  return refusal(
+    new ProviderEndpointRefusedError({ provider: context.provider, refusal: reason }),
+    FAILURE_RANK.definitive,
+  );
+}
+
+/** Why the request never got an answer: a refused redirect, a policy refusal, or the network. */
+function failureFor(
+  err: unknown,
+  context: ProbeContext,
+  egress: ModelProviderEgress,
+): RankedFailure {
+  if (isRefusedRedirect(err, egress)) return redirectedFailure(context);
+  return endpointRefusedFailure(err, context, egress) ?? unreachableFailure(context);
+}
+
+/**
  * One auth shape, asked once: accepted, refused, or never answered.
  */
 async function probeOnce({
@@ -281,12 +305,7 @@ async function probeOnce({
       signal: deadline,
     });
   } catch (err) {
-    return {
-      accepted: false,
-      failure: isRefusedRedirect(err, egress)
-        ? redirectedFailure(context)
-        : unreachableFailure(context),
-    };
+    return { accepted: false, failure: failureFor(err, context, egress) };
   }
 
   if (response.ok || isReachableRefusal({ provider: context.provider, status: response.status })) {

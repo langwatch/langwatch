@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Nurturing learns from the owners' events (§9); an owner that pushes a fact calls this.
 
-Peers call these through the token, declared at `../contract/src/nurturing-types.ts:291`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/nurturing-types.ts:294`; nothing else in this package is public.
 
 #### `recordSignal`
 
@@ -80,54 +80,56 @@ Declared at `src/eventing/nurturing-trace-window-end.pipeline.ts:34`.
 
 ### Pipeline `nurturing` (aggregate `nurturing_signal`)
 
-Declared at `src/eventing/nurturing.pipeline.ts:335`. Events: `nurturingSignalRecordedEventSchema`.
+Declared at `src/eventing/nurturing.pipeline.ts:347`. Events: `nurturingSignalRecordedEventSchema`.
 
-| Kind            | Name                            | Handles                                                                                                     | Declared at                              |
-| --------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| command         | `recordSignal`                  | –                                                                                                           | `src/eventing/nurturing.pipeline.ts:667` |
-| subscriber      | `deliverSignal`                 | `lw.nurturing.signal_recorded` from [nurturing](../README.md)                                               | `src/eventing/nurturing.pipeline.ts:340` |
-| peer subscriber | `guidedOnboardingRecorded`      | `lw.guided_onboarding.recorded` from [onboarding](../../../../modules/onboarding/README.md)                 | `src/eventing/nurturing.pipeline.ts:345` |
-| peer subscriber | `onboardingVariantAssigned`     | `lw.guided_onboarding.variant_assigned` from [onboarding](../../../../modules/onboarding/README.md)         | `src/eventing/nurturing.pipeline.ts:353` |
-| peer subscriber | `guidedOnboardingTurnFailed`    | `lw.langy_guided_onboarding.turn_failed` from [langy](../../../../modules/langy/README.md)                  | `src/eventing/nurturing.pipeline.ts:361` |
-| peer subscriber | `usageReportReceived`           | `lw.saas.usage_report_received` from [saas](../../saas/README.md)                                           | `src/eventing/nurturing.pipeline.ts:366` |
-| peer subscriber | `experimentRan`                 | `lw.experiment.ran` from [experiment](../../../../modules/experiment/README.md)                             | `src/eventing/nurturing.pipeline.ts:371` |
-| peer subscriber | `evaluationRan`                 | `lw.evaluation.ran` from [evaluation](../../../../modules/evaluation/README.md)                             | `src/eventing/nurturing.pipeline.ts:379` |
-| peer subscriber | `evaluationCompleted`           | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)             | `src/eventing/nurturing.pipeline.ts:387` |
-| peer subscriber | `subscriptionStarted`           | `lw.billing.subscription_started` from [billing](../../billing/README.md)                                   | `src/eventing/nurturing.pipeline.ts:399` |
-| peer subscriber | `checkoutCompleted`             | `lw.billing.checkout_completed` from [billing](../../billing/README.md)                                     | `src/eventing/nurturing.pipeline.ts:407` |
-| peer subscriber | `sessionStarted`                | `lw.auth.session_started` from [auth](../../../../modules/auth/README.md)                                   | `src/eventing/nurturing.pipeline.ts:415` |
-| peer subscriber | `ssoAutoAdded`                  | `lw.auth.sso_auto_added` from [auth](../../../../modules/auth/README.md)                                    | `src/eventing/nurturing.pipeline.ts:423` |
-| peer subscriber | `organizationSignedUp`          | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md)                 | `src/eventing/nurturing.pipeline.ts:431` |
-| peer subscriber | `userRegistered`                | `lw.user.registered` from [user](../../../../modules/user/README.md)                                        | `src/eventing/nurturing.pipeline.ts:439` |
-| peer subscriber | `userCreated`                   | `lw.user.created` from [user](../../../../modules/user/README.md)                                           | `src/eventing/nurturing.pipeline.ts:448` |
-| peer subscriber | `authSignedUp`                  | `lw.auth.signed_up` from [auth](../../../../modules/auth/README.md)                                         | `src/eventing/nurturing.pipeline.ts:457` |
-| peer subscriber | `membersInvited`                | `lw.organization.members_invited` from [organization](../../../../modules/organization/README.md)           | `src/eventing/nurturing.pipeline.ts:465` |
-| peer subscriber | `inviteAccepted`                | `lw.organization.invite_accepted` from [organization](../../../../modules/organization/README.md)           | `src/eventing/nurturing.pipeline.ts:473` |
-| peer subscriber | `memberRoleChanged`             | `lw.organization.member_role_changed` from [organization](../../../../modules/organization/README.md)       | `src/eventing/nurturing.pipeline.ts:481` |
-| peer subscriber | `memberAdmitted`                | `lw.organization.member_admitted` from [organization](../../../../modules/organization/README.md)           | `src/eventing/nurturing.pipeline.ts:489` |
-| peer subscriber | `integrationMethodChosen`       | `lw.organization.integration_method_chosen` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing.pipeline.ts:497` |
-| peer subscriber | `promptCreated`                 | `lw.prompt.created` from [prompt](../../../../modules/prompt/README.md)                                     | `src/eventing/nurturing.pipeline.ts:505` |
-| peer subscriber | `workflowCreated`               | `lw.workflow.created` from [workflow](../../../../modules/workflow/README.md)                               | `src/eventing/nurturing.pipeline.ts:513` |
-| peer subscriber | `scenarioCreated`               | `lw.scenario.created` from [scenario](../../../../modules/scenario/README.md)                               | `src/eventing/nurturing.pipeline.ts:521` |
-| peer subscriber | `scenarioRunSucceeded`          | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                        | `src/eventing/nurturing.pipeline.ts:529` |
-| peer subscriber | `simulationRunFinished`         | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                        | `src/eventing/nurturing.pipeline.ts:541` |
-| peer subscriber | `firstTraceRecorded`            | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)                           | `src/eventing/nurturing.pipeline.ts:557` |
-| peer subscriber | `traceReceived`                 | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                                 | `src/eventing/nurturing.pipeline.ts:568` |
-| peer subscriber | `codingAgentSessionStored`      | `lw.coding_agent.session_stored` from [coding-agent](../../../../modules/coding-agent/README.md)            | `src/eventing/nurturing.pipeline.ts:583` |
-| peer subscriber | `userErased`                    | `lw.user.erased` from [user](../../../../modules/user/README.md)                                            | `src/eventing/nurturing.pipeline.ts:596` |
-| peer subscriber | `appPageOpened`                 | `lw.auth.app_page_opened` from [auth](../../../../modules/auth/README.md)                                   | `src/eventing/nurturing.pipeline.ts:601` |
-| peer subscriber | `virtualKeyCreated`             | `lw.governance.vk_lifecycle` from [gateway](../../../../modules/gateway/README.md)                          | `src/eventing/nurturing.pipeline.ts:607` |
-| peer subscriber | `keyBudgetThreshold`            | `lw.governance.budget_crossing` from [gateway](../../../../modules/gateway/README.md)                       | `src/eventing/nurturing.pipeline.ts:612` |
-| peer subscriber | `keyFirstRequest`               | `lw.governance.vk_first_request` from [gateway](../../../../modules/gateway/README.md)                      | `src/eventing/nurturing.pipeline.ts:617` |
-| peer subscriber | `gatewaySpendWithoutBudget`     | `lw.governance.unbudgeted_spend` from [gateway](../../../../modules/gateway/README.md)                      | `src/eventing/nurturing.pipeline.ts:623` |
-| peer subscriber | `governanceSourceConnected`     | `lw.governance.ingestion_source_created` from [governance](../../governance/README.md)                      | `src/eventing/nurturing.pipeline.ts:628` |
-| peer subscriber | `governanceSourceLive`          | `lw.governance.ingestion_source_went_live` from [governance](../../governance/README.md)                    | `src/eventing/nurturing.pipeline.ts:633` |
-| peer subscriber | `langyFirstMessageSeen`         | `lw.langy_guided_onboarding.first_message_seen` from [langy](../../../../modules/langy/README.md)           | `src/eventing/nurturing.pipeline.ts:638` |
-| peer subscriber | `insightFiled`                  | `lw.insight.filed` from [insight](../../../../modules/insight/README.md)                                    | `src/eventing/nurturing.pipeline.ts:644` |
-| peer subscriber | `insightSeen`                   | `lw.insight.seen` from [insight](../../../../modules/insight/README.md)                                     | `src/eventing/nurturing.pipeline.ts:649` |
-| peer subscriber | `insightArchived`               | `lw.insight.archived` from [insight](../../../../modules/insight/README.md)                                 | `src/eventing/nurturing.pipeline.ts:655` |
-| peer subscriber | `insightKept`                   | `lw.insight.kept` from [insight](../../../../modules/insight/README.md)                                     | `src/eventing/nurturing.pipeline.ts:661` |
-| lane aliases    | `≈ MAIN_NURTURING_LANE_ALIASES` | –                                                                                                           | `src/eventing/nurturing.pipeline.ts:668` |
+| Kind            | Name                            | Handles                                                                                                        | Declared at                              |
+| --------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| command         | `recordSignal`                  | –                                                                                                              | `src/eventing/nurturing.pipeline.ts:695` |
+| subscriber      | `deliverSignal`                 | `lw.nurturing.signal_recorded` from [nurturing](../README.md)                                                  | `src/eventing/nurturing.pipeline.ts:352` |
+| peer subscriber | `guidedOnboardingRecorded`      | `lw.guided_onboarding.recorded` from [onboarding](../../../../modules/onboarding/README.md)                    | `src/eventing/nurturing.pipeline.ts:357` |
+| peer subscriber | `onboardingVariantAssigned`     | `lw.guided_onboarding.variant_assigned` from [onboarding](../../../../modules/onboarding/README.md)            | `src/eventing/nurturing.pipeline.ts:365` |
+| peer subscriber | `guidedOnboardingTurnFailed`    | `lw.langy_guided_onboarding.turn_failed` from [langy](../../../../modules/langy/README.md)                     | `src/eventing/nurturing.pipeline.ts:373` |
+| peer subscriber | `usageReportReceived`           | `lw.saas.usage_report_received` from [saas](../../saas/README.md)                                              | `src/eventing/nurturing.pipeline.ts:378` |
+| peer subscriber | `experimentRan`                 | `lw.experiment.ran` from [experiment](../../../../modules/experiment/README.md)                                | `src/eventing/nurturing.pipeline.ts:383` |
+| peer subscriber | `evaluationRan`                 | `lw.evaluation.ran` from [evaluation](../../../../modules/evaluation/README.md)                                | `src/eventing/nurturing.pipeline.ts:391` |
+| peer subscriber | `evaluationCompleted`           | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                | `src/eventing/nurturing.pipeline.ts:399` |
+| peer subscriber | `subscriptionStarted`           | `lw.billing.subscription_started` from [billing](../../billing/README.md)                                      | `src/eventing/nurturing.pipeline.ts:411` |
+| peer subscriber | `scenarioRunsThresholdReached`  | `lw.entitlement.scenario_runs_threshold_reached` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/nurturing.pipeline.ts:419` |
+| peer subscriber | `scenarioRunGraceEnded`         | `lw.entitlement.scenario_run_grace_ended` from [entitlement](../../../../modules/entitlement/README.md)        | `src/eventing/nurturing.pipeline.ts:427` |
+| peer subscriber | `checkoutCompleted`             | `lw.billing.checkout_completed` from [billing](../../billing/README.md)                                        | `src/eventing/nurturing.pipeline.ts:435` |
+| peer subscriber | `sessionStarted`                | `lw.auth.session_started` from [auth](../../../../modules/auth/README.md)                                      | `src/eventing/nurturing.pipeline.ts:443` |
+| peer subscriber | `ssoAutoAdded`                  | `lw.auth.sso_auto_added` from [auth](../../../../modules/auth/README.md)                                       | `src/eventing/nurturing.pipeline.ts:451` |
+| peer subscriber | `organizationSignedUp`          | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md)                    | `src/eventing/nurturing.pipeline.ts:459` |
+| peer subscriber | `userRegistered`                | `lw.user.registered` from [user](../../../../modules/user/README.md)                                           | `src/eventing/nurturing.pipeline.ts:467` |
+| peer subscriber | `userCreated`                   | `lw.user.created` from [user](../../../../modules/user/README.md)                                              | `src/eventing/nurturing.pipeline.ts:476` |
+| peer subscriber | `authSignedUp`                  | `lw.auth.signed_up` from [auth](../../../../modules/auth/README.md)                                            | `src/eventing/nurturing.pipeline.ts:485` |
+| peer subscriber | `membersInvited`                | `lw.organization.members_invited` from [organization](../../../../modules/organization/README.md)              | `src/eventing/nurturing.pipeline.ts:493` |
+| peer subscriber | `inviteAccepted`                | `lw.organization.invite_accepted` from [organization](../../../../modules/organization/README.md)              | `src/eventing/nurturing.pipeline.ts:501` |
+| peer subscriber | `memberRoleChanged`             | `lw.organization.member_role_changed` from [organization](../../../../modules/organization/README.md)          | `src/eventing/nurturing.pipeline.ts:509` |
+| peer subscriber | `memberAdmitted`                | `lw.organization.member_admitted` from [organization](../../../../modules/organization/README.md)              | `src/eventing/nurturing.pipeline.ts:517` |
+| peer subscriber | `integrationMethodChosen`       | `lw.organization.integration_method_chosen` from [organization](../../../../modules/organization/README.md)    | `src/eventing/nurturing.pipeline.ts:525` |
+| peer subscriber | `promptCreated`                 | `lw.prompt.created` from [prompt](../../../../modules/prompt/README.md)                                        | `src/eventing/nurturing.pipeline.ts:533` |
+| peer subscriber | `workflowCreated`               | `lw.workflow.created` from [workflow](../../../../modules/workflow/README.md)                                  | `src/eventing/nurturing.pipeline.ts:541` |
+| peer subscriber | `scenarioCreated`               | `lw.scenario.created` from [scenario](../../../../modules/scenario/README.md)                                  | `src/eventing/nurturing.pipeline.ts:549` |
+| peer subscriber | `scenarioRunSucceeded`          | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                           | `src/eventing/nurturing.pipeline.ts:557` |
+| peer subscriber | `simulationRunFinished`         | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                           | `src/eventing/nurturing.pipeline.ts:569` |
+| peer subscriber | `firstTraceRecorded`            | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)                              | `src/eventing/nurturing.pipeline.ts:585` |
+| peer subscriber | `traceReceived`                 | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                                    | `src/eventing/nurturing.pipeline.ts:596` |
+| peer subscriber | `codingAgentSessionStored`      | `lw.coding_agent.session_stored` from [coding-agent](../../../../modules/coding-agent/README.md)               | `src/eventing/nurturing.pipeline.ts:611` |
+| peer subscriber | `userErased`                    | `lw.user.erased` from [user](../../../../modules/user/README.md)                                               | `src/eventing/nurturing.pipeline.ts:624` |
+| peer subscriber | `appPageOpened`                 | `lw.auth.app_page_opened` from [auth](../../../../modules/auth/README.md)                                      | `src/eventing/nurturing.pipeline.ts:629` |
+| peer subscriber | `virtualKeyCreated`             | `lw.governance.vk_lifecycle` from [gateway](../../../../modules/gateway/README.md)                             | `src/eventing/nurturing.pipeline.ts:635` |
+| peer subscriber | `keyBudgetThreshold`            | `lw.governance.budget_crossing` from [gateway](../../../../modules/gateway/README.md)                          | `src/eventing/nurturing.pipeline.ts:640` |
+| peer subscriber | `keyFirstRequest`               | `lw.governance.vk_first_request` from [gateway](../../../../modules/gateway/README.md)                         | `src/eventing/nurturing.pipeline.ts:645` |
+| peer subscriber | `gatewaySpendWithoutBudget`     | `lw.governance.unbudgeted_spend` from [gateway](../../../../modules/gateway/README.md)                         | `src/eventing/nurturing.pipeline.ts:651` |
+| peer subscriber | `governanceSourceConnected`     | `lw.governance.ingestion_source_created` from [governance](../../governance/README.md)                         | `src/eventing/nurturing.pipeline.ts:656` |
+| peer subscriber | `governanceSourceLive`          | `lw.governance.ingestion_source_went_live` from [governance](../../governance/README.md)                       | `src/eventing/nurturing.pipeline.ts:661` |
+| peer subscriber | `langyFirstMessageSeen`         | `lw.langy_guided_onboarding.first_message_seen` from [langy](../../../../modules/langy/README.md)              | `src/eventing/nurturing.pipeline.ts:666` |
+| peer subscriber | `insightFiled`                  | `lw.insight.filed` from [insight](../../../../modules/insight/README.md)                                       | `src/eventing/nurturing.pipeline.ts:672` |
+| peer subscriber | `insightSeen`                   | `lw.insight.seen` from [insight](../../../../modules/insight/README.md)                                        | `src/eventing/nurturing.pipeline.ts:677` |
+| peer subscriber | `insightArchived`               | `lw.insight.archived` from [insight](../../../../modules/insight/README.md)                                    | `src/eventing/nurturing.pipeline.ts:683` |
+| peer subscriber | `insightKept`                   | `lw.insight.kept` from [insight](../../../../modules/insight/README.md)                                        | `src/eventing/nurturing.pipeline.ts:689` |
+| lane aliases    | `≈ MAIN_NURTURING_LANE_ALIASES` | –                                                                                                              | `src/eventing/nurturing.pipeline.ts:696` |
 
 ## Configuration
 

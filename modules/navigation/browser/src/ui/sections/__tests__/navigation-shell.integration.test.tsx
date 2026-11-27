@@ -15,7 +15,10 @@ let orgFlags: Record<string, Record<string, boolean>> = {};
 /** Whether the per-organization flag queries have answered yet. */
 let areOrgFlagsLoading = false;
 /** What `boards.resolve` answers per board id; a board not named fails to resolve. */
-let resolvedBoards: Record<string, { homeProduct: string; scope: string }> = {};
+let resolvedBoards: Record<
+  string,
+  { homeProduct: string; scope: string; project?: { id: string; slug: string } | null }
+> = {};
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
@@ -1524,6 +1527,52 @@ describe("a board with the organization's library released", () => {
         });
       });
       expect(navigateMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a board only its project lists opens at the organization's address", () => {
+    const supportBot = { id: "project_2", slug: "support-bot" };
+    const open = (board: (typeof resolvedBoards)[string]) => {
+      releaseLibrary();
+      resolvedBoards = { board_1: board };
+      renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
+    };
+
+    /** @scenario "A board only its project lists switches the app to that project" */
+    it.each(["PROJECT", "PRIVATE"])("makes its owner the project in view: %s", async (scope) => {
+      open({ homeProduct: "llm-ops", scope, project: supportBot });
+
+      await waitFor(() => {
+        expect(rememberScopeMock).toHaveBeenCalledWith({
+          teamId: "team_1",
+          projectSlug: "support-bot",
+        });
+      });
+    });
+
+    /** @scenario "A board only its project lists switches the app to that project" */
+    it("leaves the project in view for a board shared with the organization", () => {
+      open({ homeProduct: "llm-ops", scope: "ORGANIZATION", project: supportBot });
+
+      expect(rememberScopeMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A board only its project lists switches the app to that project" */
+    it("leaves the project in view when the owner is not one the member reads", () => {
+      open({ homeProduct: "llm-ops", scope: "PROJECT", project: null });
+
+      expect(rememberScopeMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A board only its project lists switches the app to that project" */
+    it("leaves the project in view when its owner is already in view", () => {
+      open({
+        homeProduct: "llm-ops",
+        scope: "PROJECT",
+        project: { id: "project_1", slug: "demo" },
+      });
+
+      expect(rememberScopeMock).not.toHaveBeenCalled();
     });
   });
 

@@ -38992,11 +38992,14 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 
 ## Judge with Instant Evals
 
-On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge with it yet. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. That model runs on LangWatch's key, so it needs no model provider or key of your own.
+
+The decision models on your own keys follow it, as in [Run Instant Evals on your own decision model](/features/instant-evals/own-model). A self-hosted install can judge only on its own decision model. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
 
 - **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
 - **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
-- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on LangWatch's model.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on your own decision model.** Your provider bills the call and LangWatch does not, so the result's cost is zero. The billing events ledger still records its tokens, with **Instant Evals (own model)** in the **Virtual key** column. These calls do not count toward the 1 USD.
 
 ## Calibrate the judge
 
@@ -40929,6 +40932,20 @@ stores no copy.
 To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
 edit**. That makes your own dashboard, named after the template plus "(copy)", with the template's
 widgets and opens it. The dashboard's header has no such button.
+
+### Releases
+
+"Ready to ship?" compares production before and after your newest change. A
+change is a new release of your application, a new prompt version, or a model
+your traces start using.
+
+LangWatch reads the release from the version your application sends with each
+trace: the OpenTelemetry resource attribute `service.version`, else `version` in
+the trace metadata, else `app_version`. A release is marked at the first trace
+that carries its version.
+
+The widget counts only traces of the sources it reads, so a version or model
+that only Langy's own runs used is never a release of your application.
 
 ## Period and grain
 
@@ -57121,9 +57138,13 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
+
+With media extraction on, the default, the whole recording is kept inside that limit, even past the 8 MiB cap on a single attribute. If extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the recording stays inline and is cut at that cap.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -57335,9 +57356,11 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the document out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the document stays inline in the span.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
@@ -57797,9 +57820,11 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the image stays inline in the span.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
@@ -63669,9 +63694,13 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+A recording sent inline has to fit in one OTLP request, which LangWatch caps at 64 MiB, about an hour of compressed call audio. On self-hosted, `OTLP_TRACES_MAX_BODY_BYTES` changes the limit.
+
+With media extraction on, the default, the whole recording is kept inside that limit, even past the 8 MiB cap on a single attribute. If extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the recording stays inline and is cut at that cap.
 
 Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
 
@@ -63814,9 +63843,11 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the document out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the document stays inline in the span.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
@@ -63949,9 +63980,11 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
+The stored bytes follow your project's trace retention: once a trace ages out, an hourly cleanup deletes the media stored from it, unless a trace that is still kept uses the same bytes.
+
+If media extraction is off (`RELEASE_TRACE_MEDIA_EXTRACTION=0`, or a Helm install with no object storage) or the store refuses the write, the image stays inline in the span.
 
 On read, LangWatch serves the original media type for images, audio, video and PDF files. Anything else is served as a download.
 
@@ -69360,7 +69393,8 @@ On LangWatch Cloud, an organization that has the model turned on sees an **Essen
 - **Price:** $0.50 per 1M characters, excluding VAT, pay as you go. A span of 1,000 characters costs $0.0005.
 - **What is billed:** each span, log record or metric point the model answers, by the characters it was sent, even when it finds no personal data. Essential detection runs first, so a phone number is already masked and counted as its marker. A metric's attributes are sent again with every export, and each export is billed.
 - **No free amount and no minimum:** billing starts at the first character of the month, and a short span costs only its characters: 50 characters cost $0.000025.
-- **Fallbacks are free:** a span with over 8,000 characters left after Essential detection, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged. Long spans are not split across model calls yet.
+- **Long spans:** where long-span splitting is on for your organization, a span of 8,001 to 32,000 characters is sent to the model in several overlapping parts. It is billed once, on its own characters; the overlap between parts is free.
+- **Fallbacks are free:** a span with over 32,000 characters left after Essential detection (over 8,000 where splitting is not on), one the model cannot split safely (such as escaped JSON) or with no free slot, or one sent while the model is unavailable, goes to the rule-based detector (Presidio) and can then go to Google Cloud DLP. It is not charged.
 - **How it is billed:** monthly, as its own line on a Growth plan paid in US dollars. Each answered record is one `pii_redaction` row on the [billing events](/ai-gateway/billing-events) ledger. A [gateway budget](/ai-gateway/budgets) does not cap it, so a spent budget never turns redaction off.
 - **Choosing it:** the page asks you to confirm the price before it turns Strict on. Cancel and the organization keeps its current level; Essential never calls the model and is never charged. An organization that has Strict included sees it as "Included for your organization", with no price.
 
@@ -76093,7 +76127,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | Variable                  | Description                                                                                                                                                                                                                      | Default |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `BLOCK_LOCAL_HTTP_CALLS`  | `true` blocks user-configured outbound HTTP calls to private IPs, localhost and hostnames that resolve to private IPs. Cloud metadata addresses are always blocked                                                               | `false` |
-| `ALLOWED_PROXY_HOSTS`     | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true`. Hostnames ending in `.local` or `.localhost` are refused whatever `BLOCK_LOCAL_HTTP_CALLS` says, so list each one you need here. Cloud metadata and cloud internal domains (`.amazonaws.com`, `.internal`) can never be listed | -       |
+| `ALLOWED_PROXY_HOSTS`     | Comma-separated hostnames still allowed when `BLOCK_LOCAL_HTTP_CALLS=true`. Hostnames ending in `.local` or `.localhost` are refused whatever `BLOCK_LOCAL_HTTP_CALLS` says, so list each one you need here. Cloud metadata and cloud internal domains (`.amazonaws.com`, `.internal`) can never be listed. To use an endpoint on a cloud internal domain, such as a model provider base URL on an AWS load balancer name, point a DNS name of your own (a CNAME) at it and use that name. A name that resolves to a metadata address is still refused | -       |
 | `TRUSTED_PROXY_ADDRESSES` | Comma-separated addresses or IPv4/IPv6 CIDR ranges of the proxies in front of the app. A forwarding header is read only from a socket peer inside this set, and the caller is the rightmost `X-Forwarded-For` hop outside it. Unset, no header is read and the socket peer is the caller. An entry that is not an address or range stops the app from starting. The Helm chart defaults to the private and loopback ranges | -       |
 | `TRUST_CLOUDFLARE_CLIENT_IP` | `true` reads the caller from `CF-Connecting-IP`, only from a peer inside `TRUSTED_PROXY_ADDRESSES` (set it to Cloudflare's published ranges). The header must hold a single valid IP; otherwise the caller comes from `X-Forwarded-For`. The app refuses to start with this on and no trusted proxy addresses | `false` |
 | `SSO_TRUSTED_IDP_ORIGINS` | Comma or whitespace separated origins of identity providers inside a private network. Without an entry here, sign-in refuses a provider whose address is not publicly routable                                                   | -       |
@@ -76106,6 +76140,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | -                                                                                            |
 | `LANGEVALS_ENDPOINT`            | URL of the LangEvals service                                                                                                                                                                                                                    | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`)         |
 | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | How long an evaluation keeps retrying while LangEvals is unreachable or starting before it is recorded as an error, in minutes (at most 120) | `120` |
+| `OTLP_TRACES_MAX_BODY_BYTES` | Largest OTLP trace export accepted at `/api/otel/v1/traces`, in bytes, checked on the wire and again after decompression. The default fits about an hour of compressed call audio sent inline. Each request is held in memory while it is read, so size the app's memory for a few of these at once. A proxy in front of the app needs a body limit at least this large; the Helm chart sets 64m on an nginx Ingress | `67108864` (64 MiB) |
 
 `LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
 
@@ -76116,10 +76151,12 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 
 The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
 
-- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/v1/files/:id`.
+- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming traces, scenario events and dataset uploads, served back via `GET /api/v1/files/:id`. Media lifted out of a trace is deleted by an hourly cleanup once the project's trace retention ends, unless a trace that is still kept uses the same bytes.
 - **Dataset uploads**: persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
 
 When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH`. That is fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
+
+Trace media is moved to stored objects by default (`RELEASE_TRACE_MEDIA_EXTRACTION`, on unless set to `0`). The Helm chart sets it to `0` when neither `app.dataplane` nor the local-filesystem volume is enabled, so media stays inline in ClickHouse instead of landing on a disk that is lost on restart. A write the store refuses also keeps that media inline. Inline media is cut at the 8 MiB attribute cap, so only extracted media keeps a recording longer than that whole.
 
 | Variable               | Description                                                                                                     | Default |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
@@ -77897,7 +77934,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.30.0 # x-release-please-version
+    targetRevision: 3.31.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -77952,7 +77989,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.30.0 # x-release-please-version
+      targetRevision: 3.31.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -78367,7 +78404,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.30.0 # x-release-please-version
+VERSION=3.31.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -78383,13 +78420,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.30.0" # x-release-please-version
+    tag: "3.31.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.30.0" # x-release-please-version
+    tag: "3.31.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.30.0" # x-release-please-version
+    tag: "3.31.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -83419,7 +83456,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.30.0 \
+  --version 3.31.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

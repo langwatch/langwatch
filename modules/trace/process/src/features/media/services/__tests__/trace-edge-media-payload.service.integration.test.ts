@@ -7,7 +7,6 @@
  * Payload preparation with both halves composed: extraction, then the spool.
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  */
-import { createHash } from "node:crypto";
 
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -16,21 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TraceEdgeSpoolService } from "../../../ingestion/services/trace-edge-spool.service.ts";
 import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
-import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
-
-function fakeStore(): TraceMediaStore {
-  const byHash = new Map<string, string>();
-  return {
-    storeFromBytes: async ({ mediaType, bytes }) => {
-      const hash = createHash("sha256").update(bytes).digest("hex");
-      const existing = byHash.get(hash);
-      if (existing) return { id: existing, mediaType, isDuplicate: true };
-      const id = `so-${hash.slice(0, 12)}`;
-      byHash.set(hash, id);
-      return { id, mediaType, isDuplicate: false };
-    },
-  };
-}
+import { fakeStoredObjects } from "./support/fake-stored-objects.support.ts";
 
 /** A span whose only oversized content is one inline audio part. */
 function commandWithAudio(bytes: number): RecordSpanCommandData {
@@ -84,7 +69,8 @@ describe("the ingest path's payload preparation", () => {
         deps: {
           featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
           hasContentDropRules: async () => false,
-          service: fakeStore(),
+          telemetry: { failOpen: vi.fn() },
+          store: fakeStoredObjects().store(),
         },
         logger: { info: vi.fn(), warn: vi.fn() },
         next: TraceEdgeSpoolService.create({

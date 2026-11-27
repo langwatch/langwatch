@@ -35,6 +35,7 @@ import type {
   StoredObjectBytesRepository,
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
+import type { StoredObjectOwnerLinkRepository } from "../repositories/stored-object-owner-link.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -65,6 +66,7 @@ const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
 
 type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  ownerLinks: StoredObjectOwnerLinkRepository;
   permissions: StoredObjectPermissions;
   storage: StoredObjectBytesRepository;
   delivery: StoredObjectDelivery;
@@ -100,6 +102,7 @@ export class StoredObjectService {
     this.now = options.now ?? nowInstant;
     this.cleanup = StoredObjectCleanupService.create({
       records: options.records,
+      ownerLinks: options.ownerLinks,
       storage: options.storage,
       deleteObject: (input) => this.delete(input),
       cleanupBatchSize: options.cleanupBatchSize,
@@ -107,6 +110,7 @@ export class StoredObjectService {
     });
     this.uploads = StoredObjectUploadService.create({
       records: options.records,
+      ownerLinks: options.ownerLinks,
       storage: options.storage,
       signer: options.signer,
       maximumUploadBytes: options.maximumUploadBytes,

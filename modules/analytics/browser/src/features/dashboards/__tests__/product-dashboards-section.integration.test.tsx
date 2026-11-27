@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
@@ -47,11 +47,13 @@ function render({
   listed,
   host = new StubAnalyticsHost(),
   storeProjects = [SHOP],
+  sidebarOrder = [],
 }: {
   element: ReactElement;
   listed: unknown[];
   host?: StubAnalyticsHost;
   storeProjects?: readonly (typeof SHOP)[];
+  sidebarOrder?: readonly string[] | Error;
 }) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
@@ -61,6 +63,12 @@ function render({
     if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
     if (call.path === "boards.update") return Promise.resolve({});
     if (call.path === "boards.getAll") return Promise.resolve([]);
+    if (call.path === "boards.sidebarOrder") {
+      return sidebarOrder instanceof Error
+        ? Promise.reject(sidebarOrder)
+        : Promise.resolve({ dashboardIds: sidebarOrder });
+    }
+    if (call.path === "boards.reorderSidebar") return Promise.resolve({ success: true });
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element, host, answer });
@@ -92,6 +100,21 @@ describe("a product's Dashboards section", () => {
       await user.click(screen.getByRole("button", { name: "Show 2 more" }));
       expect(linkNames(list)).toHaveLength(10);
       expect(screen.getByRole("button", { name: "Show less" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given the member's sidebar order cannot be read", () => {
+    /** @scenario "Reordering in one project keeps the place of boards listed only in another" */
+    it("lists the boards by name and offers no reorder, so a save cannot drop stored slots", async () => {
+      render({
+        element: <ProductDashboardsSection product="gateway" />,
+        listed: [board({ id: "Beta" }), board({ id: "Alpha" })],
+        sidebarOrder: new UiProcedureRefusal("forbidden", 403),
+      });
+
+      const list = await screen.findByRole("list", { name: "Dashboards" });
+      expect(linkNames(list)).toEqual(["Alpha", "Beta"]);
+      expect(screen.queryByRole("button", { name: /^Reorder / })).toBeNull();
     });
   });
 
@@ -186,23 +209,13 @@ describe("a product's Dashboards section", () => {
     });
   });
 
-  describe("given LLM Ops in a project", () => {
-    /** @scenario "The LLM Ops section ends with Browse templates" */
-    it("ends with Browse templates, which opens the project's templates", async () => {
-      render({ element: <ProductDashboardsSection product="llm-ops" />, listed: [] });
-
-      expect(await screen.findByRole("link", { name: "Browse templates" })).toHaveAttribute(
-        "href",
-        "/test-project/dashboards/templates",
-      );
-    });
-
-    /** @scenario "The LLM Ops section ends with Browse templates" */
-    it("is the only section with Browse templates: Gateway has none", async () => {
-      render({ element: <ProductDashboardsSection product="gateway" />, listed: [] });
+  describe("given any product in a project", () => {
+    /** @scenario "The Dashboards section has no templates entry" */
+    it.each(["llm-ops", "gateway"] as const)("has no Browse templates in %s", async (product) => {
+      render({ element: <ProductDashboardsSection product={product} />, listed: [] });
 
       await screen.findByRole("region", { name: "Dashboards" });
-      expect(screen.queryByRole("link", { name: "Browse templates" })).toBeNull();
+      expect(screen.queryByText("Browse templates")).toBeNull();
     });
   });
 
@@ -356,6 +369,40 @@ describe("a product's Dashboards section", () => {
       const row = await within(list).findByRole("link", { name: /Untitled dashboard/ });
       expect(row).toHaveAttribute("aria-current", "page");
       expect(screen.queryByText("No dashboards yet")).toBeNull();
+    });
+
+    describe("when the member opens its row's menu", () => {
+      const openDraft = () =>
+        render({
+          element: <ProductDashboardsSection product="llm-ops" />,
+          listed: [],
+          host: new StubAnalyticsHost({ route: { params: { dashboardId: "new" }, query: {} } }),
+        });
+
+      /** @scenario "AC162k The new board's sidebar row has its menu before it is stored" */
+      it("offers Rename and Delete", async () => {
+        const { user } = openDraft();
+
+        await user.click(
+          await screen.findByRole("button", { name: /^Actions for Untitled dashboard/ }),
+        );
+
+        const items = await screen.findAllByRole("menuitem");
+        expect(items.map((item) => item.textContent)).toEqual(["Rename", "Delete"]);
+      });
+
+      /** @scenario "AC162k The new board's sidebar row has its menu before it is stored" */
+      it("throws the board away on Delete, storing nothing, and leaves for the dashboards", async () => {
+        const { host, calls, user } = openDraft();
+
+        await user.click(
+          await screen.findByRole("button", { name: /^Actions for Untitled dashboard/ }),
+        );
+        await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+
+        expect(host.navigations).toEqual(["/test-project/dashboards"]);
+        expect(calls.filter(({ path }) => path.startsWith("boards.create"))).toEqual([]);
+      });
     });
   });
 

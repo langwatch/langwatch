@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:90`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:91`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1239,20 +1239,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:278` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:263` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:284`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:269`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:288)
-// Response: inline, src/transport/otlp-ingest.rest.ts:291
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:273)
+// Response: inline, src/transport/otlp-ingest.rest.ts:276
 type Response = unknown;
 ```
 
@@ -2276,15 +2276,16 @@ Declared at `src/features/ingestion/eventing/trace-ingest-source-billing.pipelin
 
 | Kind   | Leaf                             | Environment variable                         | Declared at                          |
 | ------ | -------------------------------- | -------------------------------------------- | ------------------------------------ |
-| config | `spanProcessingShards`           | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
-| config | `tokenizer.bpeDirectory`         | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
-| config | `tokenizer.fetchTimeoutMs`       | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
-| config | `tokenizer.disabled`             | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
-| config | `disableCodingAgentSpanFilter`   | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
-| config | `evaluationAnalyticsQuorumReads` | `TRACE_EVALUATION_ANALYTICS_QUORUM_READS`    | `../contract/src/trace.config.ts:36` |
-| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:43` |
-| config | `publicBaseUrl`                  | `BASE_HOST`                                  | `../contract/src/trace.config.ts:44` |
-| config | `objectRetentionConfirmed`       | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:46` |
-| config | `legacySpoolRetentionConfirmed`  | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:47` |
+| config | `spanProcessingShards`           | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:16` |
+| config | `tokenizer.bpeDirectory`         | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:18` |
+| config | `tokenizer.fetchTimeoutMs`       | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:19` |
+| config | `tokenizer.disabled`             | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:23` |
+| config | `disableCodingAgentSpanFilter`   | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:31` |
+| config | `evaluationAnalyticsQuorumReads` | `TRACE_EVALUATION_ANALYTICS_QUORUM_READS`    | `../contract/src/trace.config.ts:39` |
+| config | `otlpTracesMaxBodyBytes`         | `OTLP_TRACES_MAX_BODY_BYTES`                 | `../contract/src/trace.config.ts:47` |
+| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:51` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                                  | `../contract/src/trace.config.ts:52` |
+| config | `objectRetentionConfirmed`       | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:54` |
+| config | `legacySpoolRetentionConfirmed`  | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:55` |
 
 <!-- readme:generated:end -->

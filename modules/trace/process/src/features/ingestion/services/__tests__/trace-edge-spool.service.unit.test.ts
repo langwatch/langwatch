@@ -7,6 +7,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { SpoolTooLargeError } from "../../../media/services/trace-blob-store.service.ts";
 import { TraceEdgeSpoolService } from "../trace-edge-spool.service.ts";
 
 const PROJECT_ID = "project-001";
@@ -108,6 +109,20 @@ describe("the ingestion edge's oversize protection", () => {
         expect(outputOf(prepared)).toHaveLength(300 * 1024);
         expect(warn).toHaveBeenCalledOnce();
         expect(warn.mock.calls[0]?.[1]).toContain("oversize protection skipped");
+      });
+    });
+
+    describe("when the spool refuses a command over its read cap", () => {
+      /** @scenario "A span whose command would spool past the read cap is refused at the edge" */
+      it("refuses the span instead of sending it inline", async () => {
+        const tooLarge = new SpoolTooLargeError({ byteLength: 300 * 1024, maxSpoolBytes: 1024 });
+        const putSpool = vi.fn().mockRejectedValue(tooLarge);
+        const { service, warn } = edge({ putSpool });
+
+        await expect(service.prepare(commandCarrying({ outputBytes: 300 * 1024 }))).rejects.toBe(
+          tooLarge,
+        );
+        expect(warn).not.toHaveBeenCalled();
       });
     });
   });

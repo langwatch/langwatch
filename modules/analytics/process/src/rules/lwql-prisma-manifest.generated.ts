@@ -869,6 +869,15 @@ export interface LwqlPrismaRows {
     readonly position: "Int";
     readonly createdAt: "DateTime";
   };
+  readonly DashboardSidebarOrder: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly organizationId: "String";
+    readonly homeProduct: "String";
+    readonly dashboardIds: "String[]";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly DashboardsV2: {
     readonly id: "String";
     readonly projectId: "String";
@@ -878,6 +887,7 @@ export interface LwqlPrismaRows {
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
     readonly homeProduct: "String";
+    readonly myDashboardOfUserId: "String?";
     readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -2725,6 +2735,15 @@ export interface LwqlPrismaRows {
     readonly deletedAt: "DateTime?";
     readonly source: "String";
     readonly legacyFingerprint: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly StoredObjectOwner: {
+    readonly tenantId: "String";
+    readonly objectId: "String";
+    readonly ownerKind: "String";
+    readonly ownerId: "String";
+    readonly retainUntil: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

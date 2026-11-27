@@ -22,6 +22,7 @@ function nurturingRecordingDeliveries() {
   const delivered: NurturingSignal[] = [];
   const counted: unknown[][] = [];
   const pipeline = buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: async ({ signal }) => void delivered.push(signal),
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,

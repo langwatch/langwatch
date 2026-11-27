@@ -1120,6 +1120,14 @@ const TRACE_METRICS: UngatedViewDefinition = {
         "Version of the last managed prompt the trace used, by the rule traces.LastUsedPromptVersionId follows; the two can differ for a trace whose prompt span arrived late. Empty when the trace used none, or was last folded before this column existed.",
       sourceColumns: ["LastUsedPromptVersionId"],
     },
+    // Folded (goose 00135) so the Release check reads releases with no map (ADR-004).
+    {
+      name: "AppVersion",
+      type: "String",
+      description:
+        "The application version the trace ran on: the resource attribute service.version, else metadata.version, else metadata.app_version. Empty when the trace sent none, or was last folded before this column existed.",
+      sourceColumns: ["AppVersion"],
+    },
     // `HasAnnotation`, `EarliestSpanStartMs` and `Attributes` are withheld: the first would answer
     // "annotated?" two ways against the authoritative `annotations` table, the second is fold
     // working state (migration 00061) not a trace fact, and the third's silent trim can't tell a
@@ -3135,6 +3143,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       EvaluationOutcomes: "omit",
       EvaluationRowsDigest: "omit",
       LastUsedPromptVersionId: "inherit",
+      AppVersion: "inherit",
     },
   }),
   trace_metrics_by_minute: defineTableCatalogue({

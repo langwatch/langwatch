@@ -15,7 +15,6 @@ import type { NurturingErasedUserRepository } from "../repositories/nurturing-er
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
 import { isClaimedSignal } from "../rules/nurturing-claimed-calls.rules.ts";
-import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
@@ -54,7 +53,11 @@ import {
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
-import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
+import { customerIoRouteOf } from "../rules/nurturing-scenario-run-cap.rules.ts";
+import {
+  fireSignup,
+  firstNameTraitOf,
+} from "../rules/nurturing-signup-identification-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import { NurturingClaimedCallsDeliveryService } from "./nurturing-claimed-calls-delivery.service.ts";
 import { NurturingCustomerIoSenderService } from "./nurturing-customer-io-sender.service.ts";
@@ -318,7 +321,8 @@ export class NurturingDeliveryService {
 
   private async toCustomerIo(signal: NurturingSignal, deliveredClaim: string): Promise<void> {
     if (!this.deps.customerIo) return;
-    if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
+    const route = customerIoRouteOf(signal);
+    if (route.kind === "direct") return this.sendCustomerIoCalls(route.calls);
     // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
     if (isClaimedSignal(signal)) {
       return this.parts.claimedCalls?.deliver({ signal, deliveredClaim });
@@ -446,6 +450,7 @@ export class NurturingDeliveryService {
             traits: {
               ...(user?.email ? { email: user.email } : {}),
               ...(user?.name ? { name: user.name } : {}),
+              ...firstNameTraitOf(user?.name),
               createdAt: unixSecondsOf(signal.occurredAt),
             },
           },

@@ -467,7 +467,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended. The expiry sweep reads it through a partial\nindex (20261125150001_session_impersonation_expiry_index), raw SQL since\nPrisma cannot express one."
+          "documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended. The expiry sweep reads it through a partial\nindex (20261126190001_session_impersonation_expiry_index), raw SQL since\nPrisma cannot express one."
         },
         {
           "name": "lastSeenAt",
@@ -9463,6 +9463,79 @@
       ]
     },
     {
+      "name": "DashboardSidebarOrder",
+      "tableName": "DashboardSidebarOrder",
+      "documentation": "One member's own order of a product sidebar's Dashboards section in one organization.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "homeProduct",
+          "columnName": "homeProduct",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The product whose sidebar section this orders: llm-ops, me, gateway or governance."
+        },
+        {
+          "name": "dashboardIds",
+          "columnName": "dashboardIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "Board ids in the member's order; a board not named lists after them, by name."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "DashboardsV2",
       "tableName": "DashboardsV2",
       "documentation": "A Dashboards v2 board, apart from the Analytics Reports boards in Dashboard. Boards\nmade before the split were copied here with their ids, so stars and insight\npointers still name them. No relation, per the database rule.",
@@ -9541,6 +9614,15 @@
           "isList": false,
           "isOptional": false,
           "documentation": "The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,\ndecision 8). Every board made before homes existed is llm-ops."
+        },
+        {
+          "name": "myDashboardOfUserId",
+          "columnName": "myDashboardOfUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member whose own My dashboard this is, whatever it is named; null on every other\nboard. Rows made before the column are filled by dashboard:mark-my-dashboards."
         },
         {
           "name": "excludedOrigins",
@@ -28067,6 +28149,82 @@
           "name": "legacyFingerprint",
           "columnName": "legacyFingerprint",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StoredObjectOwner",
+      "tableName": "StoredObjectOwner",
+      "documentation": "",
+      "primaryKey": [
+        "tenantId",
+        "objectId",
+        "ownerKind",
+        "ownerId"
+      ],
+      "fields": [
+        {
+          "name": "tenantId",
+          "columnName": "tenantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "objectId",
+          "columnName": "objectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerKind",
+          "columnName": "ownerKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerId",
+          "columnName": "ownerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "retainUntil",
+          "columnName": "retainUntil",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,

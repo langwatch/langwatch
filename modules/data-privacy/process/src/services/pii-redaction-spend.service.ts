@@ -31,7 +31,8 @@ type PiiRedactionAnsweredCall = Readonly<{
   texts: readonly string[];
   /** The record's trace and span, when it has them. */
   recordKey?: string | undefined;
-  durationMs: number;
+  /** Each model call's duration (ADR-201 decision 6, ADR-207): our cost sums them. */
+  callDurationsMs: readonly number[];
 }>;
 
 /** Whether the organization pays nothing, or that the free list could not say. */

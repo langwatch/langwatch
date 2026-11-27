@@ -39,6 +39,7 @@ const boardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardTrpcSummarySchema.shape,
     homeProduct: dashboardHomeProductSchema,
+    myDashboardOfUserId: boardSchema.shape.myDashboardOfUserId,
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
     ownerProject: dashboardProjectSchema.nullable(),

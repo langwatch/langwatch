@@ -6,6 +6,7 @@ import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -53,6 +54,19 @@ describe("dashboard app installation", () => {
         await expect(
           app.getById({ projectId: "other-project", dashboardId: created.id }),
         ).rejects.toBeInstanceOf(DashboardNotFoundError);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "My dashboards made before the mark are marked by a background step" */
+    it("declares dashboard:mark-my-dashboards as its migration step", async () => {
+      const runtime = await process("worker");
+
+      try {
+        expect(runtime.migrationSteps(isMigrationStep).map((step) => step.id)).toEqual([
+          "dashboard:mark-my-dashboards",
+        ]);
       } finally {
         await runtime.stop();
       }

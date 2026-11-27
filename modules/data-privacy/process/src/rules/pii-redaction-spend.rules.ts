@@ -80,7 +80,7 @@ export function piiRedactionSpendFact({
   projectId,
   texts,
   recordKey,
-  durationMs,
+  callDurationsMs,
   free,
   occurredAt,
 }: {
@@ -89,7 +89,8 @@ export function piiRedactionSpendFact({
   projectId: string;
   texts: readonly string[];
   recordKey?: string | undefined;
-  durationMs: number;
+  /** Each model call's duration: one for a batch sent whole, one per call for a split span. */
+  callDurationsMs: readonly number[];
   free: boolean;
   occurredAt: number;
 }): PiiRedactionSpendPricedEventData {
@@ -105,6 +106,9 @@ export function piiRedactionSpendFact({
     characters,
     texts: texts.length,
     priceNanoUsd: piiRedactionPriceNanoUsd({ characters, free }),
-    costNanoUsd: piiRedactionCostNanoUsd({ durationMs }),
+    costNanoUsd: callDurationsMs.reduce(
+      (total, durationMs) => total + piiRedactionCostNanoUsd({ durationMs }),
+      0,
+    ),
   };
 }

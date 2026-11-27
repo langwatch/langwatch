@@ -9,9 +9,11 @@ import {
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
 import {
   LWQL_SCOPED_SCHEMA,
+  LWQL_PROJECT_KEYS_VIEW,
   scopedCopiesWritableCondition,
 } from "../rules/lwql-scoped-view.rules.ts";
 import {
@@ -21,6 +23,7 @@ import {
 } from "./langwatch-ql-postgres-mapping.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
+const sqlText = LangWatchQLSqlTextService.create();
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -138,6 +141,57 @@ export class LangWatchQLPostgresViewsService {
         viewSchema: LWQL_SCOPED_SCHEMA,
         onlyWhen,
       });
+    });
+  }
+
+  /**
+   * The scoped copy of project keys: each project's `lower-hex sha256(lwqlKey)` and id, row-scoped
+   * like the other copies. The hash is the exact token the app's key map stores
+   * (`createHash("sha256").update(key).digest("hex")`), so the ClickHouse side compares equal.
+   */
+  projectKeysScopedViewStatement({ schema }: { schema: string }): string {
+    const base = sqlText.postgresQuoted(POSTGRES_BASE_ALIAS);
+    return postgresMapping.approvedViewStatement({
+      schema,
+      view: LWQL_PROJECT_KEYS_VIEW,
+      baseRelation: "Project",
+      columns: [
+        {
+          exposed: "KeyHash",
+          expression: `encode(sha256(convert_to(${base}."lwqlKey", 'UTF8')), 'hex')`,
+        },
+        { exposed: "TenantId", source: "id" },
+      ],
+      rowFilter: `coalesce(${base}."lwqlKey", '') <> ''`,
+      rowScope: { tenant: { alias: POSTGRES_BASE_ALIAS, column: "id" } },
+      viewSchema: LWQL_SCOPED_SCHEMA,
+      onlyWhen: scopedCopiesWritableCondition({ appSchema: schema }),
+    });
+  }
+
+  /**
+   * The ClickHouse key map of a private server: a PostgreSQL-engine table over the scoped
+   * project-key copy, bound to the collection the server's config mounts. It carries no rows.
+   */
+  keyMapEngineTableStatement({
+    names,
+    collection,
+    schema,
+  }: {
+    names: LangWatchQLNames;
+    collection: string;
+    schema: string;
+  }): string {
+    return postgresMapping.engineTableStatement({
+      names,
+      table: names.keyMapTable,
+      columns: [
+        { name: "KeyHash", type: "String" },
+        { name: "TenantId", type: "String" },
+      ],
+      collection,
+      postgresRelation: LWQL_PROJECT_KEYS_VIEW,
+      schema,
     });
   }
 

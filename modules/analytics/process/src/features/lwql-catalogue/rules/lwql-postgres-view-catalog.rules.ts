@@ -398,6 +398,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       organizationId: "omit", // set only once a board is shared with the organization
       excludedOrigins: "omit", // deprecated, unread since queries name their sources (AC200)
       homeProduct: "omit", // which product's sidebar lists the board; navigation only
+      myDashboardOfUserId: "omit", // marks a member's own default board; navigation only
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },

@@ -1,11 +1,11 @@
+import { createHash } from "node:crypto";
+
 /**
  * @vitest-environment node
  * Bytes sent to LangWatch's signed route: the digest the write took is kept, so a
  * confirm reads nothing back, and a client that breaks off is told so.
  * @see modules/stored-object/specs/uploads-through-langwatch.feature
  */
-import { createHash } from "node:crypto";
-
 import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stores";
 import type { StoredObjectUploadBody } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal } from "@langwatch/time";
@@ -17,6 +17,7 @@ import {
   MemoryStoredObjectFiles,
   createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
@@ -67,6 +68,7 @@ function fixture() {
   const records = MemoryStoredObjectRecordRepository.create();
   const service = StoredObjectService.create({
     records,
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
     permissions: new GrantedStoredObjectPermissions(),
     storage,
     signer: createStoredObjectTestSigner(),

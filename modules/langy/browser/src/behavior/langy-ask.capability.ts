@@ -77,7 +77,7 @@ export function createLangyAsk(): LangyAsk {
 
       const before = seeded;
       if (prompt) {
-        langy.askLangy(prompt);
+        langy.askLangy(prompt, request.askedFrom);
       } else {
         langy.openPanel();
         // Opened from another page to be written in: the cursor waits in the composer.

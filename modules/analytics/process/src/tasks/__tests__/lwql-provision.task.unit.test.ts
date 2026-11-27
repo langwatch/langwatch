@@ -2,7 +2,10 @@ import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
-import { LWQL_SCOPED_READER_GROUP } from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
+import {
+  LWQL_PROJECT_KEYS_VIEW,
+  LWQL_SCOPED_READER_GROUP,
+} from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LangWatchQLPostgresMappingService } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
@@ -93,6 +96,16 @@ function scopedStateRows({
   const asked = Array.isArray(views) ? views.map(String) : [];
   return asked.map((view) => {
     const copy = state.copies.find((candidate) => candidate.view === view);
+    // The project-keys copy is no part of what these cases vary: readable unless named.
+    if (view === LWQL_PROJECT_KEYS_VIEW && copy === undefined) {
+      return {
+        view,
+        groupOnShared: false,
+        copyExists: true,
+        copyPassesGuard: true,
+        copyGranted: true,
+      };
+    }
     return {
       view,
       groupOnShared: state.groupOnShared.includes(view),
@@ -490,11 +503,16 @@ function describeReconvergenceCheck() {
         true,
         false,
       ]);
-      const last = postgres.ran.at(-1) ?? "";
-      expect(last).toContain('GRANT USAGE ON SCHEMA "lwql_scoped"');
+      const groupGrants =
+        postgres.ran.find((run) => run.includes('GRANT USAGE ON SCHEMA "lwql_scoped"')) ?? "";
+      expect(groupGrants).toContain('GRANT USAGE ON SCHEMA "lwql_scoped"');
       for (const view of approvedViews) {
-        expect(last).toContain(`GRANT SELECT ON "lwql_scoped"."${view}" TO`);
+        expect(groupGrants).toContain(`GRANT SELECT ON "lwql_scoped"."${view}" TO`);
       }
+      // Not a gap here, so the project-keys copy is neither rebuilt nor re-granted.
+      expect(
+        postgres.ran.filter((run) => run.includes(`"lwql_scoped"."${LWQL_PROJECT_KEYS_VIEW}"`)),
+      ).toEqual([]);
     });
 
     /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
@@ -609,7 +627,12 @@ function describeReconvergenceCheck() {
       expect(at('CREATE OR REPLACE VIEW "lwql_scoped".')).toBeGreaterThan(
         at('CREATE SCHEMA "lwql_scoped"'),
       );
-      expect(at('GRANT USAGE ON SCHEMA "lwql_scoped"')).toBe(postgres.ran.length - 1);
+      const groupGrant = at('GRANT USAGE ON SCHEMA "lwql_scoped"');
+      expect(groupGrant).toBeGreaterThan(at('CREATE OR REPLACE VIEW "lwql_scoped".'));
+      // The new view comes after the group's grants, so a failure in it skips none of them.
+      expect(
+        at(`CREATE OR REPLACE VIEW "lwql_scoped"."${LWQL_PROJECT_KEYS_VIEW}"`),
+      ).toBeGreaterThan(groupGrant);
     });
 
     /** @scenario "Without CREATE on the database, the scoped part fails closed" */

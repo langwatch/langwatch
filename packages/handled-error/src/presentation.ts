@@ -235,6 +235,41 @@ const reachableSentence = (error: HandledErrorShape): string => {
 const strEq = (error: HandledErrorShape, key: string, expected: string): boolean =>
   str(error, key, "") === expected;
 
+/** Why the outbound policy refused a base URL, and what lifts it, keyed by `meta.refusal`. */
+const ENDPOINT_REFUSAL_COPY: Readonly<Record<string, { title: string; remedy: string }>> = {
+  cloud_internal_domain: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses cloud provider internal domains such as amazonaws.com, and no setting allows them. Point a DNS name of your own at the endpoint, such as a CNAME to the load balancer, and use that as the base URL.",
+  },
+  on_premise_domain: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses .local and .localhost names unless each is allowed by name. On a self-hosted instance, an administrator can add this exact host to ALLOWED_PROXY_HOSTS.",
+  },
+  private_address: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses private and local addresses. On a self-hosted instance, an administrator can add this exact host to ALLOWED_PROXY_HOSTS.",
+  },
+  metadata_endpoint: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "It points at a cloud metadata endpoint, which is always refused. Use the address the provider serves.",
+  },
+  unresolvable_host: {
+    title: "That base URL's host wasn't found",
+    remedy: "Its hostname doesn't resolve. Check the base URL is spelled correctly.",
+  },
+  invalid_url: {
+    title: "That base URL can't be used",
+    remedy: "Use a full http or https address, such as https://inference.acme.internal/v1.",
+  },
+};
+
+const endpointRefusal = (error: HandledErrorShape) =>
+  ENDPOINT_REFUSAL_COPY[str(error, "refusal", "")];
+
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[str(error, "request_type", "")] ??
   "Set the model where this endpoint expects it, then try again.";
@@ -262,7 +297,7 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 /** Creation caps the cloud Free plan sets, named as the pricing page does. */
 const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
-  scenarioSets: "simulations",
+  scenarioRuns: "scenario runs a month",
   evaluators: "custom evaluators",
   testSuites: "suites",
 };
@@ -708,9 +743,9 @@ const presentations = {
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
   lwql_not_provisioned: {
-    title: "Custom SQL isn't set up where this data lives",
+    title: "Dashboards aren't available for this data yet",
     describe: () =>
-      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+      "Dashboards and custom SQL aren't available yet for the data this organisation keeps on its own server. Nothing is wrong with your account, and trying again won't help. Your workspace administrator or LangWatch support can tell you when it will be switched on.",
   },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
@@ -1722,11 +1757,16 @@ const presentations = {
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
   model_provider_invalid: {
+    // `meta.refusal` names why the outbound policy refused the base URL, the same reason the
+    // credential probe reports as `provider_endpoint_refused`, so both say the same thing.
     title: "That provider can't be saved",
-    describe: (error) =>
-      strEq(error, "reason", "endpoint_not_allowed")
+    describe: (error) => {
+      const refusal = endpointRefusal(error);
+      if (refusal) return `${refusal.title}, so nothing was saved. ${refusal.remedy}`;
+      return strEq(error, "reason", "endpoint_not_allowed")
         ? "The base URL can't be used. Check it is a full address such as https://inference.acme.internal/v1 that resolves to a public host, then save again."
-        : "Check the provider's fields, then save again.",
+        : "Check the provider's fields, then save again.";
+    },
   },
   model_provider_custom_keys_missing: {
     title: "This provider has no credentials saved",
@@ -1871,6 +1911,19 @@ const presentations = {
     title: "That endpoint redirects somewhere else",
     describe: () =>
       "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
+  },
+  provider_endpoint_refused: {
+    // Not "we couldn't reach it": nothing was sent. The instance's outbound policy refused the
+    // base URL, and `meta.refusal` says which part of the policy, so the copy names what lifts
+    // it instead of sending an operator to debug a network that works.
+    title: "This instance doesn't send requests to that base URL",
+    titleFor: (error) => endpointRefusal(error)?.title,
+    describe: (error) => {
+      const refusal = endpointRefusal(error);
+      return refusal
+        ? `Nothing was sent, so this API key was not checked. ${refusal.remedy}`
+        : "Its outbound policy refused the base URL, so nothing was sent and this API key was not checked.";
+    },
   },
   provider_key_missing: {
     title: "No API key to check",
@@ -3107,6 +3160,11 @@ const presentations = {
     describe: (error) => {
       const limitType = str(error, "limitType", "");
       const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
+      if (limitType === "scenarioRuns") {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : "a monthly number of scenario runs";
+        return `Your plan includes ${included} and this month's are used. Upgrade your plan to keep running scenarios, or wait for the count to start again next month.`;
+      }
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;

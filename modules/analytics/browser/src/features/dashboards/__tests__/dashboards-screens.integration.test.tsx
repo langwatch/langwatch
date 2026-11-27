@@ -22,16 +22,19 @@ const listed = ({
   id,
   name = id,
   createdById = "user-1",
+  myDashboardOfUserId = null,
 }: {
   id: string;
   name?: string;
   createdById?: string;
+  myDashboardOfUserId?: string | null;
 }) => ({
   ...HOME_BOARD,
   id,
   name,
   description: null,
   createdById,
+  myDashboardOfUserId,
   isStarred: false,
   updatedAt: new Date("2026-01-01"),
 });
@@ -172,6 +175,21 @@ describe("the Dashboards screens", () => {
         renderDashboards({ element: <DashboardsIndexScreen />, host, answer: server.answer });
 
         await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/mine"]));
+        expect(server.state.calls.map(({ path }) => path)).not.toContain("boards.create");
+      });
+    });
+
+    describe("when the member renamed their My dashboard and later made a board under that name", () => {
+      /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+      it("opens the renamed one, making no board", async () => {
+        const server = boardsServer([
+          listed({ id: "renamed", name: "Team pulse", myDashboardOfUserId: "user-1" }),
+          listed({ id: "later", name: "My dashboard" }),
+        ]);
+        const host = hostOpening({ flags: FLAG_ON });
+        renderDashboards({ element: <DashboardsIndexScreen />, host, answer: server.answer });
+
+        await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/renamed"]));
         expect(server.state.calls.map(({ path }) => path)).not.toContain("boards.create");
       });
     });

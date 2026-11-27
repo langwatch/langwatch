@@ -986,6 +986,16 @@ const registry = {
     docsPath: "/platform/model-providers",
   },
 
+  provider_endpoint_refused: {
+    tips: [
+      "meta.refusal names the part of the outbound policy that refused the base URL; nothing was sent to it",
+      "private_address and on_premise_domain are lifted on a self-hosted instance by naming the exact host in ALLOWED_PROXY_HOSTS",
+      "cloud_internal_domain (amazonaws.com, .internal) is never lifted; point a DNS name of your own at the endpoint instead",
+      "metadata_endpoint is never lifted, whatever name points at it; use the address the provider serves",
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
   model_provider_unavailable: {
     tips: [
       "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",

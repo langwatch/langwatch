@@ -1,14 +1,14 @@
 /**
- * Product sidebar "Dashboards" section: My dashboard, then the product's boards, each with the
- * library's "⋮" menu on hover. "No dashboards yet" when empty, in every product. "Browse
- * templates" only in LLM Ops: templates read its data.
+ * Product sidebar "Dashboards" section: My dashboard, then the product's boards in the member's
+ * own order, which they drag to change, each with the library's "⋮" menu on hover. "No
+ * dashboards yet" when empty, in every product; the templates live on a new board.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import type { ProductDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { LayoutDashboard, LayoutTemplate, Lock } from "lucide-react";
+import { LayoutDashboard, Lock } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -20,25 +20,31 @@ import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-librar
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { type StoreProject, useStoreProject } from "../../behavior/use-store-project.ts";
-import { dashboardTemplatesPath, DRAFT_SEGMENT, draftBoardPath } from "../../model/boards.ts";
+import { DRAFT_SEGMENT, draftBoardPath } from "../../model/boards.ts";
 import {
+  isOwnMyDashboard,
   type LibraryBoard,
   libraryBoardPath,
   namesInProduct,
 } from "../../model/organization-library.ts";
 import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
 import { BoardMenu } from "../blocks/board-menu.tsx";
-import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
+import {
+  SIDEBAR_ROW_ICON_SIZE,
+  SidebarLinkRow,
+  type SidebarRowDrag,
+} from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
 import { hasSharingChoice, NewDashboardDialog } from "./new-dashboard-dialog.tsx";
+import { SortableBoardRows, useBoardRowDrag } from "./sortable-board-rows.tsx";
 
 /** One title in every product, never with a project name (the G13 title rule). */
 const LABEL = "Dashboards";
 
 export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const host = useAnalyticsHost();
-  const { boards, allBoards, isLoaded } = useProductDashboards({ product });
+  const { boards, allBoards, isLoaded, reorder } = useProductDashboards({ product });
   const store = useStoreProject();
   const [isShowingAll, setIsShowingAll] = useState(false);
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
@@ -72,16 +78,8 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           onDuplicate={store.storeProject ? duplicateBoard : void 0}
           onMove={setPendingMove}
           onDelete={setPendingDelete}
+          onReorder={reorder}
         />
-      )}
-      {projectSlug && product === "llm-ops" && (
-        <RowList label="Templates">
-          <SidebarLinkRow
-            name="Browse templates"
-            href={dashboardTemplatesPath({ projectSlug })}
-            icon={<LayoutTemplate size={SIDEBAR_ROW_ICON_SIZE} />}
-          />
-        </RowList>
       )}
       {isNewDialogOpen && (
         <ProductNewDashboard
@@ -110,6 +108,7 @@ function BoardRows({
   onDuplicate,
   onMove,
   onDelete,
+  onReorder,
 }: {
   boards: readonly LibraryBoard[];
   openId: string | undefined;
@@ -118,7 +117,10 @@ function BoardRows({
   onDuplicate: ((board: LibraryBoard) => void) | undefined;
   onMove: (board: LibraryBoard) => void;
   onDelete: (board: LibraryBoard) => void;
+  /** The movable boards' ids in their new order, after a drag; unset, no row moves. */
+  onReorder: ((ids: readonly string[]) => void) | undefined;
 }) {
+  const host = useAnalyticsHost();
   if (boards.length === 0) {
     return (
       <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
@@ -128,27 +130,52 @@ function BoardRows({
   }
   const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
   const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
+  // My dashboard stays first; every other row moves once the stored order has loaded.
+  const isFixed = (board: LibraryBoard) =>
+    !onReorder || isOwnMyDashboard({ board, userId: host.userId() });
+  const movableIds = boards.filter((board) => !isFixed(board)).map((board) => board.id);
+  const names = new Map(boards.map((board) => [board.id, board.name]));
   return (
-    <RowList label={LABEL}>
-      {shownRows.map((board) => (
-        <BoardRow
-          key={board.id}
-          board={board}
-          isOpen={board.id === openId}
-          onDuplicate={onDuplicate ? () => onDuplicate(board) : void 0}
-          onMove={() => onMove(board)}
-          onDelete={() => onDelete(board)}
-        />
-      ))}
-      {hiddenCount > 0 && (
-        <Box as="li" listStyleType="none">
-          <ToggleRow onClick={onToggleShowAll}>
-            {isShowingAll ? "Show less" : `Show ${hiddenCount} more`}
-          </ToggleRow>
-        </Box>
-      )}
-    </RowList>
+    <SortableBoardRows ids={movableIds} names={names} onReorder={(ids) => onReorder?.(ids)}>
+      <RowList label={LABEL}>
+        {shownRows.map((board) => {
+          const row = {
+            board,
+            isOpen: board.id === openId,
+            onDuplicate: onDuplicate ? () => onDuplicate(board) : void 0,
+            onMove: () => onMove(board),
+            onDelete: () => onDelete(board),
+          };
+          return isFixed(board) ? (
+            <BoardRow key={board.id} {...row} />
+          ) : (
+            <MovableBoardRow key={board.id} {...row} />
+          );
+        })}
+        {hiddenCount > 0 && (
+          <Box as="li" listStyleType="none">
+            <ToggleRow onClick={onToggleShowAll}>
+              {isShowingAll ? "Show less" : `Show ${hiddenCount} more`}
+            </ToggleRow>
+          </Box>
+        )}
+      </RowList>
+    </SortableBoardRows>
   );
+}
+
+type BoardRowProps = {
+  board: LibraryBoard;
+  isOpen: boolean;
+  onDuplicate: (() => void) | undefined;
+  onMove: () => void;
+  onDelete: () => void;
+};
+
+/** A board row the member may drag to another place in the section. */
+function MovableBoardRow(props: BoardRowProps) {
+  const drag = useBoardRowDrag({ id: props.board.id, name: props.board.name });
+  return <BoardRow {...props} drag={drag} />;
 }
 
 /**
@@ -161,13 +188,8 @@ function BoardRow({
   onDuplicate,
   onMove,
   onDelete,
-}: {
-  board: LibraryBoard;
-  isOpen: boolean;
-  onDuplicate: (() => void) | undefined;
-  onMove: () => void;
-  onDelete: () => void;
-}) {
+  drag,
+}: BoardRowProps & { drag?: SidebarRowDrag }) {
   const edits = useLibraryBoardEdits();
   const [isRenaming, setIsRenaming] = useState(false);
   const actions = useBoardMenuActions({
@@ -198,21 +220,46 @@ function BoardRow({
       isActive={isOpen}
       menu={<BoardMenu name={board.name} actions={actions} />}
       renaming={isRenaming ? renaming : void 0}
+      drag={isRenaming ? void 0 : drag}
     />
   );
 }
 
-/** The new board in view, listed while nothing is stored; its own row takes over once it is. */
+/**
+ * The new board in view, listed while nothing is stored; its own row takes over once it is. Its
+ * "⋮" offers Rename, which stores it under that name, and Delete, which throws it away.
+ */
 function DraftRow({ projectSlug }: { projectSlug: string }) {
+  const host = useAnalyticsHost();
   const saved = useSavedDashboards();
   const draft = useDraftBoard({ takenNames: saved.boards.map(({ name }) => name) });
+  const [isRenaming, setIsRenaming] = useState(false);
   if (draft.savedId !== void 0) return null;
+  const renaming = {
+    onCommit: (name: string) => {
+      setIsRenaming(false);
+      draft.materialise({ name }).catch((error: unknown) => {
+        host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" });
+      });
+    },
+    onCancel: () => setIsRenaming(false),
+  };
   return (
     <SidebarLinkRow
       name={draft.board.name}
       href={draftBoardPath({ projectSlug })}
-      icon={<LayoutDashboard size={14} />}
+      icon={<LayoutDashboard size={SIDEBAR_ROW_ICON_SIZE} />}
       isActive
+      menu={
+        <BoardMenu
+          name={draft.board.name}
+          actions={{
+            onRename: () => setIsRenaming(true),
+            ...(draft.isStoring ? {} : { remove: { onDelete: draft.discard } }),
+          }}
+        />
+      }
+      renaming={isRenaming ? renaming : void 0}
     />
   );
 }

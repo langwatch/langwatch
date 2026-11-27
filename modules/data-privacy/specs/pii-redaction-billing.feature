@@ -169,12 +169,36 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
     @unit
     Scenario: A span over the model's length cap is redacted by Presidio and priced for nobody
-      Given an organization with a Strict project, on the free list or not
+      Given an organization with a Strict project, on the free list or not, and splitting off
       When it sends a span of 12,000 characters
       Then Presidio redacts the span and the model is not called
       And no priced fact is recorded
-      # Splitting a long text across model calls is tasks#1226, not built: such a span
-      # costs nothing today.
+
+    @unit
+    Scenario: A split span is priced once on its characters, never on its overlap
+      Given a paying Cloud organization with a Strict project and splitting on (ADR-207)
+      When the model answers a span of 20,000 characters in several split calls
+      Then one priced fact is recorded with 20,000 characters and the price of 20,000 characters
+      And our cost on it is the duration charge of every call plus one request fee per call
+
+    @unit
+    Scenario: The same split span redacted twice is one request
+      Given a split span whose redaction runs twice because its ingestion was retried
+      When the model answers both times
+      Then both priced facts carry the same request id, the one an unsplit call of the same texts would carry
+
+    @unit
+    Scenario: A split span with a failed call is priced for nobody
+      Given a split span one of whose calls fails
+      When Presidio redacts it instead
+      Then no priced fact is recorded
+
+    @unit
+    Scenario: A span over 32,000 characters is redacted by Presidio and priced for nobody
+      Given an organization with a Strict project and splitting on
+      When it sends a span of 40,000 characters
+      Then Presidio redacts the span and no model is called
+      And no priced fact is recorded
 
     @unit
     Scenario: An organization that declined Strict at a price stays on Essential and is never priced
@@ -221,7 +245,7 @@ Feature: A PII redaction model call is priced per character, written to the spen
 
   Rule: The spend page names a PII redaction row by what it is
 
-    @unit
+    @unit @integration
     Scenario: A spend row with no virtual key and the pii redaction request type reads as PII redaction
       Given a spend row of request type pii_redaction
       When the spend page names its key
@@ -353,6 +377,20 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Given an organization with no active subscription and PII redaction spend this month
       When the month is reported
       Then no meter event is sent
+
+    @unit
+    Scenario: PII redaction spend confirmed after the month's last trace is reported
+      Given an organization whose last trace this month was already reported
+      And a redaction whose spend gateway confirms after it, with no later trace
+      When billing receives the confirmed spend
+      Then the month's report runs and the PII redaction meter receives the month's total
+
+    @integration
+    Scenario: PII redaction spend after the month's last trace reaches the Stripe simulator
+      Given a usage-billed organization whose last trace this month was already reported
+      And gateway confirms a pii_redaction spend whose row lands after the first report ran
+      When the follow-up report runs, with no later trace
+      Then the simulator's usage for langwatch_pii_redaction_usd equals the month's price in dollars
 
     @integration
     Scenario: The month's PII redaction total reaches the Stripe simulator

@@ -145,15 +145,21 @@ export class DashboardAccessService {
     projectIds,
     viewer,
     permission = "analytics:view",
+    shouldSkipOthersPersonal = false,
   }: {
     organizationId: string | null;
     projectIds: string[];
     viewer?: DashboardViewer;
     /** What the viewer must hold there; reading, unless a caller names another. */
     permission?: "analytics:view" | "analytics:create";
+    /** Leaves out personal projects the viewer does not own, as a place to store a board. */
+    shouldSkipOthersPersonal?: boolean;
   }): Promise<DashboardProject[]> {
     if (projectIds.length === 0 || organizationId === null || !viewer) return [];
-    const projects = await this.#projects.listNamesByIds({ projectIds });
+    const named = await this.#projects.listNamesByIds({ projectIds });
+    const projects = shouldSkipOthersPersonal
+      ? named.filter(({ isPersonal, ownerUserId }) => !isPersonal || ownerUserId === viewer.userId)
+      : named;
     const decision = await this.#authz.canBatchByIds({
       principal: { type: "user", id: viewer.userId },
       permission,

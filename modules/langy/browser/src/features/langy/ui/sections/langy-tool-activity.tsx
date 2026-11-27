@@ -48,6 +48,7 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
+  isAnsweredByGitHubConnectCard,
   isSandboxCredentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
@@ -804,6 +805,8 @@ function keepsItsCard({
   isLastStep: boolean;
 }): boolean {
   if (failure.call.state === "output-denied") return true;
+  // Not even as the step the turn ended on: the turn's connect card is that ask.
+  if (isAnsweredByGitHubConnectCard(failure.presentation)) return false;
   if (readerMustAct({ presentation: failure.presentation, toolName: failure.sourceToolName }))
     return true;
   if (isReaderDecision({ call: failure.call, presentation: failure.presentation })) return true;
@@ -1040,8 +1043,10 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
   const { message, detail } = presentation;
-  // Langy's own key failing prints CLI login steps; dev mode's raw data still has them.
-  const hidesOutput = isSandboxCredentialFault({ presentation, toolName: failure.sourceToolName });
+  // Langy's own key or the sandbox's gh failing prints login steps; dev mode's raw data has them.
+  const hidesOutput =
+    isSandboxCredentialFault({ presentation, toolName: failure.sourceToolName }) ||
+    isAnsweredByGitHubConnectCard(presentation);
   // Copy the raw block already carries (a plain error's own text) is not said twice. The block
   // shows the failure without colour codes, so it agrees with the presentation's raw.
   const raw = presentation.raw ?? toolResultText(call) ?? "";

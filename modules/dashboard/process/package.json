@@ -40,6 +40,7 @@
     "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },

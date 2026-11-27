@@ -229,4 +229,8 @@ export * from "./explorer/origin-display.ts";
 export * from "./explorer/suggestion-items.ts";
 export * from "./trace-browser-slices.ts";
 export * from "./trace-lent-components.ts";
-export { traceConfig, type TraceServerConfig } from "./trace.config.ts";
+export {
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
+  traceConfig,
+  type TraceServerConfig,
+} from "./trace.config.ts";

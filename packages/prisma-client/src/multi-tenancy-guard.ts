@@ -382,6 +382,25 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         : "create requires tenantId in the data payload";
     },
   },
+  StoredObjectOwner: {
+    validateWhere: (where) => {
+      const reason = "requires a tenantId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (clause) =>
+          typeof clause.tenantId === "string" ||
+          typeof clauseField(clause.tenantId_objectId_ownerKind_ownerId, "tenantId") === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = createRecords(data);
+      return records.every((record) => typeof record?.tenantId === "string")
+        ? null
+        : "create requires tenantId in the data payload";
+    },
+  },
   // Experiment settings are keyed by a flag and one exact subject. A subject
   // can be a user, organization, or project, so these rows cannot use the
   // ordinary projectId rule or a global exemption. The feature service reads

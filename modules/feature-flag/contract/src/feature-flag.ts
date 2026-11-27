@@ -166,6 +166,13 @@ export const FEATURE_FLAGS = [
       "Records an organization's PII redaction model calls at a price of zero, our own cost still kept (ADR-201). Off by default; enable per organization through an operator rule for organizations that use the model for free. It does not let an organization use the model: release_pii_redaction_model_enabled does that. The Data Privacy page shows Strict as included for these organizations, with no price.",
   },
   {
+    key: "release_pii_redaction_model_split_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Splits an organization's strict spans of 8,001 to 32,000 characters across several PII redaction model calls instead of sending them to Presidio (ADR-207). Off by default; enable per organization through an operator rule, one organization until the Cloud load test passes. Takes effect only with release_pii_redaction_model_enabled on and the model reached as a Lambda function (PII_REDACTION_MODEL_ENDPOINT an ARN); an HTTP model never splits.",
+  },
+  {
     key: "release_instant_evals",
     scope: "PRODUCT",
     defaultValue: false,
@@ -241,14 +248,14 @@ export const FEATURE_FLAGS = [
     description:
       "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline. Both routes keep attribute values up to 8 MiB whole.",
   },
-  // Externalizes inline media to stored-objects store at ingestion edge;
-  // currently opt-in (ADR pending).
+  // Externalizes inline media to the stored-objects store at the ingestion edge; ON by default
+  // for cloud and self-hosted alike (specs/trace-processing/trace-media-blob-extraction.feature).
   {
     key: "release_trace_media_extraction",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
+      "Externalizes inline media (audio, images, files) from span content into the stored-objects store at the ingestion edge, replacing base64 payloads with stored-object references, so a recording past the 8 MiB attribute cap survives. Stored media expires with the project's trace retention. On by default; switch it off fleet-wide or per project to keep media inline. Projects with content-drop rules never store media; a store that refuses a write keeps that media inline.",
   },
   {
     key: "release_ui_ai_governance_enabled",

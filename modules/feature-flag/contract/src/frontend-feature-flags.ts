@@ -68,6 +68,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_pii_redaction_model_enabled",
   // On the free list: the picker shows Strict as included, with no price and no price confirmation.
   "release_pii_redaction_model_free",
+  // Long Strict spans go to the model in parts: the picker's small print names the split limit
+  // (ADR-207, pii-redaction-level-picker.feature).
+  "release_pii_redaction_model_split_enabled",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

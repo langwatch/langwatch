@@ -239,11 +239,11 @@ export function templateSections({
   return catalogueSections({ items: templates, keys: TRUNKS, keyOf: ({ trunk }) => trunk });
 }
 
+/** Only the chips: the finder has no search box of its own, the ask bar is the one. */
 const QUERY_KEYS = {
-  search: "q",
   trunk: "trunk",
   agentKind: "agent",
-} as const satisfies Record<keyof CatalogueFilters, string>;
+} as const satisfies Record<Exclude<keyof CatalogueFilters, "search">, string>;
 
 const oneOf = <Value extends string>({
   raw,
@@ -260,7 +260,7 @@ export function templateFiltersFromQuery(
   const trunk = oneOf({ raw: query[QUERY_KEYS.trunk], values: TRUNKS });
   const agentKind = oneOf({ raw: query[QUERY_KEYS.agentKind], values: AGENT_KINDS });
   return {
-    search: query[QUERY_KEYS.search] ?? "",
+    search: "",
     ...(trunk ? { trunk } : {}),
     ...(agentKind ? { agentKind } : {}),
   };
@@ -276,7 +276,6 @@ export function templateFiltersQuery({
 }): Record<string, string | undefined> {
   return {
     ...query,
-    [QUERY_KEYS.search]: filters.search || void 0,
     [QUERY_KEYS.trunk]: filters.trunk,
     [QUERY_KEYS.agentKind]: filters.agentKind,
   };

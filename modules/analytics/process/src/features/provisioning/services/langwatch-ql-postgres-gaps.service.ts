@@ -7,6 +7,7 @@ import type {
   LwqlPostgresViewFound,
   LwqlScopedViewState,
 } from "../../../repositories/langwatch-ql-postgres.repository.ts";
+import { LWQL_PROJECT_KEYS_VIEW } from "../rules/lwql-scoped-view.rules.ts";
 import { LangWatchQLPostgresViewsService } from "./langwatch-ql-postgres-views.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -87,6 +88,15 @@ export class LangWatchQLPostgresGapsService {
   /** The gaps on shared approved views alone. */
   sharedGaps({ gaps }: { gaps: readonly LwqlPostgresGap[] }): LwqlSharedPostgresGap[] {
     return gaps.filter((gap): gap is LwqlSharedPostgresGap => gap.kind === "shared");
+  }
+
+  /** Whether the project-keys copy is a gap: the schema was absent, or that copy falls short. */
+  needsProjectKeys({ gaps }: { gaps: readonly LwqlPostgresGap[] }): boolean {
+    return gaps.some(
+      (gap) =>
+        gap.kind === "scoped-schema-absent" ||
+        (gap.kind === "scoped" && gap.view === LWQL_PROJECT_KEYS_VIEW),
+    );
   }
 
   /**

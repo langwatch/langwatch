@@ -20,6 +20,7 @@ import {
 import { UsageWarningService } from "../../services/usage-warning.service.ts";
 import {
   BILLING_MONTH_COUNTED_SUBSCRIBER_NAME,
+  BILLING_SPEND_CONFIRMED_SUBSCRIBER_NAME,
   BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME,
   BillingReportingPipeline,
   billingReportingEventing,
@@ -32,6 +33,7 @@ const peers: ConnectedBillingPeers = {
 
 const MONTH_COUNTED_LANE = `billing_reporting.${BILLING_MONTH_COUNTED_SUBSCRIBER_NAME}`;
 const THRESHOLD_CROSSED_LANE = `billing_reporting.${BILLING_USAGE_THRESHOLD_CROSSED_SUBSCRIBER_NAME}`;
+const SPEND_CONFIRMED_LANE = `billing_reporting.${BILLING_SPEND_CONFIRMED_SUBSCRIBER_NAME}`;
 
 /** The roll-up composed as the app composes it. */
 function rollUp(
@@ -177,6 +179,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       expect(pipeline.globalProjections?.map(({ name }) => name)).toEqual([
         MONTH_COUNTED_LANE,
         THRESHOLD_CROSSED_LANE,
+        SPEND_CONFIRMED_LANE,
       ]);
     });
   });
@@ -257,6 +260,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       expect(definition.globalProjections?.map(({ name }) => name)).toEqual([
         MONTH_COUNTED_LANE,
         THRESHOLD_CROSSED_LANE,
+        SPEND_CONFIRMED_LANE,
       ]);
       expect(subscriber?.eventTypes).toEqual([USAGE_MONTH_COUNTED_EVENT_TYPE]);
       expect(reported).toEqual([

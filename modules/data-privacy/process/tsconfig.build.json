@@ -54,6 +54,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/limiter/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {

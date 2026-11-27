@@ -10,10 +10,17 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { RestHost } from "@langwatch/api/rest";
-import { PII_REDACTION_NANO_USD_PER_CHARACTER } from "@langwatch/data-privacy-contract/pii-redaction-spend";
-import { BILLING_REPORT_COMMAND_TYPES } from "@langwatch/enterprise-billing-contract";
+import {
+  PII_REDACTION_NANO_USD_PER_CHARACTER,
+  PII_REDACTION_REQUEST_TYPE,
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import {
+  BILLING_REPORT_COMMAND_TYPES,
+  type ReportUsageForMonthCommandData,
+} from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { createTenantId } from "@langwatch/eventing";
+import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import { GATEWAY_SPEND_CONFIRMED_EVENT_TYPE } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -24,7 +31,14 @@ import { createStripeUsageReporting } from "../billing.module.ts";
 import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.channels.ts";
 import { HttpStripeWebhooksChannel } from "../channels/http/http.billing.channels.ts";
 import { MemoryBillingWebhookHostChannel } from "../channels/memory/memory.billing-webhook-host.channel.ts";
-import { ReportUsageForMonthCommandHandler } from "../eventing/report-usage-for-month.commands.ts";
+import {
+  BILLING_SPEND_CONFIRMED_SUBSCRIBER_NAME,
+  BillingReportingPipeline,
+} from "../eventing/billing-reporting.pipeline.ts";
+import {
+  ReportUsageForMonthCommandHandler,
+  type ReportUsageForMonthCommandDeps,
+} from "../eventing/report-usage-for-month.commands.ts";
 import { MemoryBillingOrganizationRepository } from "../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "../repositories/memory/memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "../repositories/memory/memory.billing-webhook-organization.repository.ts";
@@ -72,6 +86,51 @@ const usageTotals = z.object({
   totals: z.array(z.object({ customer: z.string(), value: z.number(), events: z.number() })),
 });
 const stripeObject = z.looseObject({ id: z.string() });
+
+/** Billing's subscriber on gateway's confirmed spend, as the global registry receives it. */
+function confirmedSpendSubscriber({
+  reporting,
+}: {
+  reporting: BillingReportingPipeline;
+}): EventSubscriberDefinition<Event> {
+  const subscribers: EventSubscriberDefinition<Event>[] = [];
+  const definition = reporting.buildProcessing({ participation: "produce" });
+  for (const projection of definition.globalProjections ?? []) {
+    projection.register(
+      createApiFixture<Parameters<typeof projection.register>[0]>({
+        registerEventSubscriber: (subscriber) => void subscribers.push(subscriber),
+      }),
+    );
+  }
+  const lane = `billing_reporting.${BILLING_SPEND_CONFIRMED_SUBSCRIBER_NAME}`;
+  const subscriber = subscribers.find(({ name }) => name === lane);
+  if (!subscriber) throw new Error("billing registers no confirmed-spend subscriber");
+  return subscriber;
+}
+
+/** Gateway's confirmed pii_redaction spend for the organization, as the event bus delivers it. */
+function piiRedactionSpendConfirmed({ organizationId }: { organizationId: string }): Event {
+  const occurredAt = Date.now();
+  const tenantId = `${organizationId}-project-1`;
+  return {
+    id: `evt_spend_${occurredAt}`,
+    aggregateId: "gwreq_late",
+    aggregateType: "gateway_spend",
+    tenantId: createTenantId(tenantId),
+    createdAt: occurredAt,
+    occurredAt,
+    type: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+    version: "2026-01-01",
+    data: {
+      gateway_request_id: "gwreq_late",
+      occurred_at: occurredAt,
+      tenantId,
+      organization_id: organizationId,
+      request_type: PII_REDACTION_REQUEST_TYPE,
+      usage: {},
+    },
+  };
+}
 
 async function freePort(): Promise<number> {
   const probe = createServer();
@@ -407,15 +466,16 @@ describe.skipIf(!goPresent)(
         }
       })();
       const ledgerReads: { requestType: string }[] = [];
+      const ledger = { nanoUsd };
       const piiRedactionSpend = PiiRedactionSpendQueryService.create({
         isSpendSourceAvailable: () => true,
         listProjectIds: async () => [`${organizationId}-project-1`, `${organizationId}-project-2`],
         sumSpendNanoUsdByRequestType: async (input) => {
           ledgerReads.push({ requestType: input.requestType });
-          return nanoUsd;
+          return ledger.nanoUsd;
         },
       });
-      const handler = ReportUsageForMonthCommandHandler.create({
+      const reportDeps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch"> = {
         organizations: MemoryBillingReportOrganizationRepository.create(store),
         billingCheckpoints: repositories.checkpoints,
         organizationCache: repositories.organizationCache,
@@ -438,18 +498,36 @@ describe.skipIf(!goPresent)(
             priceName: price,
             priceId: price === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
           }),
-        selfDispatch: async () => {},
         errorReporter,
         connectedUsageCeiling: async () => null,
+      };
+      // Every report the roll-up dispatches, from the spend subscriber or from a report itself.
+      const dispatched: ReportUsageForMonthCommandData[] = [];
+      const handler = ReportUsageForMonthCommandHandler.create({
+        ...reportDeps,
+        selfDispatch: async (data) => void dispatched.push(data),
       });
+      const reporting = BillingReportingPipeline.create({
+        ...reportDeps,
+        usageWarnings: createApiFixture<UsageWarningService>({}),
+      });
+      reporting.connectSelfDispatch(async (data) => void dispatched.push(data));
+      const spendSubscriber = confirmedSpendSubscriber({ reporting });
       const now = new Date();
       const billingMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-      const reportMonth = () =>
+      const run = (data: ReportUsageForMonthCommandData) =>
         handler.handle({
           tenantId: createTenantId(organizationId),
           aggregateId: organizationId,
           type: BILLING_REPORT_COMMAND_TYPES.REPORT_USAGE_FOR_MONTH,
-          data: { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() },
+          data,
+        });
+      const reportMonth = () =>
+        run({ organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() });
+      const confirmSpend = () =>
+        spendSubscriber.handle(piiRedactionSpendConfirmed({ organizationId }), {
+          tenantId: `${organizationId}-project-1`,
+          aggregateId: "gwreq_late",
         });
       const piiUsage = async () =>
         usageTotals.parse(
@@ -461,6 +539,10 @@ describe.skipIf(!goPresent)(
         piiUsage,
         errors,
         ledgerReads,
+        ledger,
+        dispatched,
+        confirmSpend,
+        run,
       };
     }
 
@@ -494,6 +576,41 @@ describe.skipIf(!goPresent)(
       expect(await customer.piiUsage()).toEqual([
         expect.objectContaining({ value: 1.1234, events: 1 }),
       ]);
+    }, 30_000);
+
+    /** @scenario "Spend confirmed after the month's last trace is invoiced through the Stripe simulator" */
+    /** @scenario "PII redaction spend after the month's last trace reaches the Stripe simulator" */
+    it("invoices PII redaction spend confirmed after the month's last trace, with no later trace", async () => {
+      const customer = await piiRedactionCustomer({
+        organizationId: "org-pii-late",
+        withPiiRedactionLine: true,
+        nanoUsd: 600_000_000,
+      });
+      // The month's last trace was counted and reported: 0.60 dollars so far.
+      await customer.reportMonth();
+      expect(await customer.piiUsage()).toEqual([expect.objectContaining({ value: 0.6 })]);
+      customer.dispatched.length = 0;
+
+      // A redaction confirmed after it; gateway has not written its ledger row yet.
+      await customer.confirmSpend();
+      const [spendReport] = customer.dispatched;
+      expect(spendReport?.trigger).toBe("spend_confirmed");
+      await customer.run(spendReport!);
+      expect(await customer.piiUsage()).toEqual([expect.objectContaining({ value: 0.6 })]);
+
+      // The row lands within the follow-up's delay, and no trace ever follows.
+      customer.ledger.nanoUsd = 1_123_400_000;
+      const followUps = customer.dispatched.filter(({ trigger }) => trigger === "spend_follow_up");
+      expect(followUps).toHaveLength(1);
+      await customer.run(followUps[0]!);
+
+      expect(customer.errors).toEqual([]);
+      expect(await customer.piiUsage()).toEqual([
+        expect.objectContaining({ value: 1.1234, events: 2 }),
+      ]);
+      expect(
+        customer.dispatched.filter(({ trigger }) => trigger === "spend_follow_up"),
+      ).toHaveLength(1);
     }, 30_000);
 
     /** @scenario "A paying organization's month reaches Stripe at 0.50 dollars per million characters" */

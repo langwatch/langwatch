@@ -848,15 +848,18 @@ describe("presentLangyToolError", () => {
       });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
-    it("says the LangWatch GitHub App is not installed", () => {
-      expect(presentGh().title).toBe("Install the GitHub App to continue");
-      expect(presentGh().message).toContain("GitHub App");
+    it("says Langy has no GitHub access here", () => {
+      expect(presentGh().title).toBe("GitHub is not connected");
+      expect(presentGh().message).toBe(
+        "Langy has no GitHub access here, so this step could not run.",
+      );
     });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
-    it("carries the code for a missing GitHub App and points at Settings", () => {
+    it("carries the code for a missing GitHub connection and names no fix of its own", () => {
       expect(presentGh().code).toBe("langy_github_not_connected");
-      expect(presentGh().tips?.join(" ")).toContain("Integrations");
+      expect(presentGh().tips).toBeUndefined();
+      expect(presentGh().message).not.toContain("Install");
     });
 
     /** @scenario "The sandbox's own gh never tells the customer to log in" */
@@ -889,7 +892,7 @@ describe("presentLangyToolError", () => {
       expect(shared.message).not.toContain("GitHub App");
       expect(shared.code).toBeUndefined();
       expect(unmarked.code).toBe("langy_github_not_connected");
-      expect(unmarked.title).toBe("Install the GitHub App to continue");
+      expect(unmarked.title).toBe("GitHub is not connected");
     });
 
     /** @scenario "The developer's own gh keeps its own instruction" */

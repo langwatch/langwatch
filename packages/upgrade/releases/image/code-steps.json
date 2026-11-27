@@ -117,6 +117,14 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "dashboard:mark-my-dashboards",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dashboard",
+    "description": "Marks each member's existing My dashboard, so renaming it keeps it theirs.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "data-retention:keep-control-plane-events-forever",
     "kind": "data",
     "mode": "background",
@@ -622,6 +630,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "trace:link-unowned-trace-media",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "trace:track-updated-at-index-materialisation",
     "kind": "data",
     "mode": "background",
@@ -683,6 +699,14 @@
     "mode": "background",
     "owner": "trace",
     "description": "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-analytics-app-version",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
     "needsOldWritersGone": true
   },
   {

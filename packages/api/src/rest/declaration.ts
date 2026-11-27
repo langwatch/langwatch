@@ -402,6 +402,15 @@ type StoredHandler<Api> = {
  * signature is comparable to all of them; `handle` is where they are enforced.
  */
 type ErasedHandler = (args: never, ...context: never[]) => unknown;
+
+/** A body cap read from the module's app on each request, erased like the handler. */
+export type RestBodyLimitResolver = (app: never) => number;
+
+/** A route's body cap: fixed bytes, or the module app's deployment setting. */
+export type RestBodyLimit = Readonly<{
+  maxBytes: number | RestBodyLimitResolver;
+  onExceeded(): Error;
+}>;
 type MiddlewareContextValues<Middleware extends readonly MiddlewareContext[]> = {
   [Index in keyof Middleware]: z.output<Middleware[Index]["schema"]>;
 };
@@ -666,7 +675,7 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly anyMethod?: boolean;
   readonly status?: ContentfulStatusCode;
   readonly middleware?: readonly MiddlewareContext[];
-  readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
+  readonly bodyLimit?: RestBodyLimit;
   readonly deprecated?: RestDeprecation;
   /** Present when the path sits in another module's namespace (R10). */
   readonly sharedPath?: RestSharedPath;
@@ -764,7 +773,7 @@ type RouteState = Readonly<{
   docs?: RestTransportDocs;
   status?: ContentfulStatusCode;
   middleware?: readonly MiddlewareContext[];
-  bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
+  bodyLimit?: RestBodyLimit;
   deprecated?: RestDeprecation;
   sharedPath?: RestSharedPath;
   credential?: RestDoorCredential;
@@ -880,6 +889,12 @@ type Permitted<
 type BodyMethodGate<Method> = [Extract<Method, "get" | "head">] extends [never] ? unknown : never;
 
 /** Declared invariant: measuring the variance walks every method of the chain. */
+/** Refuses a body cap that is not a whole, non-negative number of bytes. */
+export function assertBodyLimitBytes(maxBytes: number): void {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0)
+    throw new Error("REST body limit must be a non-negative safe integer");
+}
+
 class RouteBuilder<in out Api, in out S extends RouteShape> {
   private readonly router: RestTransportRouter<
     Api,
@@ -1794,9 +1809,10 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
     });
   }
 
-  withBodyLimit(limit: Readonly<{ maxBytes: number; onExceeded?(): Error }>): RouteBuilder<Api, S> {
-    if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
-      throw new Error("REST body limit must be a non-negative safe integer");
+  withBodyLimit(
+    limit: Readonly<{ maxBytes: number | ((app: Api) => number); onExceeded?(): Error }>,
+  ): RouteBuilder<Api, S> {
+    if (typeof limit.maxBytes === "number") assertBodyLimitBytes(limit.maxBytes);
 
     return new RouteBuilder<Api, S>({
       router: this.router,
@@ -1806,7 +1822,10 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       state: {
         ...this.state,
         bodyLimit: {
-          maxBytes: limit.maxBytes,
+          maxBytes:
+            typeof limit.maxBytes === "number"
+              ? limit.maxBytes
+              : (limit.maxBytes as RestBodyLimitResolver),
           onExceeded: limit.onExceeded ?? (() => new PayloadTooLargeError()),
         },
       },

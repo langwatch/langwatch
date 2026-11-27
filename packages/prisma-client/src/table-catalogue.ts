@@ -63,6 +63,7 @@ export const prismaTableCatalogue = {
   "DatasetVersionRun": "DatasetVersionRun",
   "Dashboard": "Dashboard",
   "DashboardFavourite": "DashboardFavourite",
+  "DashboardSidebarOrder": "DashboardSidebarOrder",
   "DashboardsV2": "DashboardsV2",
   "DashboardWidget": "DashboardWidget",
   "InsightProjection": "InsightProjection",
@@ -201,6 +202,7 @@ export const prismaTableCatalogue = {
   "SystemMigrationTenantState": "SystemMigrationTenantState",
   "SystemMigrationEnrollment": "SystemMigrationEnrollment",
   "StoredObject": "StoredObject",
+  "StoredObjectOwner": "StoredObjectOwner",
   "DiscoveredPerson": "DiscoveredPerson",
   "DiscoveredAgent": "DiscoveredAgent",
   "DiscoveredAgentListing": "DiscoveredAgentListing",
@@ -1253,6 +1255,15 @@ export const prismaModelFieldCatalogue = {
     "position",
     "createdAt"
   ],
+  "DashboardSidebarOrder": [
+    "id",
+    "userId",
+    "organizationId",
+    "homeProduct",
+    "dashboardIds",
+    "createdAt",
+    "updatedAt"
+  ],
   "DashboardsV2": [
     "id",
     "projectId",
@@ -1262,6 +1273,7 @@ export const prismaModelFieldCatalogue = {
     "scope",
     "organizationId",
     "homeProduct",
+    "myDashboardOfUserId",
     "excludedOrigins",
     "createdAt",
     "updatedAt"
@@ -3288,6 +3300,15 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "StoredObjectOwner": [
+    "tenantId",
+    "objectId",
+    "ownerKind",
+    "ownerId",
+    "retainUntil",
+    "createdAt",
+    "updatedAt"
+  ],
   "DiscoveredPerson": [
     "id",
     "organizationId",
@@ -3953,6 +3974,7 @@ export const prismaRelationCatalogue = {
     "graphs": "CustomGraph"
   },
   "DashboardFavourite": {},
+  "DashboardSidebarOrder": {},
   "DashboardsV2": {},
   "DashboardWidget": {},
   "InsightProjection": {},
@@ -4333,6 +4355,7 @@ export const prismaRelationCatalogue = {
   "SystemMigrationTenantState": {},
   "SystemMigrationEnrollment": {},
   "StoredObject": {},
+  "StoredObjectOwner": {},
   "DiscoveredPerson": {},
   "DiscoveredAgent": {},
   "DiscoveredAgentListing": {},

@@ -27,6 +27,7 @@ const board = (overrides: Partial<LibraryBoard> = {}): LibraryBoard => ({
   homeProduct: "llm-ops",
   project: SHOP,
   openProject: SHOP,
+  updatedAt: "2026-11-20T10:00:00.000Z",
   ...overrides,
 });
 
@@ -87,11 +88,30 @@ describe("boardMenuActions", () => {
   });
 
   describe("given the member's own My dashboard", () => {
-    it("offers no Rename and shows Delete with nothing to run, so it renders disabled", () => {
+    /** @scenario "AC163 My dashboard cannot be deleted" */
+    it("offers Rename and shows Delete with nothing to run, so it renders disabled", () => {
+      const menu = menuOf(
+        board({ name: MY_DASHBOARD_NAME, createdById: ME, myDashboardOfUserId: ME }),
+      );
+
+      expect(menu.onRename).toBe(handlers.rename);
+      expect(menu.move).toEqual({ onMove: handlers.move });
+      expect(menu.remove).toEqual({});
+    });
+
+    /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+    it("stays undeletable and renamable once renamed", () => {
+      const menu = menuOf(board({ name: "Team pulse", createdById: ME, myDashboardOfUserId: ME }));
+
+      expect(menu.onRename).toBe(handlers.rename);
+      expect(menu.remove).toEqual({});
+    });
+
+    /** @scenario "My dashboards made before the mark are marked by a background step" */
+    it("offers no Rename while the step has not marked it, so a new name cannot orphan it", () => {
       const menu = menuOf(board({ name: MY_DASHBOARD_NAME, createdById: ME }));
 
       expect(menu.onRename).toBeUndefined();
-      expect(menu.move).toEqual({ onMove: handlers.move });
       expect(menu.remove).toEqual({});
     });
   });

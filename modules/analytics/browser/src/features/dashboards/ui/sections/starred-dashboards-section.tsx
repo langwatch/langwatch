@@ -179,8 +179,9 @@ function ManagedBoardRow({
   const fromTemplate = useBoardFromTemplate();
   const [isRenaming, setIsRenaming] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  // My dashboard keeps its name and cannot be deleted.
+  // My dashboard cannot be deleted, and keeps its name only until it is marked theirs.
   const isMine = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
+  const keepsName = isMine && !board.myDashboardOfUserId;
   return (
     <>
       <SavedDashboardRow
@@ -193,7 +194,7 @@ function ManagedBoardRow({
           onToggleStar: () => favourites.toggleStar(link.star),
           isRenaming,
           ...(access.canEdit
-            ? { rename: isMine ? {} : { onStart: () => setIsRenaming(true) } }
+            ? { rename: keepsName ? {} : { onStart: () => setIsRenaming(true) } }
             : {}),
           ...(access.canDuplicate
             ? {

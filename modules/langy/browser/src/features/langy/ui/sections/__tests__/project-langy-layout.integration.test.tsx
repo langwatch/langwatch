@@ -246,6 +246,7 @@ beforeEach(() => {
     panelMode: "floating",
     dockShellClaims: 0,
     dockShifted: false,
+    panelWidths: {},
   });
   sidecarMounts.count = 0;
   deepLinkReads.count = 0;
@@ -255,7 +256,7 @@ afterEach(() => cleanup());
 
 describe("ProjectLangyLayout", () => {
   describe("given the router mounts the layout as a route with no children", () => {
-    /** @scenario A product page renders inside the Langy layout */
+    /** @scenario "A product page renders inside the Langy layout" */
     it("draws the routed page inside the Langy provider, beside the panel", async () => {
       renderRoutedAt("/demo/experiments/workbench");
 
@@ -274,7 +275,7 @@ describe("ProjectLangyLayout", () => {
   });
 
   describe("given Langy is open on a project page", () => {
-    /** @scenario The panel stays open when navigating between pages of the same project */
+    /** @scenario "The panel stays open when navigating between pages of the same project" */
     it("stays open when navigating to another page of the same project", async () => {
       const router = renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
@@ -296,7 +297,7 @@ describe("ProjectLangyLayout", () => {
   });
 
   describe("given Langy is open in one project", () => {
-    /** @scenario Switching projects resets Langy */
+    /** @scenario "Switching projects resets Langy" */
     it("remounts the Langy tree when the ambient project changes", async () => {
       const router = renderAt("/demo/traces");
       await openLangy();
@@ -316,7 +317,7 @@ describe("ProjectLangyLayout", () => {
       expect(sidecarMounts.count).toBeGreaterThan(mountsBefore);
     });
 
-    /** @scenario Langy travels into settings and back */
+    /** @scenario "Langy travels into settings and back" */
     it("stays mounted on settings while the ambient project holds", async () => {
       const router = renderAt("/demo/traces");
       await openLangy();
@@ -363,10 +364,10 @@ describe("ProjectLangyLayout", () => {
     });
 
     describe("when the rollout flag is off", () => {
-      /** @scenario The visibility gate is not widened */
+      /** @scenario "The visibility gate is not widened" */
       // The pre-warm hook lives inside the sidecar, so a user without Langy
       // never mounts it and no warm request can fire.
-      /** @scenario A user without Langy never triggers a warm */
+      /** @scenario "A user without Langy never triggers a warm" */
       it("hides Langy for a team member", () => {
         gate.flagEnabled = false;
         renderAt("/demo/traces");
@@ -510,6 +511,23 @@ describe("ProjectLangyLayout", () => {
         useLangyStore.getState().closePanel();
       });
       expect(screen.getByTestId("drawer-end-inset").textContent).toBe("0");
+    });
+
+    /** @scenario "Dragging the free edge resizes the panel" */
+    it("widens the reservation with the dock and publishes the width for the shell", async () => {
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(getComputedStyle(dockWrapper() as HTMLElement).paddingRight).toBe("392px");
+
+      act(() => {
+        useLangyStore.getState().setPanelWidth({ placement: "sidebar", width: 480 });
+      });
+
+      expect(getComputedStyle(dockWrapper() as HTMLElement).paddingRight).toBe("480px");
+      expect(useLangyStore.getState().dockWidthPx).toBe(480);
     });
 
     /** @scenario "Closing the dock returns the page to full width" */

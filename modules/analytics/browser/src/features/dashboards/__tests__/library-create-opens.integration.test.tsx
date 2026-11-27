@@ -184,7 +184,7 @@ describe("a board made in the library", () => {
     const [newDashboard] = await screen.findAllByRole("button", { name: "New dashboard" });
     if (!newDashboard) throw new Error("no New dashboard button");
     await user.click(newDashboard);
-    await user.selectOptions(await screen.findByRole("combobox"), "gateway");
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Product" }), "gateway");
     await user.clear(screen.getByRole("textbox"));
     await user.type(screen.getByRole("textbox"), "Gateway spend");
     await user.click(screen.getByRole("button", { name: "Create" }));

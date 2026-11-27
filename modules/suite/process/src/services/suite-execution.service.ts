@@ -1,3 +1,4 @@
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
 import type {
   ResolvedRunModels,
@@ -52,10 +53,10 @@ type SuiteExecutionItem = {
   scenarioRunId: string;
 };
 
-/** What the service asks of the scenario owner: resolving a run's values, and queueing each run. */
+/** What the service asks of the scenario owner: the run cap, run values and queueing each run. */
 type SuiteExecutionScenarios = Pick<
   ScenarioApi,
-  "resolveRunParametersForScenarios" | "queueSimulationRun"
+  "assertSimulationRunAllowed" | "resolveRunParametersForScenarios" | "queueSimulationRun"
 >;
 
 /** One scenario's evaluators in a suite run: its test suite's, then the plan's own (§9 S2). */
@@ -100,6 +101,8 @@ export class SuiteExecutionService implements SuiteExecution {
   }
 
   async execute(input: SuiteExecutionRequest): Promise<SuiteRunResult> {
+    // A plan past the run cap is refused whole, before its suite run starts.
+    await this.scenarios.assertSimulationRunAllowed({ projectId: input.projectId });
     const { parameters, secrets } = await this.resolveParameters(input);
     // A caller that pinned the run's identity keeps it; everyone else gets the
     // identity their idempotency key and their configuration name, so a retry
@@ -314,8 +317,41 @@ export class SuiteExecutionService implements SuiteExecution {
       }),
     );
     SuiteExecutionService.logRejected({ items, enqueued, suiteId: input.suiteId, batchRunId });
+    // The cap crossed part way through: the queued runs stand, each refused slot closes as an error
+    // so the batch still reaches its total, and the caller gets the refusal.
+    const capRefusal = enqueued.find(isCapRefusal);
+    if (capRefusal) {
+      const refused = items.filter((_, index) => isCapRefusal(enqueued[index]));
+      await this.closeCapRefused({ projectId: input.projectId, batchRunId, items: refused });
+      throw capRefusal.reason;
+    }
 
     return items.filter((_, index) => enqueued[index]?.status === "fulfilled");
+  }
+
+  private async closeCapRefused({
+    projectId,
+    batchRunId,
+    items,
+  }: {
+    projectId: string;
+    batchRunId: string;
+    items: readonly SuiteExecutionItem[];
+  }): Promise<void> {
+    const occurredAt = nowInstant().epochMilliseconds;
+    await Promise.all(
+      items.map((item) =>
+        this.commands.completeSuiteRunItem({
+          tenantId: projectId,
+          batchRunId,
+          scenarioRunId: item.scenarioRunId,
+          scenarioId: item.scenarioId,
+          status: "ERROR",
+          error: "The plan's monthly scenario run cap refused this run.",
+          occurredAt,
+        }),
+      ),
+    );
   }
 
   /** A partial enqueue is otherwise invisible: the batch reads smaller with no record of why. */
@@ -352,4 +388,10 @@ export class SuiteExecutionService implements SuiteExecution {
   private static withTargetParameters(runParameters: SuiteTarget["runParameters"]) {
     return hasParameterOverrides(runParameters) ? { targetParameters: runParameters } : {};
   }
+}
+
+function isCapRefusal(
+  result: PromiseSettledResult<unknown> | undefined,
+): result is PromiseRejectedResult {
+  return result?.status === "rejected" && result.reason instanceof LimitExceededError;
 }

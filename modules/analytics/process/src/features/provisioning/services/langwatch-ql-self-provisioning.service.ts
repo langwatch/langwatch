@@ -33,6 +33,7 @@ import {
 } from "./langwatch-ql-clickhouse-drift.service.ts";
 import {
   LangWatchQLCollectionBindingService,
+  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlPostgresEndpoint,
   type LwqlPostgresSettings,
@@ -58,6 +59,16 @@ const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
+
+/** What an external collection leaves in the definition: never rendered, so never a password. */
+const NO_NAMED_COLLECTION_VALUES = {
+  collection: LWQL_RENDERED_NAMED_COLLECTION,
+  host: "",
+  port: 0,
+  database: "",
+  user: "",
+  password: "",
+};
 
 /** The SaaS-convention names every self-provisioning distribution shares. */
 export const LWQL_SELF_PROVISION_DEFAULTS = {
@@ -128,6 +139,14 @@ function postgresEndpoints({
   ];
 }
 
+/** A private ClickHouse without the `lwql_postgres` named collection: provisioning stops there. */
+export class LwqlPrivateCollectionAbsentError extends Error {
+  constructor({ collection }: { collection: string }) {
+    super(`named collection absent: ${collection}`);
+    this.name = "LwqlPrivateCollectionAbsentError";
+  }
+}
+
 /** The self-hosted provisioning statements, and the environment that selects them. */
 export class LangWatchQLSelfProvisioningService {
   static create(): LangWatchQLSelfProvisioningService {
@@ -194,6 +213,8 @@ export class LangWatchQLSelfProvisioningService {
     only,
     server = NO_COLLECTION_STATE,
     collectionLoaded = false,
+    externalCollection,
+    postgresKeyMap = false,
   }: {
     names: LangWatchQLNames;
     restrictedPassword: string;
@@ -211,6 +232,16 @@ export class LangWatchQLSelfProvisioningService {
     server?: LwqlCollectionState;
     /** The task found ClickHouse holds the app's collection values: engine tables are stamped. */
     collectionLoaded?: boolean;
+    /**
+     * A collection the server's own config holds, with the PostgreSQL login for this server: every
+     * engine table binds to it, and no statement writes a collection or carries a password.
+     */
+    externalCollection?: string;
+    /**
+     * With `externalCollection`: the key map the row policies read is a PostgreSQL-engine table
+     * over the scoped project keys, not a local table, so no key rows exist on this server.
+     */
+    postgresKeyMap?: boolean;
   }): string[] {
     if (names.database !== sourceDatabase) {
       throw new Error(
@@ -218,7 +249,8 @@ export class LangWatchQLSelfProvisioningService {
       );
     }
     const engineTable: EngineTableBinding = {
-      collectionFor: (table) => collectionBinding.collectionFor({ names, mode, server, table }),
+      collectionFor: (table) =>
+        externalCollection ?? collectionBinding.collectionFor({ names, mode, server, table }),
       schema,
       credentialFingerprint: collectionLoaded
         ? collectionBinding.credentialFingerprint({ postgres, schema })
@@ -236,15 +268,34 @@ export class LangWatchQLSelfProvisioningService {
     const definition = accessModelDefinition.build({
       names,
       passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
-      namedCollection: collectionBinding.namedCollectionValues({ names, postgres, mode }),
+      namedCollection:
+        externalCollection === undefined
+          ? collectionBinding.namedCollectionValues({ names, postgres, mode })
+          : NO_NAMED_COLLECTION_VALUES,
       sourceDatabase,
     });
-    const structural = accessModel.setupStatements({ names, sourceDatabase, includeAppFunctions });
-    const engineTables = this.#engineTableStatements({
+    const structural = accessModel.setupStatements({
       names,
-      engineTable,
-      views: catalogShapes.postgresViews(LWQL_VIEW_CATALOG),
+      sourceDatabase,
+      includeAppFunctions,
+      localKeyMap: !postgresKeyMap,
     });
+    const engineTables = [
+      ...(externalCollection !== undefined && postgresKeyMap
+        ? [
+            postgresViews.keyMapEngineTableStatement({
+              names,
+              collection: externalCollection,
+              schema,
+            }),
+          ]
+        : []),
+      ...this.#engineTableStatements({
+        names,
+        engineTable,
+        views: catalogShapes.postgresViews(LWQL_VIEW_CATALOG),
+      }),
+    ];
     const views = viewProvisioning.setupStatements({
       names,
       sourceDatabase,
@@ -252,7 +303,9 @@ export class LangWatchQLSelfProvisioningService {
     });
     if (mode === "rendered") return [...structural, ...engineTables, ...views];
     // A config-defined collection belongs to its file: no statement may write it.
-    const configDefined = server.configDefined?.includes(definition.namedCollection.collection);
+    const configDefined =
+      externalCollection !== undefined ||
+      server.configDefined?.includes(definition.namedCollection.collection);
     return [
       ...structural,
       ...(configDefined ? [] : accessModelDefinition.renderNamedCollectionDdl(definition)),
@@ -326,6 +379,19 @@ export class LangWatchQLSelfProvisioningService {
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     ];
+  }
+
+  /** Every table a row policy must guard for this access model, as `database.table`. */
+  policedTables({
+    names,
+    sourceDatabase,
+  }: {
+    names: LangWatchQLNames;
+    sourceDatabase: string;
+  }): string[] {
+    return viewProvisioning
+      .sourceTables({ names, sourceDatabase })
+      .map((table) => `${table.database ?? names.database}.${table.table}`);
   }
 
   /** The catalog datasets whose approved PostgreSQL view is among `approvedViews`. */

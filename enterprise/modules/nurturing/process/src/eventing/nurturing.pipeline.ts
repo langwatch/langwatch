@@ -33,6 +33,12 @@ import {
   usageReportReceivedEventDataSchema,
 } from "@langwatch/enterprise-saas-contract";
 import {
+  SCENARIO_RUN_GRACE_ENDED_EVENT_TYPE,
+  SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE,
+  scenarioRunGraceEndedEventDataSchema,
+  scenarioRunsThresholdReachedEventDataSchema,
+} from "@langwatch/entitlement-contract";
+import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
@@ -168,6 +174,10 @@ import {
   userRegisteredSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
+import {
+  scenarioRunGraceEndedSignal,
+  scenarioRunsThresholdSignal,
+} from "../rules/nurturing-scenario-run-cap.rules.ts";
 import { nurturingBatchLane } from "./nurturing-batch.subscriber.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
 import {
@@ -253,6 +263,8 @@ export type NurturingPipeline = StaticPipelineDefinition<
  */
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
+  /** The organization's member user ids, each told an organization-wide fact. */
+  organizationMembers: (organizationId: string) => Promise<string[]>;
   guidedTurnFailed: (data: GuidedOnboardingTurnFailedEventData) => Promise<void>;
   usageReportReceived: (input: {
     data: UsageReportReceivedEventData;
@@ -402,6 +414,22 @@ export function buildNurturingPipeline(deps: {
         handle: (data, { aggregateId }) => {
           const signal = subscriptionStartedSignal({ data, aggregateId });
           return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("scenarioRunsThresholdReached", {
+        eventType: SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE,
+        data: scenarioRunsThresholdReachedEventDataSchema,
+        handle: async (data, context) => {
+          const memberUserIds = await deps.organizationMembers(data.organizationId);
+          return deliverSignal(scenarioRunsThresholdSignal({ data, ...context, memberUserIds }));
+        },
+      })
+      .withPeerSubscriber("scenarioRunGraceEnded", {
+        eventType: SCENARIO_RUN_GRACE_ENDED_EVENT_TYPE,
+        data: scenarioRunGraceEndedEventDataSchema,
+        handle: async (data, context) => {
+          const memberUserIds = await deps.organizationMembers(data.organizationId);
+          return deliverSignal(scenarioRunGraceEndedSignal({ data, ...context, memberUserIds }));
         },
       })
       .withPeerSubscriber("checkoutCompleted", {

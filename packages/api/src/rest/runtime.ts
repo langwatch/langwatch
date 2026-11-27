@@ -87,11 +87,13 @@ import {
   recordRouteTemplate,
 } from "./credential.ts";
 import {
+  assertBodyLimitBytes,
   DOOR_SCOPE_TIER,
   permissionOf,
   routePermissions,
   routeTargetField,
   routeWrites,
+  type RestBodyLimit,
   type RestDeprecation,
   type RestDoorCredential,
   type RestPermissionTarget,
@@ -841,6 +843,31 @@ function contextBindings<Api>({
   return bound;
 }
 
+/** The route's cap; a setting is read from the module's app on each request. */
+function bodyLimitOf<Api>({
+  limit,
+  app,
+}: {
+  limit: RestBodyLimit;
+  app: () => Api;
+}): MiddlewareHandler {
+  const capped = (maxSize: number) =>
+    bodyLimit({
+      maxSize,
+      onError: () => {
+        throw limit.onExceeded();
+      },
+    });
+  const { maxBytes } = limit;
+  if (typeof maxBytes === "number") return capped(maxBytes);
+  const resolve = maxBytes as (app: Api) => number;
+  return async (context, next) => {
+    const maxSize = resolve(app());
+    assertBodyLimitBytes(maxSize);
+    return capped(maxSize)(context, next);
+  };
+}
+
 /**
  * The whole stack for one mount of one route: the version headers, the
  * document block, the validators, the merged input and the handler.
@@ -890,16 +917,7 @@ function routeStack<Api>({
 
   // Ahead of the validators: they read the body to parse it, and a stream
   // read once cannot be drained again to measure it.
-  const cap = limit
-    ? [
-        bodyLimit({
-          maxSize: limit.maxBytes,
-          onError: () => {
-            throw limit.onExceeded();
-          },
-        }),
-      ]
-    : [];
+  const cap = limit ? [bodyLimitOf({ limit, app: options.app })] : [];
 
   const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
   const named = route.rawBody ?? route.inputMediaType;

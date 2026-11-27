@@ -66,6 +66,24 @@ describe("AwsPiiRedactionModelChannel", () => {
       expect(sent[0]!.abortSignal).toBe(request.signal);
     });
 
+    /** @scenario "Split calls go to the model's one endpoint, each naming its context" */
+    it("names each call's context on the event, single when the call names none", async () => {
+      const { channel, sent } = channelAnswering({
+        Payload: framed({ status: 200, body: ANSWER }),
+      });
+
+      await channel.detect(batch());
+      await channel.detect(batch(), { context: "split" });
+
+      const contextOf = (i: number) => {
+        const payload = sent[i]!.command.input.Payload;
+        return JSON.parse(typeof payload === "string" ? payload : "{}").headers?.[
+          "x-langwatch-pii-call-context"
+        ];
+      };
+      expect([contextOf(0), contextOf(1)]).toEqual(["single", "split"]);
+    });
+
     it("sends nothing for an empty batch", async () => {
       const { channel, sent } = channelAnswering(new Error("must not invoke"));
 

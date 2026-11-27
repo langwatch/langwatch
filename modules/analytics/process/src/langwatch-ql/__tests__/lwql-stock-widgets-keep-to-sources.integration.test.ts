@@ -185,6 +185,13 @@ describe.skipIf(!url)(
       });
     });
 
+    /** @scenario "The Release check names production's change, never a model only Langy ran" */
+    it("names production's new model as the Release check's change, not Langy's", async () => {
+      const rows = await rowsOf({ label: "ship-rollout/changes", list: ["application"] });
+
+      expect(rows.map((row) => row.label)).toEqual(["Model: text-embed"]);
+    });
+
     /** @scenario "The Release check compares production around a change production made" */
     it("compares production around production's newest change, not Langy's", async () => {
       const rows = await rowsOf({ label: "ship-rollout/traffic", list: ["application"] });

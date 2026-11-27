@@ -8,6 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { convergeLwqlAccessModel } from "../../../../tasks/lwql-provision.task.ts";
+import { LWQL_PROJECT_KEYS_VIEW } from "../../rules/lwql-scoped-view.rules.ts";
 import type { LwqlPostgresGap } from "../langwatch-ql-postgres-gaps.service.ts";
 import {
   ADMIN,
@@ -321,8 +322,9 @@ describe("given a deployment where the scoped-reader group does not exist", () =
 
     /** @scenario "Scoped copies exist only where the scoped-reader group does" */
     it("every copy exists and the group selects exactly the copies", async () => {
+      // The project-keys copy is granted with them; it is not an approved dataset view.
       expect((await harness.selectableBy(GROUP)).toSorted()).toEqual(
-        VIEW_NAMES.map((view) => `${SCOPED}.${view}`).toSorted(),
+        [...VIEW_NAMES, LWQL_PROJECT_KEYS_VIEW].map((view) => `${SCOPED}.${view}`).toSorted(),
       );
     });
 

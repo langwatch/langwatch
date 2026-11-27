@@ -5,6 +5,7 @@ import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,
   USAGE_REPORT_RECEIVED_EVENT_VERSION,
 } from "@langwatch/enterprise-saas-contract";
+import { SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
@@ -130,6 +131,7 @@ function nurturingOverMemoryPostHog(users: UserApi = peopleWithEmails()) {
     users,
   });
   const pipeline = buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: (input) => delivery.deliver(input),
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
     usageReportReceived: (input) => delivery.deliverUsageReport(input),
@@ -395,6 +397,7 @@ describe("nurturing's userCreated peer subscriber", () => {
         traits: {
           email: "jane@example.com",
           name: "Jane Doe",
+          first_name: "Jane",
           createdAt: 1,
         },
       });
@@ -957,6 +960,50 @@ describe("nurturing's project active day, derived from trace and scenario facts"
           properties: { source: "trace", projectId: "project-1", days_since_signup: 3 },
         },
       ]);
+    });
+  });
+});
+
+describe("nurturing's scenarioRunsThresholdReached peer subscriber", () => {
+  describe("when entitlement records the month's threshold, delivered twice", () => {
+    it("tracks scenario_runs_threshold_reached once for each member", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog(jane());
+      const fact = {
+        ...userFact(SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE),
+        aggregateId: "org-1",
+        tenantId: createTenantId("org-1"),
+        data: {
+          organizationId: "org-1",
+          month: "2026-11",
+          occurredAt: 1_000,
+          runs: 80,
+          maxPerMonth: 100,
+          inGrace: false,
+          graceEndsAt: 500,
+        },
+      } as Event;
+
+      await deliverFact(fact);
+      await deliverFact(fact);
+      await settle();
+
+      const properties = { organizationId: "org-1", runs: 80, limit: 100, month: "2026-11" };
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "scenario_runs_threshold_reached",
+          properties: { ...properties, $groups: { organization: "org-1" } },
+          uuid: expect.any(String),
+          timestamp: expect.anything(),
+        },
+      ]);
+      // The email identify goes out in its own batch first, then the one track.
+      const sent = customerIoFetch.mock.calls.map(([, init]) => {
+        const body = init?.body;
+        return typeof body === "string" ? JSON.parse(body) : body;
+      });
+      expect(JSON.stringify(sent).match(/scenario_runs_threshold_reached/g)).toHaveLength(1);
+      expect(JSON.stringify(sent)).toContain('"runs":80');
     });
   });
 });

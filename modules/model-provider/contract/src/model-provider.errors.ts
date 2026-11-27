@@ -332,11 +332,15 @@ export class ModelProviderCustomKeysMissingError extends HandledError {
 export class ModelProviderInvalidError extends HandledError {
   declare readonly code: "model_provider_invalid";
 
-  constructor(message = "Invalid model provider", reason?: "endpoint_not_allowed") {
+  constructor(
+    message = "Invalid model provider",
+    reason?: "endpoint_not_allowed",
+    refusal?: ProviderEndpointRefusal,
+  ) {
     super("model_provider_invalid", message, {
       httpStatus: 400,
       fault: "customer",
-      ...(reason ? { meta: { reason } } : {}),
+      ...(reason ? { meta: { reason, ...(refusal ? { refusal } : {}) } } : {}),
     });
     this.name = "ModelProviderInvalidError";
   }
@@ -707,6 +711,38 @@ export class ProviderEndpointRedirectedError extends HandledError {
       },
     );
     this.name = "ProviderEndpointRedirectedError";
+  }
+}
+
+/**
+ * Why the instance's outbound policy refused a base URL. `private_address` and
+ * `on_premise_domain` are the two ALLOWED_PROXY_HOSTS can lift; the rest no setting lifts.
+ */
+export type ProviderEndpointRefusal =
+  | "metadata_endpoint"
+  | "cloud_internal_domain"
+  | "on_premise_domain"
+  | "private_address"
+  | "unresolvable_host"
+  | "invalid_url";
+
+/**
+ * The base URL was refused by the instance's outbound policy, so nothing was sent and
+ * nothing was learned about the key. Not unreachable: the network was never tried.
+ */
+export class ProviderEndpointRefusedError extends HandledError {
+  constructor({ provider, refusal }: { provider: string; refusal: ProviderEndpointRefusal }) {
+    super(
+      "provider_endpoint_refused",
+      `The base URL configured for ${provider} is refused by this instance's outbound policy`,
+      {
+        fault: "customer",
+        httpStatus: 400,
+        meta: { provider, refusal },
+        ...remediation("provider_endpoint_refused"),
+      },
+    );
+    this.name = "ProviderEndpointRefusedError";
   }
 }
 

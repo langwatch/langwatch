@@ -1,4 +1,5 @@
 import { describeError } from "@langwatch/browser-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   modelProviders,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
@@ -93,6 +94,8 @@ export type UseProviderFormSubmitState = {
 export type UseProviderFormSubmitActions = {
   submit: () => Promise<void>;
   reset: () => void;
+  /** Drops the credential refusal shown beside the fields, once a credential changes. */
+  clearErrors: () => void;
 };
 
 export type UseProviderFormSubmitReturn = UseProviderFormSubmitState & UseProviderFormSubmitActions;
@@ -153,6 +156,33 @@ function modelImportToast({
     type: "success",
     duration: 4000,
   };
+}
+
+/** A save refused for its base URL belongs beside the credential fields, not in a toast. */
+function isRefusedEndpoint(error: unknown): boolean {
+  const handled = readHandledError(error);
+  return (
+    handled?.code === "model_provider_invalid" && handled.meta?.reason === "endpoint_not_allowed"
+  );
+}
+
+/** A refused base URL is shown beside the credential fields; anything else is a toast. */
+function reportSaveFailure({
+  error,
+  setErrors,
+  showErrorToast,
+}: {
+  error: unknown;
+  setErrors: (errors: { customKeysRoot?: string }) => void;
+  showErrorToast: ReturnType<typeof useShowErrorToast>;
+}): void {
+  if (isRefusedEndpoint(error)) {
+    setErrors({
+      customKeysRoot: describeError({ error, fallbackTitle: "That provider can't be saved" }),
+    });
+    return;
+  }
+  showErrorToast({ error, fallbackTitle: "Couldn't save the provider settings" });
 }
 
 function nameToSend(name: string | undefined): string | undefined {
@@ -608,10 +638,7 @@ export function useProviderFormSubmit({
       onSuccess?.();
     } catch (err) {
       onError?.(err);
-      showErrorToast({
-        error: err,
-        fallbackTitle: "Couldn't save the provider settings",
-      });
+      reportSaveFailure({ error: err, setErrors, showErrorToast });
     } finally {
       setIsSaving(false);
     }
@@ -632,10 +659,13 @@ export function useProviderFormSubmit({
     setIsSaving(false);
   }, []);
 
+  const clearErrors = useCallback(() => setErrors({}), []);
+
   return {
     isSaving,
     errors,
     submit,
     reset,
+    clearErrors,
   };
 }

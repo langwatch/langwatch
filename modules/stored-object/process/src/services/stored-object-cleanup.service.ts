@@ -10,6 +10,7 @@ import type {
   StoredObjectBytesRepository,
   StoredObjectStorageAddress,
 } from "../repositories/stored-object-bytes.repository.ts";
+import type { StoredObjectOwnerLinkRepository } from "../repositories/stored-object-owner-link.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -18,6 +19,7 @@ import { StoredObjectUploadReapService } from "./stored-object-upload-reap.servi
 
 type StoredObjectCleanupOptions = Readonly<{
   records: StoredObjectRecordRepository;
+  ownerLinks: StoredObjectOwnerLinkRepository;
   storage: StoredObjectBytesRepository;
   /** The one logical delete; project purges and retries go through it. */
   deleteObject: (input: DeleteStoredObjectInput) => Promise<StoredObjectsDeleteOutput>;
@@ -77,6 +79,7 @@ export class StoredObjectCleanupService {
       isFullPage = page.length >= limit;
       afterId = page.at(-1)?.id;
     } while (isFullPage && afterId);
+    await this.options.ownerLinks.deleteForTenant({ tenantId: input.projectId });
 
     return {
       projectId: input.projectId,

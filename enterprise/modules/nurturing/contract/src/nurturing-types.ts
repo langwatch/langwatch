@@ -60,6 +60,7 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Onboarding
   email: string;
   name: string;
+  first_name?: string;
   role: string;
   /** The org seat (lite_member/member/admin/developer), not the sign-up `role` (job title). */
   seat?: string;
@@ -227,6 +228,8 @@ export type CioEventName =
   | "coding_agent_first_session"
   | "sessions_page_viewed"
   | "usage_page_viewed"
+  | "scenario_runs_threshold_reached"
+  | "scenario_run_grace_ended"
   | "joined_via_invite"
   | "joined_via_sso"
   /** Sent beside the two above, for invite and SSO alike; `join_method` tells them apart. */

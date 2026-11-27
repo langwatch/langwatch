@@ -23,6 +23,7 @@ import {
   type LwqlCollectionState,
   type LwqlKeyMapInsertRow,
   type LwqlPostgresCredentials,
+  type LwqlRowPolicy,
   type ProvisioningFailureLevel,
   type RunClickHouseStatementsResult,
   type SkippedProvisioningStatement,
@@ -281,8 +282,18 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
   }
 
   /** The deploy task's own admin connection, from its resolved `CLICKHOUSE_URL`. */
-  static open({ url }: { url: string | undefined }): ClickHouseLangWatchQLProvisioningRepository {
-    const client = createClient({ url });
+  static open({
+    url,
+    requestTimeoutMs,
+  }: {
+    url: string | undefined;
+    /** Bounds every request, so one unresponsive server cannot hold a deploy. */
+    requestTimeoutMs?: number;
+  }): ClickHouseLangWatchQLProvisioningRepository {
+    const client = createClient({
+      url,
+      ...(requestTimeoutMs === undefined ? {} : { request_timeout: requestTimeoutMs }),
+    });
     return new ClickHouseLangWatchQLProvisioningRepository(
       {
         async command(statement) {
@@ -394,6 +405,21 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
 
   queryRows(sql: string): Promise<Record<string, unknown>[]> {
     return this.client.rows(sql);
+  }
+
+  async findRowPolicies({ tables }: { tables: readonly string[] }): Promise<LwqlRowPolicy[]> {
+    const rows = await this.client.rows(
+      `SELECT concat(database, '.', table) AS name, apply_to_list, apply_to_all, ` +
+        `length(apply_to_except) > 0 AS has_exceptions FROM system.row_policies ` +
+        `WHERE concat(database, '.', table) IN {tables:Array(String)}`,
+      { tables: [...tables] },
+    );
+    return rows.map((row) => ({
+      table: String(row.name),
+      appliesTo: Array.isArray(row.apply_to_list) ? row.apply_to_list.map(String) : [],
+      appliesToAll: Number(row.apply_to_all) > 0,
+      hasExceptions: Number(row.has_exceptions) > 0,
+    }));
   }
 
   /** @param table Already qualified and validated by `keyMapTableQualifiedName`. */

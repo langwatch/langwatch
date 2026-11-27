@@ -20,6 +20,7 @@ import type {
   BoardSummaryRecord,
   BoardUpdate,
   MemberStars,
+  SidebarOrderKey,
 } from "../board.repository.ts";
 
 /** The column a star matches on: the board id for a board, the template id for a template. */
@@ -74,6 +75,7 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     scope: row.scope,
     organizationId: row.organizationId,
     homeProduct: homeProductOf(row.homeProduct),
+    myDashboardOfUserId: row.myDashboardOfUserId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -85,6 +87,7 @@ export class PrismaBoardRepository
     "DashboardFavourite",
     "CustomGraph",
     "Dashboard",
+    "DashboardSidebarOrder",
   )
   implements BoardRepository
 {
@@ -146,6 +149,7 @@ export class PrismaBoardRepository
     createdById?: string | null;
     scope?: DashboardScope;
     homeProduct?: DashboardHomeProduct;
+    myDashboardOfUserId?: string | null;
     organizationId?: string | null;
   }): Promise<BoardRecord> {
     return boardRow(
@@ -290,6 +294,25 @@ export class PrismaBoardRepository
           }),
         ),
       );
+    });
+  }
+
+  async findSidebarOrder(input: SidebarOrderKey): Promise<string[]> {
+    const row = await this.prisma.dashboardSidebarOrder.findUnique({
+      where: { userId_organizationId_homeProduct: input },
+      select: { dashboardIds: true },
+    });
+    return row?.dashboardIds ?? [];
+  }
+
+  async setSidebarOrder(
+    input: SidebarOrderKey & { dashboardIds: readonly string[] },
+  ): Promise<void> {
+    const { dashboardIds, ...key } = input;
+    await this.prisma.dashboardSidebarOrder.upsert({
+      where: { userId_organizationId_homeProduct: key },
+      create: { ...key, dashboardIds: [...dashboardIds] },
+      update: { dashboardIds: [...dashboardIds] },
     });
   }
 

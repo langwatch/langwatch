@@ -1,5 +1,5 @@
 /**
- * The templates finder's pool, search, category chip, counts, sections and address.
+ * The templates finder's pool, category chip, counts, sections and address.
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
@@ -37,8 +37,6 @@ const titles = new Map(CATALOGUE_WIDGETS.map(({ id, title }) => [id, title]));
 const POOL = finderPool({});
 const poolIds = (templates: readonly LibraryTemplate[]) => templates.map(({ board }) => board.id);
 
-const shownIds = (filters: Partial<CatalogueFilters>) =>
-  poolIds(filterCatalogue({ items: POOL, filters: { ...NO_CATALOGUE_FILTERS, ...filters } }));
 const unbuiltPreviewWidgets = () =>
   TEMPLATE_LIBRARY.filter(({ board }) => !TEMPLATE_PREVIEW_IDS.has(board.id))
     .flatMap(({ preview }) => (preview.kind === "layout" ? preview.widgets : []))
@@ -132,67 +130,48 @@ describe("the templates finder", () => {
     });
   });
 
-  describe("when the member searches", () => {
-    /** @scenario "AC102 Templates library: search matches name, job, widget questions and agent kinds" */
-    it.each([
-      ["a name", "WHERE THE MONEY GOES", "costs"],
-      ["a job", "whether you stay within budget", "costs"],
-      ["a widget question", "which model costs me the most", "costs"],
-      ["an agent kind", "VOICE AGENT", "calls"],
-    ])("matches %s, ignoring case", (_what, search, id) => {
-      expect(shownIds({ search })).toContain(id);
-    });
-
-    /** @scenario "AC102 Templates library: search matches name, job, widget questions and agent kinds" */
-    it("leaves out templates the search does not match", () => {
-      expect(shownIds({ search: "zzz-no-such-template" })).toEqual([]);
-    });
-  });
-
   describe("when the member picks a category", () => {
     /** @scenario "AC103 Templates library: one category chip and one agent-type chip narrow the finder" */
-    it("shows only that category's templates, with the search applied", () => {
+    it("shows only that category's templates", () => {
       const result = filterCatalogue({
         items: POOL,
-        filters: { ...NO_CATALOGUE_FILTERS, trunk: "Profit", search: "cost" },
+        filters: { ...NO_CATALOGUE_FILTERS, trunk: "Profit" },
       });
 
       expect(result.length).toBeGreaterThan(0);
-      for (const { board, trunk, searchText } of result) {
-        expect(trunk, board.id).toBe("Profit");
-        expect(searchText, board.id).toContain("cost");
-      }
+      for (const { board, trunk } of result) expect(trunk, board.id).toBe("Profit");
     });
 
     /** @scenario "AC103 Templates library: one category chip and one agent-type chip narrow the finder" */
-    it("counts each category with the search applied, never another category", () => {
-      const counts = trunkCounts({ items: POOL, search: "cost" });
-      const searched = filterCatalogue({
-        items: POOL,
-        filters: { ...NO_CATALOGUE_FILTERS, search: "cost" },
-      });
+    it("counts each category's own templates, never another category's", () => {
+      const counts = trunkCounts({ items: POOL, search: "" });
 
-      expect(counts.all).toBe(searched.length);
+      expect(counts.all).toBe(POOL.length);
       for (const trunk of TRUNKS) {
         expect(counts.byTrunk[trunk], trunk).toBe(
-          searched.filter((template) => template.trunk === trunk).length,
+          POOL.filter((template) => template.trunk === trunk).length,
         );
       }
     });
   });
 
   describe("given a view in the address", () => {
-    /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
-    it("writes the search and chips over the rest of the query, and reads them back", () => {
-      const filters: CatalogueFilters = { search: "cost", trunk: "Profit", agentKind: "voice" };
+    /** @scenario "AC104 Templates library: the filters are kept in the address" */
+    it("writes the chips over the rest of the query, and reads them back", () => {
+      const filters: CatalogueFilters = { search: "", trunk: "Profit", agentKind: "voice" };
 
       const query = templateFiltersQuery({ query: { other: "kept" }, filters });
 
-      expect(query).toEqual({ other: "kept", q: "cost", trunk: "Profit", agent: "voice" });
+      expect(query).toEqual({ other: "kept", trunk: "Profit", agent: "voice" });
       expect(templateFiltersFromQuery(query)).toEqual(filters);
     });
 
-    /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
+    /** @scenario "AC104 Templates library: the filters are kept in the address" */
+    it("reads no search from an old address", () => {
+      expect(templateFiltersFromQuery({ q: "cost" })).toEqual(NO_CATALOGUE_FILTERS);
+    });
+
+    /** @scenario "AC104 Templates library: the filters are kept in the address" */
     it("drops chip values it does not know", () => {
       expect(templateFiltersFromQuery({ trunk: "Growth", agent: "robot" })).toEqual(
         NO_CATALOGUE_FILTERS,

@@ -90,6 +90,57 @@ function makeBoard({
   return client.boards.createAtScope.mutate({ projectId, name, scope, ...home });
 }
 
+/**
+ * Puts a template's widgets on an empty board at the template's own places: the creates run
+ * together, the layout lands in one write after. Resolves the new widgets' ids in order; a
+ * failure removes the widgets it made, so the board is left as it was.
+ */
+export async function placeTemplateWidgets({
+  client,
+  projectId,
+  dashboardId,
+  widgets,
+  widgetSource = fromCatalogue,
+}: {
+  client: BoardsClient;
+  projectId: string;
+  dashboardId: string;
+  widgets: readonly BoardTemplateWidget[];
+  widgetSource?: BoardSource["widgetSource"];
+}): Promise<string[]> {
+  // Settled, not raced: a refused create still waits for the others, so none is left behind.
+  const settled = await Promise.allSettled(
+    widgets.map(async (widget) => {
+      const { name, definition, layout } = widget;
+      const created = await client.dashboardWidgets.create.mutate({
+        projectId,
+        dashboardId,
+        name,
+        code: definition.code,
+        queries: definition.queries,
+        description: definition.description,
+        prompt: definition.prompt,
+        source: widgetSource(widget),
+      });
+      return { graphId: created.id, ...layout };
+    }),
+  );
+  const layouts = settled.flatMap((each) => (each.status === "fulfilled" ? [each.value] : []));
+  try {
+    const refused = settled.find((each) => each.status === "rejected");
+    if (refused) throw refused.reason;
+    await client.dashboardWidgets.batchUpdateLayouts.mutate({ projectId, layouts });
+    return layouts.map(({ graphId }) => graphId);
+  } catch (error) {
+    await Promise.all(
+      layouts.map(({ graphId }) =>
+        client.dashboardWidgets.delete.mutate({ projectId, id: graphId }).catch(() => void 0),
+      ),
+    );
+    throw error;
+  }
+}
+
 /** Removes a half-made board; best effort, as a leftover stays listed and can be deleted. */
 async function discard({
   client,
@@ -164,25 +215,7 @@ export function useBoardFromTemplate({
     dashboardId: string;
   }) => {
     await client.boards.update.mutate({ projectId, dashboardId, description });
-    // Independent rows, so the creates run together; the layout lands in one write after.
-    const layouts = await Promise.all(
-      widgets.map(async (widget) => {
-        const { name, definition, layout } = widget;
-        const created = await client.dashboardWidgets.create.mutate({
-          projectId,
-          dashboardId,
-          name,
-          code: definition.code,
-          queries: definition.queries,
-          description: definition.description,
-          prompt: definition.prompt,
-          source: widgetSource(widget),
-        });
-        return { graphId: created.id, ...layout };
-      }),
-    );
-    await client.dashboardWidgets.batchUpdateLayouts.mutate({ projectId, layouts });
-    return layouts.map(({ graphId }) => graphId);
+    return placeTemplateWidgets({ client, projectId, dashboardId, widgets, widgetSource });
   };
 
   /**

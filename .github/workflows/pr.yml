@@ -144,6 +144,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # the Nx cache role (nx-remote-cache action)
 
   e2e:
     needs: changes

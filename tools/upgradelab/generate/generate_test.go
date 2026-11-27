@@ -13,6 +13,8 @@ import (
 	"github.com/langwatch/langwatch/tools/upgradelab/seed"
 )
 
+const repoRoot = "../../.."
+
 var anchor = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 
 func mustBuild(t *testing.T, shape, release string, seedValue int64) Plan {
@@ -132,8 +134,8 @@ func TestEveryDeclaredStepIsCovered(t *testing.T) {
 	}
 	declared := regexp.MustCompile(`define(?:MigrationStep|ProjectionReplayStep)\(\{\s*id: "([^"]+)"`)
 	found := 0
-	for _, glob := range []string{"../../../modules/*/process/src/*.module.ts", "../../../enterprise/modules/*/process/src/*.module.ts"} {
-		paths, _ := filepath.Glob(glob)
+	for _, glob := range seed.StepDeclarationGlobs {
+		paths, _ := filepath.Glob(filepath.Join(repoRoot, glob))
 		for _, path := range paths {
 			data, err := os.ReadFile(path)
 			if err != nil {
