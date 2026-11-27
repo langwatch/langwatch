@@ -26,3 +26,20 @@ export class SeatRequestFullMemberError extends HandledError {
     this.name = "SeatRequestFullMemberError";
   }
 }
+
+/** The asking account has no email address, which a seat request is filed and answered under. */
+export class SeatRequestNoEmailError extends HandledError {
+  declare readonly code: "seat_request_no_email";
+
+  constructor() {
+    super(
+      "seat_request_no_email",
+      "Your account has no email address to file a seat request under",
+      {
+        httpStatus: 409,
+        ...remediation("seat_request_no_email"),
+      },
+    );
+    this.name = "SeatRequestNoEmailError";
+  }
+}

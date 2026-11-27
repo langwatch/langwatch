@@ -823,6 +823,7 @@ export const APP_ERROR_CODES = [
   "seat_payment_waiting",
   "seat_quantity_below_in_use",
   "seat_request_full_member",
+  "seat_request_no_email",
   "seat_request_not_found",
   "seats_held_for_payment",
   "secret_absent",

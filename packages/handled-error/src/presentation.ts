@@ -2352,6 +2352,11 @@ const presentations = {
     describe: () =>
       "Nothing to request. If something is still refused, reload the page, or ask an organization admin which role you need.",
   },
+  seat_request_no_email: {
+    title: "Your account has no email address",
+    describe: () =>
+      "A seat request is answered by email. Ask an organization admin to give you a full seat directly.",
+  },
   seat_request_not_found: {
     title: "This seat request is no longer open",
     describe: () =>

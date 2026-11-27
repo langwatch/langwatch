@@ -1199,6 +1199,11 @@ const registry = {
       "A seat request is for Lite Members: a full member refused an action is missing a permission instead",
     ],
   },
+  seat_request_no_email: {
+    tips: [
+      "A seat request is filed and answered by email: the account needs an email address, or an admin changes the role directly",
+    ],
+  },
   seat_change_needs_support: {
     tips: [
       "The organization's active subscription is ENTERPRISE or carries limits an operator set, so no card checkout is offered",

@@ -258,6 +258,13 @@ Feature: Proration Preview Before Seat Update
     Then no email is sent and the attempt stays recorded
 
   @unit
+  Scenario: The billing-fixed notice runs every 15 minutes
+    Given billing is installed
+    When the billing-fixed notice is scheduled
+    Then it wakes every 15 minutes and asks for one notice pass per wake
+    And each pass prunes its own outbox rows older than a week
+
+  @unit
   Scenario: The billing-fixed email says what was tried, what finishing costs and that nothing was charged
     Given an admin tried to make a member an Admin while billing was blocked
     When the billing-fixed email is rendered

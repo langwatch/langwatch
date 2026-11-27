@@ -434,7 +434,7 @@ completeSeatApproval(input: CompleteSeatApprovalInput, by: OrganizationCaller): 
 
 #### `requestSeatAccess`
 
-A member refused for want of a full seat asks for one; an open request answers as it is. Refuses `seat_request_full_member` when the caller holds a full seat already.
+A member refused for want of a full seat asks for one; an open request answers as it is. Refuses `seat_request_full_member` when the caller holds a full seat already, and `seat_request_no_email` when their account has no email address.
 
 ```typescript
 requestSeatAccess(input: RequestSeatAccessInput, by: OrganizationCaller): Promise<MyAccessRequest>;

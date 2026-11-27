@@ -94,6 +94,23 @@ describe("given a Lite Member refused for want of a full seat", () => {
     });
   });
 
+  describe("when a Lite Member whose account has no email address asks", () => {
+    /** @scenario "A Lite Member with no email address is refused with seat_request_no_email" */
+    it("refuses with seat_request_no_email and opens nothing", async () => {
+      const { app, memory, liteMember, openRequests } = await application();
+      const lena = liteMember({ email: "lena@acme.example" });
+      const user = memory.users.get(lena.userId);
+      if (user) user.email = null;
+
+      const refusal = await app
+        .requestSeatAccess(scope, lena.caller)
+        .catch((error: unknown) => error);
+
+      expect(codeOf(refusal)).toBe("seat_request_no_email");
+      expect(await openRequests()).toEqual([]);
+    });
+  });
+
   describe("when she reads where her own request stands", () => {
     /** @scenario "A member reads where their own request stands" */
     it("reads none, then open, then approved", async () => {

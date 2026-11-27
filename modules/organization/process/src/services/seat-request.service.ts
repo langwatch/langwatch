@@ -18,6 +18,7 @@ import {
   type SeatApprovalCompletion,
   type SeatApprovalWithSeat,
   SeatRequestFullMemberError,
+  SeatRequestNoEmailError,
   SeatRequestNotFoundError,
   type SeatRequestResolved,
 } from "@langwatch/organization-contract";
@@ -359,7 +360,7 @@ export class SeatRequestService {
       membership.role === OrganizationUserRole.ADMIN;
     if (isFull && !membership.disabledAt) throw new SeatRequestFullMemberError();
     const email = membership.user.email?.toLowerCase();
-    if (!email) throw new SeatRequestFullMemberError();
+    if (!email) throw new SeatRequestNoEmailError();
     await this.notice.open({
       organizationId,
       email,

@@ -803,6 +803,11 @@ const MEMBER_TYPE_ROLE: Record<string, string> = {
   Developer: "Developer",
 };
 
+/** "an Admin", "a Member", "a Lite Member". */
+export function withArticle(label: string): string {
+  return `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
+}
+
 /** "an Admin", "a Member", "a Lite Member": the role as the members page names it. */
 export function memberRoleWithArticle({
   role,
@@ -811,6 +816,5 @@ export function memberRoleWithArticle({
   role: string;
   memberType: string;
 }): string {
-  const label = MEMBER_TYPE_ROLE[memberType] ?? (role === "ADMIN" ? "Admin" : "Member");
-  return `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
+  return withArticle(MEMBER_TYPE_ROLE[memberType] ?? (role === "ADMIN" ? "Admin" : "Member"));
 }

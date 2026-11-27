@@ -302,13 +302,12 @@ export class MemberRoleSeatPurchaseService {
   ): Promise<{ recorded: boolean }> {
     const { organizationId, userId, role } = input;
     const memberName = await this.dependencies.memberName({ organizationId, userId });
-    await this.dependencies.billing.recordBlockedSeatChange({
+    return this.dependencies.billing.recordBlockedSeatChange({
       organizationId,
       userId: by.id,
       attempt: { kind: "role_change", memberName, role: roleLabel(role) },
       seats: 1,
     });
-    return { recorded: true };
   }
 
   async complete({

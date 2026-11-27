@@ -1423,8 +1423,8 @@ export class BillingModule
     userId: string;
     attempt: BlockedSeatChangeAttempt;
     seats: number;
-  }): Promise<void> {
-    await this.#keepBlockedSeatChange(input);
+  }): Promise<{ recorded: boolean }> {
+    return { recorded: await this.#keepBlockedSeatChange(input) };
   }
 
   async #keepBlockedSeatChange(input: {

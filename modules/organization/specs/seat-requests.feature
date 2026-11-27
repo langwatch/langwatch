@@ -469,6 +469,13 @@ Feature: Seat requests when an organization is over its seat limit
       And no seat request names "mel@acme.example"
 
     @unit
+    Scenario: A Lite Member with no email address is refused with seat_request_no_email
+      Given a Lite Member whose account has no email address
+      When she asks for access
+      Then the request refuses with seat_request_no_email
+      And no seat request is opened
+
+    @unit
     Scenario: Asking needs only a membership in the organization
       When the request access procedure is declared
       Then it needs members:view, which every organization role holds

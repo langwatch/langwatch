@@ -76,7 +76,9 @@ function world({
     const key = payment.kind === "invoice" ? payment.invoiceId : payment.subscriptionId;
     return { status: state.payments.get(key) ?? "open" };
   });
-  const recordBlockedSeatChange = vi.fn<BillingApi["recordBlockedSeatChange"]>(async () => {});
+  const recordBlockedSeatChange = vi.fn<BillingApi["recordBlockedSeatChange"]>(async () => ({
+    recorded: true,
+  }));
   const pending = MemoryPendingSeatRoleChangeRepository.create(now ? { now } : {});
   let ids = 0;
   const service = MemberRoleSeatPurchaseService.create({
@@ -233,6 +235,14 @@ describe("MemberRoleSeatPurchaseService", () => {
       });
       expect(addFullSeat).not.toHaveBeenCalled();
       expect(state.roles.get(SAM)).toBe("EXTERNAL");
+    });
+
+    /** @scenario "Keeping a refused role change answers whether billing kept it" */
+    it("answers not recorded when billing keeps nothing", async () => {
+      const { service, recordBlockedSeatChange } = world();
+      recordBlockedSeatChange.mockResolvedValueOnce({ recorded: false });
+
+      expect(await service.recordBlocked(MAKE_ADMIN, ADMIN)).toEqual({ recorded: false });
     });
   });
 

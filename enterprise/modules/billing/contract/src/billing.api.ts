@@ -113,14 +113,15 @@ export interface BillingApi {
   /**
    * Keeps a seat change refused with `subscription_ambiguous` for the admin who tried; once the
    * organization is back on one subscription that admin gets one email to finish it. `seats`:
-   * the seats the change needs beyond today's. Never throws.
+   * the seats the change needs beyond today's. `recorded` is false where nothing keeps it (off
+   * Cloud). Never throws.
    */
   recordBlockedSeatChange(input: {
     organizationId: string;
     userId: string;
     attempt: BlockedSeatChangeAttempt;
     seats: number;
-  }): Promise<void>;
+  }): Promise<{ recorded: boolean }>;
   /**
    * Bills the storage an organization keeps beyond the 90 days Growth includes: the metered line
    * follows the longest retention, and a measurement goes to the meter as that day's share of a

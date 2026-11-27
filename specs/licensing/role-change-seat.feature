@@ -339,6 +339,12 @@ Feature: Adding a seat with a role change
       And the attempt is kept once for me, so I hear once billing is fixed
       And picking Admin again keeps nothing more and charges nothing
 
+    @unit
+    Scenario: Keeping a refused role change answers whether billing kept it
+      Given a deployment where billing keeps no refused seat change
+      When a role change refused for two live subscriptions is kept for me
+      Then the answer says it was not recorded
+
     @integration
     Scenario: A plan without paid seats keeps Save
       Given "ACME" has no paid seat plan

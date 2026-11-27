@@ -104,18 +104,18 @@ const newInviteRow = (): InviteRow => ({
 export type MemberRefusal = { userId: string; message: string };
 
 /** The members of the organization by lowercased address. */
-export function membersByEmailOf(users: SubscriptionUser[]): Map<string, SubscriptionUser> {
+function membersByEmailOf(users: SubscriptionUser[]): Map<string, SubscriptionUser> {
   return new Map(users.map((user) => [normalisedEmail(user.email), user]));
 }
 
 /** "Sam Lee is already on your team as a Lite Member." */
-export function alreadyMemberMessage(user: SubscriptionUser): string {
+function alreadyMemberMessage(user: SubscriptionUser): string {
   const name = user.name.trim() || user.email;
   return `${name} is already on your team as ${memberRoleWithArticle(user)}.`;
 }
 
 /** The addresses that already belong to a member, by row: no seat is priced or bought for them. */
-export function memberErrorsOf({
+function memberErrorsOf({
   rows,
   members,
 }: {
@@ -131,7 +131,7 @@ export function memberErrorsOf({
 }
 
 /** The addresses that are not emails, by row. */
-export function emailErrorsOf({ rows }: { rows: InviteRow[] }): Record<string, string> {
+function emailErrorsOf({ rows }: { rows: InviteRow[] }): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const row of rows) {
     const trimmed = row.email.trim();

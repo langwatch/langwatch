@@ -118,10 +118,10 @@ createSeatCheckout(input: { organizationId: string; baseUrl: string; membersToAd
 
 #### `recordBlockedSeatChange`
 
-Keeps a seat change refused with `subscription_ambiguous` for the admin who tried; once the organization is back on one subscription that admin gets one email to finish it. `seats`: the seats the change needs beyond today's. Never throws.
+Keeps a seat change refused with `subscription_ambiguous` for the admin who tried; once the organization is back on one subscription that admin gets one email to finish it. `seats`: the seats the change needs beyond today's. `recorded` is false where nothing keeps it (off Cloud). Never throws.
 
 ```typescript
-recordBlockedSeatChange(input: { organizationId: string; userId: string; attempt: BlockedSeatChangeAttempt; seats: number; }): Promise<void>;
+recordBlockedSeatChange(input: { organizationId: string; userId: string; attempt: BlockedSeatChangeAttempt; seats: number; }): Promise<{ recorded: boolean }>;
 ```
 
 #### `recordRetentionStorage`

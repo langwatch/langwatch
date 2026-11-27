@@ -572,7 +572,8 @@ export interface OrganizationApi {
   ): Promise<SeatApprovalCompletion>;
   /**
    * A member refused for want of a full seat asks for one; an open request answers as it is.
-   * Refuses `seat_request_full_member` when the caller holds a full seat already.
+   * Refuses `seat_request_full_member` when the caller holds a full seat already, and
+   * `seat_request_no_email` when their account has no email address.
    */
   requestSeatAccess(
     input: RequestSeatAccessInput,

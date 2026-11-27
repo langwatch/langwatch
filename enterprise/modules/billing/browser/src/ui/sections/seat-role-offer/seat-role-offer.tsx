@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 
 import { billingApi } from "../../../behavior/billing-api.ts";
 import { billingDay } from "../../../model/seat-change-summary.ts";
+import { withArticle } from "../../../model/seat-purchase.ts";
 
 type ChargeOffer = Extract<SeatOffer, { kind: "charge" }>;
 type BuyableOffer = Extract<SeatOffer, { kind: "charge" | "checkout" }>;
@@ -29,11 +30,6 @@ function perPeriod(interval: string): string {
   if (interval === "year" || interval === "annual") return "/yr";
   if (interval === "month" || interval === "monthly") return "/mo";
   return "";
-}
-
-/** "an Admin", "a Member", "a Lite Member". */
-function withArticle(label: string): string {
-  return `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
 }
 
 function offerButtonLabel({
