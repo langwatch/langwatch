@@ -57,6 +57,9 @@
       "path": "../../../../modules/ops/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/analytics/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
@@ -76,9 +79,6 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"

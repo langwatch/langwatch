@@ -57,6 +57,15 @@ const dataPrivacyAudienceOptionsSchemaDefinition = z
      * organization without any sees the group control empty and disabled).
      */
     groups: z.array(namedScopeSchema),
+    /**
+     * ADR-208: the organization's live API keys a rule's audience may name, by the names their
+     * owners gave them. Empty for a caller who may edit no rule here.
+     */
+    apiKeys: z.array(namedScopeSchema),
+    /** Whether the caller may add a key a rule does not name yet: an organization admin. */
+    canAddApiKeys: z.boolean(),
+    /** Set when api-key could not list the keys: a key not in `apiKeys` may still be live. */
+    apiKeysUnavailable: z.literal(true).optional(),
   })
   .strict();
 export interface DataPrivacyAudienceOptionsSchema extends Named<
@@ -89,6 +98,12 @@ const dataPrivacySnapshotSchemaDefinition = z
     available: dataPrivacyScopeAvailableSchema,
     /** Choices for the restrict-audience picker. */
     audienceOptions: dataPrivacyAudienceOptionsSchema,
+    /**
+     * Whether an organization admin accepted the PII Redaction Model's price. Until then a priced
+     * Cloud organization's Strict runs the rule-based detector, unbilled (ADR-201 decision 15).
+     * False for a personal-account project, which has no organization to accept it.
+     */
+    piiRedactionModelAccepted: z.boolean(),
   })
   .strict();
 export interface DataPrivacySnapshotSchema extends Named<

@@ -962,6 +962,17 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.recordInstantEvalsOptIn(input);
   }
 
+  isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean> {
+    return this.#dependencies.organizations.isPiiRedactionModelAccepted(input);
+  }
+
+  recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    return this.#dependencies.organizations.recordPiiRedactionModelAcceptance(input);
+  }
+
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.#dependencies.organizations.readGuidedOnboardingState(input);
   }

@@ -25,7 +25,11 @@ export class PrismaDigestSendRepository
     super(database);
   }
 
-  async isSent(input: { userId: string; isoWeek: string }): Promise<boolean> {
+  async isSent(input: {
+    userId: string;
+    organizationId: string;
+    isoWeek: string;
+  }): Promise<boolean> {
     const row = await this.database.digestSend.findUnique({
       where: { id: digestSendKey(input) },
       select: { id: true },

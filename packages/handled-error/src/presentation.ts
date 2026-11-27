@@ -4465,6 +4465,12 @@ const presentations = {
       return `${need} Ask an administrator, or set the rule on a scope you manage.`.trim();
     },
   },
+  data_privacy_api_key_add_forbidden: {
+    // ADR-208: the caller may edit this rule and keep its keys; only adding one is refused.
+    title: "Only an organization admin can add an API key",
+    describe: () =>
+      "You can still change this rule and keep the keys it names. Ask an organization admin to add the key.",
+  },
   data_privacy_config_invalid: {
     // `meta.reason` is the service's own line naming the offending pattern.
     // It is the only part the reader can act on, so it is what they read.
@@ -4963,6 +4969,10 @@ const presentations = {
     describe: () =>
       "Only active members of this organization can get a test digest. Pick someone else.",
   },
+  digest_impersonation_refused: {
+    title: "Can't change this while impersonating",
+    describe: () => "Email preferences belong to the person. Stop impersonating to change them.",
+  },
   digest_link_invalid: {
     title: "This link isn't valid",
     describe: () => "It may have expired or been changed. Use the link from the latest email.",
@@ -4979,10 +4989,6 @@ const presentations = {
   digest_operator_address_missing: {
     title: "Your account has no email address",
     describe: () => "Add an email address to your account, then send the test again.",
-  },
-  digest_organization_not_enrolled: {
-    title: "Organization not enrolled",
-    describe: () => "Enrol this organization in the digest before sending a test.",
   },
   digest_member_unsubscribed: {
     title: "Member opted out",

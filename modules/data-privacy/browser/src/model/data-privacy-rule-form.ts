@@ -1,20 +1,21 @@
-import {
-  CONTENT_CATEGORIES,
-  type DataPrivacyConfig,
-  type DataPrivacyRule,
-} from "@langwatch/data-privacy-contract";
+import { type DataPrivacyConfig, type DataPrivacyRule } from "@langwatch/data-privacy-contract";
 
 import {
   attributePatternError,
   customSecretPatternError,
   secretPatternError,
 } from "./data-privacy-patterns.ts";
-import { configsEqual, isEmptyRuleConfig, type RuleFormState } from "./data-privacy-rule-config.ts";
+import {
+  configsEqual,
+  isEmptyRuleConfig,
+  restrictsContentCategory,
+  type RuleFormState,
+} from "./data-privacy-rule-config.ts";
 
 /** Whether any category or attribute rule restricts content, which is when the audience matters. */
 export function formRestrictsContent(form: RuleFormState): boolean {
   return (
-    CONTENT_CATEGORIES.some((category) => form.dispositions[category] === "restrict") ||
+    restrictsContentCategory(form.dispositions) ||
     form.customAttributes.some((row) => row.disposition === "restrict")
   );
 }

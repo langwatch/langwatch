@@ -44,19 +44,7 @@ jobs:
       - uses: ./.github/actions/docs-media-encoders
         with:
           save: "false"
-      - name: Read the Playwright version
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install build browser
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-chromium
       - name: Build the documentation under /docs
         env:
           # Signs the star count read, which GitHub refuses from shared runner addresses.
@@ -76,7 +64,7 @@ jobs:
   lighthouse:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -94,19 +82,7 @@ jobs:
         with:
           name: docs-site-lighthouse-all-build
           path: apps/docs/dist
-      - name: Read the Playwright version
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install the audit browser
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-chromium
       - name: Lighthouse on this shard's pages
         run: >-
           pnpm --filter @langwatch/docs-site audit:site

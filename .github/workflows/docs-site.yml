@@ -31,6 +31,8 @@ on:
       - "packages/vitest-config/**"
       - "sdks/typescript/**"
       - ".github/actions/docs-media-encoders/**"
+      - ".github/actions/playwright-chromium/**"
+      - ".github/actions/apt-ubuntu-sources/**"
       - "dev/tests/e2e-stack/**"
       - "packages/oxlint-rules/**"
       - "packages/architecture-enforcer/oxlint.architecture.jsonc"
@@ -87,6 +89,8 @@ jobs:
               - 'packages/design-system/**'
               - 'packages/time/**'
               - '.github/workflows/docs-site.yml'
+              - '.github/actions/playwright-chromium/**'
+              - '.github/actions/apt-ubuntu-sources/**'
               - 'cmd/docsdeploy/**'
               - 'tools/docsdeploy/**'
             relevant:
@@ -102,6 +106,8 @@ jobs:
               - 'packages/vitest-config/**'
               - 'sdks/typescript/**'
               - '.github/actions/docs-media-encoders/**'
+              - '.github/actions/playwright-chromium/**'
+              - '.github/actions/apt-ubuntu-sources/**'
               - 'dev/tests/e2e-stack/**'
               - 'packages/oxlint-rules/**'
               - 'packages/architecture-enforcer/oxlint.architecture.jsonc'
@@ -186,20 +192,7 @@ jobs:
           restore-keys: |
             docs-site-${{ matrix.mount }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - uses: ./.github/actions/docs-media-encoders
-      - name: Read the Playwright version
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install build browser
-        timeout-minutes: 10
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-chromium
       - name: Build the documentation
         env:
           # Signs the star count read, which GitHub refuses from shared runner addresses.
@@ -222,7 +215,7 @@ jobs:
   check:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -296,22 +289,8 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: apps/docs/dist
-      - name: Read the Playwright version
+      - uses: ./.github/actions/playwright-chromium
         if: matrix.browser
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        if: matrix.browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install the test browser
-        if: matrix.browser
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.haven
         with:
@@ -337,7 +316,7 @@ jobs:
   audit:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -358,19 +337,7 @@ jobs:
         with:
           name: docs-site-mounted
           path: apps/docs/dist
-      - name: Read the Playwright version
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install the audit browser
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-chromium
       # Three runs per page, judged on the median, at two at a time on the
       # runner's four cores: one slow run neither passes nor fails a page.
       - name: Audit performance, accessibility, search and agent readiness

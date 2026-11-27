@@ -452,6 +452,13 @@ export interface OrganizationApi {
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
   /** The organization's own Instant Evals consent; a second call keeps the first record. */
   recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void>;
+  /** Whether an organization admin accepted the PII Redaction Model's price (ADR-201). */
+  isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean>;
+  /** An admin's acceptance of that price (ADR-201); a second call keeps the first record. */
+  recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;

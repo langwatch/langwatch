@@ -90,6 +90,9 @@ jobs:
             zlib-dev \
             aws-cli
 
+      - uses: ./.github/actions/apt-ubuntu-sources
+        if: ${{ !contains(matrix.target.platform, 'musl') }}
+
       - name: Read pinned versions
         id: versions
         shell: bash

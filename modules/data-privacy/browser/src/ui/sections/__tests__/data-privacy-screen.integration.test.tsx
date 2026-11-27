@@ -56,10 +56,11 @@ const { snapshot, invalidate, removeForScope, setForScope } = vi.hoisted(() => {
         teams: [{ id: "team-1", name: "Platform" }],
         projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
       },
-      audienceOptions: { groups: [] },
+      audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
       effective: baseline,
       effectiveTeam: baseline,
       effectiveOrganization: baseline,
+      piiRedactionModelAccepted: false,
       rules: [
         {
           scopeType: "TEAM" as const,
@@ -83,6 +84,9 @@ vi.mock("../../../behavior/data-privacy-api.ts", () => ({
       },
       setForScope: {
         useMutation: () => ({ mutateAsync: setForScope, isPending: false }),
+      },
+      acceptPiiRedactionModel: {
+        useMutation: () => ({ mutateAsync: vi.fn(async () => undefined), isPending: false }),
       },
     },
   },

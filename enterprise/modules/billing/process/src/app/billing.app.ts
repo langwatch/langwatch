@@ -1121,6 +1121,8 @@ export class BillingModule
     const piiRedactionSpend = PiiRedactionSpendQueryService.create({
       isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
       listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      findPiiRedactionModelAcceptedAtMs: (input) =>
+        repositories.reportOrganizations.findPiiRedactionModelAcceptedAtMs(input),
       sumSpendNanoUsdByRequestType: (input) =>
         repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });

@@ -218,6 +218,14 @@ export abstract class OrganizationRepository {
     userId: string;
     at: Instant;
   }): Promise<void>;
+  /** An unknown organization reads as not accepted. */
+  abstract isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean>;
+  /** First write wins: the moment and admin that accepted the price are kept. */
+  abstract recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void>;
   /**
    * Records the labels of the private ClickHouse and S3 routes seen for an organization, each
    * only where none is recorded yet: safe to repeat.

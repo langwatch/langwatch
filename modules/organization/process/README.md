@@ -264,6 +264,22 @@ The organization's own Instant Evals consent; a second call keeps the first reco
 recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void>;
 ```
 
+#### `isPiiRedactionModelAccepted`
+
+Whether an organization admin accepted the PII Redaction Model's price (ADR-201).
+
+```typescript
+isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean>;
+```
+
+#### `recordPiiRedactionModelAcceptance`
+
+An admin's acceptance of that price (ADR-201); a second call keeps the first record.
+
+```typescript
+recordPiiRedactionModelAcceptance(input: { organizationId: string; userId: string; }): Promise<void>;
+```
+
 #### `writeGuidedOnboardingState`
 
 Replaces the record, leaving every other sign-up answer where it is.

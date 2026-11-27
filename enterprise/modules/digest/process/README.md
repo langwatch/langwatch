@@ -12,15 +12,9 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`DigestApi`)
 
-The weekly digest. The operator controls admit Cloud admin staff through `OpsApi.admitCloudAdmin`, so they answer not_found where cloud ops is off (§3.5); the token operations serve the public unsubscribe address, whose signed token is the authorization.
+The weekly digest, sent to every organization's members. The operator controls admit Cloud admin staff through `OpsApi.admitCloudAdmin`, so they answer not_found where cloud ops is off (§3.5); the token operations serve the public unsubscribe address, whose signed token is the authorization.
 
 Peers call these through the token, declared at `../contract/src/digest.api.ts:20`; nothing else in this package is public.
-
-#### `setEnrolled`
-
-```typescript
-setEnrolled(input: DigestSetEnrolledInput & Operated): Promise<DigestSettings>;
-```
 
 #### `setArmed`
 
@@ -34,6 +28,22 @@ Mails the member's week to the operator alone; no send is recorded.
 
 ```typescript
 sendTest(input: DigestSendTestInput & Operated): Promise<void>;
+```
+
+#### `getPreference`
+
+The signed-in person's own choice; the caller names themselves, never anyone else.
+
+```typescript
+getPreference(input: Readonly<{ userId: string }>): Promise<DigestPreference>;
+```
+
+#### `setPreference`
+
+Opts the signed-in person in or out of every organization's digest at once. Staff impersonating them (`impersonatorId`) are refused with `digest_impersonation_refused`.
+
+```typescript
+setPreference(input: Readonly<{ userId: string; impersonatorId?: string | undefined } & DigestPreference>): Promise<DigestPreference>;
 ```
 
 #### `isSubscribed`
@@ -80,7 +90,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-// Query: digestTokenQuerySchema, ../contract/src/digest.ts:67
+// Query: digestTokenQuerySchema, ../contract/src/digest.ts:65
 interface Query {
   token: string;
 }
@@ -97,7 +107,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:65
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:76
 type Response = unknown;
 ```
@@ -111,7 +121,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:65
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:94
 type Response = unknown;
 ```
@@ -120,44 +130,48 @@ type Response = unknown;
 
 ### `digest`
 
-Contract `../contract/src/digest.trpc.ts:13`, router `src/transport/digest.trpc.ts:21`.
+Contract `../contract/src/digest.trpc.ts:17`, router `src/transport/digest.trpc.ts:24`.
 
-| Procedure            | Kind     | Gate                             | Input                          | Output                     |
-| -------------------- | -------- | -------------------------------- | ------------------------------ | -------------------------- |
-| `digest.setEnrolled` | mutation | Platform permission `ops:manage` | `digestSetEnrolledInputSchema` | `digestSettingsSchema`     |
-| `digest.setArmed`    | mutation | Platform permission `ops:manage` | `digestSetArmedInputSchema`    | `digestSettingsSchema`     |
-| `digest.sendTest`    | mutation | Platform permission `ops:manage` | `digestSendTestInputSchema`    | `digestAcknowledgedSchema` |
+| Procedure                | Kind     | Gate                                                                                  | Input                       | Output                     |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------- | --------------------------- | -------------------------- |
+| `digest.setArmed`        | mutation | Platform permission `ops:manage`                                                      | `digestSetArmedInputSchema` | `digestSettingsSchema`     |
+| `digest.sendTest`        | mutation | Platform permission `ops:manage`                                                      | `digestSendTestInputSchema` | `digestAcknowledgedSchema` |
+| `digest.getMyPreference` | query    | No permission: operates on the session user's own opt-out, so no tenant scope applies | `digestNoInputSchema`       | `digestPreferenceSchema`   |
+| `digest.setMyPreference` | mutation | No permission: operates on the session user's own opt-out, so no tenant scope applies | `digestPreferenceSchema`    | `digestPreferenceSchema`   |
 
 ```typescript
-// digest.setEnrolled
-// Input: digestSetEnrolledInputSchema, ../contract/src/digest.ts:34
+// digest.setArmed
+// Input: digestSetArmedInputSchema, ../contract/src/digest.ts:29
 interface Input {
-  organizationId: string;
-  enrolled: boolean;
+  armed: boolean;
 }
-// Output: digestSettingsSchema, ../contract/src/digest.ts:23
+// Output: digestSettingsSchema, ../contract/src/digest.ts:21
 interface Output {
   armed: boolean;
-  enrolledOrganizationIds: string[];
 }
-
-// digest.setArmed
-// Input: digestSetArmedInputSchema, ../contract/src/digest.ts:42
-interface Input {
-  armed: boolean;
-}
-type Output = z.infer<typeof digestSettingsSchema>; // ../contract/src/digest.ts:23
 
 // digest.sendTest
-// Input: digestSendTestInputSchema, ../contract/src/digest.ts:54
+// Input: digestSendTestInputSchema, ../contract/src/digest.ts:52
 interface Input {
   organizationId: string;
   userId: string;
 }
-// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:62
+// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:60
 interface Output {
   ok: true;
 }
+
+// digest.getMyPreference
+// Input: digestNoInputSchema, ../contract/src/digest.ts:35
+type Input = Record<string, unknown>;
+// Output: digestPreferenceSchema, ../contract/src/digest.ts:40
+interface Output {
+  subscribed: boolean;
+}
+
+// digest.setMyPreference
+type Input = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:40
+type Output = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:40
 ```
 
 ## Sockets
@@ -168,36 +182,37 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `digest_send` (aggregate `digest_send`)
 
-Declared at `src/eventing/digest-send.pipeline.ts:56`. Events: `DigestSendRequestedEventSchema`.
+Declared at `src/eventing/digest-send.pipeline.ts:79`. Events: `DigestSendRequestedEventSchema`, `DigestOrganizationPlanRequestedEventSchema`.
 
-| Kind            | Name               | Handles                                                                             | Declared at                               |
-| --------------- | ------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------- |
-| command         | `requestSend`      | –                                                                                   | `src/eventing/digest-send.pipeline.ts:61` |
-| process manager | `digestWeeklyPlan` | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:62` |
-| process manager | `digestMemberSend` | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:74` |
+| Kind            | Name                      | Handles                                                                             | Declared at                                |
+| --------------- | ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------ |
+| command         | `requestSend`             | –                                                                                   | `src/eventing/digest-send.pipeline.ts:84`  |
+| command         | `requestOrganizationPlan` | –                                                                                   | `src/eventing/digest-send.pipeline.ts:85`  |
+| process manager | `digestWeeklyPlan`        | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:86`  |
+| process manager | `digestOrganizationPlan`  | intents `planOrganization` (outbox)                                                 | `src/eventing/digest-send.pipeline.ts:98`  |
+| process manager | `digestMemberSend`        | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:112` |
 
 ### Pipeline `digest` (aggregate `digest_week`)
 
-Declared at `src/eventing/digest.pipeline.ts:82`. Events: `projectActivityRecordedEventSchema`, `userActivityRecordedEventSchema`.
+Declared at `src/eventing/digest.pipeline.ts:73`. Events: `projectActivityRecordedEventSchema`, `userActivityRecordedEventSchema`.
 
 | Kind                | Name                                                    | Handles                                                                                                                | Declared at                           |
 | ------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| command             | `recordProjectActivity`                                 | –                                                                                                                      | `src/eventing/digest.pipeline.ts:128` |
-| command             | `recordUserActivity`                                    | –                                                                                                                      | `src/eventing/digest.pipeline.ts:129` |
-| peer subscriber     | `spanRecorded`                                          | `lw.trace.span_recorded` from [trace](../../../../modules/trace/README.md)                                             | `src/eventing/digest.pipeline.ts:90`  |
-| peer subscriber     | `evaluationCompleted`                                   | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                        | `src/eventing/digest.pipeline.ts:96`  |
-| peer subscriber     | `scenarioRunFinished`                                   | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                                   | `src/eventing/digest.pipeline.ts:104` |
-| peer subscriber     | `codingAgentSpanFacts`                                  | `lw.obs.coding_agent_session.span_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md)   | `src/eventing/digest.pipeline.ts:110` |
-| peer subscriber     | `codingAgentMetricFacts`                                | `lw.obs.coding_agent_session.metric_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md) | `src/eventing/digest.pipeline.ts:116` |
-| peer subscriber     | `userErased`                                            | `lw.user.erased` from [user](../../../../modules/user/README.md)                                                       | `src/eventing/digest.pipeline.ts:123` |
-| Postgres projection | `≈ projectWeekProjection({ store: deps.projectWeeks })` | –                                                                                                                      | `src/eventing/digest.pipeline.ts:87`  |
-| Postgres projection | `≈ userWeekProjection({ store: deps.userWeeks })`       | –                                                                                                                      | `src/eventing/digest.pipeline.ts:88`  |
+| command             | `recordProjectActivity`                                 | –                                                                                                                      | `src/eventing/digest.pipeline.ts:107` |
+| command             | `recordUserActivity`                                    | –                                                                                                                      | `src/eventing/digest.pipeline.ts:108` |
+| peer subscriber     | `evaluationCompleted`                                   | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)                        | `src/eventing/digest.pipeline.ts:80`  |
+| peer subscriber     | `scenarioRunFinished`                                   | `lw.simulation_run.finished` from [scenario](../../../../modules/scenario/README.md)                                   | `src/eventing/digest.pipeline.ts:85`  |
+| peer subscriber     | `codingAgentSpanFacts`                                  | `lw.obs.coding_agent_session.span_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md)   | `src/eventing/digest.pipeline.ts:91`  |
+| peer subscriber     | `codingAgentMetricFacts`                                | `lw.obs.coding_agent_session.metric_facts_contributed` from [coding-agent](../../../../modules/coding-agent/README.md) | `src/eventing/digest.pipeline.ts:96`  |
+| peer subscriber     | `userErased`                                            | `lw.user.erased` from [user](../../../../modules/user/README.md)                                                       | `src/eventing/digest.pipeline.ts:102` |
+| Postgres projection | `≈ projectWeekProjection({ store: deps.projectWeeks })` | –                                                                                                                      | `src/eventing/digest.pipeline.ts:78`  |
+| Postgres projection | `≈ userWeekProjection({ store: deps.userWeeks })`       | –                                                                                                                      | `src/eventing/digest.pipeline.ts:79`  |
 
 ## Configuration
 
 | Kind   | Leaf            | Environment variable | Declared at                          |
 | ------ | --------------- | -------------------- | ------------------------------------ |
-| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:69`           |
+| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:73`           |
 | config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/digest.config.ts:5` |
 
 <!-- readme:generated:end -->

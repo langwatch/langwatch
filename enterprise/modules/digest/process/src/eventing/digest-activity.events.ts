@@ -29,6 +29,8 @@ export const projectActivitySchema = z.object({
   ...envelope,
   projectId: z.string().min(1),
   fact: z.discriminatedUnion("kind", [
+    // Spans are no longer folded (ADR-002), but facts queued or stored under this version before
+    // that still parse; the fold ignores them.
     z.object({
       kind: z.literal("span"),
       root: z.boolean(),
@@ -58,7 +60,7 @@ export const userActivitySchema = z.object({
   userId: z.string().min(1),
   sessionId: z.string().min(1),
   repository: z.string().nullable(),
-  /** One metric series' converged total (replaces, never adds), or none for a span fact. */
+  /** One metric series' converged total (replaces, never adds), or none for a coding-agent span fact. */
   series: z
     .object({
       seriesId: z.string().min(1),
@@ -98,7 +100,7 @@ export const projectWeekKey = ({
 }): string => `project:${projectId}:${isoWeek}`;
 
 /**
- * A person's week within one organization: a member of two enrolled organizations has a fold in
+ * A person's week within one organization: a member of two organizations has a fold in
  * each, read by that organization alone.
  */
 export const userWeekKey = ({

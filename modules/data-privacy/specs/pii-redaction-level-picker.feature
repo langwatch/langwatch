@@ -48,6 +48,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   @integration
   Scenario: Picking Strict writes the organization rule and shows Strict's example
     Given release_pii_redaction_model_enabled is on for "acme"
+    And an organization admin already accepted the model's price
     And an organization rule on "acme" that drops trace input and leaves PII inheriting
     When an admin picks Strict in the organization PII level picker and confirms
     Then the organization rule is saved with PII level strict
@@ -124,6 +125,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   Scenario: With the flag the effective summary names what runs the level
     Given release_pii_redaction_model_enabled is on for "acme"
     And the organization's PII level resolves to Strict
+    And an organization admin accepted the model's price
     When an admin opens the Data Privacy page for project "web-app"
     Then the effective summary reads "Strict · LangWatch PII Redaction Model" for PII redaction
 
@@ -225,6 +227,108 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   @unit
   Scenario: Saving a rule asks for the price only when it turns Strict on at a price
     Then a rule already on Strict, a free organization, a self-hosted deployment and a level other than Strict save without asking
+    And so does a member who cannot accept the price while no organization admin has accepted it
+
+  # On LangWatch Cloud a priced organization reaches the model only once an organization admin
+  # accepted its price on this page (ADR-201 decision 15). An organization on Strict without a
+  # recorded acceptance, including one that confirmed the price before this change, keeps
+  # rule-based detection (Presidio) at no charge until an organization admin accepts again. A
+  # free organization and a self-hosted deployment need no acceptance and see the page as before.
+
+  @integration
+  Scenario: An organization on Strict that never accepted the price sees it is rule-based, at no charge
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Strict
+    And no organization admin accepted the model's price
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the picker says "Organization on Strict (rule-based)"
+    And Strict reads "Currently on rule-based (Presidio), no charge" beside its title
+    And Strict offers "Switch to the PII Redaction Model" under its price
+    And the page says "Switching to the model asks an organization admin to accept its price first."
+    And the page does not say Strict is billed
+    And the effective summary does not say Strict runs the LangWatch PII Redaction Model
+
+  @integration
+  Scenario: Accepting the price from the picker switches the organization to the model
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Strict and no organization admin accepted the price
+    When an admin presses "Switch to the PII Redaction Model"
+    Then a confirmation titled "Switch to the PII Redaction Model?" names the model's price as the Strict card shows it
+    And it says the acceptance covers every Strict rule in the organization and the organization's level does not change
+    And nothing is accepted until the admin presses "Accept and switch"
+    When the admin presses "Accept and switch"
+    Then the organization's acceptance of the price is recorded
+    And the page says Strict is billed from the next trace
+
+  @integration
+  Scenario: An admin accepts the price for a project's Strict rule while the organization is on Essential
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Essential and a project rule sets Strict
+    And no organization admin accepted the model's price
+    When an admin opens the Data Privacy page for project "web-app"
+    Then Strict reads "Currently on rule-based (Presidio), no charge" and offers "Switch to the PII Redaction Model"
+    When the admin presses it and then "Accept and switch" in the "Switch to the PII Redaction Model?" prompt
+    Then the organization's acceptance of the price is recorded and the organization stays on Essential
+    And an organization on custom PII settings is asked the same, with no word on its settings, and keeps them
+
+  @integration
+  Scenario: Picking Strict through the price prompt records the acceptance first
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Essential and no organization admin accepted the price
+    When an admin picks Strict in the organization PII level picker and confirms
+    Then the acceptance is recorded, then the organization rule is saved with PII level strict
+    And an acceptance that fails saves nothing and tells the admin
+
+  @integration
+  Scenario: A member who cannot accept the price is not asked it in the rule drawer
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And no organization admin accepted the model's price
+    And the caller cannot write a rule at the organization scope
+    When the caller sets a project rule's PII redaction to Strict in the drawer
+    Then the drawer says Strict stays rule-based, at no charge, until an organization admin accepts its price
+    And the rule is saved without a price confirmation and nothing is accepted
+
+  @integration
+  Scenario: An admin saving a rule at Strict accepts the price with the confirmation
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And no organization admin accepted the model's price
+    When an admin sets a project rule's PII redaction to Strict in the drawer, saves and confirms the price
+    Then the acceptance is recorded and the rule is saved
+
+  @integration
+  Scenario: The picker waits while an acceptance is on its way
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And no organization admin accepted the model's price
+    When an admin confirms the price, by picking Strict or by the switch, and the acceptance has not come back
+    Then the level radios and the switch cannot be used
+    And they can again once the acceptance and the save it leads to are done
+
+  @integration
+  Scenario: The rule drawer waits while an acceptance is on its way
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And no organization admin accepted the model's price
+    When an admin saves a rule at Strict, confirms the price, and the acceptance has not come back
+    Then the drawer saves nothing else and cannot be closed until the acceptance and the Strict save are done
+    And the organization picker's levels cannot be used meanwhile
+    And a failed acceptance frees the drawer again
+
+  @integration
+  Scenario: An acceptance given on the page holds only for its own organization
+    Given an organization admin accepted the model's price on the page for "acme"
+    When the page shows a project of another organization whose price no admin accepted
+    Then Strict there is still rule-based, with the switch to the model
+    And a price prompt opened for one organization is dismissed when the page shows another, accepting nothing
+    And an acceptance finishing after the move saves its own organization's pick and leaves the shown level alone
+
+  @unit
+  Scenario: Only an organization admin can accept the price
+    Then accepting the PII redaction model's price is declared at organization:manage on the organization it names
+    And the acceptance records the organization and the admin who accepted it
+
+  @unit
+  Scenario: The page's snapshot says whether the organization accepted the price
+    Then the snapshot reads the organization's acceptance of the model's price
+    And a personal project, with no organization, reads as not accepted without asking
 
   @unit
   Scenario: The settings page names the model's own length limit

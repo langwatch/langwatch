@@ -14,7 +14,11 @@ import {
   type UserWeekState,
   userWeekTotals,
 } from "../../rules/digest-week.rules.ts";
-import type { ProjectActivity, UserActivity } from "../digest-activity.events.ts";
+import {
+  type ProjectActivity,
+  projectActivitySchema,
+  type UserActivity,
+} from "../digest-activity.events.ts";
 import { applyProjectActivity, applyUserActivity } from "../digest-week.projection.ts";
 
 const seriesActivity = (seriesId: string): UserActivity => ({
@@ -140,45 +144,37 @@ describe("applyProjectActivity()", () => {
       expect(week.evaluators["evaluator-0"]).toEqual({ runs: 2, passed: 2, failed: 0 });
     });
   });
+});
 
-  describe("when a trace's root span succeeds and its two child spans fail", () => {
-    const spanActivity = ({
-      spanId,
-      root,
-      error,
-    }: {
-      spanId: string;
-      root: boolean;
-      error: boolean;
-    }): ProjectActivity => ({
-      tenantId: "project-1",
-      occurredAt: 0,
+describe("a span fact stored before spans stopped being folded", () => {
+  const stored = {
+    tenantId: "org-1",
+    occurredAt: 0,
+    organizationId: "org-1",
+    isoWeek: "2026-W47",
+    sourceKey: "span-1",
+    projectId: "project-1",
+    fact: {
+      kind: "span",
+      root: true,
+      error: false,
+      tokens: 10,
+      costUsd: 0.1,
+      durationMs: 5,
+      model: "gpt-5",
+    },
+  };
+
+  /** @scenario "Trace spans are never folded" */
+  it("still parses, keeps its ids and counts nothing", () => {
+    const activity: ProjectActivity = projectActivitySchema.parse(stored);
+    const state = emptyProjectWeek();
+
+    expect(applyProjectActivity({ state, activity })).toEqual({
+      ...state,
+      projectId: "project-1",
       organizationId: "org-1",
       isoWeek: "2026-W47",
-      sourceKey: `source-${spanId}`,
-      projectId: "project-1",
-      fact: { kind: "span", root, error, tokens: 10, costUsd: 0.1, durationMs: 80, model: "gpt-5" },
-    });
-    const week = [
-      spanActivity({ spanId: "root", root: true, error: false }),
-      spanActivity({ spanId: "child-1", root: false, error: true }),
-      spanActivity({ spanId: "child-2", root: false, error: true }),
-    ].reduce((state, activity) => applyProjectActivity({ state, activity }), emptyProjectWeek());
-
-    /** @scenario "Trace spans fold into the project's week as they arrive" */
-    it("counts one trace and no error, so the error rate cannot pass 100%", () => {
-      expect(week).toMatchObject({ traces: 1, errors: 0 });
-    });
-
-    /** @scenario "Trace spans fold into the project's week as they arrive" */
-    it("counts the model once per call, three for the trace", () => {
-      expect(week.models).toEqual({ "gpt-5": 3 });
-    });
-
-    /** @scenario "Trace spans fold into the project's week as they arrive" */
-    it("sums every span's tokens and cost", () => {
-      expect(week.tokens).toBe(30);
-      expect(week.costUsd).toBeCloseTo(0.3);
     });
   });
 });

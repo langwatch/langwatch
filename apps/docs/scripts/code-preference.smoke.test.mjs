@@ -4,7 +4,7 @@ import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
 
-import { withPreviewBrowser } from "./browser-fixture.mjs";
+import { copyAndRead, withPreviewBrowser } from "./browser-fixture.mjs";
 
 const { values } = parseArgs({
   options: { "out-dir": { type: "string" }, screenshots: { type: "string" } },
@@ -44,18 +44,13 @@ await it("switches filenames and copied code together and remembers the language
         const frame = groups
           .filter({ has: page.locator("[data-docs-code-title]", { hasText: "chat.ts" }) })
           .first();
-        await frame.getByRole("button", { name: "Copy code", exact: true }).click();
-        await page.waitForFunction(() =>
-          navigator.clipboard.readText().then((text) => text.includes("import { OpenAI }")),
+        const copied = await copyAndRead(
+          page,
+          frame.getByRole("button", { name: "Copy code", exact: true }),
         );
-        assert.match(
-          await page.evaluate(() => navigator.clipboard.readText()),
-          /async function chat/,
-        );
-        assert.doesNotMatch(
-          await page.evaluate(() => navigator.clipboard.readText()),
-          /from openai import/,
-        );
+        assert.match(copied, /import \{ OpenAI \}/);
+        assert.match(copied, /async function chat/);
+        assert.doesNotMatch(copied, /from openai import/);
         await page.reload();
         await page.waitForFunction(
           () =>

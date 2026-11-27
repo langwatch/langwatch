@@ -3,6 +3,7 @@
  */
 import {
   dataPrivacyConfigSchema,
+  namedApiKeyIds,
   resolveDataPrivacy,
   type DataPrivacyPolicy,
   type DataPrivacyRow,
@@ -11,9 +12,16 @@ import {
   type DataPrivacyScopeType,
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
+import { createLogger } from "@langwatch/observability";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
+import type { OrganizationApiKeys } from "../channels/data-privacy.channels.ts";
+import { offerableApiKeys } from "../rules/audience-api-keys.rules.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
+import type { PiiRedactionModelAcceptanceService } from "./pii-redaction-model-acceptance.service.ts";
+
+const logger = createLogger("langwatch:data-privacy:snapshot");
 
 /**
  * The two policy reads the snapshot stands on. Named structurally rather than as
@@ -35,20 +43,35 @@ type ScopeLens = {
   nameOf(scopeType: DataPrivacyScopeType, scopeId: string): string;
 };
 
+type DataPrivacySnapshotDependencies = {
+  policies: DataPrivacySnapshotPolicies;
+  directory: DataPrivacyDirectoryReader;
+  permissions: DataPrivacyPermissionsService;
+  apiKeys: OrganizationApiKeys;
+  acceptance: Pick<PiiRedactionModelAcceptanceService, "isAccepted">;
+  clock?: () => Instant;
+};
+
 export class DataPrivacySnapshotService {
-  static create(options: {
-    policies: DataPrivacySnapshotPolicies;
-    directory: DataPrivacyDirectoryReader;
-    permissions: DataPrivacyPermissionsService;
-  }): DataPrivacySnapshotService {
-    return new DataPrivacySnapshotService(options.policies, options.directory, options.permissions);
+  static create(options: DataPrivacySnapshotDependencies): DataPrivacySnapshotService {
+    return new DataPrivacySnapshotService({ clock: nowInstant, ...options });
   }
 
-  private constructor(
-    private readonly policies: DataPrivacySnapshotPolicies,
-    private readonly directory: DataPrivacyDirectoryReader,
-    private readonly permissions: DataPrivacyPermissionsService,
-  ) {}
+  private readonly policies: DataPrivacySnapshotPolicies;
+  private readonly directory: DataPrivacyDirectoryReader;
+  private readonly permissions: DataPrivacyPermissionsService;
+  private readonly apiKeys: OrganizationApiKeys;
+  private readonly acceptance: DataPrivacySnapshotDependencies["acceptance"];
+  private readonly clock: () => Instant;
+
+  private constructor(options: DataPrivacySnapshotDependencies & { clock: () => Instant }) {
+    this.policies = options.policies;
+    this.directory = options.directory;
+    this.permissions = options.permissions;
+    this.apiKeys = options.apiKeys;
+    this.acceptance = options.acceptance;
+    this.clock = options.clock;
+  }
 
   async getSnapshot(input: { userId: string; projectId: string }): Promise<DataPrivacySnapshot> {
     const { userId, projectId } = input;
@@ -82,10 +105,11 @@ export class DataPrivacySnapshotService {
     organizationName: string | null;
   }): Promise<DataPrivacySnapshot> {
     const { userId, projectId, organizationId, organizationName } = input;
-    const [directory, rows, canManageOrganization] = await Promise.all([
+    const [directory, rows, canManageOrganization, piiRedactionModelAccepted] = await Promise.all([
       this.directory.findOrganizationDirectory({ organizationId }),
       this.policies.listOrganizationRules({ organizationId }),
       this.permissions.canManageOrganization({ userId, organizationId }),
+      this.acceptance.isAccepted({ organizationId }),
     ]);
 
     const [teamManage, projectManage] = await Promise.all([
@@ -108,7 +132,16 @@ export class DataPrivacySnapshotService {
       teamManage,
       projectManage,
     });
+    const available = this.availableScopes({
+      directory,
+      organizationId,
+      organizationName,
+      canManageOrganization,
+      teamManage,
+      projectManage,
+    });
     const allRows = this.parseRows(rows);
+    const rules = this.visibleRules({ rows: allRows, lens });
     const baselines = this.baselineCascades({
       rows: allRows,
       organizationId,
@@ -120,17 +153,53 @@ export class DataPrivacySnapshotService {
       effective: input.effective,
       effectiveTeam: baselines.effectiveTeam,
       effectiveOrganization: baselines.effectiveOrganization,
-      rules: this.visibleRules({ rows: allRows, lens }),
-      available: this.availableScopes({
-        directory,
-        organizationId,
-        organizationName,
-        canManageOrganization,
-        teamManage,
-        projectManage,
-      }),
-      audienceOptions: { groups: [...directory.groups] },
+      rules,
+      available,
+      audienceOptions: {
+        groups: [...directory.groups],
+        ...(await this.offerableKeys({
+          organizationId,
+          available,
+          canManageOrganization,
+          rules,
+        })),
+        canAddApiKeys: canManageOrganization,
+      },
+      piiRedactionModelAccepted,
     };
+  }
+
+  /**
+   * ADR-208: an organization admin, who sees every key on the API keys page, is offered them
+   * all; another editor only the keys the rules they can read already name; others none.
+   */
+  private async offerableKeys(input: {
+    organizationId: string;
+    available: DataPrivacyScopeAvailable;
+    canManageOrganization: boolean;
+    rules: readonly DataPrivacyRule[];
+  }): Promise<{ apiKeys: { id: string; name: string }[]; apiKeysUnavailable?: true }> {
+    const { available } = input;
+    const canEditARule =
+      available.organization !== null ||
+      available.departments.length > 0 ||
+      available.teams.length > 0 ||
+      available.projects.length > 0;
+    if (!canEditARule) return { apiKeys: [] };
+    const named = new Set(input.rules.flatMap((rule) => namedApiKeyIds(rule.config)));
+    if (!input.canManageOrganization && named.size === 0) return { apiKeys: [] };
+    try {
+      const keys = await this.apiKeys.listAll({ organizationId: input.organizationId });
+      const offered = offerableApiKeys({ keys, now: this.clock() });
+      return {
+        apiKeys: input.canManageOrganization ? offered : offered.filter((key) => named.has(key.id)),
+      };
+    } catch (error) {
+      // The page still opens; the picker offers no key until api-key answers again, and never
+      // calls a key the rule names gone meanwhile.
+      logger.warn({ error, organizationId: input.organizationId }, "API keys unavailable");
+      return { apiKeys: [], apiKeysUnavailable: true };
+    }
   }
 
   /** Who may read a scope's rule, and what that scope is called on the page. */
@@ -308,7 +377,9 @@ export class DataPrivacySnapshotService {
             ]
           : [],
       },
-      audienceOptions: { groups: [] },
+      audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
+      // No organization, so nobody can accept the model's price for it.
+      piiRedactionModelAccepted: false,
     };
   }
 }

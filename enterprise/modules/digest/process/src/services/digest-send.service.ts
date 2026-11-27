@@ -5,20 +5,23 @@ import {
   DigestMemberUnsubscribedError,
   DigestNothingToSendError,
   DigestOperatorAddressMissingError,
-  DigestOrganizationNotEnrolledError,
   DigestPublicBaseUrlMissingError,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   MemberNotFoundError,
+  ORGANIZATION_ID_PAGE_LIMIT,
   type OrganizationApi,
   type OrganizationRestMemberSummary,
 } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
-import type { DigestSendRequest } from "../eventing/digest-send.events.ts";
+import type {
+  DigestOrganizationPlanRequest,
+  DigestSendRequest,
+} from "../eventing/digest-send.events.ts";
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import type { DigestSendRepository } from "../repositories/digest-send.repository.ts";
 import {
@@ -29,9 +32,9 @@ import {
   type DigestTemplateProps,
   type OrganizationWeek,
   pickFocusProject,
-  weekVisibleTo,
 } from "../rules/digest-email.rules.ts";
 import {
+  DIGEST_EMAIL_PREFERENCES_PATH,
   DIGEST_UNSUBSCRIBE_PATH,
   type DigestMailRender,
   renderDigestMail,
@@ -41,63 +44,23 @@ import {
   eligibleDigestTemplates,
 } from "../rules/digest-template.rules.ts";
 import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
-import {
-  DigestHomeOrganizationService,
-  type HomeRanking,
-  type Membership,
-} from "./digest-home-organization.service.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
 
 type Member = Readonly<{ userId: string; admin: boolean }>;
 
-const logger = createLogger("langwatch:digest");
+/** A member's standing when their email is sent, which may differ from the plan's. */
+type Membership = Readonly<{ kind: "active"; admin: boolean }> | Readonly<{ kind: "gone" }>;
 
-/**
- * Asks each organization's sends. A person's home organization is decided once here, not by each
- * organization's send, so the sends cannot disagree.
- */
-async function requestSends({
-  rosters,
-  organizationsOf,
-  attempt,
-  rankHome,
-  requestSend,
-  isoWeek,
-  at,
-}: {
-  rosters: ReadonlyMap<string, Member[]>;
-  organizationsOf: ReadonlyMap<string, string[]>;
-  attempt: (organizationId: string, work: () => Promise<void>) => Promise<void>;
-  rankHome: (query: {
-    userId: string;
-    isoWeek: string;
-    candidates: readonly string[];
-  }) => Promise<HomeRanking>;
-  requestSend: (request: DigestSendRequest & { occurredAt: number }) => Promise<void>;
-  isoWeek: string;
-  at: number;
-}): Promise<void> {
-  const homes = new Map<string, string | null>();
-  for (const [organizationId, members] of rosters) {
-    await attempt(organizationId, async () => {
-      for (const member of members) {
-        if (!homes.has(member.userId)) {
-          const candidates = organizationsOf.get(member.userId) ?? [organizationId];
-          const home = await rankHome({ userId: member.userId, isoWeek, candidates });
-          homes.set(member.userId, home.kind === "home" ? home.organizationId : null);
-        }
-        await requestSend({
-          userId: member.userId,
-          organizationId,
-          isoWeek,
-          homeOrganizationId: homes.get(member.userId) ?? null,
-          occurredAt: at,
-        });
-      }
-    });
+/** A plan that left some asks unmade, thrown after the walk so the outbox retries it. */
+class DigestPlanIncompleteError extends Error {
+  constructor(detail: { isoWeek: string; organizationId?: string; failed: number }) {
+    super(`the digest plan left ${detail.failed} ask(s) unmade: ${JSON.stringify(detail)}`);
+    this.name = "DigestPlanIncompleteError";
   }
 }
+
+const logger = createLogger("langwatch:digest");
 
 const MEMBER_PAGE = 500;
 
@@ -116,9 +79,14 @@ type Deps = Readonly<{
       userId: string;
     }): Promise<Pick<OrganizationRestMemberSummary, "role" | "disabledAt">>;
     findProvisioningSummary: OrganizationApi["findProvisioningSummary"];
+    /** Organization ids a page at a time, the install's hidden system one left out. */
+    listAllIds: OrganizationApi["listAllIds"];
   }>;
   /** A project's name, and each project's team, which is what its access is decided on. */
-  projects: Pick<ProjectApi, "findSummaryById" | "listNamesByIds">;
+  projects: Pick<
+    ProjectApi,
+    "findSummaryById" | "listNamesByIds" | "findLiveNonGovernanceIdsByOrganization"
+  >;
   /** Which of the week's projects a member may view; the email shows no other. */
   access: Pick<AuthzApi, "canBatchByIds">;
   /** The address an email goes to, read when it is sent and never stored. */
@@ -130,6 +98,9 @@ type Deps = Readonly<{
   /** The deployment's public origin; absent, a send refuses by name, since no link could work. */
   publicBaseUrl: string | undefined;
   requestSend: (request: DigestSendRequest & { occurredAt: number }) => Promise<void>;
+  requestOrganizationPlan: (
+    request: DigestOrganizationPlanRequest & { occurredAt: number },
+  ) => Promise<void>;
   now: () => number;
 }>;
 
@@ -137,11 +108,14 @@ type Deps = Readonly<{
 type Composed = Readonly<{
   template: DigestTemplateProps;
   oneClick: string;
+  /** What the subject names, so a person's emails from different organizations differ. */
+  organizationName: string | null;
 }>;
 
 /**
- * The weekly send. A plan asks one send per enrolled member; each send picks the member's
- * template, renders it through `@langwatch/mail` and sends it through our own mailer
+ * The weekly send, on for every organization. A plan asks one send per member of each
+ * organization, so a person in three gets three emails, each about that organization's week and
+ * naming it; each send picks the member's template for that organization, renders it through `@langwatch/mail` and sends it through our own mailer
  * (`NotificationApi.sendEmail`), with a one-click unsubscribe the digest's own route honours.
  */
 export class DigestSendService {
@@ -149,19 +123,12 @@ export class DigestSendService {
     return new DigestSendService(deps);
   }
 
-  readonly #home: DigestHomeOrganizationService;
-
-  private constructor(private readonly deps: Deps) {
-    this.#home = DigestHomeOrganizationService.create({
-      weeks: deps.weeks,
-      membership: (input) => this.#membership(input),
-      visibleWeek: (input) => this.#visibleWeek(input),
-    });
-  }
+  private constructor(private readonly deps: Deps) {}
 
   /**
    * The hourly wake's plan, after the week service's sweep: for the week the slot may send, armed
-   * and not yet planned, ask the sends.
+   * and not yet planned, ask one plan per organization, a page of ids at a time. Each plan is its
+   * own intent, so the walk here is short and one organization failing holds up no other.
    */
   async planWeek({ isoWeek, at }: { isoWeek: string; at: number }): Promise<void> {
     // Only the week the plan's own slot may send: before Monday 08:00 that is none (ADR-001).
@@ -170,71 +137,72 @@ export class DigestSendService {
     const settings = await this.deps.audience.getSettings();
     if (!settings.armed) return;
     if (settings.lastPlannedWeek !== null && settings.lastPlannedWeek >= isoWeek) return;
-    const enrolled = await this.deps.audience.findEnrolled();
-    if (enrolled.length === 0) return;
+    let after: string | undefined;
     let failed = 0;
-    // One organization failing (a deleted one, say) must not keep the rest from being asked.
-    const attempt = async (organizationId: string, work: () => Promise<void>) => {
-      try {
-        await work();
-      } catch (error) {
-        failed += 1;
-        logger.error(
-          { error, organizationId, isoWeek },
-          "the digest could not plan an organization",
-        );
-      }
-    };
-    const rosters = new Map<string, Member[]>();
-    for (const organizationId of enrolled) {
-      await attempt(organizationId, async () => {
-        rosters.set(organizationId, await this.members({ organizationId }));
+    do {
+      const page = await this.deps.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
       });
-    }
-    const organizationsOf = new Map<string, string[]>();
-    for (const [organizationId, members] of rosters) {
-      for (const { userId } of members) {
-        organizationsOf.set(userId, [...(organizationsOf.get(userId) ?? []), organizationId]);
+      for (const organizationId of page.ids) {
+        // One organization failing must not keep the rest from being asked.
+        try {
+          await this.deps.requestOrganizationPlan({ organizationId, isoWeek, occurredAt: at });
+        } catch (error) {
+          failed += 1;
+          logger.error({ error, organizationId, isoWeek }, "the digest could not ask a plan");
+        }
       }
-    }
-    // Decided once here, not by each organization's send, so the sends cannot disagree.
-    await requestSends({
-      rosters,
-      organizationsOf,
-      attempt,
-      rankHome: (query) => this.#home.rankHome(query),
-      requestSend: this.deps.requestSend,
-      isoWeek,
-      at,
-    });
-    // Left unplanned so the next wake tries the failed ones again; a request is keyed by
-    // organization, person and week, so the organizations that went through are not asked twice.
-    if (failed === 0) await this.deps.audience.markPlanned({ isoWeek });
+      after = page.next ?? undefined;
+    } while (after !== undefined);
+    // Thrown once the walk is done so the intent retries; a request is keyed by organization and
+    // week, so the retry asks nothing twice, and the week is marked planned only when all went.
+    if (failed > 0) throw new DigestPlanIncompleteError({ isoWeek, failed });
+    await this.deps.audience.markPlanned({ isoWeek });
   }
 
   /**
-   * One member's week, sent at most once: only the claimer sends. Role and visible projects are
+   * One organization's plan: a send asked for each member. A failure is retried by the outbox,
+   * and a member already asked is not asked twice, so only this organization is walked again.
+   */
+  async planOrganization({
+    organizationId,
+    isoWeek,
+  }: {
+    organizationId: string;
+    isoWeek: string;
+  }): Promise<void> {
+    const occurredAt = this.deps.now();
+    let failed = 0;
+    for (const { userId } of await this.members({ organizationId })) {
+      // One member failing must not keep the rest from being asked; the retry skips those asked.
+      try {
+        await this.deps.requestSend({ userId, organizationId, isoWeek, occurredAt });
+      } catch (error) {
+        failed += 1;
+        logger.error({ error, organizationId, userId, isoWeek }, "the digest could not ask a send");
+      }
+    }
+    if (failed > 0) throw new DigestPlanIncompleteError({ isoWeek, organizationId, failed });
+  }
+
+  /**
+   * One member's week in one organization, sent at most once: only the claimer sends. Role and visible projects are
    * read now, not from the plan; the email is rendered before the claim, so one that cannot be
    * rendered claims nothing and is retried.
    */
-  async sendDigest({
-    userId,
-    organizationId,
-    isoWeek,
-    homeOrganizationId,
-  }: DigestSendRequest): Promise<void> {
-    const [settings, enrolled, unsubscribed, sent] = await Promise.all([
+  async sendDigest({ userId, organizationId, isoWeek }: DigestSendRequest): Promise<void> {
+    const sendKey = { userId, organizationId, isoWeek };
+    const [settings, unsubscribed, sent] = await Promise.all([
       this.deps.audience.getSettings(),
-      this.deps.audience.findEnrolled(),
       this.deps.audience.findUnsubscribed({ userIds: [userId] }),
-      this.deps.sends.isSent({ userId, isoWeek }),
+      this.deps.sends.isSent(sendKey),
     ]);
     // A skipped send is otherwise silent: the reason is the only trace of why no email went out.
     // Never the address: logs outlive the email.
     const skip = (reason: string) =>
       logger.info({ reason, userId, organizationId, isoWeek }, "the digest skipped a send");
     if (!settings.armed) return skip("digest is not armed");
-    if (!enrolled.includes(organizationId)) return skip("organization is not enrolled");
     if (unsubscribed.length > 0) return skip("member opted out");
     if (sent) return skip("week already sent to this member");
     const membership = await this.#membership({ organizationId, userId });
@@ -242,16 +210,11 @@ export class DigestSendService {
     const user = await this.deps.users.findById({ id: userId });
     if (!user?.email) return skip("member has no email address");
     if (user.deactivatedAt !== null) return skip("member is deactivated");
-    const choice = { organizationId, userId, isoWeek, enrolled, homeOrganizationId };
-    if (!(await this.#home.isHomeOrganization(choice))) return skip("another organization is home");
-    const week = await this.#visibleWeek({
-      week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
-      userId,
-    });
+    const week = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
       week,
       member: { userId, admin: membership.admin },
-      recipient: { userId, sendId: digestSendKey({ userId, isoWeek }) },
+      recipient: { userId, sendId: digestSendKey(sendKey) },
     });
     if (!composed) return skip("no template has anything to show");
     // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
@@ -261,7 +224,8 @@ export class DigestSendService {
         ...composed.template,
         to: user.email,
         oneClickUnsubscribeUrl: composed.oneClick,
-        idempotencyKey: digestMessageId({ userId, isoWeek }),
+        organizationName: composed.organizationName,
+        idempotencyKey: digestMessageId(sendKey),
         test: false,
       },
       renderer: this.deps.renderer,
@@ -269,9 +233,7 @@ export class DigestSendService {
     // Claimed before the mailer is called, since SMTP does not dedupe a retry: a failure past
     // the claim loses this week's email rather than risk sending it twice (ADR-001).
     const claimed = await this.deps.sends.claim({
-      userId,
-      organizationId,
-      isoWeek,
+      ...sendKey,
       templateId: composed.template.templateId,
       sentAt: this.deps.now(),
     });
@@ -280,9 +242,9 @@ export class DigestSendService {
   }
 
   /**
-   * A member's last week, mailed to the operator alone, its unsubscribe link naming the operator;
-   * no send is recorded. It respects enrolment and opt-out like the weekly send, but not arming,
-   * so a test can come first.
+   * A member's last week in one organization, mailed to the operator alone, its signed unsubscribe
+   * header naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
+   * arming, so a test can come first.
    */
   async sendTest({
     organizationId,
@@ -293,9 +255,6 @@ export class DigestSendService {
     userId: string;
     operatorId: string;
   }): Promise<void> {
-    if (!(await this.deps.audience.findEnrolled()).includes(organizationId)) {
-      throw new DigestOrganizationNotEnrolledError(organizationId);
-    }
     const membership = await this.#membership({ organizationId, userId });
     if (membership.kind === "gone") throw new DigestMemberNotFoundError(userId);
     const member = { userId, admin: membership.admin };
@@ -306,10 +265,7 @@ export class DigestSendService {
     if (!operator?.email) throw new DigestOperatorAddressMissingError();
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
-    const week = await this.#visibleWeek({
-      week: await this.deps.weeks.organizationWeek({ organizationId, isoWeek }),
-      userId,
-    });
+    const week = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
       week,
       member,
@@ -322,6 +278,7 @@ export class DigestSendService {
           ...composed.template,
           to: operator.email,
           oneClickUnsubscribeUrl: composed.oneClick,
+          organizationName: composed.organizationName,
           test: true,
         },
         renderer: this.deps.renderer,
@@ -367,27 +324,49 @@ export class DigestSendService {
     }
   }
 
-  /** The week as the member may see it: only the projects they hold `project:view` on. */
-  async #visibleWeek({
-    week,
+  /**
+   * The member's week: only the live projects they may see are asked of, so analytics is never
+   * read for one they may not. Archived and governance projects are never theirs to see here, and
+   * a personal workspace is its owner's alone, whatever an admin's role could otherwise view.
+   */
+  async #weekOf({
+    organizationId,
+    isoWeek,
     userId,
   }: {
-    week: OrganizationWeek;
+    organizationId: string;
+    isoWeek: string;
     userId: string;
   }): Promise<OrganizationWeek> {
-    if (week.projects.length === 0) return week;
-    const identities = await this.deps.projects.listNamesByIds({
-      projectIds: week.projects.map(({ projectId }) => projectId),
+    const projectIds = await this.#visibleProjectIds({ organizationId, userId });
+    return this.deps.weeks.organizationWeek({ organizationId, isoWeek, projectIds });
+  }
+
+  async #visibleProjectIds({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const liveIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
+      organizationId,
     });
+    if (liveIds.length === 0) return [];
+    const identities = (await this.deps.projects.listNamesByIds({ projectIds: liveIds })).filter(
+      ({ isPersonal, ownerUserId, kind }) =>
+        // An aggregate reads its members' traces, which analytics refuses without a caller's proof.
+        !isAggregateProjectKind(kind) && (!isPersonal || ownerUserId === userId),
+    );
+    if (identities.length === 0) return [];
     const decided = await this.deps.access.canBatchByIds({
       principal: { type: "user", id: userId },
       permission: "project:view",
-      organizationId: week.organizationId,
+      organizationId,
       teams: [...new Set(identities.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
       projects: identities.map(({ id, teamId }) => ({ projectId: id, teamId })),
     });
-    const visible = identities.filter(({ id }) => decided.projects.get(id) === true);
-    return weekVisibleTo({ week, visibleProjectIds: new Set(visible.map(({ id }) => id)) });
+    return identities.filter(({ id }) => decided.projects.get(id) === true).map(({ id }) => id);
   }
 
   /** The member's pick and its props, with an unsubscribe signed for whoever receives it. */
@@ -401,9 +380,13 @@ export class DigestSendService {
     recipient: Readonly<{ userId: string; sendId: string }>;
   }): Promise<Composed | null> {
     const baseUrl = this.#baseUrl();
-    const unsubscribeUrl = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
+    const organizationName =
+      (await this.deps.organizations.findProvisioningSummary(week.organizationId))?.name ?? null;
+    // The footer opens the person's email preferences; the signed link is only the one-click header.
+    const oneClickUrl = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
       this.deps.unsubscribes.token(recipient),
     )}`;
+    const preferencesUrl = `${baseUrl}${DIGEST_EMAIL_PREFERENCES_PATH}`;
     // The first eligible template whose props build: one that cannot (a name not found) must
     // not cost the member the email a lower-ranked template could send.
     for (const pick of eligibleDigestTemplates(digestTemplateInput({ week, ...member }))) {
@@ -411,24 +394,27 @@ export class DigestSendService {
         pick,
         week,
         userId: member.userId,
-        names: await this.#names({ week, pick }),
+        names: await this.#names({ week, pick, organizationName }),
         baseUrl,
-        unsubscribeUrl,
+        preferencesUrl,
         now: this.deps.now(),
       });
-      if (template) return { template, oneClick: unsubscribeUrl };
+      if (template) return { template, oneClick: oneClickUrl, organizationName };
     }
     return null;
   }
 
   /** Only the names the picked template shows are read. */
-  async #names({ week, pick }: { week: OrganizationWeek; pick: DigestTemplatePick }) {
-    if (pick.template === "digest-plan-pressure") {
-      const organization = await this.deps.organizations.findProvisioningSummary(
-        week.organizationId,
-      );
-      return { organizationName: organization?.name ?? null, project: null };
-    }
+  async #names({
+    week,
+    pick,
+    organizationName,
+  }: {
+    week: OrganizationWeek;
+    pick: DigestTemplatePick;
+    organizationName: string | null;
+  }) {
+    if (pick.template === "digest-plan-pressure") return { organizationName, project: null };
     const focus = pickFocusProject(week);
     const showsProject =
       pick.template === "digest-scenarios-trend" || pick.template === "digest-traces-week";

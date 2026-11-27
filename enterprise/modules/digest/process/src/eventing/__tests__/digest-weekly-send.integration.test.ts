@@ -35,8 +35,6 @@ import {
 } from "./digest.fixture.ts";
 
 const MEMBERS = [ADMIN, MEMBER, OTHER_MEMBER];
-/** Past how long a process may keep its view of the enrolled cohort. */
-const COHORT_REFRESH_MS = 61 * 1000;
 /** An instant inside the sent week. */
 const IN_SENT_WEEK = Date.parse("2026-11-11T12:00:00Z");
 /** An hour of the Monday the sent week's email goes out, 2026-W47's first day. */
@@ -55,12 +53,6 @@ afterEach(async () => {
   await digest.close();
 });
 
-const enrol = () =>
-  digest.repositories.audience.setEnrolled({
-    organizationId: ORGANIZATION,
-    enrolled: true,
-    by: "operator-1",
-  });
 const arm = () => digest.repositories.audience.setArmed({ armed: true });
 
 /**
@@ -81,7 +73,7 @@ function tokenOf(oneClickUrl: string): string {
 
 /** One member's send for a week, carried out as the outbox would. */
 const sendFor = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
-  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek, homeOrganizationId: null });
+  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek });
 
 /** Each send carried out in turn, as the outbox would. */
 async function carryOutAll(payloads: readonly unknown[]): Promise<void> {
@@ -117,8 +109,7 @@ async function planAndCollect({
 describe("the weekly digest send", () => {
   describe("when the send is not armed", () => {
     /** @scenario "Nothing is sent while the send is disarmed" */
-    it("plans nothing and mails no one, even for an enrolled organization", async () => {
-      await enrol();
+    it("plans nothing and mails no one, even for an organization with members", async () => {
       everyoneNearTheLimit();
 
       await digest.plan();
@@ -133,28 +124,27 @@ describe("the weekly digest send", () => {
     });
   });
 
-  describe("when the send is armed but no organization is enrolled", () => {
-    /** @scenario "Nothing is sent while no organization is enrolled" */
-    it("mails no one", async () => {
+  describe("when the send is armed and an organization was never enrolled", () => {
+    /** @scenario "An organization that was never enrolled is sent to" */
+    it("mails its members all the same: there is no enrolment to ask for", async () => {
       await arm();
       everyoneNearTheLimit();
 
       await digest.plan();
+      await sendPlanned();
 
-      expect(await sendPlanned()).toBe(0);
-      expect(digest.mail).toEqual([]);
-      expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBeNull();
+      expect(recipients()).toEqual(MEMBERS.map(emailOf).toSorted());
+      expect((await digest.repositories.audience.getSettings()).lastPlannedWeek).toBe(SENT_WEEK);
     });
   });
 
-  describe("when the send is armed and an organization with three members is enrolled", () => {
+  describe("when the send is armed and an organization has three members", () => {
     beforeEach(async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
     });
 
-    /** @scenario "Each enrolled member gets one email a week" */
+    /** @scenario "Each member gets one email a week" */
     it("mails each member once, however often the wake and the sends run", async () => {
       const planned = await planAndCollect({ expected: 3 });
       await carryOutAll(planned);
@@ -167,18 +157,28 @@ describe("the weekly digest send", () => {
         const mail = digest.mail.find((sent) => sent.to === emailOf(userId));
         expect(mail).toMatchObject({
           templateId: "digest-plan-pressure",
-          idempotencyKey: `digest:${userId}:${SENT_WEEK}`,
+          idempotencyKey: `digest:${userId}:${ORGANIZATION}:${SENT_WEEK}`,
           test: false,
-          email: { to: emailOf(userId), idempotencyKey: `digest:${userId}:${SENT_WEEK}` },
+          email: {
+            to: emailOf(userId),
+            idempotencyKey: `digest:${userId}:${ORGANIZATION}:${SENT_WEEK}`,
+          },
         });
         expect(mail?.email.subject).not.toBe("");
         expect(mail?.email.html).not.toBe("");
-        expect(await digest.repositories.sends.isSent({ userId, isoWeek: SENT_WEEK })).toBe(true);
+        expect(
+          await digest.repositories.sends.isSent({
+            userId,
+            organizationId: ORGANIZATION,
+            isoWeek: SENT_WEEK,
+          }),
+        ).toBe(true);
       }
     });
 
-    /** @scenario "Each enrolled member gets one email a week" */
-    it("gives every email an RFC 8058 one-click unsubscribe, the same address its footer opens", async () => {
+    /** @scenario "Each member gets one email a week" */
+    /** @scenario "The email's footer link opens the person's email preferences" */
+    it("gives every email an RFC 8058 one-click unsubscribe, and a footer link to the email preferences page", async () => {
       await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(digest.mail).toHaveLength(3);
@@ -186,14 +186,14 @@ describe("the weekly digest send", () => {
         expect(mail.oneClickUnsubscribeUrl).toMatch(
           new RegExp(`^${BASE_URL}/api/digest/unsubscribe\\?token=.+`),
         );
-        expect(mail.props.unsubscribeUrl).toBe(mail.oneClickUnsubscribeUrl);
+        expect(mail.props.preferencesUrl).toBe(`${BASE_URL}/settings/profile#email-preferences`);
         expect(mail.email.unsubscribe).toEqual({ url: mail.oneClickUnsubscribeUrl });
       }
     });
   });
 
-  describe("when an enrolled organization has more members than one page of its roster", () => {
-    /** @scenario "Each enrolled member gets one email a week" */
+  describe("when an organization has more members than one page of its roster", () => {
+    /** @scenario "Each member gets one email a week" */
     it("reads every page and stops after the short last one", async () => {
       // One past the 500-member page: the second page holds a single member.
       digest.world.members = Array.from({ length: 501 }, (_, index) => ({
@@ -211,7 +211,6 @@ describe("the weekly digest send", () => {
 
   describe("when the send is armed early on Monday, before 08:00 UTC", () => {
     beforeEach(async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
     });
@@ -234,7 +233,7 @@ describe("the weekly digest send", () => {
 
       const keys = digest.mail.map((mail) => mail.idempotencyKey ?? "");
       expect(keys.toSorted((left, right) => left.localeCompare(right))).toEqual(
-        MEMBERS.map((userId) => `digest:${userId}:${SENT_WEEK}`).toSorted(),
+        MEMBERS.map((userId) => `digest:${userId}:${ORGANIZATION}:${SENT_WEEK}`).toSorted(),
       );
     });
 
@@ -251,7 +250,6 @@ describe("the weekly digest send", () => {
   describe("when the mailer fails after it accepted a member's email", () => {
     /** @scenario "A send retried after the mailer failed is not sent twice" */
     it("does not hand the email over again when the outbox retries", async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
       digest.mailChannel.failAfterAccepting();
@@ -259,9 +257,13 @@ describe("the weekly digest send", () => {
       await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow(
         "the connection closed after the mailer accepted the email",
       );
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        true,
-      );
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(true);
       await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
 
       expect(recipients()).toEqual([emailOf(MEMBER)]);
@@ -270,7 +272,6 @@ describe("the weekly digest send", () => {
 
   describe("when a member's email cannot be rendered", () => {
     beforeEach(async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
     });
@@ -283,18 +284,26 @@ describe("the weekly digest send", () => {
       await expect(sendFor({ userId: MEMBER, isoWeek: SENT_WEEK })).rejects.toThrow(/Invalid URL/);
 
       expect(digest.mail).toEqual([]);
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        false,
-      );
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(false);
 
       digest.world.publicBaseUrl = BASE_URL;
       await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
       await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
 
       expect(recipients()).toEqual([emailOf(MEMBER)]);
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        true,
-      );
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(true);
     });
 
     /** @scenario "A send without a public base URL is refused by name" */
@@ -307,16 +316,19 @@ describe("the weekly digest send", () => {
       });
 
       expect(digest.mail).toEqual([]);
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        false,
-      );
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(false);
     });
   });
 
   describe("when two attempts at one member's week run at once", () => {
     /** @scenario "A send retried after the mailer failed is not sent twice" */
     it("lets only the attempt that claimed the week send it", async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
 
@@ -332,7 +344,6 @@ describe("the weekly digest send", () => {
   describe("when a member opted out of the digest", () => {
     /** @scenario "An unsubscribed member is skipped" */
     it("mails everyone but them", async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
       await digest.repositories.audience.unsubscribe({
@@ -347,29 +358,9 @@ describe("the weekly digest send", () => {
     });
   });
 
-  describe("when the organization is unenrolled after its sends are planned", () => {
-    /** @scenario "A member of an organization unenrolled after planning is skipped" */
-    it("mails none of its members", async () => {
-      await enrol();
-      await arm();
-      everyoneNearTheLimit();
-      const planned = await planAndCollect({ expected: 3 });
-
-      await digest.repositories.audience.setEnrolled({
-        organizationId: ORGANIZATION,
-        enrolled: false,
-        by: "operator-1",
-      });
-      await carryOutAll(planned);
-
-      expect(digest.mail).toEqual([]);
-    });
-  });
-
   describe("when the send is disarmed after its sends are planned", () => {
     /** @scenario "Disarming after the week is planned sends nothing more" */
     it("mails no one", async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
       const planned = await planAndCollect({ expected: 3 });
@@ -384,7 +375,6 @@ describe("the weekly digest send", () => {
   describe("when the organization is at 90% of its monthly limit", () => {
     /** @scenario "An organization admin near the plan limit is sent the plan's numbers" */
     it("mails its admin plan-pressure with the plan's numbers, and not its members", async () => {
-      await enrol();
       await arm();
       digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
 
@@ -401,7 +391,6 @@ describe("the weekly digest send", () => {
   describe("when a member had five coding-agent sessions in two repositories", () => {
     /** @scenario "A member with coding-agent sessions is sent their coding-agent week" */
     it("mails them coding-agent-week with their totals and busiest repository", async () => {
-      await enrol();
       await arm();
       const repositories = ["acme/api", "acme/web", "acme/api", "acme/web", "acme/api"];
       for (const [index, repository] of repositories.entries()) {
@@ -431,7 +420,7 @@ describe("the weekly digest send", () => {
       expect(mail?.templateId).toBe("digest-coding-agent-week");
       expect(mail?.props).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: mail?.oneClickUnsubscribeUrl,
+        preferencesUrl: `${BASE_URL}/settings/profile#email-preferences`,
         sessions: 5,
         tokens: 1_200,
         costUsd: 2.5,
@@ -448,22 +437,24 @@ describe("the weekly digest send", () => {
   describe("when a member's pick is the what's new fallback", () => {
     /** @scenario "A member whose pick has nothing to show this week is sent nothing" */
     it("mails them nothing and records no send, since no card is published", async () => {
-      await enrol();
       await arm();
 
       await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(digest.mail).toEqual([]);
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        false,
-      );
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(false);
     });
   });
 
   describe("when a member has no address", () => {
     /** @scenario "A member with no email address is skipped" */
     it("mails them nothing", async () => {
-      await enrol();
       await arm();
       everyoneNearTheLimit();
       digest.world.users = [ADMIN, OTHER_MEMBER];
@@ -477,7 +468,6 @@ describe("the weekly digest send", () => {
 
 describe("unsubscribing from the digest", () => {
   async function sentEmailOf(userId: string) {
-    await enrol();
     await arm();
     everyoneNearTheLimit();
     await sendFor({ userId, isoWeek: SENT_WEEK });
@@ -496,7 +486,7 @@ describe("unsubscribing from the digest", () => {
 
       expect(await digest.unsubscribes.isSubscribed({ token, callerAddress: CALLER })).toBe(false);
       expect(digest.repositories.audience.unsubscribeSources().get(MEMBER)).toBe(
-        `${MEMBER}:${SENT_WEEK}`,
+        `${MEMBER}:${ORGANIZATION}:${SENT_WEEK}`,
       );
       await sendFor({ userId: MEMBER, isoWeek: "2026-W47" });
       expect(digest.mail).toHaveLength(1);
@@ -596,8 +586,8 @@ describe("unsubscribing from the digest", () => {
 
       expect(await digest.unsubscribes.isSubscribed({ token, callerAddress: CALLER })).toBe(true);
       expect(digest.mail.map((mail) => mail.idempotencyKey)).toEqual([
-        `digest:${MEMBER}:${SENT_WEEK}`,
-        `digest:${MEMBER}:2026-W47`,
+        `digest:${MEMBER}:${ORGANIZATION}:${SENT_WEEK}`,
+        `digest:${MEMBER}:${ORGANIZATION}:2026-W47`,
       ]);
     });
   });
@@ -701,7 +691,6 @@ describe("when no signing secret is configured", () => {
 
   /** @scenario "Without a signing secret no link is signed or honoured" */
   it("sends no member their week, and records no send", async () => {
-    await enrol();
     await arm();
     everyoneNearTheLimit();
 
@@ -710,9 +699,13 @@ describe("when no signing secret is configured", () => {
     });
 
     expect(digest.mail).toEqual([]);
-    expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-      false,
-    );
+    expect(
+      await digest.repositories.sends.isSent({
+        userId: MEMBER,
+        organizationId: ORGANIZATION,
+        isoWeek: SENT_WEEK,
+      }),
+    ).toBe(false);
   });
 
   /** @scenario "Without a signing secret no link is signed or honoured" */
@@ -736,8 +729,6 @@ describe("when no signing secret is configured", () => {
 
 describe("an operator's test send", () => {
   describe("when an operator asks for a member's email", () => {
-    beforeEach(() => enrol());
-
     /** @scenario "Sending a test goes only to the operator" */
     it("mails the operator alone, marked as a test, and records no send", async () => {
       everyoneNearTheLimit();
@@ -752,9 +743,13 @@ describe("an operator's test send", () => {
         test: true,
       });
       expect(mail?.idempotencyKey).toBeUndefined();
-      expect(await digest.repositories.sends.isSent({ userId: MEMBER, isoWeek: SENT_WEEK })).toBe(
-        false,
-      );
+      expect(
+        await digest.repositories.sends.isSent({
+          userId: MEMBER,
+          organizationId: ORGANIZATION,
+          isoWeek: SENT_WEEK,
+        }),
+      ).toBe(false);
     });
 
     /** @scenario "A test email's unsubscribe link names the operator, not the member" */
@@ -774,7 +769,6 @@ describe("an operator's test send", () => {
   describe("when the member's pick has nothing to show", () => {
     /** @scenario "A test send of a member whose pick has nothing to show is refused" */
     it("is refused as nothing to send and mails no one", async () => {
-      await enrol();
       await expect(
         digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR }),
       ).rejects.toMatchObject({ code: "digest_nothing_to_send" });
@@ -785,7 +779,6 @@ describe("an operator's test send", () => {
   describe("when the person asked for is not a member", () => {
     /** @scenario "A test send of someone who is not a member is refused" */
     it("is refused as not found and mails no one", async () => {
-      await enrol();
       await expect(
         digest.sendTest({ organizationId: ORGANIZATION, userId: "stranger", operatorId: OPERATOR }),
       ).rejects.toMatchObject({ code: "digest_member_not_found" });
@@ -796,7 +789,6 @@ describe("an operator's test send", () => {
   describe("when the operator has no address to send to", () => {
     /** @scenario "A test send to an operator with no email address is refused" */
     it("is refused as an operator without an address and mails no one", async () => {
-      await enrol();
       everyoneNearTheLimit();
 
       await expect(
@@ -806,26 +798,13 @@ describe("an operator's test send", () => {
     });
   });
 
-  describe("when the organization is not enrolled", () => {
-    /** @scenario "A test send respects enrolment" */
-    it("is refused as not enrolled and mails no one", async () => {
-      everyoneNearTheLimit();
-
-      await expect(
-        digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR }),
-      ).rejects.toMatchObject({ code: "digest_organization_not_enrolled", httpStatus: 409 });
-      expect(digest.mail).toEqual([]);
-    });
-  });
-
   describe("when the member opted out", () => {
     /** @scenario "A test send respects a member's opt-out" */
     it("is refused as opted out and mails no one", async () => {
-      await enrol();
       everyoneNearTheLimit();
       await digest.repositories.audience.unsubscribe({
         userId: MEMBER,
-        sendId: `${MEMBER}:${SENT_WEEK}`,
+        sendId: `${MEMBER}:${ORGANIZATION}:${SENT_WEEK}`,
         at: WAKE_AT,
       });
 
@@ -841,7 +820,6 @@ describe("the digest fold", () => {
   describe("when the same evaluation completed event is delivered twice", () => {
     /** @scenario "A redelivered event is not counted twice" */
     it("counts the evaluation once in the project's week", async () => {
-      await enrol();
       const evaluation = (evaluationId: string) => ({
         tenantId: PROJECT,
         projectId: PROJECT,
@@ -865,9 +843,9 @@ describe("the digest fold", () => {
     });
   });
 
-  describe("when a project's organization is not enrolled", () => {
-    /** @scenario "A project of an organization not enrolled folds nothing" */
-    it("folds nothing for it until it is", async () => {
+  describe("when a project's organization was never enrolled", () => {
+    /** @scenario "A project of an organization that was never enrolled folds" */
+    it("folds it, since every organization is in", async () => {
       await digest.evaluationCompleted({
         tenantId: PROJECT,
         projectId: PROJECT,
@@ -875,8 +853,23 @@ describe("the digest fold", () => {
         evaluationId: "evaluation-1",
         passed: true,
       });
-      await enrol();
-      digest.world.clockOffsetMs = COHORT_REFRESH_MS;
+
+      await vi.waitFor(async () => {
+        expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.evaluators.custom?.runs).toBe(1);
+      });
+    });
+  });
+
+  describe("when a project belongs to no organization", () => {
+    /** @scenario "A project that belongs to no organization folds nothing" */
+    it("folds nothing for it", async () => {
+      await digest.evaluationCompleted({
+        tenantId: "project-orphan",
+        projectId: "project-orphan",
+        occurredAt: IN_SENT_WEEK,
+        evaluationId: "evaluation-1",
+        passed: true,
+      });
       await digest.evaluationCompleted({
         tenantId: PROJECT,
         projectId: PROJECT,
@@ -888,6 +881,14 @@ describe("the digest fold", () => {
       await vi.waitFor(async () => {
         expect((await digest.projectWeek({ isoWeek: SENT_WEEK }))?.evaluators.custom?.runs).toBe(1);
       });
+      expect(
+        (
+          await digest.repositories.projectWeeks.findWeeks({
+            isoWeeks: [SENT_WEEK],
+            organizationId: ORGANIZATION,
+          })
+        ).map((fold) => fold.projectId),
+      ).toEqual([PROJECT]);
     });
   });
 
@@ -897,7 +898,7 @@ describe("the digest fold", () => {
       const weeks = ["2026-W41", "2026-W42", "2026-W43", "2026-W44", "2026-W45", "2026-W46"];
       const current = isoWeekOf(WAKE_AT);
       for (const [index, isoWeek] of [...weeks, current].entries()) {
-        await digest.recordProject(spanIn({ isoWeek, sourceKey: `span-${index}` }));
+        await digest.recordProject(scenarioIn({ isoWeek, sourceKey: `span-${index}` }));
       }
       await vi.waitFor(async () => {
         const kept = await digest.repositories.projectWeeks.findWeeks({
@@ -948,18 +949,8 @@ function codingAgentFact({
   });
 }
 
-/** One root span on the project's week, through digest's own record command. */
-function spanIn({
-  isoWeek,
-  sourceKey,
-  error = false,
-  model = null,
-}: {
-  isoWeek: string;
-  sourceKey: string;
-  error?: boolean;
-  model?: string | null;
-}) {
+/** One passed scenario run on the project's week, through digest's own record command. */
+function scenarioIn({ isoWeek, sourceKey }: { isoWeek: string; sourceKey: string }) {
   return {
     tenantId: PROJECT,
     occurredAt: IN_SENT_WEEK,
@@ -967,14 +958,6 @@ function spanIn({
     organizationId: ORGANIZATION,
     isoWeek,
     sourceKey,
-    fact: {
-      kind: "span" as const,
-      root: true,
-      error,
-      tokens: 15,
-      costUsd: 0.5,
-      durationMs: 80,
-      model,
-    },
+    fact: { kind: "scenario" as const, scenarioId: null, outcome: "passed" as const },
   };
 }

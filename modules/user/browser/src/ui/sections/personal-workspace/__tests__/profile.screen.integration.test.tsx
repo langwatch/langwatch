@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Profile screen: composes the four bands over the host port.
+ * Profile screen: composes the five bands over the host port.
  */
 
 import { cleanup, screen } from "@testing-library/react";
@@ -16,7 +16,16 @@ import ProfileScreen from "../profile.screen.tsx";
 vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
-    useUtils: () => ({ auth: { browserSessions: { invalidate: () => Promise.resolve() } } }),
+    useUtils: () => ({
+      auth: { browserSessions: { invalidate: () => Promise.resolve() } },
+      digest: { getMyPreference: { invalidate: () => Promise.resolve() } },
+    }),
+    digest: {
+      getMyPreference: { useQuery: () => ({ data: { subscribed: true } }) },
+      setMyPreference: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve(), isPending: false }),
+      },
+    },
     routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
     identity: { myIdentifiers: { useQuery: () => ({ data: [] }) } },
     auth: {
@@ -49,7 +58,8 @@ afterEach(() => cleanup());
 
 describe("given a signed-in reader", () => {
   describe("when the profile page renders", () => {
-    it("composes the four bands in order", () => {
+    /** @scenario "The profile shows my email preferences after my keys" */
+    it("composes the five bands in order", () => {
       const host = fakePersonalWorkspaceHost();
       renderWithPersonalWorkspaceHost(<ProfileScreen />, { host });
 
@@ -57,6 +67,9 @@ describe("given a signed-in reader", () => {
       expect(screen.getByTestId("sign-in-methods-summary")).toBeTruthy();
       expect(screen.getByTestId("browser-sessions-settings-section")).toBeTruthy();
       expect(screen.getByTestId("personal-api-keys-summary")).toBeTruthy();
+      const keys = screen.getByTestId("personal-api-keys-summary");
+      const email = screen.getByTestId("email-preferences-settings-section");
+      expect(keys.compareDocumentPosition(email) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 });

@@ -762,6 +762,8 @@ export const prismaModelFieldCatalogue = {
     "connectServicesDisabled",
     "instantEvalsEnabledAt",
     "instantEvalsEnabledByUserId",
+    "piiRedactionModelAcceptedAt",
+    "piiRedactionModelAcceptedByUserId",
     "connectLastSyncAt",
     "connectLastSyncError",
     "issuedLicenses",
