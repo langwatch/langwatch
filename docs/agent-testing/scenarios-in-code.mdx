@@ -286,7 +286,7 @@ def seeded_customer():
     yield customer
 
     # Clean up: delete only what this run created, even if the test failed.
-    # Try every delete, orders before the customer, then raise the first failure.
+    # Try every delete, orders before the customer, then report every failure.
     errors = []
     for order_id in created_order_ids:
         try:
@@ -298,7 +298,7 @@ def seeded_customer():
     except Exception as error:
         errors.append(error)
     if errors:
-        raise errors[0]
+        raise RuntimeError("cleanup failed: " + "; ".join(repr(e) for e in errors)) from errors[0]
 ```
 
 `create_test_customer`, `delete_order` and `delete_test_customer` are your own helpers, for example calls to your API or database.
