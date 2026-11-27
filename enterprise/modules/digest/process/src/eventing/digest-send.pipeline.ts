@@ -50,8 +50,16 @@ const PLAN_LEASE_MS = 10 * 60 * 1000;
 const ORGANIZATION_PLAN_LEASE_MS = 10 * 60 * 1000;
 const ORGANIZATION_PLAN_MAX_ATTEMPTS = 5;
 const ORGANIZATION_PLANS_AT_ONCE = 2;
-/** One member's send reads the week's folds and mails the picked template once. */
-const SEND_LEASE_MS = 2 * 60 * 1000;
+/**
+ * One person's send for one organization: up to three analytics reads per visible project (the
+ * week's totals, its model breakdown, the week before's traces), each through the 8-slot limiter
+ * the concurrent sends share, then one mail. Analytics bounds a read at 45s (the tenant gate's
+ * wait in `analytics.app.ts`), so a send among SENDS_AT_ONCE (4) with P projects each waits at
+ * worst 4 x 3 x P reads / 8 slots x 45s = 67.5s x P: 10 minutes covers P = 8 with every read at
+ * its bound, and reads that take a second cover hundreds of projects. The 30-minute cache means
+ * the members of one organization mostly share those reads.
+ */
+const SEND_LEASE_MS = 10 * 60 * 1000;
 const SEND_MAX_ATTEMPTS = 5;
 const SENDS_AT_ONCE = 4;
 

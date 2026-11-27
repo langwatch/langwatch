@@ -8,7 +8,8 @@ Feature: Profile - who I am here, and where I am signed in
   # /settings/profile, the second page of the YOU section
   # (specs/navigation/settings-shell-v2.feature). Security is its sibling and
   # holds everything about CHANGING how you prove who you are; this page reads
-  # it back and changes only the two things nowhere else changes.
+  # it back and changes only the three things nowhere else changes: the name, the photo and
+  # whether the weekly digest email reaches me.
   #
   # FIVE BANDS, each a narrower kind of "you" than the one above, the last
   # being the mail that reaches you:
@@ -22,7 +23,9 @@ Feature: Profile - who I am here, and where I am signed in
   # SUMMARISED here and managed on Security; API keys are summarised here and
   # managed on the API Keys page. Two pages that both added an address would be
   # two places for the same refusal to be worded differently. Signing one
-  # browser out is the single exception, because it has no other home.
+  # browser out is an exception, because it has no other home. The weekly digest switch is the
+  # other: it and the signed unsubscribe link in every digest email write ONE shared row, so
+  # either undoes the other and the page shows whichever was last.
   #
   # The photo already worked, on a page about personal API keys. The name did
   # not: it was rendered read-only beside it, and the only writers of it were
