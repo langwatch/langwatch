@@ -40,6 +40,21 @@ void describe("lint:types batch report", () => {
   });
 
   /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("reads a file name with a space as its project's finding", () => {
+    const spaced = "packages/time/src/calendar copy.ts:1:1: Floating promise [y]\n\n1 problem(s)\n";
+    const results = taskResults({ tasks, roots, status: 1, out: spaced, err: "" });
+    assert.equal(results["time:lint:types"].success, false);
+    assert.equal(results["process:lint:types"].success, true);
+  });
+
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("fails every project when a failing run has no finding a project owns", () => {
+    const stray = "elsewhere/a.ts:1:1: Floating promise [y]\n\n1 problem(s)\n";
+    const results = taskResults({ tasks, roots, status: 1, out: stray, err: "" });
+    assert.ok(Object.values(results).every((result) => !result.success));
+  });
+
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
   void it("fails every project when an oxlint process could not run", () => {
     const err = "oxlint -c .oxlintrc.types.jsonc exited 2:\nthread panicked\n";
     const results = taskResults({ tasks, roots, status: 1, out: "", err });

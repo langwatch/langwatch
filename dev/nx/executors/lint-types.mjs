@@ -5,7 +5,7 @@ import { join } from "node:path";
 // `dev/nx/lint.mjs --resolved --types` run, so a miss of many projects builds their
 // programs once, as the tree run did, and each project still caches its own result.
 // The report is split back by the project that owns each file (ADR-150).
-const DIAGNOSTIC = /^(\S+?):\d+:\d+: /;
+const DIAGNOSTIC = /^(\S.*?):\d+:\d+: /;
 const PROCESS_FAILED = /^oxlint -c \S+ exited /m;
 
 function lint({ workspaceRoot, roots }) {
@@ -40,15 +40,18 @@ export function splitReport({ out, roots }) {
   return byRoot;
 }
 
-/** One result per task; a run where an oxlint process failed fails every task. */
+const countOf = (lines) => lines.filter((line) => DIAGNOSTIC.test(line)).length;
+
+/** One result per task; a failed oxlint process, or a failing run no project owns, fails all. */
 export function taskResults({ tasks, roots, status, out, err }) {
   const byRoot = splitReport({ out, roots });
-  const failed = PROCESS_FAILED.test(err) || (status !== 0 && !out.includes("problem(s)"));
+  const attributed = [...byRoot.values()].reduce((sum, lines) => sum + countOf(lines), 0);
+  const failed = PROCESS_FAILED.test(err) || (status !== 0 && attributed === 0);
 
   return Object.fromEntries(
     tasks.map((task, i) => {
       const lines = byRoot.get(roots[i]);
-      const problems = lines.filter((line) => DIAGNOSTIC.test(line)).length;
+      const problems = countOf(lines);
       const report = failed
         ? `${err}${out}`
         : `${lines.map((line) => `${line}\n`).join("")}${problems} problem(s)\n`;
