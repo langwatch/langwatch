@@ -1,4 +1,8 @@
-import type { DatasetApi, DatasetSummary } from "@langwatch/dataset-contract";
+import {
+  DatasetCopyInterruptedError,
+  type DatasetApi,
+  type DatasetSummary,
+} from "@langwatch/dataset-contract";
 import {
   evaluatorConfigSchema,
   newEvaluatorId,
@@ -107,14 +111,35 @@ export class StaffAccessCopyMakeService {
           ...(copied.incomplete ? { incomplete: copied.incomplete } : {}),
         };
       }
-      case "dataset": {
-        const copied = await this.deps.datasets.copyDataset({
-          sourceDatasetId: work.source.id,
-          sourceProjectId,
-          targetProjectId: projectId,
-        });
-        return into(copied.id);
-      }
+      case "dataset":
+        return this.copyDataset({ dataset: work.source, sourceProjectId, projectId });
+    }
+  }
+
+  /** A dataset whose copy failed after it existed is recorded as made and incomplete. */
+  private async copyDataset({
+    dataset,
+    sourceProjectId,
+    projectId,
+  }: {
+    dataset: DatasetSummary;
+    sourceProjectId: string;
+    projectId: string;
+  }): Promise<CopyMade> {
+    try {
+      const copied = await this.deps.datasets.copyDataset({
+        sourceDatasetId: dataset.id,
+        sourceProjectId,
+        targetProjectId: projectId,
+      });
+      return { targetId: copied.id, targetProjectId: projectId };
+    } catch (error) {
+      if (!(error instanceof DatasetCopyInterruptedError)) throw error;
+      return {
+        targetId: error.targetDatasetId,
+        targetProjectId: projectId,
+        incomplete: "dataset_copy_incomplete",
+      };
     }
   }
 

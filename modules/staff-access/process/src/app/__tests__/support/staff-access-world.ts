@@ -89,6 +89,9 @@ export function staffAccessWorld({
     passkeys: new Set([OLIVIA]),
     audit: [] as RecordAuditLogCommand[],
     auditRefused: false,
+    /** Refuses only this action in this organization, counting each refused try. */
+    auditRefusedFor: null as { organizationId: string; action: string } | null,
+    auditRefusedTries: 0,
     usersRefused: false,
     keyRevokeRefused: new Set<string>(),
     mail: [] as SendEmailCommand[],
@@ -251,6 +254,15 @@ export function staffAccessWorld({
   const auditLog = createApiFixture<AuditLogApi>({
     record: async (command) => {
       if (state.auditRefused) throw new Error("audit log unavailable");
+      const refused = state.auditRefusedFor;
+      if (
+        refused &&
+        command.organizationId === refused.organizationId &&
+        command.action === refused.action
+      ) {
+        state.auditRefusedTries++;
+        throw new Error("audit log unavailable");
+      }
       state.audit.push(command);
       return { id: `audit_${state.audit.length}`, occurredAt: 0 };
     },

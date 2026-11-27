@@ -84,6 +84,14 @@ Feature: Copying an organization's setup into another organization
     And Globex holds one copy of the dataset
 
   @integration
+  Scenario: A dataset whose copy the owner reports interrupted is kept as made and incomplete
+    Given the dataset owner reports a copy of ACME's dataset interrupted after it created the dataset in Globex
+    When the agent copies ACME into Globex and then again
+    Then the dataset is reported as failed with "dataset_copy_incomplete" and its target
+    And the rerun reports it as already copied with "dataset_copy_incomplete"
+    And Globex holds one copy of the dataset
+
+  @integration
   Scenario: Kinds a copy cannot carry yet are skipped with a reason
     Given ACME has a workflow evaluator and a monitor attached to an experiment
     When the agent copies ACME into Globex
@@ -114,7 +122,15 @@ Feature: Copying an organization's setup into another organization
     When Olivia revokes the source session after the evaluator was made
     Then nothing more is made and every remaining item is reported as stopped
     And the report says why it stopped
-    And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row with the reason and what was made, each written on its own and retried
+    And ACME's and Globex's audit logs each hold a "staffAccess.orgCopyStopped" row with the reason and what was made, each written on its own in up to three attempts
+
+  @integration
+  Scenario: A stop row that fails every attempt does not lose the stopped report
+    Given a copy is running and Globex's audit log refuses every stop row
+    When Olivia revokes the source session after the evaluator was made
+    Then Globex's stop row is tried three times and then given up
+    And the other organization keeps its stop row
+    And the agent still gets the stopped report
 
   @integration
   Scenario: A failed audit write copies nothing

@@ -52,7 +52,7 @@ The copy is an ops operation of the `staff-access` module:
   approvals. Once either is revoked, lapsed or ended, nothing more is made,
   the remaining items are reported `stopped` and the report says why. Each
   audit log is then sent a `staffAccess.orgCopyStopped` row with what was made,
-  written on its own and retried three times; a side whose row still fails is
+  written on its own in up to three attempts; a side whose row still fails is
   logged, and the other organization keeps its row. This last row is best
   effort: the trail rows and the `staffAccess.orgCopy` rows written before the
   run already name the copy in both organizations.
@@ -78,7 +78,11 @@ The copy is an ops operation of the `staff-access` module:
   releases it, and a reservation left unfinished by a crash or a failed write
   is reported `copy_interrupted` on every rerun instead of made again. Only an
   owner's refusal by name (a handled error below 500) releases the
-  reservation, since any other failure may come after the target exists. A
+  reservation, since any other failure may come after the target exists. An
+  owner that can fail after it created the target never throws such a refusal
+  then: `DatasetApi.copyDataset` throws `DatasetCopyInterruptedError` naming
+  the new dataset, and the copy completes the row with it and
+  `incomplete: dataset_copy_incomplete`. A
   prompt whose later version the owner refuses keeps its row with
   `incomplete: prompt_versions_incomplete`, and every rerun reports it as
   `already_copied` with that reason: the missing versions are not appended. A rerun reports earlier items as

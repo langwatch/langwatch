@@ -1,6 +1,7 @@
 import {
   copyDatasetInputSchema,
   DatasetChunkCountMissingError,
+  DatasetCopyInterruptedError,
   type CopyDatasetInput,
   type Dataset,
   type DatasetNameInput,
@@ -67,17 +68,20 @@ export class DatasetCopyService {
       name,
       columnTypes: source.columnTypes,
     });
-    await options.content.copyDataset({
-      source,
-      sourceProjectId: parsed.sourceProjectId,
-      target,
-      targetProjectId: parsed.targetProjectId,
-    });
-
-    return this.deps.getBySlugOrId({
-      projectId: parsed.targetProjectId,
-      slugOrId: target.id,
-    });
+    try {
+      await options.content.copyDataset({
+        source,
+        sourceProjectId: parsed.sourceProjectId,
+        target,
+        targetProjectId: parsed.targetProjectId,
+      });
+      return await this.deps.getBySlugOrId({
+        projectId: parsed.targetProjectId,
+        slugOrId: target.id,
+      });
+    } catch (cause) {
+      throw new DatasetCopyInterruptedError({ targetDatasetId: target.id, cause });
+    }
   }
 
   /**

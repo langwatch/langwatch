@@ -81,6 +81,13 @@ Feature: Large dataset storage
     And no dataset is created in the other project
 
   @unit
+  Scenario: A copy that fails after its dataset exists names the dataset it made
+    Given a dataset in object storage being copied to another project
+    When the copy fails after the new dataset was created there
+    Then the copy fails as interrupted and names the new dataset
+    And the error never reads as a refusal made before the copy existed
+
+  @unit
   Scenario: Copying a legacy single-file dataset
     Given a dataset the previous release kept as one stored file
     When I copy it to another project

@@ -6,6 +6,7 @@
  */
 import { ClientAddress } from "@langwatch/api/policy";
 import type { StaffAccessScope } from "@langwatch/authz-contract";
+import { DatasetCopyInterruptedError, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -316,6 +317,30 @@ function scenarios(backend: Backend): void {
         expect(stopped[0]?.metadata).toMatchObject({ stoppedBecause: "source_approval_ended" });
       });
 
+      /** @scenario "A stop row that fails every attempt does not lose the stopped report" */
+      it("gives up on a stop row after three tries and still answers the stopped report", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        w.state.auditRefusedFor = {
+          organizationId: GLOBEX.id,
+          action: "staffAccess.orgCopyStopped",
+        };
+        w.copy.hooks.beforeEvaluatorCreate = async () => {
+          await w.app.revokeSession({ ...w.operator(OLIVIA), requestId: source.requestId });
+        };
+
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+        });
+
+        expect(report.stoppedBecause).toBe("source_approval_ended");
+        expect(w.state.auditRefusedTries).toBe(3);
+        const stopped = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyStopped");
+        expect(stopped.map((row) => row.organizationId)).toEqual([ACME.id]);
+      });
+
       /** @scenario "A rerun copies only what is new" */
       it("copies only the prompt added since the first copy", async () => {
         const w = world();
@@ -366,6 +391,40 @@ function scenarios(backend: Backend): void {
         expect(
           w.copy.data.datasets.filter((dataset) => dataset.projectId === targetProjectId),
         ).toHaveLength(1);
+      });
+
+      /** @scenario "A dataset whose copy the owner reports interrupted is kept as made and incomplete" */
+      it("records the dataset the owner made before its copy failed and never remakes it", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        const body = { sourceOpsToken: source.opsToken, projects: [seeded.project.id] };
+        w.copy.hooks.afterDatasetCreate = async ({ targetDatasetId }) => {
+          throw new DatasetCopyInterruptedError({
+            targetDatasetId,
+            cause: new DatasetNotFoundError(),
+          });
+        };
+
+        const first = await w.app.copyOrganization({ session: target.session, body });
+        w.copy.hooks.afterDatasetCreate = async () => {};
+        const rerun = await w.app.copyOrganization({ session: target.session, body });
+
+        const targetProjectId = first.items.find((item) => item.kind === "project")?.targetId;
+        const made = w.copy.data.datasets.filter(
+          (dataset) => dataset.projectId === targetProjectId,
+        );
+        expect(made).toHaveLength(1);
+        expect(first.items.find((item) => item.kind === "dataset")).toMatchObject({
+          outcome: "failed",
+          reason: "dataset_copy_incomplete",
+          targetId: made[0]?.id,
+        });
+        expect(rerun.items.find((item) => item.kind === "dataset")).toMatchObject({
+          outcome: "already_copied",
+          reason: "dataset_copy_incomplete",
+          targetId: made[0]?.id,
+        });
       });
 
       /** @scenario "Kinds a copy cannot carry yet are skipped with a reason" */
