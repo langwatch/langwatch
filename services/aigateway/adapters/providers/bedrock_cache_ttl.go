@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"strconv"
 
-	bfbedrock "github.com/maximhq/bifrost/core/providers/bedrock"
-	bfutils "github.com/maximhq/bifrost/core/providers/utils"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const hourCacheTTL = "1h"
@@ -18,25 +18,35 @@ const hourCacheTTL = "1h"
 // claude-sonnet-4-20250514 has no minor.
 var claudeVersionPattern = regexp.MustCompile(`claude-(?:opus|sonnet|haiku)-(\d+)(?:-(\d)(?:\D|$))?`)
 
-// carryBedrockCacheTTL puts an hour-long cache_control TTL on the Converse body.
-// Bifrost v1.5.17 has no ttl on BedrockCachePoint (v1.14 does), so such a request
-// is converted here and sent raw; delete this on upgrade. Other requests stay on
-// Bifrost's conversion.
-func carryBedrockCacheTTL(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostResponsesRequest, anthropicBody []byte) error {
-	if bfReq.Provider != bfschemas.Bedrock || !bedrockModelTakesHourCache(bfReq.Model) {
+// bedrockBodySource is what a translated Bedrock request came from: the
+// client's Anthropic body and the credential whose deployment map names the
+// model Bifrost dispatches.
+type bedrockBodySource struct {
+	anthropicBody []byte
+	cred          domain.Credential
+}
+
+// prepareBedrockConverseBody converts a public-Bedrock Responses request here
+// and sends it raw when Bifrost v1.5.17's own conversion would lose part of
+// it: an hour-long cache_control TTL (BedrockCachePoint has no ttl until v1.14)
+// or the adaptive thinking of a Claude model it does not know takes adaptive
+// thinking. Other requests stay on Bifrost's conversion.
+func prepareBedrockConverseBody(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostResponsesRequest, src bedrockBodySource) error {
+	if bfReq.Provider != bfschemas.Bedrock {
 		return nil
 	}
-	hourMarkers := countHourCacheMarkers(anthropicBody)
-	if hourMarkers == 0 {
+	model := bedrockModelID(bfReq.Model, src.cred)
+	hourMarkers := hourCacheMarkersFor(model, src.anthropicBody)
+	if hourMarkers == 0 && !responsesThinkingIntent(bfReq, model).needsPinning() {
 		return nil
 	}
-	converse, err := bfbedrock.ToBedrockResponsesRequest(bfCtx, bfReq)
+	converse, err := convertResponsesForBedrock(bfCtx, bfReq, model)
 	if err != nil {
 		return fmt.Errorf("convert request for bedrock: %w", err)
 	}
-	body, err := bfutils.MarshalSorted(converse)
+	body, err := marshalConverseBody(bfCtx, converse)
 	if err != nil {
-		return fmt.Errorf("encode bedrock request: %w", err)
+		return err
 	}
 	if body, err = setHourCachePoints(body, hourMarkers); err != nil {
 		return fmt.Errorf("set bedrock cache ttl: %w", err)
@@ -44,6 +54,15 @@ func carryBedrockCacheTTL(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.Bifr
 	bfReq.RawRequestBody = body
 	bfCtx.SetValue(bfschemas.BifrostContextKeyUseRawRequestBody, true)
 	return nil
+}
+
+// hourCacheMarkersFor counts the hour-long breakpoints a Bedrock model would
+// keep, 0 for a model that refuses that lifetime.
+func hourCacheMarkersFor(model string, anthropicBody []byte) int {
+	if !bedrockModelTakesHourCache(model) {
+		return 0
+	}
+	return countHourCacheMarkers(anthropicBody)
 }
 
 // bedrockModelTakesHourCache reports whether Bedrock accepts an hour-long TTL on

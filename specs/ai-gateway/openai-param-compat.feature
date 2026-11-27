@@ -231,6 +231,12 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
       Then additionalModelRequestFields carries the same thinking and output_config shapes bifrost's bedrock translator emits
       And no output cap the caller never sent is force-set
 
+    @unit
+    Scenario: reasoning toward a Claude 5 model on Bedrock is sent as adaptive thinking
+      When a chat completion with reasoning_effort, or reasoning.max_tokens, targets a Claude 5 model on Bedrock over the public or the VPCE path
+      Then additionalModelRequestFields carries thinking type adaptive with output_config effort
+      And no budget_tokens reaches Bedrock
+
     @live
     Scenario Outline: client cap verifiably bounds output on the anthropic and bedrock lanes
       When a client POSTs /v1/chat/completions toward <provider> with <cap_field> 16 asking for a long answer, <mode>

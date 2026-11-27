@@ -1,0 +1,11 @@
+{
+  "model": "claude-opus-4-7",
+  "max_tokens": 32000,
+  "stream": true,
+  "thinking": {"type":"adaptive"},
+  "output_config": {"effort": "high"},
+  "system": [{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude."},{"type":"text","text":"You are an interactive agent that helps users with software engineering tasks.","cache_control":{"type":"ephemeral"}}],
+  "tools": [{"name":"Bash","description":"Executes a given bash command.","input_schema":{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}}],
+  "messages": [{"role":"user","content":[{"type":"text","text":"Why does the build fail? Think it through."}]}],
+  "metadata": {"user_id": "user_0000_account__session_0000"}
+}
