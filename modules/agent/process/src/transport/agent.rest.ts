@@ -314,6 +314,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withParams(agentRestParamsSchema)
       .withInput(relayCallBodySchema)
       .withPermission("scenarios:create")
+      .spends()
       .withOutput(relayCallResponseSchema)
       .withDocs({ summary: "Send one conversation turn to an online connected agent" })
       .withBodyLimit({

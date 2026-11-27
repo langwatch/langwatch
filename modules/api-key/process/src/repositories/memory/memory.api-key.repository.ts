@@ -92,6 +92,21 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
+  async findEveryKeyInOrganization(input: {
+    organizationId: string;
+    limit: number;
+  }): Promise<ApiKeyRow[]> {
+    const keys = this.#list((key) => key.organizationId === input.organizationId);
+    return [
+      ...keys.filter((key) => key.revokedAt === null),
+      ...keys
+        .filter((key) => key.revokedAt !== null)
+        .toSorted(
+          (left, right) => (right.revokedAt?.getTime() ?? 0) - (left.revokedAt?.getTime() ?? 0),
+        ),
+    ].slice(0, input.limit);
+  }
+
   async update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const { id, grants: _grants, revokedAt, lastUsedAt, ...data } = input;
 

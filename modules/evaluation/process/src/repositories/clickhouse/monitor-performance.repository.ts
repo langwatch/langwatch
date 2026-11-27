@@ -2,8 +2,11 @@ import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 
+import { evaluatorErrorCodeSql } from "../../rules/evaluator-error-code.rules.ts";
 import {
   MonitorPerformanceRepository,
+  type EvaluatorOutcomeRow,
+  type EvaluatorOutcomeRowQuery,
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository.ts";
@@ -92,6 +95,60 @@ const queryForTimeZone = (timeZone: string): string => `
   ORDER BY EvaluatorId, Period, Day
 `;
 
+const outcomeErrorCode = evaluatorErrorCodeSql({ column: "Error" });
+
+/** Each run at its latest revision; the error text becomes its code inside ClickHouse. */
+const OUTCOME_QUERY = `
+  SELECT
+    EvaluatorId,
+    any(EvaluatorType) AS EvaluatorType,
+    ErrorCode,
+    count() AS Runs,
+    countIf(Status = 'error') AS Errors,
+    countIf(Status = 'skipped') AS Skipped,
+    maxIf(toUnixTimestamp64Milli(SettledAt), Status = 'error') AS LastErrorAt
+  FROM (
+    SELECT
+      tupleElement(Latest, 1) AS EvaluatorId,
+      tupleElement(Latest, 2) AS EvaluatorType,
+      tupleElement(Latest, 3) AS Status,
+      tupleElement(Latest, 4) AS ErrorCode,
+      tupleElement(Latest, 5) AS SettledAt
+    FROM (
+      SELECT
+        EvaluationId,
+        argMax(
+          tuple(
+            EvaluatorId,
+            EvaluatorType,
+            Status,
+            if(Status = 'error', ${outcomeErrorCode.sql}, ''),
+            coalesce(CompletedAt, UpdatedAt)
+          ),
+          UpdatedAt
+        ) AS Latest
+      FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
+        AND ScheduledAt >= {since:DateTime64(3)}
+        AND ScheduledAt < {until:DateTime64(3)}
+      GROUP BY TenantId, EvaluationId
+    )
+  )
+  GROUP BY EvaluatorId, ErrorCode
+  ORDER BY EvaluatorId, ErrorCode
+  LIMIT {limit:UInt32}
+`;
+
+type ClickHouseOutcomeRow = {
+  EvaluatorId: string;
+  EvaluatorType: string;
+  ErrorCode: string;
+  Runs: string;
+  Errors: string;
+  Skipped: string;
+  LastErrorAt: string;
+};
+
 type ClickHouseMonitorPerformanceRow = {
   EvaluatorId: string;
   Period: "current" | "previous";
@@ -171,5 +228,38 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
       );
       throw error;
     }
+  }
+
+  async findOutcomeRows(input: EvaluatorOutcomeRowQuery): Promise<EvaluatorOutcomeRow[]> {
+    if (input.until <= input.since) return [];
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseMonitorPerformanceRepository.findOutcomeRows",
+    );
+    const client = await this.options.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: OUTCOME_QUERY,
+      query_params: {
+        ...outcomeErrorCode.params,
+        tenantId: input.tenantId,
+        since: clickHouseMomentOf(input.since),
+        until: clickHouseMomentOf(input.until),
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+      clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+    });
+    return (await result.json<ClickHouseOutcomeRow>()).map((row): EvaluatorOutcomeRow => {
+      const lastErrorAt = Number(row.LastErrorAt);
+      return {
+        evaluatorId: row.EvaluatorId,
+        evaluatorType: row.EvaluatorType,
+        errorCode: row.ErrorCode,
+        runs: Number(row.Runs),
+        errors: Number(row.Errors),
+        skipped: Number(row.Skipped),
+        lastErrorAt: lastErrorAt > 0 ? lastErrorAt : null,
+      };
+    });
   }
 }

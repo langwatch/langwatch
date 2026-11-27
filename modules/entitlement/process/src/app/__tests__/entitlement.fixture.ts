@@ -91,7 +91,9 @@ export class TestUsageWarnings implements UsageWarning {
 
 export function createEntitlementTestApp(
   input: Readonly<{
-    repositories?: Pick<EntitlementRepositories, "membership" | "spend" | "tenancy">;
+    repositories?: Partial<
+      Pick<EntitlementRepositories, "membership" | "seats" | "spend" | "tenancy">
+    >;
     infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ billing: BillingApi }>;

@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:275`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:276`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -1158,6 +1158,14 @@ The same summaries for these ids; an id with no organization is left out.
 findForOperators(input: Readonly<{ organizationIds: readonly string[] }>): Promise<OrganizationOperatorSummary[]>;
 ```
 
+#### `getOpsSnapshot`
+
+One organization for a staff investigation: ids, counts and its creation time, never a name, slug or address (ADR-202, ops functions). Throws `OrganizationNotFoundError`.
+
+```typescript
+getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
+```
+
 ## REST transport
 
 ### `groupsRest`
@@ -2116,13 +2124,13 @@ interface Output {
 }
 
 // organization.deleteMember
-// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:458
+// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:459
 interface Input {
   organizationId: string;
   userId: string;
   giveSeatToUserId?: string | null;
 }
-// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:475
+// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:476
 interface Output {
   success: true;
   seatGivenToUserId: string | null;
@@ -2135,7 +2143,7 @@ interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:498
+// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:499
 interface Output {
   holdsFullSeat: boolean;
   seatFreesAt: unknown | null;
@@ -2148,7 +2156,7 @@ interface Output {
 
 // organization.listHeldSeats
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:521
+// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:522
 interface Output {
   heldSeats: {
     userId: string;
@@ -2226,7 +2234,7 @@ type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:433
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:434
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
@@ -2276,7 +2284,7 @@ interface Output {
 
 // organization.getDocsPlaygroundPolicy
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:268
+// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:293
 interface Output {
   docsPlaygroundSessionsEnabled: boolean;
   docsPlaygroundSessionsDisabledAt: unknown | null;
@@ -2304,7 +2312,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:396
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:397
 ```
 
 ### `personalWorkspaceFeatures`
@@ -2587,7 +2595,7 @@ Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSc
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:340`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:342`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

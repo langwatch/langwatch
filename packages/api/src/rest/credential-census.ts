@@ -28,7 +28,8 @@ export function doorCredentialOf({
   if (
     credential === "internal_secret" ||
     credential === "instance_admin" ||
-    credential === "licence_token"
+    credential === "licence_token" ||
+    credential === "staff_access"
   ) {
     return { credentialType: "system", ...scopeIdsOf(caller) };
   }

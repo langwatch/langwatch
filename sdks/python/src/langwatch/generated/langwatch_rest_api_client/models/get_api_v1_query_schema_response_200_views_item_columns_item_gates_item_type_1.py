@@ -82,6 +82,7 @@ class GetApiV1QuerySchemaResponse200ViewsItemColumnsItemGatesItemType1(str, Enum
     LANGYVIEW = "langy:view"
     MEMBERSVIEW = "members:view"
     OPSMANAGE = "ops:manage"
+    OPSREADVIEW = "opsRead:view"
     OPSVIEW = "ops:view"
     ORGANIZATIONDELETE = "organization:delete"
     ORGANIZATIONMANAGE = "organization:manage"

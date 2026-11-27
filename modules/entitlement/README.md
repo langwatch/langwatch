@@ -6,13 +6,13 @@ What a plan allows, and what has been used and spent against it, so the allowanc
 
 ## At a glance
 
-|                |                                                                                                                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Classification | core (`modules/catalogue.json`)                                                                                      |
-| Subjects       | entitlement, usage                                                                                                   |
-| Halves         | [contract](contract) · [process](process/README.md)                                                                  |
-| Api token      | `EntitlementApi` = `moduleApi<EntitlementApi>()("entitlement")`, `contract/src/entitlement.api.ts:52` (9 operations) |
-| Installed by   | api, worker, tasks (process)                                                                                         |
+|                |                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                                       |
+| Subjects       | entitlement, usage                                                                                                    |
+| Halves         | [contract](contract) · [process](process/README.md)                                                                   |
+| Api token      | `EntitlementApi` = `moduleApi<EntitlementApi>()("entitlement")`, `contract/src/entitlement.api.ts:58` (10 operations) |
+| Installed by   | api, worker, tasks (process)                                                                                          |
 
 ## What entitlement owns
 
@@ -36,6 +36,6 @@ Anything else entitlement needs belongs to another module and is reached through
 
 ## Who depends on entitlement
 
-[analytics](../analytics/README.md), [annotation](../annotation/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [data-privacy](../data-privacy/README.md), [data-retention](../data-retention/README.md), [dataset](../dataset/README.md), [digest](../../enterprise/modules/digest/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [prompt](../prompt/README.md), [role](../role/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
+[analytics](../analytics/README.md), [annotation](../annotation/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [data-privacy](../data-privacy/README.md), [data-retention](../data-retention/README.md), [dataset](../dataset/README.md), [digest](../../enterprise/modules/digest/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [prompt](../prompt/README.md), [role](../role/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md), [staff-access](../staff-access/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
 
 <!-- readme:generated:end -->

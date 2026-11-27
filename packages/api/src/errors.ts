@@ -217,6 +217,118 @@ export class ConfirmationRequiredError extends HandledError {
   }
 }
 
+/**
+ * A staff agent's key (ADR-202) on a process with no staff access gate bound: nothing can record
+ * the request, so it is refused rather than run unrecorded.
+ */
+export class StaffAccessUnavailableError extends HandledError {
+  constructor() {
+    super("staff_access_unavailable", "Staff access is not available on this server", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_access_unavailable"),
+    });
+    this.name = "StaffAccessUnavailableError";
+  }
+}
+
+/** An operator revoked the staff access this key belongs to. */
+export class StaffAccessRevokedError extends HandledError {
+  constructor() {
+    super("staff_access_revoked", "This staff access was revoked", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_access_revoked"),
+    });
+    this.name = "StaffAccessRevokedError";
+  }
+}
+
+/** The staff access this key belongs to has passed its hour. */
+export class StaffAccessExpiredError extends HandledError {
+  constructor() {
+    super("staff_access_expired", "This staff access has expired", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_access_expired"),
+    });
+    this.name = "StaffAccessExpiredError";
+  }
+}
+
+/** The staff key came from an address other than the one that redeemed it. */
+export class StaffAccessIpMismatchError extends HandledError {
+  constructor() {
+    super("staff_access_ip_mismatch", "This staff key is pinned to another address", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_access_ip_mismatch"),
+    });
+    this.name = "StaffAccessIpMismatchError";
+  }
+}
+
+/** The operator who approved this staff access no longer holds the platform operator grant. */
+export class StaffAccessOperatorLostError extends HandledError {
+  constructor() {
+    super("staff_access_operator_lost", "The approving operator no longer holds the grant", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_access_operator_lost"),
+    });
+    this.name = "StaffAccessOperatorLostError";
+  }
+}
+
+/** A route that starts a spending run, asked by staff access approved without spend. */
+export class StaffSpendNotApprovedError extends HandledError {
+  constructor() {
+    super("staff_spend_not_approved", "This staff access was not approved to start runs", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_spend_not_approved"),
+    });
+    this.name = "StaffSpendNotApprovedError";
+  }
+}
+
+/** A staff key approved without `org:content` asked a route that serves content. */
+export class StaffContentNotApprovedError extends HandledError {
+  constructor() {
+    super("staff_content_not_approved", "This staff access was not approved to read content", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_content_not_approved"),
+    });
+    this.name = "StaffContentNotApprovedError";
+  }
+}
+
+/** A staff key asked a write no staff access may make: a removal, or one no bag allows. */
+export class StaffWriteNotAllowedError extends HandledError {
+  constructor() {
+    super("staff_write_not_allowed", "Staff access cannot make this change", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_write_not_allowed"),
+    });
+    this.name = "StaffWriteNotAllowedError";
+  }
+}
+
+/** The staff trail row could not be written before the handler, so the request is refused. */
+export class StaffAccessAuditUnavailableError extends HandledError {
+  constructor() {
+    super("staff_access_audit_unavailable", "The staff access trail could not be written", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      ...remediation("staff_access_audit_unavailable"),
+    });
+    this.name = "StaffAccessAuditUnavailableError";
+  }
+}
+
 export class RateLimitedError extends HandledError {
   constructor() {
     super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });

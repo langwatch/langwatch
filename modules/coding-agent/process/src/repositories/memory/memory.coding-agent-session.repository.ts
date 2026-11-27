@@ -178,9 +178,10 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
       (row) => input.since === undefined || row.startedAtMs >= input.since,
     );
     const first = Math.min(...rows.map((row) => row.startedAtMs));
+    const last = Math.max(...rows.map((row) => row.startedAtMs));
     return {
       sessions: new Set(counted.map((row) => row.sessionId)).size,
-      ...(rows.length === 0 ? {} : { firstSessionAt: first }),
+      ...(rows.length === 0 ? {} : { firstSessionAt: first, lastSessionAt: last }),
     };
   }
 

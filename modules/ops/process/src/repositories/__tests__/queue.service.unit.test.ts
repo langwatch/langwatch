@@ -33,6 +33,7 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
   return {
     discoverQueueNames: vi.fn().mockResolvedValue([]),
     countWaitingJobs: vi.fn().mockResolvedValue(0),
+    countTenantGroups: vi.fn().mockResolvedValue([]),
     scanQueues: vi.fn().mockResolvedValue([]),
     getGroupJobs: vi.fn().mockResolvedValue({ jobs: [], total: 0 }),
     getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),

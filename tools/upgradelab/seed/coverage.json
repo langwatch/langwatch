@@ -65,6 +65,11 @@
       "cells": ["C3", "C4"],
       "note": "not in plan 3.4; needs usage traffic in the window"
     },
+    "dashboard:mark-my-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs My dashboards without the owner mark, as the previous release wrote them"
+    },
     "data-retention:keep-control-plane-events-forever": {
       "status": "seeded",
       "seed": "heavy:product.retention",
@@ -91,7 +96,7 @@
     "entitlement:materialise-billable-events-ttl": {
       "status": "pending",
       "seed": "unplanned",
-      "note": "needs billable events older than 13 months, written by the previous release before the TTL"
+      "note": "needs My dashboards without the owner mark, as the previous release wrote them"
     },
     "evaluator:backfill-versions": {
       "status": "pending",
