@@ -1,7 +1,7 @@
 /**
  * Provisions LangWatchQL on each organisation's own ClickHouse. The route URL's admin only opens
- * the connection and is never altered; a derived per-organisation reader owns the profile, grants
- * and row policies, and is what the routed executor signs in as.
+ * the connection and is never altered; a per-organisation reader owns the profile, grants and row
+ * policies, and is what the routed executor signs in as.
  * @see specs/lwql/api.feature
  */
 import { createLogger } from "@langwatch/observability";
@@ -16,7 +16,13 @@ import type { LangWatchQLProvisioningRepository } from "../repositories/langwatc
 import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { unguardedTables } from "../rules/lwql-private-policies.rules.ts";
-import { type LwqlPrivateReader, privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
+import {
+  type LwqlPrivateReader,
+  type LwqlPrivateReaderName,
+  type LwqlPrivateReaderPasswords,
+  type LwqlPrivateReaderResolution,
+  resolvePrivateReader,
+} from "../rules/lwql-private-reader.rules.ts";
 import {
   type LwqlServerAddress,
   readPrivateRoute,
@@ -141,7 +147,7 @@ export function privateNamesOf({
   tenantSetting,
 }: {
   database: string;
-  reader: LwqlPrivateReader;
+  reader: LwqlPrivateReaderName;
   tenantSetting: string;
 }): LangWatchQLNames {
   return {
@@ -361,29 +367,102 @@ function claimServer({
   return { claimed: checked.address };
 }
 
+/** Warns where an organisation's reader falls back to the pepper or where it has none. */
+function warnReaderFallback({
+  organizationId,
+  resolved,
+}: {
+  organizationId: string;
+  resolved: LwqlPrivateReaderResolution;
+}): void {
+  switch (resolved.kind) {
+    case "own":
+      return;
+    case "derived":
+      logger.warn(
+        { organizationId },
+        "LangWatchQL private provisioning derived the organisation's reader password from the key pepper, as no LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId> is set; set one so no platform-derived secret reaches its server",
+      );
+      return;
+    case "refused":
+      logger.warn(
+        { organizationId, variable: resolved.variable },
+        "LangWatchQL private provisioning refused an organisation whose reader password variable is blank or names it twice; it stays refused and nothing is derived in its place",
+      );
+      return;
+    case "absent":
+      logger.warn(
+        { organizationId },
+        "LangWatchQL private provisioning skipped an organisation with no reader password of its own and no key pepper to derive one; it stays refused",
+      );
+  }
+}
+
+/** Each endpoint in turn, claimed then converged as its organisation's reader; none throws. */
+async function provisionInOrder({
+  ordered,
+  sharedOrigins,
+  keyPepper,
+  readerPasswords,
+  shared,
+  converge,
+}: {
+  ordered: readonly LwqlPrivateEndpoint[];
+  sharedOrigins: readonly string[];
+  keyPepper: string | undefined;
+  readerPasswords: LwqlPrivateReaderPasswords;
+  shared: LwqlConvergencePlan;
+  converge: (plan: LwqlConvergencePlan) => Promise<void>;
+}): Promise<void> {
+  const owners = new Map<string, string>();
+  for (const endpoint of ordered) {
+    const claimed = claimServer({ endpoint, sharedOrigins, owners });
+    if ("skipped" in claimed) continue;
+    const { organizationId } = endpoint;
+    if (organizationId === undefined) continue;
+    const resolved = resolvePrivateReader({
+      organizationId,
+      passwords: readerPasswords,
+      keyPepper,
+    });
+    warnReaderFallback({ organizationId, resolved });
+    if (resolved.kind !== "own" && resolved.kind !== "derived") continue;
+    const { reader } = resolved;
+    try {
+      const plan = privatePlanOf({ shared, endpoint, address: claimed.claimed, reader });
+      await provisionOne({ plan, reader, organizationId, converge });
+    } catch (error) {
+      warnNotProvisioned({ organizationId, error });
+    }
+  }
+}
+
 /**
  * Converges each distinct private server and never throws: a failed target warns, URL and
  * passwords left out, and its organisation stays refused. The first organisation in id order owns
- * a server and database; another claiming it is refused (this run only). No pepper, no target.
+ * a server and database; another claiming it is refused (this run only). No reader, no target.
  */
 export async function provisionLwqlPrivateTargets({
   endpoints,
   sharedUrl,
   keyPepper,
+  readerPasswords,
   shared,
   converge,
 }: {
   endpoints: readonly LwqlPrivateEndpoint[];
   sharedUrl: string | undefined;
   keyPepper: string | undefined;
+  /** Each organisation's own reader password, which wins over the key pepper's. */
+  readerPasswords: LwqlPrivateReaderPasswords;
   shared: LwqlConvergencePlan;
   converge: (plan: LwqlConvergencePlan) => Promise<void>;
 }): Promise<void> {
   if (endpoints.length === 0) return;
-  if (keyPepper === undefined) {
+  if (keyPepper === undefined && readerPasswords.passwords.size === 0) {
     logger.warn(
       { organisations: endpoints.length },
-      "LangWatchQL private provisioning skipped: no key pepper (API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET) to derive the readers from; those organisations stay refused",
+      "LangWatchQL private provisioning skipped: no LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId> is set and no key pepper (API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET) to derive the readers from; those organisations stay refused",
     );
     return;
   }
@@ -391,22 +470,8 @@ export async function provisionLwqlPrivateTargets({
     const read = url === undefined ? undefined : readServerAddress({ url });
     return read === undefined || "unreadable" in read ? [] : [read.address.origin];
   });
-  const owners = new Map<string, string>();
   const ordered = [...endpoints].toSorted((a, b) =>
     compareCodePoints({ left: a.organizationId ?? "", right: b.organizationId ?? "" }),
   );
-  for (const endpoint of ordered) {
-    const claimed = claimServer({ endpoint, sharedOrigins, owners });
-    if ("skipped" in claimed) continue;
-    const { organizationId } = endpoint;
-    if (organizationId === undefined) continue;
-    const address = claimed.claimed;
-    const reader = privateReaderOf({ keyPepper, organizationId });
-    try {
-      const plan = privatePlanOf({ shared, endpoint, address, reader });
-      await provisionOne({ plan, reader, organizationId, converge });
-    } catch (error) {
-      warnNotProvisioned({ organizationId, error });
-    }
-  }
+  await provisionInOrder({ ordered, sharedOrigins, keyPepper, readerPasswords, shared, converge });
 }

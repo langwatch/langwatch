@@ -124,7 +124,7 @@ export class RoutedLangWatchQLExecutorRepository implements LangWatchQLRouter {
     connection: LangWatchQLConnection;
     route: LangWatchQLTenantRouting;
     createExecutor: LangWatchQLExecutorFactory;
-    /** An organization's reader; null with no key pepper, so private runs refuse. */
+    /** An organization's reader; null, or answering null, where it has none: its runs refuse. */
     privateReader?: LwqlPrivateReaderOf | null;
     maxPrivateExecutors?: number;
   }): RoutedLangWatchQLExecutorRepository {

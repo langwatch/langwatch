@@ -66,6 +66,7 @@ import {
   resolveLwqlSource,
   withChainedSecrets,
 } from "../rules/lwql-default-credentials.rules.ts";
+import { parsePrivateReaderPasswords } from "../rules/lwql-private-reader.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 import {
@@ -972,6 +973,7 @@ async function runLwqlProvisioningTask({
     endpoints: privateEndpointsOf({ source }),
     sharedUrl: source.CLICKHOUSE_URL,
     keyPepper: findKeyPeppers(source)[0],
+    readerPasswords: parsePrivateReaderPasswords(source),
     shared: plan,
     converge: (privatePlan) => convergeLwqlPrivateClickHouse({ database, plan: privatePlan }),
   });

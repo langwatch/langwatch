@@ -139,7 +139,12 @@ import {
   type LwqlCredentials,
   resolveLwqlCredentials,
 } from "../rules/lwql-default-credentials.rules.ts";
-import { type LwqlPrivateReaderOf, privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
+import {
+  LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
+  type LwqlPrivateReaderOf,
+  parsePrivateReaderPasswords,
+  privateReaderLookupOf,
+} from "../rules/lwql-private-reader.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -508,6 +513,34 @@ async function queryHashKey(secrets: ScopedSecrets): Promise<Buffer> {
   return key;
 }
 
+/** Each organisation's private reader (ADR-200); a fallback to the pepper or to none is warned. */
+function lwqlPrivateReaders(secrets: ScopedSecrets): Promise<LwqlPrivateReaderOf> {
+  return secrets.into(AnalyticsModule.secrets.lwqlPrivateReaderPasswords, (family) =>
+    intoKeyPepper(secrets, (keyPepper) =>
+      privateReaderLookupOf({
+        passwords: parsePrivateReaderPasswords(Object.fromEntries(family)),
+        keyPepper,
+        onFallback: ({ organizationId, fallback }) => {
+          if (fallback.kind === "derived") {
+            lwqlLogger.warn(
+              { organizationId },
+              "LangWatchQL signs in to this organisation's private ClickHouse with a reader password derived from the key pepper; set LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId> so no platform-derived secret reaches it",
+            );
+            return;
+          }
+          lwqlLogger.warn(
+            {
+              organizationId,
+              ...(fallback.kind === "refused" ? { variable: fallback.variable } : {}),
+            },
+            "LangWatchQL has no private reader for this organisation: its reader password variable is blank or names it twice, or neither it nor a key pepper is set; its queries are refused",
+          );
+        },
+      }),
+    ),
+  );
+}
+
 /**
  * The two reads hydration makes, in the Trace peer's own vocabulary: it names
  * traces and threads where hydration names keys.
@@ -576,6 +609,8 @@ export class AnalyticsModule
     queryHashKey: apiKeyPepper,
     queryHashKeyFallback: credentialsSecret,
     queryHashKeyLastFallback: sessionSecret,
+    /** `LWQL_PRIVATE_READER_PASSWORD__<label>__<orgId>`: each private instance's own password. */
+    lwqlPrivateReaderPasswords: Secret.family(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX),
   } as const;
 
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
@@ -662,13 +697,7 @@ export class AnalyticsModule
     const runTelemetry = LangWatchQLRunTelemetryService.create({
       queryHashKey: await queryHashKey(setup.secrets),
     });
-    const privateReader = await intoKeyPepper(
-      setup.secrets,
-      (keyPepper): LwqlPrivateReaderOf | null =>
-        keyPepper === void 0
-          ? null
-          : ({ organizationId }) => privateReaderOf({ keyPepper, organizationId }),
-    );
+    const privateReader = await lwqlPrivateReaders(setup.secrets);
     const router = connection
       ? RoutedLangWatchQLExecutorRepository.create({
           connection,
