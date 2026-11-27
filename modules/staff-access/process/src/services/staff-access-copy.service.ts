@@ -270,7 +270,11 @@ export class StaffAccessCopyService {
     }));
     try {
       for (const row of rows) await this.deps.events.create(row);
-    } catch {
+    } catch (error) {
+      logger.error(
+        { error, sourceApproval: source.row.id, targetApproval: target.row.id },
+        "a staff access copy trail row was not written",
+      );
       throw new StaffAccessAuditUnavailableError();
     }
     return rows.map((row) => row.id);
@@ -335,7 +339,11 @@ export class StaffAccessCopyService {
     }
     try {
       for (const entry of sides) await recordSide(entry);
-    } catch {
+    } catch (error) {
+      logger.error(
+        { error, action, sourceApproval: source.row.id, targetApproval: target.row.id },
+        "a staff access copy audit row was not written",
+      );
       throw new StaffAccessAuditUnavailableError();
     }
   }

@@ -199,6 +199,7 @@ export class StaffAccessCopyRunService {
         return { ...step.item, outcome: "skipped", reason: "copied_by_a_concurrent_run" };
       }
     } catch (error) {
+      this.logFailure({ error, step, run, stage: "reserve" });
       return { ...step.item, outcome: "failed", reason: failureReason(error) };
     }
     let made: Awaited<ReturnType<StaffAccessCopyMakeService["make"]>>;
@@ -210,6 +211,7 @@ export class StaffAccessCopyRunService {
         run,
       });
     } catch (error) {
+      this.logFailure({ error, step, run, stage: "make" });
       if (refusedBeforeMaking(error)) await this.releaseQuietly({ id: reservation.id });
       return { ...step.item, outcome: "failed", reason: failureReason(error) };
     }
@@ -227,10 +229,34 @@ export class StaffAccessCopyRunService {
         incomplete: made.incomplete ?? null,
       });
     } catch (error) {
+      this.logFailure({ error, step, run, stage: "complete" });
       return { ...copied, outcome: "failed", reason: failureReason(error) };
     }
     if (made.incomplete) return { ...copied, outcome: "failed", reason: made.incomplete };
     return { ...copied, outcome: "copied", reason: null };
+  }
+
+  /** Logs a failed item: a handled refusal as a warning, anything else as an error. */
+  private logFailure({
+    error,
+    step,
+    run,
+    stage,
+  }: {
+    error: unknown;
+    step: Step;
+    run: Run;
+    stage: "reserve" | "make" | "complete";
+  }): void {
+    const context = {
+      error,
+      stage,
+      requestId: run.requestId,
+      kind: step.item.kind,
+      sourceId: step.item.sourceId,
+    };
+    if (refusedBeforeMaking(error)) logger.warn(context, "a staff access copy item was refused");
+    else logger.error(context, "a staff access copy item failed");
   }
 
   /** Drops a reservation that made nothing; a failed release leaves it interrupted. */

@@ -1,4 +1,6 @@
 import { STAFF_COPY_TARGET_PERMISSIONS } from "@langwatch/authz-contract";
+import { DatasetNotReadyError } from "@langwatch/dataset-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { StaffAccessCopyItem } from "@langwatch/staff-access-contract";
 import { describe, expect, it } from "vitest";
 
@@ -9,6 +11,8 @@ import {
   copyTotals,
   failureReason,
   holdsScopes,
+  promptFields,
+  refusedBeforeMaking,
   selectProjects,
   withinGrant,
 } from "../staff-access-copy.rules.ts";
@@ -38,7 +42,8 @@ describe("withinGrant", () => {
   it("allows a kind only when the grant holds every permission it needs", () => {
     expect(withinGrant({ kind: "project", grant: STAFF_COPY_TARGET_PERMISSIONS })).toBe(true);
     expect(withinGrant({ kind: "monitor", grant: STAFF_COPY_TARGET_PERMISSIONS })).toBe(true);
-    expect(withinGrant({ kind: "monitor", grant: ["evaluations:create"] })).toBe(false);
+    expect(withinGrant({ kind: "monitor", grant: ["evaluations:create"] })).toBe(true);
+    expect(withinGrant({ kind: "prompt", grant: ["prompts:create"] })).toBe(false);
     expect(withinGrant({ kind: "dataset", grant: ["project:create"] })).toBe(false);
     expect(withinGrant({ kind: "project", grant: [] })).toBe(false);
   });
@@ -99,6 +104,60 @@ describe("copyTotals and auditedPlan", () => {
       counts: { project: 1, dataset: 1 },
       names: ["project: support-bot", "dataset: golden"],
     });
+  });
+});
+
+describe("refusedBeforeMaking", () => {
+  /** @scenario "Only a handled refusal below 500 counts as refused before anything was made" */
+  it("counts a handled error below 500 and nothing else", () => {
+    expect(refusedBeforeMaking(new DatasetNotReadyError({ status: "processing" }))).toBe(true);
+    expect(refusedBeforeMaking({ code: "copy_broke", httpStatus: 500 })).toBe(false);
+    expect(refusedBeforeMaking(new Error("connection reset"))).toBe(false);
+    expect(refusedBeforeMaking({ httpStatus: 404 })).toBe(false);
+    expect(refusedBeforeMaking(null)).toBe(false);
+  });
+});
+
+describe("promptFields", () => {
+  const version = (settings: Partial<VersionedPrompt>): VersionedPrompt =>
+    ({
+      id: "prompt_1",
+      prompt: "Answer politely",
+      messages: [{ role: "system", content: "Answer politely" }],
+      inputs: [{ identifier: "question", type: "str" }],
+      outputs: [{ identifier: "answer", type: "str" }],
+      model: "openai/gpt-5",
+      ...settings,
+    }) as VersionedPrompt;
+
+  const settings = {
+    temperature: 0.2,
+    maxTokens: 512,
+    topP: 0.9,
+    frequencyPenalty: 0.1,
+    presencePenalty: 0.3,
+    seed: 7,
+    topK: 40,
+    minP: 0.05,
+    repetitionPenalty: 1.1,
+    reasoning: "high",
+    verbosity: "low",
+    promptingTechnique: { type: "chain_of_thought" as const },
+    demonstrations: { name: "Golden answers" },
+    responseFormat: { type: "json_schema" as const, json_schema: { name: "answer", schema: {} } },
+  } satisfies Partial<VersionedPrompt>;
+
+  /** @scenario "A copied prompt version carries every model setting it has and no other" */
+  it("carries each setting a version has and leaves out the ones it has not", () => {
+    const base = {
+      prompt: "Answer politely",
+      messages: [{ role: "system", content: "Answer politely" }],
+      inputs: [{ identifier: "question", type: "str" }],
+      outputs: [{ identifier: "answer", type: "str" }],
+      model: "openai/gpt-5",
+    };
+    expect(promptFields(version(settings))).toEqual({ ...base, ...settings });
+    expect(promptFields(version({ id: "prompt_2" }))).toEqual(base);
   });
 });
 

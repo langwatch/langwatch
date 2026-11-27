@@ -46,13 +46,12 @@ export function namesOrganization(scopes: readonly StaffAccessScope[]): boolean 
 
 /**
  * Exactly what an approved `copy:target` lets the server create in the target organization:
- * projects, evaluators, monitors (created, then paused), prompt versions and datasets. The
+ * projects, evaluators, monitors (created paused in one write), prompt versions and datasets. The
  * approval page lists it and the passkey signs it; the copy checks each item against it.
  */
 export const STAFF_COPY_TARGET_PERMISSIONS: readonly AuthzPermission[] = [
   "project:create",
   "evaluations:create",
-  "evaluations:update",
   "prompts:create",
   "prompts:update",
   "datasets:create",

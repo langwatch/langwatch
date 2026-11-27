@@ -83,6 +83,26 @@ Feature: Copying an organization's setup into another organization
     Then the dataset is reported as "copy_interrupted"
     And Globex holds one copy of the dataset
 
+  @unit
+  Scenario: An owner's refusal by name releases the reservation so a rerun retries the item
+    Given the dataset owner refuses a copy with a handled error below 500 before it makes anything
+    When the copy runs and then runs again once the owner accepts
+    Then the first run reports the dataset failed with the owner's code
+    And the rerun copies the dataset once
+
+  @unit
+  Scenario: Only a handled refusal below 500 counts as refused before anything was made
+    Given a handled error below 500, a handled error at 500 and a plain error
+    When the copy decides whether the owner made nothing
+    Then only the handled error below 500 counts as refused before making
+
+  @unit
+  Scenario: A copied prompt version carries every model setting it has and no other
+    Given a prompt version with every optional model setting set, and one with none
+    When the copy reads the fields it writes into the target
+    Then each setting is carried with its value
+    And a setting the version does not have stays absent
+
   @integration
   Scenario: A dataset whose copy the owner reports interrupted is kept as made and incomplete
     Given the dataset owner reports a copy of ACME's dataset interrupted after it created the dataset in Globex

@@ -22,7 +22,7 @@ export const COPY_KIND_PERMISSIONS: Readonly<
 > = {
   project: ["project:create"],
   evaluator: ["evaluations:create"],
-  monitor: ["evaluations:create", "evaluations:update"],
+  monitor: ["evaluations:create"],
   prompt: ["prompts:create", "prompts:update"],
   dataset: ["datasets:create"],
 };

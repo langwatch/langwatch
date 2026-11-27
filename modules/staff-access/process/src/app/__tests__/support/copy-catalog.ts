@@ -254,6 +254,7 @@ export function copyCatalog() {
     beforeEvaluatorCreate: async () => {},
     afterDatasetCreate: async (_made: { targetDatasetId: string }) => {},
     afterPromptCreate: async () => {},
+    beforeDatasetCopy: async () => {},
   };
 
   const evaluators = createApiFixture<EvaluatorApi>({
@@ -345,6 +346,7 @@ export function copyCatalog() {
           updatedAt: AT,
         })) as never,
     copyDataset: async ({ sourceDatasetId, targetProjectId }) => {
+      await hooks.beforeDatasetCopy();
       const source = data.datasets.find((dataset) => dataset.id === sourceDatasetId);
       if (!source) throw new Error("no such dataset");
       const copied = { ...source, id: fresh("dataset"), projectId: targetProjectId };

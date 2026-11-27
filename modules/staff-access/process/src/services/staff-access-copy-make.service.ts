@@ -14,6 +14,7 @@ import {
   type MonitorApi,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
 import type {
   OrganizationApi,
   OrganizationProvisioningSummary,
@@ -22,6 +23,8 @@ import type { Project, ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
 
 import { copyKeyOf, promptFields } from "../rules/staff-access-copy.rules.ts";
+
+const logger = createLogger("langwatch:staff-access:copy");
 
 const TEAMS_PAGE = 100;
 
@@ -236,7 +239,11 @@ export class StaffAccessCopyMakeService {
           },
         });
       }
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { error, requestId: run.requestId, sourceId: prompt.id, targetId: created.id },
+        "a copied prompt version was refused",
+      );
       return { id: created.id, incomplete: "prompt_versions_incomplete" };
     }
     return { id: created.id };

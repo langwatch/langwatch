@@ -32,7 +32,7 @@ The copy is an ops operation of the `staff-access` module:
   needs the organization's name typed.
 - **The target grant is signed.** `copy:target` grants exactly what a copy
   creates (`STAFF_COPY_TARGET_PERMISSIONS`: `project:create`,
-  `evaluations:create`, `evaluations:update`, `prompts:create`,
+  `evaluations:create`, `prompts:create`,
   `prompts:update`, `datasets:create`). The list is stored on the request row
   (`copyGrant`) when the request is made. The approval page shows that stored
   list, the passkey signs it, and the run checks each item against it before
@@ -95,6 +95,8 @@ The copy is an ops operation of the `staff-access` module:
 
 The copy runs inside the request. A very large source organization can outrun
 the request timeout; a rerun continues where the ledger stopped, except for
-items reported `copy_interrupted` or incomplete, which need a look by hand. Workflows,
+items reported `copy_interrupted` or incomplete, which need a look by hand: no
+operation clears a `copy_interrupted` reservation yet, and one would be its own
+ops function with its own approval. Workflows,
 scenarios, agents, dashboards, triggers and ClickHouse data (traces, runs) are
 specified as `@unimplemented` and need their owners' APIs first.

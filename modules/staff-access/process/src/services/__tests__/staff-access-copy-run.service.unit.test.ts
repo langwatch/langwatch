@@ -1,3 +1,4 @@
+import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -70,5 +71,37 @@ describe("StaffAccessCopyRunService.execute", () => {
     expect(stoppedBecause).toBe("target_approval_ended");
     expect(items.map((item) => item.outcome)).toEqual(["stopped", "stopped", "stopped"]);
     expect(catalog.data.projects.some((p) => p.organizationId === GLOBEX.id)).toBe(false);
+  });
+
+  /** @scenario "An owner's refusal by name releases the reservation so a rerun retries the item" */
+  it("releases the reservation of a dataset the owner refused, and the rerun copies it once", async () => {
+    const grant = ["project:create", "evaluations:create", "datasets:create"];
+    const execute = (current: StaffAccessCopyPlan) =>
+      run.execute({
+        plan: current,
+        requestId: "staffrequest_1",
+        source: ACME,
+        target: GLOBEX,
+        grant,
+        stillLive: async () => null,
+      });
+    catalog.hooks.beforeDatasetCopy = async () => {
+      throw new DatasetNotReadyError({ status: "processing" });
+    };
+
+    const first = await execute(plan);
+    catalog.hooks.beforeDatasetCopy = async () => {};
+    const rerun = await execute(
+      await run.plan({ source: ACME, target: GLOBEX, projects: [sourceProjectId] }),
+    );
+
+    expect(first.items.find((item) => item.kind === "dataset")).toMatchObject({
+      outcome: "failed",
+      reason: "dataset_not_ready",
+    });
+    expect(rerun.items.find((item) => item.kind === "dataset")).toMatchObject({
+      outcome: "copied",
+    });
+    expect(catalog.data.datasets.filter((d) => d.projectId !== sourceProjectId)).toHaveLength(1);
   });
 });
