@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
  * @vitest-environment node
  * The two subscription reads the ops functions stand on, against Postgres: an organization's
  * rows newest first, and every row created in a range across organizations.
- * @see modules/staff-access/specs/staff-access-functions-billing.feature
+ * @see enterprise/modules/billing/specs/billing.feature
  */
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -61,6 +61,7 @@ describe.skipIf(!DB_URL)("given two organizations with subscriptions across two 
   });
 
   describe("when one organization's rows are read", () => {
+    /** @scenario "An organization's subscriptions read newest first, cancelled ones included" */
     it("answers all of them, cancelled included, newest first", async () => {
       const rows = await repository.findForOrganization(organizationIds[0] ?? "");
 
@@ -69,6 +70,7 @@ describe.skipIf(!DB_URL)("given two organizations with subscriptions across two 
   });
 
   describe("when rows created in November are read", () => {
+    /** @scenario "Subscriptions created in a range are read across organizations" */
     it("answers both organizations' November rows and not October's", async () => {
       const rows = await repository.findCreatedBetween({
         since: Temporal.Instant.from("2026-11-01T00:00:00Z"),

@@ -8,6 +8,11 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { BilledSeatKind } from "./stripe-prices.ts";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
+const BILLING_FACTS_UNAVAILABLE_MESSAGES = {
+  not_cloud: "Billing facts are only available on LangWatch Cloud",
+  no_payment_provider: "No payment provider is configured, so there are no prices to read",
+} as const;
+
 /**
  * Billing's ops reads run where billing bills: LangWatch Cloud, and for the price catalogue a
  * configured payment provider. A self-hosted deployment answers this by name.
@@ -16,7 +21,7 @@ export class BillingFactsUnavailableError extends HandledError {
   declare readonly code: "billing_facts_unavailable";
 
   constructor({ reason }: { reason: "not_cloud" | "no_payment_provider" }) {
-    super("billing_facts_unavailable", "Billing facts are only available on LangWatch Cloud", {
+    super("billing_facts_unavailable", BILLING_FACTS_UNAVAILABLE_MESSAGES[reason], {
       httpStatus: 403,
       fault: "customer",
       meta: { reason },

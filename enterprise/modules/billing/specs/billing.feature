@@ -360,3 +360,17 @@ Feature: Enterprise billing compatibility
       When the usage-billing catch-up step runs as a dry run
       Then no usage-billed fact is recorded
       And no checkpoint is saved
+
+  # prisma.subscription.repository.ts findForOrganization, findCreatedBetween: the reads the
+  # staff ops functions org.billing and billing.subscriptions stand on (ADR-202).
+  @integration
+  Scenario: An organization's subscriptions read newest first, cancelled ones included
+    Given an organization with an older cancelled subscription and a newer active one
+    When its subscriptions are read for a staff investigation
+    Then both are answered, the newer first
+
+  @integration
+  Scenario: Subscriptions created in a range are read across organizations
+    Given two organizations with subscriptions created in October and in November
+    When the subscriptions created in November are read
+    Then both organizations' November subscriptions are answered and no October one

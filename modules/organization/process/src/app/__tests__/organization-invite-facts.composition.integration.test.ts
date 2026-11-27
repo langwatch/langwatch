@@ -1,7 +1,7 @@
 /**
  * Every invitation of an organization through `OrganizationModule.create` over the memory
  * registry, as a staff investigation reads it: statuses, ids and times, never an address or code.
- * @see dev/docs/adr/202-ops-agent-access.md
+ * @see modules/organization/specs/invitations.feature
  */
 import { type Instant, nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -106,6 +106,7 @@ describe("OrganizationModule.findInviteFacts", () => {
       },
     ];
 
+    /** @scenario "Every invitation of an organization reads newest first with the status a person sees" */
     it("answers each of this organization's invitations, newest first, with the status a person sees", async () => {
       const app = await application(seeds);
 
@@ -128,6 +129,7 @@ describe("OrganizationModule.findInviteFacts", () => {
       });
     });
 
+    /** @scenario "An organization's invitations read for staff carry no address, code or link" */
     it("carries no address, code or link", async () => {
       const app = await application(seeds);
 
@@ -138,6 +140,7 @@ describe("OrganizationModule.findInviteFacts", () => {
   });
 
   describe("given an organization with no invitations", () => {
+    /** @scenario "An organization with no invitations reads as an empty list" */
     it("answers an empty list", async () => {
       const app = await application([]);
 

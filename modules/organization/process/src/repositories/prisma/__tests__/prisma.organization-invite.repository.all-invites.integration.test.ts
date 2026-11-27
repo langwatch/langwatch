@@ -2,7 +2,7 @@
  * @vitest-environment node
  * Every invitation of one organization, whatever its status, newest first, and none of another
  * organization's (ADR-202, ops functions: org.invites).
- * @see dev/docs/adr/202-ops-agent-access.md
+ * @see modules/organization/specs/invitations.feature
  */
 import { createLogger } from "@langwatch/observability";
 import {
@@ -68,6 +68,7 @@ describe.skipIf(!DB_URL)("findAllInvites (Postgres)", () => {
     await prisma.$disconnect();
   });
 
+  /** @scenario "Every invitation of an organization reads newest first with the status a person sees" */
   it("answers every status of this organization only, newest first", async () => {
     const acme = await organization("acme");
     const other = await organization("other");
@@ -105,6 +106,7 @@ describe.skipIf(!DB_URL)("findAllInvites (Postgres)", () => {
     ]);
   });
 
+  /** @scenario "An organization with no invitations reads as an empty list" */
   it("answers an empty list for an organization with none", async () => {
     const empty = await organization("empty");
 

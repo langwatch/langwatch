@@ -5,10 +5,9 @@ import type {
   StaffAccessFunctionInput,
   StaffAccessFunctionOutput,
 } from "@langwatch/staff-access-contract";
-import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
-import { pageOf } from "../rules/staff-access-function.rules.ts";
+import { pageOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
 import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
@@ -266,18 +265,4 @@ async function mapInBatches<Item, Result>({
     results.push(...(await Promise.all(items.slice(at, at + size).map(map))));
   }
   return results;
-}
-
-function isoOfMs(ms: number): string {
-  return isoText(Temporal.Instant.fromEpochMilliseconds(ms));
-}
-
-function pageInputOf(input: { limit?: number; cursor?: string }): {
-  limit?: number;
-  cursor?: string;
-} {
-  return {
-    ...(input.limit === undefined ? {} : { limit: input.limit }),
-    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-  };
 }

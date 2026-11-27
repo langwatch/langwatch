@@ -13,7 +13,7 @@ import type {
 import { type Instant, Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { pageOf, rangeOf } from "../rules/staff-access-function.rules.ts";
+import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
 import {
   imageTagOf,
   plainWordOf,
@@ -311,20 +311,6 @@ function servicesOf(processes: readonly OpsServingProcess[]) {
   }));
 }
 
-function isoOfMs(ms: number): string {
-  return isoText(Temporal.Instant.fromEpochMilliseconds(ms));
-}
-
 function isoTextOf(text: string): string {
   return isoText(Temporal.Instant.from(text));
-}
-
-function pageInputOf(input: { limit?: number; cursor?: string }): {
-  limit?: number;
-  cursor?: string;
-} {
-  return {
-    ...(input.limit === undefined ? {} : { limit: input.limit }),
-    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-  };
 }

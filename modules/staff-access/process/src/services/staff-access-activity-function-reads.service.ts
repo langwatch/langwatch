@@ -17,13 +17,12 @@ import type { TraceApi } from "@langwatch/trace-contract";
 
 import {
   foldInstantEvalWeeks,
-  isoOfMs,
   plainCode,
   sumByWeek,
   WEEK_MS,
   weekStartsBack,
 } from "../rules/staff-access-activity-function.rules.ts";
-import { pageOf, rangeOf } from "../rules/staff-access-function.rules.ts";
+import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
 import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
 type ActivityReadsDeps = Readonly<{
@@ -175,22 +174,20 @@ export class StaffAccessActivityFunctionReadsService {
       valueOf: (row) => row.runs,
     });
     const memberUserIds = members.map((member) => member.id);
-    const rows = [];
-    for (const start of starts) {
-      const weekly = await this.weekCounts({
-        projectIds,
-        memberUserIds,
-        since: start,
-        until: start + WEEK_MS,
-      });
-      rows.push({
+    const rows = await Promise.all(
+      starts.map(async (start) => ({
         week: isoOfMs(start),
-        ...weekly,
+        ...(await this.weekCounts({
+          projectIds,
+          memberUserIds,
+          since: start,
+          until: start + WEEK_MS,
+        })),
         instantEvalRuns: instantRuns.get(start) ?? 0,
         codingAgentSessions: sessions.get(start) ?? 0,
         gatewayRequests: requests.get(start) ?? 0,
-      });
-    }
+      })),
+    );
     return pageOf({
       rows,
       keyOf: (row) => row.week,
@@ -292,14 +289,4 @@ function windowOf({
 }): Window {
   const range = rangeOf({ since: input.since, ...(input.until ? { until: input.until } : {}), at });
   return { since: range.since.epochMilliseconds, until: range.until.epochMilliseconds };
-}
-
-function pageInputOf(input: { limit?: number; cursor?: string }): {
-  limit?: number;
-  cursor?: string;
-} {
-  return {
-    ...(input.limit === undefined ? {} : { limit: input.limit }),
-    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-  };
 }

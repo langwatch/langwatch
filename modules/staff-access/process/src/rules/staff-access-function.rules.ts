@@ -17,6 +17,8 @@ import {
 import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
+import { isoText } from "./staff-access.rules.ts";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const cursorShape = z.object({ f: z.string(), k: z.string() });
 
@@ -132,4 +134,18 @@ export function functionsFor({
     if (!functionFitsScopes({ name, scopes })) throw new StaffFunctionScopeMismatchError({ name });
   }
   return names.toSorted();
+}
+export function isoOfMs(ms: number): string {
+  return isoText(Temporal.Instant.fromEpochMilliseconds(ms));
+}
+
+/** A paged input's limit and cursor, each only when given. */
+export function pageInputOf(input: { limit?: number; cursor?: string }): {
+  limit?: number;
+  cursor?: string;
+} {
+  return {
+    ...(input.limit === undefined ? {} : { limit: input.limit }),
+    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+  };
 }

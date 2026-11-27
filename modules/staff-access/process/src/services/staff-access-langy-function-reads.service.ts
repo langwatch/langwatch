@@ -10,10 +10,15 @@ import {
   type StaffAccessFunctionInput,
   type StaffAccessFunctionOutput,
 } from "@langwatch/staff-access-contract";
-import { type Instant, Temporal } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 
-import { pageOf, rangeOf, type StaffAccessPage } from "../rules/staff-access-function.rules.ts";
-import { isoText } from "../rules/staff-access.rules.ts";
+import {
+  pageOf,
+  rangeOf,
+  type StaffAccessPage,
+  isoOfMs,
+  pageInputOf,
+} from "../rules/staff-access-function.rules.ts";
 import type { StaffAccessFunctionRuns } from "./staff-access-function-reads.service.ts";
 
 /** How many tool calls one turn of `org.langy_turn` answers; `truncated` says when it ran more. */
@@ -119,19 +124,5 @@ function toolCallsPageOf(
     total: calls.length,
     truncated: calls.length > items.length,
     nextCursor: null,
-  };
-}
-
-function isoOfMs(ms: number): string {
-  return isoText(Temporal.Instant.fromEpochMilliseconds(ms));
-}
-
-function pageInputOf(input: { limit?: number; cursor?: string }): {
-  limit?: number;
-  cursor?: string;
-} {
-  return {
-    ...(input.limit === undefined ? {} : { limit: input.limit }),
-    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
   };
 }

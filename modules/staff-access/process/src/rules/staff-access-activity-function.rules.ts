@@ -4,9 +4,8 @@
  */
 import type { InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
 import type { StaffAccessFunctionOutput } from "@langwatch/staff-access-contract";
-import { Temporal } from "@langwatch/time";
 
-import { isoText } from "./staff-access.rules.ts";
+import { isoOfMs } from "./staff-access-function.rules.ts";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const WEEK_MS = 7 * DAY_MS;
@@ -28,10 +27,6 @@ export function weekStartOf(ms: number): number {
 export function weekStartsBack({ weeks, at }: { weeks: number; at: number }): number[] {
   const current = weekStartOf(at);
   return Array.from({ length: weeks }, (_, index) => current - (weeks - 1 - index) * WEEK_MS);
-}
-
-export function isoOfMs(ms: number): string {
-  return isoText(Temporal.Instant.fromEpochMilliseconds(ms));
 }
 
 /** Code counts merged into one record, stored codes collapsed first. */
