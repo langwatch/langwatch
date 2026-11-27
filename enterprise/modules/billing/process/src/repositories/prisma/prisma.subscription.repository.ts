@@ -284,7 +284,10 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     return { ...subscriptionRecordOf(row), organization: row.organization };
   }
 
-  /** The stored status decides at the write, so a parallel activation that won keeps its start. */
+  /**
+   * Checked just before the write, so an activation that already finished keeps its start.
+   * Not atomic: Prisma's updateMany reads matching ids, then updates them by id alone.
+   */
   private async startUnlessActive(id: string): Promise<void> {
     await this.prisma.subscription.updateMany({
       where: { id, status: { not: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus } },
