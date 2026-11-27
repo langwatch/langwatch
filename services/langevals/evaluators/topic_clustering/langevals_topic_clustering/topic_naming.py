@@ -10,7 +10,7 @@ import json
 from random import random
 from typing import Iterable, TypeVar, Optional
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from langevals_topic_clustering.types import Money, Trace
 
@@ -18,8 +18,14 @@ from langevals_topic_clustering.utils import (
     generate_embeddings,
 )
 from langevals_topic_clustering._logger import get_logger
+from langevals_topic_clustering.refusals import is_auth_refusal
 
 T = TypeVar("T")
+
+# A missing or refused key fails every retry and every batch the same way.
+_retry_unless_refused = retry_if_exception(
+    lambda error: isinstance(error, Exception) and not is_auth_refusal(error)
+)
 
 logger = get_logger("topic_clustering.naming")
 
@@ -35,7 +41,7 @@ def cost_of(response) -> float:
         return 0.0
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
+@retry(retry=_retry_unless_refused, wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def generate_topic_names(
     litellm_params: dict[str, str],
     topic_examples: list[list[str]],
@@ -167,6 +173,8 @@ def generate_topic_names_split(
                 cost["amount"] += cost_["amount"]
                 results += result
             except Exception as e:
+                if is_auth_refusal(e):
+                    raise
                 logger.error("Failed to generate topic names for batch", batch_size=len(batch), error=str(e))
                 results += [None] * len(batch)
             batch = []
@@ -177,13 +185,15 @@ def generate_topic_names_split(
             cost["amount"] += cost_["amount"]
             results += result
         except Exception as e:
+            if is_auth_refusal(e):
+                raise
             logger.error("Failed to generate topic names for final batch", batch_size=len(batch), error=str(e))
             results += [None] * len(batch)
 
     return results, cost
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(2), reraise=True)
+@retry(retry=_retry_unless_refused, wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(2), reraise=True)
 def generate_topic_names_split_and_improve_similar_names(
     litellm_params: dict[str, str],
     embeddings_litellm_params: dict[str, str],

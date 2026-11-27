@@ -176,6 +176,16 @@ describe("topic clustering langevals requests", () => {
       });
     });
 
+    describe("when the provider has no API key", () => {
+      /** @scenario "A model provider with no API key named by the clustering service is the customer's to fix" */
+      it("fails the page as a missing-key failure the customer can fix", async () => {
+        expect(classifyClusteringError(await refusedWith("model_provider_key_missing"))).toEqual({
+          code: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_KEY_MISSING,
+          isUserActionable: true,
+        });
+      });
+    });
+
     describe("when the refusal names no provider code, or a request the provider called malformed", () => {
       /** @scenario "A clustering service failure without a provider code stays ours" */
       it.each([undefined, "model_provider_bad_request" as const])(

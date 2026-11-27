@@ -306,6 +306,9 @@ type internalExportJob struct {
 	mirrorTier      string
 	sourceOrgID     string
 	sourceProjectID string
+	// mirrorOnly marks a batch the collector already holds (the manager's own
+	// langy.turn root), so only the mirror copy is built from it.
+	mirrorOnly bool
 }
 
 // Options configures the relay. The zero value is valid: no second export.
@@ -518,6 +521,19 @@ func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end t
 		return
 	}
 	info := entry.info
+	// The mirror's copy of the root, through the same bounded lane as the worker
+	// batches: with a harness that exports no spans of its own, this root is the
+	// only relay-built span the gateway's mirrored model calls can join.
+	r.exportInternal(internalExportJob{
+		conversationID:  info.ConversationID,
+		model:           info.Model,
+		turn:            sc,
+		payload:         payload,
+		mirrorTier:      info.MirrorTier,
+		sourceOrgID:     info.SourceOrganizationID,
+		sourceProjectID: info.SourceProjectID,
+		mirrorOnly:      true,
+	})
 	go func() {
 		defer clog.HandlePanic(r.baseCtx, false)
 		ctx, cancel := context.WithTimeout(r.baseCtx, 10*time.Second)
@@ -782,7 +798,8 @@ func (r *Relay) exportInternal(job internalExportJob) {
 	// as MirrorTierSkip, resolved control-plane side.
 	mirrorWanted := r.mirrorEndpoint != "" &&
 		domain.NormalizeMirrorTier(job.mirrorTier) != domain.MirrorTierSkip
-	if r.internalEndpoint == "" && !mirrorWanted {
+	collectorWanted := r.internalEndpoint != "" && !job.mirrorOnly
+	if !collectorWanted && !mirrorWanted {
 		return
 	}
 	if r.internalCtx.Err() != nil {
@@ -832,7 +849,7 @@ func (r *Relay) processInternalJob(job internalExportJob) {
 			zap.String("conversation", job.conversationID), zap.Error(err))
 		return
 	}
-	if r.internalEndpoint != "" {
+	if r.internalEndpoint != "" && !job.mirrorOnly {
 		r.deliverInternal(job, td)
 	}
 	tier := domain.NormalizeMirrorTier(job.mirrorTier)

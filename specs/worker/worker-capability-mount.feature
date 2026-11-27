@@ -32,10 +32,17 @@ Feature: The worker is the installed module list in the worker role
 
   @unit
   Scenario: Topic clustering names the provider it cannot use rather than inventing a model
-    Given the project's embeddings model names a provider that is missing or disabled
+    Given the project's embeddings model names a provider that is missing
     When a clustering page resolves its embeddings model
-    Then the resolution refuses naming that provider
+    Then the resolution refuses naming that provider, with the model_not_configured code
     And no topic is named with a provider the customer did not choose
+
+  @unit
+  Scenario: A disabled embeddings provider skips the run like a disabled clustering provider
+    Given the project's clustering or embeddings model names a provider that is disabled
+    When a clustering page runs
+    Then the run is skipped as not configured
+    And nothing is sent to the clustering service
 
   @unit
   Scenario: The clustering page posts its body directly
