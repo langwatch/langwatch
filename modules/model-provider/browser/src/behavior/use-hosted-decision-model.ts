@@ -1,7 +1,7 @@
 /**
- * Whether Default models may offer the hosted decision model LangWatch Instant (preview), as the
- * server answers it: released, or one switch away for a self-serve organization. Everywhere else
- * the column lists only the project's own decision models and an unset column reads "Not set".
+ * Whether Default models may offer the hosted decision model LangWatch Instant (preview): released,
+ * or one switch away for a self-serve organization. Elsewhere only own decision models are listed
+ * and an unset column reads "Choose a decision model".
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 import { isHostedDecisionModelOffered } from "../model/decision-model-options.ts";

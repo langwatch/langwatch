@@ -14,11 +14,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { clearFlowCallbacks, useDrawer } from "../../../behavior/use-drawer.ts";
 import { CurrentDrawer } from "../current-drawer.tsx";
 
-function ReadableDrawer({ subject }: { subject?: string }) {
+function ReadableDrawer({ subject, picked }: { subject?: string; picked?: string }) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   return (
     <div>
       <p>reading {subject ?? "nothing"}</p>
+      {picked && <p>picked {picked}</p>}
       <button type="button" onClick={closeDrawer}>
         close
       </button>
@@ -32,10 +33,13 @@ function ReadableDrawer({ subject }: { subject?: string }) {
 }
 
 function OtherDrawer() {
-  const { canGoBack, goBack } = useDrawer();
+  const { canGoBack, goBack, goBackWith } = useDrawer();
   return (
     <div>
       <p>the other drawer</p>
+      <button type="button" onClick={() => goBackWith({ picked: "the result" })}>
+        hand back
+      </button>
       {canGoBack && (
         <button type="button" onClick={goBack}>
           back
@@ -205,6 +209,28 @@ describe("the drawer host", () => {
         await user.click(await screen.findByRole("button", { name: "back" }));
 
         expect(await screen.findByText("reading a trace")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a reader who walked from one drawer into another", () => {
+    describe("when the second drawer goes back with a result", () => {
+      /** @scenario "A sub-flow hands a result back to the drawer that opened it" */
+      it("returns to the first drawer with its parameters and the result", async () => {
+        mount("/acme/traces");
+        const user = userEvent.setup();
+
+        await user.click(screen.getByRole("button", { name: "open readable" }));
+        await screen.findByText("reading a trace");
+        await user.click(screen.getByRole("button", { name: "open other" }));
+        await screen.findByText("the other drawer");
+
+        await user.click(screen.getByRole("button", { name: "hand back" }));
+
+        expect(await screen.findByText("reading a trace")).toBeInTheDocument();
+        expect(screen.getByText("picked the result")).toBeInTheDocument();
+        expect(screen.queryByText("the other drawer")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "back" })).not.toBeInTheDocument();
       });
     });
   });

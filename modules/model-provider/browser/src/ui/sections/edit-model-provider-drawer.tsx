@@ -17,11 +17,18 @@ type EditModelProviderDrawerProps = {
   organizationId?: string;
   modelProviderId?: string;
   providerKey: string;
+  /** Opened from a picker for this model: saving goes back to the picker's drawer, handing it the
+   * model as `pick`, rather than closing every drawer. */
+  returnPick?: string;
 };
 
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
-  const { projectId, organizationId, modelProviderId, providerKey } = props;
-  const { closeDrawer } = useDrawer();
+  const { projectId, organizationId, modelProviderId, providerKey, returnPick } = props;
+  const { closeDrawer, goBack, goBackWith, canGoBack } = useDrawer();
+  // Opened from the Instant Evals picker: saving hands the model back, cancelling just goes back.
+  const isPickerSubFlow = !!returnPick && canGoBack;
+  const onSaved = isPickerSubFlow ? () => goBackWith({ pick: returnPick }) : undefined;
+  const onClose = isPickerSubFlow ? goBack : closeDrawer;
   const [saveState, setSaveState] = useState<ModelProviderSaveState>({
     busy: false,
     label: "Save",
@@ -64,7 +71,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
 
   return (
     <Drawer
-      onClose={closeDrawer}
+      onClose={onClose}
       size="xl"
       title={title || "Model provider"}
       icon={
@@ -79,7 +86,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
         isFormDataLoading
           ? void 0
           : {
-              cancel: { onClick: closeDrawer },
+              cancel: { onClick: onClose },
               busy: saveState.busy,
               primaryAction: {
                 label: saveState.label,
@@ -99,6 +106,7 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
         organizationId={organizationId}
         modelProviderId={modelProviderId}
         providerKey={providerKey}
+        onSaved={onSaved}
         formId="model-provider-form"
         onSaveStateChange={setSaveState}
       />

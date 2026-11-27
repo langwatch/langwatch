@@ -14,12 +14,12 @@ import { DECISION_MODEL_PICKER_PLACEHOLDER } from "../decision-model-picker.tsx"
 import {
   CONNECT_SETTINGS_HREF,
   CONTACT_US_HREF,
+  INSTANT_EVALS_SETUP_HREF,
   InstantEvalRefusalPopover,
   instantEvalRefusalCopy,
   type InstantEvalRefusal,
   MODEL_PROVIDERS_HREF,
   OWN_MODEL_LINK,
-  SELF_HOSTED_INSTANT_EVALS_HREF,
   UPGRADE_HREF,
   WHERE_THE_TEXT_GOES_HREF,
 } from "../instant-eval-refusal-popover.tsx";
@@ -80,7 +80,7 @@ describe("given the deployment has no classifier", () => {
   /** @scenario "A missing classifier opens the model popover and keeps the eval chip" */
   it("says Instant Evals can't run right now and offers a word with us, not the model settings", () => {
     const copy = instantEvalRefusalCopy({ kind: "model" });
-    if ("lock" in copy) throw new Error("a model refusal is not the license lock");
+    if ("turnOn" in copy) throw new Error("a model refusal is not the self-hosted way in");
 
     expect(copy.title).toBe("Instant Evals can't run right now");
     expect(copy.body).toBe(
@@ -346,18 +346,25 @@ describe("given a self-hosted install that judges through LangWatch", () => {
 });
 
 describe("given an eval chip refused on a self-hosted install", () => {
+  const withoutHostedJudging = ["not_in_license", "not_connected", "ask_operator"] as const;
+
   function renderRefusal(
     kind: "not_in_license" | "switched_off" | "not_connected" | "ask_operator",
-    { canActivateLicense = false }: { canActivateLicense?: boolean } = {},
+    {
+      canManageOrganization = false,
+      offersOwnModel = true,
+      onClose = () => {},
+    }: { canManageOrganization?: boolean; offersOwnModel?: boolean; onClose?: () => void } = {},
   ) {
     render(
       <InstantEvalRefusalPopover
         refusal={{ kind }}
-        onClose={() => {}}
+        onClose={onClose}
         onSkip={() => {}}
         onEnable={() => {}}
         isEnabling={false}
-        canActivateLicense={canActivateLicense}
+        canManageOrganization={canManageOrganization}
+        offersOwnModel={offersOwnModel}
       >
         <span>anchor</span>
       </InstantEvalRefusalPopover>,
@@ -365,35 +372,122 @@ describe("given an eval chip refused on a self-hosted install", () => {
     );
   }
 
-  describe("when its license does not include Instant Evals, or no license is installed", () => {
+  describe("when the install has no hosted judging", () => {
     /** @scenario "Each self-hosted refusal says what to do about it" */
-    it("shows the Enterprise lock to an admin, both buttons on the License page", () => {
-      renderRefusal("not_in_license", { canActivateLicense: true });
-      expect(screen.getByText("Instant Evals is part of LangWatch Enterprise")).toBeInTheDocument();
-      expect(screen.queryByText(/license doesn't include/)).toBeNull();
-      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
+    it.each(withoutHostedJudging)(
+      "reads Turn on Instant Evals for %s, never Enterprise or license",
+      (kind) => {
+        renderRefusal(kind, { canManageOrganization: true });
+        const popover = screen.getByTestId("instant-eval-refusal");
+        expect(screen.getByText("Turn on Instant Evals")).toBeInTheDocument();
+        expect(popover.textContent).not.toMatch(/enterprise|licen[cs]e/i);
+        expect(screen.queryByText("Contact us")).toBeNull();
+      },
+    );
+  });
+
+  describe("when the reader may manage the organization", () => {
+    /** @scenario "A self-hosted admin is offered two ways to turn Instant Evals on" */
+    it("offers LangWatch Instant (preview) first, then the own decision model, each with its button", () => {
+      renderRefusal("not_in_license", { canManageOrganization: true });
+      const hosted = screen.getByTestId("instant-eval-turn-on-hosted");
+      const ownModel = screen.getByTestId("instant-eval-turn-on-own-model");
+      expect(
+        hosted.compareDocumentPosition(ownModel) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(within(hosted).getByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(within(hosted).getByText("Recommended")).toBeInTheDocument();
+      expect(within(hosted).getByText(/You pay per eval/)).toBeInTheDocument();
+      expect(within(hosted).getByRole("link", { name: "Connect to LangWatch" })).toHaveAttribute(
         "href",
-        "/settings/license",
+        CONNECT_SETTINGS_HREF,
       );
-      expect(screen.getByRole("link", { name: "Get a license" })).toHaveAttribute(
+      expect(within(ownModel).getByText("Your own decision model")).toBeInTheDocument();
+      expect(within(ownModel).getByText(/You pay the provider/)).toBeInTheDocument();
+      expect(within(ownModel).getByRole("link", { name: "Add a key" })).toHaveAttribute(
         "href",
-        "/settings/license",
+        INSTANT_EVALS_SETUP_HREF,
       );
-      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
-        "href",
-        SELF_HOSTED_INSTANT_EVALS_HREF,
-      );
-      expect(screen.queryByText("Contact us")).toBeNull();
+      expect(screen.queryByTestId("instant-eval-ask-admin")).toBeNull();
     });
 
-    /** @scenario "Each self-hosted refusal says what to do about it" */
-    it("tells a member to ask an organization admin, with no license button", () => {
-      renderRefusal("not_in_license");
-      expect(
-        screen.getByText(/Ask an organization admin to activate a license\./),
-      ).toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: "Activate a license" })).toBeNull();
-      expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
+    /** @scenario "A self-hosted admin is offered two ways to turn Instant Evals on" */
+    it("closes on Not now", () => {
+      const onClose = vi.fn();
+      renderRefusal("not_connected", { canManageOrganization: true, onClose });
+      fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the reader may not manage the organization", () => {
+    /** @scenario "A self-hosted member sees the two ways and a link to send an admin" */
+    it("shows both ways with no button, and copies the setup link for an admin", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderRefusal("ask_operator");
+
+      expect(screen.getByTestId("instant-eval-turn-on-hosted")).toBeInTheDocument();
+      expect(screen.getByTestId("instant-eval-turn-on-own-model")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Connect to LangWatch" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Add a key" })).toBeNull();
+      expect(screen.getByText("Only an admin can turn this on")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}${INSTANT_EVALS_SETUP_HREF}`,
+      );
+      expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+    });
+
+    /** @scenario "A member whose browser can't copy is left the link to copy by hand" */
+    it("keeps the link on screen and says to copy it by hand when the write is refused", async () => {
+      const writeText = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderRefusal("ask_operator");
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(await screen.findByText(/Select the link above/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+      expect(screen.getByTestId("instant-eval-ask-admin-address")).toHaveTextContent(
+        `${window.location.origin}${INSTANT_EVALS_SETUP_HREF}`,
+      );
+    });
+
+    /** @scenario "A member whose browser can't copy is left the link to copy by hand" */
+    it("says to copy it by hand when the browser has no clipboard", async () => {
+      Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+      renderRefusal("ask_operator");
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(await screen.findByText(/Select the link above/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+    });
+  });
+
+  describe("when own decision models are switched off for the organization", () => {
+    /** @scenario "With own decision models switched off, a self-hosted install is offered LangWatch Instant (preview) only" */
+    it("shows only the LangWatch Instant (preview) card", () => {
+      renderRefusal("not_in_license", { canManageOrganization: true, offersOwnModel: false });
+      expect(screen.getByTestId("instant-eval-turn-on-hosted")).toBeInTheDocument();
+      expect(screen.queryByTestId("instant-eval-turn-on-own-model")).toBeNull();
+      expect(screen.getByTestId("instant-eval-refusal").textContent).not.toMatch(
+        /own decision model/i,
+      );
+    });
+
+    /** @scenario "With own decision models switched off, a self-hosted install is offered LangWatch Instant (preview) only" */
+    it("gives a member the Connect settings link to send", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderRefusal("not_in_license", { offersOwnModel: false });
+
+      await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}${CONNECT_SETTINGS_HREF}`);
     });
   });
 
@@ -406,32 +500,6 @@ describe("given an eval chip refused on a self-hosted install", () => {
         "href",
         CONNECT_SETTINGS_HREF,
       );
-      expect(screen.queryByText("Contact us")).toBeNull();
-    });
-  });
-
-  describe("when the install isn't connected to LangWatch", () => {
-    /** @scenario "Each self-hosted refusal says what to do about it" */
-    it("names both addresses and links Read more, with no Contact us", () => {
-      renderRefusal("not_connected");
-      expect(screen.getByText("This install isn't connected to LangWatch")).toBeInTheDocument();
-      expect(
-        screen.getByText(/connect\.langwatch\.ai and gateway\.langwatch\.ai/),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
-        "href",
-        SELF_HOSTED_INSTANT_EVALS_HREF,
-      );
-      expect(screen.queryByText("Contact us")).toBeNull();
-    });
-  });
-
-  describe("when the install judges with its own key", () => {
-    /** @scenario "Each self-hosted refusal says what to do about it" */
-    it("sends the reader to whoever runs the install, with no Contact us", () => {
-      renderRefusal("ask_operator");
-      expect(screen.getByText("Instant Evals are off on this install")).toBeInTheDocument();
-      expect(screen.getByText(/whoever runs it decides/)).toBeInTheDocument();
       expect(screen.queryByText("Contact us")).toBeNull();
     });
   });
@@ -449,8 +517,35 @@ describe("given an eval chip refused by a gate on LangWatch's own model", () => 
     { kind: "ask_operator" },
   ];
 
-  // Unreleased picks the model in place instead; its own test pins the picker.
-  const linked = gated.filter((refusal) => refusal.kind !== "unreleased");
+  // Unreleased picks the model in place instead; its own test pins the picker. A self-hosted
+  // install without hosted judging offers the own model as a card, pinned below.
+  const turnOnKinds: readonly string[] = ["not_in_license", "not_connected", "ask_operator"];
+  const linked = gated.filter(
+    (refusal) => refusal.kind !== "unreleased" && !turnOnKinds.includes(refusal.kind),
+  );
+
+  /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
+  it.each(gated.filter((refusal) => turnOnKinds.includes(refusal.kind)))(
+    "offers $kind the own decision model as the second card",
+    (refusal) => {
+      render(
+        <InstantEvalRefusalPopover
+          refusal={refusal}
+          onClose={vi.fn()}
+          onSkip={vi.fn()}
+          onEnable={vi.fn()}
+          isEnabling={false}
+          offersOwnModel
+          canManageOrganization
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("instant-eval-turn-on-own-model")).toBeInTheDocument();
+    },
+  );
 
   /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
   it.each(linked)(
@@ -499,6 +594,7 @@ describe("given an eval chip refused by a gate on LangWatch's own model", () => 
       );
 
       expect(screen.queryByTestId("instant-eval-own-model-link")).toBeNull();
+      expect(screen.queryByTestId("instant-eval-turn-on-own-model")).toBeNull();
     },
   );
 

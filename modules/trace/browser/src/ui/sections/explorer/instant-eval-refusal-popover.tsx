@@ -1,4 +1,3 @@
-import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 /**
  * The refusal an Instant Eval met, anchored under the search bar: what the eval would have found,
@@ -6,6 +5,7 @@ import { Link as RoutedLink } from "@langwatch/browser-host/link";
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
 import { AccessState } from "@langwatch/design-system/access-state";
+import { Card } from "@langwatch/design-system/card";
 import {
   PopoverAnchor,
   PopoverArrow,
@@ -13,10 +13,19 @@ import {
   PopoverContent,
   PopoverRoot,
 } from "@langwatch/design-system/popover";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import type { ExplorerSelfHostedInstantEvalOffer } from "@langwatch/trace-contract";
-import { Sparkles } from "lucide-react";
+import { Check, Copy, KeyRound, Sparkles } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 
 import { DecisionModelPicker } from "./decision-model-picker.tsx";
 
@@ -48,9 +57,13 @@ export const OWN_MODEL_LINK = {
   href: MODEL_PROVIDERS_HREF,
 } as const;
 
-/** What an Instant Eval does, said once on the Enterprise lock. */
+/** What an Instant Eval does, said once above the two ways to turn them on. */
 const INSTANT_EVALS_DESCRIPTION =
-  "Ask your traces a question in plain language and keep only the results that answer it.";
+  "Ask your traces a question in plain language and keep only the results that answer it. Pick how it judges.";
+
+/** Where an admin adds a decision model key: Model providers, with the Instant Evals picker
+ *  open. */
+export const INSTANT_EVALS_SETUP_HREF = "/settings/model-providers?setup=instant-evals";
 
 /** Where a project without Instant Evals asks for them to be switched on. */
 export const CONTACT_US_HREF =
@@ -81,8 +94,8 @@ interface InstantEvalRefusalPopoverProps {
   isEnabling: boolean;
   /** The install judges through LangWatch: "can't run right now" then names the two addresses. */
   viaConnect?: boolean;
-  /** The reader may manage the organization, so the license lock offers the License page. */
-  canActivateLicense?: boolean;
+  /** The reader may manage the organization, so the self-hosted ways in carry their buttons. */
+  canManageOrganization?: boolean;
   /** The own-decision-model kill switch is on, so Default models can pick one: offer it. */
   offersOwnModel?: boolean;
   /** The reader may set the project's default models, so the decision model is picked in place. */
@@ -109,51 +122,55 @@ interface InstantEvalRefusalCopy {
   dismiss: string;
 }
 
-/** The license gap: the Enterprise lock owns its words; the entry holds what sits beside it. */
-interface InstantEvalLicenseLockCopy {
-  lock: "license";
+/**
+ * A self-hosted install without hosted judging: the two ways to turn Instant Evals on, LangWatch
+ * Instant (preview) through Connect, and (when offered) the project's own decision model.
+ */
+interface InstantEvalTurnOnCopy {
+  turnOn: true;
+  title: string;
+  body: string;
+  hosted: { title: string; body: string; action: { label: string; href: string } };
+  ownModel?: { title: string; body: string; action: { label: string; href: string } };
   more: { label: string; href: string };
-  ownModel?: { label: string; href: string };
   dismiss: string;
 }
 
-const READ_MORE_SELF_HOSTED = { label: "Read more", href: SELF_HOSTED_INSTANT_EVALS_HREF };
+/** The two ways in, said the same whichever reason kept hosted judging off. */
+const TURN_ON_COPY: InstantEvalTurnOnCopy = {
+  turnOn: true,
+  title: "Turn on Instant Evals",
+  body: INSTANT_EVALS_DESCRIPTION,
+  hosted: {
+    title: "LangWatch Instant (preview)",
+    body: "Runs on LangWatch Cloud. Connect this install to your LangWatch organization and add credits. You pay per eval.",
+    action: { label: "Connect to LangWatch", href: CONNECT_SETTINGS_HREF },
+  },
+  ownModel: {
+    title: "Your own decision model",
+    body: "OpenAI, Perplexity, Inception, Cloudflare or TypeSafe. Paste a key and it becomes the default. You pay the provider.",
+    action: { label: "Add a key", href: INSTANT_EVALS_SETUP_HREF },
+  },
+  more: { label: "How Instant Evals work", href: SELF_HOSTED_INSTANT_EVALS_HREF },
+  dismiss: "Not now",
+};
 
 /**
  * A self-hosted refusal, keyed by the server's offer so a fifth offer fails the typecheck rather
- * than falling through to the enterprise copy. Only a license gap offers a word with us: the other
- * three are fixed on the install, by an admin, its network or its operator.
+ * than falling through to the enterprise copy. No license gap, missing connection or operator
+ * choice is a wall: each offers the two ways in. Only an admin's own switch is told apart.
  */
-const SELF_HOSTED_REFUSAL_COPY: { not_in_license: InstantEvalLicenseLockCopy } & Record<
-  Exclude<ExplorerSelfHostedInstantEvalOffer, "not_in_license">,
-  InstantEvalRefusalCopy
-> = {
-  // Also the answer with no license at all, so it never says what a license holds.
-  not_in_license: {
-    lock: "license",
-    more: READ_MORE_SELF_HOSTED,
-    ownModel: OWN_MODEL_LINK,
-    dismiss: "Not now",
-  },
+const SELF_HOSTED_REFUSAL_COPY: Record<
+  Exclude<ExplorerSelfHostedInstantEvalOffer, "switched_off">,
+  InstantEvalTurnOnCopy
+> & { switched_off: InstantEvalRefusalCopy } = {
+  not_in_license: TURN_ON_COPY,
+  not_connected: TURN_ON_COPY,
+  ask_operator: TURN_ON_COPY,
   switched_off: {
     title: "Instant Evals are switched off for your organization",
     body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
     action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
-    ownModel: OWN_MODEL_LINK,
-    dismiss: "Not now",
-  },
-  not_connected: {
-    // Not "can't reach": an operator who switched Connect off on purpose gets this one too.
-    title: "This install isn't connected to LangWatch",
-    body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
-    more: READ_MORE_SELF_HOSTED,
-    ownModel: OWN_MODEL_LINK,
-    dismiss: "Not now",
-  },
-  ask_operator: {
-    title: "Instant Evals are off on this install",
-    body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
-    more: READ_MORE_SELF_HOSTED,
     ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
@@ -180,7 +197,7 @@ type RefusalCopyOptions = {
 export function instantEvalRefusalCopy(
   refusal: InstantEvalRefusal,
   options: RefusalCopyOptions = {},
-): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
+): InstantEvalRefusalCopy | InstantEvalTurnOnCopy {
   const copy = refusalCopyFor(refusal, options);
   if (options.offersOwnModel || !copy.ownModel) return copy;
   const { ownModel: _hidden, ...withoutOwnModel } = copy;
@@ -190,7 +207,7 @@ export function instantEvalRefusalCopy(
 function refusalCopyFor(
   refusal: InstantEvalRefusal,
   { viaConnect = false, offersOwnModel = false, canPickDecisionModel = false }: RefusalCopyOptions,
-): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
+): InstantEvalRefusalCopy | InstantEvalTurnOnCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
   const skip = "Skip searches your words without the eval.";
@@ -276,7 +293,7 @@ export function InstantEvalRefusalPopover({
   onEnable,
   isEnabling,
   viaConnect,
-  canActivateLicense = false,
+  canManageOrganization = false,
   offersOwnModel = false,
   canPickDecisionModel = false,
   decisionModels,
@@ -287,30 +304,17 @@ export function InstantEvalRefusalPopover({
   const refusalCopy = refusal
     ? instantEvalRefusalCopy(refusal, { viaConnect, offersOwnModel, canPickDecisionModel })
     : null;
-  const lockCopy = refusalCopy && "lock" in refusalCopy ? refusalCopy : null;
-  const copy = refusalCopy && !("lock" in refusalCopy) ? refusalCopy : null;
+  const turnOnCopy = refusalCopy && "turnOn" in refusalCopy ? refusalCopy : null;
+  const copy = refusalCopy && !("turnOn" in refusalCopy) ? refusalCopy : null;
   const action = copy?.action;
   const actionHref = action?.href;
   // Only a button that says Skip routes the words again; "Not now" just closes.
   const onDismiss = copy?.dismiss === "Skip" ? onSkip : onClose;
-  const licenseLock = lockCopy ? (
-    <EnterpriseLock
-      compact
-      feature="Instant Evals"
-      description={INSTANT_EVALS_DESCRIPTION}
-      canManage={canActivateLicense}
-      data-testid="instant-eval-enterprise-lock"
-      extraActions={
-        <>
-          <Button size="xs" variant="ghost" onClick={onDismiss}>
-            {lockCopy.dismiss}
-          </Button>
-          <RoutedLink href={lockCopy.more.href} target="_blank" rel="noopener noreferrer">
-            {lockCopy.more.label}
-          </RoutedLink>
-          <OwnModelLink link={lockCopy.ownModel} />
-        </>
-      }
+  const turnOn = turnOnCopy ? (
+    <TurnOnInstantEvals
+      copy={turnOnCopy}
+      canManageOrganization={canManageOrganization}
+      onDismiss={onClose}
     />
   ) : null;
   return (
@@ -325,10 +329,14 @@ export function InstantEvalRefusalPopover({
       unmountOnExit
     >
       <PopoverAnchor asChild>{children}</PopoverAnchor>
-      <PopoverContent maxWidth="360px" data-testid="instant-eval-refusal">
+      <PopoverContent
+        width={turnOn ? "420px" : undefined}
+        maxWidth={turnOn ? "calc(100vw - 32px)" : "360px"}
+        data-testid="instant-eval-refusal"
+      >
         <PopoverArrow />
         <PopoverBody>
-          {licenseLock ??
+          {turnOn ??
             (copy && actionHref && refusal?.kind === "budget" ? (
               <AccessState
                 kind="upgrade"
@@ -425,6 +433,162 @@ export function InstantEvalRefusalPopover({
         </PopoverBody>
       </PopoverContent>
     </PopoverRoot>
+  );
+}
+
+/**
+ * One way to turn Instant Evals on: what it is, who pays, and its button for an admin. A
+ * recommended option carries the "Recommended" badge and the one solid button.
+ */
+function TurnOnOption({
+  option,
+  icon,
+  isRecommended = false,
+  canAct,
+  testId,
+}: {
+  option: { title: string; body: string; action: { label: string; href: string } };
+  icon: React.ReactNode;
+  isRecommended?: boolean;
+  canAct: boolean;
+  testId: string;
+}) {
+  return (
+    <Card
+      variant="nested"
+      padding="sm"
+      icon={icon}
+      title={option.title}
+      badge={
+        isRecommended ? (
+          <Badge size="sm" colorPalette="orange" variant="subtle">
+            Recommended
+          </Badge>
+        ) : undefined
+      }
+      description={option.body}
+      footer={
+        canAct ? (
+          <Button
+            asChild
+            size="xs"
+            colorPalette={isRecommended ? "orange" : undefined}
+            variant={isRecommended ? "solid" : "outline"}
+          >
+            {/* A new tab, so the typed query the popover keeps survives the detour. */}
+            <RoutedLink href={option.action.href} target="_blank" rel="noopener noreferrer">
+              {option.action.label}
+            </RoutedLink>
+          </Button>
+        ) : undefined
+      }
+      footerDivider={false}
+      data-testid={testId}
+    />
+  );
+}
+
+/**
+ * The self-hosted way in: LangWatch Instant (preview) first, then the own decision model. A
+ * reader who may not manage the organization sees both, and a link to send an admin.
+ */
+function TurnOnInstantEvals({
+  copy,
+  canManageOrganization,
+  onDismiss,
+}: {
+  copy: InstantEvalTurnOnCopy;
+  canManageOrganization: boolean;
+  onDismiss: () => void;
+}) {
+  return (
+    <VStack align="stretch" gap={3} data-testid="instant-eval-turn-on">
+      <VStack align="stretch" gap={1}>
+        <Text textStyle="sm" fontWeight="semibold">
+          {copy.title}
+        </Text>
+        <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+          {copy.body}
+        </Text>
+      </VStack>
+      <TurnOnOption
+        option={copy.hosted}
+        icon={<Sparkles size={16} />}
+        isRecommended
+        canAct={canManageOrganization}
+        testId="instant-eval-turn-on-hosted"
+      />
+      {copy.ownModel && (
+        <TurnOnOption
+          option={copy.ownModel}
+          icon={<KeyRound size={16} />}
+          canAct={canManageOrganization}
+          testId="instant-eval-turn-on-own-model"
+        />
+      )}
+      {!canManageOrganization && <AskAnAdmin href={(copy.ownModel ?? copy.hosted).action.href} />}
+      <HStack gap={2}>
+        <Text textStyle="xs">
+          <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
+            {copy.more.label}
+          </RoutedLink>
+        </Text>
+        <Spacer />
+        <Button size="xs" variant="ghost" onClick={onDismiss}>
+          {copy.dismiss}
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+/**
+ * What a member sees in place of the buttons: who can act, and a link to send them. Without
+ * clipboard access the address stays on screen, selectable, with a line saying to copy it by hand.
+ */
+function AskAnAdmin({ href }: { href: string }) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const address = typeof window === "undefined" ? href : `${window.location.origin}${href}`;
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(address);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  };
+  const copied = copyState === "copied";
+  return (
+    <VStack align="stretch" gap={1} data-testid="instant-eval-ask-admin">
+      <Text textStyle="xs" fontWeight="medium">
+        Only an admin can turn this on
+      </Text>
+      <HStack gap={2}>
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          fontFamily="mono"
+          truncate={copyState !== "failed"}
+          wordBreak="break-all"
+          userSelect="all"
+          flex={1}
+          minWidth={0}
+          data-testid="instant-eval-ask-admin-address"
+        >
+          {address}
+        </Text>
+        <Button size="xs" variant="outline" onClick={() => void copy()}>
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+      </HStack>
+      <Text textStyle="xs" color="fg.muted">
+        {copyState === "failed"
+          ? "Couldn't copy it. Select the link above and send it to an admin."
+          : "Send it to an admin so they can turn it on."}
+      </Text>
+    </VStack>
   );
 }
 

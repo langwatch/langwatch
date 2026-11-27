@@ -9,17 +9,33 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockUpdate, mockValidateApiKey, mockProviders, mockCloseDrawer } = vi.hoisted(() => ({
+const {
+  mockUpdate,
+  mockValidateApiKey,
+  mockProviders,
+  mockCloseDrawer,
+  mockGoBack,
+  mockGoBackWith,
+  stack,
+} = vi.hoisted(() => ({
   mockUpdate: vi.fn().mockResolvedValue({ id: "mp-1" }),
   mockValidateApiKey: vi.fn().mockResolvedValue({ valid: true }),
   mockCloseDrawer: vi.fn(),
+  mockGoBack: vi.fn(),
+  mockGoBackWith: vi.fn(),
+  stack: { canGoBack: false },
   mockProviders: {
     current: [] as Record<string, unknown>[],
   },
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
-  useDrawer: () => ({ closeDrawer: mockCloseDrawer }),
+  useDrawer: () => ({
+    closeDrawer: mockCloseDrawer,
+    goBack: mockGoBack,
+    goBackWith: mockGoBackWith,
+    canGoBack: stack.canGoBack,
+  }),
 }));
 
 vi.mock("@langwatch/feature-flag-client", () => ({
@@ -210,6 +226,61 @@ describe("given the model-provider editor drawer", () => {
         provider: "openai",
         customKeys: expect.objectContaining({ OPENAI_API_KEY: "sk-test123" }),
       });
+    });
+  });
+
+  describe("when it was opened from the Instant Evals picker for a model", () => {
+    beforeEach(() => {
+      stack.canGoBack = true;
+      renderWithModelProviderHost(
+        <EditModelProviderDrawer
+          providerKey="openai"
+          modelProviderId="new"
+          projectId="proj-1"
+          returnPick="openai/decisions:gpt-6-luna"
+        />,
+        new FakeModelProviderHost(),
+      );
+    });
+    afterEach(() => {
+      stack.canGoBack = false;
+    });
+
+    /** @scenario "Saving the key returns to the Default models drawer with the model picked" */
+    it("goes back to the picker's drawer with the model, instead of closing", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+
+      await typeTheKey(user, "sk-test123");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() =>
+        expect(mockGoBackWith).toHaveBeenCalledWith({ pick: "openai/decisions:gpt-6-luna" }),
+      );
+      expect(mockCloseDrawer).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Cancelling the provider form returns to the Default models drawer" */
+    it("goes back to the picker's drawer on Cancel, keeping the stack", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+
+      await user.click(await screen.findByRole("button", { name: /cancel/i }));
+
+      expect(mockGoBack).toHaveBeenCalledTimes(1);
+      expect(mockCloseDrawer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when it was opened from the Model providers table", () => {
+    /** @scenario "Saving a provider opened from the page closes its drawer as before" */
+    it("closes on save, with nothing to go back to", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderWithModelProviderHost(OPEN_FOR_A_NEW_OPENAI_KEY, new FakeModelProviderHost());
+
+      await typeTheKey(user, "sk-test123");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalled());
+      expect(mockGoBackWith).not.toHaveBeenCalled();
     });
   });
 });

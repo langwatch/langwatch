@@ -34,3 +34,29 @@ export const Selected: Story = {};
 export const WithInherit: Story = {
   args: { model: "", inheritOption: { label: "Inherit (from organization)" } },
 };
+
+/** A row that cannot be picked yet carries the button that lifts it, such as Add key. */
+export const WithRowAction: Story = {
+  args: {
+    model: "",
+    placeholder: "Choose a decision model",
+    defaultOpen: true,
+    query: {
+      isLoading: false,
+      data: [
+        {
+          label: "Decisions API",
+          value: "openai/decisions",
+          subtitle: "Optimized for classification",
+        },
+        {
+          label: "Perplexity Decider v1.2",
+          value: "perplexity/decider-v1.2",
+          subtitle: "Add a Perplexity key in Model Providers to use it.",
+          disabled: true,
+          action: { label: "Add key", onAction: () => void 0 },
+        },
+      ],
+    },
+  },
+};

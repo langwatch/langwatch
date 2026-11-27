@@ -297,16 +297,16 @@ describe("given the Default Models table", () => {
         });
       });
 
-      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column reads Not set" */
-      it("reads Not set where nothing is set, never LangWatch Instant (preview)", () => {
+      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column asks for a decision model" */
+      it("reads Choose a decision model where nothing is set, never LangWatch Instant (preview)", () => {
         renderSection();
 
         const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-        expect(cell.textContent).toBe("Not set");
+        expect(cell.textContent).toBe("Choose a decision model");
       });
 
-      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column reads Not set" */
-      it("reads Not set where the row pins LangWatch Instant (preview)", () => {
+      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column asks for a decision model" */
+      it("reads Choose a decision model where the row pins LangWatch Instant (preview)", () => {
         mockGetDefaultModels.mockReturnValue({
           data: {
             ...FAKE_PAYLOAD,
@@ -322,7 +322,7 @@ describe("given the Default Models table", () => {
         renderSection();
 
         expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
-          "Not set",
+          "Choose a decision model",
         );
       });
 
@@ -425,6 +425,63 @@ describe("given the Default Models table", () => {
           CUSTOM_DISPLAY_NAME,
         );
       });
+    });
+  });
+});
+
+describe("given the page is opened on the Instant Evals setup address", () => {
+  const setupHost = () => new FakeModelProviderHost({ query: { setup: "instant-evals" } });
+
+  beforeEach(() => {
+    mockInstantEvalAccess.mockReturnValue({
+      data: { hostedReleased: false, offer: "not_in_license" },
+      isLoading: false,
+    });
+  });
+  afterEach(() => cleanup());
+
+  describe("when the organization has a config", () => {
+    /** @scenario "The Instant Evals setup address opens the decision model picker" */
+    it("opens the organization's config once, on the Instant Evals picker", () => {
+      mockGetDefaultModels.mockReturnValue({ data: FAKE_PAYLOAD, isLoading: false });
+      const host = setupHost();
+      renderSection({ host });
+
+      expect(host.drawerOpens).toEqual([
+        {
+          drawer: "defaultModelOverride",
+          params: { editingId: "cfg_acme_org", focusRole: "INSTANT_EVALS" },
+        },
+      ]);
+    });
+  });
+
+  describe("when the organization has no config", () => {
+    /** @scenario "The Instant Evals setup address opens the decision model picker" */
+    it("opens a new config at the organization scope, on the Instant Evals picker", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: { ...FAKE_PAYLOAD, configs: [FAKE_PAYLOAD.configs[1]!] },
+        isLoading: false,
+      });
+      const host = setupHost();
+      renderSection({ host });
+
+      expect(host.drawerOpens).toEqual([
+        {
+          drawer: "defaultModelOverride",
+          params: { scopeType: "ORGANIZATION", scopeId: "org-1", focusRole: "INSTANT_EVALS" },
+        },
+      ]);
+    });
+  });
+
+  describe("when the address has no setup query", () => {
+    it("opens no drawer", () => {
+      mockGetDefaultModels.mockReturnValue({ data: FAKE_PAYLOAD, isLoading: false });
+      const host = new FakeModelProviderHost();
+      renderSection({ host });
+
+      expect(host.drawerOpens).toEqual([]);
     });
   });
 });

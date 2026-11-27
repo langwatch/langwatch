@@ -605,10 +605,11 @@ export const useDrawer = () => {
 
   /**
    * Go back to the drawer at `index` beneath the open one, dropping it and
-   * everything above. Nothing at `index` closes the drawer entirely.
+   * everything above. Nothing at `index` closes the drawer entirely. `params`
+   * are added to the ones the drawer was left with, to hand it a result.
    */
   const goBackTo = useCallback(
-    (index: number) => {
+    (index: number, options: { params?: Record<string, string> } = {}) => {
       const ancestors = readDrawerAncestors(readDrawerLocation().state);
       const target = ancestors[index];
       if (!target) {
@@ -617,9 +618,11 @@ export const useDrawer = () => {
       }
       // Push, so the next browser Back returns to the drawer this one left,
       // rather than landing on an entry that repeats the address.
-      updateDrawerUrl(target.drawer, target.params, {
-        state: drawerAncestorsState(ancestors.slice(0, index)),
-      });
+      updateDrawerUrl(
+        target.drawer,
+        { ...target.params, ...options.params },
+        { state: drawerAncestorsState(ancestors.slice(0, index)) },
+      );
     },
     [closeDrawer, updateDrawerUrl],
   );
@@ -628,6 +631,14 @@ export const useDrawer = () => {
   const goBack = useCallback(() => {
     goBackTo(readDrawerAncestors(readDrawerLocation().state).length - 1);
   }, [goBackTo]);
+
+  /** `goBack`, handing the drawer beneath `params` as a result, such as what was just saved. */
+  const goBackWith = useCallback(
+    (params: Record<string, string>) => {
+      goBackTo(readDrawerAncestors(readDrawerLocation().state).length - 1, { params });
+    },
+    [goBackTo],
+  );
 
   /**
    * Check if a specific drawer is currently open.
@@ -651,6 +662,7 @@ export const useDrawer = () => {
       closeDrawer,
       drawerOpen,
       goBack,
+      goBackWith,
       goBackTo,
       canGoBack,
       backStack,
@@ -665,6 +677,7 @@ export const useDrawer = () => {
       closeDrawer,
       drawerOpen,
       goBack,
+      goBackWith,
       goBackTo,
       canGoBack,
       backStack,

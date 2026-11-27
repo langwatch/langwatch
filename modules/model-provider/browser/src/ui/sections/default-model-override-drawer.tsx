@@ -4,7 +4,7 @@
  * keeps the outgoing model stale until remounted.
  */
 import type { WireOf } from "@langwatch/api/web";
-import { useDrawer } from "@langwatch/browser-host/drawer";
+import { updateDrawerParams, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -34,17 +34,31 @@ import {
   UNSET_ROLE_FALLBACK,
 } from "@langwatch/model-provider-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
+import { useDefaultModelsDraftStore } from "../../behavior/default-models-draft.store.ts";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
+  CHOOSE_DECISION_MODEL,
   DECISION_MODEL_DISPLAY_NAMES,
   decisionModelPickerOptions,
+  isPickableDecisionOption,
   rolePickerOptions,
+  withAddKeyActions,
 } from "../../model/decision-model-options.ts";
 import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
-import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import {
+  MODEL_PROVIDER_MANAGE_PERMISSION,
+  useModelProviderHost,
+} from "../../model/model-provider-host.ts";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;
@@ -147,15 +161,18 @@ function nextHydration({
   editing,
   editingId,
   hydratedFor,
+  initialScope,
 }: {
   editing: ConfigRow | undefined;
   editingId: string | undefined;
   hydratedFor: string | null;
+  /** Creating: the scope the address picked, such as the organization for Instant Evals setup. */
+  initialScope?: ScopeTriadEntry;
 }): { config: Record<string, string>; scopes: ScopeTriadEntry[]; target: string } | null {
   if (!editingId) {
     if (hydratedFor === CREATE_TARGET) return null;
 
-    return { config: {}, scopes: [], target: CREATE_TARGET };
+    return { config: {}, scopes: initialScope ? [initialScope] : [], target: CREATE_TARGET };
   }
   if (!editing || hydratedFor === editing.id) return null;
 
@@ -349,11 +366,161 @@ interface Props {
    *  prop so the drawer fits the URL-driven `currentDrawer` pattern used
    *  everywhere else. */
   editingId?: string;
+  /** The role whose picker starts open, for an address that leads straight to it. */
+  focusRole?: string;
+  /** Creating: the one scope to start with. */
+  scopeType?: string;
+  scopeId?: string;
+  /** A decision model handed back by the provider form: picked once it can run. */
+  pick?: string;
 }
 
-export function DefaultModelOverrideDrawer({ editingId }: Props) {
+function isScopeType(value: string | undefined): value is ScopeType {
+  return value === "ORGANIZATION" || value === "TEAM" || value === "PROJECT";
+}
+
+/**
+ * The drawer's unsaved scopes and config, hydrated once per target. Coming back from a provider
+ * form opened by Add key, the draft kept before it is restored instead.
+ */
+function useConfigDraft({
+  editing,
+  editingId,
+  scopeType,
+  scopeId,
+}: {
+  editing: ConfigRow | undefined;
+  editingId: string | undefined;
+  scopeType: string | undefined;
+  scopeId: string | undefined;
+}) {
+  const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
+  const [config, setConfig] = useState<Record<string, string>>({});
+  const [attempted, setAttempted] = useState(false);
+  const hydratedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const initialScope = isScopeType(scopeType) && scopeId ? { scopeType, scopeId } : void 0;
+    const next = nextHydration({
+      editing,
+      editingId,
+      hydratedFor: hydratedForRef.current,
+      initialScope,
+    });
+    if (!next) return;
+
+    const draftStore = useDefaultModelsDraftStore.getState();
+    const restored = draftStore.draft?.target === next.target ? draftStore.draft : next;
+    if (draftStore.draft) draftStore.clear();
+    hydratedForRef.current = next.target;
+    setAttempted(false);
+    setScopes(restored.scopes);
+    setConfig(restored.config);
+  }, [editingId, editing, scopeType, scopeId]);
+  const keepDraft = () =>
+    useDefaultModelsDraftStore.getState().keep({
+      target: hydratedForRef.current ?? editingId ?? CREATE_TARGET,
+      scopes,
+      config,
+    });
+  return {
+    scopes,
+    setScopes,
+    config,
+    setConfig,
+    attempted,
+    setAttempted,
+    hydratedForRef,
+    keepDraft,
+  };
+}
+
+/**
+ * The Instant Evals column's options. The server weighs the flag and the keys of the picked
+ * scopes, not the page's project, so it offers only models every picked scope would run.
+ */
+function useListedDecisionOptions({
+  projectId,
+  organizationId,
+  scopes,
+  open,
+}: {
+  projectId: string | undefined;
+  organizationId: string | undefined;
+  scopes: ScopeTriadEntry[];
+  open: boolean;
+}) {
+  const isEnabled = !!projectId && open;
+  const pickableDecisionModels =
+    modelProviderApi.modelProvider.listDecisionModelsForScopes.useQuery(
+      {
+        projectId: projectId ?? "",
+        scopes: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })),
+      },
+      { enabled: isEnabled && scopes.length > 0 },
+    );
+  const { enabled: isJudgeRouted } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_judge_router,
+    { projectId: projectId ?? NOT_TARGETED, organizationId, enabled: isEnabled },
+  );
+  const { enabled: isOwnModelEnabled, isLoading: isOwnModelLoading } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_own_decision_model,
+    // Asked of the organization only, as the server asks it (ADR-182 decision 4).
+    { projectId: NOT_TARGETED, organizationId, enabled: isEnabled },
+  );
+  const isHostedOffered = useHostedDecisionModelOffered({ projectId, enabled: open });
+  return {
+    listedDecisionOptions: decisionModelPickerOptions({
+      pickable: pickableDecisionModels.data,
+      isJudgeRouted,
+      isOwnModelEnabled,
+      isHostedOffered,
+    }),
+    isPickableLoaded:
+      pickableDecisionModels.isSuccess && !pickableDecisionModels.isFetching && !isOwnModelLoading,
+    isHostedOffered,
+  };
+}
+
+/**
+ * Picks the model a provider form handed back once its key reaches every scope; else leaves it.
+ * Either way the pick leaves the address, so a later Add key's way back does not hand it in again.
+ */
+function useReturnedPick({
+  pick,
+  options,
+  isPickableLoaded,
+  hydratedForRef,
+  setConfig,
+}: {
+  pick: string | undefined;
+  options: ModelPickerOption[];
+  isPickableLoaded: boolean;
+  hydratedForRef: RefObject<string | null>;
+  setConfig: Dispatch<SetStateAction<Record<string, string>>>;
+}) {
+  const [appliedPick, setAppliedPick] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pick || appliedPick === pick || !isPickableLoaded || hydratedForRef.current === null) {
+      return;
+    }
+    setAppliedPick(pick);
+    if (isPickableDecisionOption({ options, model: pick })) {
+      setConfig((prev) => withOverride(prev, "INSTANT_EVALS", pick));
+    }
+    updateDrawerParams({ pick: undefined }, { push: false });
+  }, [pick, appliedPick, isPickableLoaded, options, hydratedForRef, setConfig]);
+}
+
+export function DefaultModelOverrideDrawer({
+  editingId,
+  focusRole,
+  scopeType,
+  scopeId,
+  pick,
+}: Props) {
   const host = useModelProviderHost();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
+  const canManageProviders = host.hasPermission(MODEL_PROVIDER_MANAGE_PERMISSION);
   const { projectId, organizationId } = host.scope();
   const utils = modelProviderApi.useUtils();
   const saveMutation = modelProviderApi.modelProvider.saveDefaultModelsConfig.useMutation();
@@ -379,7 +546,10 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
   // pops the URL param and unmounts.
   const open = true;
-  const onClose = closeDrawer;
+  const onClose = () => {
+    useDefaultModelsDraftStore.getState().clear();
+    closeDrawer();
+  };
 
   // Ask the server what the cascade would resolve for each role +
   // feature key if the picked scopes had nothing set. The drawer uses
@@ -392,24 +562,20 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // overrides. Keys absent = inherit. Local-only "EXPANDED" tracking
   // for which roles have their feature lists open in the form.
 
-  const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const {
+    scopes,
+    setScopes,
+    config,
+    setConfig,
+    attempted,
+    setAttempted,
+    hydratedForRef,
+    keepDraft,
+  } = useConfigDraft({ editing, editingId, scopeType, scopeId });
   const [expanded, setExpanded] = useState<Record<ModelRole, boolean>>(() => perRole(() => false));
   const [busy, setBusy] = useState(false);
-  const [attempted, setAttempted] = useState(false);
   const scopeRef = useRef<HTMLDivElement>(null);
   const rolesRef = useRef<HTMLDivElement>(null);
-
-  const hydratedForRef = useRef<string | null>(null);
-  useEffect(() => {
-    const next = nextHydration({ editing, editingId, hydratedFor: hydratedForRef.current });
-    if (!next) return;
-
-    hydratedForRef.current = next.target;
-    setAttempted(false);
-    setScopes(next.scopes);
-    setConfig(next.config);
-  }, [editingId, editing]);
 
   const inheritedQuery = modelProviderApi.modelProvider.getInheritedValuesForScopes.useQuery(
     {
@@ -438,35 +604,37 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { enabled: !!projectId && open, refetchOnMount: false },
   );
 
-  // The server weighs the flag and the keys of the picked scopes, not the page's project, so
-  // the column offers only models every picked scope would run. No scope picked: LangWatch only.
-  const pickableDecisionModels =
-    modelProviderApi.modelProvider.listDecisionModelsForScopes.useQuery(
+  const { listedDecisionOptions, isPickableLoaded, isHostedOffered } = useListedDecisionOptions({
+    projectId,
+    organizationId,
+    scopes,
+    open,
+  });
+  // A row waiting on a key opens that provider's form over this drawer, which comes back with the
+  // model as `pick` once the key is saved.
+  const openProviderForm = ({ provider, model }: { provider: string; model: string }) => {
+    keepDraft();
+    openDrawer(
+      "editModelProvider",
       {
-        projectId: projectId ?? "",
-        scopes: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })),
+        projectId,
+        organizationId,
+        providerKey: provider,
+        modelProviderId: "new",
+        returnPick: model,
       },
-      { enabled: !!projectId && scopes.length > 0 && open },
+      { replace: false },
     );
-  const { enabled: isJudgeRouted } = useFeatureFlag(
-    FrontendFlags.release_instant_evals_judge_router,
-    {
-      projectId: projectId ?? NOT_TARGETED,
-      organizationId,
-      enabled: !!projectId && open,
-    },
-  );
-  const { enabled: isOwnModelEnabled } = useFeatureFlag(
-    FrontendFlags.release_instant_evals_own_decision_model,
-    // Asked of the organization only, as the server asks it (ADR-182 decision 4).
-    { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
-  );
-  const isHostedOffered = useHostedDecisionModelOffered({ projectId, enabled: open });
-  const decisionOptions = decisionModelPickerOptions({
-    pickable: pickableDecisionModels.data,
-    isJudgeRouted,
-    isOwnModelEnabled,
-    isHostedOffered,
+  };
+  const decisionOptions = canManageProviders
+    ? withAddKeyActions({ options: listedDecisionOptions, onAddKey: openProviderForm })
+    : listedDecisionOptions;
+  useReturnedPick({
+    pick,
+    options: listedDecisionOptions,
+    isPickableLoaded,
+    hydratedForRef,
+    setConfig,
   });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
@@ -578,6 +746,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               displayNames={displayNames}
               pickerOptionFor={pickerOptionFor}
               pickerFor={(llmOptions) => rolePickerOptions({ role, decisionOptions, llmOptions })}
+              startsOpen={focusRole === role}
             />
           ))}
         </VStack>
@@ -606,6 +775,7 @@ function RoleRow({
   displayNames,
   pickerOptionFor,
   pickerFor,
+  startsOpen = false,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -624,6 +794,8 @@ function RoleRow({
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
+  /** The picker starts open, for an address that leads straight to it. */
+  startsOpen?: boolean;
 }) {
   // A pinned LangWatch model the column no longer offers reads as unset, as the table cell does.
   const stored = canonicalModelId(config[role] ?? "");
@@ -671,6 +843,7 @@ function RoleRow({
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={unsetDefault && !current ? undefined : roleInherit}
             disabled={unsupportedAtScope}
+            defaultOpen={startsOpen}
             labelFor={(fullModelId) =>
               modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
             }
@@ -850,7 +1023,7 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
  * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
- * inherit; Instant Evals falls back to LangWatch Instant (preview), or "Not set" if not offered.
+ * inherit; Instant Evals falls back to LangWatch Instant (preview), or asks for a decision model.
  */
 export function buildInheritOption(
   entry: InheritedEntry,
@@ -860,7 +1033,7 @@ export function buildInheritOption(
   const hit = inheritHitOption(entry);
   if (hit) return hit;
   if (role === "INSTANT_EVALS") {
-    if (!isHostedOffered) return { label: "Not set" };
+    if (!isHostedOffered) return { label: CHOOSE_DECISION_MODEL };
     return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default", isUnsetDefault: true };
   }
   return { label: "Not configured" };
@@ -879,7 +1052,8 @@ export function roleInheritOption({
   role: ModelRole;
   inherited: Record<string, InheritedEntry>;
   config: Record<string, string>;
-  /** Whether LangWatch Instant (preview) may be offered; if not, unset reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, unset asks for a decision
+   *  model. */
   isHostedOffered?: boolean;
 }): InheritOptionShape {
   const own = inheritHitOption(inherited[role] ?? null);

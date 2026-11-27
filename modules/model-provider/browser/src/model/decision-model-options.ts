@@ -4,10 +4,12 @@
  *           specs/model-providers/judge-default-model.feature.
  */
 
+import type { ModelPickerAction } from "@langwatch/design-system/provider-model-selector";
 import {
   DECISION_MODELS,
   decisionModelPickerTitle,
   findDecisionModel,
+  isOwnDecisionModelId,
   LANGWATCH_DECISION_PREVIEWS,
   ownDecisionModelPickerOptions,
   type BuiltInModel,
@@ -21,12 +23,16 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
   DECISION_MODELS.map((entry) => [entry.id, decisionModelPickerTitle(entry)]),
 );
 
+/** What an unset Instant Evals column reads where LangWatch Instant (preview) is not offered. */
+export const CHOOSE_DECISION_MODEL = "Choose a decision model";
+
 /** Offers that leave LangWatch's own model one switch away: the organization's, or its admin's. */
 const HOSTED_ONE_SWITCH_AWAY: ReadonlySet<string> = new Set(["enable", "ask_admin"]);
 
 /**
  * Whether the column may offer LangWatch Instant (preview): released, or one switch away. Not
- * answered yet counts as offered, so a released organization never sees it flicker to "Not set".
+ * answered yet counts as offered, so a released organization never sees it flicker to
+ * "Choose a decision model".
  */
 export function isHostedDecisionModelOffered(
   access: { hostedReleased: boolean; offer: string } | undefined,
@@ -113,4 +119,43 @@ export function rolePickerOptions({
   llmOptions: ModelPickerOption[];
 }): ModelPickerOption[] {
   return role === "INSTANT_EVALS" ? decisionOptions : llmOptions;
+}
+
+/** A picker row that may carry a button, such as "Add key". */
+export type DecisionPickerOption = ModelPickerOption & { action?: ModelPickerAction };
+
+/** What an own decision model row's "Add key" button says. */
+export const ADD_KEY_LABEL = "Add key";
+
+/**
+ * Gives every own decision model row that waits on a key an "Add key" button, which opens that
+ * provider's form for the model. Rows that run, and LangWatch's own, are left as they are.
+ */
+export function withAddKeyActions({
+  options,
+  onAddKey,
+}: {
+  options: readonly ModelPickerOption[];
+  onAddKey: (request: { provider: string; model: string }) => void;
+}): DecisionPickerOption[] {
+  return options.map((option) => {
+    const provider = findDecisionModel(option.value)?.provider;
+    if (!option.disabled || !provider || !isOwnDecisionModelId(option.value)) return option;
+    const action = {
+      label: ADD_KEY_LABEL,
+      onAction: () => onAddKey({ provider, model: option.value }),
+    };
+    return { ...option, action };
+  });
+}
+
+/** Whether `model` is a row the picker lets the reader pick now. */
+export function isPickableDecisionOption({
+  options,
+  model,
+}: {
+  options: readonly ModelPickerOption[];
+  model: string;
+}): boolean {
+  return options.some((option) => option.value === model && !option.disabled);
 }

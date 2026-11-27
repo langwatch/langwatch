@@ -17,9 +17,9 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     customer signed a license that names Instant Evals, which is the same agreement, and an
     organization admin can still switch hosted judging off in Settings, Connect; the operator's
     release flag never releases it, so no install judges without a license that names them;
-  - a self-hosted install that is not released is told why in its own terms: its license does
-    not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
-    has judging turned off, since judging runs on LangWatch Cloud only, and its operator decides;
+  - a self-hosted install that is not released is offered the two ways to turn them on:
+    LangWatch Instant (preview) through a connection to LangWatch Cloud, or a decision model of
+    its own; an install whose admin switched hosted judging off is told where to switch it back on;
   - on the hosted service the plan decides what releases a project: a self-serve organization is
     released by its own switch alone, whatever the operator's release flag says, so no organization
     sends its text to the judge without having agreed to it; an enterprise organization is released
@@ -87,22 +87,60 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
       Given a self-hosted install
       When the popover asks what to offer
-      Then an install whose license does not include Instant Evals, or that holds no license, is told Instant Evals are part of LangWatch Enterprise
-      And an install whose admin switched hosted judging off is told where to switch it back on
-      And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
-      And an install that has judging turned off is told to ask whoever runs it
+      Then an install whose license does not include Instant Evals, or that holds no license, is answered not_in_license
+      And an install whose admin switched hosted judging off is answered switched_off
+      And an install with Connect switched off, or that holds no credential to present, is answered not_connected
+      And an install that has judging turned off is answered ask_operator
+
+    # An own decision model needs no license (ADR-182), and LangWatch Instant (preview) needs only
+    # a connection and credits, so a self-hosted refusal never reads as a license wall.
 
     @integration
     Scenario: Each self-hosted refusal says what to do about it
       Given an eval chip refused on a self-hosted install
       When the popover opens
-      Then an install without Instant Evals in its license, or with no license, says "Instant Evals is part of LangWatch Enterprise"
-      And an organization admin is offered "Activate a license" and "Get a license", both leading to Settings > License
-      And a member is told "Ask an organization admin to activate a license." with no button
-      And it never says the license doesn't include them when no license is installed
+      Then an install without Instant Evals in its license, with no license, not connected to LangWatch, or with judging turned off reads "Turn on Instant Evals"
+      And it never says "Enterprise" or "license"
       And a switched-off organization names Settings, Connect, and offers no "Contact us"
-      And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
-      And an install that has judging turned off offers no "Contact us"
+      And no self-hosted refusal offers "Contact us"
+
+    @integration
+    Scenario: A self-hosted admin is offered two ways to turn Instant Evals on
+      Given an eval chip refused on a self-hosted install without hosted judging
+      And the reader may manage the organization
+      When the popover opens
+      Then the first card offers "LangWatch Instant (preview)", marked "Recommended", that runs on LangWatch Cloud with credits
+      And its "Connect to LangWatch" button leads to Settings > Connect
+      And the second card offers "Your own decision model", paid to the provider
+      And its "Add a key" button leads to Model providers with the Instant Evals picker open
+      And "Not now" closes the popover and leaves the eval chip in the bar
+
+    @integration
+    Scenario: A self-hosted member sees the two ways and a link to send an admin
+      Given an eval chip refused on a self-hosted install without hosted judging
+      And the reader may not manage the organization
+      When the popover opens
+      Then both cards are shown with no button on either
+      And it says "Only an admin can turn this on"
+      And "Copy link" copies the address of Model providers with the Instant Evals picker open
+
+    @integration
+    Scenario: A member whose browser can't copy is left the link to copy by hand
+      Given an eval chip refused on a self-hosted install without hosted judging
+      And the reader may not manage the organization
+      And the browser refuses clipboard access
+      When the reader presses "Copy link"
+      Then the button never reads "Copied"
+      And the popover says to select the link and send it to an admin
+
+    @integration
+    Scenario: With own decision models switched off, a self-hosted install is offered LangWatch Instant (preview) only
+      Given an eval chip refused on a self-hosted install without hosted judging
+      And own decision models are switched off for the organization
+      When the popover opens
+      Then only the "LangWatch Instant (preview)" card is shown
+      And the popover never mentions the own decision model
+      And a member's "Copy link" copies the address of Settings, Connect
 
     @integration
     Scenario: A judgement that fails on an install judging through LangWatch names the addresses it needs
@@ -143,6 +181,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an eval chip refused for the plan, the organization's switch, a license or an install
       When the refusal popover opens
       Then it links to Default models, in a new tab, to run Instant Evals on the project's own decision model
+      And a self-hosted install offered the two ways in offers it as the second card instead of a link
       And a judge that can't run right now offers no such link
       And with the own decision model switched off for the organization it offers no such link and never mentions the own decision model
   Rule: The switch is the organization's, and the first click is the one that counts

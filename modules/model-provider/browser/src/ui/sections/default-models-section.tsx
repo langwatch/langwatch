@@ -38,11 +38,12 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
+  CHOOSE_DECISION_MODEL,
   DECISION_MODEL_DISPLAY_NAMES,
   isShownDecisionModel,
 } from "../../model/decision-model-options.ts";
@@ -57,6 +58,9 @@ import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import type { ScopeFilterValue, ScopeHierarchy } from "../../model/provider-scope-filter.ts";
 import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
 import { ModelChip } from "../elements/model-chip.tsx";
+
+/** The address query that opens the Instant Evals picker, which a refused eval links to. */
+const INSTANT_EVALS_SETUP_QUERY = { key: "setup", value: "instant-evals" } as const;
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
 type ConfigRow = WireOf<ModelDefaultConfigSnapshot>;
@@ -87,7 +91,9 @@ export function DefaultModelsSection({
   displayNames,
 }: DefaultModelsSectionProps) {
   const host = useModelProviderHost();
-  const { projectId, teamId } = host.scope();
+  const { projectId, teamId, organizationId } = host.scope();
+  const isInstantEvalsSetup =
+    host.route().query[INSTANT_EVALS_SETUP_QUERY.key] === INSTANT_EVALS_SETUP_QUERY.value;
 
   const dataQuery = modelProviderApi.modelProvider.getDefaultModelsForProject.useQuery(
     { projectId: projectId ?? "" },
@@ -131,6 +137,24 @@ export function DefaultModelsSection({
     // table above and the virtual-key picker use.
     return [...filtered].toSorted(compareConfigsByScopeThenName);
   })();
+
+  // The setup address opens the organization's config, or a new one there, on the Instant Evals
+  // picker, once per visit to the page.
+  const openedSetupRef = useRef(false);
+  const setupConfigs = dataQuery.data?.configs;
+  useEffect(() => {
+    if (!isInstantEvalsSetup || openedSetupRef.current || !setupConfigs || !organizationId) return;
+    openedSetupRef.current = true;
+    const organizationConfig = setupConfigs.find((config) =>
+      config.scopes.some((scope) => scope.type === "ORGANIZATION"),
+    );
+    host.openPlatformDrawer({
+      drawer: "defaultModelOverride",
+      params: organizationConfig
+        ? { editingId: organizationConfig.id, focusRole: "INSTANT_EVALS" }
+        : { scopeType: "ORGANIZATION", scopeId: organizationId, focusRole: "INSTANT_EVALS" },
+    });
+  }, [isInstantEvalsSetup, setupConfigs, organizationId, host]);
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
@@ -365,7 +389,7 @@ function ConfigCell({
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
-  /** Whether LangWatch Instant (preview) may be offered; if not, an unset cell reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, an unset cell asks for a model. */
   isHostedOffered: boolean;
 }) {
   const isInvalid = (model: string) =>
@@ -427,8 +451,8 @@ function ConfigCell({
 
 /**
  * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded LangWatch
- * Instant (preview) default, never "Not configured" (ADR-182 decision 1). Where it is not offered,
- * unset or pinned to it reads "Not set". Only an own model can need an update: no hosted row.
+ * Instant (preview) default (ADR-182 decision 1). Where it is not offered, unset or pinned to it
+ * asks for a decision model. Only an own model can need an update.
  */
 function DecisionModelChip({
   model,
@@ -445,8 +469,8 @@ function DecisionModelChip({
       : null;
   if (!shown && !isHostedOffered) {
     return (
-      <Badge colorPalette="gray" variant="subtle" data-testid="instant-evals-not-set">
-        Not set
+      <Badge colorPalette="orange" variant="subtle" data-testid="instant-evals-not-set">
+        {CHOOSE_DECISION_MODEL}
       </Badge>
     );
   }

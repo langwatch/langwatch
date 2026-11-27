@@ -289,7 +289,7 @@ export const SearchBar: React.FC = () => {
   // refused reader's offer.
   const instantEvalAccess = useInstantEvalAccess({ projectId: project?.id });
   const traceHost = useOptionalTraceHost();
-  const canActivateLicense = traceHost?.hasPermission("organization:manage") ?? false;
+  const canManageOrganization = traceHost?.hasPermission("organization:manage") ?? false;
   // The in-place pick writes the project's default models, so only a project admin gets it.
   const canPickDecisionModel = traceHost?.hasPermission("project:manage") ?? false;
   // Asked of the organization only, as Default models asks it (ADR-182 decision 4).
@@ -392,7 +392,7 @@ export const SearchBar: React.FC = () => {
         onEnable={instantEval.enableInstantEvals}
         isEnabling={instantEval.isEnabling}
         viaConnect={instantEvalAccess.viaConnect}
-        canActivateLicense={canActivateLicense}
+        canManageOrganization={canManageOrganization}
         offersOwnModel={offersOwnModel}
         canPickDecisionModel={canPickDecisionModel}
         decisionModels={decisionModels}

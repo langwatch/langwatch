@@ -381,10 +381,11 @@ Feature: Instant Evals decision model column in Default models
     And it reads "LangWatch Instant (preview)" with the LangWatch mark where nothing is set
 
   @integration
-  Scenario: Without LangWatch Instant (preview), the Instant Evals column reads Not set
+  Scenario: Without LangWatch Instant (preview), the Instant Evals column asks for a decision model
     Given LangWatch's hosted model is neither released for my organization nor one switch away
     When I open Settings > Model Providers > Default models
-    Then the Instant Evals column reads "Not set" where nothing is set, or where LangWatch Instant (preview) is pinned
+    Then the Instant Evals column reads "Choose a decision model" where nothing is set, or where LangWatch Instant (preview) is pinned
+    And it never reads "Not set"
     And it never reads "LangWatch Instant (preview)"
     And a picked own decision model still reads its own name
 
@@ -395,14 +396,14 @@ Feature: Instant Evals decision model column in Default models
     When I edit the Instant Evals column
     Then "LangWatch Instant (preview)" is not listed
     And I can pick OpenAI's "Decisions API"
-    And the column reads "Not set" while nothing is picked
+    And the column reads "Choose a decision model" while nothing is picked
 
   @integration
-  Scenario: Without LangWatch Instant (preview), a config that pinned it reads Not set in the drawer
+  Scenario: Without LangWatch Instant (preview), a config that pinned it asks for a decision model in the drawer
     Given LangWatch's hosted model is neither released for my organization nor one switch away
     And a config row pinned "LangWatch Instant (preview)" for the Instant Evals column before that
     When I edit that config row
-    Then the Instant Evals column reads "Not set", as the table does
+    Then the Instant Evals column reads "Choose a decision model", as the table does
     And it never reads "LangWatch Instant (preview)"
 
   @unit
@@ -475,6 +476,62 @@ Feature: Instant Evals decision model column in Default models
     When I edit the Instant Evals column
     Then "Inception Mercury Decide" reads "Add an Inception key in Model Providers to use it."
     And it cannot be picked
+
+  @integration
+  Scenario: A decision model whose provider has no key offers to add one in place
+    Given the flag is on for my organization
+    And my project has no Inception key
+    And I may manage model providers
+    When I edit the Instant Evals column
+    Then "Inception Mercury Decide" offers "Add key"
+    And pressing it opens the Inception provider form over the Default models drawer, Inception already picked
+
+  @integration
+  Scenario: A reader who may not manage model providers is offered no Add key
+    Given the flag is on for my organization
+    And my project has no Inception key
+    And I may not manage model providers
+    When I edit the Instant Evals column
+    Then "Inception Mercury Decide" offers no "Add key" and still says which key to add
+
+  @integration
+  Scenario: Saving the key returns to the Default models drawer with the model picked
+    Given I pressed "Add key" on "Inception Mercury Decide" in the Default models drawer
+    When I save an Inception key
+    Then the Default models drawer comes back
+    And the Instant Evals column holds "Inception Mercury Decide", saved only when I save the drawer
+
+  @integration
+  Scenario: Edits made before Add key are still there when the drawer comes back
+    Given I changed the scopes of a config in the Default models drawer without saving
+    When I press "Add key" on "Inception Mercury Decide" and come back from the provider form
+    Then the drawer still holds the scopes I picked
+
+  @integration
+  Scenario: Cancelling the provider form returns to the Default models drawer
+    Given I pressed "Add key" on "Inception Mercury Decide" in the Default models drawer
+    When I cancel or close the provider form
+    Then the Default models drawer comes back instead of closing with it
+
+  @integration
+  Scenario: A picked model the new key does not reach is left unpicked
+    Given I pressed "Add key" on "Inception Mercury Decide" in the Default models drawer
+    When I save an Inception key that does not reach every scope of the config
+    Then the Default models drawer comes back with the Instant Evals column unchanged
+    And "Inception Mercury Decide" still says which key to add
+
+  @integration
+  Scenario: Saving a provider opened from the page closes its drawer as before
+    Given I opened a provider's form from the Model providers table
+    When I save it
+    Then the drawer closes, with no drawer coming back beneath it
+
+  @integration
+  Scenario: The Instant Evals setup address opens the decision model picker
+    Given I open Settings > Model Providers with "setup=instant-evals" in the address
+    When the page loads
+    Then the Default models drawer opens on the organization's config, or a new one at the organization scope when there is none
+    And the Instant Evals picker is open
 
   @unit
   Scenario: LangWatch Instant (preview) reads the same whether or not the judge router flag is on
