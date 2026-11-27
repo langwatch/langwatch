@@ -493,8 +493,8 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     expect(growth?.startDate).toBeInstanceOf(Temporal.Instant);
   });
 
-  /** @scenario "A later subscription-active message keeps the start of a subscription already running" */
-  it("keeps the recorded start when a running subscription is reported active again", async () => {
+  /** @scenario "A later activation keeps the start of a subscription already running" */
+  it("keeps the recorded start when a running subscription is activated again", async () => {
     const started = Temporal.Instant.from("2026-09-15T08:01:06Z");
     const running = harness({
       growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE, startDate: started },
@@ -503,6 +503,7 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     });
 
     await deliverTogether(running, [subscriptionActive()]);
+    await deliverTogether(running, [paymentSucceeded("in_renewal")]);
 
     expect(rowOf(running, GROWTH_ROW)?.startDate).toEqual(started);
   });

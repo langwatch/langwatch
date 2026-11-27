@@ -119,15 +119,12 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     return { count: 1 };
   }
 
-  async activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<BillingSubscriptionWithOrganization> {
+  async activate(input: { id: string }): Promise<BillingSubscriptionWithOrganization> {
     const activated = this.update(input.id, (subscription) => ({
       ...subscription,
       status: ACTIVE,
       lastPaymentFailedDate: null,
-      startDate: subscription.status === ACTIVE ? subscription.startDate : nowInstant(),
+      startDate: startOf(subscription),
     }));
 
     return this.withOrganization(activated);
@@ -185,7 +182,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       ...subscription,
       status: ACTIVE,
       lastPaymentFailedDate: null,
-      startDate: subscription.status === ACTIVE ? subscription.startDate : nowInstant(),
+      startDate: startOf(subscription),
       maxMembers: input.maxMembers,
       maxMembersDeveloper: input.maxMembersDeveloper ?? subscription.maxMembersDeveloper,
       maxMessagesPerMonth: input.maxMessagesPerMonth,
@@ -228,6 +225,11 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
 
     return { ...subscription, organization: organizationRecordOf(organization) };
   }
+}
+
+/** A row not already active starts now; one already running keeps its start. */
+function startOf(subscription: BillingSubscriptionRecord): BillingSubscriptionRecord["startDate"] {
+  return subscription.status === ACTIVE ? subscription.startDate : nowInstant();
 }
 
 /** The three organization facts a subscription answer carries. */

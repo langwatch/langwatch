@@ -270,7 +270,7 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Then the Growth subscription records when it started
 
   @unit @regression
-  Scenario: A later subscription-active message keeps the start of a subscription already running
+  Scenario: A later activation keeps the start of a subscription already running
     Given a Growth seat subscription that started earlier
-    When another message that the subscription is active arrives
+    When another subscription-active message and a renewal payment arrive
     Then the Growth subscription keeps the start it recorded

@@ -71,10 +71,7 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.linkStripeId(input);
   }
 
-  async activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<ActivateSubscriptionResult> {
+  async activate(input: { id: string }): Promise<ActivateSubscriptionResult> {
     if (!this.present(input.id)) return { outcome: "missing_subscription" };
     const activated = await this.subscriptions.activate(input);
     return { outcome: "activated", subscription: activated };

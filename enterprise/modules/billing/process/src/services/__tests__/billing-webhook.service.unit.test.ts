@@ -316,7 +316,6 @@ describe("EEWebhookService", () => {
 
         expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
-          previousStatus: SubscriptionStatus.PENDING,
         });
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
@@ -693,7 +692,6 @@ describe("EEWebhookService", () => {
 
         expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
-          previousStatus: SubscriptionStatus.PENDING,
         });
         expect(clearedLicenses).toEqual([{ organizationId: "org_123" }]);
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
@@ -762,7 +760,6 @@ describe("EEWebhookService", () => {
 
         expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
-          previousStatus: SubscriptionStatus.ACTIVE,
         });
         expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
@@ -944,7 +941,6 @@ describe("EEWebhookService", () => {
 
         expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
-          previousStatus: SubscriptionStatus.PENDING,
         });
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -998,7 +994,6 @@ describe("EEWebhookService", () => {
 
         expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
-          previousStatus: SubscriptionStatus.PENDING,
         });
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({

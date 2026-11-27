@@ -62,10 +62,7 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.linkStripeId(input);
   }
 
-  async activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<ActivateSubscriptionResult> {
+  async activate(input: { id: string }): Promise<ActivateSubscriptionResult> {
     const activated = await this.orNull("activate", () => this.subscriptions.activate(input));
     return activated
       ? { outcome: "activated", subscription: activated }

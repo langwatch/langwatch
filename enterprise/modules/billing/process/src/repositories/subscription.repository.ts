@@ -60,10 +60,8 @@ export abstract class BillingSubscriptionRepository {
     id: string;
     stripeSubscriptionId: string;
   }): Promise<{ count: number }>;
-  abstract activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<BillingSubscriptionWithOrganization>;
+  /** Activates it; a row not already active starts now, decided from the stored row. */
+  abstract activate(input: { id: string }): Promise<BillingSubscriptionWithOrganization>;
   abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
   abstract cancel(input: { id: string }): Promise<void>;
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
