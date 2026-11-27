@@ -1,7 +1,7 @@
 /**
  * One stored widget on a board, in the card chrome: Ask Langy, the drag handle and menu, its
  * declared Langy actions and its queries' sources (AC200), over the board's period and grain.
- * Ask Langy also opens the widget large beside Langy (AC121b).
+ * Ask Langy also opens the widget in a dialog Langy stays usable above (AC121b).
  */
 
 import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -39,7 +39,7 @@ import { WidgetActionRow } from "../blocks/widget-action-row.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
-import { WidgetLangyView, widgetViewChartHeightPx } from "./widget-langy-view.tsx";
+import { WidgetLangyView } from "./widget-langy-view.tsx";
 
 /** What a card asks of Langy; every one of them is absent when Langy is not available. */
 export interface WidgetCardLangy {
@@ -68,6 +68,12 @@ export function chartAsks({
     onAskLangyAbout: (subject) =>
       langy.askAbout(subject, widgetClickFor({ actions: declared, subject })),
   };
+}
+
+/** The Langy actions a widget's catalogue entry declares; none for a hand-written widget. */
+function declaredActions(widget: BoardWidget): readonly WidgetAction[] {
+  const source = widget.definition.source;
+  return catalogueWidgetActions(source?.kind === "catalogue" ? source.catalogueId : undefined);
 }
 
 /** Who may lift a widget's limit on an editable board, and the edits the face offers them. */
@@ -140,10 +146,7 @@ export function BoardWidgetCard({
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
-  const source = widget.definition.source;
-  const declared = langyOnData
-    ? catalogueWidgetActions(source?.kind === "catalogue" ? source.catalogueId : undefined)
-    : [];
+  const declared = langyOnData ? declaredActions(widget) : [];
   // The widget's code says whether its problem is on the card; a face over the chart hides it.
   const [problem, setProblem] = useState(false);
   const actions = shownWidgetButtons({ actions: declared, problem: problem && face === "chart" });
@@ -248,7 +251,6 @@ export function BoardWidgetCard({
     </WidgetCardShell>
   );
   if (!isViewOpen || !langyOnData) return card;
-  const viewHeightPx = widgetViewChartHeightPx(widgetBodyHeightPx(widget.placement.rowSpan));
   return (
     <>
       {card}
@@ -258,12 +260,13 @@ export function BoardWidgetCard({
         footer={footer}
         actions={actionRow}
         onClose={() => setViewOpen(false)}
-        chartHeightPx={viewHeightPx}
-        chart={
+        colSpan={widget.placement.colSpan}
+        rowSpan={widget.placement.rowSpan}
+        chart={({ heightPx }) =>
           picksNoSources(widget.definition.queries) ? (
             <NoSourcesPicked />
           ) : (
-            frame({ maxHeight: viewHeightPx, onCard: false })
+            frame({ maxHeight: heightPx, onCard: false })
           )
         }
       />

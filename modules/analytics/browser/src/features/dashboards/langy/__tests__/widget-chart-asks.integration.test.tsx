@@ -12,14 +12,22 @@ import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { frameProps } = vi.hoisted(() => ({
+const { frameProps, propsOfNode } = vi.hoisted(() => ({
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
+  propsOfNode: new WeakMap<Element, SandboxedChartFrameProps>(),
 }));
 
 vi.mock("../../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
   SandboxedChartFrame: (props: SandboxedChartFrameProps) => {
     frameProps(props);
-    return <div data-testid="sandboxed-frame" />;
+    return (
+      <div
+        data-testid="sandboxed-frame"
+        ref={(node) => {
+          if (node) propsOfNode.set(node, props);
+        }}
+      />
+    );
   },
 }));
 
@@ -193,6 +201,30 @@ describe("asking Langy from a widget card", () => {
         expect(request?.context[1]?.ref).toContain(
           'clicked: error "Timeout", raw value TimeoutError',
         );
+      });
+    });
+
+    describe("when the member clicks a value in the widget's Ask Langy dialog", () => {
+      /** @scenario "AC121e Ask Langy: clicking a value in the dialog drafts Langy about it, as on the card" */
+      it("drafts about that value as the card does, and the dialog stays open", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const host = openBoard();
+        await user.click(await screen.findByRole("button", { name: "Ask Langy about Top errors" }));
+        const view = await screen.findByRole("dialog", { name: "Top errors" });
+        const props = propsOfNode.get(await within(view).findByTestId("sandboxed-frame"));
+        if (!props?.onAskLangy) throw new Error("the dialog's chart takes no asks");
+
+        const { onAskLangy } = props;
+        await act(async () =>
+          onAskLangy({ kind: "day", label: "Sep 3", at: "2026-09-03T00:00:00Z", series: "Errors" }),
+        );
+
+        expect(host.langyAsks).toHaveLength(2);
+        expect(host.langyAsks[1]?.draft).toMatch(
+          /^On "Top errors", what stands out about Errors on 3 September 2026\?/,
+        );
+        expect(host.langyAsks[1]?.context[1]).toMatchObject({ label: "widget: Top errors" });
+        expect(screen.getByRole("dialog", { name: "Top errors" })).toBe(view);
       });
     });
 

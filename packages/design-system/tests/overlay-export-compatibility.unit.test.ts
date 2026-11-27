@@ -42,6 +42,7 @@ describe("overlay public exports", () => {
   describe("when the dialog subpath is imported", () => {
     it("still exposes every runtime name it did before the split", () => {
       expect(Object.keys(dialogFacade).toSorted()).toEqual([
+        "DIALOG_COMPANION_ATTR",
         "Dialog",
         "DialogActionTrigger",
         "DialogBody",
@@ -54,6 +55,7 @@ describe("overlay public exports", () => {
         "DialogTitle",
         "DialogTrigger",
         "RawDialog",
+        "useCompanionDialogOpen",
         "useOverlayPortalTarget",
       ]);
     });

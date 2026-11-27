@@ -68,7 +68,7 @@ export function CuratedWidgetsGrid({
       onPlacementsCommit={onPlacementsCommit}
       rowHeightPx={BOARD_GRID_ROW_HEIGHT_PX}
       minRowSpan={BOARD_MIN_ROW_SPAN}
-      renderCard={({ graphId, rowSpan }) => {
+      renderCard={({ graphId, colSpan, rowSpan }) => {
         const widget = byKey.get(graphId);
         if (!widget) return null;
         return (
@@ -79,6 +79,7 @@ export function CuratedWidgetsGrid({
             boardName={boardName}
             projectId={projectId}
             projectSlug={projectSlug}
+            colSpan={colSpan}
             rowSpan={rowSpan}
             timeWindow={timeWindow}
             granularitySeconds={granularitySeconds}

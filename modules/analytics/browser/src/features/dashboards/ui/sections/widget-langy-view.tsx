@@ -1,27 +1,14 @@
 /**
- * A widget opened large from its card's Ask Langy (AC121b): a drawer that Langy rides beside
- * as it does beside the trace drawer, so the chart and the conversation about it sit together.
+ * A widget opened large from its card's Ask Langy (AC121b): a centred dialog shaped like the card,
+ * with Langy usable above its backdrop, so the chart and the conversation about it sit together.
  */
 
-import { useInPlaceDrawer } from "@langwatch/browser-host/drawer";
-import { Drawer } from "@langwatch/design-system/drawer";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-import { useFloatingLangyAtOpen } from "../../langy/behavior/use-floating-langy-at-open.ts";
-
-/** The tallest the chart grows in the drawer: room to read it, under the drawer's header. */
-export const WIDGET_VIEW_CHART_HEIGHT_PX = 440;
-
-const WIDGET_VIEW_GROWTH = 1.6;
-
-/**
- * The chart's height in the drawer, from its body height on the card: grown for the wider drawer
- * and capped, so a short widget such as a row of numbers stays short instead of trailing a gap.
- */
-export function widgetViewChartHeightPx(cardBodyHeightPx: number): number {
-  return Math.min(WIDGET_VIEW_CHART_HEIGHT_PX, Math.round(cardBodyHeightPx * WIDGET_VIEW_GROWTH));
-}
+import { useWidgetViewSizePx } from "../../behavior/use-widget-view-size.ts";
+import type { WidgetViewSize } from "../../model/widget-view-size.ts";
 
 export function WidgetLangyView({
   name,
@@ -29,7 +16,8 @@ export function WidgetLangyView({
   footer,
   actions,
   onClose,
-  chartHeightPx,
+  colSpan,
+  rowSpan,
   chart,
 }: {
   name: string;
@@ -39,26 +27,33 @@ export function WidgetLangyView({
   /** The widget's Langy actions; absent when it shows none. */
   actions?: ReactNode;
   onClose: () => void;
-  /** From `widgetViewChartHeightPx`. */
-  chartHeightPx: number;
-  /** The widget drawn at `chartHeightPx`. */
-  chart: ReactNode;
+  /** The card's spans on the board, which the dialog keeps the shape of. */
+  colSpan: number;
+  rowSpan: number;
+  /** The widget drawn at the given size. */
+  chart: (size: WidgetViewSize) => ReactNode;
 }) {
-  useInPlaceDrawer({ open: true });
-  const waitForFloatingLangy = useFloatingLangyAtOpen();
+  const size = useWidgetViewSizePx({ colSpan, rowSpan });
   return (
-    <Drawer
+    <Dialog
       open
       onClose={onClose}
-      size="xl"
-      companionMotion={waitForFloatingLangy ? "wait" : "follow"}
       title={name}
-      {...(description ? { subtitle: description } : {})}
+      {...(description ? { description } : {})}
+      size="fit"
+      placement="center"
+      companion
+      cancelLabel={null}
       data-testid="widget-langy-view"
     >
       <VStack align="stretch" gap={3}>
-        <Box height={`${chartHeightPx}px`} data-testid="widget-langy-view-chart">
-          {chart}
+        <Box
+          width={`${size.widthPx}px`}
+          height={`${size.heightPx}px`}
+          flexShrink={0}
+          data-testid="widget-langy-view-chart"
+        >
+          {chart(size)}
         </Box>
         {actions}
         {footer && (
@@ -66,11 +61,7 @@ export function WidgetLangyView({
             {footer}
           </Text>
         )}
-        <Text textStyle="sm" color="fg.muted">
-          Ask Langy about this chart in the panel beside it, or click a bar, point or row to ask
-          about that value.
-        </Text>
       </VStack>
-    </Drawer>
+    </Dialog>
   );
 }

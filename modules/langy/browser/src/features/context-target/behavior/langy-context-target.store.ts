@@ -9,7 +9,7 @@ import {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { useLangyStore } from "../../../behavior/langy.store.ts";
+import { attachedContextToChip, useLangyStore } from "../../../behavior/langy.store.ts";
 
 export {
   LANGY_CONTEXT_DRAG_MIME,
@@ -328,8 +328,8 @@ export function releaseContextTarget(id: string): void {
  */
 export function removeContextChip(id: string): void {
   const langy = useLangyStore.getState();
-  if (langy.attachedContext.some((attached) => attached.id === id)) {
-    langy.detachContext(id);
-  }
+  // The composer names an attachment by its chip id, `<type>:<id>`, not by its own id.
+  const attached = langy.attachedContext.find((item) => attachedContextToChip(item).id === id);
+  if (attached) langy.detachContext(attached.id);
   langy.dismissChip(id);
 }

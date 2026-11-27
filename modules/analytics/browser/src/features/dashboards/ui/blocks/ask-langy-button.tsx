@@ -1,6 +1,6 @@
 /**
  * A widget's Ask Langy button on a board card, spelled out and shown with the card's hover
- * controls: one click opens the widget large beside Langy, with a ready draft about it (AC120).
+ * controls: one click opens the widget in a dialog, with a ready draft about it (AC120).
  */
 
 import { Button } from "@langwatch/design-system/primitives";

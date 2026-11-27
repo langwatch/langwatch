@@ -10,6 +10,10 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
+import {
+  isInDialogCompanion,
+  registerCompanionDialog,
+} from "../../../overlays/companion-dialog.ts";
 import { useDrawerEndInset } from "../../../overlays/drawer-inset.ts";
 import { firstFocusable } from "../../../overlays/focusable.ts";
 import { registerOpenModal } from "../../../overlays/modal-stack.ts";
@@ -46,6 +50,8 @@ export interface DialogContentProps extends ChakraDialog.ContentProps {
   withErrorBoundary?: boolean;
   /** The label the error fallback shows when the crash carries no code. */
   errorScope?: string;
+  /** `false` (a companion dialog): a drawer opened over it stays non-modal. Default true. */
+  countsAsModal?: boolean;
 }
 
 /** @deprecated Render `<Dialog>` (the shape). */
@@ -59,6 +65,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       positionerProps,
       withErrorBoundary = true,
       errorScope,
+      countsAsModal = true,
       children,
       ...contentProps
     },
@@ -66,7 +73,10 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
   ) {
     const portalTarget = React.useRef<HTMLDivElement | null>(null);
     const { open } = useDialogContext();
-    React.useEffect(() => (open ? registerOpenModal() : undefined), [open]);
+    React.useEffect(
+      () => (open && countsAsModal ? registerOpenModal() : undefined),
+      [open, countsAsModal],
+    );
     const guarded = withErrorBoundary;
     return (
       <Portal disabled={!portalled} container={portalRef}>
@@ -138,8 +148,8 @@ export const DialogCloseTrigger = React.forwardRef<
   );
 });
 
-/** The shared overlay width scale, as maxima capped by the viewport. */
-export type DialogSize = "sm" | "md" | "detail" | "lg" | "xl" | "document";
+/** The shared overlay width scale, as maxima capped by the viewport; `fit` is its content's. */
+export type DialogSize = "sm" | "md" | "detail" | "lg" | "xl" | "document" | "fit";
 
 const DIALOG_WIDTH: Record<DialogSize, string> = {
   sm: "28rem",
@@ -148,7 +158,60 @@ const DIALOG_WIDTH: Record<DialogSize, string> = {
   lg: "42rem",
   xl: "56rem",
   document: "64rem",
+  fit: "100vw",
 };
+
+/** The page stays live; clicks, typing and Escape inside a companion panel are the panel's. */
+const COMPANION_ROOT = {
+  modal: false,
+  trapFocus: false,
+  onInteractOutside: (event) => {
+    if (isInDialogCompanion(event.detail.originalEvent.target)) event.preventDefault();
+  },
+  onEscapeKeyDown: (event) => {
+    if (isInDialogCompanion(event.target)) event.preventDefault();
+  },
+} satisfies Partial<ChakraDialog.RootProps>;
+
+/** The focus, when a companion panel holds it: a companion dialog leaves it there. */
+function focusedCompanion(): HTMLElement | null {
+  const focused = document.activeElement;
+  return focused instanceof HTMLElement && isInDialogCompanion(focused) ? focused : null;
+}
+
+/** What `companion` and size `fit` change on the frame; nothing for any other dialog. */
+function useCompanionFrame({
+  open,
+  companion,
+  size,
+  endInset,
+}: {
+  open: boolean;
+  companion: boolean;
+  size: DialogSize;
+  endInset: number;
+}) {
+  React.useLayoutEffect(
+    () => (open && companion ? registerCompanionDialog() : undefined),
+    [open, companion],
+  );
+  return {
+    rootProps: companion ? COMPANION_ROOT : {},
+    contentProps: {
+      width: size === "fit" ? "fit-content" : "full",
+      countsAsModal: !companion,
+      ...(companion && endInset > 0
+        ? { positionerProps: { paddingInlineEnd: { base: 0, md: `${endInset}px` } } }
+        : {}),
+    },
+    keptFocus: () => (companion ? focusedCompanion() : null),
+  };
+}
+
+/** The frame's height cap: `reading` stops at 85vh, under the viewport safety cap either way. */
+function frameMaxHeight(heightLimit: "default" | "reading"): string {
+  return heightLimit === "reading" ? "min(85vh, calc(100dvh - 4rem))" : "calc(100dvh - 4rem)";
+}
 
 /**
  * The size cap: from md up it shrinks by a docked panel's width, so a centred dialog is not
@@ -222,7 +285,7 @@ interface DialogBaseProps {
   onClose: () => void;
   /** Sentence case; names the thing and the act. Always the accessible name. */
   title: string;
-  /** Default "sm"; the body scrolls inside the frame. */
+  /** Default "sm"; `fit` takes its content's width, up to the room. The body scrolls inside. */
   size?: DialogSize;
   /** Where the frame sits. Omitted, it keeps the dialog recipe's own placement (top). */
   placement?: DialogPlacement;
@@ -261,6 +324,12 @@ interface DialogBaseProps {
   trapFocus?: boolean;
   /** `false` leaves the document scrollable. Default true. */
   preventScroll?: boolean;
+  /**
+   * Beside a companion panel (`DIALOG_COMPANION_ATTR`): no focus trap, clicks, typing and Escape
+   * in the panel leave it open, it centres in the room a docked panel leaves, and the panel lifts
+   * above its backdrop (`useCompanionDialogOpen`). Default false.
+   */
+  companion?: boolean;
   /** "alertdialog" for a must-acknowledge or destroying confirm. Default "dialog". */
   role?: "dialog" | "alertdialog";
   /** Shorthand for `initialFocusEl`; falls back to the first field, then Cancel. */
@@ -498,6 +567,7 @@ export function Dialog({
   closeOnEscape = true,
   trapFocus = true,
   preventScroll = true,
+  companion = false,
   role = "dialog",
   initialFocus,
   initialFocusEl,
@@ -515,6 +585,7 @@ export function Dialog({
   // By id, not a ref: a resuming focus trap calls this mid-commit, while React has refs detached.
   const contentId = React.useId();
   const endInset = useDrawerEndInset();
+  const companionFrame = useCompanionFrame({ open, companion, size, endInset });
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const closable = dismissible && !busy;
   const cancel =
@@ -542,7 +613,8 @@ export function Dialog({
       content
     );
   };
-  const resolveInitialFocus = () => initialFocusEl?.() ?? pickInitialFocus();
+  const resolveInitialFocus = () =>
+    initialFocusEl?.() ?? companionFrame.keptFocus() ?? pickInitialFocus();
   const resetKeys = [title, entityKey];
   const frame = (
     <>
@@ -597,14 +669,13 @@ export function Dialog({
       onOpenChange={(details) => {
         if (!details.open) onClose();
       }}
+      {...companionFrame.rootProps}
     >
       <DialogContent
         ref={contentRef}
         maxWidth={dialogMaxWidth({ size, endInset })}
-        width="full"
-        maxHeight={
-          heightLimit === "reading" ? "min(85vh, calc(100dvh - 4rem))" : "calc(100dvh - 4rem)"
-        }
+        {...companionFrame.contentProps}
+        maxHeight={frameMaxHeight(heightLimit)}
         withErrorBoundary={false}
         aria-label={title}
         aria-describedby={descriptionId}

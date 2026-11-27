@@ -92,6 +92,7 @@ describe("given a limit failure on a From LangWatch widget", () => {
           boardName="Release check"
           projectId="proj-1"
           projectSlug="test-project"
+          colSpan={4}
           rowSpan={4}
           timeWindow={{ start: 1_000, end: 2_000 }}
           granularitySeconds={3600}

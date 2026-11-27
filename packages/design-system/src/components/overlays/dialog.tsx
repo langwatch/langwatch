@@ -7,6 +7,7 @@ import { Dialog as ChakraDialog } from "@chakra-ui/react";
 export * from "./views/dialog-view.tsx";
 export { Dialog as RawDialog } from "@chakra-ui/react";
 export { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
+export { DIALOG_COMPANION_ATTR, useCompanionDialogOpen } from "../../overlays/companion-dialog.ts";
 
 /** @deprecated Use the shape's actions. */
 export const DialogFooter = ChakraDialog.Footer;

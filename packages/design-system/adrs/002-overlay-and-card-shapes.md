@@ -150,3 +150,16 @@ total, `totalSummary`. Defaults keep every existing consumer unchanged.
 Compatibility exception: the trace raw-JSON, edit-diff, share and shortcut dialogs and the two lens
 dialogs pass `trapFocus={false}` and `preventScroll={false}` explicitly, as their local wrapper did.
 It is scoped to those dialogs and is not copied to others.
+
+## Amendment (2026-11-27): a companion dialog beside the assistant
+
+Dialog gains `companion` and size `fit`. A companion dialog shows something to talk to the
+assistant about, such as a dashboard widget opened from Ask Langy, while the assistant stays
+usable. It is a second exception to ADR-001's trapped modal default: it is non-modal (no focus
+trap, the page is not hidden from assistive tech), and a click, typing or Escape inside an element
+carrying `DIALOG_COMPANION_ATTR` leaves it open; Escape elsewhere, the X and a click on the backdrop
+close it. It centres in the room a docked panel leaves, and while one is open
+`useCompanionDialogOpen()` is true, so the companion panel lifts itself above the backdrop
+(z-index 1600 over the dialog's 1500). It is not counted as an open modal, so a drawer opened
+over it stays non-modal. Size `fit` takes its content's width up to that room.
+Defaults keep every existing consumer unchanged.
