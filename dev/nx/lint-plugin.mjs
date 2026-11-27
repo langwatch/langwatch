@@ -4,13 +4,13 @@ import { dirname, join } from "node:path";
 import { memberPatterns } from "./workspace-members.mjs";
 
 // Adds `lint` (oxlint over one project) to every workspace member, and
-// `lint:types` (type-aware, through dev/nx/lint.mjs for its directive check) to every
+// `lint:types` (type-aware, a batching executor in dev/nx/executors) to every
 // TypeScript one, so no package.json carries either. Cache, inputs and ordering live in
 // nx.json's targetDefaults; ADR-150 records why.
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);
 
 const lint = { command: "oxlint --quiet --config .oxlintrc.jsonc {projectRoot}" };
-const lintTypes = { command: "node dev/nx/lint.mjs --resolved --types {projectRoot}" };
+const lintTypes = { executor: "./dev/nx/executors:lint-types" };
 
 export const createNodes = [
   `{${members.join(",")}}/package.json`,

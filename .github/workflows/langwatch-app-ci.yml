@@ -768,11 +768,10 @@ jobs:
         id: typecheck
         run: pnpm run typecheck
 
-      # Type-aware rules, one cached `lint:types` task per TypeScript project, each after
-      # that project's typecheck (the step above), so the declarations it reads were built
-      # from hashed sources or replayed. The cache narrows the run: an unchanged project
-      # and its unchanged dependencies replay. Native, plugin and type-aware processes per
-      # project share one unused-directive check (ADR-150).
+      # Type-aware rules, one cached `lint:types` task per TypeScript project, after the
+      # typecheck above (replayed here), so the declarations it reads were built from
+      # hashed sources. Unchanged projects replay; the rest go to one oxlint run, split
+      # back per project (dev/nx/executors, ADR-150).
       - name: Oxlint type-aware, every project (blocking)
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
         run: pnpm lint:types

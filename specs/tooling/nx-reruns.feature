@@ -63,10 +63,12 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     And a full or --base plain run resolves its scope and lints it through the cached Nx target
     And the target's run lints only the paths it was given, dropping the flags and the --base value
 
-  Scenario: Type-aware lint runs per project after that project's typecheck
+  Scenario: Type-aware lint batches the projects Nx did not replay
     Given a full or --base lint:types run
-    Then every TypeScript project's cached lint:types target runs, whatever the --base value
-    And each one runs after that project's typecheck, so the declarations it reads are built from hashed sources
+    Then every TypeScript project's typecheck runs or replays first, so the declarations it reads are built from hashed sources
+    And every TypeScript project's lint:types is cached on its own files and its dependencies' sources, whatever the --base value
+    And the projects Nx did not replay are linted in one oxlint run, each failing only on findings in its own files
+    And an oxlint process that could not run fails every project in the run
     And the plain lint does not wait for typecheck
 
   Scenario: Build info written outside dist is a typecheck output

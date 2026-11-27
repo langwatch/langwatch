@@ -51,7 +51,7 @@ void describe("routeFlags", () => {
     });
   });
 
-  /** @scenario "Type-aware lint runs per project after that project's typecheck" */
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
   void it("sends a full or --base type-aware run to every project's lint:types", () => {
     assert.deepEqual(routeFlags(["--types"]), { route: "projects", types: true });
     assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {

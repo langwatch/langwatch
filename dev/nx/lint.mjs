@@ -165,8 +165,8 @@ function print(diagnostic) {
   return `${diagnostic.filename}:${line}:${column}: ${diagnostic.message}${rule}${help}`;
 }
 
-/** Runs one Nx command and exits with its status. */
-function nx(args) {
+/** Runs one Nx command; resolves its exit status. */
+function nxStatus(args) {
   const env = { ...process.env, FORCE_COLOR: "0", NX_LOAD_DOT_ENV_FILES: "false" };
   const run = spawnSync("pnpm", ["exec", "nx", ...args, "--outputStyle=static"], {
     cwd: root,
@@ -174,7 +174,21 @@ function nx(args) {
     env,
   });
 
-  process.exit(run.status ?? 1);
+  return run.status ?? 1;
+}
+
+const nx = (args) => process.exit(nxStatus(args));
+
+/**
+ * Every project's `lint:types`, after every `typecheck` wrote the declarations it reads.
+ * Two runs, not a dependsOn: with no task dependencies Nx batches every miss into one
+ * oxlint run (dev/nx/executors/lint-types.mjs) instead of one per dependency level.
+ */
+function lintProjects() {
+  const typecheck = nxStatus(["run-many", "-t", "typecheck"]);
+  const lint = nxStatus(["run-many", "-t", "lint:types"]);
+
+  process.exit(typecheck || lint);
 }
 
 /** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
@@ -211,7 +225,7 @@ function ownScopes(flags) {
     if (files.length === 0) process.exit(0);
     return scopes({ types, files, base: undefined });
   }
-  if (decision.route === "projects") return nx(["run-many", "-t", "lint:types"]);
+  if (decision.route === "projects") return lintProjects();
   const paths = scopes({ types, files: undefined, base: decision.base }).flatMap((s) => s.paths);
   if (paths.length === 0) process.exit(0);
 

@@ -79,9 +79,9 @@ there, as it always has.
 A plain run resolves its scope (`--base <sha>`: the changed files, plus the tree
 when a lint global changed) and runs through the cached `workspace:lint:tree` target
 with that scope as its arguments, so the same tree and scope replay the result
-(inputs: the whole tree). `pnpm lint:types` runs every TypeScript project's cached
-`lint:types` target (`dev/nx/lint-plugin.mjs`), each after that project's
-`typecheck`; an unchanged project replays, so `--base` changes nothing there.
+(inputs: the whole tree). `pnpm lint:types` runs every `typecheck`, then every
+TypeScript project's cached `lint:types` target (`dev/nx/lint-plugin.mjs`). An unchanged
+project replays, so `--base` changes nothing there, and the rest are linted in one batch.
 `--changed` lints the working tree itself; with `--types` it takes the projects
 `nx show projects --affected` names, all of them past half. `pnpm lint:changed` can miss a finding in an untouched file when
 the cause is something no Nx input names, and it never runs the enforcer, so

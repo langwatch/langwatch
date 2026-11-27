@@ -84,10 +84,11 @@ void describe("per-project typecheck", () => {
 void describe("type-aware lint", () => {
   const nx = JSON.parse(readFileSync(join(workspaceRoot, "nx.json"), "utf8"));
 
-  /** @scenario "Type-aware lint runs per project after that project's typecheck" */
-  void it("runs each project's lint:types after its typecheck, and the plain lint without it", () => {
-    assert.deepEqual(nx.targetDefaults["lint:types"].dependsOn, ["typecheck"]);
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("caches lint:types per project with no task dependency, so its misses form one batch", () => {
+    assert.equal(nx.targetDefaults["lint:types"].dependsOn, undefined);
     assert.equal(nx.targetDefaults["lint:types"].cache, true);
+    assert.ok(nx.targetDefaults["lint:types"].inputs.includes("^production"));
     assert.ok(!targets["lint:tree"].dependsOn.some((task) => task.endsWith("typecheck")));
   });
 });

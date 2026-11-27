@@ -66,7 +66,7 @@
     "test:changed": "node dev/nx/test-changed.mjs",
     "build:affected": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx affected -t build",
     "lint:types": "node dev/nx/lint.mjs --types",
-    "lint:types:affected": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx affected -t lint:types"
+    "lint:types:affected": "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx run-many -t typecheck && FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false nx affected -t lint:types"
   },
   "devDependencies": {
     "@nx/js": "23.2.1",

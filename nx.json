@@ -298,7 +298,6 @@
     ],
     "lint:types": {
       "cache": true,
-      "dependsOn": ["typecheck"],
       "inputs": [
         "default",
         "^production",
@@ -306,10 +305,6 @@
         "npmDeps",
         {
           "externalDependencies": ["oxlint", "oxlint-tsgolint"]
-        },
-        {
-          "dependentTasksOutputFiles": "**/*.{ts,tsx,mts,cts,json}",
-          "transitive": true
         },
         {
           "runtime": "node --version"

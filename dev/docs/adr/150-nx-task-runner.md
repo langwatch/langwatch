@@ -516,11 +516,15 @@ still walks its references, but `^typecheck` has built them, so the walk only re
 their build info. `pnpm typecheck` is `nx run-many -t typecheck`; `pnpm typecheck:src`
 stays the root build without test programs, cached on the tree.
 
-`lint:types` depends on its project's `typecheck` and hashes the same dependency
-declarations beside `default`, `^production` and `lintGlobals` (the plugin rules read
-dependency sources and the globals). Its command is `dev/nx/lint.mjs --resolved --types
-{projectRoot}`, so the native, plugin and type-aware processes share one unused-directive
-check as in the tree run. `pnpm lint:types` runs every project's target; `--base` no
-longer narrows it, the cache does. Plain `pnpm lint` stays the tree target: one project
+`lint:types` is cached per project on `default`, `^production` and `lintGlobals` (the
+plugin rules read dependency sources and the globals). One process per project was
+slower than the tree on a full miss (8 min 48 s against about 6 min in CI): each tsgolint
+process rebuilds its dependencies' programs. So its executor (`dev/nx/executors`) is a
+batch one: Nx replays every project it can and hands the rest to one `dev/nx/lint.mjs
+--resolved --types` run, whose report it splits back by the project owning each file. The
+target has no task dependency, because Nx forms one batch per set of ready tasks and a
+`dependsOn` would split the run by dependency level. `pnpm lint:types` runs every
+`typecheck` first, then every `lint:types`; `--base` no longer narrows it, the cache does.
+Plain `pnpm lint` stays the tree target: one project
 at a time it took 280 s against 36 s for the tree (2026-10-05 table), and a miss of the
 tree run costs about 25 s.
