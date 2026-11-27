@@ -18,7 +18,7 @@ function subscriptionWrite(
   return { resource: "subscription", method, params, actorId: "olive", req: { headers: {} } };
 }
 
-async function backOffice() {
+async function instanceAdmin() {
   const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
   const audit = new AuditStub();
   const service = InstanceAdminService.create({
@@ -59,7 +59,7 @@ describe("given an organization with an active subscription", () => {
   describe("when an operator creates another one for it as active", () => {
     /** @scenario "The Back office refuses a second active subscription for an organization" */
     it("refuses with ops_subscription_already_active naming the live one and writes nothing", async () => {
-      const { service, audit } = await backOffice();
+      const { service, audit } = await instanceAdmin();
 
       await expect(
         service.execute(
@@ -78,7 +78,7 @@ describe("given an organization with an active subscription", () => {
   describe("when an operator reactivates the cancelled one or activates the pending one", () => {
     /** @scenario "The Back office refuses a second active subscription for an organization" */
     it.each(["sub_old", "sub_pending"])("refuses %s and leaves it as it was", async (id) => {
-      const { service, statusOf } = await backOffice();
+      const { service, statusOf } = await instanceAdmin();
       const before = await statusOf(id);
 
       await expect(
@@ -89,7 +89,7 @@ describe("given an organization with an active subscription", () => {
 
     /** @scenario "The Back office refuses a second active subscription for an organization" */
     it("refuses a bulk activation too", async () => {
-      const { service } = await backOffice();
+      const { service } = await instanceAdmin();
 
       await expect(
         service.execute(
@@ -105,7 +105,7 @@ describe("given an organization with an active subscription", () => {
       { id: "sub_live", data: { organizationId: "org_other", status: { set: "ACTIVE" } } },
       { id: "sub_pending", data: { organizationId: { set: "org_acme" }, status: "ACTIVE" } },
     ])("refuses %o with validation_error and writes nothing", async ({ id, data }) => {
-      const { service, statusOf } = await backOffice();
+      const { service, statusOf } = await instanceAdmin();
       const before = await statusOf(id);
 
       await expect(
@@ -120,7 +120,7 @@ describe("given an organization with an active subscription", () => {
     it.each([{}, { ids: [] }, { ids: "sub_pending" }, { where: { organizationId: "org_acme" } }])(
       "refuses %o as malformed and writes nothing",
       async (selector) => {
-        const { service, statusOf } = await backOffice();
+        const { service, statusOf } = await instanceAdmin();
 
         await expect(
           service.execute(
@@ -135,7 +135,7 @@ describe("given an organization with an active subscription", () => {
   describe("when an operator edits the active one's limits", () => {
     /** @scenario "The Back office still edits an organization's one active subscription" */
     it("saves the edit", async () => {
-      const { service } = await backOffice();
+      const { service } = await instanceAdmin();
 
       const { data } = await service.execute(
         subscriptionWrite("update", {
@@ -151,7 +151,7 @@ describe("given an organization with an active subscription", () => {
   describe("when an operator cancels the live one, then activates the pending one", () => {
     /** @scenario "The Back office still edits an organization's one active subscription" */
     it("saves both", async () => {
-      const { service, statusOf } = await backOffice();
+      const { service, statusOf } = await instanceAdmin();
 
       await service.execute(
         subscriptionWrite("update", { id: "sub_live", data: { status: "CANCELLED" } }),
