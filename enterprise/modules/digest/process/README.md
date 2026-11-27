@@ -182,15 +182,15 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `digest_send` (aggregate `digest_send`)
 
-Declared at `src/eventing/digest-send.pipeline.ts:71`. Events: `DigestSendRequestedEventSchema`, `DigestOrganizationPlanRequestedEventSchema`.
+Declared at `src/eventing/digest-send.pipeline.ts:79`. Events: `DigestSendRequestedEventSchema`, `DigestOrganizationPlanRequestedEventSchema`.
 
 | Kind            | Name                      | Handles                                                                             | Declared at                                |
 | --------------- | ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------ |
-| command         | `requestSend`             | –                                                                                   | `src/eventing/digest-send.pipeline.ts:76`  |
-| command         | `requestOrganizationPlan` | –                                                                                   | `src/eventing/digest-send.pipeline.ts:77`  |
-| process manager | `digestWeeklyPlan`        | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:78`  |
-| process manager | `digestOrganizationPlan`  | intents `planOrganization` (outbox)                                                 | `src/eventing/digest-send.pipeline.ts:90`  |
-| process manager | `digestMemberSend`        | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:104` |
+| command         | `requestSend`             | –                                                                                   | `src/eventing/digest-send.pipeline.ts:84`  |
+| command         | `requestOrganizationPlan` | –                                                                                   | `src/eventing/digest-send.pipeline.ts:85`  |
+| process manager | `digestWeeklyPlan`        | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:86`  |
+| process manager | `digestOrganizationPlan`  | intents `planOrganization` (outbox)                                                 | `src/eventing/digest-send.pipeline.ts:98`  |
+| process manager | `digestMemberSend`        | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:112` |
 
 ### Pipeline `digest` (aggregate `digest_week`)
 
