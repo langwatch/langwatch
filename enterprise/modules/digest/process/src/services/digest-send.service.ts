@@ -10,6 +10,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   MemberNotFoundError,
+  ORGANIZATION_ID_PAGE_LIMIT,
   type OrganizationApi,
   type OrganizationRestMemberSummary,
 } from "@langwatch/organization-contract";
@@ -62,7 +63,6 @@ class DigestPlanIncompleteError extends Error {
 const logger = createLogger("langwatch:digest");
 
 const MEMBER_PAGE = 500;
-const ORGANIZATION_PAGE = 200;
 
 type Deps = Readonly<{
   audience: DigestAudienceRepository;
@@ -142,7 +142,7 @@ export class DigestSendService {
     do {
       const page = await this.deps.organizations.listAllIds({
         after,
-        limit: ORGANIZATION_PAGE,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
       });
       for (const organizationId of page.ids) {
         // One organization failing must not keep the rest from being asked.

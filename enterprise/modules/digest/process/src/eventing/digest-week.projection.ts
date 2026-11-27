@@ -48,7 +48,7 @@ export function applyProjectActivity({
       return applyScenario({ state: next, fact });
     case "span":
       // Retired: a span fact queued before spans stopped being folded counts nothing.
-      return state;
+      return next;
   }
 }
 

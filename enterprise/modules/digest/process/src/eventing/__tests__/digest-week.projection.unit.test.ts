@@ -166,10 +166,15 @@ describe("a span fact stored before spans stopped being folded", () => {
   };
 
   /** @scenario "Trace spans are never folded" */
-  it("still parses, and folds to nothing", () => {
+  it("still parses, keeps its ids and counts nothing", () => {
     const activity: ProjectActivity = projectActivitySchema.parse(stored);
     const state = emptyProjectWeek();
 
-    expect(applyProjectActivity({ state, activity })).toEqual(state);
+    expect(applyProjectActivity({ state, activity })).toEqual({
+      ...state,
+      projectId: "project-1",
+      organizationId: "org-1",
+      isoWeek: "2026-W47",
+    });
   });
 });

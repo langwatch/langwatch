@@ -18,7 +18,7 @@ import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts
  * What the weekly digest's footer link scrolls to (`/settings/profile#email-preferences`, built
  * by digest's `DIGEST_EMAIL_PREFERENCES_PATH`); the digest module cannot be imported here.
  */
-export const EMAIL_PREFERENCES_ANCHOR = "email-preferences";
+const EMAIL_PREFERENCES_ANCHOR = "email-preferences";
 
 export function EmailPreferencesSection() {
   const host = usePersonalWorkspaceHost();

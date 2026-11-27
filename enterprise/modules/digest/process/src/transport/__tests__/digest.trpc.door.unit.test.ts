@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * The digest's operator controls behind the platform door (Q42): non-staff are answered
@@ -5,7 +6,6 @@
  * app still asks ops to admit the operator on every control. Spec: digest.feature.
  */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   bindTrpcMiddlewareContext,
   createTrpcRuntime,

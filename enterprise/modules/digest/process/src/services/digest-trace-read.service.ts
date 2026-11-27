@@ -15,8 +15,8 @@ import {
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** A finished week's numbers hardly move, so one organization's members share one read. */
-const REMEMBER_MS = 30 * 60 * 1000;
-const MAX_REMEMBERED = 5_000;
+export const REMEMBER_MS = 30 * 60 * 1000;
+export const MAX_REMEMBERED = 5_000;
 /** Reads in flight at once in this process, however many sends ask. */
 const MAX_CONCURRENT_READS = 8;
 
