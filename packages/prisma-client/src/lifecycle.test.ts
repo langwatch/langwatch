@@ -350,6 +350,25 @@ describe("explicit Prisma lifecycle", () => {
       expect(logger.error).not.toHaveBeenCalled();
     });
 
+    it("lands a lost serializable race at warn, because its caller retries it", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-11-27T16:42:44.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: {
+          target: "x",
+          message:
+            "Transaction failed due to a write conflict or a deadlock. Please retry your transaction",
+          timestamp,
+        },
+      });
+
+      expect(logger.warn).toHaveBeenCalledOnce();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
     it("lands a query event on the logger at debug, keyed by its SQL text", () => {
       const logger = fakeLogger();
       const timestamp = new Date("2026-09-09T00:00:00.000Z");
