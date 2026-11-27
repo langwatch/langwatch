@@ -5,6 +5,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { OrganizationUserRole } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -348,6 +349,57 @@ describe("given an organization paying per seat in Stripe with every full seat i
       expect(await openRequests()).toEqual([]);
       expect(seatBilling.purchases).toBe(1);
       expect(membershipOf(lena.userId)?.role).toBe(OrganizationUserRole.MEMBER);
+    });
+  });
+
+  describe("when the request is declined and asked again just as an approval with a seat starts", () => {
+    /** @scenario "A Stripe page from before a decline never approves the request opened again" */
+    it("refuses with seat_request_not_found, buys nothing and leaves the new request open", async () => {
+      const { app, lena, seatRequestId, seatBilling, seatRequests, openRequests } =
+        await lenaAsking();
+      const getOpen = seatRequests.getOpen.bind(seatRequests);
+      let replaced = false;
+      seatRequests.getOpen = async (input) => {
+        const row = await getOpen(input);
+        if (!replaced) {
+          replaced = true;
+          await app.declineSeatRequest({ ...scope, seatRequestId }, ADA);
+          await new Promise((resolve) => setTimeout(resolve, 2));
+          await app.requestSeatAccess(scope, lena.caller);
+        }
+        return row;
+      };
+
+      const refusal = await app
+        .approveSeatRequestWithSeat({ ...scope, seatRequestId }, ADA)
+        .catch((error: unknown) => error);
+
+      expect(codeOf(refusal)).toBe("seat_request_not_found");
+      expect(seatBilling.purchases).toBe(0);
+      expect((await openRequests()).map((open) => open.id)).toEqual([seatRequestId]);
+    });
+  });
+
+  describe("when a held Lite Member is approved and no Lite seat is free to enable her", () => {
+    /** @scenario "Approve with no seat free on a live Stripe seat subscription adds the seat and approves" */
+    it("refuses and buys no full seat, which would not free a Lite one", async () => {
+      const context = await application({ ...stripe, freeFull: 1 });
+      const hana = context.liteMember({ email: "hana@acme.example" });
+      await context.app.requestSeatAccess(scope, hana.caller);
+      const [request] = await context.openRequests();
+      const row = context.membershipOf(hana.userId);
+      if (!row) throw new Error("expected Hana's membership");
+      row.disabledAt = nowInstant();
+
+      const refusal = await context.app
+        .approveSeatRequestWithSeat({ ...scope, seatRequestId: request!.id }, ADA)
+        .catch((error: unknown) => error);
+
+      expect(codeOf(refusal)).toBe("member_seat_limit_reached");
+      expect(HandledError.isHandled(refusal) && refusal.meta).toMatchObject({
+        limitType: "membersLite",
+      });
+      expect(context.seatBilling.purchases).toBe(0);
     });
   });
 

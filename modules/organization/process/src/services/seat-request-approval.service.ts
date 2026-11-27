@@ -263,7 +263,11 @@ export class SeatRequestApprovalService {
       }
       return await this.giveFullSeat(give);
     } catch (error) {
-      if (!buySeat || readSeatRefusal(error).kind !== "seat-limit") throw error;
+      // Only a full seat shortage is one a bought seat resolves; a Lite one refuses again.
+      const refusal = readSeatRefusal(error);
+      if (!buySeat || refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") {
+        throw error;
+      }
       if (!(await buySeat())) throw error;
       return this.giveFullSeat(give);
     }

@@ -90,6 +90,8 @@ export async function application(
   const memory = MemoryOrganizationDatabase.create();
   const state = { plan: planWith(options) };
   const salesNotices: SalesNotice[] = [];
+  /** Whether billing's sales notice goes out; a test may bring it back up. */
+  const sales = { down: options.salesDown ?? false };
   const seatBilling: SeatBilling = { purchase: "added", payment: "paid", purchases: 0 };
   const addSeat = () => {
     state.plan = { ...state.plan, maxMembers: state.plan.maxMembers + 1 };
@@ -112,8 +114,9 @@ export async function application(
     billing: createApiFixture<BillingApi>(
       {
         notifySalesOfSeatRequest: async (input: SalesNotice) => {
-          if (options.salesDown) throw new Error("sales notice unavailable");
+          if (sales.down) return { sent: false };
           salesNotices.push(input);
+          return { sent: true };
         },
         addFullSeat: async () => {
           seatBilling.purchases += 1;
@@ -237,6 +240,7 @@ export async function application(
     mail,
     push,
     salesNotices,
+    sales,
     seatRequests,
     seatBilling,
     arrive,

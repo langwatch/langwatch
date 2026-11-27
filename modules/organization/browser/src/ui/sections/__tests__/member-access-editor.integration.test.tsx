@@ -1115,6 +1115,46 @@ describe("<MemberAccessEditor/>", () => {
       await vi.waitFor(() => expect(mockApplyMemberGrants).toHaveBeenCalledTimes(2));
       expect(mockApplyMemberGrants.mock.calls[1]![0]).toEqual(failedBatch);
       expect(mockUpdateMemberRole).not.toHaveBeenCalled();
+      // The saved rows leave the staging, so nothing is left to save twice.
+      await vi.waitFor(() => {
+        expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+        expect(save).toBeDisabled();
+      });
+    });
+
+    /** @scenario "Access rows that do not save after the paid role change are named" */
+    it("never stages a closed member's failed draft on the member opened next", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      let failBatch: () => void = () => {};
+      mockApplyMemberGrants.mockReturnValueOnce(
+        new Promise<void>((_, reject) => {
+          failBatch = () => reject(new Error("boom"));
+        }),
+      );
+      const view = renderLite();
+      fireEvent.click(screen.getByTestId("stub-fill-draft"));
+      pickAdmin();
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+      await vi.waitFor(() => expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1));
+
+      view.rerender(
+        <MemberAccessEditor
+          organizationId="org-1"
+          userId="user-2"
+          memberRole={OrganizationUserRole.MEMBER}
+          canManage={true}
+          isCurrentUser={false}
+        />,
+      );
+      await act(async () => failBatch());
+
+      expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+      expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "One click adds the seat and changes the role" */

@@ -22,7 +22,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryPendingSeatRoleChangeRepository } from "../../repositories/memory/memory.pending-seat-role-change.repository.ts";
 import { seatRoleChangeReturnPath } from "../../rules/seat-role-change.rules.ts";
-import { MemberRoleSeatPurchaseService } from "../member-role-seat-purchase.service.ts";
+import {
+  MemberRoleSeatPurchaseService,
+  SeatRoleChangeNotAppliedYetError,
+} from "../member-role-seat-purchase.service.ts";
 
 const ORG = "org_acme";
 const SAM = "user_sam";
@@ -32,7 +35,11 @@ const KIM = "user_kim";
 const MAKE_ADMIN = { organizationId: ORG, userId: SAM, role: "ADMIN" as OrganizationUserRole };
 
 /** ACME's members and the full seats it pays for, as organization and billing hold them. */
-function world({ paid = 2, used = 2 }: { paid?: number; used?: number } = {}) {
+function world({
+  paid = 2,
+  used = 2,
+  now,
+}: { paid?: number; used?: number; now?: () => number } = {}) {
   const state = {
     paid,
     used,
@@ -70,7 +77,7 @@ function world({ paid = 2, used = 2 }: { paid?: number; used?: number } = {}) {
     return { status: state.payments.get(key) ?? "open" };
   });
   const recordBlockedSeatChange = vi.fn<BillingApi["recordBlockedSeatChange"]>(async () => {});
-  const pending = MemoryPendingSeatRoleChangeRepository.create();
+  const pending = MemoryPendingSeatRoleChangeRepository.create(now ? { now } : {});
   let ids = 0;
   const service = MemberRoleSeatPurchaseService.create({
     changeMemberRole,
@@ -221,8 +228,8 @@ describe("MemberRoleSeatPurchaseService", () => {
   });
 
   describe("given a change waiting on its payment", () => {
-    const waiting = async (payment: SeatPayment = INVOICE) => {
-      const w = world();
+    const waiting = async (payment: SeatPayment = INVOICE, now?: () => number) => {
+      const w = world(now ? { now } : {});
       w.state.purchase = { status: "payment_required", payment, url: "https://pay.example" };
       await w.service.changeWithSeat(MAKE_ADMIN, ADMIN);
       return w;
@@ -405,7 +412,7 @@ describe("MemberRoleSeatPurchaseService", () => {
       changeMemberRole.mockImplementationOnce(async (input, by) => {
         await expect(
           service.paymentPaid({ organizationId: ORG, payment: INVOICE }),
-        ).rejects.toThrow(/could not apply yet/);
+        ).rejects.toThrow(SeatRoleChangeNotAppliedYetError);
         return write(input, by);
       });
 
@@ -451,6 +458,35 @@ describe("MemberRoleSeatPurchaseService", () => {
       expect(state.roles.get(SAM)).toBe("EXTERNAL");
     });
 
+    /** @scenario "The return applies the change, then the paid fact changes nothing" */
+    it("keeps the claim through a paid role write that outlasts the claim period", async () => {
+      vi.useFakeTimers();
+      try {
+        const { state, service, pay, changeMemberRole } = await waiting(INVOICE, () => Date.now());
+        pay("in_seat");
+        const write = changeMemberRole.getMockImplementation()!;
+        let finishWrite: () => void = () => {};
+        changeMemberRole.mockImplementationOnce(async (input, by) => {
+          await new Promise<void>((resolve) => {
+            finishWrite = resolve;
+          });
+          return write(input, by);
+        });
+
+        const slow = service.complete({ organizationId: ORG, changeId: "change_1" });
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+        await expect(
+          service.paymentPaid({ organizationId: ORG, payment: INVOICE }),
+        ).rejects.toThrow(SeatRoleChangeNotAppliedYetError);
+        finishWrite();
+
+        expect(await slow).toEqual({ status: "applied", reason: null });
+        expect(state.roleWrites).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     /** @scenario "A paid fact that cannot apply yet is delivered again" */
     it("throws on the paid fact while another applier holds the change", async () => {
       const { service, pay, pending } = await waiting();
@@ -458,7 +494,7 @@ describe("MemberRoleSeatPurchaseService", () => {
       await pending.claim({ organizationId: ORG, id: "change_1", token: "another-applier" });
 
       await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
-        /could not apply yet/,
+        SeatRoleChangeNotAppliedYetError,
       );
     });
 
@@ -467,7 +503,7 @@ describe("MemberRoleSeatPurchaseService", () => {
       const { service } = await waiting();
 
       await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
-        /could not apply yet/,
+        SeatRoleChangeNotAppliedYetError,
       );
     });
 

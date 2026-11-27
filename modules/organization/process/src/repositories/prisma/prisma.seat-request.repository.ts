@@ -203,6 +203,13 @@ export class PrismaSeatRequestRepository
     });
   }
 
+  async releaseSalesNotice({ id, at }: { id: string; at: number }): Promise<void> {
+    await this.prisma.seatRequest.updateMany({
+      where: { id, salesNotifiedAt: new Date(at) },
+      data: { salesNotifiedAt: null },
+    });
+  }
+
   async findForUser({ userId }: { userId: string }): Promise<SeatRequestRow[]> {
     const rows = await this.prisma.seatRequest.findMany({ where: { userId } });
     return rows.map(rowOf);

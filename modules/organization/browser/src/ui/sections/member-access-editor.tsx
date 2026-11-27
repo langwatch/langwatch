@@ -543,6 +543,40 @@ async function saveAfterPaidRole({
   }
 }
 
+/**
+ * One staged batch: a sent batch leaves the staging, a failed one stages its flushed draft again
+ * for the retry. Only the member still open has its staging changed.
+ */
+async function sendStagedBatch({
+  send,
+  stillOpen,
+  uncommitted,
+  removed,
+  added,
+  setPendingGrantRemovals,
+  setPendingGrantAdditions,
+}: {
+  send: () => Promise<unknown>;
+  stillOpen: () => boolean;
+  uncommitted: PendingGrant | null;
+  removed: Set<string>;
+  added: PendingGrant[];
+  setPendingGrantRemovals: (update: (staged: Set<string>) => Set<string>) => void;
+  setPendingGrantAdditions: (update: (staged: PendingGrant[]) => PendingGrant[]) => void;
+}): Promise<void> {
+  try {
+    await send();
+  } catch (error) {
+    if (uncommitted && stillOpen()) {
+      setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: uncommitted }));
+    }
+    throw error;
+  }
+  if (!stillOpen()) return;
+  setPendingGrantRemovals((prev) => new Set([...prev].filter((id) => !removed.has(id))));
+  setPendingGrantAdditions((prev) => prev.filter((grant) => !added.includes(grant)));
+}
+
 /** The staged rows follow the picked seat. */
 function useStagedFollowsSeat({
   pendingSeat,
@@ -642,6 +676,11 @@ function useMemberAccessEditor({
     setHasDraftGrant(false);
   };
   const keepStagedOnRoleRefresh = useResetStaged({ userId, memberSeat, reset, setPendingSeat });
+  // The member open now: an answer for a member since closed leaves the editor alone.
+  const openMember = useRef(userId);
+  useEffect(() => {
+    openMember.current = userId;
+  }, [userId]);
 
   const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
@@ -697,20 +736,21 @@ function useMemberAccessEditor({
       removals: pendingGrantRemovals,
     });
     if (pendingGrantRemovals.size === 0 && additions.length === 0) return;
-    // The flushed draft left its input row, so a failed batch stages it for the retry.
-    await applyMemberGrants
-      .mutateAsync({
-        organizationId,
-        userId,
-        bindingIdsToDelete: [...pendingGrantRemovals],
-        bindingsToCreate: additions.map(bindingToCreate),
-      })
-      .catch((error: unknown) => {
-        if (uncommitted) {
-          setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: uncommitted }));
-        }
-        throw error;
-      });
+    await sendStagedBatch({
+      send: () =>
+        applyMemberGrants.mutateAsync({
+          organizationId,
+          userId,
+          bindingIdsToDelete: [...pendingGrantRemovals],
+          bindingsToCreate: additions.map(bindingToCreate),
+        }),
+      stillOpen: () => openMember.current === userId,
+      uncommitted,
+      removed: pendingGrantRemovals,
+      added: pendingGrantAdditions,
+      setPendingGrantRemovals,
+      setPendingGrantAdditions,
+    });
   };
 
   const seatPanel = useSeatRolePanel({
@@ -727,7 +767,7 @@ function useMemberAccessEditor({
         applyStagedGrants,
         refresh: refreshAccessQueries,
         onBatchFailed: (error) => {
-          keepStagedOnRoleRefresh.current = true;
+          if (openMember.current === userId) keepStagedOnRoleRefresh.current = true;
           showErrorToast({
             error,
             fallbackTitle: "The role changed, but the access rows did not save",

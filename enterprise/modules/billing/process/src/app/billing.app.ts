@@ -1094,7 +1094,7 @@ export class BillingModule
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void> {
+  }): Promise<{ sent: boolean }> {
     return this.#resourceLimitAlerts.notifySalesOfSeatRequest(input);
   }
 

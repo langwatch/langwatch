@@ -92,14 +92,14 @@ export interface SeatRequestPeers {
     organizationId: string;
     payment: SeatPayment;
   }): Promise<{ status: SeatPaymentStatus }>;
-  /** Billing's sales notice for an account-managed organization; never throws. */
+  /** Billing's sales notice for an account-managed organization; `sent` false when it failed. */
   notifySales(input: {
     organizationId: string;
     organizationName: string;
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void>;
+  }): Promise<{ sent: boolean }>;
 }
 
 /** Refused sign-ins an organization is told about per UTC day, both kinds together. */
@@ -299,7 +299,8 @@ export class SeatRequestService {
       return bought.purchase.status === "added";
     };
     try {
-      const { outcome } = await this.approve({ ...input, buySeat });
+      // The opening the payment reference names, so a replaced one is never approved for it.
+      const { outcome } = await this.approve({ ...input, buySeat, openedAt });
       return { status: "approved", outcome, seatAdded: bought.purchase !== undefined };
     } catch (error) {
       const { purchase } = bought;
@@ -493,7 +494,7 @@ export class SeatRequestService {
           "could not record the seat request notice",
         );
       });
-    // The request is saved; a failed sales notice is logged, and its claim is never taken.
+    // The request is saved; a failed sales notice is logged and released for the next ask.
     await this.tellSales({ request: opened.request }).catch((error: unknown) => {
       this.dependencies.logger.warn(
         { organizationId: input.organizationId, error },
@@ -548,18 +549,21 @@ export class SeatRequestService {
     if (path.kind !== "contact_sales" || !this.dependencies.isSaas) return;
     // Read before the claim, so a failed read leaves the notice to the next opening or ask.
     const organizationName = await this.dependencies.peers.organizationName({ organizationId });
-    const claimed = await this.dependencies.requests.claimSalesNotice({
-      id: request.id,
-      at: this.dependencies.now(),
-    });
-    if (!claimed) return;
-    await this.dependencies.peers.notifySales({
-      organizationId,
-      organizationName,
-      plan: plan.type,
-      seats: plan.maxMembers,
-      requestedSeats: plan.maxMembers + 1,
-    });
+    const claim = { id: request.id, at: this.dependencies.now() };
+    if (!(await this.dependencies.requests.claimSalesNotice(claim))) return;
+    let sent = false;
+    try {
+      ({ sent } = await this.dependencies.peers.notifySales({
+        organizationId,
+        organizationName,
+        plan: plan.type,
+        seats: plan.maxMembers,
+        requestedSeats: plan.maxMembers + 1,
+      }));
+    } finally {
+      // A notice that did not go out frees its claim, so the next ask sends it.
+      if (!sent) await this.dependencies.requests.releaseSalesNotice(claim);
+    }
   }
 
   private async approvalOf({

@@ -80,6 +80,8 @@ export abstract class SeatRequestRepository {
   }): Promise<SeatRequestRow[]>;
   /** Claims the one sales notice of this opening; false when it was claimed already. */
   abstract claimSalesNotice(input: { id: string; at: number }): Promise<boolean>;
+  /** Frees the sales notice claimed at `at` when it did not go out; a newer claim stays. */
+  abstract releaseSalesNotice(input: { id: string; at: number }): Promise<void>;
   /** Every request naming this person, in any organization. */
   abstract findForUser(input: { userId: string }): Promise<SeatRequestRow[]>;
 }

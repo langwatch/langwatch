@@ -196,8 +196,9 @@ describe("OrganizationAccessNoticeService", () => {
     /** @scenario "Administrators and Billing members get an in-app push when a member asks" */
     it("still pushes the administrators before the notice write fails", async () => {
       const { push, repository, service } = notices();
+      const failure = new Error("notice log unavailable");
       repository.record = async () => {
-        throw new Error("notice log unavailable");
+        throw failure;
       };
 
       await expect(
@@ -211,7 +212,7 @@ describe("OrganizationAccessNoticeService", () => {
           askedFor: { reason: "run the workbench" },
           seatRequestId: "seat-request-1",
         }),
-      ).rejects.toThrow("notice log unavailable");
+      ).rejects.toBe(failure);
       expect(push.pushes.map((sent) => sent.userId)).toEqual(["user-ada", "user-bill"]);
     });
   });

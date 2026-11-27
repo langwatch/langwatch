@@ -54,11 +54,13 @@ function alertsFor({
   isSaas = true,
   organizations = [ACME],
   send = async () => {},
+  sendSeatRequest = async () => {},
 }: {
   isSaas?: boolean;
   /** Answered in turn, the last one repeating. */
   organizations?: (typeof ACME | null)[];
   send?: (context: ResourceLimitNotificationContext) => Promise<void>;
+  sendSeatRequest?: () => Promise<void>;
 } = {}) {
   const sent: ResourceLimitNotificationContext[] = [];
   const errors = RecordingErrorReporter.create();
@@ -77,6 +79,7 @@ function alertsFor({
         sent.push(context);
         await send(context);
       },
+      sendSlackSeatRequest: () => sendSeatRequest(),
     }),
     errors,
   });
@@ -156,6 +159,25 @@ describe("the resource-limit alert", () => {
     await alerts.notifyResourceLimitReached(REACHED);
 
     expect(sent).toEqual([]);
+  });
+
+  it("answers whether the sales seat request notice went out, and never throws", async () => {
+    const failure = new Error("slack unavailable");
+    const notice = {
+      organizationId: "org_acme",
+      organizationName: "Acme",
+      plan: "ENTERPRISE",
+      seats: 5,
+      requestedSeats: 6,
+    };
+    const working = alertsFor();
+    const failing = alertsFor({ sendSeatRequest: () => Promise.reject(failure) });
+
+    await expect(working.alerts.notifySalesOfSeatRequest(notice)).resolves.toEqual({ sent: true });
+    await expect(failing.alerts.notifySalesOfSeatRequest(notice)).resolves.toEqual({
+      sent: false,
+    });
+    expect(failing.errors.captured).toEqual([failure]);
   });
 
   it("releases the cooldown when the organization is not found", async () => {

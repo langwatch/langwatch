@@ -46,8 +46,8 @@ export interface PendingSeatRoleChangeRepository {
   }): Promise<PendingSeatRoleChangeRecord[]>;
   /** True for the one caller that may apply the change now, holding it under its own token. */
   claim(input: ChangeRef & { token: string }): Promise<boolean>;
-  /** True while the token is still the claim on the change, false once it expired or moved. */
-  holds(input: ChangeRef & { token: string }): Promise<boolean>;
+  /** Restarts the claim period while the token still holds it; false once it expired or moved. */
+  renew(input: ChangeRef & { token: string }): Promise<boolean>;
   /** Frees the claim only when the token still holds it. */
   release(input: ChangeRef & { token: string }): Promise<void>;
   /** Moves a waiting change to its outcome; false, changing nothing, once it is settled. */

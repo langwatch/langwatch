@@ -9,16 +9,19 @@ import type {
 
 /** The week Redis keeps a change for, from the moment it was saved. */
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+/** The claim period Redis gives an applier before another may take the change. */
+const CLAIM_MS = 120 * 1000;
 
 type ChangeRef = { organizationId: string; id: string };
 type Kept = { record: PendingSeatRoleChangeRecord; expiresAt: number };
+type Claim = { token: string; expiresAt: number };
 
 /** The changes waiting on a seat payment, held in the process; each expires a week after saving. */
 export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleChangeRepository {
   private readonly records = new Map<string, Kept>();
   /** The organization's latest saved change, as the Redis index keeps it. */
   private readonly latestForOrganization = new Map<string, string>();
-  private readonly claims = new Map<string, string>();
+  private readonly claims = new Map<string, Claim>();
 
   static create({
     now = () => nowInstant().epochMilliseconds,
@@ -81,17 +84,19 @@ export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleCha
   }
 
   async claim({ id, token }: ChangeRef & { token: string }): Promise<boolean> {
-    if (this.claims.has(id)) return false;
-    this.claims.set(id, token);
+    if (this.liveClaim(id)) return false;
+    this.claims.set(id, { token, expiresAt: this.now() + CLAIM_MS });
     return true;
   }
 
-  async holds({ id, token }: ChangeRef & { token: string }): Promise<boolean> {
-    return this.claims.get(id) === token;
+  async renew({ id, token }: ChangeRef & { token: string }): Promise<boolean> {
+    if (this.liveClaim(id)?.token !== token) return false;
+    this.claims.set(id, { token, expiresAt: this.now() + CLAIM_MS });
+    return true;
   }
 
   async release({ id, token }: ChangeRef & { token: string }): Promise<void> {
-    if (this.claims.get(id) === token) this.claims.delete(id);
+    if (this.liveClaim(id)?.token === token) this.claims.delete(id);
   }
 
   async settle({
@@ -110,6 +115,11 @@ export class MemoryPendingSeatRoleChangeRepository implements PendingSeatRoleCha
     }
     this.records.set(id, { ...kept, record: { ...record, status, reason: reason ?? null } });
     return true;
+  }
+
+  private liveClaim(id: string): Claim | undefined {
+    const claim = this.claims.get(id);
+    return claim && claim.expiresAt > this.now() ? claim : undefined;
   }
 
   private read(id: string): PendingSeatRoleChangeRecord | undefined {

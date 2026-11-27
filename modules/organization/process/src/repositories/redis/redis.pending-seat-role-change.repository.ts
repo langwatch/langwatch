@@ -9,7 +9,7 @@ import type {
 
 const PREFIX = "organization:seat-role-change";
 const KEEP_SECONDS = 7 * 24 * 60 * 60;
-/** Long enough for one role write; a crashed applier frees the change after it. */
+/** Renewed by its holder while the role write runs; a crashed applier frees the change after it. */
 const CLAIM_SECONDS = 120;
 /** Reserves the payment and writes the record and both indexes in one step, or writes nothing. */
 const SAVE_SCRIPT =
@@ -18,6 +18,9 @@ const SAVE_SCRIPT =
   "redis.call('SET', KEYS[3], ARGV[1], 'EX', ARGV[3]) " +
   "redis.call('SET', KEYS[4], ARGV[1], 'EX', ARGV[3]) " +
   "return 1";
+const RENEW_SCRIPT =
+  "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('EXPIRE', KEYS[1], ARGV[2]) end " +
+  "return 0";
 const RELEASE_SCRIPT =
   "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0";
 /** Replaces the record only while it still reads as the waiting one the caller saw. */
@@ -87,8 +90,8 @@ export class RedisPendingSeatRoleChangeRepository implements PendingSeatRoleChan
     return taken === "OK";
   }
 
-  async holds({ token, ...ref }: ChangeRef & { token: string }): Promise<boolean> {
-    return (await this.redis.get(claimKey(ref))) === token;
+  async renew({ token, ...ref }: ChangeRef & { token: string }): Promise<boolean> {
+    return (await this.redis.eval(RENEW_SCRIPT, 1, claimKey(ref), token, CLAIM_SECONDS)) === 1;
   }
 
   async release({ token, ...ref }: ChangeRef & { token: string }): Promise<void> {

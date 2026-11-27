@@ -49,6 +49,31 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
       at,
     });
 
+  describe("when a claimed sales notice did not go out", () => {
+    it("frees only the claim taken at that moment, so the next ask can claim it", async () => {
+      const opened = await requests.open({
+        id: `${namespace}-sales-row`,
+        organizationId,
+        email: "sales@acme.example",
+        userId: null,
+        name: null,
+        source: "idp_refused",
+        idpRefused: true,
+        idpKind: "okta",
+        at: 600,
+      });
+      const row = opened.request;
+      expect(await requests.claimSalesNotice({ id: row.id, at: 700 })).toBe(true);
+
+      await requests.releaseSalesNotice({ id: row.id, at: 699 });
+      expect(await requests.claimSalesNotice({ id: row.id, at: 710 })).toBe(false);
+
+      await requests.releaseSalesNotice({ id: row.id, at: 700 });
+      expect(await requests.claimSalesNotice({ id: row.id, at: 720 })).toBe(true);
+      await prisma.seatRequest.deleteMany({ where: { organizationId, id: row.id } });
+    });
+  });
+
   describe("when the same address opens, repeats, is declined and opens again", () => {
     it("keeps one row: opened, already open, then reopened with a fresh sales claim", async () => {
       const first = await open(`${namespace}-a`, 1_000);

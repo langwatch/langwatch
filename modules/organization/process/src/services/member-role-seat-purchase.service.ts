@@ -27,6 +27,8 @@ const logger = createLogger("langwatch:organization:memberRoleSeatPurchase");
 
 /** What the admin reads when the role write fails for a cause we did not name. */
 const UNKNOWN_REFUSAL = "something went wrong on our side";
+/** How often a role write renews its claim, well inside the claim period. */
+const CLAIM_RENEW_MS = 30_000;
 
 type RoleChange = (
   input: Readonly<{
@@ -58,7 +60,7 @@ type Dependencies = {
 };
 
 /** Thrown to the paid fact while its change cannot apply yet, so eventing delivers it again. */
-class SeatRoleChangeNotAppliedYetError extends Error {
+export class SeatRoleChangeNotAppliedYetError extends Error {
   constructor(changeId: string) {
     super(`The role change ${changeId} waiting on a paid seat could not apply yet`);
     this.name = "SeatRoleChangeNotAppliedYetError";
@@ -153,11 +155,12 @@ export class MemberRoleSeatPurchaseService {
   }): Promise<MemberRoleWithSeatResult | undefined> {
     const { organizationId, userId, role } = input;
     const held = await this.holdWaiting({ organizationId, userId });
+    const write = () =>
+      this.dependencies.changeMemberRole({ organizationId, userId, role, planUser: by }, by);
     try {
-      const { teamsLeftWithoutAdmin } = await this.dependencies.changeMemberRole(
-        { organizationId, userId, role, planUser: by },
-        by,
-      );
+      const { teamsLeftWithoutAdmin } = held
+        ? await this.underClaim({ organizationId, ...held }, write)
+        : await write();
       if (held) {
         await this.dependencies.pending.settle({
           organizationId,
@@ -190,6 +193,29 @@ export class MemberRoleSeatPurchaseService {
       throw new SeatPaymentWaitingError();
     }
     return held;
+  }
+
+  /**
+   * Runs a role write while renewing the claim, so the claim lapses only when its holder is gone
+   * or cannot reach the store, and no second applier writes beside a live one.
+   */
+  private async underClaim<T>(
+    claim: { organizationId: string; id: string; token: string },
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const renewal = setInterval(() => {
+      this.dependencies.pending.renew(claim).catch((error: unknown) => {
+        logger.warn(
+          { organizationId: claim.organizationId, changeId: claim.id, error },
+          "claim not renewed",
+        );
+      });
+    }, CLAIM_RENEW_MS);
+    try {
+      return await work();
+    } finally {
+      clearInterval(renewal);
+    }
   }
 
   /** The same change asked again reopens its payment page; any other one waits its turn. */
@@ -373,11 +399,13 @@ export class MemberRoleSeatPurchaseService {
       return settle("seat_only", "the admin who asked can no longer change roles");
     }
     // A claim that expired during the checks has passed to another applier, which writes instead.
-    if (!(await this.dependencies.pending.holds({ organizationId, id, token }))) {
+    if (!(await this.dependencies.pending.renew({ organizationId, id, token }))) {
       return { status: "waiting", reason: null };
     }
     try {
-      await this.dependencies.changeMemberRole({ organizationId, userId, role, planUser: by }, by);
+      await this.underClaim({ organizationId, id, token }, () =>
+        this.dependencies.changeMemberRole({ organizationId, userId, role, planUser: by }, by),
+      );
     } catch (error) {
       logger.warn({ organizationId, changeId: id, error }, "seat paid, then the role was refused");
       return settle("seat_only", refusalReason(error));

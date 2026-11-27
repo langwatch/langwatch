@@ -78,6 +78,26 @@ describe("given an account-managed cloud organization whose sales notice fails",
       expect((await openRequests()).map((request) => request.email)).toEqual(["lena@acme.example"]);
     });
   });
+
+  describe("when she asks again once the sales notice works", () => {
+    /** @scenario "Sales hear about a seat request from an account-managed organization once" */
+    it("tells sales on the second ask, once", async () => {
+      const { app, liteMember, sales, salesNotices } = await application({
+        isSaas: true,
+        salesDown: true,
+        plan: { planSource: "license", type: "ENTERPRISE", free: false },
+      });
+      const lena = liteMember({ email: "lena@acme.example" });
+      await app.requestSeatAccess({ organizationId: ORGANIZATION_ID }, lena.caller);
+      expect(salesNotices).toHaveLength(0);
+
+      sales.down = false;
+      await app.requestSeatAccess({ organizationId: ORGANIZATION_ID }, lena.caller);
+      await app.requestSeatAccess({ organizationId: ORGANIZATION_ID }, lena.caller);
+
+      expect(salesNotices.map((notice) => notice.organizationId)).toEqual([ORGANIZATION_ID]);
+    });
+  });
 });
 
 describe("given an organization refused at sign-in by many typed addresses in a day", () => {

@@ -45,6 +45,31 @@ describe("MemoryPendingSeatRoleChangeRepository", () => {
       expect(await pending.findByPayment({ organizationId: ORG, payment: saved.payment })).toEqual(
         [],
       );
+      expect(
+        await pending.findLatestForMember({ organizationId: ORG, userId: saved.userId }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a claim is held past the claim period", () => {
+    it("passes the change on unless its holder renewed the claim, as Redis does", async () => {
+      const clock = { now: 0 };
+      const pending = MemoryPendingSeatRoleChangeRepository.create({ now: () => clock.now });
+      const ref = { organizationId: ORG, id: "change-a" };
+      await pending.claim({ ...ref, token: "renewing" });
+      await pending.claim({ organizationId: ORG, id: "change-b", token: "silent" });
+
+      clock.now = 100_000;
+      expect(await pending.renew({ ...ref, token: "renewing" })).toBe(true);
+      clock.now = 200_000;
+
+      expect(await pending.claim({ ...ref, token: "next" })).toBe(false);
+      expect(await pending.claim({ organizationId: ORG, id: "change-b", token: "next" })).toBe(
+        true,
+      );
+      expect(await pending.renew({ organizationId: ORG, id: "change-b", token: "silent" })).toBe(
+        false,
+      );
     });
   });
 
