@@ -42,6 +42,7 @@ const INPUT_HIDDEN_FROM_THE_PUBLIC: ResolvedDataPrivacy = {
         viewers: false,
         projectOwner: false,
         groupIds: [],
+        apiKeyIds: [],
       },
     },
   },

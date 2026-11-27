@@ -92,6 +92,13 @@ Feature: Generating a typical upgrade snapshot from an old release
     Then the app and the four store ports are all different across both runs
 
   @unit
+  Scenario: A generation run stops when the OS offers only ports already handed out
+    Given a generation run that already holds its ports
+    When the OS keeps offering a second run only a port the first run holds
+    Then the second run fails with an error after a bounded number of offers
+    And it neither loops nor reuses the held port
+
+  @unit
   Scenario: each product kind is created through the old release's doors
     Given an old app that answers its sign-in, tRPC and collector doors
     When the product seeds run signed in as the seed account

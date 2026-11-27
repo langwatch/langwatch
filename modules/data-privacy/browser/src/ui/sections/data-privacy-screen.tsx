@@ -26,6 +26,7 @@ import { useMemo, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
+import { apiKeySaveConfirmation, combineSaveConfirmations } from "../../model/audience-api-keys.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -284,19 +285,23 @@ function PrivacyRuleDrawerMount({
     scopes: PrivacyScopeEntry[];
     config: DataPrivacyConfig;
   } | null>(null);
-  const confirmation = pending
-    ? ruleSaveConfirmation({
-        offer: piiRedactionModelOffer,
-        before: editingRule?.config,
-        after: pending.config,
-      })
-    : null;
-  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
-    const asks = ruleSaveConfirmation({
+  // The price of Strict and a key reading restricted content each ask first (ADR-208).
+  const asksBefore = (config: DataPrivacyConfig) => {
+    const price = ruleSaveConfirmation({
       offer: piiRedactionModelOffer,
       before: editingRule?.config,
       after: config,
     });
+    const key = apiKeySaveConfirmation({
+      before: editingRule?.config,
+      after: config,
+      options: snapshot.audienceOptions,
+    });
+    return combineSaveConfirmations(price, key);
+  };
+  const confirmation = pending ? asksBefore(pending.config) : null;
+  const saveOrAsk = (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
+    const asks = asksBefore(config);
     if (asks) setPending({ scopes, config });
     else void save(scopes, config);
   };

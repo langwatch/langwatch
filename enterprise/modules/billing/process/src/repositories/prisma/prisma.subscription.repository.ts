@@ -12,6 +12,7 @@ import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
   type LiveUnlinkedSubscription,
+  type SupersededSubscription,
 } from "../subscription.repository.ts";
 
 const NUMERIC_OVERRIDE_FIELDS = [
@@ -234,39 +235,31 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     // Once the migration lands, restore the updateMany query filtering on isTrial.
   }
 
-  async migrateToSeatEvent(input: {
+  async findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    return this.prisma.$transaction(async (tx) => {
-      const oldSubs = await tx.subscription.findMany({
-        where: {
-          organizationId: input.organizationId,
-          id: { not: input.excludeSubscriptionId },
-          status: {
-            not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-          },
-          stripeSubscriptionId: { not: null },
-          plan: { in: [...TIERED_PLAN_TYPES] as PrismaPlanTypes[] },
-        },
-      });
-
-      for (const oldSub of oldSubs) {
-        await tx.subscription.update({
-          where: { id: oldSub.id },
-          data: {
-            status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-            endDate: toDate(nowInstant()),
-            // The superseded row's open case would otherwise keep the banner and emails going.
-            ...RECOVERY_CLEARED,
-          },
-        });
-      }
-
-      return oldSubs.map((s) => ({
-        stripeSubscriptionId: s.stripeSubscriptionId,
-      }));
+  }): Promise<SupersededSubscription[]> {
+    const rows = await this.prisma.subscription.findMany({
+      where: {
+        organizationId: input.organizationId,
+        id: { not: input.excludeSubscriptionId },
+        stripeSubscriptionId: { not: null },
+        plan: { in: [...TIERED_PLAN_TYPES] as PrismaPlanTypes[] },
+      },
+      select: { id: true, stripeSubscriptionId: true, status: true },
     });
+
+    return rows.flatMap(({ id, stripeSubscriptionId, status }) =>
+      stripeSubscriptionId
+        ? [
+            {
+              id,
+              stripeSubscriptionId,
+              cancelledInRecords: status === SubscriptionStatus.CANCELLED,
+            },
+          ]
+        : [],
+    );
   }
 
   async findLiveUnlinkedBeside({

@@ -4,10 +4,10 @@ import type {
   BillingSubscriptionRecord,
   BillingSubscriptionWithOrganization,
   LiveUnlinkedSubscription,
+  SupersededSubscription,
 } from "./subscription.repository.ts";
 
 export type SubscriptionWithOrg = BillingSubscriptionWithOrganization;
-export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
 /** Outcome names the why; never collapses to null. */
 export type SubscriptionMutationResult<T> =
@@ -56,10 +56,10 @@ export abstract class BillingWebhookSubscriptionRepository {
 
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
 
-  abstract migrateToSeatEvent(input: {
+  abstract findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]>;
+  }): Promise<SupersededSubscription[]>;
 
   abstract findLiveUnlinkedBeside(input: {
     pendingId: string;

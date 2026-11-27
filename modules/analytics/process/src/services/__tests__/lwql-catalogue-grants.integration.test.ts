@@ -5,7 +5,7 @@
  */
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { builtinRoleGrants, type AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
@@ -46,7 +46,7 @@ function protectionsService({
   return WorkbenchProtectionsService.create({
     authz,
     dataPrivacy: createApiFixture<DataPrivacyApi>({ getResolvedForProject: policy }),
-    projects: createApiFixture<ProjectApi>(),
+    projects: createApiFixture<ProjectApi>({ findById: async () => null }),
   });
 }
 
@@ -215,7 +215,9 @@ describe("given a policy that hides captured input from the member", () => {
       audience: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.input.audience, admins: true },
     } as const;
     const protections = await protectionsService({
-      authz: authzGranting({ grants: (check) => check.permission !== "project:update" }).authz,
+      authz: authzGranting({
+        grants: ({ permission }) => builtinRoleGrants({ role: "member", permission }),
+      }).authz,
       policy: () =>
         Promise.resolve({
           ...PLATFORM_DEFAULT_DATA_PRIVACY,

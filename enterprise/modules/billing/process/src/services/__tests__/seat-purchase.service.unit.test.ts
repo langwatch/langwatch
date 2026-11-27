@@ -55,6 +55,7 @@ const seatSubscription = (quantity: number, id = "sub_stripe_1"): BillingSubscri
       unitAmount: 3400,
       interval: "month",
       quantity,
+      createdAt: 1_700_000_000,
     },
   ],
 });

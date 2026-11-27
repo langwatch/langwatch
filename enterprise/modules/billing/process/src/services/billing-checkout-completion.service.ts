@@ -31,6 +31,7 @@ import {
 } from "./billing-subscription-lifecycle.service.ts";
 import type { DuplicateSubscriptionAlerts } from "./duplicate-subscription-alert.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { SupersededPlanRetirementError } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 
@@ -226,22 +227,23 @@ export class BillingCheckoutCompletionService {
       throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
     }
 
-    await this.lifecycle.syncInvoicePaymentSuccess({
+    // A failed follow-up still lets the plan land, then fails the delivery so
+    // Stripe redelivers it: every step here is safe to repeat.
+    const failures = await this.syncPaidPlan({
       subscriptionId,
-      throwOnMissing: true,
       startsPlan: alreadyLinked === null,
     });
 
     const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
-    // A failed follow-up still lets the plan land, then fails the delivery so
-    // Stripe redelivers it: every step here is safe to repeat.
-    const failures = await this.announcePaidCheckout({
-      subscriptionId,
-      pendingId: subscriptionClientReferenceId,
-      organizationId: subscriptionRecord?.organizationId ?? null,
-      selectedCurrency,
-    });
+    failures.push(
+      ...(await this.announcePaidCheckout({
+        subscriptionId,
+        pendingId: subscriptionClientReferenceId,
+        organizationId: subscriptionRecord?.organizationId ?? null,
+        selectedCurrency,
+      })),
+    );
 
     // Cancel any active trial subscriptions for this org
     if (subscriptionRecord) {
@@ -253,6 +255,27 @@ export class BillingCheckoutCompletionService {
     if (failures.length > 0) throw failures[0];
 
     return { earlyReturn: false };
+  }
+
+  /** Lands the paid plan; a refused old-plan retirement is returned so the delivery fails later. */
+  private async syncPaidPlan({
+    subscriptionId,
+    startsPlan,
+  }: {
+    subscriptionId: string;
+    startsPlan: boolean;
+  }): Promise<unknown[]> {
+    try {
+      await this.lifecycle.syncInvoicePaymentSuccess({
+        subscriptionId,
+        throwOnMissing: true,
+        startsPlan,
+      });
+      return [];
+    } catch (err) {
+      if (!(err instanceof SupersededPlanRetirementError)) throw err;
+      return [err];
+    }
   }
 
   /** The currency choice and the held invites a paid checkout announces; failures returned. */

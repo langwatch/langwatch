@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/upgradelab/seed"
@@ -31,25 +32,65 @@ const (
 // Ports are the host ports the compose override publishes; the doors and the capture reach the stack through them.
 type Ports struct{ App, Postgres, Redis, ClickHouse, Private string }
 
-// freePorts asks the OS for five distinct free loopback ports, holding all open until every one is read.
+// handedOutPorts are the ports this process already gave a run: the OS may offer a closed one again.
+type handedOutPorts struct {
+	mu    sync.Mutex
+	ports map[string]bool
+}
+
+func newHandedOutPorts() *handedOutPorts { return &handedOutPorts{ports: map[string]bool{}} }
+
+var processPorts = newHandedOutPorts()
+
+// portOfferAttempts bounds how many ports the OS may offer before a run gives up on finding five new ones.
+const portOfferAttempts = 64
+
+func listenLoopback() (net.Listener, error) {
+	return (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+}
+
+// freePorts asks the OS for five free loopback ports no earlier run in this process was given.
 // shortcut: a port can be taken between close and docker's bind; retry the run if compose reports it.
-func freePorts() (Ports, error) {
-	var found [5]string
-	listeners := make([]net.Listener, 0, len(found))
+func freePorts() (Ports, error) { return freePortsFrom(listenLoopback, processPorts) }
+
+// freePortsFrom holds every offered port open until five new ones are read, so the OS offers fresh ones.
+func freePortsFrom(listen func() (net.Listener, error), handed *handedOutPorts) (Ports, error) {
+	handed.mu.Lock()
+	defer handed.mu.Unlock()
+	var listeners []net.Listener
 	defer func() {
 		for _, listener := range listeners {
 			_ = listener.Close()
 		}
 	}()
-	for index := range found {
-		listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
-		if err != nil {
-			return Ports{}, err
-		}
-		listeners = append(listeners, listener)
-		_, found[index], _ = net.SplitHostPort(listener.Addr().String())
+	found, err := newPortsFrom(listen, handed.ports, &listeners)
+	if err != nil {
+		return Ports{}, err
+	}
+	for _, port := range found {
+		handed.ports[port] = true
 	}
 	return Ports{App: found[0], Postgres: found[1], Redis: found[2], ClickHouse: found[3], Private: found[4]}, nil
+}
+
+// newPortsFrom reads offered ports until five are neither taken nor repeated, keeping each listener open.
+func newPortsFrom(listen func() (net.Listener, error), taken map[string]bool, listeners *[]net.Listener) ([]string, error) {
+	found := make([]string, 0, 5)
+	for attempt := 0; attempt < portOfferAttempts && len(found) < 5; attempt++ {
+		listener, err := listen()
+		if err != nil {
+			return nil, err
+		}
+		*listeners = append(*listeners, listener)
+		_, port, _ := net.SplitHostPort(listener.Addr().String())
+		if !taken[port] && !slices.Contains(found, port) {
+			found = append(found, port)
+		}
+	}
+	if len(found) < 5 {
+		return nil, fmt.Errorf("the OS offered %d new loopback ports in %d tries, 5 needed", len(found), portOfferAttempts)
+	}
+	return found, nil
 }
 
 func (ports Ports) appURL() string { return "http://localhost:" + ports.App }

@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { type Disposition, EMPTY_AUDIENCE, type ResolvedAudience } from "../data-privacy.ts";
+import {
+  type Disposition,
+  EMPTY_AUDIENCE,
+  namedApiKeyIds,
+  type ResolvedAudience,
+} from "../data-privacy.ts";
 import {
   describeAudience,
   type EffectiveRestriction,
   isContentVisible,
+  isContentVisibleToKey,
   isContentVisibleToPublic,
   needsAudienceFacts,
+  needsOwnerFact,
+  needsRoleEverywhere,
+  ownsEveryGovernedProject,
+  viewerFactsFrom,
   type ViewerFacts,
 } from "../data-privacy.visibility.ts";
 
@@ -30,6 +40,15 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
     isProjectOwner: false,
     groupIds: [],
     ...partial,
+  };
+}
+
+/** The three role permissions a viewer holds at one project, named so a call reads plainly. */
+function permissions(held: { view: boolean; update: boolean; manage: boolean }) {
+  return {
+    "traces:view": held.view,
+    "traces:update": held.update,
+    "project:manage": held.manage,
   };
 }
 
@@ -156,5 +175,224 @@ describe("needsAudienceFacts and isContentVisibleToPublic", () => {
     expect(isContentVisibleToPublic(eff("capture"))).toBe(true);
     expect(isContentVisibleToPublic(eff("restrict", { admins: true }))).toBe(false);
     expect(isContentVisibleToPublic(eff("drop"))).toBe(false);
+  });
+});
+
+describe("viewerFactsFrom", () => {
+  const facts = (held: { view: boolean; update: boolean; manage: boolean }) =>
+    viewerFactsFrom({
+      held: permissions(held),
+      heldElsewhere: [],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+  describe("given a project Member, who writes traces but does not manage the project", () => {
+    it("reads them as the Members role, not as an admin", () => {
+      expect(facts({ view: true, update: true, manage: false })).toMatchObject({
+        isAdmin: false,
+        isMemberRole: true,
+        isViewer: false,
+      });
+    });
+
+    it("hides content restricted to admins from them", () => {
+      const viewer = facts({ view: true, update: true, manage: false });
+      expect(isContentVisible(eff("restrict", { admins: true }), viewer)).toBe(false);
+    });
+  });
+
+  describe("given a project Admin", () => {
+    it("reads them as an admin, not as the Members role", () => {
+      expect(facts({ view: true, update: true, manage: true })).toMatchObject({
+        isAdmin: true,
+        isMemberRole: false,
+        isViewer: false,
+      });
+    });
+  });
+
+  describe("given a Viewer, who only reads traces", () => {
+    it("reads them as a viewer", () => {
+      expect(facts({ view: true, update: false, manage: false })).toMatchObject({
+        isAdmin: false,
+        isMemberRole: false,
+        isViewer: true,
+      });
+    });
+  });
+});
+
+describe("viewerFactsFrom across the projects a read spans", () => {
+  /** @scenario "Admins-only content stays hidden when a read spans a project where the viewer is no admin" */
+  it("counts an admin only where they are admin at every project", () => {
+    const viewer = viewerFactsFrom({
+      held: permissions({ view: true, update: true, manage: true }),
+      heldElsewhere: [permissions({ view: true, update: true, manage: false })],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+    expect(viewer).toMatchObject({ isAdmin: false, isMemberRole: false, isViewer: false });
+    expect(isContentVisible(eff("restrict", { admins: true }), viewer)).toBe(false);
+  });
+
+  it("keeps the read's own membership when they hold no role at the other project", () => {
+    const viewer = viewerFactsFrom({
+      held: permissions({ view: true, update: true, manage: true }),
+      heldElsewhere: [permissions({ view: false, update: false, manage: false })],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+    expect(isContentVisible(eff("capture"), viewer)).toBe(true);
+    expect(isContentVisible(eff("restrict", { allMembers: true }), viewer)).toBe(true);
+  });
+});
+
+describe("needsRoleEverywhere and needsOwnerFact", () => {
+  it("asks the role at the other projects only when a restriction names a role", () => {
+    expect(needsRoleEverywhere(eff("restrict", { admins: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { members: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { viewers: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { allMembers: true, groupIds: ["g"] }))).toBe(false);
+    expect(needsRoleEverywhere(eff("capture"))).toBe(false);
+  });
+
+  it("reads ownership only for an owner audience, or for a viewer who is no member", () => {
+    const owner = [eff("restrict", { projectOwner: true })];
+    const admins = [eff("restrict", { admins: true }), eff("capture")];
+    expect(needsOwnerFact({ restrictions: owner, isMember: true })).toBe(true);
+    expect(needsOwnerFact({ restrictions: admins, isMember: true })).toBe(false);
+    expect(needsOwnerFact({ restrictions: admins, isMember: false })).toBe(true);
+  });
+});
+
+describe("ownsEveryGovernedProject", () => {
+  const owners: Record<string, string | null> = { a: "user-1", b: "user-1", c: "user-2", d: null };
+  const ownerOf = async (projectId: string) => owners[projectId];
+  const noFailure = () => {
+    throw new Error("no lookup was expected to fail");
+  };
+
+  it("counts the viewer as owner when they own every project the read spans", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a", "b"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(true);
+  });
+
+  /** @scenario "Owner-only content stays hidden when a read spans a project the viewer does not own" */
+  it("does not when one spanned project belongs to someone else", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a", "c"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("does not when a project has no owner, or no project is named", async () => {
+    for (const projectIds of [["d"], []]) {
+      await expect(
+        ownsEveryGovernedProject({
+          userId: "user-1",
+          projectIds,
+          ownerOf,
+          onLookupFailure: noFailure,
+        }),
+      ).resolves.toBe(false);
+    }
+  });
+
+  it("does not for a caller with no user", async () => {
+    await expect(
+      ownsEveryGovernedProject({
+        userId: undefined,
+        projectIds: ["a"],
+        ownerOf,
+        onLookupFailure: noFailure,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("fails closed and reports the failure when an owner lookup throws", async () => {
+    const failures: unknown[] = [];
+    await expect(
+      ownsEveryGovernedProject({
+        userId: "user-1",
+        projectIds: ["a"],
+        ownerOf: () => Promise.reject(new Error("projects unreadable")),
+        onLookupFailure: (error) => failures.push(error),
+      }),
+    ).resolves.toBe(false);
+    expect(failures).toHaveLength(1);
+  });
+});
+
+describe("isContentVisibleToKey", () => {
+  describe("given content restricted to the project owner or a group, naming a key", () => {
+    /** @scenario A named key never sees more than Admins */
+    it("hides it from the key, as from Admins", () => {
+      for (const partial of [{ projectOwner: true }, { groupIds: ["security"] }]) {
+        const restricted = eff("restrict", { ...partial, apiKeyIds: ["key-named"] });
+        expect(isContentVisible(restricted, viewer({ isAdmin: true }))).toBe(false);
+        expect(isContentVisibleToKey(restricted, { apiKeyId: "key-named" })).toBe(false);
+      }
+    });
+
+    it("shows it when the audience is All members, which Admins are part of", () => {
+      const restricted = eff("restrict", { allMembers: true, apiKeyIds: ["key-named"] });
+      expect(isContentVisibleToKey(restricted, { apiKeyId: "key-named" })).toBe(true);
+    });
+  });
+
+  describe("given content restricted to admins and one named key", () => {
+    const restricted = eff("restrict", { admins: true, apiKeyIds: ["key-named"] });
+
+    /** @scenario A key named in the audience sees restricted content */
+    it("shows the named key the content", () => {
+      expect(isContentVisibleToKey(restricted, { apiKeyId: "key-named" })).toBe(true);
+    });
+
+    /** @scenario A key not named in the audience keeps reading restricted content as the public */
+    it("hides it from any other key", () => {
+      expect(isContentVisibleToKey(restricted, { apiKeyId: "key-other" })).toBe(false);
+    });
+  });
+
+  describe("given content dropped by a rule that names the key", () => {
+    /** @scenario A named key never sees dropped content */
+    it("hides it, since there is nothing stored to show", () => {
+      expect(
+        isContentVisibleToKey(eff("drop", { apiKeyIds: ["key-named"] }), { apiKeyId: "key-named" }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given captured content", () => {
+    it("shows it to any key, as to the public", () => {
+      expect(isContentVisibleToKey(eff("capture"), { apiKeyId: "key-other" })).toBe(true);
+    });
+  });
+});
+
+describe("namedApiKeyIds", () => {
+  it("collects every key the content categories name, once", () => {
+    expect(
+      namedApiKeyIds({
+        categories: {
+          input: { disposition: "restrict", audience: { admins: true, apiKeyIds: ["key-a"] } },
+          output: { disposition: "restrict", audience: { apiKeyIds: ["key-a", "key-b"] } },
+          system: { disposition: "capture" },
+        },
+      }),
+    ).toEqual(["key-a", "key-b"]);
   });
 });

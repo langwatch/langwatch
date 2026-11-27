@@ -84,7 +84,7 @@ function rollUp({
     isInstantEvalMeterProvisioned: () => true,
     queryPiiRedactionSpendTotal: async () => ({ outcome: "counted", total: ledger.piiRedaction }),
     isPiiRedactionMeterProvisioned: () => true,
-    subscriptionCarriesPrice: async () => true,
+    subscriptionPriceLine: async () => ({ carried: true, addedAtMs: null }),
     organizationCache: repositories.organizationCache,
     errorReporter: BillingErrorReporterService.create(),
     connectedUsageCeiling: async () => null,

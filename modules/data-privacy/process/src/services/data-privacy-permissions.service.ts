@@ -39,8 +39,8 @@ export class DataPrivacyPermissionsService {
     return decided.teams;
   }
 
-  /** `project:update` per id, in a map keyed by the id asked for. */
-  async canUpdateProjects(input: {
+  /** `project:manage` per id: a project rule decides who sees content, so it is an admin's. */
+  async canManageProjects(input: {
     userId: string;
     organizationId: string | null;
     projectIds: readonly string[];
@@ -58,7 +58,7 @@ export class DataPrivacyPermissionsService {
               projectId,
               await this.authz.hasPermission({
                 userId: input.userId,
-                permission: "project:update",
+                permission: "project:manage",
                 projectId,
               }),
             ] as const,
@@ -70,7 +70,7 @@ export class DataPrivacyPermissionsService {
 
     const decided = await this.authz.canBatchByIds({
       principal: { type: "user", id: input.userId },
-      permission: "project:update",
+      permission: "project:manage",
       organizationId: input.organizationId,
       teams: [],
       projects: input.projectIds.map((projectId) => ({ projectId })),

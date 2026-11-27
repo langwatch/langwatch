@@ -28,4 +28,10 @@ export class MemoryBillingWebhookOrganizationRepository extends BillingWebhookOr
     const organization = this.store.organizations.get(organizationId);
     return organization ? { id: organization.id, name: organization.name } : null;
   }
+
+  async isOnSeatEventPricing({ organizationId }: { organizationId: string }): Promise<boolean> {
+    const organization = this.store.organizations.get(organizationId);
+    if (!organization) throw new Error(`No organization "${organizationId}" exists.`);
+    return organization.pricingModel === "SEAT_EVENT";
+  }
 }

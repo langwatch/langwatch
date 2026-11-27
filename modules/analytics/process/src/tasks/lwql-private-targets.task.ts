@@ -12,7 +12,9 @@ import {
   LwqlPrivateCollectionAbsentError,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { unguardedTables } from "../rules/lwql-private-policies.rules.ts";
 import { type LwqlPrivateReader, privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
 import {
@@ -20,12 +22,106 @@ import {
   readPrivateRoute,
   readServerAddress,
 } from "../rules/lwql-private-route.rules.ts";
+import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 import type { LwqlConvergencePlan } from "./lwql-provision.task.ts";
 
 const logger = createLogger("langwatch:task:lwql-private-targets");
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const sqlText = LangWatchQLSqlTextService.create();
+const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
+
+/** The one access store rendered mode owns; a reader held in any other is never updated. */
+const RENDERED_ACCESS_STORAGE = "users_xml";
+
+/** A rendered private server still holding the reader an earlier sql-mode upgrade created. */
+export class LwqlPrivateStaleSqlReaderError extends Error {
+  readonly reader: string;
+  readonly storage: string;
+
+  constructor({ reader, storage }: { reader: string; storage: string }) {
+    super(`the reader ${reader} is held in the SQL access store ${storage}`);
+    this.name = "LwqlPrivateStaleSqlReaderError";
+    this.reader = reader;
+    this.storage = storage;
+  }
+}
+
+/** A rendered private server of several hosts whose plain CREATE would reach one of them. */
+export class LwqlPrivateDatabaseNotReplicatedError extends Error {
+  readonly database: string;
+  readonly engine: string;
+  readonly hostCount: number;
+
+  constructor({
+    database,
+    engine,
+    hostCount,
+  }: {
+    database: string;
+    engine: string;
+    hostCount: number;
+  }) {
+    super(`the database ${database} on ${hostCount} hosts uses the ${engine} engine`);
+    this.name = "LwqlPrivateDatabaseNotReplicatedError";
+    this.database = database;
+    this.engine = engine;
+    this.hostCount = hostCount;
+  }
+}
+
+type RowReader = Pick<LangWatchQLProvisioningRepository, "queryRows">;
+
+/** Every access store holding the reader, from `system.users`; none while the server lacks it. */
+export async function findReaderStorages({
+  repository,
+  reader,
+}: {
+  repository: RowReader;
+  reader: string;
+}): Promise<string[]> {
+  const name = sqlText.assertIdentifier(reader, "reader");
+  const rows = await repository.queryRows(
+    `SELECT storage FROM system.users WHERE name = ${clickHouseLiteral(name)}`,
+  );
+  // An unreadable storage counts as foreign, so the stale check fails closed.
+  return rows.map((row) => (typeof row.storage === "string" ? row.storage : "unknown"));
+}
+/**
+ * Rendered mode writes no access entity and no `ON CLUSTER`: a reader a sql-mode upgrade created
+ * is never updated, and a plain CREATE reaches one host unless the database is Replicated. Either
+ * leaves the server unconverged, before any statement runs.
+ */
+export async function assertRenderedPrivateServer({
+  repository,
+  names,
+}: {
+  repository: RowReader;
+  names: LangWatchQLNames;
+}): Promise<void> {
+  const reader = names.restrictedUser;
+  const foreign = (await findReaderStorages({ repository, reader })).filter(
+    (storage) => storage !== RENDERED_ACCESS_STORAGE,
+  );
+  if (foreign.length > 0) {
+    throw new LwqlPrivateStaleSqlReaderError({ reader, storage: foreign.join(", ") });
+  }
+  const query = (sql: string) => repository.queryRows(sql);
+  const hostCount = Math.max(
+    await clusterGuard.maxOwnClusterHostCount(query),
+    await clusterGuard.maxReplicaHostCount(query),
+  );
+  if (hostCount <= 1) return;
+  const database = sqlText.assertIdentifier(names.database, "database");
+  const [row] = await query(
+    `SELECT engine FROM system.databases WHERE name = ${clickHouseLiteral(database)}`,
+  );
+  const engine = typeof row?.engine === "string" ? row.engine : "absent";
+  if (engine !== "Replicated") {
+    throw new LwqlPrivateDatabaseNotReplicatedError({ database, engine, hostCount });
+  }
+}
 
 /** Bounds each request, not each target, so one unresponsive server cannot hold the deploy. */
 const PRIVATE_REQUEST_TIMEOUT_MS = 15_000;
@@ -36,6 +132,26 @@ const SINGLE_NODE_BYPASS = "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE";
 export interface LwqlPrivateEndpoint {
   readonly organizationId?: string;
   readonly url: string;
+}
+
+/** A private server's names: its database, its organisation's reader and the tenant setting. */
+export function privateNamesOf({
+  database,
+  reader,
+  tenantSetting,
+}: {
+  database: string;
+  reader: LwqlPrivateReader;
+  tenantSetting: string;
+}): LangWatchQLNames {
+  return {
+    database,
+    restrictedUser: reader.username,
+    settingsProfile: reader.settingsProfile,
+    // A PostgreSQL-engine table over the scoped project keys: no key row lives on this server.
+    keyMapTable: LWQL_PROJECT_KEYS_VIEW,
+    tenantSetting,
+  };
 }
 
 /**
@@ -74,14 +190,7 @@ export function privatePlanOf({
       // The shared Postgres is never named to a customer's server; its login is the config's.
       endpoint: { host: "", port: 0, database: "" },
     },
-    names: {
-      ...shared.names,
-      database,
-      restrictedUser: reader.username,
-      settingsProfile: reader.settingsProfile,
-      // A PostgreSQL-engine table over the scoped project keys: no key row lives on this server.
-      keyMapTable: LWQL_PROJECT_KEYS_VIEW,
-    },
+    names: privateNamesOf({ database, reader, tenantSetting: shared.names.tenantSetting }),
     settings,
     sourceDatabase: () => database,
     openRepository: () =>
@@ -92,21 +201,31 @@ export function privatePlanOf({
   };
 }
 
-/** The source tables and the key map the reader has no sole row policy on; none means guarded. */
+/**
+ * The source tables and the key map the reader has no sole row policy on (none means guarded), or
+ * `unloaded` where a rendered server does not hold the reader yet: its users.d is not mounted.
+ */
 async function tablesWithoutOwnPolicy({
   plan,
   reader,
 }: {
   plan: LwqlConvergencePlan;
   reader: LwqlPrivateReader;
-}): Promise<string[]> {
+}): Promise<string[] | "unloaded"> {
   const database = sqlText.assertIdentifier(plan.sourceDatabase(), "database");
   const tables = [
     ...selfProvisioning.policedTables({ names: plan.names, sourceDatabase: database }),
     `${database}.${plan.names.keyMapTable}`,
   ];
+  const isRendered = selfProvisioning.accessModelMode({ source: plan.settings }) === "rendered";
   const repository = plan.openRepository();
   try {
+    const storages = isRendered
+      ? await findReaderStorages({ repository, reader: reader.username })
+      : undefined;
+    if (storages?.length === 0) {
+      return "unloaded";
+    }
     const policies = await repository.findRowPolicies({ tables });
     return unguardedTables({
       policies,
@@ -138,6 +257,13 @@ async function provisionOne({
 }): Promise<void> {
   await converge(plan);
   const unguarded = await tablesWithoutOwnPolicy({ plan, reader });
+  if (unguarded === "unloaded") {
+    logger.warn(
+      { organizationId, reader: reader.username },
+      "LangWatchQL provisioned a private ClickHouse whose reader is not loaded yet; its queries stay refused until the rendered users.d file is mounted on the server",
+    );
+    return;
+  }
   if (unguarded.length === 0) return;
   logger.warn(
     { organizationId, tables: unguarded },
@@ -157,6 +283,21 @@ function warnNotProvisioned({
     logger.warn(
       { organizationId },
       "LangWatchQL private provisioning stopped: the organisation's ClickHouse holds no lwql_postgres named collection; its queries stay refused until infra mounts it",
+    );
+    return;
+  }
+  if (error instanceof LwqlPrivateStaleSqlReaderError) {
+    logger.warn(
+      { organizationId, reader: error.reader, storage: error.storage },
+      "LangWatchQL private provisioning stopped: the organisation's ClickHouse holds its reader in a SQL access store, from an earlier sql-mode upgrade, which rendered mode never updates; drop that user so the rendered users.d file takes over. The server is not converged until then",
+    );
+    return;
+  }
+  if (error instanceof LwqlPrivateDatabaseNotReplicatedError) {
+    const { database, engine, hostCount } = error;
+    logger.warn(
+      { organizationId, database, engine, hostCount },
+      "LangWatchQL private provisioning stopped: the organisation's ClickHouse has more than one host and its database does not use the Replicated engine, so the views would reach one host only. The server is not converged until the database is Replicated",
     );
     return;
   }

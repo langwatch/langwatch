@@ -62,7 +62,7 @@ function subscriptionStore() {
       return { outcome: "activated", subscription: withOrg() };
     },
     cancelTrialSubscriptions: async () => {},
-    migrateToSeatEvent: async () => [],
+    findSupersededBySeatEvent: async () => [],
     findLiveUnlinkedBeside: async () => [],
     findLiveLinkedBeside: async () => [],
   });
@@ -93,6 +93,7 @@ function completion() {
     organizationRepository: {
       findByStripeCustomerId: async () => null,
       findNameById: async () => "Acme",
+      isOnSeatEventPricing: async () => true,
     } as never,
     stripeSubscriptions,
     itemCalculator: { calculateQuantityForPrice: () => 0, prices: {} as never },

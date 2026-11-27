@@ -1,5 +1,6 @@
 import {
   EMPTY_AUDIENCE,
+  isContentVisibleToKey,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedAudience,
   type ResolvedDataPrivacy,
@@ -266,6 +267,37 @@ describe("strictestDataPrivacy", () => {
           audience: audience({ admins: true }),
         },
       ]);
+    });
+  });
+
+  describe("when the members name different API keys", () => {
+    /** @scenario Rules that disagree keep only the keys every rule names */
+    it("keeps only the keys every audience names", () => {
+      const folded = strictestDataPrivacy([
+        withInput("restrict", audience({ admins: true, apiKeyIds: ["key-a", "key-b"] })),
+        withInput("restrict", audience({ admins: true, apiKeyIds: ["key-b", "key-c"] })),
+      ]);
+
+      expect(folded.categories.input.audience.apiKeyIds).toEqual(["key-b"]);
+    });
+
+    it("names no key when an all-members audience names none", () => {
+      const folded = strictestDataPrivacy([
+        withInput("restrict", audience({ allMembers: true })),
+        withInput("restrict", audience({ admins: true, apiKeyIds: ["key-a"] })),
+      ]);
+
+      expect(folded.categories.input.audience.apiKeyIds).toEqual([]);
+    });
+
+    /** @scenario A named key never sees more than Admins */
+    it("hides it from a key both name when the fold leaves Admins out", () => {
+      const folded = strictestDataPrivacy([
+        withInput("restrict", audience({ admins: true, apiKeyIds: ["key-a"] })),
+        withInput("restrict", audience({ groupIds: ["security"], apiKeyIds: ["key-a"] })),
+      ]);
+
+      expect(isContentVisibleToKey(folded.categories.input, { apiKeyId: "key-a" })).toBe(false);
     });
   });
 });

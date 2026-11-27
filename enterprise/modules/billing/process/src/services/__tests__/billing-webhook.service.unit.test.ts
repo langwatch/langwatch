@@ -43,7 +43,7 @@ const createMockBillingSubscription = (): {
   recordPaymentFailure: vi.fn(),
   cancel: vi.fn(),
   cancelTrialSubscriptions: vi.fn(),
-  migrateToSeatEvent: vi.fn(),
+  findSupersededBySeatEvent: vi.fn(),
   findLiveUnlinkedBeside: vi.fn().mockResolvedValue([]),
   findLiveLinkedBeside: vi.fn().mockResolvedValue([]),
   adoptCheckout: vi.fn(),
@@ -56,6 +56,7 @@ const createMockOrganizationRepository = (): {
 } => ({
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
+  isOnSeatEventPricing: vi.fn().mockResolvedValue(false),
 });
 
 const ORGANIZATION_ROW_COMMANDS = [
@@ -199,6 +200,7 @@ const stripeSubscription = (overrides: Partial<BillingSubscription> = {}): Billi
 const itemFor = (priceId: string): BillingSubscriptionItem => ({
   id: `si_${priceId}`,
   priceId,
+  createdAt: 1_700_000_000,
   unitAmount: null,
   interval: null,
 });
@@ -802,9 +804,9 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         });
-        subRepo.migrateToSeatEvent.mockResolvedValue([
-          { stripeSubscriptionId: "sub_old_1" },
-          { stripeSubscriptionId: "sub_old_2" },
+        subRepo.findSupersededBySeatEvent.mockResolvedValue([
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1", cancelledInRecords: false },
+          { id: "sub_db_old_2", stripeSubscriptionId: "sub_old_2", cancelledInRecords: false },
         ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -814,22 +816,25 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.migrateToSeatEvent).toHaveBeenCalledWith({
+        expect(subRepo.findSupersededBySeatEvent).toHaveBeenCalledWith({
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(localStripe.cancellations).toContainEqual({
-          subscriptionId: "sub_old_1",
-          prorate: true,
-        });
-        expect(localStripe.cancellations).toContainEqual({
-          subscriptionId: "sub_old_2",
-          prorate: true,
-        });
+        expect(localStripe.cancellations).toEqual([
+          { subscriptionId: "sub_old_1", prorate: true },
+          { subscriptionId: "sub_old_2", prorate: true },
+        ]);
+        expect(subRepo.cancel.mock.calls).toEqual([
+          [{ id: "sub_db_old_1" }],
+          [{ id: "sub_db_old_2" }],
+        ]);
       });
 
-      it("logs but does not fail when Stripe cancellation fails", async () => {
-        const localStripe = subscriptionsTwin();
+      it("fails the delivery and keeps the old row live when Stripe refuses the cancel", async () => {
+        const localStripe = subscriptionsTwin(
+          stripeSubscription(),
+          stripeSubscription({ id: "sub_old_1" }),
+        );
         localStripe.refuse({ operation: "cancelSubscription", error: new Error("Stripe error") });
         service = EEWebhookService.create({
           licenses,
@@ -853,16 +858,22 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         });
-        subRepo.migrateToSeatEvent.mockResolvedValue([{ stripeSubscriptionId: "sub_old_1" }]);
+        subRepo.findSupersededBySeatEvent.mockResolvedValue([
+          { id: "sub_db_old_1", stripeSubscriptionId: "sub_old_1", cancelledInRecords: false },
+        ]);
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
         });
+        const outcome = promise.then(
+          () => "resolved",
+          () => "rejected",
+        );
 
         await vi.advanceTimersByTimeAsync(2000);
-        // Should not throw
-        await promise;
 
+        expect(await outcome).toBe("rejected");
+        expect(subRepo.cancel).not.toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
     });
@@ -1737,7 +1748,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
         makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
       );
       subRepo.activate.mockResolvedValue({ outcome: "activated", subscription: seat });
-      subRepo.migrateToSeatEvent.mockResolvedValue([]);
+      subRepo.findSupersededBySeatEvent.mockResolvedValue([]);
 
       await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
 

@@ -78,6 +78,7 @@ describe("Growth seat changes", () => {
         items: [
           {
             id: "si_seat",
+            createdAt: 1_700_000_000,
             priceId: prices.GROWTH_SEAT_EUR_MONTHLY,
             unitAmount: SEAT_PRICE_CENTS,
             interval: "month",

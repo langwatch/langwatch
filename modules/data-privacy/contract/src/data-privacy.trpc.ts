@@ -57,7 +57,7 @@ export const dataPrivacyTrpc = defineTrpcContract("dataPrivacy")
   /**
    * Write the rule at one target, authorized on the TARGET scope (not the
    * project named): ORGANIZATION/DEPARTMENT need `organization:manage`, TEAM
-   * `team:manage`, PROJECT `project:update` — so no member can push a rule up.
+   * `team:manage`, PROJECT `project:manage` — so no member can push a rule up.
    */
   .mutation("setForScope")
   .withInput(

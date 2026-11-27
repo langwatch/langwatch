@@ -20,6 +20,27 @@ Feature: Managed-Bedrock dispatch through a customer VPC endpoint
       Then the request is sent to the customer endpoint, not the public AWS endpoint
       And the response is returned as a normal chat completion
 
+  Rule: A managed Bedrock row reaches the gateway with its endpoint on the Bedrock credential
+
+    # Hosted gateways refuse a base URL that is plain http or resolves to a
+    # private address. A managed row's private endpoint is both, so it rides
+    # the Bedrock runtime endpoint field, which has its own amazonaws.com check.
+
+    @unit
+    Scenario: The config bundle keeps a Bedrock row's runtime endpoint on the credential
+      Given a Bedrock slot in the config bundle that names a runtime endpoint
+      When the gateway reads the slot
+      Then the credential carries the runtime endpoint
+      And it carries no base URL
+
+    @unit
+    Scenario: A hosted gateway admits a private runtime endpoint it refuses as a base URL
+      Given a gateway that blocks private addresses and requires https for customer endpoints
+      And a managed Bedrock credential naming a plain-http PrivateLink endpoint as its runtime endpoint
+      When the gateway checks the credential before dispatch
+      Then the credential passes and dispatch goes through that endpoint
+      And the same endpoint sent as a base URL is refused
+
   Rule: Bedrock without a managed endpoint is unaffected
 
     @integration

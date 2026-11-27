@@ -46,7 +46,7 @@ import { MemoryBillingWebhookSubscriptionRepository } from "../repositories/memo
 import { MemoryBillingRepositories } from "../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
-import { carriesPrice } from "../rules/subscription-price.rules.ts";
+import { priceLineOf } from "../rules/price-line.rules.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import type { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
@@ -466,12 +466,14 @@ describe.skipIf(!goPresent)(
         }
       })();
       const ledgerReads: { requestType: string }[] = [];
+      const windowStarts: (number | undefined)[] = [];
       const ledger = { nanoUsd };
       const piiRedactionSpend = PiiRedactionSpendQueryService.create({
         isSpendSourceAvailable: () => true,
         listProjectIds: async () => [`${organizationId}-project-1`, `${organizationId}-project-2`],
         sumSpendNanoUsdByRequestType: async (input) => {
           ledgerReads.push({ requestType: input.requestType });
+          windowStarts.push(input.fromMs);
           return ledger.nanoUsd;
         },
       });
@@ -490,13 +492,19 @@ describe.skipIf(!goPresent)(
         queryPiiRedactionSpendTotal: (input) =>
           piiRedactionSpend.queryPiiRedactionSpendTotal(input),
         isPiiRedactionMeterProvisioned: () => true,
-        subscriptionCarriesPrice: async ({ stripeCustomerId, price }) =>
-          carriesPrice({
+        subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
+          priceLineOf({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
-            priceName: price,
-            priceId: price === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
+            prices: [
+              {
+                priceName: price,
+                priceId:
+                  price === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
+              },
+            ],
+            billingMonth,
           }),
         errorReporter,
         connectedUsageCeiling: async () => null,
@@ -533,10 +541,18 @@ describe.skipIf(!goPresent)(
         usageTotals.parse(
           await control(`/usage?customer=${customer}&event_name=langwatch_pii_redaction_usd`),
         ).totals;
+      const subscriptionLines = async () =>
+        (
+          await stripeChannels.subscriptions.getSubscription({
+            subscriptionId: completed.subscription,
+          })
+        ).items;
       return {
         subscription: completed.subscription,
         reportMonth,
         piiUsage,
+        subscriptionLines,
+        windowStarts,
         errors,
         ledgerReads,
         ledger,
@@ -576,6 +592,14 @@ describe.skipIf(!goPresent)(
       expect(await customer.piiUsage()).toEqual([
         expect.objectContaining({ value: 1.1234, events: 1 }),
       ]);
+      // Once the line is there, the month is read from no earlier than the provider says it was
+      // added (the seat start, to the millisecond, can sit inside that second).
+      const lines = await customer.subscriptionLines();
+      const piiLine = lines.find(({ priceId }) => priceId === GROWTH_PII_REDACTION_USD);
+      expect(piiLine).toMatchObject({ createdAt: expect.any(Number) });
+      expect(Math.min(...customer.windowStarts.slice(1).map(Number))).toBeGreaterThanOrEqual(
+        Number(piiLine?.createdAt) * 1000,
+      );
     }, 30_000);
 
     /** @scenario "Spend confirmed after the month's last trace is invoiced through the Stripe simulator" */
@@ -784,13 +808,18 @@ describe.skipIf(!goPresent)(
         isInstantEvalMeterProvisioned: () => true,
         queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
         isPiiRedactionMeterProvisioned: () => false,
-        subscriptionCarriesPrice: async ({ stripeCustomerId, price }) =>
-          carriesPrice({
+        subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
+          priceLineOf({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
-            priceName: price,
-            priceId: price === "GROWTH_INSTANT_EVAL_USD" ? GROWTH_INSTANT_EVAL_USD : undefined,
+            prices: [
+              {
+                priceName: price,
+                priceId: price === "GROWTH_INSTANT_EVAL_USD" ? GROWTH_INSTANT_EVAL_USD : undefined,
+              },
+            ],
+            billingMonth,
           }),
         selfDispatch: async () => {},
         errorReporter: new (class extends BillingErrorReporter {

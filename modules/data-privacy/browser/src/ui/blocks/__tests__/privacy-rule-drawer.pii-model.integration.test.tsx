@@ -39,7 +39,7 @@ function renderDrawer({ piiRedactionModelOffered }: { piiRedactionModelOffered: 
       editingRule={null}
       onClose={vi.fn()}
       available={available}
-      audienceOptions={{ groups: [] }}
+      audienceOptions={{ groups: [], apiKeys: [], canAddApiKeys: false }}
       effectiveTeam={baseline}
       effectiveOrganization={baseline}
       projectId="proj-1"
