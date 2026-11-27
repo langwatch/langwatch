@@ -242,8 +242,8 @@ export class DigestSendService {
   }
 
   /**
-   * A member's last week in one organization, mailed to the operator alone, its unsubscribe link
-   * naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
+   * A member's last week in one organization, mailed to the operator alone, its signed unsubscribe
+   * header naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
    * arming, so a test can come first.
    */
   async sendTest({

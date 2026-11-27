@@ -174,7 +174,7 @@ export function buildDigestTemplateProps({
   userId: string;
   names: DigestNames;
   baseUrl: string;
-  /** The page behind the email's own unsubscribe link. */
+  /** The email-preferences page the footer link opens. */
   preferencesUrl: string;
   now: number;
 }): DigestTemplateProps | undefined {

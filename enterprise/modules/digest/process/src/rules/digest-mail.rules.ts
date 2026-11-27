@@ -5,7 +5,7 @@ import { sendEmailCommandSchema } from "@langwatch/notification-contract";
 import type { DigestMail, RenderedDigestMail } from "../channels/digest-mail.channel.ts";
 
 /**
- * The address both the email's unsubscribe link (GET, a page) and its RFC 8058 header (POST) use.
+ * The address the email's RFC 8058 List-Unsubscribe header (POST) and its page (GET) use.
  * It lives here, not in the send service, so the route can name it without a transport naming a service.
  */
 export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
