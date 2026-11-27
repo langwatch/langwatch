@@ -416,7 +416,7 @@ describe("given the Data Privacy page", () => {
       // A save that still fired would land within the wait: none may arrive.
       await expect(
         waitFor(() => expect(api.setForScope).toHaveBeenCalled(), { timeout: 500 }),
-      ).rejects.toThrow();
+      ).rejects.toThrow("to be called at least once");
     });
   });
 });
