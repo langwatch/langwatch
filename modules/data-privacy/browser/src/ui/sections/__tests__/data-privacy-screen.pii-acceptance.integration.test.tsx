@@ -338,6 +338,41 @@ describe("given a Cloud organization on the model flag whose price no admin acce
     });
   });
 
+  describe("when an admin who could accept the price only lets an API key read a rule", () => {
+    /** @scenario A member who cannot accept the price is not asked it in the rule drawer */
+    it("asks about the key alone and records no acceptance of the price", async () => {
+      api.snapshot = {
+        ...snapshotWith({
+          rules: [
+            projectRuleWith({
+              categories: { input: { disposition: "restrict", audience: { admins: true } } },
+            }),
+          ],
+          accepted: false,
+        }),
+        audienceOptions: {
+          groups: [],
+          apiKeys: [{ id: "key-nightly", name: "Nightly eval runner" }],
+          canAddApiKeys: true,
+        },
+      };
+      page({ flagOn: true, query: { rule: "PROJECT:proj-1:false" } });
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByLabelText("Restricted content is visible to"));
+      await user.click(await screen.findByRole("option", { name: "Nightly eval runner" }));
+      await user.keyboard("{Escape}");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      const dialog = await screen.findByRole("dialog", {
+        name: "Let an API key read restricted content?",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Save and let it read" }));
+
+      await waitFor(() => expect(api.setForScope).toHaveBeenCalledTimes(1));
+      expect(api.acceptPiiRedactionModel).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the page moves to another organization while the price prompt is open", () => {
     /** @scenario An acceptance given on the page holds only for its own organization */
     it("dismisses the prompt and accepts nothing for either organization", async () => {

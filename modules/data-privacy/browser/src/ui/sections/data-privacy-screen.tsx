@@ -325,13 +325,15 @@ function PrivacyRuleDrawerMount({
     config: DataPrivacyConfig;
   } | null>(null);
   // The price of Strict and a key reading restricted content each ask first (ADR-208).
-  const asksBefore = (config: DataPrivacyConfig) => {
-    const price = ruleSaveConfirmation({
+  const priceAsk = (config: DataPrivacyConfig) =>
+    ruleSaveConfirmation({
       offer: piiRedactionModelOffer,
       acceptance,
       before: editingRule?.config,
       after: config,
     });
+  const asksBefore = (config: DataPrivacyConfig) => {
+    const price = priceAsk(config);
     const key = apiKeySaveConfirmation({
       before: editingRule?.config,
       after: config,
@@ -348,7 +350,9 @@ function PrivacyRuleDrawerMount({
   // The drawer stays busy from the acceptance to the end of the save it leads to.
   const acceptThenSave = async (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => {
     const organization = available.organization;
-    const asksAcceptance = acceptance === "can-accept" && organization !== null;
+    // Only a prompt that named the price records its acceptance; a key's alone never does.
+    const asksAcceptance =
+      acceptance === "can-accept" && organization !== null && priceAsk(config) !== null;
     if (asksAcceptance && !(await onAccept({ organizationId: organization.id }))) return;
     await save(scopes, config);
   };
