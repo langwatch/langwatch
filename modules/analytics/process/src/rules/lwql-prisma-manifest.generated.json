@@ -31443,7 +31443,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The send whose unsubscribe link or one-click header the person used; the Profile switch writes `settings` here."
+          "documentation": "The send whose unsubscribe link or one-click header the person used; the Profile switch writes\n`settings` here."
         },
         {
           "name": "updatedAt",
