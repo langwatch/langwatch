@@ -22,7 +22,7 @@ import {
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
 } from "@langwatch/design-system/scope-filter";
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import { usePiiRedactionModelOffer } from "../../behavior/use-pii-redaction-model-offer.ts";
@@ -41,7 +41,7 @@ import {
 } from "../../model/data-privacy-rule-filter.ts";
 import {
   type PiiRedactionModelOffer,
-  ruleSaveDialog,
+  piiLevelStepDialog,
   ruleSaveStep,
 } from "../../model/pii-redaction-level-offer.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
@@ -67,21 +67,18 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   const snapshotQuery = dataPrivacyApi.dataPrivacy.getSnapshot.useQuery({ projectId });
 
   const available = snapshotQuery.data?.available;
-  const filterAvailable = useMemo(
-    () => ({
-      organization: available?.organization
-        ? { id: available.organization.id, name: available.organization.name }
-        : null,
-      teams: available?.teams.map((team) => ({ id: team.id, name: team.name })) ?? [],
-      projects:
-        available?.projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          teamId: project.teamId,
-        })) ?? [],
-    }),
-    [available],
-  );
+  const filterAvailable = {
+    organization: available?.organization
+      ? { id: available.organization.id, name: available.organization.name }
+      : null,
+    teams: available?.teams.map((team) => ({ id: team.id, name: team.name })) ?? [],
+    projects:
+      available?.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        teamId: project.teamId,
+      })) ?? [],
+  };
 
   const query = host.route().query;
   const scopeFilter = scopeFilterFromAddress({
@@ -296,7 +293,7 @@ function PrivacyRuleDrawerMount({
   // Read live: a save waiting for the subscription's currency asks with its price once it loads.
   const step = pending ? stepFor(pending.config) : null;
   const pendingKeyAsk = pending && step?.kind !== "wait" ? keyAskFor(pending.config) : null;
-  const confirmation = combineSaveConfirmations(ruleSaveDialog(step), pendingKeyAsk);
+  const confirmation = combineSaveConfirmations(piiLevelStepDialog(step), pendingKeyAsk);
   const [readingPlan, setReadingPlan] = useState(false);
   const readPlanAgain = async () => {
     setReadingPlan(true);

@@ -39,10 +39,24 @@ import {
 type Api = typeof dataPrivacyApi;
 type Procedures = Api["dataPrivacy"];
 
+/** What the organization's active plan read answers: loading, failed, or a plan type. */
+export type ActivePlanReading = {
+  isLoading: boolean;
+  isError: boolean;
+  data?: { type: string };
+  refetch: () => Promise<unknown>;
+};
+
 export const api = {
   snapshot: undefined as DataPrivacySnapshot | undefined,
   invalidate: vi.fn(async () => undefined),
   setForScope: vi.fn(async (_input: unknown) => undefined),
+  activePlan: vi.fn((): ActivePlanReading => ({
+    isLoading: false,
+    isError: false,
+    data: { type: "FREE" },
+    refetch: async () => ({}),
+  })),
 };
 
 /** The binding the screen calls, answering only what the screen uses. */
@@ -65,6 +79,14 @@ export function fakeDataPrivacyApi(): Api {
     {
       useUtils: (() => ({ dataPrivacy: { getSnapshot: { invalidate: api.invalidate } } })) as never,
       dataPrivacy: procedures,
+      plan: createApiFixture<Api["plan"]>(
+        {
+          getActivePlan: createApiFixture<Api["plan"]["getActivePlan"]>({
+            useQuery: (() => api.activePlan()) as never,
+          }),
+        },
+        "dataPrivacyApi.plan",
+      ),
     },
     "dataPrivacyApi",
   );
@@ -177,7 +199,8 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
 
 /**
  * Renders the page; `rerender` renders it again over the current snapshot. `answerPlan` mounts a
- * new host as the plan answering does, `mounted` reads it, and `setFlag` changes a flag live.
+ * new host as the plan answering does, `mounted` reads it, `setFlag` changes a flag live
+ * and `navigate` changes the address.
  */
 export function renderScreen({
   screenElement,
@@ -242,11 +265,17 @@ export function renderScreen({
     flags = flagsAnswering(answers);
     result.rerender(tree());
   };
+  // A route change the page did not make, as browser Back is: the new address, rendered again.
+  const navigate = (next: Record<string, string>) => {
+    mounted.setQuery(next);
+    result.rerender(tree());
+  };
   return {
     host,
     rerender: () => result.rerender(tree()),
     answerPlan,
     setFlag,
+    navigate,
     mounted: () => mounted,
   };
 }

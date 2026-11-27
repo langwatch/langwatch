@@ -20,7 +20,7 @@ import {
   piiRedactionModelOfferOf,
   piiRedactionModelPrice,
   piiRedactionModelPriceIn,
-  RULE_SAVE_WAITING,
+  PII_LEVEL_STEP_WAITING,
   ruleSaveStep,
   strictFallbackNote,
   STRICT_RULE_BASED_NOTES,
@@ -203,6 +203,30 @@ describe("given the deployment and the PII redaction model flags", () => {
         free: false,
         split: false,
         currency: "unknown",
+        loading: false,
+        readPrice,
+      });
+    });
+
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("marks the first read in flight as loading, so the price area offers no retry yet", () => {
+      expect(
+        piiRedactionModelOfferOf({
+          isSaaS: true,
+          modelFlag: true,
+          freeFlag: false,
+          splitFlag: false,
+          licence: "unknown",
+          mayManageLicence: true,
+          currency: "loading",
+          readPrice,
+        }),
+      ).toEqual({
+        kind: "model",
+        free: false,
+        split: false,
+        currency: "unknown",
+        loading: true,
         readPrice,
       });
     });
@@ -318,7 +342,7 @@ describe("given the organization's resolved PII level", () => {
 describe("given a change of the organization's level", () => {
   const priced = { kind: "model", free: false, split: false, currency: "USD" } as const;
   const included = { kind: "model", free: true, split: false, licensed: false } as const;
-  const priceUnknown = { ...priced, currency: "unknown", readPrice } as const;
+  const priceUnknown = { ...priced, currency: "unknown", loading: false, readPrice } as const;
 
   describe("when Strict is picked before the subscription's currency is read", () => {
     /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
@@ -429,7 +453,7 @@ describe("given the fallback note", () => {
 
 describe("given a rule saved from the drawer", () => {
   const model = { kind: "model", free: false, split: false, currency: "USD" } as const;
-  const priceUnknown = { ...model, currency: "unknown", readPrice } as const;
+  const priceUnknown = { ...model, currency: "unknown", loading: false, readPrice } as const;
   const turnsStrictOn = {
     before: { pii: { level: "essential" as const } },
     after: { pii: { level: "strict" as const } },
@@ -459,7 +483,7 @@ describe("given a rule saved from the drawer", () => {
       expect(ruleSaveStep({ offer: priceUnknown, ...turnsStrictOn })).toEqual({
         kind: "wait",
       });
-      expect(RULE_SAVE_WAITING.description).not.toMatch(/[$€]/);
+      expect(PII_LEVEL_STEP_WAITING.description).not.toMatch(/[$€]/);
     });
   });
 

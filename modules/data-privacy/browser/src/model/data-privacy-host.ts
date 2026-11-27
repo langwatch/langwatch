@@ -46,8 +46,8 @@ export type PrivacyLicence = "loading" | "enterprise" | "none" | "unknown";
 /** The currency the organization's subscription is billed in, which Strict's price is quoted in. */
 export type PrivacyBillingCurrency = "USD" | "EUR";
 
-/** The currency as the host reads it: "unknown" until the plan answers, or when it cannot. */
-export type PrivacyBillingCurrencyReading = PrivacyBillingCurrency | "unknown";
+/** The currency as the host reads it: "loading" on the first read, "unknown" when it failed. */
+export type PrivacyBillingCurrencyReading = PrivacyBillingCurrency | "loading" | "unknown";
 
 /** The one thing the screen is handed. */
 export abstract class DataPrivacyHostApi {
@@ -72,7 +72,7 @@ export abstract class DataPrivacyHostApi {
   /** Whether this reader may activate a licence, so the advert links there. */
   abstract mayManageLicence(): boolean;
 
-  /** Euros for a euro Growth subscription, else dollars; "unknown" until the plan answers. */
+  /** Euros for a euro Growth plan, else dollars; "loading" first, "unknown" if the read failed. */
   abstract billingCurrency(): PrivacyBillingCurrencyReading;
 
   /** Reads the plan again, for a save waiting on the currency; settles when the read does. */

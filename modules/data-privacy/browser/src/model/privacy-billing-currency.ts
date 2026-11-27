@@ -22,17 +22,18 @@ export function mayReadSubscriptionPlan({
 }
 
 /**
- * Euros for a euro Growth plan, dollars for any other; unknown until a plan answers. A refresh
- * that fails keeps the last answer, so a passing read error never takes the price away.
+ * Euros for a euro Growth plan, dollars for any other; "loading" while the first read is in
+ * flight, "unknown" once it failed with no plan. A refresh that fails keeps the last answer, so a
+ * passing read error never takes the price away.
  */
 export function billingCurrencyOf({
   mayRead,
   plan,
 }: {
   mayRead: boolean;
-  plan: { data: { type: string } | undefined };
+  plan: { isLoading?: boolean; data: { type: string } | undefined };
 }): PrivacyBillingCurrencyReading {
   if (!mayRead) return "USD";
-  if (!plan.data) return "unknown";
+  if (!plan.data) return plan.isLoading ? "loading" : "unknown";
   return parseGrowthSeatPlanType(plan.data.type)?.currency === "EUR" ? "EUR" : "USD";
 }

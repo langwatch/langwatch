@@ -15,23 +15,17 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-type PlanQuery = {
-  isLoading: boolean;
-  isError: boolean;
-  data?: { type: string };
-  refetch?: () => Promise<unknown>;
-};
-const activePlan = vi.fn((): PlanQuery => ({
-  isLoading: false,
-  isError: false,
-  data: { type: "FREE" },
-}));
-vi.mock("../data-privacy-api.ts", () => ({
-  dataPrivacyApi: { plan: { getActivePlan: { useQuery: () => activePlan() } } },
-}));
-
 import { useDataPrivacyHost } from "../../model/data-privacy-host.ts";
+import { api } from "../../ui/sections/__tests__/data-privacy-screen.pii-level.fixture.tsx";
 import DataPrivacyHostMount from "../data-privacy-host-mount.tsx";
+
+vi.mock("../data-privacy-api.ts", async () => {
+  const { fakeDataPrivacyApi } =
+    await import("../../ui/sections/__tests__/data-privacy-screen.pii-level.fixture.tsx");
+  return { dataPrivacyApi: fakeDataPrivacyApi() };
+});
+
+const noRefetch = async () => ({});
 
 class TestScope extends UiScope {
   activeScope(): UiActiveScope {
@@ -108,10 +102,11 @@ describe("given the Data Privacy host mounted on LangWatch Cloud", () => {
   describe("when the organization's active plan is a euro Growth seat plan", () => {
     /** @scenario "Strict shows the euro price to an organization on a euro Growth subscription" */
     it("reads the subscription's currency as euros", () => {
-      activePlan.mockReturnValue({
+      api.activePlan.mockReturnValue({
         isLoading: false,
         isError: false,
         data: { type: "GROWTH_SEAT_EUR_MONTHLY" },
+        refetch: noRefetch,
       });
 
       renderOnCloud();
@@ -123,7 +118,7 @@ describe("given the Data Privacy host mounted on LangWatch Cloud", () => {
   describe("when the plan read fails", () => {
     /** @scenario "A Strict rule save waits for the subscription's currency" */
     it("reads the currency as unknown, never dollars", () => {
-      activePlan.mockReturnValue({ isLoading: false, isError: true });
+      api.activePlan.mockReturnValue({ isLoading: false, isError: true, refetch: noRefetch });
 
       renderOnCloud();
 
@@ -134,10 +129,11 @@ describe("given the Data Privacy host mounted on LangWatch Cloud", () => {
   describe("when a refresh fails after the plan answered in euros", () => {
     /** @scenario "A Strict rule save waits for the subscription's currency" */
     it("keeps reading euros", () => {
-      activePlan.mockReturnValue({
+      api.activePlan.mockReturnValue({
         isLoading: false,
         isError: true,
         data: { type: "GROWTH_SEAT_EUR_MONTHLY" },
+        refetch: noRefetch,
       });
 
       renderOnCloud();
@@ -150,7 +146,7 @@ describe("given the Data Privacy host mounted on LangWatch Cloud", () => {
     /** @scenario "A Strict rule save waits for the subscription's currency" */
     it("refetches the plan query", async () => {
       const refetch = vi.fn(async () => ({}));
-      activePlan.mockReturnValue({ isLoading: false, isError: true, refetch });
+      api.activePlan.mockReturnValue({ isLoading: false, isError: true, refetch });
 
       renderOnCloud();
       await userEvent.setup().click(screen.getByRole("button", { name: "Read the plan again" }));

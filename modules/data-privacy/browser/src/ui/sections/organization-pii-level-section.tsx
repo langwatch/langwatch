@@ -5,7 +5,7 @@
 
 import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import type { DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
@@ -16,7 +16,7 @@ import {
   type OrganizationPiiLevel,
   otherPiiLevelLabel,
   type PiiRedactionModel,
-  ruleSaveDialog,
+  piiLevelStepDialog,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
@@ -32,6 +32,30 @@ function useOptimisticPick(stored: string | undefined) {
     setPicked(null);
   }
   return [picked, setPicked] as const;
+}
+
+/** A waiting pick left with nothing to ask (the model turned free) applies as a direct pick. */
+function useApplyWaitingPick({
+  asking,
+  from,
+  model,
+  ready,
+  apply,
+}: {
+  asking: OrganizationPiiLevel | null;
+  from: Parameters<typeof levelChangeStep>[0]["from"] | undefined;
+  model: PiiRedactionModel;
+  ready: boolean;
+  apply: (level: OrganizationPiiLevel) => void;
+}) {
+  const kind =
+    asking && from !== undefined ? levelChangeStep({ from, to: asking, model }).kind : null;
+  const run = useEffectEvent(() => {
+    if (asking && ready) apply(asking);
+  });
+  useEffect(() => {
+    if (kind === "save") run();
+  }, [kind]);
 }
 
 /** Strict at a price, or replacing Custom, asks first; a free organization is never asked. */
@@ -54,6 +78,17 @@ export function OrganizationPiiLevelSection({
   const [asking, setAsking] = useState<OrganizationPiiLevel | null>(null);
   const [readingPrice, setReadingPrice] = useState(false);
   const organizationId = snapshot.available.organization?.id ?? host.scope().organizationId;
+  const ready = !!organizationId && !!snapshot.effectiveOrganization;
+  useApplyWaitingPick({
+    asking,
+    from: snapshot.effectiveOrganization?.pii.level,
+    model,
+    ready,
+    apply: (level) => {
+      setAsking(null);
+      void save(level);
+    },
+  });
   if (!organizationId || !snapshot.effectiveOrganization) return null;
 
   const storedPii = snapshot.effectiveOrganization.pii;
@@ -64,7 +99,7 @@ export function OrganizationPiiLevelSection({
     levelChangeStep({ from: storedPii.level, to: level, model });
   // Read live: a pick waiting for the price asks with it once the plan answers.
   const step = asking ? stepFor(asking) : null;
-  const confirmation = ruleSaveDialog(step);
+  const confirmation = piiLevelStepDialog(step);
   const readPrice = async () => {
     if (model.free || model.currency !== "unknown") return;
     setReadingPrice(true);

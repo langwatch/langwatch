@@ -32,10 +32,17 @@ describe("mayReadSubscriptionPlan()", () => {
 });
 
 describe("billingCurrencyOf()", () => {
-  describe("when no plan has answered yet: still loading, failed or empty", () => {
+  describe("when the plan's first read is still in flight", () => {
+    /** @scenario "Before the price is read the page still offers the level picker, quoting no price" */
+    it("answers loading, so no currency is quoted and no failure shown", () => {
+      const plan = { isLoading: true, isError: false, data: undefined };
+      expect(billingCurrencyOf({ mayRead: true, plan })).toBe("loading");
+    });
+  });
+
+  describe("when no plan has answered: the read failed or came back empty", () => {
     /** @scenario "The price currency is the subscription's, read from its Growth plan" */
     it.each([
-      ["loading", { isLoading: true, isError: false, data: undefined }],
       ["failed", { isLoading: false, isError: true, data: undefined }],
       ["empty", { isLoading: false, isError: false, data: undefined }],
     ])("answers unknown when %s, so no currency is quoted", (_case, plan) => {

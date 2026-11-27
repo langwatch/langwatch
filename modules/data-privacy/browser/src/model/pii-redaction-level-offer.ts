@@ -106,6 +106,8 @@ export type PiiRedactionModel =
       free: false;
       split: boolean;
       currency: "unknown";
+      /** The first read is still in flight: the price area waits quietly, offering no retry. */
+      loading: boolean;
       readPrice: () => Promise<void>;
     };
 
@@ -151,8 +153,15 @@ export function piiRedactionModelOfferOf({
   if (isSaaS) {
     if (modelFlag !== true) return null;
     if (freeFlag) return { kind: "model", free: true, split: splitFlag, licensed: false };
-    return currency === "unknown"
-      ? { kind: "model", free: false, split: splitFlag, currency, readPrice }
+    return currency === "unknown" || currency === "loading"
+      ? {
+          kind: "model",
+          free: false,
+          split: splitFlag,
+          currency: "unknown",
+          loading: currency === "loading",
+          readPrice,
+        }
       : { kind: "model", free: false, split: splitFlag, currency };
   }
   if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
@@ -216,12 +225,12 @@ export function organizationPiiLevel(level: PiiLevel | undefined): OrganizationP
 }
 
 /** What a level change or a rule save does next: save, ask first, or wait for the price. */
-export type RuleSaveStep =
+export type PiiLevelStep =
   | { kind: "save" }
   | { kind: "ask"; confirmation: LevelChangeConfirmation }
   | { kind: "wait" };
 
-export const RULE_SAVE_WAITING: LevelChangeConfirmation = {
+export const PII_LEVEL_STEP_WAITING: LevelChangeConfirmation = {
   title: "Turn on Strict?",
   description:
     "Strict's price is in your subscription's currency, which hasn't loaded yet. Try again to read it.",
@@ -237,7 +246,7 @@ export function levelChangeStep({
   from: PiiLevel;
   to: OrganizationPiiLevel;
   model: PiiRedactionModel;
-}): RuleSaveStep {
+}): PiiLevelStep {
   if (!model.free && model.currency === "unknown") {
     if (to === "strict") return { kind: "wait" };
     const replaces = replaceCustomConfirmation({ from, to });
@@ -259,16 +268,16 @@ export function ruleSaveStep({
   offer: PiiRedactionModelOffer;
   before: DataPrivacyConfig | undefined;
   after: DataPrivacyConfig;
-}): RuleSaveStep {
+}): PiiLevelStep {
   if (after.pii?.level !== "strict" || before?.pii?.level === "strict") return { kind: "save" };
   if (offer?.kind !== "model") return { kind: "save" };
   return levelChangeStep({ from: "essential", to: "strict", model: offer });
 }
 
-/** What the drawer's dialog says for a step: its question, the wait, or nothing. */
-export function ruleSaveDialog(step: RuleSaveStep | null): LevelChangeConfirmation | null {
+/** What a step's dialog says, in the drawer or the level picker: its question, the wait or none. */
+export function piiLevelStepDialog(step: PiiLevelStep | null): LevelChangeConfirmation | null {
   if (step?.kind === "ask") return step.confirmation;
-  return step?.kind === "wait" ? RULE_SAVE_WAITING : null;
+  return step?.kind === "wait" ? PII_LEVEL_STEP_WAITING : null;
 }
 
 /** How the picker names a level it does not offer: "Off", or "Custom (2 types)". */

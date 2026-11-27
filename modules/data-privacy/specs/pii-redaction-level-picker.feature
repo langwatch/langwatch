@@ -263,10 +263,12 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And the subscription's plan has not answered, or its read failed
     When an admin opens the Data Privacy page for project "web-app"
     Then the picker offers Essential and Strict, and Strict reads "Price not loaded" with Try again
+    And while the plan's first read is in flight Strict reads "Loading price", with no Try again
     And the rule drawer at Strict shows the LangWatch PII Redaction Model with no price
     And Try again reads the plan again
     And picking Strict waits for the price, then asks at it once the plan answers
     And changing to Essential asks only what it asked before
+    And a Strict pick waiting for the price applies at once if the organization turns free meanwhile
 
   @unit @integration
   Scenario: A Strict rule save waits for the subscription's currency
@@ -278,6 +280,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And once the plan answers in euros the confirmation asks at "€0.425 per 1M characters"
     And the rule is saved only once the admin confirms
     And if the model's flag turns off meanwhile, the rule saves without asking
+    And closing the drawer drops the waiting save, so it never saves later
 
   @unit
   Scenario: Saving a rule asks for the price only when it turns Strict on at a price

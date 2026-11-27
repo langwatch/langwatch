@@ -101,10 +101,10 @@ dollar meter, at 0.85 euros per dollar of usage, picked from the Stripe subscrip
     circuit breaker; a pending total is replayed. The other meters do not wait on it.
 11. **Checkout adds the price in the subscription's currency (revised 2026-11-26).** A Growth
     checkout in dollars carries the metered `GROWTH_PII_REDACTION_USD` line, like Instant Evals,
-    wherever the mode maps it: $1.00 per meter unit (one dollar redacted), monthly, mapped in
-    test mode only until live is provisioned. A checkout in euros carries
-    `GROWTH_PII_REDACTION_EUR` on the same dollar meter at 85 euro cents per meter unit: the
-    dollar price's unit amount times 0.85, the seat ratio of EUR 29 to USD 34. The currency is
+    wherever the mode maps it: $1.00 per dollar of redaction usage, monthly, mapped in test mode
+    only until live is provisioned. A checkout in euros carries `GROWTH_PII_REDACTION_EUR` on the
+    same dollar meter at 85 euro cents per dollar of redaction usage: the dollar price's unit
+    amount times 0.85, the seat ratio of EUR 29 to USD 34. The currency is
     the one Stripe holds the customer in, never `Organization.currency`, which can disagree.
     Neither mode maps a euro id yet; until an operator creates the price under that lookup key
     and the price sync maps it, a euro checkout carries no PII line. Live ids, dollar and euro

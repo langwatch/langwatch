@@ -19,6 +19,13 @@ import {
  */
 export function PiiRedactionModelPrice({ model }: { model: PiiRedactionModel }) {
   if (!model.free && model.currency === "unknown") {
+    if (model.loading) {
+      return (
+        <Text fontSize="sm" color="fg.muted" data-testid="pii-redaction-model-price">
+          Loading price
+        </Text>
+      );
+    }
     return (
       <HStack gap={1.5} wrap="wrap" align="center" data-testid="pii-redaction-model-price">
         <Text fontSize="sm" fontWeight="600">
