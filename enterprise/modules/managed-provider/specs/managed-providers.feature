@@ -114,6 +114,13 @@ Feature: Managed model providers
       And no error reaches the gateway, so the key's other providers keep serving
 
     @unit
+    Scenario: A runtime endpoint saved on a row never reaches the gateway
+      Given a Bedrock row that stores its own runtime endpoint
+      When the gateway reads the row's keys
+      Then the stored runtime endpoint is dropped and the row's other keys are kept
+      And only a minted managed session names a runtime endpoint
+
+    @unit
     Scenario: A stalled role hop gives up inside the gateway's config fetch
       Given assuming the proxy role does not answer
       When the managed Bedrock credentials are minted

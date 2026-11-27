@@ -30,8 +30,14 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
       () => deadline.abort(new Error("The managed Bedrock role hops ran out of time")),
       ROLE_HOP_BUDGET_MS,
     );
+    const timedOut = new Promise<never>((_resolve, reject) => {
+      deadline.signal.addEventListener("abort", () => reject(deadline.signal.reason), {
+        once: true,
+      });
+    });
     try {
-      return await this.hop({ config, abortSignal: deadline.signal });
+      // The SDK's retry backoff ignores the signal, so the race enforces the budget.
+      return await Promise.race([this.hop({ config, abortSignal: deadline.signal }), timedOut]);
     } finally {
       clearTimeout(timer);
     }

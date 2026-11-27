@@ -12,6 +12,7 @@ const sts = vi.hoisted(() => ({
   assumed: [] as { clientIndex: number; roleArn: string; abortSignal?: AbortSignal }[],
   proxyReturnsCredentials: true,
   proxyStalls: false,
+  proxyAnswersLate: false,
 }));
 
 vi.mock("@aws-sdk/client-sts", () => {
@@ -44,6 +45,9 @@ vi.mock("@aws-sdk/client-sts", () => {
       });
 
       if (this.index === 0) {
+        if (sts.proxyAnswersLate) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
         if (sts.proxyStalls) {
           return new Promise((_resolve, reject) => {
             options?.abortSignal?.addEventListener("abort", () =>
@@ -92,6 +96,7 @@ describe("HttpManagedProviderCredentialsChannel", () => {
     sts.assumed.length = 0;
     sts.proxyReturnsCredentials = true;
     sts.proxyStalls = false;
+    sts.proxyAnswersLate = false;
   });
 
   afterEach(() => {
@@ -147,6 +152,21 @@ describe("HttpManagedProviderCredentialsChannel", () => {
         expect(early).toBe("still waiting");
         await expect(outcome).resolves.toBe("The managed Bedrock role hops ran out of time");
         expect(sts.assumed.map((call) => call.roleArn)).toEqual([CONFIG.proxyRoleArn]);
+      });
+
+      it("gives up at the deadline even while the SDK waits out a retry backoff", async () => {
+        vi.useFakeTimers();
+        sts.proxyAnswersLate = true;
+        const outcome = HttpManagedProviderCredentialsChannel.create()
+          .assumeCustomerRole(CONFIG)
+          .then(
+            () => "resolved",
+            (error: Error) => error.message,
+          );
+
+        await vi.advanceTimersByTimeAsync(1500);
+
+        await expect(outcome).resolves.toBe("The managed Bedrock role hops ran out of time");
       });
 
       it("bounds both hops with one deadline", async () => {

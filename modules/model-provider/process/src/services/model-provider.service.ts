@@ -115,6 +115,12 @@ function managedBedrockKeys(session: ManagedBedrockCredentials): Record<string, 
   };
 }
 
+/** A row's stored keys minus the runtime endpoint, which only a minted managed session may set. */
+function storedGatewayKeys(customKeys: Record<string, unknown> | null): Record<string, unknown> {
+  const { AWS_BEDROCK_RUNTIME_ENDPOINT: _mintedOnly, ...stored } = customKeys ?? {};
+  return stored;
+}
+
 /**
  * The canonical contract delegates coherent read, write, defaults, and costs
  * lifecycles to private collaborators in this feature.
@@ -273,7 +279,10 @@ export class ModelProviderService {
         const session = await this.options.catalog.getManagedBedrockCredentials({
           organizationId: row.organizationId,
         });
-        return { ...owner, customKeys: { ...row.customKeys, ...managedBedrockKeys(session) } };
+        return {
+          ...owner,
+          customKeys: { ...storedGatewayKeys(row.customKeys), ...managedBedrockKeys(session) },
+        };
       } catch (error) {
         logger.warn(
           { modelProviderId: row.id, error },
@@ -282,7 +291,7 @@ export class ModelProviderService {
       }
     }
     if (!row.customKeys) throw new ModelProviderCustomKeysMissingError();
-    return { ...owner, customKeys: row.customKeys };
+    return { ...owner, customKeys: storedGatewayKeys(row.customKeys) };
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {

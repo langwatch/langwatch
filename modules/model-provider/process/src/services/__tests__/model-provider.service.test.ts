@@ -1534,6 +1534,27 @@ describe("ModelProviderService", () => {
       ).resolves.toMatchObject({ customKeys: stored });
     });
 
+    /** @scenario "A runtime endpoint saved on a row never reaches the gateway" */
+    it("drops a runtime endpoint the row stores, keeping its other keys", async () => {
+      const stored = {
+        AWS_ACCESS_KEY_ID: "AKIA-own",
+        AWS_SECRET_ACCESS_KEY: "own-secret",
+        AWS_BEDROCK_RUNTIME_ENDPOINT: "http://vpce-attacker.vpce.amazonaws.com",
+      };
+      const providers = new Providers();
+      providers.rows = [
+        provider({ provider: "bedrock", organizationId: "org_2", customKeys: stored }),
+      ];
+      const modelProviders = service(providers, new ManagedBedrockCatalog());
+
+      const keys = await modelProviders.getGatewayCustomKeys({ modelProviderId: "mp_1" });
+
+      expect(keys.customKeys).toEqual({
+        AWS_ACCESS_KEY_ID: "AKIA-own",
+        AWS_SECRET_ACCESS_KEY: "own-secret",
+      });
+    });
+
     /** @scenario "A failed role hop leaves the row's own keys and fails only that row" */
     it("falls back to the stored keys when the role hop fails, throwing nothing", async () => {
       const stored = { MANAGED: "true" };
