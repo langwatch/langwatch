@@ -1,9 +1,10 @@
 /** The drain and the queue's claim list agree on real Redis (ADR-092). */
+import { readTenantClaimedGroups } from "@langwatch/group-queue";
 import { GroupStagingScripts } from "@langwatch/group-queue/operational";
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { EVENT_SOURCING_QUEUE_KEY_NAME, eventSourcingClaimsIndex } from "../replayClaimsIndex.ts";
+import type { ReplayClaimsIndex } from "../replayClaimsIndex.ts";
 import { waitForActiveJobs } from "../replayDrain.ts";
 
 let redis: Redis;
@@ -22,8 +23,15 @@ describe("given the event-sourcing queue has claimed a state projection's group"
   /** @scenario "A replay drain on real Redis waits for a group the queue claimed" */
   it("waits while the group is claimed and finishes once it completes", async () => {
     const tenantId = `drain-${crypto.randomUUID().slice(0, 8)}`;
+    // A queue of this test's own, so dispatch never claims another suite's group.
+    const queueName = `{test/drain-${crypto.randomUUID().slice(0, 8)}}`;
     const groupId = `${tenantId}/state/counter/conversation-1`;
-    const scripts = new GroupStagingScripts(redis, EVENT_SOURCING_QUEUE_KEY_NAME);
+    const scripts = new GroupStagingScripts(redis, queueName);
+    const claims: ReplayClaimsIndex = {
+      isReady: async () => true,
+      claimedGroups: ({ tenantId: tenant, groupIdPrefix }) =>
+        readTenantClaimedGroups({ redis, queueName, tenantId: tenant, groupIdPrefix }),
+    };
     await scripts.stage({
       stagedJobId: `${tenantId}-job`,
       groupId,
@@ -32,29 +40,39 @@ describe("given the event-sourcing queue has claimed a state projection's group"
       dedupTtlMs: 0,
       jobDataJson: "{}",
     });
-    let claim = await scripts.dispatch({ nowMs: Date.now() + 1_000, activeTtlSec: 60 });
-    while (claim && claim.groupId !== groupId) {
-      claim = await scripts.dispatch({ nowMs: Date.now() + 1_000, activeTtlSec: 60 });
-    }
+    const claim = await scripts.dispatch({ nowMs: Date.now() + 1_000, activeTtlSec: 60 });
     expect(claim?.groupId).toBe(groupId);
 
     const drain = (maxWaitMs: number) =>
       waitForActiveJobs({
         redis,
-        claims: eventSourcingClaimsIndex({ redis, isReady: async () => true }),
+        claims,
         aggregates: [{ tenantId, aggregateType: "conversation", aggregateId: "conversation-1" }],
         projectionName: "counter",
         kind: "state",
         maxWaitMs,
       });
 
-    await expect(drain(500)).rejects.toThrow(/Timed out/);
-
-    await scripts.complete({
-      groupId,
-      stagedJobId: claim!.stagedJobId,
-      claimToken: claim!.claimToken,
-    });
-    await expect(drain(500)).resolves.toBeUndefined();
+    let completed = false;
+    try {
+      await expect(drain(500)).rejects.toThrow(/Timed out/);
+      await scripts.complete({
+        groupId,
+        stagedJobId: claim!.stagedJobId,
+        claimToken: claim!.claimToken,
+      });
+      completed = true;
+      await expect(drain(500)).resolves.toBeUndefined();
+    } finally {
+      if (!completed && claim) {
+        await scripts.complete({
+          groupId,
+          stagedJobId: claim.stagedJobId,
+          claimToken: claim.claimToken,
+        });
+      }
+      const keys = await redis.keys(`${queueName}*`);
+      if (keys.length > 0) await redis.del(...keys);
+    }
   });
 });

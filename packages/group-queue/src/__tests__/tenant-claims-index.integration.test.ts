@@ -45,7 +45,7 @@ function freshQueue() {
         tenantId: "tenant-a",
         groupIdPrefix: PREFIX,
       }),
-    async claim({ groupId = GROUP, stagedJobId = "j1" } = {}) {
+    async claim({ groupId = GROUP, stagedJobId = "j1", activeTtlSec = 60 } = {}) {
       await scripts.stage({
         stagedJobId,
         groupId,
@@ -54,7 +54,7 @@ function freshQueue() {
         dedupTtlMs: 0,
         jobDataJson: JSON.stringify({ stagedJobId }),
       });
-      const claim = await scripts.dispatch({ nowMs: 1_000, activeTtlSec: 60 });
+      const claim = await scripts.dispatch({ nowMs: 1_000, activeTtlSec });
       expect(claim?.groupId).toBe(groupId);
       return claim!;
     },
@@ -139,6 +139,25 @@ describe("tenant claims index", () => {
 
       expect(refreshed).toBe(true);
       expect(await redis.pttl(q.indexKey("tenant-a"))).toBeGreaterThan(GROUP_KEY_TTL_MS - 60_000);
+    });
+  });
+
+  describe("given a claim whose active key outlives the claimed record", () => {
+    /** @scenario "A heartbeat keeps the tenant's claim list alive" */
+    it("keeps the claim list alive as long as the active key", async () => {
+      const q = freshQueue();
+      const activeTtlSec = GROUP_KEY_TTL_MS / 1000 + 3_600;
+      const claim = await q.claim({ activeTtlSec });
+      expect(await redis.pttl(q.indexKey("tenant-a"))).toBeGreaterThan(GROUP_KEY_TTL_MS);
+
+      await redis.pexpire(q.indexKey("tenant-a"), 1_000);
+      await q.scripts.refreshActiveKey({
+        groupId: GROUP,
+        stagedJobId: claim.stagedJobId,
+        claimToken: claim.claimToken,
+        activeTtlSec,
+      });
+      expect(await redis.pttl(q.indexKey("tenant-a"))).toBeGreaterThan(GROUP_KEY_TTL_MS);
     });
   });
 

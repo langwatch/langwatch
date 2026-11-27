@@ -661,16 +661,21 @@ local function gqTenantClaimsKey(claimedKey, groupId)
   return keyPrefix .. "tenant-claims:" .. string.sub(groupId, 1, slashPos - 1)
 end
 
-local function gqListClaim(claimedKey, groupId)
+-- The list must outlive both keys it stands for: the claimed record and the active key.
+local function gqClaimListTtlMs(activeTtlSec)
+  return math.max(${GROUP_KEY_TTL_MS}, (tonumber(activeTtlSec) or 0) * 1000)
+end
+
+local function gqListClaim(claimedKey, groupId, activeTtlSec)
   local indexKey = gqTenantClaimsKey(claimedKey, groupId)
   if not indexKey then return end
   redis.call("SADD", indexKey, groupId)
-  redis.call("PEXPIRE", indexKey, ${GROUP_KEY_TTL_MS})
+  redis.call("PEXPIRE", indexKey, gqClaimListTtlMs(activeTtlSec))
 end
 
-local function gqKeepClaimListed(claimedKey, groupId)
+local function gqKeepClaimListed(claimedKey, groupId, activeTtlSec)
   local indexKey = gqTenantClaimsKey(claimedKey, groupId)
-  if indexKey then redis.call("PEXPIRE", indexKey, ${GROUP_KEY_TTL_MS}) end
+  if indexKey then redis.call("PEXPIRE", indexKey, gqClaimListTtlMs(activeTtlSec)) end
 end
 
 local function gqUnlistClaim(claimedKey, groupId)
@@ -1516,7 +1521,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 redis.call("HSET", claimedKey, "token", claimToken)
               end
               redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
-              gqListClaim(claimedKey, groupId)
+              gqListClaim(claimedKey, groupId, activeTtlSec)
 
               results[#results + 1] = stagedJobId
               results[#results + 1] = groupId
@@ -1871,7 +1876,7 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
   if claimToken ~= "" then
     redis.call("PEXPIRE", claimedKey, ${GROUP_KEY_TTL_MS})
-    gqKeepClaimListed(claimedKey, groupId)
+    gqKeepClaimListed(claimedKey, groupId, activeTtlSec)
   end
   -- Keep the pending-sibling jobs/data keys alive while this group is actively
   -- processing: a long-running active job must not let staged siblings expire
