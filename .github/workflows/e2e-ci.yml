@@ -59,7 +59,8 @@ jobs:
               - 'package.json'
               - '.npmrc'
               - '.github/workflows/e2e-ci.yml'
-              - '.github/actions/wait-for-containers/**'
+              - 'cmd/waitcontainers/**'
+              - 'tools/waitcontainers/**'
 
   e2e:
     needs: changes
@@ -233,10 +234,7 @@ jobs:
 
       - name: Wait for Postgres, Redis and ClickHouse
         timeout-minutes: 3
-        uses: ./.github/actions/wait-for-containers
-        with:
-          names: postgres redis clickhouse
-          start-log: ${{ runner.temp }}/datastores.log
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 150s postgres redis clickhouse
 
       # The api and the worker never migrate and refuse to serve until the
       # upgrade has run: the preparation script, `upgrade` then the
@@ -258,11 +256,7 @@ jobs:
 
       - name: Wait for OpenSearch and langevals
         timeout-minutes: 4
-        uses: ./.github/actions/wait-for-containers
-        with:
-          names: opensearch langevals
-          start-log: ${{ runner.temp }}/datastores.log
-          seconds: "210"
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 210s opensearch langevals
 
       - name: Run E2E tests
         env:

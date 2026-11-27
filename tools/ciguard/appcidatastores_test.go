@@ -64,7 +64,7 @@ func TestStepsAfterAFailureAndContainerWaitsHaveTheirOwnTimeLimit(t *testing.T) 
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Postgres
-        uses: ./.github/actions/wait-for-containers
+        run: go run ./cmd/waitcontainers postgres
       - name: Run the suites
         run: echo
       - name: Upload the report

@@ -17,8 +17,8 @@ var AppCIWorkflows = []string{
 	".github/workflows/e2e-ci.yml",
 }
 
-// waitForContainersAction is the local action that holds a step until its containers are healthy.
-const waitForContainersAction = "./.github/actions/wait-for-containers"
+// waitContainersCommand holds a step until the containers it names are healthy.
+const waitContainersCommand = "go run ./cmd/waitcontainers"
 
 // afterFailure matches an `if:` that runs a step once an earlier step failed or the job was cancelled.
 var afterFailure = regexp.MustCompile(`\b(always|failure)\(\)`)
@@ -54,7 +54,7 @@ func appCIJobProblems(path, name string, job ciscan.Job) []string {
 		slices.Sort(names)
 		problems = append(problems, fmt.Sprintf(
 			"%s declares services: %s; start them with docker run in the background and wait with %s",
-			where, strings.Join(names, ", "), waitForContainersAction))
+			where, strings.Join(names, ", "), waitContainersCommand))
 	}
 	for i := range job.Steps {
 		if label, unbounded := unboundedStep(&job.Steps[i]); unbounded {
@@ -69,7 +69,7 @@ func appCIJobProblems(path, name string, job ciscan.Job) []string {
 // timeout-minutes of its own, so a hang there holds the job until the job's own timeout.
 func unboundedStep(step *ciscan.Step) (string, bool) {
 	bounded := step.TimeoutMinutes != nil
-	needsBound := afterFailure.MatchString(step.If) || step.Uses == waitForContainersAction
+	needsBound := afterFailure.MatchString(step.If) || strings.Contains(step.Run, waitContainersCommand)
 	if bounded || !needsBound {
 		return "", false
 	}

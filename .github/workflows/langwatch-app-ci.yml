@@ -194,7 +194,8 @@ jobs:
               - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
-              - '.github/actions/wait-for-containers/**'
+              - 'cmd/waitcontainers/**'
+              - 'tools/waitcontainers/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
@@ -1087,7 +1088,7 @@ jobs:
 
     steps:
       # In the background: the image pulls overlap the checkout and install, and
-      # "Wait for Postgres and Redis" holds the first step that reads them.
+      # "Wait for Postgres and Redis" (cmd/waitcontainers) holds the first step that reads them.
       - name: Start Postgres and Redis in the background
         timeout-minutes: 1
         run: |
@@ -1169,12 +1170,15 @@ jobs:
       - name: Build workspace packages
         run: pnpm run ensure:built
 
+      - name: Set up Go for the container wait
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
       - name: Wait for Postgres and Redis
         timeout-minutes: 3
-        uses: ./.github/actions/wait-for-containers
-        with:
-          names: postgres redis
-          start-log: ${{ runner.temp }}/datastores.log
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 150s postgres redis
 
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.
