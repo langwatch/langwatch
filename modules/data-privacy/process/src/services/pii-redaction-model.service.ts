@@ -12,6 +12,7 @@ import {
   batchCharactersOf,
   failureName,
   failureOutcomeOf,
+  narrowedToPending,
   PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
   type ModelCallContext,
   PII_REDACTION_MODEL_SPLIT_FLAG,
@@ -205,7 +206,7 @@ export class PiiRedactionModelService {
       spareNamesAndPlaces: input.spareNamesAndPlaces,
     };
     const recall = this.repeats.recall({ scope, texts: input.texts });
-    const sent = pendingInput({ input, pending: recall.pending });
+    const sent = narrowedToPending({ input, pending: recall.pending });
     if (sent.texts.length === 0) {
       // Every text is held: priced as the batch, with no call of ours to cost.
       await this.spend.record({
@@ -483,22 +484,4 @@ export class PiiRedactionModelService {
 
 function elapsedSince(startedAt: number): number {
   return Math.round(performance.now() - startedAt);
-}
-
-/** The batch narrowed to the texts at `pending`, their spared flags kept beside them. */
-function pendingInput({
-  input,
-  pending,
-}: {
-  input: ModelClearInput;
-  pending: readonly number[];
-}): ModelClearInput {
-  if (pending.length === input.texts.length) return input;
-  const spared = input.spareNamesAndPlaces;
-  return {
-    ...input,
-    texts: pending.map((index) => input.texts[index] ?? ""),
-    spareNamesAndPlaces: spared && pending.map((index) => spared[index] ?? false),
-    batchTexts: input.texts,
-  };
 }

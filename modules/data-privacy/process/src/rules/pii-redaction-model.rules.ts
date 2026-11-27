@@ -98,3 +98,28 @@ function isThrottled(error: unknown): boolean {
     (error.name === "TooManyRequestsException" || error.name === "ThrottlingException")
   );
 }
+
+/** A batch's texts and their spared flags, and the whole batch they came from. */
+type NarrowableBatch = {
+  texts: readonly string[];
+  spareNamesAndPlaces?: readonly boolean[] | undefined;
+  batchTexts?: readonly string[] | undefined;
+};
+
+/** The batch narrowed to the texts at `pending`, keeping the whole batch for its price and id. */
+export function narrowedToPending<T extends NarrowableBatch>({
+  input,
+  pending,
+}: {
+  input: T;
+  pending: readonly number[];
+}): T {
+  if (pending.length === input.texts.length) return input;
+  const spared = input.spareNamesAndPlaces;
+  return {
+    ...input,
+    texts: pending.map((index) => input.texts[index] ?? ""),
+    spareNamesAndPlaces: spared && pending.map((index) => spared[index] ?? false),
+    batchTexts: input.texts,
+  };
+}
