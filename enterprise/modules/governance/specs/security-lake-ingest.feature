@@ -119,6 +119,11 @@ Feature: AWS Security Lake ingest of AI activity
       When the key adds a Security Lake source over the REST API
       Then the source is saved with no user as its creator
 
+    @integration
+    Scenario: A Security Lake source with an empty or non-cron schedule is refused
+      When an admin adds a Security Lake source with an empty schedule or one that is not a five-field cron expression
+      Then the request is refused as invalid and nothing is stored
+
   Rule: the reader keeps AI activity and writes it once per OCSF event
 
     @unit
@@ -204,6 +209,13 @@ Scenario: Events of the readable objects are kept when a later object becomes po
       And its message is deleted
 
     @unit
+    Scenario: A corrupt object's poison reason says it is not a readable Parquet file
+      Given the queue announces an object that is not a Parquet file
+      When it is recorded as poison
+      Then the reason says the object is not a readable Parquet file
+      And it does not say the AWS request failed
+
+    @unit
     Scenario: A Security Lake row past the OCSF event limits is counted invalid and not stored
       Given a Parquet object with a row of more than 64 KiB in UTF-8 bytes and a row with class_uid 99999999999
       When the source is read
@@ -276,6 +288,12 @@ Scenario: Editing one Security Lake setting keeps the other stored settings
       When the admin opens the source's own page
       Then it counts and lists the two events once each
 
+    @unit
+    Scenario: A source's own page reads its Security Lake rows with the source type bound, not spliced
+      When the source's own page counts and lists the rows the source wrote
+      Then each query names the Security Lake source type as a bound parameter
+      And the source type is never written into the SQL text
+
   Rule: model callers without traces are listed
 
     @unit
@@ -290,6 +308,13 @@ Scenario: Editing one Security Lake setting keeps the other stored settings
       Given an organisation with many live projects
       When the admin opens the callers seen in Security Lake
       Then no more than a few trace lookups run at once
+
+    @unit
+    Scenario: A Security Lake read refuses a row of the wrong shape
+      Given the event store answers the callers or the written count read
+      When a row's counts arrive as text and another row has the wrong shape
+      Then the counts are read as numbers
+      And the row of the wrong shape is refused rather than shown
 
   Rule: the settings in the governance sources surface
 
@@ -343,6 +368,27 @@ Scenario: Editing one Security Lake setting keeps the other stored settings
       Given a source whose last run failed and recorded one poison object
       When the admin opens the Security Lake settings
       Then the panel shows the error, the lag, the counts and the poison object
+
+    @integration
+    Scenario: The health card says a read wrote no new events rather than showing no lag
+      Given a source whose last read wrote no events
+      When the admin opens the Security Lake settings
+      Then the lag says there were no new events
+      And before the first read it says the source was not read yet
+
+    @integration
+    Scenario: An organisation without Enterprise is not offered a Security Lake source to add
+      Given an organisation without the Enterprise plan
+      When an admin opens the Security Lake settings
+      Then no Add Security Lake source or Edit is offered
+      And the section says the Enterprise plan unlocks it
+
+    @integration
+    Scenario: A Security Lake source's own page offers no secret to rotate
+      Given a Security Lake source, which has no ingest secret
+      When an admin opens the source's own page
+      Then Rotate secret is not offered
+      And Edit opens the Security Lake settings instead of the generic edit drawer
 
     @integration
     Scenario: With no Security Lake source the callers list asks to connect one

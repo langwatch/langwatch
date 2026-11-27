@@ -25,6 +25,8 @@ import type { GovernanceModule } from "../../../app/governance.app.ts";
 import type { GovernanceRepositories } from "../../../repositories/governance.repositories.ts";
 import { pruneAgentRegistryDeliveries } from "./agent-registry-delivery.intent.ts";
 import {
+  AGENT_REGISTRY_ALERT_INTENT,
+  agentRegistryAlertIntentSchema,
   AGENT_REGISTRY_DELIVERY_INITIAL_STATE,
   AGENT_REGISTRY_DELIVERY_MAX_ATTEMPTS,
   AGENT_REGISTRY_DELIVERY_PROCESS_NAME,
@@ -70,6 +72,7 @@ type AgentRegistryApp = Pick<
   GovernanceModule,
   | "connectAgentRegistryOutbox"
   | "requestAgentRegistryDelivery"
+  | "requestAgentRegistryAlert"
   | "reconcileAgentRegistryForProject"
   | "reconcileAgentRegistryTraffic"
 >;
@@ -111,6 +114,9 @@ export function buildAgentRegistryPipeline({
           AGENT_REGISTRY_DELIVERY_REQUEST_INTENT,
           agentRegistryDeliveryIntentSchema,
           (intent, context) => app.requestAgentRegistryDelivery(intent, context),
+        )
+        .intent(AGENT_REGISTRY_ALERT_INTENT, agentRegistryAlertIntentSchema, (intent, context) =>
+          app.requestAgentRegistryAlert(intent, context),
         )
         .intent(
           AGENT_REGISTRY_DELIVERY_PRUNE_INTENT,

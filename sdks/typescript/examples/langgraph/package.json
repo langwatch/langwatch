@@ -12,14 +12,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@langchain/community": "^1.1.18",
-    "@langchain/core": "^0.3.80",
-    "@langchain/langgraph": "^0.4.3",
-    "@langchain/openai": "^0.6.3",
+    "@langchain/core": "^1.5.1",
+    "@langchain/langgraph": "^1.7.5",
+    "@langchain/openai": "^1.8.5",
     "cli-markdown": "^3.5.1",
-    "langchain": "^0.3.37",
     "langwatch": "file:../../",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",
@@ -30,7 +28,7 @@
     "axios": ">=1.20.0 <2",
     "handlebars": ">=4.7.10 <5",
     "js-yaml": ">=4.3.2 <5",
-    "langsmith": ">=0.8.0 <0.11",
+    "langsmith": ">=0.11.0 <1",
     "linkify-it": ">=5.0.2 <6",
     "markdown-it": ">=14.3.3 <15",
     "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.6",

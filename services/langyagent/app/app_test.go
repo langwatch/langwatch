@@ -105,7 +105,7 @@ func (w *fakeWorker) SetTurnTraceContext(sc trace.SpanContext) {
 	w.turnTraceContexts = append(w.turnTraceContexts, sc)
 }
 func (w *fakeWorker) LastLLMError() (herr.E, bool) { return w.llmErr, w.llmErrOK }
-func (w *fakeWorker) PostMessage(_ context.Context, _, prompt, historySeed, resumeToken string) error {
+func (w *fakeWorker) PostMessage(_ context.Context, _, prompt, historySeed, resumeToken string, _ []domain.TurnImage) error {
 	w.posted++
 	w.gotPrompt = prompt
 	w.gotHistorySeed = historySeed

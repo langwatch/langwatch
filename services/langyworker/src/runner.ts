@@ -4,6 +4,8 @@
  * invariant.
  */
 
+import type { ImageContent } from "@earendil-works/pi-ai";
+
 import { buildHandoffDigest } from "./digest.js";
 import { TurnEventMapper, type SessionEventLike } from "./events.js";
 import {
@@ -25,6 +27,7 @@ import {
   type GuidedTurnEvent,
   type TerminalEvent,
   type TurnCommand,
+  type TurnImage,
 } from "./protocol.js";
 import { prependResumeSeed } from "./system-prompt.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -32,7 +35,7 @@ import type { ProtocolWriter } from "./writer.js";
 
 /** The slice of pi's AgentSession the runner drives (injectable for tests). */
 export type SessionLike = {
-  prompt: (text: string) => Promise<void>;
+  prompt: (text: string, options?: { images?: ImageContent[] }) => Promise<void>;
   abort: () => Promise<void>;
   agent: {
     state: {
@@ -41,6 +44,10 @@ export type SessionLike = {
     };
   };
 };
+
+function toImageContent(image: TurnImage): ImageContent {
+  return { type: "image", data: image.data, mimeType: image.mediaType };
+}
 
 type TurnState = {
   turnId: string;
@@ -227,7 +234,9 @@ export class TurnRunner {
 
       let thrown: unknown;
       try {
-        await session.prompt(prompt);
+        // Only the turn's first prompt carries its images; guided continuations do not.
+        const images = command.images?.map(toImageContent);
+        await (images ? session.prompt(prompt, { images }) : session.prompt(prompt));
       } catch (error) {
         thrown = error;
       }

@@ -1,5 +1,5 @@
 /**
- * Whether Default models may offer LangWatch's hosted decision model (Evals Preview), as the
+ * Whether Default models may offer the hosted decision model LangWatch Instant (preview), as the
  * server answers it: released, or one switch away for a self-serve organization. Everywhere else
  * the column lists only the project's own decision models and an unset column reads "Not set".
  * @see specs/model-providers/instant-evals-decision-model.feature

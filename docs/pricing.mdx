@@ -40,7 +40,7 @@ Input tokens are the text the judge reads, the questions asked about it and a sm
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
-Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
+Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit, and Instant Evals are not charged on their invoice yet.
 
 Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
 
@@ -107,7 +107,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
   <Accordion title="Can I customize how long my data is retained?">
     On LangWatch Cloud every plan keeps events for 49 days by default. Paid plans set 35, 63 or 91 days in **Settings → Data Retention**, per organization, team or project. Enterprise plans set any whole number of weeks from 49 days up, and a higher volume of stored events. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set up an Enterprise window or extra volume.
 
-    Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, with a separate window for traces, scenarios and experiments.
+    Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, covering traces, logs, metrics, scenarios and experiments. Logs and metrics follow the traces window.
   </Accordion>
 
 <Accordion title="Are webhooks and the billing events API included in my plan?">

@@ -12,7 +12,7 @@ description: "How to upgrade a self-hosted LangWatch to the latest version: what
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
-4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable, and also invalidates API keys unless `API_KEY_PEPPER` is set. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
 5. **On AWS S3, set the bucket's region.** Datasets are stored in object storage from this release. On AWS S3 with any credentials (access keys, IRSA or an instance role), set `app.dataplane.providers.awsS3.region` (`S3_REGION`) to your bucket's region, unless `AWS_REGION`, the AWS profile or a regional endpoint (`s3.<region>.amazonaws.com`) already names it. Otherwise LangWatch asks AWS where the bucket lives on first use, which works for commercial regions; GovCloud and China must set the region
 6. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
@@ -183,7 +183,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.28.0 \
+  --version 3.31.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

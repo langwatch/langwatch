@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:77`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:78`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -143,7 +143,7 @@ registerLegacyLicense(input: { licenseKey: string; organizationId: string; opera
 #### `revokeIssuedLicense`
 
 ```typescript
-revokeIssuedLicense(input: { id: string; operatorId: string; reason: string; }): Promise<IssuedLicenseView>;
+revokeIssuedLicense(input: { id: string; operatorId: string; reason: string; unusedOnly?: boolean; }): Promise<IssuedLicenseView>;
 ```
 
 #### `reissueLicense`
@@ -182,6 +182,14 @@ linkLicenseToOrganization(input: { id: string; organizationId: string; operatorI
 
 ```typescript
 getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
+```
+
+#### `getIssuedLicenseChain`
+
+The reissue chain the license belongs to, the newest first.
+
+```typescript
+getIssuedLicenseChain(input: { id: string }): Promise<IssuedLicenseChain>;
 ```
 
 #### `listIssuedLicenses`
@@ -784,9 +792,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                              |
 | ------ | -------------------------------- | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:183`           |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:184`           |
-| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:185`           |
+| secret | `instanceLicenseKey`             | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:184`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:185`           |
+| secret | `upgradeDiagnosticsSlackWebhook` | `SLACK_CHANNEL_UPGRADE_DIAGNOSTICS`  | `src/app/licensing.app.ts:186`           |
 | config | `publicKey`                      | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:46` |
 | config | `connectDisabled`                | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:54` |
 | config | `connectGatewayEndpoint`         | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:61` |

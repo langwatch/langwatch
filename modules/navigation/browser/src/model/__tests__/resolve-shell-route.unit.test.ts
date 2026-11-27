@@ -217,3 +217,44 @@ describe("resolveShellRoute", () => {
     });
   });
 });
+
+describe("resolveShellRoute with the organization's Dashboards library", () => {
+  const withLibrary = (pathname: string, boardHomeProduct: "gateway" | "llm-ops" | null = null) =>
+    resolveShellRoute({
+      pathname,
+      isPersonalScope: false,
+      isOrgScope: false,
+      isOnOwnPersonalProject: false,
+      organizationRole: "MEMBER",
+      boardHomeProduct,
+      hasOrganizationLibrary: true,
+    });
+
+  describe("given a board homed in Gateway", () => {
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it.each(["/dashboards/board_1", "/shop/dashboards/board_1"])(
+      "draws Gateway at %s, as organization scope",
+      (pathname) => {
+        const route = withLibrary(pathname, "gateway");
+
+        expect(route.activeProductId).toBe("gateway");
+        expect(route.isOrgScopeRoute).toBe(true);
+      },
+    );
+  });
+
+  describe("given a project's Dashboards pages", () => {
+    it.each(["/shop/dashboards", "/shop/dashboards/templates", "/shop/dashboards/board_1"])(
+      "draws LLM Ops at %s",
+      (pathname) => {
+        expect(withLibrary(pathname).activeProductId).toBe("llm-ops");
+      },
+    );
+  });
+
+  describe("given the library's own pages", () => {
+    it.each(["/dashboards", "/dashboards/templates"])("draws Dashboards at %s", (pathname) => {
+      expect(withLibrary(pathname).activeProductId).toBe("dashboards");
+    });
+  });
+});

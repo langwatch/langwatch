@@ -7,6 +7,7 @@ import {
   instantEvalCancelRequestedEventSchema,
   instantEvalFinishedEventSchema,
   instantEvalLatePageBilledEventSchema,
+  instantEvalPageFailedEventSchema,
   instantEvalPageJudgedEventSchema,
   instantEvalPlannedEventSchema,
   instantEvalRequestedEventSchema,
@@ -78,6 +79,13 @@ const cancelRequested = (): InstantEvalProcessingEvent =>
   instantEvalCancelRequestedEventSchema.parse({
     ...envelope("lw.obs.instant_eval.cancel_requested", AT),
     data: { runId: RUN_ID, requestedByUserId: null },
+  });
+
+const pageFailed = (): InstantEvalProcessingEvent =>
+  instantEvalPageFailedEventSchema.parse({
+    ...envelope("lw.obs.instant_eval.page_failed", AT),
+    version: "2026-11-24",
+    data: { runId: RUN_ID, page: 2, errorCode: "instant_eval_classifier_unavailable" },
   });
 
 const finished = (data: Record<string, unknown>, occurredAt = AT): InstantEvalProcessingEvent =>
@@ -189,6 +197,14 @@ describe("given a run's event stream", () => {
   describe("when a cancellation has been requested", () => {
     it("leaves the status alone until the run actually stops", () => {
       expect(fold([planned(10), cancelRequested()]).status).toBe("RUNNING");
+    });
+  });
+
+  describe("when a page has failed on its last attempt", () => {
+    it("leaves the status, error, cost and price to the finish it leads to", () => {
+      const running = fold([planned(1_000), page({ page: 1, rows: 500, hasNextPage: true })]);
+
+      expect(applyInstantEvalRunEvent(running, pageFailed())).toEqual(running);
     });
   });
 

@@ -27,6 +27,9 @@ export class StubAuthzManagedGrantRepository extends AuthzManagedGrantRepository
   readonly findOrganizationRole = vi.fn<AuthzManagedGrantRepository["findOrganizationRole"]>(
     async () => null,
   );
+  readonly isBillingOnlyMember = vi.fn<AuthzManagedGrantRepository["isBillingOnlyMember"]>(
+    async () => false,
+  );
   readonly isGroupInOrganization = vi.fn<AuthzManagedGrantRepository["isGroupInOrganization"]>(
     async () => false,
   );

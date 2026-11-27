@@ -32,6 +32,13 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
     Then the prose renders as prose and the fence renders as a chart card
     And the card sits where the fence sat in the reply's flow
 
+  @integration
+  Scenario: A timeseries card draws its chart in the panel
+    Given a turn whose reply carried a stamped timeseries card
+    When the panel renders the turn
+    Then the card draws the chart of its series
+    And it never says "No chart renderer configured"
+
   Scenario: The browser renders the stamped part, never its own parse of the text
     Given a turn whose reply carried a derived card
     When the conversation is reloaded from history

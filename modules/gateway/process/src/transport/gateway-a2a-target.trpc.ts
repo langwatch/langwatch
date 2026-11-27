@@ -7,7 +7,7 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
   typeof gatewayA2aTargetTrpc
 > = defineTrpcRouter(GatewayApi, gatewayA2aTargetTrpc)
   .procedure("list")
-  .withPermission("virtualKeys:view")
+  .withPermission("gatewayA2aTargets:view")
   .handle(({ app, input }) => {
     return app.listA2aTargets(input.organizationId);
   })
@@ -15,25 +15,25 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
   .procedure("create")
   // A project-scoped row names the project's organization; an org-wide one derives its target.
   .withAudit({ target: "organization", via: "projectId" })
-  .withPermission("virtualKeys:manage")
+  .withPermission("gatewayA2aTargets:manage")
   .handle(({ app, input, actor }) => {
     return app.createA2aTarget({ ...input, actorUserId: actor.id });
   })
 
   .procedure("update")
-  .withPermission("virtualKeys:manage")
+  .withPermission("gatewayA2aTargets:manage")
   .handle(({ app, input, actor }) => {
     return app.updateA2aTarget({ ...input, actorUserId: actor.id });
   })
 
   .procedure("setBlocked")
-  .withPermission("virtualKeys:manage")
+  .withPermission("gatewayA2aTargets:manage")
   .handle(({ app, input, actor }) => {
     return app.setA2aTargetBlocked({ ...input, actorUserId: actor.id });
   })
 
   .procedure("archive")
-  .withPermission("virtualKeys:manage")
+  .withPermission("gatewayA2aTargets:manage")
   .handle(({ app, input, actor }) => {
     return app.archiveA2aTarget({
       id: input.id,
@@ -43,25 +43,25 @@ export const gatewayA2aTargetTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("listForProject")
-  .withPermission("virtualKeys:view", { via: "projectId" })
+  .withPermission("gatewayA2aTargets:view", { via: "projectId" })
   .handle(({ app, input }) => {
     return app.listProjectA2aTargets({ projectId: input.projectId });
   })
 
   .procedure("updateForProject")
-  .withPermission("virtualKeys:manage", { via: "projectId" })
+  .withPermission("gatewayA2aTargets:manage", { via: "projectId" })
   .handle(({ app, input, actor }) => {
     return app.updateProjectA2aTarget({ ...input, actorUserId: actor.id });
   })
 
   .procedure("setBlockedForProject")
-  .withPermission("virtualKeys:manage", { via: "projectId" })
+  .withPermission("gatewayA2aTargets:manage", { via: "projectId" })
   .handle(({ app, input, actor }) => {
     return app.setProjectA2aTargetBlocked({ ...input, actorUserId: actor.id });
   })
 
   .procedure("archiveForProject")
-  .withPermission("virtualKeys:manage", { via: "projectId" })
+  .withPermission("gatewayA2aTargets:manage", { via: "projectId" })
   .handle(({ app, input, actor }) => {
     return app.archiveProjectA2aTarget({
       id: input.id,

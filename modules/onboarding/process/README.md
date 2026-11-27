@@ -70,6 +70,14 @@ beginPath(input: OnboardingCallerInput & Readonly<{ path: string }>): Promise<Gu
 completePath(input: Readonly<{ organizationId: string; userId: string | null; path: string }>): Promise<GuidedOnboardingState>;
 ```
 
+#### `recordLangyStart`
+
+The start picked on Langy's governance opener; called with a project credential.
+
+```typescript
+recordLangyStart(input: Readonly<{ organizationId: string; userId: string | null; start: LangyStart }>): Promise<GuidedOnboardingState>;
+```
+
 #### `attachConversation`
 
 ```typescript
@@ -104,7 +112,7 @@ getGuidedStateByProject(input: Readonly<{ projectId: string }>): Promise<GuidedO
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/onboarding.rest.ts:26`        |
+| Declared at | `src/transport/onboarding.rest.ts:28`        |
 | Base URL    | `/api/onboarding`, twin `/api/v1/onboarding` |
 | Addressing  | dated                                        |
 | Credential  | project                                      |
@@ -114,7 +122,7 @@ getGuidedStateByProject(input: Readonly<{ projectId: string }>): Promise<GuidedO
 
 Read the guided onboarding state of this project's organization: the paths picked in order, the one being set up, the ones done, the provider connected, and where the tour stands.
 
-Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:30`.
+Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:32`.
 
 Answers at `/api/onboarding/guided`, `/api/v1/onboarding/guided`; also, undocumented, `/api/onboarding/2026-08-07/guided`, `/api/v1/onboarding/2026-08-07/guided`, `/api/onboarding/latest/guided`, `/api/v1/onboarding/latest/guided`.
 
@@ -126,16 +134,34 @@ type Response = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contra
 
 Mark one guided onboarding path as done for this project's organization. Idempotent: completing a path twice changes nothing. An unknown path is refused with guided_onboarding_path_unknown.
 
-Permission `traces:create`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:42`.
+Permission `traces:create`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:44`.
 
 Answers at `/api/onboarding/guided/paths/:path/complete`, `/api/v1/onboarding/guided/paths/:path/complete`; also, undocumented, `/api/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/v1/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/onboarding/latest/guided/paths/:path/complete`, `/api/v1/onboarding/latest/guided/paths/:path/complete`.
 
 ```typescript
-// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:133
+// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:141
 interface Params {
   path: string;
 }
-// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:141
+// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:149
+type Body = Record<string, unknown>;
+type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
+```
+
+#### `POST /guided/start/:start` · `postApiOnboardingGuidedStart`
+
+Record the start the person picked on Langy's governance opener: coding or call. A call records the choice only; it books nothing.
+
+Permission `traces:create`. Hidden from the OpenAPI document. Declared at `src/transport/onboarding.rest.ts:63`.
+
+Answers at `/api/onboarding/guided/start/:start`, `/api/v1/onboarding/guided/start/:start`; also, undocumented, `/api/onboarding/2026-08-07/guided/start/:start`, `/api/v1/onboarding/2026-08-07/guided/start/:start`, `/api/onboarding/latest/guided/start/:start`, `/api/v1/onboarding/latest/guided/start/:start`.
+
+```typescript
+// Params: guidedStartRestParamsSchema, ../contract/src/onboarding-schemas.ts:158
+interface Params {
+  start: "coding" | "call";
+}
+// Body: guidedStartRestInputSchema, ../contract/src/onboarding-schemas.ts:166
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 ```

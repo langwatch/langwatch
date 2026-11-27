@@ -46,6 +46,8 @@ function lifecycleSenders({
     recordMemberEnabled: accepts,
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
+    recordMemberRoleChanged: accepts,
+    recordMemberAdmitted: accepts,
     recordTraceSharingDisabled: accepts,
     recordDocsPlaygroundSessionsDisabled: {
       send: async (data) => {

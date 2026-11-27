@@ -15,6 +15,7 @@ import {
   MemoryStoredObjectFiles,
   createStoredObjectTestSigner,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "../../repositories/memory/memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "../../repositories/memory/memory.stored-object-record.repository.ts";
 import { ObjectStorageStoredObjectBytesRepository } from "../../repositories/object-storage/object-storage.stored-object-bytes.repository.ts";
 import { StoredObjectService } from "../stored-object.service.ts";
@@ -27,6 +28,7 @@ function fixture() {
   const records = MemoryStoredObjectRecordRepository.create();
   const service = StoredObjectService.create({
     records,
+    ownerLinks: MemoryStoredObjectOwnerLinkRepository.create(),
     permissions: new GrantedStoredObjectPermissions(),
     storage: ObjectStorageStoredObjectBytesRepository.create({
       objectStorage: memoryObjectStorage(),
@@ -261,10 +263,11 @@ describe("StoredObjectService uploads", () => {
     });
   });
 
-  describe("when LangWatch stores the same bytes from two traces", () => {
+  describe("when LangWatch stores two different pictures from two traces", () => {
     /** @scenario "A file LangWatch stores itself gets a new id and is hashed as it streams" */
     it("stores each as its own file with the digest the storage write computed", async () => {
       const { service, records } = fixture();
+      const other = new TextEncoder().encode("another receipt");
       const input = {
         projectId: PROJECT_ID,
         filename: "picture.png",
@@ -274,16 +277,20 @@ describe("StoredObjectService uploads", () => {
         ownerKind: "trace",
         ownerId: "trace_1",
         bytes: RECEIPT,
+        retentionDays: 30,
       } as const;
 
       const first = await service.storeFromBytes(input);
-      const second = await service.storeFromBytes({ ...input, ownerId: "trace_2" });
+      const second = await service.storeFromBytes({ ...input, ownerId: "trace_2", bytes: other });
 
       expect(second.reference.id).not.toBe(first.reference.id);
-      for (const stored of [first, second]) {
+      for (const [stored, bytes] of [
+        [first, RECEIPT],
+        [second, other],
+      ] as const) {
         await expect(
           records.findById({ tenantId: PROJECT_ID, id: stored.reference.id }),
-        ).resolves.toMatchObject({ status: "available", sha256: sha256Of(RECEIPT) });
+        ).resolves.toMatchObject({ status: "available", sha256: sha256Of(bytes) });
       }
     });
   });

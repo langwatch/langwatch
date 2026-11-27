@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ManagedProviderApi`)
 
-Peers call these through the token, declared at `../contract/src/managed-provider.api.ts:42`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/managed-provider.api.ts:59`; nothing else in this package is public.
 
 #### `isManagedProvider`
 
@@ -24,6 +24,14 @@ isManagedProvider(input: { organizationId: string; provider: string }): boolean;
 
 ```typescript
 buildLitellmParameters(input: BuildManagedProviderParametersInput): Promise<Record<string, string>>;
+```
+
+#### `getBedrockCredentials`
+
+Mints the organization's managed Bedrock session; throws for an organization not managed.
+
+```typescript
+getBedrockCredentials(input: { organizationId: string }): Promise<ManagedBedrockCredentials>;
 ```
 
 ## REST transport

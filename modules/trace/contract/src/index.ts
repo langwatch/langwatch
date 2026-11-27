@@ -42,6 +42,7 @@ export * from "./explorer/actions/index.ts";
 export * from "./features/evaluation/trace-instant-eval-chips.ts";
 export * from "./features/evaluation/trace-instant-eval.schemas.ts";
 export * from "./features/braid/trace-braid.schemas.ts";
+export * from "./features/ops/trace-ops.schemas.ts";
 export * from "./features/query/trace-langwatch-ql-filter.ts";
 export * from "./features/query/trace-query-analysis.ts";
 export * from "./features/query/trace-query-ast.ts";
@@ -202,6 +203,7 @@ export * from "./features/edit-overlay/trace-edit-overlay-apply.ts";
 export * from "./features/content/trace-python-repr.ts";
 export * from "./features/analytics/trace-model-spend.ts";
 export * from "./features/analytics/trace-agent-traffic.ts";
+export * from "./features/analytics/trace-managed-prompt-version-floor.ts";
 export * from "./features/ingest/trace-collector-common.ts";
 export * from "./features/content/trace-rag-chunks.ts";
 export * from "./features/content/trace-rag-extraction.ts";
@@ -227,4 +229,8 @@ export * from "./explorer/origin-display.ts";
 export * from "./explorer/suggestion-items.ts";
 export * from "./trace-browser-slices.ts";
 export * from "./trace-lent-components.ts";
-export { traceConfig, type TraceServerConfig } from "./trace.config.ts";
+export {
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
+  traceConfig,
+  type TraceServerConfig,
+} from "./trace.config.ts";

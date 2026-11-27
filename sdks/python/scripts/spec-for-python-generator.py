@@ -84,6 +84,22 @@ def open_registry_event_type(item):
     return item
 
 
+REGISTRY_ENTRY_FIELDS_ADDED_LATER = ("dormant", "posture", "platform", "labels", "owner_label")
+
+
+def relax_registry_entry(node):
+    """A registry entry reads an older server's payload, which lacks the fields added with posture."""
+    if isinstance(node, dict):
+        relaxed = {key: relax_registry_entry(value) for key, value in node.items()}
+        required = relaxed.get("required")
+        if isinstance(required, list) and "dormant" in relaxed.get("properties", {}):
+            relaxed["required"] = [n for n in required if n not in REGISTRY_ENTRY_FIELDS_ADDED_LATER]
+        return relaxed
+    if isinstance(node, list):
+        return [relax_registry_entry(value) for value in node]
+    return node
+
+
 def is_registry_event_feed(path):
     """The change feed and an agent's versions: both answer pages of registry events."""
     return "/governance/registry/" in path and path.endswith(("/events", "/versions"))
@@ -116,8 +132,10 @@ def main() -> int:
     for path, item in spec.get("paths", {}).items():
         if path.startswith("/api/v1/prompts"):
             spec["paths"][path] = relax_prompt_schema(item)
+        if "/governance/registry/" in path:
+            spec["paths"][path] = relax_registry_entry(spec["paths"][path])
         if is_registry_event_feed(path):
-            spec["paths"][path] = open_registry_event_type(item)
+            spec["paths"][path] = open_registry_event_type(spec["paths"][path])
     if "SpanInputOutput" in schemas:
         schemas["SpanInputOutput"] = flatten_self_reference(
             schemas["SpanInputOutput"], "#/components/schemas/SpanInputOutput"

@@ -72,11 +72,11 @@ Feature: Agent call graph across A2A hops
   Rule: A2A span marks
 
     @unit
-    Scenario: A2A spans are marked so the span tree can label them
+    Scenario: A2A spans are classified with their role, method, context, task and state
       Given spans with a2a attributes, an A2A JSON-RPC method name or an a2a.server span name
-      When the call graph is read for the trace
-      Then each of them is listed as an A2A span with its role, method, context, task and state
-      And plain spans are not listed
+      When each span is classified
+      Then each of them is an A2A call with its role, method, context, task and state
+      And plain spans are not
 
     @unit
     Scenario: A gRPC call to another service with an A2A method name is not an A2A call
@@ -156,6 +156,13 @@ Feature: Agent call graph across A2A hops
       Then the tab does not switch back to the waterfall
       When the call graph read fails
       Then the tab stays and shows the failure
+
+    @unit
+    Scenario: The viz pane keeps the Agents view until the tab's visibility is final
+      Given the Agents tab is selected and the span tree is still loading
+      Then the viz pane keeps the Agents tab and its view, not the waterfall
+      When the span tree has loaded and holds no second agent
+      Then the viz pane drops the Agents tab and shows the waterfall
 
     @integration
     Scenario: The Agents pane shows a loading state and an error state with a retry

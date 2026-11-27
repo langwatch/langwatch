@@ -18,7 +18,7 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 | Gateway | `/health` | Exact | `<release>-gateway` | `80` |
 | Gateway | `/a2a` | Prefix | `<release>-gateway` | `80` |
 
-`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+`<release>` is the Helm release name. The gateway Service forwards its port to container port 5563. Port 80 is the default; if you set `gateway.service.port`, use that port in every route that names the gateway Service.
 
 Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
 
@@ -146,6 +146,7 @@ spec:
     - matches:
         - path: { type: PathPrefix, value: /v1 }
         - path: { type: Exact, value: /health }
+        - path: { type: PathPrefix, value: /a2a }
       backendRefs:
         - name: langwatch-gateway
           port: 80

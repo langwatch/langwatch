@@ -123,8 +123,24 @@ export interface InstantEvalClassification {
   readonly route?: InstantEvalJudgeRouteRequest;
 }
 
-/** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
+/**
+ * The model a judge's settings are saved with to be answered by Instant Evals (ADR-174 decision
+ * 11): the id the previous release reads. The -preview ids read the same (ADR-182).
+ */
 export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/instant-evals";
+
+/** The evaluators Instant Evals answers; no other evaluator is offered a LangWatch model. */
+export const INSTANT_EVAL_JUDGE_EVALUATOR_TYPES = [
+  "langevals/llm_boolean",
+  "langevals/llm_score",
+  "langevals/llm_category",
+] as const;
+
+export function isInstantEvalJudgeEvaluatorType(evaluatorType: string | undefined): boolean {
+  return (INSTANT_EVAL_JUDGE_EVALUATOR_TYPES as readonly (string | undefined)[]).includes(
+    evaluatorType,
+  );
+}
 
 /**
  * Switches LangWatch's hosted judge off for an organization, whatever its plan, switch or license;

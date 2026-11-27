@@ -6,7 +6,13 @@ import {
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi, TraceServerConfig } from "@langwatch/trace-contract";
-import { defineMigrationStep, defineProjectionReplayStep } from "@langwatch/upgrade/step";
+import {
+  defineMigrationStep,
+  defineProjectionReplayStep,
+  type LaneReplayer,
+  type MigrationStep,
+  type MigrationStepDefinition,
+} from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
 import { traceChannels } from "./channels/trace-channels.registry.ts";
@@ -18,6 +24,11 @@ import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { APP_VERSION_REPLAY_STEP_ID } from "./rules/app-version.rules.ts";
+import {
+  MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+  MANAGED_VERSION_REPLAY_HOURS,
+} from "./rules/managed-prompt-version-replay.rules.ts";
 import {
   RECORD_EVALUATION_OUTCOMES_STEP_ID,
   TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
@@ -47,6 +58,30 @@ import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { tracesRest } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
+
+/**
+ * Refolds the 122 days att-change reads so each trace_analytics row carries its trace's managed
+ * prompt version (goose 00133), once no older writer is left to write rows without it.
+ * `after` names the lane's earlier replays: two replays of one lane share its markers and pause.
+ */
+export function managedPromptVersionReplayStep({
+  replayer,
+  after,
+}: {
+  replayer: LaneReplayer;
+  after: NonNullable<MigrationStepDefinition["after"]>;
+}): MigrationStep {
+  return defineProjectionReplayStep({
+    id: MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+    description:
+      "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
+    lane: TRACE_ANALYTICS_PROJECTION_NAME,
+    since: nowInstant().subtract({ hours: MANAGED_VERSION_REPLAY_HOURS }).toString(),
+    needsOldWritersGone: true,
+    after,
+    replayer,
+  });
+}
 
 /**
  * Canonical Trace server feature installer: the registry chooses every repository tier, and
@@ -131,7 +166,38 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           });
         },
       });
+      // After both: the outcomes are in the log and the lane's own replay has run, so this pass
+      // writes every recent trace's evaluation rows from the whole history (trace ADR-003).
+      const replayEvaluationAnalytics = defineProjectionReplayStep({
+        id: TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+        description:
+          "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+        lane: TRACE_ANALYTICS_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
+        needsOldWritersGone: true,
+        after: [recordEvaluationOutcomes, replayTraceAnalytics],
+        replayer,
+      });
+      const managedPromptVersion = managedPromptVersionReplayStep({
+        replayer,
+        after: [replayTraceAnalytics, replayEvaluationAnalytics],
+      });
       return [
+        // An old image stores trace media without a link, so wait until none serves.
+        defineMigrationStep({
+          id: "trace:link-unowned-trace-media",
+          kind: "tenant",
+          mode: "background",
+          tenants: "project",
+          needsOldWritersGone: true,
+          title: "Owner links for trace media stored before them",
+          description:
+            "Links audio and images stored from traces before owner links existed to their trace, so they are deleted with it.",
+          requiresOperatorConfirmation: false,
+          runsAutomaticallyOnSelfHosted: true,
+          enrolledAutomatically: true,
+          migrateTenant: (args) => app.linkUnownedTraceMedia(args),
+        }),
         defineMigrationStep({
           id: "trace:track-updated-at-index-materialisation",
           kind: "data",
@@ -194,16 +260,16 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           },
         }),
         recordEvaluationOutcomes,
-        // After both: the outcomes are in the log and the lane's own replay has run, so this pass
-        // writes every recent trace's evaluation rows from the whole history (trace ADR-003).
+        replayEvaluationAnalytics,
+        managedPromptVersion,
         defineProjectionReplayStep({
-          id: TRACE_EVALUATION_ANALYTICS_REPLAY_STEP_ID,
+          id: APP_VERSION_REPLAY_STEP_ID,
           description:
-            "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+            "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
           lane: TRACE_ANALYTICS_PROJECTION_NAME,
-          since: nowInstant().subtract({ hours: EVALUATION_OUTCOMES_BACKFILL_HOURS }).toString(),
+          since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
           needsOldWritersGone: true,
-          after: [recordEvaluationOutcomes, replayTraceAnalytics],
+          after: [replayTraceAnalytics, replayEvaluationAnalytics, managedPromptVersion],
           replayer,
         }),
       ];

@@ -2,7 +2,8 @@
 
 /**
  * One project's traces on one UTC day of append time, as nurturing counts them from trace's facts:
- * a trace is its root span (span_received), a failed trace trace's own trace_failed fact.
+ * a trace is its root span (span_received), a failed trace trace's own trace_failed fact. Each
+ * source's fold keeps its own row of a day, and a read sums them.
  */
 export type NurturingTraceDay = Readonly<{
   projectId: string;
@@ -21,9 +22,15 @@ export type NurturingTraceDay = Readonly<{
 export type NurturingCountedTraceKind = "trace" | "failed";
 
 /**
- * One trace as nurturing counts it: its project and the fact's day and time; never its body.
- * Nothing de-duplicates: a redelivered batch or a root span stored again counts again (accepted,
- * issue 9378).
+ * The fold, one per owner pipeline, whose row of a project's day it is: `spans` from
+ * span_received, `failures` from trace_failed. A peer fold reads one owner's log (§9).
+ */
+export type NurturingTraceDaySource = "spans" | "failures";
+
+/**
+ * One trace as nurturing counts it: its project and the fact's day and time; never its body. A
+ * redelivered batch folds once; a root span stored again under a new event id counts again
+ * (accepted, issue 9378).
  */
 export type NurturingCountedTrace = Readonly<{
   projectId: string;
@@ -75,19 +82,32 @@ export function addCountedTrace(
       };
 }
 
-/** Counted traces folded into one increment per project and day, so each day is written once. */
-export function traceDayIncrementsOf(
-  traces: readonly NurturingCountedTrace[],
-): NurturingTraceDay[] {
-  const days = new Map<string, NurturingTraceDay>();
-  for (const trace of traces) {
-    const key = JSON.stringify([trace.projectId, trace.day]);
-    days.set(key, addCountedTrace(days.get(key) ?? emptyTraceDay(), trace));
-  }
-  return [...days.values()];
+/** The row key of a project's day, as the trace-day folds group and store it. */
+export function traceDayKeyOf({
+  projectId,
+  day,
+}: Readonly<{ projectId: string; day: string }>): string {
+  return JSON.stringify([projectId, day]);
 }
 
-/** The days after `windowStartDay`, summed into the organization's trace counts. */
+/** The project and day a trace-day row key names; refuses a key no fold wrote. */
+export function traceDayOfKey(key: string): Readonly<{ projectId: string; day: string }> {
+  const parsed: unknown = JSON.parse(key);
+  if (
+    !Array.isArray(parsed) ||
+    parsed.length !== 2 ||
+    typeof parsed[0] !== "string" ||
+    typeof parsed[1] !== "string"
+  ) {
+    throw new Error(`not a trace-day key: ${key}`);
+  }
+  return { projectId: parsed[0], day: parsed[1] };
+}
+
+/**
+ * The days after `windowStartDay`, summed into the organization's trace counts: each source's row
+ * of a day adds to the sums, and the day is active once.
+ */
 export function traceCountsOf({
   days,
   windowStartDay,

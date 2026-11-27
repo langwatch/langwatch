@@ -23,7 +23,7 @@ import {
   SEARCH_FIELDS,
 } from "@langwatch/trace-contract";
 
-import { LWQL_EXAMPLE_DATABASE, LWQL_EXAMPLES } from "./langwatch-ql-examples.rules.ts";
+import { LWQL_EXAMPLES } from "./langwatch-ql-examples.rules.ts";
 import { heldLwqlGates, publishedLwqlGates, type LwqlGate } from "./lwql-gate.rules.ts";
 
 /**
@@ -167,31 +167,19 @@ function isAvailable(input: { gates: readonly LwqlGate[]; held: ReadonlySet<Lwql
   return input.gates.every((gate) => input.held.has(gate));
 }
 
-/**
- * The statement, qualified with the database this deployment actually serves.
- * The library writes the production spelling, and a deployment serving the same
- * views elsewhere would otherwise publish a database its callers cannot reach.
- */
-function qualify(input: { sql: string; database: string }): string {
-  if (input.database === LWQL_EXAMPLE_DATABASE) return input.sql;
-
-  return input.sql.split(`${LWQL_EXAMPLE_DATABASE}.`).join(`${input.database}.`);
-}
-
 function describeExamples(input: {
   held: ReadonlySet<LwqlGate>;
   lwqlEnabled: boolean;
-  database: string;
   traceFilterExamples: readonly QueryReferenceTraceFilterExample[];
 }): readonly QueryReferenceExample[] {
-  const { held, lwqlEnabled, database, traceFilterExamples } = input;
+  const { held, lwqlEnabled, traceFilterExamples } = input;
   const statements: QueryReferenceExample[] = LWQL_EXAMPLES.map((example) => ({
     id: example.id,
     title: example.title,
     intent: example.intent,
     language: "lwql" as const,
     tags: example.tags,
-    text: qualify({ sql: example.sql, database }),
+    text: example.sql,
     parameters: example.parameters,
     requires: { gates: publishedLwqlGates(example.gates), functions: [] },
     // Two ways a SQL example is not runnable here: a column it reads is
@@ -225,7 +213,6 @@ function describeExamples(input: {
 export function buildQueryReference(input: {
   protections: LangWatchQLProtections;
   lwqlEnabled: boolean;
-  database: string;
   schema: LangWatchQLSchema;
   limits: {
     maxStatementLength: number;
@@ -235,7 +222,7 @@ export function buildQueryReference(input: {
   };
   traceFilterExamples: readonly QueryReferenceTraceFilterExample[];
 }): QueryReference {
-  const { protections, lwqlEnabled, database, schema, limits, traceFilterExamples } = input;
+  const { protections, lwqlEnabled, schema, limits, traceFilterExamples } = input;
 
   return {
     version: QUERY_REFERENCE_VERSION,
@@ -258,7 +245,6 @@ export function buildQueryReference(input: {
     examples: describeExamples({
       held: heldLwqlGates(protections),
       lwqlEnabled,
-      database,
       traceFilterExamples,
     }),
     decisionTable: DECISION_TABLE,

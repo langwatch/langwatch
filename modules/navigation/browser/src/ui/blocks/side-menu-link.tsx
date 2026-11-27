@@ -147,6 +147,7 @@ export const SideMenuItem = ({
             flex={1}
             overflow="hidden"
             textOverflow="ellipsis"
+            title={label}
           >
             {label}
           </Text>

@@ -62,6 +62,21 @@ export type OrganizationOperatorQuery =
 /** One organization's stored presence switch, as the presence step reads it a page at a time. */
 export type OrganizationPresenceSettingRow = Readonly<{ id: string; presenceEnabled: boolean }>;
 
+/** One membership neither disabled nor held by a deactivated user, with its row's creation time. */
+export type OrganizationActiveMemberRow = Readonly<{
+  organizationId: string;
+  userId: string;
+  joinedAt: Instant;
+}>;
+
+/** A page of organizations in id order and their active members. */
+export type OrganizationActiveMemberPage = Readonly<{
+  /** The page's last organization, where the next page starts; null past the end. */
+  lastOrganizationId: string | null;
+  organizations: number;
+  members: readonly OrganizationActiveMemberRow[];
+}>;
+
 /**
  * The stored settings row, before decryption: `tryFindSettings` is the
  * service's, over this raw read, since encryption is an members
@@ -102,6 +117,14 @@ export abstract class OrganizationRepository {
     afterId: string | null;
     limit: number;
   }): Promise<OrganizationPresenceSettingRow[]>;
+  /**
+   * Up to `limit` organizations in id order after `afterId`, system ones included, and their
+   * members whose membership is not disabled and whose user is not deactivated.
+   */
+  abstract findActiveMemberPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationActiveMemberPage>;
   /** The usage report's counts; the caller never passes an empty organization list. */
   abstract countUsage(input: {
     organizationIds: readonly string[];
@@ -235,7 +258,11 @@ export abstract class OrganizationRepository {
     at: Instant;
     error: string | null;
   }): Promise<void>;
-  /** Throws OrganizationNotFoundError. */
+  /**
+   * Writes licensing's key only while licensing's row still holds it, checked under the
+   * organization's row lock; a newer key's own fact writes that one. Throws
+   * OrganizationNotFoundError.
+   */
   abstract setLicense(input: {
     organizationId: string;
     licenseKey: string;

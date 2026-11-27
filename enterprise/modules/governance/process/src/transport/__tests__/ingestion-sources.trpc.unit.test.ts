@@ -63,6 +63,10 @@ function mount() {
     ingestionSourceValidateOttl: async (input) => record(input, { status: "valid" as const }),
     ingestionSourceOttlStarter: (input) =>
       record(input, { enabled: true, statements: [], enabledSourceTypes: ["otel_generic"] }),
+    ingestionSourceTestAgentListing: async (input) =>
+      record(input, { outcome: "listed" as const, agentCount: 2 }),
+    ingestionSourceTestAgentListingForSource: async (input) =>
+      record(input, { outcome: "empty" as const }),
   });
   const router = governanceTrpcRuntime(governanceTrpcMembers({ permits: () => true, asked })).mount(
     ingestionSourcesTrpcTransport,
@@ -90,7 +94,24 @@ describe("the ingestionSources tRPC namespace", () => {
       archive: "mutation",
       validateOttl: "mutation",
       ottlStarter: "query",
+      testAgentListing: "mutation",
+      testAgentListingForSource: "mutation",
     });
+  });
+
+  it("tests an agent listing under ingestionSources:manage", async () => {
+    const { caller, asked } = mount();
+    await expect(
+      caller.testAgentListing({
+        organizationId: "org_1",
+        sourceType: "ard_registry",
+        config: { adapter: "ard_registry", registryUrl: "registry.acme.test" },
+      }),
+    ).resolves.toEqual({ outcome: "listed", agentCount: 2 });
+    await expect(
+      caller.testAgentListingForSource({ organizationId: "org_1", sourceId: "src_1" }),
+    ).resolves.toEqual({ outcome: "empty" });
+    expect(asked).toEqual(["ingestionSources:manage", "ingestionSources:manage"]);
   });
 
   it("reads under ingestionSources:view", async () => {

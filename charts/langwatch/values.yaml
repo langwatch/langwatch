@@ -155,21 +155,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.28.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.28.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.28.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
   # The PII redaction model's public image (piiRedactionModel below), used
   # only when piiRedactionModel.enabled.
@@ -178,7 +178,7 @@ images:
   ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
   pii_redaction_model:
     repository: langwatch/pii-redaction-model
-    tag: 3.28.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -1777,7 +1777,7 @@ ingress:
 
   # Ingress annotations for specific behaviors
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
-  ## @param ingress.annotations [object] Additional ingress annotations. With className nginx the app Ingress also gets proxy-read-timeout and proxy-send-timeout of 120 s; set either here to override.
+  ## @param ingress.annotations [object] Additional ingress annotations. With className nginx the app Ingress also gets proxy-read-timeout and proxy-send-timeout of 120 s and proxy-body-size 64m (the trace receiver's default OTLP_TRACES_MAX_BODY_BYTES); set any of them here to override.
   annotations: {}
 
   # Extra labels applied to the Ingress and to the blackhole Service that backs
@@ -2283,7 +2283,7 @@ clickhouse:
   # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
   ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
   podAnnotations:
-    langwatch.com/lwql-access-catalog: "3.28.0" # x-release-please-version
+    langwatch.com/lwql-access-catalog: "3.31.0" # x-release-please-version
 
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
@@ -2292,8 +2292,8 @@ clickhouse:
 # identity (langwatch_lwql), the <database>_profile settings profile
 # (langwatch_profile by default), the tenant row policies, the lwql_postgres
 # named collection and the caller-facing views.
-# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
-# backend objects exist regardless.
+# The `release_lwql_workbench` feature flag gates the HTTP endpoint and is on by
+# default on a self-hosted install; the backend objects exist regardless.
 #
 # One rule, one owner (issue #8258): the APPLICATION owns the access model in
 # code. How it reaches ClickHouse depends on the posture:
@@ -2317,7 +2317,7 @@ clickhouse:
 # it converges the identities with.
 ## @section LangWatchQL (LWQL)
 lwql:
-  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag, on by default on a self-hosted install, gates the endpoint.
   enabled: true
   ## @param lwql.imagePullSecrets [array] Pull secrets for the app image the access-render Job runs. That Job uses its own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach it (same reason app.storedObjects.localFilesystem.serializeUpgradesPullSecrets exists).
   imagePullSecrets: []
@@ -2429,7 +2429,7 @@ gateway:
   ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
   chartManaged: true
 
-  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
+  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. The gateway also uses it as A2A_PUBLIC_BASE_URL, the base of the URLs in proxied A2A Agent Cards; without it the gateway refuses Agent Card calls (a2a_public_url_unset), even when ingress.gateway.host publishes the gateway. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
   ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.

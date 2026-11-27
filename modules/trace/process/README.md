@@ -6,13 +6,13 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:56`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…).withIdIndexes(TRACE_ID_INDEXES, …)`, `src/trace.module.ts:91`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:203`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:206`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -63,6 +63,14 @@ Where the span widgets' history starts, from the span_analytics replay's recorde
 
 ```typescript
 getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
+```
+
+#### `getManagedPromptVersionFloor`
+
+Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+
+```typescript
+getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
 ```
 
 #### `renderSpanMessages`
@@ -431,6 +439,14 @@ Every trace of the named threads. `maxTraces` is the ceiling across all of them 
 readThreadsTraces(input: { projectId: string; threadIds: string[]; protections: unknown; withEditOverlay?: boolean; maxTraces?: number; }): Promise<Trace[]>;
 ```
 
+#### `readThreadsTraceIds`
+
+The trace ids of the named threads, one list per thread, oldest first. Reads the trace summaries' keys only: no content, so it needs no protections. `maxTraces` is the ceiling across all of the threads together.
+
+```typescript
+readThreadsTraceIds(input: { projectId: string; threadIds: string[]; maxTraces?: number; }): Promise<ThreadTraceIds[]>;
+```
+
 #### `readSampleTraces`
 
 ```typescript
@@ -461,10 +477,10 @@ resolveViewerProtections(input: { projectId: string; userId: string | null; /** 
 
 #### `resolveApiKeyProtections`
 
-The same redactions for an API-KEY caller: the public branch of every content category, plus the credential's own `cost:view` grant. A legacy project key (`principal: null`) predates RBAC and sees costs.
+The same redactions for a REST credential: an API key reads the public branch of every content category, a project-bound access token (`user` principal) reads as its person. Costs are the credential's own `cost:view` grant; a legacy key (`null`) sees them.
 
 ```typescript
-resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | null; }): Promise<Protections>;
+resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | null; /** The read's proof, folded in for an access token as for its person (ADR-177 decision 9). */ authorization?: Authorization; }): Promise<Protections>;
 ```
 
 #### `findExistingTraceIds`
@@ -1155,6 +1171,22 @@ The project's distinct traces over the last 24 hours.
 countTracesInLastDay(input: { projectId: string }): Promise<number>;
 ```
 
+#### `countIngestionByProject`
+
+A staff investigation's ingestion figures (ADR-202): one row per asked project, zeros when nothing arrived in `[since, until)` (epoch ms). Refusals are counted per UTC day, so a range takes every day it touches.
+
+```typescript
+countIngestionByProject(input: { projectIds: string[]; since: number; until: number; }): Promise<TraceIngestionCount[]>;
+```
+
+#### `findTracePresence`
+
+Whether a trace id is stored in the project, with counts and arrival times only (ADR-202).
+
+```typescript
+findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]>;
+```
+
 #### `hasTraceWithAttribute`
 
 Whether any trace carrying `attribute` landed for the project at or after `sinceMs`.
@@ -1207,20 +1239,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:278` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:263` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:284`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:269`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:288)
-// Response: inline, src/transport/otlp-ingest.rest.ts:291
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:273)
+// Response: inline, src/transport/otlp-ingest.rest.ts:276
 type Response = unknown;
 ```
 
@@ -1338,7 +1370,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:309`   |
+| Declared at | `src/transport/traces.rest.ts:310`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1348,13 +1380,13 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:313`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:314`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
-// Response: inline, src/transport/traces.rest.ts:318
+// Response: inline, src/transport/traces.rest.ts:319
 type Response = unknown;
 ```
 
@@ -1362,7 +1394,7 @@ type Response = unknown;
 
 Recommended trace wait for a scenario judge
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:340`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:341`.
 
 Answers at `/api/traces/settle-settings`, `/api/v1/traces/settle-settings`; also, undocumented, `/api/traces/2026-08-07/settle-settings`, `/api/v1/traces/2026-08-07/settle-settings`, `/api/traces/latest/settle-settings`, `/api/v1/traces/latest/settle-settings`.
 
@@ -1379,7 +1411,7 @@ interface Response {
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:364`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:365`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1401,7 +1433,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:397`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:398`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1417,7 +1449,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:436`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:437`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1437,7 +1469,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:462`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:463`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
@@ -2087,7 +2119,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:289
+type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:278
 
 // traces.spanDetail
 // Input: inline, ../contract/src/traces.trpc.ts:599
@@ -2244,15 +2276,16 @@ Declared at `src/features/ingestion/eventing/trace-ingest-source-billing.pipelin
 
 | Kind   | Leaf                             | Environment variable                         | Declared at                          |
 | ------ | -------------------------------- | -------------------------------------------- | ------------------------------------ |
-| config | `spanProcessingShards`           | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
-| config | `tokenizer.bpeDirectory`         | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
-| config | `tokenizer.fetchTimeoutMs`       | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
-| config | `tokenizer.disabled`             | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
-| config | `disableCodingAgentSpanFilter`   | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
-| config | `evaluationAnalyticsQuorumReads` | `TRACE_EVALUATION_ANALYTICS_QUORUM_READS`    | `../contract/src/trace.config.ts:36` |
-| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:43` |
-| config | `publicBaseUrl`                  | `BASE_HOST`                                  | `../contract/src/trace.config.ts:44` |
-| config | `objectRetentionConfirmed`       | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:46` |
-| config | `legacySpoolRetentionConfirmed`  | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:47` |
+| config | `spanProcessingShards`           | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:16` |
+| config | `tokenizer.bpeDirectory`         | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:18` |
+| config | `tokenizer.fetchTimeoutMs`       | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:19` |
+| config | `tokenizer.disabled`             | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:23` |
+| config | `disableCodingAgentSpanFilter`   | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:31` |
+| config | `evaluationAnalyticsQuorumReads` | `TRACE_EVALUATION_ANALYTICS_QUORUM_READS`    | `../contract/src/trace.config.ts:39` |
+| config | `otlpTracesMaxBodyBytes`         | `OTLP_TRACES_MAX_BODY_BYTES`                 | `../contract/src/trace.config.ts:47` |
+| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:51` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                                  | `../contract/src/trace.config.ts:52` |
+| config | `objectRetentionConfirmed`       | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:54` |
+| config | `legacySpoolRetentionConfirmed`  | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:55` |
 
 <!-- readme:generated:end -->

@@ -38,11 +38,22 @@ describe("MemoryIngestionSourceRepository.recordEventReceived", () => {
       const repository = MemoryIngestionSourceRepository.create({ now: () => NOW });
       const source = await sourceIn(repository);
 
-      await repository.recordEventReceived(source.id, STAMPED_AT);
+      await repository.recordEventReceived(source, STAMPED_AT);
 
       const stored = await repository.findById(source.id);
       expect(stored?.status).toBe("active");
       expect(stored?.lastEventAt).toEqual(new Date(NOW));
+    });
+
+    /** @scenario "A source's first data records that it went live, once" */
+    it("says the first stamp moved it live and no later one did", async () => {
+      const repository = MemoryIngestionSourceRepository.create({ now: () => NOW });
+      const source = await sourceIn(repository);
+
+      const first = await repository.recordEventReceived(source, STAMPED_AT);
+      const second = await repository.recordEventReceived(source, STAMPED_AT);
+
+      expect([first, second]).toEqual([{ wentLive: true }, { wentLive: false }]);
     });
   });
 
@@ -53,8 +64,9 @@ describe("MemoryIngestionSourceRepository.recordEventReceived", () => {
       const source = await sourceIn(repository);
       await repository.update(source.id, { status: "disabled" });
 
-      await repository.recordEventReceived(source.id, STAMPED_AT);
+      const stamp = await repository.recordEventReceived(source, STAMPED_AT);
 
+      expect(stamp).toEqual({ wentLive: false });
       const stored = await repository.findById(source.id);
       expect(stored?.status).toBe("disabled");
       expect(stored?.lastEventAt).toBeNull();

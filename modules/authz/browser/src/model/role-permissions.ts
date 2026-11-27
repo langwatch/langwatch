@@ -121,6 +121,11 @@ const RESOURCE_COPY = {
     blurb: "The controls that run this installation.",
     area: "Platform operations",
   },
+  opsRead: {
+    label: "Staff agent reads",
+    blurb: "The cross-organization reads an approved staff agent may make.",
+    area: "Platform operations",
+  },
   auditLog: {
     label: "Audit log",
     blurb: "The record of what was done, and by whom.",
@@ -164,6 +169,11 @@ const RESOURCE_COPY = {
   gatewayCacheRules: {
     label: "Cache rules",
     blurb: "Which answers the gateway is allowed to reuse.",
+    area: "AI gateway",
+  },
+  gatewayA2aTargets: {
+    label: "A2A agents",
+    blurb: "The agents the gateway may call for your agents, and the credentials it sends them.",
     area: "AI gateway",
   },
   governance: {

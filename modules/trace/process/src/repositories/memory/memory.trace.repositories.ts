@@ -38,6 +38,7 @@ import { MemoryTraceIndexMaterialisationRepository } from "./memory.trace-index-
 import { MemoryTraceIngestSourceBillingRepository } from "./memory.trace-ingest-source-billing.repository.ts";
 import { MemoryTraceInstantEvalRunsRepository } from "./memory.trace-instant-eval-runs.repository.ts";
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
+import { MemoryTracePlanLimitRefusalsRepository } from "./memory.trace-plan-limit-refusals.repository.ts";
 import { MemoryTraceRateLimitRepository } from "./memory.trace-rate-limit.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "./memory.trace-span-dedup.repository.ts";
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
@@ -149,12 +150,14 @@ export class MemoryTraceRepositories {
     return {
       editOverlay: MemoryTraceEditOverlayRepository.create(),
       ingestSourceBilling: MemoryTraceIngestSourceBillingRepository.create(),
+      planLimitRefusals: MemoryTracePlanLimitRefusalsRepository.create(),
       summaryProjection: MemoryTraceSummaryProjectionRepository.create(),
       analyticsProjection: MemoryTraceAnalyticsRepository.create(),
       analyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
       evaluationAnalytics: MemoryTraceEvaluationAnalyticsRepository.create(),
       spanAnalytics: MemorySpanAnalyticsRepository.create(),
       spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
+      managedPromptVersionLedger: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),

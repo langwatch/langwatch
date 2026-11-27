@@ -4,6 +4,9 @@ server release adds as a plain string, instead of raising on the whole page.
 
 The generator makes a closed Enum of every enum, so scripts/spec-for-python-generator.py
 opens the registry event `type` to the Enum or a string.
+
+The fields added with posture (dormant, posture, platform, labels, owner_label) are optional
+in the generator's copy, so a page from a server that predates them still reads.
 """
 
 from typing import Any
@@ -48,10 +51,21 @@ AGENT: dict[str, Any] = {
     "last_seen_at": None,
     "updated_at": "2026-11-12T00:00:00.000Z",
     "removed_at": None,
+    "dormant": False,
+    "posture": "governed",
+    "platform": None,
+    "labels": {},
+    "owner_label": None,
+}
+
+AGENT_BEFORE_POSTURE: dict[str, Any] = {
+    key: value
+    for key, value in AGENT.items()
+    if key not in ("dormant", "posture", "platform", "labels", "owner_label")
 }
 
 
-def event(event_type: str) -> dict[str, Any]:
+def event(event_type: str, agent: dict[str, Any] = AGENT) -> dict[str, Any]:
     return {
         "id": "agentreg_2",
         "sequence": "42",
@@ -62,7 +76,7 @@ def event(event_type: str) -> dict[str, Any]:
         "to_version": 1,
         "tool": None,
         "occurred_at": "2026-11-12T00:00:00.000Z",
-        "agent": AGENT,
+        "agent": agent,
     }
 
 
@@ -90,3 +104,10 @@ class TestRegistryEventType:
         parsed = model.from_dict(event("governance.agent.a_later_release_type"))
         assert parsed.type_ == "governance.agent.a_later_release_type"
         assert parsed.to_dict()["type"] == "governance.agent.a_later_release_type"
+
+    def test_reads_an_agent_from_a_server_before_posture(
+        self, model: Any, known: Any
+    ) -> None:
+        parsed = model.from_dict(event("governance.agent.registered", AGENT_BEFORE_POSTURE))
+        assert parsed.agent.name == "Support tickets"
+        assert "dormant" not in parsed.to_dict()["agent"]

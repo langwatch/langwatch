@@ -35,12 +35,13 @@ export function a2aTargetToWire(target: GatewayA2aTargetResource): GatewayA2aTar
 }
 
 export function a2aTargetToDto(target: GatewayA2aTargetResource): GatewayA2aTargetDto {
-  const { upstreamHeaders, archivedAt: _archivedAt, ...rest } = target;
+  const { upstreamHeaders, ...rest } = target;
   return {
     ...rest,
     upstreamHeaderNames: Object.keys(upstreamHeaders).toSorted(),
     createdAt: target.createdAt.toISOString(),
     updatedAt: target.updatedAt.toISOString(),
+    archivedAt: target.archivedAt?.toISOString() ?? null,
   };
 }
 

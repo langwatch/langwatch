@@ -35,6 +35,8 @@ export const agentRow = (id: string, name: string): GovernanceAgentRow => ({
   lastActiveMinutesAgo: 5,
   health: "responding",
   registeredDaysAgo: 30,
+  posture: "governed",
+  platform: null,
 });
 
 export const stopOf = ({
@@ -115,6 +117,7 @@ export function answerAgentsPage({
   answerQuery("governanceKillSwitch.pendingApprovals", () => pendingApprovals);
   answerQuery("governanceKillSwitch.plan", () => SUPPORT_BOT_PLAN);
   answerQuery("governanceKillSwitch.awsConnections", () => []);
+  answerQuery("governanceRegistry.settings", () => ({ dormant_after_days: 30 }));
 }
 
 export function renderAgentsPage({

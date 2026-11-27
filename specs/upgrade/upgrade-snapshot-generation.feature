@@ -49,6 +49,11 @@ Feature: Generating a typical upgrade snapshot from an old release
     Then coverage.json maps each one to the seed that feeds it or says why the old release cannot hold it
 
   @unit
+  Scenario: a step listed twice in coverage.json is refused
+    When coverage.json lists the same step id twice in one section
+    Then loading it fails naming the id, rather than keeping only the last entry
+
+  @unit
   Scenario: an unknown shape is refused
     When I plan shape "cloud" from release "3.20.1" at volume "S" with seed 1
     Then planning fails naming the four shapes
@@ -85,6 +90,13 @@ Feature: Generating a typical upgrade snapshot from an old release
     Given two generation runs planned at the same time
     When each builds its doors
     Then the app and the four store ports are all different across both runs
+
+  @unit
+  Scenario: A generation run stops when the OS offers only ports already handed out
+    Given a generation run that already holds its ports
+    When the OS keeps offering a second run only a port the first run holds
+    Then the second run fails with an error after a bounded number of offers
+    And it neither loops nor reuses the held port
 
   @unit
   Scenario: each product kind is created through the old release's doors

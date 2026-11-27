@@ -61,6 +61,8 @@ export const registerLegacyLicenseInputSchema: RegisterLegacyLicenseInputSchema 
 const revokeIssuedLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   reason: z.string().min(1),
+  /** Refuses with `license_in_use` when an install has bound the license by now. */
+  unusedOnly: z.boolean().optional(),
 });
 export interface RevokeIssuedLicenseInputSchema extends Named<
   typeof revokeIssuedLicenseInputSchemaDefinition

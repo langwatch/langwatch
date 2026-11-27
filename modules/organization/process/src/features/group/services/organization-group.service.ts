@@ -135,6 +135,7 @@ export class OrganizationGroupService {
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
       userIds: memberIds,
+      grantingAccess: true,
     });
     const bindings = parsed.grants ?? [];
     await this.bindings.validateGroupBindings(parsed.organizationId, bindings);
@@ -215,6 +216,7 @@ export class OrganizationGroupService {
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
       userIds: [parsed.userId],
+      grantingAccess: true,
     });
     await this.groups.addMember(parsed);
     await this.grants.invalidateOrganization({ organizationId: parsed.organizationId });
@@ -311,6 +313,7 @@ export class OrganizationGroupService {
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
       userIds: memberIdsToAdd,
+      grantingAccess: true,
     });
     await this.bindings.validateGroupBindings(parsed.organizationId, parsed.grantsToCreate);
     await OrganizationGrantCeilingService.create(this.grants).assertWithinCaller({

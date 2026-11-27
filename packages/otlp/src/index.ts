@@ -20,6 +20,7 @@ export {
   parseOtlpTraces,
   readOtlpBody,
   decodeOtlpBody,
+  type OtlpBodyLimit,
   type OtlpParseResult,
 } from "./body.ts";
 export {

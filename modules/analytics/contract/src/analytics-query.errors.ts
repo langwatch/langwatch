@@ -3,6 +3,7 @@
  * actionable by callers.
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
+import { z } from "zod";
 
 export class QueryTimeoutError extends HandledError {
   declare readonly code: "query_timeout";
@@ -121,4 +122,76 @@ export class AggregateUnattendedReadError extends HandledError {
     );
     this.name = "AggregateUnattendedReadError";
   }
+}
+
+/** A boolean filter value the query cannot apply, as the refusal reports it. */
+const analyticsFilterValueRefusalSchema = z.object({
+  filterField: z.string(),
+  filterName: z.string(),
+  received: z.string(),
+  accepted: z.array(z.string()).readonly(),
+});
+export type AnalyticsFilterValueRefusal = z.infer<typeof analyticsFilterValueRefusalSchema>;
+
+/** A keyed filter sent without its key, as the refusal reports it. */
+const analyticsFilterKeyRefusalSchema = z.object({
+  filterField: z.string(),
+  example: z.string(),
+});
+export type AnalyticsFilterKeyRefusal = z.infer<typeof analyticsFilterKeyRefusalSchema>;
+
+/**
+ * A boolean filter given a value other than the option values the options endpoint returns,
+ * most often the option's label ("Traces with error"). Refused because the query would
+ * otherwise drop the filter and answer the unfiltered numbers.
+ */
+export class AnalyticsFilterValueUnsupportedError extends HandledError {
+  declare readonly code: "analytics_filter_value_unsupported";
+
+  constructor({ filterField, filterName, received, accepted }: AnalyticsFilterValueRefusal) {
+    super(
+      "analytics_filter_value_unsupported",
+      `The "${filterName}" filter (${filterField}) accepts only ${accepted.map((value) => `"${value}"`).join(" or ")}, ` +
+        `not "${received}". Send an option's field, not the label shown next to it.`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { field: `filters.${filterField}`, filterField, received, accepted: [...accepted] },
+      },
+    );
+    this.name = "AnalyticsFilterValueUnsupportedError";
+  }
+}
+
+/** A keyed analytics filter sent without the key (or subkey) it filters by. */
+export class AnalyticsFilterKeyRequiredError extends HandledError {
+  declare readonly code: "analytics_filter_key_required";
+
+  constructor({ filterField, example }: AnalyticsFilterKeyRefusal) {
+    super(
+      "analytics_filter_key_required",
+      `The "${filterField}" filter needs its key, so a bare list cannot be applied. ` +
+        `Write it nested: ${example}`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { field: `filters.${filterField}`, filterField, example },
+      },
+    );
+    this.name = "AnalyticsFilterKeyRequiredError";
+  }
+}
+
+/** What a refused analytics filter carries, for {@link analyticsFilterRefusal}. */
+export type AnalyticsFilterRefusal =
+  | ({ kind: "unsupported_value" } & AnalyticsFilterValueRefusal)
+  | ({ kind: "key_required" } & AnalyticsFilterKeyRefusal);
+
+/** The error a caller reads for a filter the query cannot apply. */
+export function analyticsFilterRefusal(
+  refusal: AnalyticsFilterRefusal,
+): AnalyticsFilterValueUnsupportedError | AnalyticsFilterKeyRequiredError {
+  return refusal.kind === "unsupported_value"
+    ? new AnalyticsFilterValueUnsupportedError(refusal)
+    : new AnalyticsFilterKeyRequiredError(refusal);
 }

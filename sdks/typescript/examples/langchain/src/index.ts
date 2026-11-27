@@ -1,6 +1,6 @@
 import * as readline from "readline";
 
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { type BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import cliMarkdown from "cli-markdown";
 import { getLangWatchTracer } from "langwatch";
@@ -33,7 +33,7 @@ async function main() {
     callbacks: [langWatchCallback],
   });
 
-  const conversationHistory: (HumanMessage | SystemMessage)[] = [
+  const conversationHistory: BaseMessage[] = [
     new SystemMessage(
       "You are a helpful assistant that can answer questions and help with tasks. You may use markdown to format your responses.",
     ),

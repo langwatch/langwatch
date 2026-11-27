@@ -82,6 +82,7 @@ export class OrganizationTeamMembersService {
     await this.deps.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
       userIds: [parsed.userId],
+      grantingAccess: true,
     });
     await this.deps.grants.attachBindings({
       organizationId: parsed.organizationId,
@@ -367,6 +368,7 @@ export class OrganizationTeamMembersService {
     await this.deps.teams.getOrganizationMembers({
       organizationId,
       userIds: [...new Set(members.map(({ userId }) => userId))],
+      grantingAccess: true,
     });
     const customMembers = members.filter(({ role }) => role.startsWith("custom:"));
     if (customMembers.length === 0) {

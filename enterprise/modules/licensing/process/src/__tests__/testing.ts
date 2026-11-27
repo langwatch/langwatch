@@ -212,6 +212,16 @@ export class MemoryLicenseStorage implements LicenseStorage {
     this.stored.set(organizationId, license);
   }
 
+  async replaceLicense({
+    organizationId,
+    license,
+    replacing,
+  }: Readonly<{ organizationId: string; license: StoredLicense; replacing: string | null }>) {
+    if ((this.stored.get(organizationId)?.licenseKey ?? null) !== replacing) return false;
+    this.stored.set(organizationId, license);
+    return true;
+  }
+
   async removeLicense(organizationId: string): Promise<void> {
     this.stored.delete(organizationId);
   }

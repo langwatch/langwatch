@@ -70,7 +70,13 @@ export type AnalyticsAlertAuthoring = {
 };
 
 /** One reference riding with a question to Langy, as self-describing text the agent reads. */
-export type AnalyticsLangyContext = { kind: "dashboard"; ref: string; label: string };
+export type AnalyticsLangyContext = {
+  kind: "dashboard";
+  ref: string;
+  label: string;
+  /** What it is apart from its text, so asking about it again lists it once. */
+  key: string;
+};
 
 /** What a Langy draft is about: a board, and a widget on it when the draft names one. */
 export type AnalyticsLangyDraftAbout = { ref: string; itemRef?: string };
@@ -84,6 +90,8 @@ export type AnalyticsLangyAskRequest = {
   /** What the draft is about; left unsent, it is dropped once that leaves the screen. */
   about?: AnalyticsLangyDraftAbout;
   context: readonly AnalyticsLangyContext[];
+  /** Where it was asked (`dashboard:<id>`): the next question there continues the conversation. */
+  askedFrom?: string;
 };
 
 /** The release flags an Analytics screen reads; the mount answers each one. */

@@ -46,6 +46,7 @@ export {
   type RunContext,
   type RunWithResultsOptions,
   type ExperimentConcurrencyOptions,
+  type PrintSummaryOptions,
   type ExperimentRowResult,
   type ExperimentRunWithResults,
   ExperimentError,

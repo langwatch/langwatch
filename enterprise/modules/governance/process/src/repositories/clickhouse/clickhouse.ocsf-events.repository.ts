@@ -7,9 +7,13 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
-import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
+import {
+  governanceOcsfExportRowOf,
+  OCSF_STORED_SCHEMA_VERSION,
+} from "../governance.repositories.ts";
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
@@ -39,6 +43,27 @@ import type {
  */
 const TABLE_NAME = "governance_ocsf_events" as const;
 
+/** One Security Lake caller row; ClickHouse sends its UInt64 columns as strings. */
+const securityLakeCallerRowSchema = z
+  .object({
+    Principal: z.string(),
+    Models: z.array(z.string()),
+    Regions: z.array(z.string()),
+    LastCallMs: z.coerce.number().finite(),
+    CallCount: z.coerce.number().finite(),
+  })
+  .transform((row): SecurityLakeCallerRow => ({
+    principalArn: row.Principal,
+    models: row.Models,
+    regions: row.Regions,
+    lastCallMs: row.LastCallMs,
+    callCount: row.CallCount,
+  }));
+
+const securityLakeCallerRowsSchema = z.array(securityLakeCallerRowSchema);
+
+const securityLakeEventCountRowsSchema = z.array(z.object({ Events: z.coerce.number().finite() }));
+
 /**
  * Rows per INSERT. A run's kept events arrive as one array and each carries
  * its whole raw payload, so an unchunked page has no upper bound on size.
@@ -52,9 +77,6 @@ const INSERT_CHUNK_SIZE = 500;
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 const logger = createLogger("langwatch:governance:clickhouse-ocsf-events-repository");
-
-const OCSF_CLASS_API_ACTIVITY = 6003;
-const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {
@@ -95,8 +117,6 @@ export interface FindOcsfEventsByIngestInput {
 export interface OcsfIngestOrderedReader {
   findAllByIngest(input: FindOcsfEventsByIngestInput): Promise<GovernanceOcsfIngestOrderedRow[]>;
 }
-
-export type { GovernanceSeatReportRow };
 
 /** The licence-seat read `governanceCost.service.ts`'s seats screen needs. */
 export interface OcsfSeatReportReader {
@@ -151,6 +171,7 @@ function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
 }
 
 function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
+  const { classUid, categoryUid, typeUid } = governanceOcsfExportRowOf(row);
   return {
     TenantId: row.tenantId,
     OcsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
@@ -158,10 +179,10 @@ function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
     TraceId: row.traceId,
     SourceId: row.sourceId,
     SourceType: row.sourceType,
-    ClassUid: row.classUid ?? OCSF_CLASS_API_ACTIVITY,
-    CategoryUid: row.categoryUid ?? OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ClassUid: classUid,
+    CategoryUid: categoryUid,
     ActivityId: row.activityId,
-    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_CLASS_API_ACTIVITY) * 100 + row.activityId,
+    TypeUid: typeUid,
     SeverityId: row.severityId,
     // `eventTime` is a Temporal Instant on this branch; the client wants a Date.
     EventTime: toDate(row.eventTime),
@@ -492,20 +513,7 @@ export class ClickHouseOcsfEventsRepository
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as {
-      Principal: string;
-      Models: string[];
-      Regions: string[];
-      LastCallMs: number | string;
-      CallCount: number | string;
-    }[];
-    return rows.map((row) => ({
-      principalArn: row.Principal,
-      models: row.Models,
-      regions: row.Regions,
-      lastCallMs: Number(row.LastCallMs),
-      callCount: Number(row.CallCount),
-    }));
+    return securityLakeCallerRowsSchema.parse(await result.json());
   }
 
   async countSecurityLakeEvents(input: { tenantId: string; sourceId: string }): Promise<number> {
@@ -525,7 +533,7 @@ export class ClickHouseOcsfEventsRepository
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as { Events: number | string }[];
-    return Number(rows[0]?.Events ?? 0);
+    const [row] = securityLakeEventCountRowsSchema.parse(await result.json());
+    return row?.Events ?? 0;
   }
 }

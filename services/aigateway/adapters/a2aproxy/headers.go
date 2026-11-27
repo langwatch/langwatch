@@ -33,6 +33,20 @@ func copyHeader(dst, src http.Header) {
 	setNoStore(dst)
 }
 
+// connectionFields are the header names a Connection header nominates as
+// hop-by-hop, canonicalised. A proxy never forwards those fields.
+func connectionFields(h http.Header) map[string]bool {
+	out := map[string]bool{}
+	for _, v := range h.Values("Connection") {
+		for _, name := range strings.Split(v, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				out[http.CanonicalHeaderKey(name)] = true
+			}
+		}
+	}
+	return out
+}
+
 // setNoStore keeps every A2A reply out of shared caches: each one answers a
 // key-scoped call, and a cached copy would skip the next caller's policy and scan.
 func setNoStore(h http.Header) {

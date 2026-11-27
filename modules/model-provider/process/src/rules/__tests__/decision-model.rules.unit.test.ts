@@ -5,7 +5,7 @@ import { decisionModelResolutionOf, picksOwnDecisionModel } from "../decision-mo
 const CLEF = "cloudflare/decisions:clef";
 
 describe("decisionModelResolutionOf", () => {
-  /** @scenario "An unset column runs on LangWatch Evals Preview" */
+  /** @scenario "An unset column runs on LangWatch Instant (preview)" */
   it("answers langwatch when nothing is stored", () => {
     expect(decisionModelResolutionOf({ model: undefined, row: undefined })).toEqual({
       kind: "langwatch",
@@ -15,7 +15,7 @@ describe("decisionModelResolutionOf", () => {
   it("answers langwatch for the hosted entry", () => {
     expect(
       decisionModelResolutionOf({
-        model: "langwatch/instant-evals",
+        model: "langwatch/instant-preview",
         row: undefined,
       }),
     ).toEqual({ kind: "langwatch" });
@@ -184,7 +184,7 @@ describe("picksOwnDecisionModel", () => {
   });
 
   it("is false for the hosted model", () => {
-    expect(picksOwnDecisionModel({ config: { INSTANT_EVALS: "langwatch/instant-evals" } })).toBe(
+    expect(picksOwnDecisionModel({ config: { INSTANT_EVALS: "langwatch/instant-preview" } })).toBe(
       false,
     );
   });

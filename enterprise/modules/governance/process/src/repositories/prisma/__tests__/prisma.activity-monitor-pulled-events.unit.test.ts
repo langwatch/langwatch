@@ -283,11 +283,12 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     });
 
     const ocsfQueries = query.mock.calls
-      .map((call) => String((call[0] as { query: string }).query))
-      .filter((sql) => sql.includes("governance_ocsf_events"));
+      .map((call) => call[0] as { query: string; query_params: Record<string, unknown> })
+      .filter((call) => call.query.includes("governance_ocsf_events"));
     expect(ocsfQueries.length).toBeGreaterThan(0);
-    for (const sql of ocsfQueries) {
-      expect(sql).toContain("(TraceId = '' AND SourceType = 'security_lake')");
+    for (const { query: sql, query_params } of ocsfQueries) {
+      expect(sql).toContain("(TraceId = '' AND SourceType = {securityLakeSourceType:String})");
+      expect(query_params).toMatchObject({ securityLakeSourceType: "security_lake" });
       expect(sql).not.toMatch(/OR TraceId = ''\)/);
     }
   });

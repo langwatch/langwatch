@@ -39,7 +39,7 @@ import {
   type PiiRedactionSpendPipeline,
 } from "../eventing/pii-redaction-spend.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
-import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../rules/pii-redaction-model.rules.ts";
+import { MODEL_CALL_RULES } from "../rules/pii-redaction-model.rules.ts";
 import { piiRedactionRequestIdKey } from "../rules/pii-redaction-spend.rules.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -150,6 +150,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #redaction: OtlpSpanPiiRedactionService;
   #snapshots: DataPrivacySnapshotService;
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
+  #permissions: DataPrivacyPermissionsService;
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
   #googleCredentials: GoogleCredentialsUse;
@@ -160,6 +161,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     redaction: OtlpSpanPiiRedactionService;
     snapshots: DataPrivacySnapshotService;
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
+    permissions: DataPrivacyPermissionsService;
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
     googleCredentials: GoogleCredentialsUse;
@@ -169,6 +171,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#redaction = services.redaction;
     this.#snapshots = services.snapshots;
     this.#scopeAuthorization = services.scopeAuthorization;
+    this.#permissions = services.permissions;
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
     this.#googleCredentials = services.googleCredentials;
@@ -221,7 +224,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
           // Its calls, durations and outcomes carry its own method and evaluator labels, so
           // Presidio's series stay Presidio's.
           metrics,
-          timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+          timeoutMs: MODEL_CALL_RULES.single.budgetMs,
           method: "pii_redaction_model",
         }),
         featureFlags: dependencies.featureFlags,
@@ -242,6 +245,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       scopes: projectScopes,
       lineage: dependencies.permissions,
       departments: repositories.directory,
+      apiKeys: channels.apiKeys,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 
@@ -260,11 +264,13 @@ export class DataPrivacyModule implements DataPrivacyApi {
         policies: privacy,
         directory: repositories.directory,
         permissions,
+        apiKeys: channels.apiKeys,
       }),
       scopeAuthorization: DataPrivacyScopeAuthorizationService.create({
         directory: repositories.directory,
         permissions,
       }),
+      permissions,
       contentDrop: ContentDropPolicyService.create(),
       spanContentDrop: OtlpSpanContentDropService.create({
         dataPrivacy: privacy,
@@ -309,7 +315,8 @@ export class DataPrivacyModule implements DataPrivacyApi {
     personalOnly: boolean;
     config: DataPrivacyConfig;
   }): Promise<DataPrivacyPolicy> {
-    return this.#privacy.setForScope(input);
+    // No caller is asked here, so it keeps the keys the rule names and adds none (ADR-208).
+    return this.#privacy.setForScope({ ...input, mayNameNewKeys: false });
   }
 
   removeForScope(input: {
@@ -339,12 +346,18 @@ export class DataPrivacyModule implements DataPrivacyApi {
     input: DataPrivacyScopeTarget & { config: DataPrivacyConfig } & DataPrivacyCallerInput,
   ): Promise<DataPrivacyPolicy> {
     const organizationId = await this.#authorizeScopeWrite(input);
+    // ADR-208: only an organization admin, who already sees every key, adds one to a rule.
+    const mayNameNewKeys = await this.#permissions.canManageOrganization({
+      userId: input.userId,
+      organizationId,
+    });
 
     return this.#privacy.setForScope({
       organizationId,
       scope: input.scope,
       personalOnly: input.personalOnly,
       config: input.config,
+      mayNameNewKeys,
     });
   }
 

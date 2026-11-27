@@ -4,7 +4,7 @@ import type {
   RunSources,
 } from "@langwatch/analytics-contract";
 
-/** Says a named list of origins changed nothing because the statement never reads it (QP21). */
+/** Says a named list of sources changed nothing because the statement never reads it (QP21). */
 export function sourcesIgnoredDiagnostics({
   sourcesNamed,
   followsSources,
@@ -17,7 +17,7 @@ export function sourcesIgnoredDiagnostics({
   return [
     {
       code: "SOURCES_IGNORED",
-      message: "This query doesn't read {dashboard_context_sources}, so it counts every origin.",
+      message: "This query doesn't read the sources you picked, so they change nothing it counts.",
     },
   ];
 }

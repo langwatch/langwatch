@@ -188,6 +188,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
+  // A member's own sidebar order, read and written by its (userId, organizationId, product) key.
+  DashboardSidebarOrder: {},
   // One row per retention scope; read by organizationId, written by row id.
   RetentionApplyStatus: {},
   // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
@@ -264,6 +266,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // cost row, and there is no query shape that wants more than one tenant's.
   DiscoveredPerson: {},
   DiscoveredAgent: {},
+  DiscoveredAgentListing: {},
   // The governance agent registry and its feed: every read and write names one organization.
   AgentRegistryEntry: {},
   AgentRegistryEvent: {},
@@ -275,6 +278,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AgentStop: {},
   AgentStopClaim: {},
   AgentStopTargetPriorState: {},
+  AgentRegistrySettings: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one
@@ -369,6 +373,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingOrganizationCreated: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isTraceWindowEndSweep(clause),
   },
+  // Nurturing's plan copy: one row per organization, by its id.
+  NurturingOrganizationPlan: {},
+  // Nurturing's gateway key copy: a key by its organization and id.
+  NurturingVirtualKey: {},
   // Nurturing's member copy: an organization's rows, or a READ of the named members' other rows.
   NurturingOrganizationMember: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
@@ -384,6 +392,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   NurturingTracedProject: {
     extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
   },
+  // The digest's enrolled cohort, one row per organization keyed by it. The weekly plan reads
+  // the whole list (organization ids only, no customer content); every write names one.
+  DigestCohortOrganization: {
+    platformScopeActions: ["findMany"],
+  },
+  // The digest's weekly folds: a project's week and a person's week within one organization.
+  // Written by the fold's row id, read by organization; the retention sweep across
+  // organizations is raw SQL that says why it skips the tenant check.
+  DigestProjectWeek: {},
+  DigestUserWeek: {},
+  // A person's digest send for one week, stamped with the organization whose week it carried;
+  // claimed by a create naming that organization, read back by its row id.
+  DigestSend: {},
 };
 
 /**
@@ -472,6 +493,11 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // no customer content: only ids, domains, enums and credential references.
   "SsoConnection",
   "Subscription",
+  // Staff access (ADR-202): platform records about one organization, read across organizations
+  // by the operator console, the gate (by key id) and the expiry sweep. The staff-access module
+  // writes them only; no customer surface reads them.
+  "StaffAccessRequest",
+  "StaffAccessEvent",
 ];
 
 export const ORG_SCOPED_MODEL_NAMES: readonly string[] = Object.keys(ORG_SCOPED_MODELS);

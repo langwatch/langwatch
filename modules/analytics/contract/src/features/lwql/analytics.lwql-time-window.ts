@@ -35,6 +35,24 @@ export const LWQL_PERIOD_GRANULARITY_PARAMETER = "dashboard_context_granularity_
 /** The trace origins a run is bound to (`Array(String)`), set by the surface from `sources`. */
 export const LWQL_SOURCES_PARAMETER = "dashboard_context_sources";
 
+/** SQL without its comments and with its string literals emptied: what a statement executes. */
+export function lwqlExecutedText(sql: string): string {
+  // One left-to-right pass, so `--` inside a literal and a quote inside a comment stay inert.
+  return sql.replace(/\/\*[\s\S]*?\*\/|--[^\n]*|'(?:[^'\\]|\\.|'')*'/g, (token) =>
+    token.startsWith("'") ? "''" : " ",
+  );
+}
+
+/** The sources placeholder, with the spacing inside its type the server's type check allows. */
+const SOURCES_PLACEHOLDER = new RegExp(
+  `\\{${LWQL_SOURCES_PARAMETER}:\\s*Array\\(\\s*String\\s*\\)\\s*\\}`,
+);
+
+/** Whether a statement reads the sources placeholder in an expression, not a comment or literal. */
+export function readsSourcesParameter(sql: string): boolean {
+  return SOURCES_PLACEHOLDER.test(lwqlExecutedText(sql));
+}
+
 /** The projects a run reads (`Array(String)`), set by the surface from `projects`. */
 export const LWQL_PROJECTS_PARAMETER = "dashboard_context_projects";
 

@@ -31,6 +31,18 @@ describe("resolveOrgSwitchDestination", () => {
       ).toBe("/beta-app/dashboards");
     });
 
+    /** @scenario "Switching organization on an org-level page" */
+    it("lands on the new organization's library when it has the Dashboards area", () => {
+      expect(
+        resolveOrgSwitchDestination({
+          currentProduct: "dashboards",
+          reachableProducts: ["llm-ops", "dashboards"],
+          projectSlug: "beta-app",
+          hasOrganizationLibrary: true,
+        }),
+      ).toBe("/dashboards");
+    });
+
     it("falls through when the product has no home to offer", () => {
       // LLM Ops without a project resolves no home; the next candidate wins.
       expect(

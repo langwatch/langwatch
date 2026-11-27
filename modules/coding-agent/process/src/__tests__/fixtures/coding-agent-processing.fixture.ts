@@ -102,6 +102,14 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.reject(new Error("Not used by Coding Agent tests."));
   }
 
+  getGatewayCustomKeys(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding Agent tests."));
+  }
+
+  getGatewayKeysEpoch(): string {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
     private readonly priced: (model: string) => boolean = () => true,

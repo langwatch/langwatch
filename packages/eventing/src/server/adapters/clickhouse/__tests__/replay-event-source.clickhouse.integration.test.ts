@@ -46,7 +46,11 @@ const TEST_PAGE = { maxEvents: 1_000, maxPayloadBytes: 3 * 1024 * 1024 };
 let capped: ClickHouseQueryClient;
 let uncapped: ClickHouseQueryClient;
 
-/** The server's HTTP interface; `cap` sets `max_memory_usage` on every statement it sends. */
+/**
+ * The server's HTTP interface. With `cap`, every statement gets `max_memory_usage` and
+ * `max_threads: 1`. Threads are pinned because memory per read can grow with the
+ * server's thread count.
+ */
 function httpDriver({ url, cap }: { url: string; cap?: number }): QueryDriver {
   const endpoint = new URL(url);
   const database = endpoint.pathname.replace(/^\//, "") || "default";
@@ -59,7 +63,10 @@ function httpDriver({ url, cap }: { url: string; cap?: number }): QueryDriver {
     for (const [name, value] of Object.entries(request.settings ?? {})) {
       search.set(name, String(value));
     }
-    if (cap !== undefined) search.set("max_memory_usage", String(cap));
+    if (cap !== undefined) {
+      search.set("max_memory_usage", String(cap));
+      search.set("max_threads", "1");
+    }
     const response = await fetch(`${endpoint.origin}/?${search.toString()}`, {
       method: "POST",
       headers: { authorization },

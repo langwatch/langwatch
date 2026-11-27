@@ -119,6 +119,8 @@ const gatewayA2aTargetDtoSchemaDefinition = z.object({
   createdById: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Null on a live target; set on the target an archive answers. */
+  archivedAt: z.string().nullable(),
 });
 export interface GatewayA2aTargetDtoSchema extends Named<
   typeof gatewayA2aTargetDtoSchemaDefinition

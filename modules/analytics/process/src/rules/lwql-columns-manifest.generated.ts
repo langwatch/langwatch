@@ -1360,6 +1360,8 @@ export interface LwqlClickHouseRows {
     readonly MetadataEnvironment: "String";
     readonly EvaluationOutcomes: "String";
     readonly EvaluationRowsDigest: "String";
+    readonly LastUsedPromptVersionId: "String";
+    readonly AppVersion: "String";
   };
   readonly trace_analytics_id_index: {
     readonly TenantId: "String";

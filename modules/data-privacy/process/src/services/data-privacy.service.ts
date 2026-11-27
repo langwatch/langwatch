@@ -1,7 +1,9 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
+  ApiKeyAddForbiddenError,
   dataPrivacyConfigSchema,
   InvalidDataPrivacyConfigError,
+  namedApiKeyIds,
   ScopeTargetNotFoundError,
   type DataPrivacyConfig,
   type DataPrivacyPiiRedactionLevel,
@@ -11,10 +13,18 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
+import { type Instant, nowInstant } from "@langwatch/time";
 import safe from "safe-regex2";
 
 import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
+import type { OrganizationApiKeys } from "../channels/data-privacy.channels.ts";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
+import {
+  foreignApiKeyIds,
+  namesKeysOnUnrestrictedCategory,
+  namesKeysWithoutAdmins,
+  restrictedCategoriesDisagreeOnKeys,
+} from "../rules/audience-api-keys.rules.ts";
 import {
   publicPiiRedactionLevel,
   withPiiRedactionLevel,
@@ -37,6 +47,8 @@ export class DataPrivacyService {
   private readonly scopes: ScopeFacts;
   private readonly lineage: ScopeLineage;
   private readonly departments: DepartmentOwners;
+  private readonly apiKeys: OrganizationApiKeys;
+  private readonly clock: () => Instant;
 
   private constructor({
     repository,
@@ -45,6 +57,8 @@ export class DataPrivacyService {
     scopes,
     lineage,
     departments,
+    apiKeys,
+    clock,
   }: {
     repository: DataPrivacyPolicyRepository;
     cache: DataPrivacyPolicyCacheService;
@@ -52,6 +66,8 @@ export class DataPrivacyService {
     scopes: ScopeFacts;
     lineage: ScopeLineage;
     departments: DepartmentOwners;
+    apiKeys: OrganizationApiKeys;
+    clock: () => Instant;
   }) {
     this.repository = repository;
     this.cache = cache;
@@ -59,6 +75,8 @@ export class DataPrivacyService {
     this.scopes = scopes;
     this.lineage = lineage;
     this.departments = departments;
+    this.apiKeys = apiKeys;
+    this.clock = clock;
   }
 
   static create(options: {
@@ -66,8 +84,11 @@ export class DataPrivacyService {
     scopes: ScopeFacts;
     lineage: ScopeLineage;
     departments: DepartmentOwners;
+    apiKeys: OrganizationApiKeys;
     ttlMs?: number;
     now?: () => number;
+    /** When a named key's expiry is checked on save. */
+    clock?: () => Instant;
   }): DataPrivacyService {
     const cache = DataPrivacyPolicyCacheService.create(
       options.repository,
@@ -86,6 +107,8 @@ export class DataPrivacyService {
       scopes: options.scopes,
       lineage: options.lineage,
       departments: options.departments,
+      apiKeys: options.apiKeys,
+      clock: options.clock ?? nowInstant,
     });
   }
 
@@ -109,9 +132,12 @@ export class DataPrivacyService {
     scope: DataPrivacyScope;
     personalOnly: boolean;
     config: DataPrivacyConfig;
+    /** Whether the caller may name a key the rule does not name yet (ADR-208). */
+    mayNameNewKeys: boolean;
   }): Promise<DataPrivacyPolicy> {
     const config = this.validated(input.config);
     const organizationId = await this.resolveOrganizationId(input);
+    await this.assertNamedKeysAreTheOrganizations({ ...input, organizationId, config });
     const row = await this.repository.upsertForScope({
       organizationId,
       scope: input.scope,
@@ -190,6 +216,43 @@ export class DataPrivacyService {
     return input.organizationId;
   }
 
+  /** ADR-208: an audience names only a live key a customer of this organization made. */
+  private async assertNamedKeysAreTheOrganizations(input: {
+    organizationId: string;
+    scope: DataPrivacyScope;
+    personalOnly: boolean;
+    config: DataPrivacyConfig;
+    mayNameNewKeys: boolean;
+  }): Promise<void> {
+    const named = namedApiKeyIds(input.config);
+    if (named.length === 0) return;
+    const rows = await this.repository.findForProjectChain({
+      organizationId: input.organizationId,
+      scopes: [
+        {
+          scopeType: input.scope.scopeType,
+          scopeId: input.scope.scopeId,
+          personalOnly: input.personalOnly,
+        },
+      ],
+    });
+    // The chain read matches scope pairs only; the personal-projects rule shares its scope.
+    const stored = rows.find((row) => row.personalOnly === input.personalOnly);
+    const kept = stored ? namedApiKeyIds(stored.config) : [];
+    // A save that adds no key needs nothing from api-key, so an api-key outage never blocks it.
+    if (named.every((id) => kept.includes(id))) return;
+    if (!input.mayNameNewKeys) {
+      // A permission, not a bad rule: the caller may keep the rule's keys but add none.
+      throw new ApiKeyAddForbiddenError();
+    }
+    const keys = await this.apiKeys.listAll({ organizationId: input.organizationId });
+    if (foreignApiKeyIds({ named, keys, kept, now: this.clock() }).length > 0) {
+      throw new InvalidDataPrivacyConfigError(
+        "The restricted content audience names an API key this organization cannot give it.",
+      );
+    }
+  }
+
   private validated(config: DataPrivacyConfig): DataPrivacyConfig {
     const parsed = dataPrivacyConfigSchema.safeParse(config);
     if (!parsed.success) {
@@ -199,6 +262,26 @@ export class DataPrivacyService {
     }
 
     this.validatePatterns(parsed.data);
+    if (namesKeysOnUnrestrictedCategory(parsed.data)) {
+      throw new InvalidDataPrivacyConfigError(
+        "Only a restricted category's audience can name API keys.",
+      );
+    }
+    if (restrictedCategoriesDisagreeOnKeys(parsed.data)) {
+      throw new InvalidDataPrivacyConfigError(
+        "Every restricted category must name the same API keys.",
+      );
+    }
+    if (namesKeysWithoutAdmins(parsed.data)) {
+      throw new InvalidDataPrivacyConfigError(
+        "An audience that names API keys must include Admins: a key reads as Admins do.",
+      );
+    }
+    if (parsed.data.customAttributes?.some((rule) => rule.audience?.apiKeyIds?.length)) {
+      throw new InvalidDataPrivacyConfigError(
+        "A custom attribute rule's audience cannot name API keys; only content categories can.",
+      );
+    }
 
     return parsed.data;
   }

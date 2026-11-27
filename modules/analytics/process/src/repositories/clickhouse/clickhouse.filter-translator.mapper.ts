@@ -4,7 +4,7 @@
  * IN subqueries are used rather than EXISTS; the two are equivalent here.
  */
 
-import type { FilterField } from "@langwatch/analytics-contract";
+import { analyticsFilterRefusal, type FilterField } from "@langwatch/analytics-contract";
 import { tenantSet } from "@langwatch/clickhouse-client";
 import {
   customMetadataKeyCondition,
@@ -13,6 +13,7 @@ import {
   type SpanAnalyticsSource,
 } from "@langwatch/trace-contract";
 
+import { findUnapplicableFilterValue } from "../../rules/analytics-filter-values.rules.ts";
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
 
 /**
@@ -178,6 +179,13 @@ export function translateFilter({
   if (values.length === 0) {
     return noOpFilter;
   }
+  // A value no handler below recognises would fall back to no predicate and widen the answer.
+  const unapplicable = findUnapplicableFilterValue({
+    field,
+    values,
+    depth: [key, subkey].filter(Boolean).length,
+  });
+  if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 
   const handler = filterHandlers[field];
   return handler ? handler({ values, key, subkey, spanTimePredicate, spanAnalytics }) : noOpFilter;
@@ -336,7 +344,7 @@ function translateErrorFilter(values: string[]): FilterTranslation {
     };
   }
 
-  // Both or neither - no filtering
+  // Both states selected is every row; any other value was refused in `translateFilter`.
   return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
@@ -743,7 +751,7 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
     };
   }
 
-  // Both or neither - no filtering
+  // Both states selected is every row; any other value was refused in `translateFilter`.
   return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 

@@ -44,6 +44,10 @@ const (
 	// path segment (would escape SESSIONS_ROOT).
 	ErrInvalidConversationID = herr.Code("invalid_conversation_id")
 
+	// ErrInvalidImages signals a turn whose attached images break the limits
+	// in turnimage.go (count, media type, base64 payload, size).
+	ErrInvalidImages = herr.Code("invalid_images")
+
 	// ErrConversationBusy signals a second concurrent turn for a conversation
 	// whose single-stream agent session is already answering. The control
 	// plane shows a "still answering — wait" notice. Maps to 409.
@@ -99,6 +103,7 @@ func RegisterStatuses() {
 	// Validation of a parsed value — 422, matching the shared decoder's
 	// unprocessable_entity posture (parse failures stay 400).
 	herr.RegisterStatus(ErrInvalidConversationID, http.StatusUnprocessableEntity)
+	herr.RegisterStatus(ErrInvalidImages, http.StatusUnprocessableEntity)
 	herr.RegisterStatus(ErrConversationBusy, http.StatusConflict)
 	herr.RegisterStatus(ErrCredentialsRequired, http.StatusPreconditionRequired)
 	herr.RegisterStatus(ErrMaxWorkers, http.StatusServiceUnavailable)

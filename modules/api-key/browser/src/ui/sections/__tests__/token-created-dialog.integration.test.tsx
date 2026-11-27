@@ -454,6 +454,66 @@ describe("given a token has just been minted", () => {
       }
     });
 
+    /** @scenario The dialog closes while a copy is still pending, and the copied state is never shown or reset afterwards */
+    it.each([
+      ["Copy API key", async () => screen.getByRole("button", { name: "Copy API key" })],
+      [
+        "the .env box",
+        async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
+      ],
+      ["the config block", async () => screen.findByRole("button", { name: /copy config/i })],
+    ])("schedules no reset and logs nothing when %s resolves after unmount", async (_, button) => {
+      const host = renderDialog();
+      const settle = host.deferNextCopy();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const timerSpy = vi.spyOn(globalThis, "setTimeout");
+      try {
+        fireEvent.click(await button());
+        expect(host.copies).toHaveLength(1);
+
+        cleanup();
+        timerSpy.mockClear();
+        await act(async () => {
+          settle(true);
+          await vi.advanceTimersByTimeAsync(2000);
+        });
+
+        expect(timerSpy).not.toHaveBeenCalledWith(expect.any(Function), 2000);
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+        timerSpy.mockRestore();
+      }
+    });
+
+    /** @scenario Copying twice restarts the reset window */
+    it.each([
+      [
+        "the .env box",
+        async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
+      ],
+      ["the config block", async () => screen.findByRole("button", { name: /copy config/i })],
+    ])("restarts the reset window for %s when copied again", async (_, button) => {
+      renderDialog();
+      const copyButton = await button();
+      const isChecked = () => copyButton.querySelector("svg.lucide-check") !== null;
+
+      fireEvent.click(copyButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      fireEvent.click(copyButton);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(isChecked()).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+      expect(isChecked()).toBe(false);
+    });
+
     /** @scenario Copy success is announced to assistive tech */
     it("hands the host a success notice for the copy", async () => {
       const host = renderDialog();

@@ -22,16 +22,19 @@ const listed = ({
   id,
   name = id,
   createdById = "user-1",
+  myDashboardOfUserId = null,
 }: {
   id: string;
   name?: string;
   createdById?: string;
+  myDashboardOfUserId?: string | null;
 }) => ({
   ...HOME_BOARD,
   id,
   name,
   description: null,
   createdById,
+  myDashboardOfUserId,
   isStarred: false,
   updatedAt: new Date("2026-01-01"),
 });
@@ -62,6 +65,26 @@ function hostOpening({
   return new StubAnalyticsHost({
     route: { params: dashboardId === void 0 ? {} : { dashboardId }, query: {} },
     ...options,
+  });
+}
+
+/** Opens one board on the board screen, with the given boards listed and no widgets. */
+function openBoardAmong({
+  dashboardId,
+  boards,
+}: {
+  dashboardId: string;
+  boards: ReturnType<typeof listed>[];
+}) {
+  renderDashboards({
+    element: <DashboardBoardScreen />,
+    host: hostOpening({ dashboardId, flags: FLAG_ON }),
+    answer: (call) => {
+      if (call.path === "boards.getAll") return Promise.resolve(boards);
+      if (call.path === "boards.listStarred") return Promise.resolve([]);
+      if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
+      return NO_PROCEDURES(call);
+    },
   });
 }
 
@@ -156,6 +179,21 @@ describe("the Dashboards screens", () => {
       });
     });
 
+    describe("when the member renamed their My dashboard and later made a board under that name", () => {
+      /** @scenario "My dashboard can be renamed and stays the member's My dashboard" */
+      it("opens the renamed one, making no board", async () => {
+        const server = boardsServer([
+          listed({ id: "renamed", name: "Team pulse", myDashboardOfUserId: "user-1" }),
+          listed({ id: "later", name: "My dashboard" }),
+        ]);
+        const host = hostOpening({ flags: FLAG_ON });
+        renderDashboards({ element: <DashboardsIndexScreen />, host, answer: server.answer });
+
+        await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/renamed"]));
+        expect(server.state.calls.map(({ path }) => path)).not.toContain("boards.create");
+      });
+    });
+
     describe("when the member has no My dashboard yet", () => {
       /** @scenario "AC160b A member with no My dashboard gets one made, pinned for them" */
       it("makes exactly one and opens it, leaving the star to the server", async () => {
@@ -205,18 +243,12 @@ describe("the Dashboards screens", () => {
       });
     });
 
-    describe("when the member opens a board", () => {
-      /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+    describe("when the member lands on their My dashboard", () => {
+      /** @scenario "AC3i The page the Analytics entry lands on points back to the old Analytics" */
       it("asks if they look for the old Analytics and links to it", async () => {
-        renderDashboards({
-          element: <DashboardBoardScreen />,
-          host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
-          answer: (call) => {
-            if (call.path === "boards.getAll") return Promise.resolve([listed({ id: "board-1" })]);
-            if (call.path === "boards.listStarred") return Promise.resolve([]);
-            if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
-            return NO_PROCEDURES(call);
-          },
+        openBoardAmong({
+          dashboardId: "mine",
+          boards: [listed({ id: "mine", name: "My dashboard" })],
         });
 
         expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
@@ -226,6 +258,35 @@ describe("the Dashboards screens", () => {
           "href",
           "/test-project/analytics",
         );
+      });
+    });
+
+    describe("when the member opens any other board", () => {
+      /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+      it("shows no old-Analytics banner on a named board", async () => {
+        openBoardAmong({
+          dashboardId: "board-1",
+          boards: [
+            listed({ id: "mine", name: "My dashboard" }),
+            listed({ id: "board-1", name: "Legal ops quality" }),
+          ],
+        });
+
+        expect(
+          await screen.findByRole("heading", { name: "Legal ops quality" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
+      });
+
+      /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+      it("shows no old-Analytics banner on someone else's My dashboard", async () => {
+        openBoardAmong({
+          dashboardId: "theirs",
+          boards: [listed({ id: "theirs", name: "My dashboard", createdById: "user-2" })],
+        });
+
+        expect(await screen.findByRole("heading", { name: "My dashboard" })).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
       });
     });
   });

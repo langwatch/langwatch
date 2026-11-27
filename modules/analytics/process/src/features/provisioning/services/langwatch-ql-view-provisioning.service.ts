@@ -16,9 +16,11 @@ import {
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "./langwatch-ql-view-twin-statements.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
+const twinStatements = LangWatchQLViewTwinStatementsService.create();
 
 /** The grants, row-policy sources and ordered setup list the views need. */
 export class LangWatchQLViewProvisioningService {
@@ -94,7 +96,8 @@ export class LangWatchQLViewProvisioningService {
     // Grants and row policies are the access model's (ADR-159), emitted from its definition.
     return views.flatMap((view) => [
       viewStatements.viewStatement({ names, sourceDatabase, view, dedup }),
-      ...viewStatements.flooredViewStatements({ names, sourceDatabase, view, dedup }),
+      ...twinStatements.flooredViewStatements({ names, sourceDatabase, view, dedup }),
+      ...twinStatements.traceIdsViewStatements({ names, sourceDatabase, view, dedup }),
     ]);
   }
 }

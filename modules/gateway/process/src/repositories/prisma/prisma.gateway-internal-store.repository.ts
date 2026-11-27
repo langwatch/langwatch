@@ -86,6 +86,7 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRe
       id: string;
       organizationId: string;
       principalUserId: string | null;
+      traceProjectId: string | null;
       lastUsedAt: Instant | null;
     }[]
   > {
@@ -95,6 +96,7 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRe
         id: true,
         organizationId: true,
         principalUserId: true,
+        traceProjectId: true,
         lastUsedAt: true,
       },
     });

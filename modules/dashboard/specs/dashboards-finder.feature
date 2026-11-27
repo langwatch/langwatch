@@ -23,14 +23,25 @@ Feature: Dashboards finder: templates and widgets filed by what the member wants
     And no chip reads 0
 
   @unit
-  Scenario: Finder: a per-kind widget list is its own focus template
+  Scenario: Finder: a template adapts to the agent kind instead of listing a copy per kind
     Given a template with its own widgets for some agent kinds
-    Then each of those lists is its own template named "<Base>: <kind> focus", listed after its base
-    And the base keeps its id, and each focus template has its own id made from the base's and the kind
-    And a focus template asks Langy for a report on its own widgets
-    And a project of that kind gets the focus template preloaded in place of the base
-    And a template preloaded for only one agent kind is a focus template for that kind
+    Then the finder lists the template once, under its own name, and never a copy per kind
+    When the member picks one of those agent types
+    Then the template's card shows its widgets for that kind, under the template's own name
+    And the board it makes has an id of its own, made from the template's and the kind, and asks
+      Langy for a report on those widgets
+    And a project of that kind gets the template preloaded with its widgets for that kind
+    And a template preloaded for only one agent kind is made for that kind
     # Decision: templates may share widgets; there are no "Also:" links between templates
+    # Owner, 2026-11-24: 47 templates fold into one per job; no stored board names a kind copy
+
+  @unit
+  Scenario: Finder: each area lists its own templates, most needed first
+    Given the dashboards catalogue
+    Then the project area's templates start with "My agent at a glance", "Answer quality" and
+      "Did my last change break anything?"
+    And the coding agents area's templates start with "Where did my tokens go?"
+    And the organisation area holds only the templates that read the whole organisation
 
   @unit @integration
   Scenario: Finder: coming-soon, coding-agent and org-wide templates are hidden
@@ -51,10 +62,12 @@ Feature: Dashboards finder: templates and widgets filed by what the member wants
     When the member picks a category in the templates finder
     Then the header shows the category, the question it answers and what its templates are for
 
-  @unit
-  Scenario: Finder: Add a widget leaves out coding-agent widgets
+  @unit @integration
+  Scenario: Finder: Add a widget offers coding-agent widgets only under the Coding agent chip
     Given "Add a widget"
-    Then no widget made for coding agents, or reading coding-agent traces, is listed
+    Then no widget made for coding agents, or reading coding-agent traces, is listed under "All"
+    And the "Coding agent" chip lists the built ones, spend first, in the coding agents area's order
+    And the picker opened on a Coding agents board starts on that chip
 
   @unit
   Scenario: Copy: no question, title or category says a bare it

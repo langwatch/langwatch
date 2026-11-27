@@ -40,7 +40,9 @@ func TestAllowlistExemptsOnlyFromBlockLocal(t *testing.T) {
 
 	assert.True(t, policy.Allowlisted("llm.internal"))
 	require.NoError(t, policy.CheckDial("10.0.0.9:443", "llm.internal"))
-	require.NoError(t, policy.CheckDial("10.0.0.5:443", "other.internal"))
+	require.NoError(t, policy.CheckDial("10.0.0.5:443", "10.0.0.5"))
+	require.ErrorIs(t, policy.CheckDial("10.0.0.5:443", "other.internal"), ErrBlocked,
+		"an allowlisted IP admits a URL that names it, never a name that resolves to it")
 	require.ErrorIs(t, policy.CheckDial("10.0.0.9:443", "other.internal"), ErrBlocked)
 	require.ErrorIs(t, policy.CheckDial("169.254.169.254:80", "llm.internal"), ErrBlocked)
 }

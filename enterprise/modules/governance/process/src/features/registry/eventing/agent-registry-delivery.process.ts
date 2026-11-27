@@ -3,12 +3,13 @@ import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
 /**
- * The agent registry's webhook outbox (ADR-167 Decision 1, as anomaly alerts do): one intent per
- * change event and subscribed endpoint, whose handler asks WebhookApi.requestDelivery after commit.
- * A daily wake prunes delivered rows. Spec: specs/agent-registry.feature
+ * The agent registry's outbox (ADR-167 Decision 1): a webhook delivery per change event and
+ * subscribed endpoint, a web push per new shadow agent and organisation admin, a daily prune.
+ * Spec: specs/agent-registry.feature, specs/cloud-agent-discovery.feature
  */
 export const AGENT_REGISTRY_DELIVERY_PROCESS_NAME = "agentRegistryDelivery" as const;
 export const AGENT_REGISTRY_DELIVERY_REQUEST_INTENT = "requestDelivery" as const;
+export const AGENT_REGISTRY_ALERT_INTENT = "requestShadowAlert" as const;
 export const AGENT_REGISTRY_DELIVERY_PRUNE_INTENT = "pruneDelivered" as const;
 export const AGENT_REGISTRY_DELIVERY_PROCESS_KEY = "agent-registry";
 /** A requestDelivery answers at once; a day of retries covers a webhook outage. */
@@ -25,6 +26,16 @@ export const agentRegistryDeliveryIntentSchema = z.object({
 });
 export type AgentRegistryDeliveryIntent = z.infer<typeof agentRegistryDeliveryIntentSchema>;
 
+/** One push alert to one organisation admin about one new shadow agent. */
+export const agentRegistryAlertIntentSchema = z.object({
+  organizationId: z.string().min(1),
+  eventId: z.string().min(1),
+  userId: z.string().min(1),
+  agentId: z.string().min(1),
+  agentName: z.string().min(1),
+});
+export type AgentRegistryAlertIntent = z.infer<typeof agentRegistryAlertIntentSchema>;
+
 export const agentRegistryDeliveryPruneSchema = z.object({ scheduledFor: z.number().int() });
 export const agentRegistryDeliveryStateSchema = z.object({ lastPruneAt: z.number().nullable() });
 type AgentRegistryDeliveryState = z.infer<typeof agentRegistryDeliveryStateSchema>;
@@ -34,6 +45,7 @@ export const AGENT_REGISTRY_DELIVERY_INITIAL_STATE: AgentRegistryDeliveryState =
 
 type AgentRegistryDeliveryIntents = {
   [AGENT_REGISTRY_DELIVERY_REQUEST_INTENT]: IntentSpec<typeof agentRegistryDeliveryIntentSchema>;
+  [AGENT_REGISTRY_ALERT_INTENT]: IntentSpec<typeof agentRegistryAlertIntentSchema>;
   [AGENT_REGISTRY_DELIVERY_PRUNE_INTENT]: IntentSpec<typeof agentRegistryDeliveryPruneSchema>;
 };
 
@@ -46,6 +58,17 @@ export function agentRegistryDeliveryKey({
   endpointId: string;
 }): string {
   return `agent-registry:${eventId}:${endpointId}`;
+}
+
+/** One key per event and admin: the outbox's dedup identity and the push's idempotency key. */
+export function agentRegistryAlertKey({
+  eventId,
+  userId,
+}: {
+  eventId: string;
+  userId: string;
+}): string {
+  return `agent-registry:${eventId}:${userId}`;
 }
 
 export const agentRegistryDeliveryPruneWake: WakeHandler<

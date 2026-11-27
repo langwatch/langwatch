@@ -33,6 +33,8 @@ export type NavigationOrganization = {
   name: string;
   /** What the organization declared it is for (ADR-038 v6); null or absent when it has not. */
   primaryIntent?: string | null;
+  /** When the organization was made, as the wire carries it; absent until the graph says. */
+  createdAt?: string | null;
   teams: NavigationTeam[];
 };
 

@@ -4,14 +4,20 @@
  * @see enterprise/modules/nurturing/specs/project-usage.feature
  */
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
+import { EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE } from "@langwatch/evaluation-contract";
 import {
   EVALUATOR_CREATED_EVENT_TYPE,
   EVALUATOR_DELETED_EVENT_TYPE,
 } from "@langwatch/evaluator-contract";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_CREATED_EVENT_TYPE,
-  organizationSignedUpEventDataSchema,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
@@ -32,33 +38,46 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import {
+  MemoryNurturingClaimRepository,
+  MemoryNurturingRepositories,
+} from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
-import { countingOver } from "../../services/__tests__/nurturing-trace-counting.test-helpers.ts";
+import type { NurturingMembership } from "../../rules/nurturing-organization-member.rules.ts";
 import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
 import {
-  evaluationDayKeyOf,
-  nurturingMembershipSubscriber,
-  nurturingEvaluationDaySubscriber,
-  nurturingFailedTraceDaySubscriber,
-  nurturingFounderMembershipSubscriber,
+  evaluationDayGroupOf,
+  nurturingEvaluationDaysMap,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
-  nurturingTraceDaySubscriber,
+  nurturingTraceDayFailuresFold,
+  nurturingTraceDaySpansFold,
   nurturingTraceUsageSyncSubscribers,
   organizationUsageSubscriber,
   projectIdOf,
   projectUsageFactOf,
   traceSyncKeyOf,
 } from "../nurturing-project-usage.pipeline.ts";
+import {
+  copiesOver,
+  liveMapsOver,
+  ownerFact,
+} from "./nurturing-organization-copies.test-helpers.ts";
+import { foldLive, spanReceived, traceFailed } from "./nurturing-trace-days.test-helpers.ts";
 
 const OCCURRED_AT = 1_000;
+
+/** A store that keeps nothing, for a fold whose declaration alone a test reads. */
+const KEEP_NOTHING = MemoryNurturingTraceDayRepository.create().forSource("spans");
 
 /** The envelope every owner event carries, on tenant `project-1`. */
 function envelope(type: string) {
@@ -188,73 +207,78 @@ describe("traceSyncKeyOf()", () => {
   });
 });
 
-describe("evaluationDayKeyOf()", () => {
+describe("the evaluation-day map", () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const NOON = Date.UTC(2026, 10, 20, 12);
+  const evaluated = (projectId: string, occurredAt: number) =>
+    ({
+      ...envelope(EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE),
+      id: `evaluation-${projectId}-${occurredAt}`,
+      type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+      occurredAt,
+      data: {
+        tenantId: projectId,
+        projectId,
+        evaluationId: `evaluation-${occurredAt}`,
+        occurredAt,
+      },
+    }) as const;
+  /** Each fact through the map's mapping and store, one write a fact, as the live lane runs it. */
+  const deliverEach = async (
+    events: readonly ReturnType<typeof evaluated>[],
+    evaluationDays = MemoryNurturingEvaluationDayRepository.create(),
+  ) => {
+    const { map } = nurturingEvaluationDaysMap(evaluationDays);
+    for (const event of events) {
+      const record = map.map(event);
+      if (!record) continue;
+      await map.store.append(record, { aggregateId: event.id, tenantId: event.tenantId });
+    }
+    return evaluationDays;
+  };
 
   /** @scenario "Evaluations mark a project's day once" */
-  it("keys an evaluation on its project's UTC day", () => {
-    const morning = peerFact({ projectId: "project-1" }, NOON - 6 * 60 * 60 * 1000);
-    const evening = peerFact({ projectId: "project-1" }, NOON + 6 * 60 * 60 * 1000);
-    const nextDay = peerFact({ projectId: "project-1" }, NOON + DAY_MS);
+  it("keeps one row for many evaluations of a project on one UTC day, a redelivery included", async () => {
+    const morning = evaluated("project-1", NOON - 6 * 60 * 60 * 1000);
+    const evening = evaluated("project-1", NOON + 6 * 60 * 60 * 1000);
 
-    expect(evaluationDayKeyOf(morning)).toBe("subscriber:evaluationActiveDay:project-1:2026-11-20");
-    expect(evaluationDayKeyOf(evening)).toBe(evaluationDayKeyOf(morning));
-    expect(evaluationDayKeyOf(nextDay)).not.toBe(evaluationDayKeyOf(morning));
+    const days = await deliverEach([morning, evening, morning]);
+
+    await expect(
+      days.findForProjects({ projectIds: ["project-1"], afterDay: "2026-01-01" }),
+    ).resolves.toEqual([{ projectId: "project-1", day: "2026-11-20" }]);
   });
-});
 
-describe("the evaluation day row", () => {
-  const NOON = Date.UTC(2026, 10, 20, 12);
+  /** @scenario "A project's evaluation days are kept once each, whatever order and however often they land" */
+  it("holds the same days whatever order the evaluations land in", async () => {
+    const facts = [0, 1, 2].map((n) => evaluated("project-1", NOON + n * DAY_MS));
+
+    const forward = await deliverEach(facts);
+    const reverse = await deliverEach(facts.toReversed());
+
+    const read = { projectIds: ["project-1"], afterDay: "2026-01-01" };
+    const sorted = async (days: MemoryNurturingEvaluationDayRepository) =>
+      (await days.findForProjects(read)).map(({ day }) => day).toSorted();
+    expect(await sorted(forward)).toEqual(["2026-11-20", "2026-11-21", "2026-11-22"]);
+    expect(await sorted(reverse)).toEqual(await sorted(forward));
+  });
 
   /** @scenario "Evaluations mark a project's day once" */
-  it("adds the evaluation's day to the project's rows, once", async () => {
-    const store = MemoryNurturingProjectUsageRepository.create();
+  it("queues a project's evaluations of one UTC day in one group, so a burst is one write", () => {
+    const { map } = nurturingEvaluationDaysMap(MemoryNurturingEvaluationDayRepository.create());
 
-    await store.recordEvaluationDay({ projectId: "project-1", occurredAt: NOON });
-    await store.recordEvaluationDay({ projectId: "project-1", occurredAt: NOON + 1000 });
-
-    const rows = await store.findForProjects({ projectIds: ["project-1"] });
-    expect(rows.map((row) => row.activeDays)).toEqual([["2026-11-20"]]);
-  });
-});
-
-describe("the evaluation day subscriber", () => {
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const NOON = Date.UTC(2026, 10, 20, 12);
-  const evaluation = (projectId: string, occurredAt: number) => ({
-    tenantId: projectId,
-    projectId,
-    evaluationId: `evaluation-${occurredAt}`,
-    occurredAt,
-  });
-  const contextOf = (occurredAt: number) => ({
-    tenantId: createTenantId("project-1"),
-    aggregateId: `evaluation-${occurredAt}`,
-    createdAt: occurredAt,
-    occurredAt,
-    eventId: `event-${occurredAt}`,
-  });
-
-  /** @scenario "A project's evaluation days are written one at a time" */
-  it("queues a project's evaluations in one lane whatever their day, so both days are kept", async () => {
-    const store = MemoryNurturingProjectUsageRepository.create();
-    const subscriber = nurturingEvaluationDaySubscriber(store);
-    const group = subscriber.options?.groupKeyFn;
-
-    expect(group?.(peerFact(evaluation("project-1", NOON), NOON))).toBe(
-      group?.(peerFact(evaluation("project-1", NOON + DAY_MS), NOON + DAY_MS)),
+    expect(map.options?.coalesceMaxBatch).toBeGreaterThan(1);
+    expect(map.store.bulkAppend).toBeDefined();
+    expect(map.options?.groupKeyFn).toBe(evaluationDayGroupOf);
+    expect(evaluationDayGroupOf(evaluated("project-1", NOON))).toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON + 1000)),
     );
-    expect(group?.(peerFact(evaluation("project-2", NOON), NOON))).not.toBe(
-      group?.(peerFact(evaluation("project-1", NOON), NOON)),
+    expect(evaluationDayGroupOf(evaluated("project-1", NOON + DAY_MS))).not.toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON)),
     );
-
-    if (!subscriber.handle) throw new Error("the evaluation day handles one fact at a time");
-    await subscriber.handle(evaluation("project-1", NOON), contextOf(NOON));
-    await subscriber.handle(evaluation("project-1", NOON + DAY_MS), contextOf(NOON + DAY_MS));
-
-    const rows = await store.findForProjects({ projectIds: ["project-1"] });
-    expect(rows.map((row) => row.activeDays.toSorted())).toEqual([["2026-11-20", "2026-11-21"]]);
+    expect(evaluationDayGroupOf(evaluated("project-2", NOON))).not.toBe(
+      evaluationDayGroupOf(evaluated("project-1", NOON)),
+    );
   });
 });
 
@@ -330,11 +354,14 @@ describe("the trace syncs", () => {
     const usage = NurturingOrganizationUsageService.create({
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
       traceDays: MemoryNurturingTraceDayRepository.create(),
+      evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
       copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
       placements,
       organizationsCreated,
       milestones,
       members,
+      erasedUsers: MemoryNurturingErasedUserRepository.create(),
+      claims: MemoryNurturingClaimRepository.create(),
       sendBatch: async (calls) => {
         sent.push(...calls);
       },
@@ -400,17 +427,85 @@ describe("the trace syncs", () => {
 
   /** @scenario "A project's first trace syncs its organization too" */
   it("counts the first trace once, by its root span: the sync writes no count", async () => {
-    const counting = countingOver({ createdAt: context.createdAt });
-    const { traceDays } = counting;
+    const traceDays = MemoryNurturingTraceDayRepository.create();
     const { firstTrace } = nurturingTraceUsageSyncSubscribers(() => Promise.resolve());
-    const rootSpan = { span: { traceId: "trace-1", parentSpanId: null } };
 
-    await nurturingTraceDaySubscriber(counting).handleBatch([{ data: rootSpan, context }]);
+    await foldLive({
+      spans: traceDays.forSource("spans"),
+      failures: traceDays.forSource("failures"),
+      facts: [spanReceived({ id: "trace-1", createdAt: context.createdAt })],
+    });
     if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
     await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
 
     const days = await traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
     expect(days.map((day) => day.traceCount)).toEqual([1]);
+  });
+
+  /** @scenario "trace_active_day is never sent twice for a member and day" */
+  it("tracks trace_active_day once on the member for the counted day, however often the sync job runs", async () => {
+    const traceDays = MemoryNurturingTraceDayRepository.create();
+    const placements = MemoryNurturingProjectPlacementRepository.create({
+      placed: new Map([["project-1", "org-1"]]),
+    });
+    const organizationsCreated = MemoryNurturingOrganizationCreatedRepository.create({
+      createdAt: new Map([["org-1", OCCURRED_AT]]),
+    });
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    await members.recordMembershipChange({
+      organizationId: "org-1",
+      userId: "member-1",
+      change: "joined",
+      at: OCCURRED_AT,
+    });
+    const milestones = MemoryNurturingMilestonesRepository.create();
+    await milestones.recordOrganization({
+      organizationId: "org-1",
+      adminUserId: "admin-1",
+      seeded: false,
+    });
+    const sent: CioBatchCall[] = [];
+    const usage = NurturingOrganizationUsageService.create({
+      projectUsage: MemoryNurturingProjectUsageRepository.create(),
+      traceDays,
+      evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
+      copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
+      placements,
+      organizationsCreated,
+      milestones,
+      members,
+      erasedUsers: MemoryNurturingErasedUserRepository.create(),
+      claims: MemoryNurturingClaimRepository.create(),
+      sendBatch: async (calls) => {
+        sent.push(...calls);
+      },
+      clock: { nowMs: () => OCCURRED_AT + 60_000 },
+      logger: createTestLogger().logger,
+      syncs: { inc: () => {} },
+    });
+    const { firstTrace } = nurturingTraceUsageSyncSubscribers((input) =>
+      usage.tracesChanged(input),
+    );
+
+    await foldLive({
+      spans: traceDays.forSource("spans"),
+      failures: traceDays.forSource("failures"),
+      facts: [spanReceived({ id: "trace-1", createdAt: context.createdAt })],
+    });
+    if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
+    // A redelivered sync job runs the same handler again.
+    await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
+    await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
+
+    expect(sent.filter((call) => call.type === "track")).toEqual([
+      {
+        type: "track",
+        userId: "member-1",
+        event: "trace_active_day",
+        messageId: "trace_active_day:member-1:1970-01-01",
+        properties: { date: "1970-01-01", days_since_signup: 0 },
+      },
+    ]);
   });
 });
 
@@ -467,322 +562,220 @@ describe("each owner's peer fold", () => {
   });
 });
 
-describe("the trace-day count", () => {
+describe("the trace-day spans fold", () => {
   const NOON = Date.UTC(2026, 10, 20, 12);
-  const OK = 1;
-  const ERROR = 2;
+  const { events, fold } = nurturingTraceDaySpansFold(
+    MemoryNurturingTraceDayRepository.create().forSource("spans"),
+  );
+  const [{ data: spanSchema }] = events;
 
-  /** trace's span fact as the subscriber gets it: trace, root marker, a status it ignores. */
-  const spanData = (
-    parentSpanId: string | null,
-    code: typeof OK | typeof ERROR,
-    traceId = "trace-1",
-  ) => ({
-    span: { traceId, parentSpanId, status: { message: null, code } },
+  /** trace's span fact as the fold gets it: parsed by the fold's own contract schema. */
+  const spanOf = (raw: ReturnType<typeof spanReceived>) => ({
+    ...raw,
+    tenantId: createTenantId(raw.tenantId),
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    data: spanSchema.parse(raw.data),
   });
-
-  /** One delivery: the span's project (tenant), its trace and append time. */
-  const itemOf = (code: typeof OK | typeof ERROR, traceId: string, createdAt = NOON) => ({
-    data: spanData(null, code, traceId),
-    context: {
-      tenantId: createTenantId("project-1"),
-      aggregateId: traceId,
-      createdAt,
-      occurredAt: createdAt,
-      eventId: `${traceId}-${createdAt}`,
-    },
-  });
-
-  /** project-1's organization, created the day before NOON unless told otherwise. */
-  function harness(createdAt = NOON - 86_400_000) {
-    const counting = countingOver({ createdAt });
-    const subscriber = nurturingTraceDaySubscriber(counting);
-    const days = () =>
-      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
-    return { subscriber, days };
-  }
-
-  it("hands the app its batch's customer traces, none of a sample's", async () => {
-    const countTraces = async (input: unknown) => {
-      handed.push(input);
-    };
-    const handed: unknown[] = [];
-    const subscriber = nurturingTraceDaySubscriber({ countTraces });
-    const sample = subscriber.data.parse({
-      span: { traceId: "trace-2", parentSpanId: null },
-      resource: { attributes: [{ key: "langwatch.origin", value: { stringValue: "sample" } }] },
-    });
-
-    await subscriber.handleBatch([
-      itemOf(OK, "trace-1", NOON),
-      { ...itemOf(OK, "trace-2"), data: sample },
-    ]);
-
-    expect(handed).toEqual([
-      { traces: [{ projectId: "project-1", kind: "trace", day: "2026-11-20", at: NOON }] },
-    ]);
-  });
+  const root = (id: string, createdAt = NOON) => spanOf(spanReceived({ id, createdAt }));
+  const foldAll = (spans: readonly ReturnType<typeof spanOf>[]) =>
+    spans.reduce((state, span) => fold.apply(state, span), fold.init());
 
   /** @scenario "A trace is its root span, counted on its project's day" */
-  it("counts a root span on its project and the UTC day it was appended", async () => {
-    const { subscriber, days } = harness();
+  it("counts a root span on its project and the UTC day it was appended", () => {
+    const late = root("trace-1", NOON + 11 * 3_600_000);
+    const nextDay = root("trace-2", NOON + 12 * 3_600_000);
 
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON + 11 * 3_600_000)]);
-    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 12 * 3_600_000)]);
-
-    const counted = (await days())
-      .map((day) => [day.day, day.traceCount] as const)
-      .toSorted(([a], [b]) => a.localeCompare(b));
-    expect(counted).toEqual([
-      ["2026-11-20", 1],
-      ["2026-11-21", 1],
-    ]);
-  });
-
-  /** @scenario "Root spans of one project and day are written as one increment" */
-  it("queues a project's day as one group and adds a batch's traces together", async () => {
-    const { subscriber, days } = harness();
-    const group = subscriber.options?.groupKeyFn;
-    const event = (createdAt: number) => ({
-      ...envelope(SPAN_RECEIVED_EVENT_TYPE),
-      createdAt,
+    expect(fold.key?.(late)).toBe(JSON.stringify(["project-1", "2026-11-20"]));
+    expect(fold.key?.(nextDay)).toBe(JSON.stringify(["project-1", "2026-11-21"]));
+    expect(foldAll([late])).toEqual({
+      projectId: "project-1",
+      day: "2026-11-20",
+      traceCount: 1,
+      errorCount: 0,
+      lastTraceAt: NOON + 11 * 3_600_000,
+      lastFailedTraceAt: null,
     });
-
-    expect(group?.(event(NOON) as Event)).toBe(group?.(event(NOON + 1000) as Event));
-    expect(group?.(event(NOON) as Event)).not.toBe(group?.(event(NOON + 86_400_000) as Event));
-    expect(subscriber.options?.coalesceMaxBatch).toBeGreaterThan(1);
-
-    await subscriber.handleBatch([itemOf(OK, "trace-1"), itemOf(OK, "trace-2")]);
-
-    expect(await days()).toEqual([expect.objectContaining({ traceCount: 2 })]);
   });
 
   /** @scenario "A failed trace is counted from trace's trace_failed fact" */
-  it("counts no failed trace from a root span's error status alone", async () => {
-    const { subscriber, days } = harness();
-
-    await subscriber.handleBatch([itemOf(ERROR, "trace-1")]);
-
-    expect(await days()).toEqual([
-      expect.objectContaining({ traceCount: 1, errorCount: 0, lastFailedTraceAt: null }),
-    ]);
+  it("counts no failed trace from a root span, whatever its status", () => {
+    expect(foldAll([root("trace-1")])).toMatchObject({ errorCount: 0, lastFailedTraceAt: null });
   });
 
-  /** @scenario "Only a root span mints a trace-day job" */
-  it("admits root spans to its queue and declines child spans", () => {
-    const filter = harness().subscriber.options?.enqueue?.filter;
+  /** @scenario "Only a root span mints a trace-day fold job" */
+  it("stages root spans and declines child spans, and counts no child span a replay hands it", () => {
+    const filter = fold.options?.enqueue?.filter;
+    const child = spanOf(spanReceived({ id: "child", createdAt: NOON, parentSpanId: "root" }));
 
-    expect(filter?.(spanData(null, OK))).toBe(true);
-    expect(filter?.(spanData("", ERROR))).toBe(true);
-    expect(filter?.(spanData("root-span", OK))).toBe(false);
-  });
-
-  /** An OTLP `langwatch.origin` attribute, as trace's span fact carries it. */
-  const originAttribute = (origin: string) => ({
-    key: "langwatch.origin",
-    value: { stringValue: origin },
-  });
-
-  /** A root span's raw fact: its origin on the span and on its resource, either absent. */
-  const rawRoot = ({ span, resource }: { span?: string; resource?: string }) => ({
-    span: {
-      traceId: "trace-1",
-      parentSpanId: null,
-      status: { message: null, code: OK },
-      attributes: span ? [originAttribute(span)] : [],
-    },
-    resource: { attributes: resource ? [originAttribute(resource)] : [] },
+    expect(filter?.(root("trace-1"))).toBe(true);
+    expect(filter?.(spanOf(spanReceived({ id: "empty", createdAt: NOON, parentSpanId: "" })))).toBe(
+      true,
+    );
+    expect(filter?.(child)).toBe(false);
+    expect(foldAll([child])).toEqual(fold.init());
   });
 
   /** @scenario "Sample and Langy traces are not counted" */
   it.each([
-    ["a sample span", rawRoot({ span: "sample" }), false],
-    ["a Langy resource", rawRoot({ resource: "langy" }), false],
-    ["a Langy span", rawRoot({ span: "langy" }), false],
-    ["an application span", rawRoot({ span: "application" }), true],
-    ["no origin", rawRoot({}), true],
-    [
-      "a span origin over its resource's",
-      rawRoot({ span: "application", resource: "langy" }),
-      true,
-    ],
-  ])("decides whether a root span of %s is queued", (_name, raw, queued) => {
-    const { subscriber } = harness();
+    ["a sample span", "sample", false],
+    ["a Langy span", "langy", false],
+    ["an application span", "application", true],
+    ["no origin", undefined, true],
+  ])("decides whether a root span of %s is staged and counted", (_name, origin, counted) => {
+    const span = spanOf(spanReceived({ id: "trace-1", createdAt: NOON, origin }));
 
-    expect(subscriber.options?.enqueue?.filter?.(subscriber.data.parse(raw))).toBe(queued);
+    expect(fold.options?.enqueue?.filter?.(span)).toBe(counted);
+    expect(foldAll([span]).traceCount).toBe(counted ? 1 : 0);
   });
 
   /** @scenario "Sample and Langy traces are not counted" */
-  it("counts no sample or Langy root span a queue already holds", async () => {
-    const { subscriber, days } = harness();
-    const parsed = (raw: ReturnType<typeof rawRoot>) => subscriber.data.parse(raw);
+  it("reads a Langy origin on the span's resource, and the span's own over it", () => {
+    const withResource = (resource: string, spanOrigin?: string) => {
+      const raw = spanReceived({ id: "trace-1", createdAt: NOON, origin: spanOrigin });
+      return spanOf({
+        ...raw,
+        data: {
+          ...(raw.data as object),
+          resource: { attributes: [{ key: "langwatch.origin", value: { stringValue: resource } }] },
+        },
+      });
+    };
 
-    await subscriber.handleBatch([
-      { ...itemOf(OK, "trace-1"), data: parsed(rawRoot({ span: "sample" })) },
-      { ...itemOf(OK, "trace-2"), data: parsed(rawRoot({ resource: "langy" })) },
-      { ...itemOf(OK, "trace-3"), data: parsed(rawRoot({ span: "application" })) },
-    ]);
-
-    expect((await days()).map((day) => day.traceCount)).toEqual([1]);
+    expect(fold.options?.enqueue?.filter?.(withResource("langy"))).toBe(false);
+    expect(fold.options?.enqueue?.filter?.(withResource("langy", "application"))).toBe(true);
   });
 
-  /** @scenario "A redelivered batch can count a trace twice; accepted" */
-  it("counts a redelivered batch again, as the owner accepted (issue 9378)", async () => {
-    const { subscriber, days } = harness();
+  /** @scenario "Governance-ingested traces are not counted" */
+  it.each([
+    ["governance ingest", "ingestion_source", false],
+    ["another origin kind", "something_else", true],
+  ])("decides whether a root span of %s is staged and counted", (_name, kind, counted) => {
+    const raw = spanReceived({ id: "trace-1", createdAt: NOON });
+    const data = raw.data as { span: object };
+    const span = spanOf({
+      ...raw,
+      data: {
+        ...data,
+        span: {
+          ...data.span,
+          attributes: [{ key: "langwatch.origin.kind", value: { stringValue: kind } }],
+        },
+      },
+    });
 
-    await subscriber.handleBatch([itemOf(OK, "trace-1")]);
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON + 2000)]);
-
-    expect(await days()).toEqual([
-      expect.objectContaining({ traceCount: 2, lastTraceAt: NOON + 2000 }),
-    ]);
+    expect(fold.options?.enqueue?.filter?.(span)).toBe(counted);
+    expect(foldAll([span]).traceCount).toBe(counted ? 1 : 0);
   });
 
   /** @scenario "Traces arriving out of order count the same" */
-  it("counts an older trace that arrives after a newer one", async () => {
-    const { subscriber, days } = harness();
+  it("counts an older trace that arrives after a newer one, keeping the newer time", () => {
+    expect(foldAll([root("trace-2", NOON + 1000), root("trace-1", NOON)])).toMatchObject({
+      traceCount: 2,
+      lastTraceAt: NOON + 1000,
+    });
+  });
 
-    await subscriber.handleBatch([itemOf(OK, "trace-2", NOON + 1000)]);
-    await subscriber.handleBatch([itemOf(OK, "trace-1", NOON)]);
-
-    expect(await days()).toEqual([
-      expect.objectContaining({ traceCount: 2, lastTraceAt: NOON + 1000 }),
-    ]);
+  /** @scenario "Folds keyed across aggregates never re-fold from one aggregate's log" */
+  it("folds an older trace on as it comes, never re-folding the day from one trace's log", () => {
+    expect(fold.options).toMatchObject({ refoldOnOutOfOrder: false });
   });
 });
 
-describe("the failed-trace count", () => {
+describe("the trace-day failures fold", () => {
   const NOON = Date.UTC(2026, 10, 20, 12);
-
-  /** trace's trace_failed fact as trace records it. */
-  const failedData = (traceId: string, origin?: string) => ({
-    tenantId: "project-1",
-    projectId: "project-1",
-    traceId,
-    occurredAt: NOON,
-    ...(origin ? { origin } : {}),
+  const { events, fold } = nurturingTraceDayFailuresFold(
+    MemoryNurturingTraceDayRepository.create().forSource("failures"),
+  );
+  const [{ data: failedSchema }] = events;
+  const failedOf = (raw: ReturnType<typeof traceFailed>) => ({
+    ...raw,
+    tenantId: createTenantId(raw.tenantId),
+    type: TRACE_FAILED_EVENT_TYPE,
+    data: failedSchema.parse(raw.data),
   });
-
-  function harness(createdAt = NOON - 86_400_000) {
-    const counting = countingOver({ createdAt });
-    const subscriber = nurturingFailedTraceDaySubscriber(counting);
-    const days = () =>
-      counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
-    const itemOf = (traceId: string, origin?: string, createdAt = NOON) => ({
-      data: subscriber.data.parse(failedData(traceId, origin)),
-      context: {
-        tenantId: createTenantId("project-1"),
-        aggregateId: `project-1:${traceId}`,
-        createdAt,
-        occurredAt: createdAt,
-        eventId: `${traceId}-failed`,
-        idempotencyKey: `project-1:trace_failed:${traceId}`,
-      },
-    });
-    return { subscriber, days, itemOf };
-  }
 
   /** @scenario "A failed trace is counted from trace's trace_failed fact" */
-  it("counts each trace_failed on its project's day of append, with the newest time", async () => {
-    const { subscriber, days, itemOf } = harness();
+  it("counts each trace_failed on its project's day of append, with the newest time", () => {
+    const first = failedOf(traceFailed({ id: "trace-1", createdAt: NOON }));
+    const second = failedOf(traceFailed({ id: "trace-2", createdAt: NOON + 1000 }));
 
-    expect(subscriber.eventType).toBe(TRACE_FAILED_EVENT_TYPE);
-    await subscriber.handleBatch([
-      itemOf("trace-1"),
-      itemOf("trace-2", "application", NOON + 1000),
-    ]);
-
-    expect(await days()).toEqual([
-      {
-        projectId: "project-1",
-        day: "2026-11-20",
-        traceCount: 0,
-        errorCount: 2,
-        lastTraceAt: null,
-        lastFailedTraceAt: NOON + 1000,
-      },
-    ]);
+    expect(fold.key?.(first)).toBe(JSON.stringify(["project-1", "2026-11-20"]));
+    expect(fold.apply(fold.apply(fold.init(), second), first)).toEqual({
+      projectId: "project-1",
+      day: "2026-11-20",
+      traceCount: 0,
+      errorCount: 2,
+      lastTraceAt: null,
+      lastFailedTraceAt: NOON + 1000,
+    });
   });
 
-  /** @scenario "Root spans of one project and day are written as one increment" */
-  it("queues failures on the same project and day group as the trace count", () => {
-    const { subscriber } = harness();
-    const traceGroup = nurturingTraceDaySubscriber(countingOver({ createdAt: NOON })).options
-      ?.groupKeyFn;
-    const event = { ...envelope(TRACE_FAILED_EVENT_TYPE), createdAt: NOON } as Event;
+  /** @scenario "The spans and failures folds keep their own rows of a day, which the read sums" */
+  it("keys a failure on the same project and day as the spans fold, in rows of its own source", () => {
+    const spans = nurturingTraceDaySpansFold(KEEP_NOTHING).fold;
+    const failure = failedOf(traceFailed({ id: "trace-1", createdAt: NOON }));
+    const span = {
+      ...spanReceived({ id: "trace-1", createdAt: NOON }),
+      tenantId: createTenantId("project-1"),
+      type: SPAN_RECEIVED_EVENT_TYPE,
+      data: { span: { parentSpanId: null } },
+    };
 
-    expect(subscriber.options?.groupKeyFn?.(event)).toBe(traceGroup?.(event));
-    expect(subscriber.options?.coalesceMaxBatch).toBeGreaterThan(1);
+    expect(fold.key?.(failure)).toBe(spans.key?.(span));
+    expect(fold.name).not.toBe(spans.name);
   });
 
   /** @scenario "Sample and Langy traces are not counted" */
-  it("queues and counts no failure of a sample or Langy trace", async () => {
-    const { subscriber, days, itemOf } = harness();
-    const filter = subscriber.options?.enqueue?.filter;
+  it("stages and counts no failure of a sample or Langy trace", () => {
+    const of = (origin?: string) =>
+      failedOf(traceFailed({ id: "trace-1", createdAt: NOON, origin }));
+    const filter = fold.options?.enqueue?.filter;
 
-    expect(filter?.(itemOf("trace-1", "sample").data)).toBe(false);
-    expect(filter?.(itemOf("trace-1", "langy").data)).toBe(false);
-    expect(filter?.(itemOf("trace-1").data)).toBe(true);
-
-    await subscriber.handleBatch([
-      itemOf("trace-1", "sample"),
-      itemOf("trace-2", "langy"),
-      itemOf("trace-3"),
-    ]);
-    expect((await days()).map((day) => day.errorCount)).toEqual([1]);
+    expect(filter?.(of("sample"))).toBe(false);
+    expect(filter?.(of("langy"))).toBe(false);
+    expect(filter?.(of())).toBe(true);
+    expect(fold.apply(fold.init(), of("langy")).errorCount).toBe(0);
   });
 });
 
 describe("nurturing's member copy", () => {
-  const ORGANIZATION_SIGNED_UP = "lw.organization.signed_up";
-  const factAt = (organizationId: string, occurredAt: number) => ({
-    tenantId: organizationId,
-    organizationId,
-    userId: "user-1",
-    occurredAt,
-    organizationName: "Acme",
-  });
-  const context = {
-    tenantId: createTenantId("org-1"),
-    aggregateId: "org-1",
-    createdAt: OCCURRED_AT,
-    occurredAt: OCCURRED_AT,
-    eventId: "member-event",
-  };
-  const subscriberOf = (
-    members: MemoryNurturingOrganizationMemberRepository,
-    change: "joined" | "left" | "returned",
-  ) =>
-    nurturingMembershipSubscriber({
-      eventType: ORGANIZATION_SIGNED_UP,
-      data: organizationSignedUpEventDataSchema,
-      change,
-      members,
-    });
-  const handle = async (
-    subscriber: ReturnType<typeof subscriberOf>,
+  const memberFact = (
+    type: string,
     organizationId: string,
-    at: number,
-  ) => {
-    if (!subscriber.handle) throw new Error("a member fact is handled one at a time");
-    await subscriber.handle(subscriber.data.parse(factAt(organizationId, at)), context);
-  };
+    occurredAt: number,
+    extra: Readonly<Record<string, unknown>> = {},
+  ) =>
+    ownerFact({
+      type,
+      aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+      aggregateId: organizationId,
+      tenantId: organizationId,
+      data: {
+        tenantId: organizationId,
+        organizationId,
+        userId: "user-1",
+        organizationName: "Acme",
+        occurredAt,
+        ...extra,
+      },
+    });
+  const copyOver = (members: MemoryNurturingOrganizationMemberRepository) =>
+    liveMapsOver({ ...copiesOver(MemoryNurturingRepositories.create()), members });
+  const byOrganization = (memberships: readonly NurturingMembership[]) =>
+    memberships.toSorted((a, b) => a.organizationId.localeCompare(b.organizationId));
 
   /** @scenario "Nurturing keeps its own copy of an organization's members" */
   it("keeps each change's latest time, whatever the order or how often it is delivered", async () => {
     const members = MemoryNurturingOrganizationMemberRepository.create();
-    const joined = subscriberOf(members, "joined");
-    const left = subscriberOf(members, "left");
+    const copy = copyOver(members);
 
-    await handle(left, "org-1", 3_000);
-    await handle(joined, "org-1", 1_000);
-    await handle(joined, "org-1", 1_000);
-    await handle(joined, "org-2", 2_000);
+    await copy(memberFact(ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, "org-1", 3_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-1", 1_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-1", 1_000));
+    await copy(memberFact(ORGANIZATION_SIGNED_UP_EVENT_TYPE, "org-2", 2_000));
 
     expect(
-      (await members.findMembershipsOfMembers({ organizationId: "org-1" })).toSorted((a, b) =>
-        a.organizationId.localeCompare(b.organizationId),
-      ),
+      byOrganization(await members.findMembershipsOfMembers({ organizationId: "org-1" })),
     ).toEqual([
       {
         organizationId: "org-1",
@@ -804,21 +797,25 @@ describe("nurturing's member copy", () => {
   /** @scenario "Nurturing keeps its own copy of an organization's members" */
   it("records the founder of a created organization as joined, and no one for a provisioned one", async () => {
     const members = MemoryNurturingOrganizationMemberRepository.create();
-    const founder = nurturingFounderMembershipSubscriber(members);
+    const copy = copyOver(members);
     const created = (organizationId: string, occurredAt: number, userId?: string) =>
-      founder.data.parse({
+      ownerFact({
+        type: ORGANIZATION_CREATED_EVENT_TYPE,
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: organizationId,
         tenantId: organizationId,
-        organizationId,
-        organizationName: "Acme",
-        occurredAt,
-        ...(userId ? { userId } : {}),
+        data: {
+          tenantId: organizationId,
+          organizationId,
+          organizationName: "Acme",
+          occurredAt,
+          ...(userId ? { userId } : {}),
+        },
       });
-    if (!founder.handle) throw new Error("a creation fact is handled one at a time");
 
-    expect(founder.eventType).toBe(ORGANIZATION_CREATED_EVENT_TYPE);
-    await founder.handle(created("org-1", 1_000, "user-1"), context);
-    await founder.handle(created("org-1", 1_000, "user-1"), context);
-    await founder.handle(created("org-2", 2_000), context);
+    await copy(created("org-1", 1_000, "user-1"));
+    await copy(created("org-1", 1_000, "user-1"));
+    await copy(created("org-2", 2_000));
 
     expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
       {
@@ -830,5 +827,30 @@ describe("nurturing's member copy", () => {
       },
     ]);
     expect(await members.findMembershipsOfMembers({ organizationId: "org-2" })).toEqual([]);
+  });
+
+  /** @scenario "Nurturing keeps its own copy of an organization's members" */
+  it("joins a listed member at the time organization's membership row was created", async () => {
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    const copy = copyOver(members);
+
+    await copy(
+      memberFact(ORGANIZATION_MEMBER_LISTED_EVENT_TYPE, "org-1", 9_000, {
+        joinedAt: 1_500,
+        backfilled: true,
+      }),
+    );
+    await copy(memberFact(ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE, "org-1", 4_000));
+    await copy(memberFact(ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE, "org-1", 3_000));
+
+    expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
+      {
+        organizationId: "org-1",
+        userId: "user-1",
+        joinedAt: 1_500,
+        leftAt: 3_000,
+        returnedAt: 4_000,
+      },
+    ]);
   });
 });

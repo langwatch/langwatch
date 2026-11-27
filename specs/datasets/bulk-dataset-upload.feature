@@ -214,7 +214,7 @@ Feature: Bulk dataset upload
     Then it states that the dataset's normalisation settled, with where it came to rest
     And the dataset reads refresh on that fact, so the row shows ready or failed in place
 
-  @integration @unimplemented
+  @integration
   Scenario: Closing the drawer mid-upload keeps the files preparing
     Given I have started an upload of several files
     When I close the drawer before they finish

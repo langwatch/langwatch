@@ -59,6 +59,15 @@ Feature: A successor lane also consumes the key a previous release queued its jo
     Then the lane the alias looks for is "global:reactor:meterCount", after its own and its peer lane
 
   @unit
+  Scenario: A retired peer subscriber lane may be succeeded by its pipeline's peer map or peer fold
+    Given the successor aliases "global:subscriber:successor.spanCopySync" to its peer map "spanCopy"
+    And "global:subscriber:successor.spanTotalSync" to its peer fold "spanTotals", which has a subscriber
+    And the previous release queued a job under each key for an event in the owner's log
+    When a worker of the new release dequeues them
+    Then the peer map records the event once and the peer fold folds it once
+    And the fold's subscriber runs once on the committed state
+
+  @unit
   Scenario: A tombstoned former lane has its jobs acknowledged with the reason logged
     Given the successor tombstones "owner:job:deferredSync" with a reason
     When a worker of the new release dequeues a job queued under that key

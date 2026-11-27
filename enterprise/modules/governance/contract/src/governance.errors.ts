@@ -8,7 +8,7 @@ import {
 export class GovernanceValidationError extends ValidationError {
   constructor(
     message: string,
-    readonly meta: { formErrors: string[] },
+    readonly meta: { formErrors: string[]; fieldErrors?: Record<string, string[]> },
   ) {
     super(message, { meta });
     this.name = "GovernanceValidationError";

@@ -6,11 +6,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BOARD_PERIOD_RANGES,
+  BOARD_PERIOD_PRESETS,
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
+  boardRangeSpanMs,
+  boardRefreshApplies,
   boardWindowEnd,
+  parseBoardRange,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);
@@ -42,18 +45,18 @@ describe("boardPeriodGranularity", () => {
 describe("boardGrainFits", () => {
   /** @scenario "AC19b A grain that does not fit the range cannot be picked" */
   it.each(["live", "1h", "24h"] as const)("offers 1m over %s", (range) => {
-    expect(boardGrainFits({ range, grain: "1m" })).toBe(true);
+    expect(boardGrainFits({ spanMs: boardRangeSpanMs({ range }), grain: "1m" })).toBe(true);
   });
 
   /** @scenario "AC19b A grain that does not fit the range cannot be picked" */
   it.each(["7d", "30d", "90d", "1y"] as const)("holds 1m back over %s", (range) => {
-    expect(boardGrainFits({ range, grain: "1m" })).toBe(false);
+    expect(boardGrainFits({ spanMs: boardRangeSpanMs({ range }), grain: "1m" })).toBe(false);
   });
 
   /** @scenario "AC19b A grain that does not fit the range cannot be picked" */
-  it.each(BOARD_PERIOD_RANGES)("never offers 5m, and always offers auto, over %s", (range) => {
-    expect(boardGrainFits({ range, grain: "5m" })).toBe(false);
-    expect(boardGrainFits({ range, grain: "auto" })).toBe(true);
+  it.each(BOARD_PERIOD_PRESETS)("never offers 5m, and always offers auto, over %s", (range) => {
+    expect(boardGrainFits({ spanMs: boardRangeSpanMs({ range }), grain: "5m" })).toBe(false);
+    expect(boardGrainFits({ spanMs: boardRangeSpanMs({ range }), grain: "auto" })).toBe(true);
   });
 });
 
@@ -106,6 +109,64 @@ describe("boardWindowEnd", () => {
       const end = boardWindowEnd({ range: "live", now: NOW + 5 * MINUTE + 1, pickedAt: NOW });
       expect(end).toBe(NOW + 6 * MINUTE);
     });
+  });
+});
+
+describe("given a custom range", () => {
+  const FROM = Date.UTC(2026, 10, 4, 9);
+  const TO = Date.UTC(2026, 10, 11, 9);
+  const custom = { from: FROM, to: TO };
+  const customSpan = boardRangeSpanMs({ range: "custom", custom });
+
+  /** @scenario "AC19e A custom range reads a fixed window from a start to an end" */
+  it("reads the address's from and to as the window", () => {
+    const reading = parseBoardRange({
+      range: "custom",
+      from: "2026-11-04T09:00:00Z",
+      to: "2026-11-11T09:00:00Z",
+    });
+    expect(reading).toEqual({ range: "custom", custom });
+  });
+
+  /** @scenario "AC19e A custom range reads a fixed window from a start to an end" */
+  it("picks on auto the grain a preset of the same length gets", () => {
+    const week = boardPeriodGranularity({ grain: "auto", periodStart: FROM, periodEnd: TO });
+    const preset = boardPeriodBounds({ range: "7d", now: TO });
+    expect(week).toBe(boardPeriodGranularity({ grain: "auto", ...preset }));
+    expect(week).toBe(DAY_S);
+    const sixHours = { periodStart: FROM, periodEnd: FROM + 6 * 3_600_000 };
+    expect(boardPeriodGranularity({ grain: "auto", ...sixHours })).toBe(3600);
+  });
+
+  /** @scenario "AC19e A custom range reads a fixed window from a start to an end" */
+  it("holds back a grain the window cannot carry", () => {
+    expect(boardGrainFits({ spanMs: customSpan, grain: "1m" })).toBe(false);
+    expect(boardGrainFits({ spanMs: customSpan, grain: "1h" })).toBe(true);
+  });
+
+  /** @scenario "AC19f Refresh does not apply to a custom range that has ended" */
+  it("lets a refresh apply only while the window has not ended", () => {
+    expect(boardRefreshApplies({ custom, now: TO + 1 })).toBe(false);
+    expect(boardRefreshApplies({ custom, now: TO - 1 })).toBe(true);
+    expect(boardRefreshApplies({ now: TO + 1 })).toBe(true);
+  });
+
+  /** @scenario "AC19g An address without a usable custom window reads the default range" */
+  it.each([
+    [{}],
+    [{ from: "2026-11-04T09:00:00Z" }],
+    [{ from: "yesterday", to: "2026-11-11T09:00:00Z" }],
+    [{ from: "2026-11-11T09:00:00Z", to: "2026-11-04T09:00:00Z" }],
+  ])("reads %o as the default 30 days", (window) => {
+    expect(parseBoardRange({ range: "custom", ...window })).toEqual({ range: "30d" });
+  });
+
+  /** @scenario "AC19g An address without a usable custom window reads the default range" */
+  it("keeps reading a preset address as before", () => {
+    expect(parseBoardRange({ range: "7d", from: "2026-11-04T09:00:00Z" })).toEqual({
+      range: "7d",
+    });
+    expect(parseBoardRange({ range: "nonsense" })).toEqual({ range: "30d" });
   });
 });
 

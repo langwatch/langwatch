@@ -4,7 +4,7 @@ import { IconRail, IconRailTile } from "@langwatch/design-system/app-shell";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
 import { Settings as SettingsIcon } from "lucide-react";
 
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useProductHome } from "../../behavior/use-product-home.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { writeDashboardsSidebarHint } from "../../model/dashboards-sidebar-hint.ts";
@@ -25,7 +25,7 @@ export function ProductIconRail({
   const host = useNavigationHost();
   const settingsHref = useSettingsEntryHref();
   const { reachableProducts } = useReachableProducts();
-  const projectSlug = useLlmOpsProjectSlug();
+  const homeOf = useProductHome();
 
   const options = PRODUCTS.filter(
     (product) => product.id === activeProductId || reachableProducts.includes(product.id),
@@ -33,7 +33,7 @@ export function ProductIconRail({
 
   const openProduct = (product: ProductDefinition) => {
     if (product.id === activeProductId && !isSettingsActive) return;
-    const home = product.homeHref({ projectSlug });
+    const home = homeOf(product);
     if (!home) return;
     // Choosing Dashboards means its own sidebar, whatever page the reader left.
     if (product.id === "dashboards")

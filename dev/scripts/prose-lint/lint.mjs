@@ -198,7 +198,7 @@ function founderUnitsIn(paragraphs) {
   for (const p of paragraphs) {
     const founderLines = p.text
       .split("\n")
-      .map((l) => l.replace(/\s+/g, " ").trim())
+      .map((l) => stripMarkup(l).replace(/\s+/g, " ").trim())
       .filter(isFounder);
     for (const u of p.units) {
       const onFounderLine = isFounder(u) || founderLines.some((l) => l.includes(u));
@@ -353,17 +353,72 @@ function splitSentences(s) {
     .filter((x) => x.length > 0);
 }
 
-// Markup that is not prose and carries punctuation the regex rules would
-// otherwise count: an image's leading exclamation mark, a comment's arrow.
-// Both go entirely, an unclosed comment to the end, until none is left.
-function stripMarkup(s) {
+// Markup that is not prose: an image and a comment go entirely, an
+// unclosed comment to the end; a link keeps its text and drops its URL.
+export function stripMarkup(s) {
   let text = s;
   let previous;
   do {
     previous = text;
     text = text.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
   } while (text !== previous);
-  return text.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  return stripLinks(text);
+}
+
+// Walks `[label](url)` and `![alt](url)` with nested brackets and balanced
+// parentheses, which a regex cannot match. Brackets are paired in one pass
+// first, so the walk stays linear and never recurses.
+function stripLinks(text) {
+  const match = pairBrackets(text);
+  const skipTo = new Map();
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (skipTo.has(i)) {
+      i = skipTo.get(i);
+      continue;
+    }
+    // An escaped character is literal, so `\![` and `\[` open nothing.
+    if (text[i] === "\\" && i + 1 < text.length) {
+      out += text.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+    const link = linkAt({ text, start: i, match });
+    if (!link) {
+      out += text[i];
+      i += 1;
+    } else if (link.isImage) {
+      i = link.urlEnd + 1;
+    } else {
+      // Keep the label, nested links included, then jump over `](url)`.
+      skipTo.set(link.labelEnd, link.urlEnd + 1);
+      i = link.open + 1;
+    }
+  }
+  return out;
+}
+
+function linkAt({ text, start, match }) {
+  const isImage = text[start] === "!" && text[start + 1] === "[";
+  const open = isImage ? start + 1 : start;
+  const labelEnd = text[open] === "[" ? match[open] : -1;
+  const urlEnd = labelEnd >= 0 && text[labelEnd + 1] === "(" ? match[labelEnd + 1] : -1;
+  return urlEnd < 0 ? null : { isImage, open, labelEnd, urlEnd };
+}
+
+// The index of the closing bracket for every unescaped `[` and `(`, or -1.
+function pairBrackets(text) {
+  const match = Array.from({ length: text.length }, () => -1);
+  const stacks = { "[": [], "(": [] };
+  const opener = { "]": "[", ")": "(" };
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === "\\") i += 1;
+    else if (c in stacks) stacks[c].push(i);
+    else if (c in opener && stacks[opener[c]].length > 0) match[stacks[opener[c]].pop()] = i;
+  }
+  return match;
 }
 
 function stripInlineCode(s) {

@@ -38,6 +38,11 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
     return new HttpCustomerIoChannel(options);
   }
 
+  /** Without an API key every post returns unsent. */
+  override isEnabled(): boolean {
+    return Boolean(this.apiKey);
+  }
+
   identifyUser(input: { userId: string; traits: Partial<CioPersonTraits> }): Promise<void> {
     return this.post("/identify", input);
   }

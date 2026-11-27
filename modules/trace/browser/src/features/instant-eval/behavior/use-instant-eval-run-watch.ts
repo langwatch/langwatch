@@ -12,6 +12,10 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { api } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import {
+  instantEvalCatchUpDelayMs,
+  isAwaitingInstantEvalEnd,
+} from "../../../model/instant-eval-end-catch-up.ts";
 import { dueInstantEvalRefetches } from "../../../model/instant-eval-refetch-pacing.ts";
 import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
@@ -58,7 +62,88 @@ export function useInstantEvalRunWatch(): void {
   useMarkRegisteredChipsTyped();
   useRefetchOnRunProgress(runs);
   useConfirmEndedRuns({ projectId, runs });
+  useCatchUpEndingRuns({ projectId, runs });
   useSettleQuietRuns();
+}
+
+type CatchUpBudget = { startedAt: number; attempt: number };
+type CatchUpTimers = Map<string, ReturnType<typeof setTimeout>>;
+
+/** Arms the next read of one run from its own budget, or nothing once its window is spent. */
+function scheduleCatchUp({
+  runId,
+  budgets,
+  timers,
+  read,
+}: {
+  runId: string;
+  budgets: Map<string, CatchUpBudget>;
+  timers: CatchUpTimers;
+  read: (runId: string) => void;
+}): void {
+  const budget = budgets.get(runId) ?? { startedAt: nowInstant().epochMilliseconds, attempt: 0 };
+  budgets.set(runId, budget);
+  const waitedMs = nowInstant().epochMilliseconds - budget.startedAt;
+  const delay = instantEvalCatchUpDelayMs({ attempt: budget.attempt, waitedMs });
+  if (delay === null) return;
+  timers.set(
+    runId,
+    setTimeout(() => {
+      timers.delete(runId);
+      budget.attempt += 1;
+      read(runId);
+      scheduleCatchUp({ runId, budgets, timers, read });
+    }, delay),
+  );
+}
+
+/** Drops the timer of every run that stopped waiting. */
+function clearLeftRuns({ timers, awaited }: { timers: CatchUpTimers; awaited: Set<string> }) {
+  for (const [runId, timer] of timers) {
+    if (awaited.has(runId)) continue;
+    clearTimeout(timer);
+    timers.delete(runId);
+  }
+}
+
+/**
+ * A run with nothing left to judge, or one the reader stopped, is read again on a short backoff
+ * until it says it ended: its end's hint can land before its row says so, and nothing hints again.
+ * Each run keeps its own backoff and window while other runs join or leave the wait.
+ */
+function useCatchUpEndingRuns({
+  projectId,
+  runs,
+}: {
+  projectId: string;
+  runs: Record<string, ExplorerInstantEvalProgress>;
+}): void {
+  const trpcUtils = api.useUtils();
+  const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
+  const budgets = useRef<Map<string, CatchUpBudget>>(new Map());
+  const pending = useRef<CatchUpTimers>(new Map());
+  const awaiting = Object.values(runs)
+    .filter((run) => isAwaitingInstantEvalEnd({ run, isStopRequested: !!stoppedByUser[run.id] }))
+    .map((run) => run.id)
+    .toSorted()
+    .join(",");
+  useEffect(() => {
+    const timers = pending.current;
+    const awaited = new Set(projectId && awaiting ? awaiting.split(",") : []);
+    clearLeftRuns({ timers, awaited });
+    const read = (runId: string) => void trpcUtils.instantEval.get.invalidate({ projectId, runId });
+    for (const runId of awaited) {
+      if (timers.has(runId)) continue;
+      scheduleCatchUp({ runId, budgets: budgets.current, timers, read });
+    }
+  }, [projectId, awaiting, trpcUtils]);
+  useEffect(() => {
+    const timers = pending.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
 }
 
 /**

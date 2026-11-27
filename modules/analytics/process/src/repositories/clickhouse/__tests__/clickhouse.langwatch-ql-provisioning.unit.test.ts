@@ -644,4 +644,43 @@ describe("readCollectionState", () => {
       expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(alias);
     });
   });
+
+  describe("when it reads the row policies on the source tables", () => {
+    const tables = ["acme_db.guarded", "acme_db.broad"];
+
+    /** @scenario "A private ClickHouse with a source table not policed for the reader after provisioning warns" */
+    it("returns each policy raw, with the table names bound rather than interpolated", async () => {
+      const queries: { query: string; query_params?: Record<string, unknown> }[] = [];
+      const policies = await provisioning({
+        async query(input) {
+          queries.push(input);
+          return {
+            json: async () => [
+              {
+                name: "acme_db.guarded",
+                apply_to_list: ["reader_a"],
+                apply_to_all: 0,
+                has_exceptions: 0,
+              },
+              { name: "acme_db.broad", apply_to_list: [], apply_to_all: 1, has_exceptions: 0 },
+            ],
+          };
+        },
+      }).findRowPolicies({ tables });
+
+      expect(policies).toEqual([
+        {
+          table: "acme_db.guarded",
+          appliesTo: ["reader_a"],
+          appliesToAll: false,
+          hasExceptions: false,
+        },
+        { table: "acme_db.broad", appliesTo: [], appliesToAll: true, hasExceptions: false },
+      ]);
+      expect(queries).toHaveLength(1);
+      expect(queries[0]?.query_params).toEqual({ tables });
+      expect(queries[0]?.query).toContain("{tables:Array(String)}");
+      expect(queries[0]?.query).not.toContain("acme_db");
+    });
+  });
 });

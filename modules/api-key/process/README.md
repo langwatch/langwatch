@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:126`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:132`; nothing else in this package is public.
 
 #### `create`
 
@@ -90,6 +90,22 @@ Revokes the one docs key named, or every docs key the named browser sessions min
 revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked>;
 ```
 
+#### `mintStaffAccessKey`
+
+An approved staff agent's key (ADR-202): ownerless, system-managed, restricted to the staff bags at organization scope, expiring within the hour. Refuses any other permission.
+
+```typescript
+mintStaffAccessKey(input: MintStaffAccessKeyInput): Promise<StaffAccessKeyMinted>;
+```
+
+#### `revokeStaffAccessKey`
+
+Revokes a staff access key and forgets its cached answer. Idempotent; silent on other keys.
+
+```typescript
+revokeStaffAccessKey(input: RevokeStaffAccessKeyInput): Promise<void>;
+```
+
 #### `resolveOrganizationToken`
 
 Resolves organization-only credentials while keeping refusal classes apart.
@@ -120,6 +136,14 @@ list(input: ApiKeyListInput): Promise<ApiKey[]>;
 
 ```typescript
 listAll(input: ApiKeyListAllInput): Promise<ApiKey[]>;
+```
+
+#### `findKeyFactsForOrganization`
+
+Every key of the organization, system, revoked and staff keys included, as ids, kinds, reach and times only (ADR-202 ops functions). Live keys first, capped at `API_KEY_FACTS_LIMIT`.
+
+```typescript
+findKeyFactsForOrganization(input: ApiKeyFactsInput): Promise<ApiKeyFacts[]>;
 ```
 
 #### `listForCaller`
@@ -917,10 +941,10 @@ Declared at `src/eventing/docs-playground-revocation.pipeline.ts:37`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                            |
 | ------ | -------------------- | ----------------------------- | -------------------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:199`           |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:200`           |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:201`           |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:203`           |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:206`           |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:207`           |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:208`           |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:210`           |
 | config | `docsOrigins`        | `LANGWATCH_DOCS_ORIGINS`      | `../contract/src/api-key.config.ts:23` |
 | config | `isSaas`             | `IS_SAAS`                     | `../contract/src/api-key.config.ts:25` |
 | config | `publicBaseUrl`      | `BASE_HOST`                   | `../contract/src/api-key.config.ts:27` |

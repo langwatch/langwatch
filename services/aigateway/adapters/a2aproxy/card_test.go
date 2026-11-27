@@ -1,10 +1,12 @@
 package a2aproxy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -146,4 +148,84 @@ func TestRewriteReplyCardLeavesErrorRepliesAlone(t *testing.T) {
 			assert.Contains(t, string(rewriteReplyCard([]byte(body), upstream, proxy)), proxy)
 		})
 	}
+}
+
+// @scenario "an extended Agent Card error reply is relayed without a gateway card URL"
+func TestExtendedCardHTTPErrorWithoutWrapperIsRelayedUnchanged(t *testing.T) {
+	const unavailable = `{"message":"unavailable"}`
+	for name, call := range map[string][3]string{
+		"HTTP+JSON": {http.MethodGet, "/a2a/billing/extendedAgentCard", ""},
+		"JSON-RPC":  {http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"GetExtendedAgentCard"}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			f.reply = func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = io.WriteString(w, unavailable)
+			}
+			rec := f.do(call[0], call[1], call[2])
+			assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+			assert.JSONEq(t, unavailable, rec.Body.String(), "relayed without a gateway card URL")
+
+			f.bundle.Config.Guardrails.Post = []domain.GuardrailEntry{{ID: "g2"}}
+			f.scanner = GuardrailScanner{Evaluator: fakeEvaluator{deny: "unavailable"}}
+			scanned := f.do(call[0], call[1], call[2])
+			assert.Contains(t, scanned.Body.String(), "a2a_content_blocked", "the error reply is still scanned")
+		})
+	}
+}
+
+// @scenario "an A2A v0.2 card request reads the agent's v0.2 card path"
+func TestLegacyCardRequestFetchesTheLegacyPath(t *testing.T) {
+	f := newFixture(t)
+	f.reply = func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/a2a"+legacyCardPath {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"name":"Billing","url":"`+f.upstream.URL+`/a2a"}`)
+	}
+	rec := f.do(http.MethodGet, "/a2a/billing/.well-known/agent.json", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"url":"http://gw.acme.test/a2a/billing"`)
+
+	modern := f.do(http.MethodGet, cardPathOnTheGateway, "")
+	assert.Equal(t, http.StatusBadGateway, modern.Code, "the v1.0 request keeps the v1.0 path")
+
+	f.setTarget(func(tg *domain.A2ATarget) { tg.CardURL = f.upstream.URL + "/a2a" + legacyCardPath })
+	modern = f.do(http.MethodGet, cardPathOnTheGateway, "")
+	assert.Equal(t, http.StatusOK, modern.Code, "a configured Agent Card URL wins")
+}
+
+// @scenario "an Agent Card is refused when the gateway has no public base URL"
+func TestCardIsRefusedWithoutAPublicBaseURL(t *testing.T) {
+	f := newFixture(t)
+	h := New(Config{
+		Registry: f.registry,
+		Bundle:   func(context.Context) *domain.Bundle { return f.bundle },
+		Client:   f.upstream.Client(),
+	})
+	serve := func(method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, "http://evil.example"+path, strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	rec := serve(http.MethodGet, cardPathOnTheGateway, "")
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, "a2a_public_url_unset", httpError(t, rec))
+	assert.NotContains(t, rec.Body.String(), "evil.example")
+
+	rec = serve(http.MethodPost, "/a2a/billing", `{"jsonrpc":"2.0","id":7,"method":"GetExtendedAgentCard"}`)
+	code, reason, id := rpcError(t, rec)
+	assert.Equal(t, -32024, code)
+	assert.Equal(t, "a2a_public_url_unset", reason)
+	assert.Equal(t, "7", id)
+	assert.Empty(t, f.upstreamCalls(), "no card is fetched that the gateway cannot point at itself")
+
+	rec = serve(http.MethodPost, "/a2a/billing", sendMessage("SendMessage", "hi"))
+	assert.Contains(t, rec.Body.String(), "TASK_STATE_COMPLETED", "other calls need no public base URL")
 }

@@ -28,7 +28,7 @@ new MATERIALIZED column.
    whole rows, newest version first, one per key. The order matches the table's, so `optimize_read_in_order` merges the parts
    as a stream with no hash state. A caller's filter on a key column does not reach the primary
    key or the partitions through `LIMIT 1 BY`; only a floored twin's bound, read inside the
-   subquery, prunes (amended 2026-11-16). An earlier form, `GROUP BY` the key with `argMax` per column under
+   subquery, prunes (amended 2026-11-16), or a trace-ids twin's cut for a pass (amended 2026-11-24). An earlier form, `GROUP BY` the key with `argMax` per column under
    `optimize_aggregation_in_order`, measured far worse (below) and was replaced; the profile pins
    no `optimize_aggregation_in_order`, so it stays the server default. Eight views pin the strategy:
    `trace_metrics`, `traces`, `evaluations`, `simulations`, `experiment_run_results`, `experiment_items`,
@@ -205,3 +205,49 @@ the started event brings an earlier time; a snapshot before the started event do
 `FINAL`, through which the caller's bound already reaches the read (`MinMax` on `StartTime`).
 `lwql-dedup-floor.rules.unit.test.ts` lists every deduplicated view without a floor and the reason,
 so a new one cannot ship reading its whole history unremarked.
+
+## Amendment 2026-11-24: a trace-ids twin for the Instant Evals passes
+
+The key and sample passes picked a page of trace ids first, then read the thread id (a lookup
+into `Attributes`) only for those traces (#9858). Through `traces` that bounded nothing: no filter
+reaches below `LIMIT 1 BY`, so `TraceId IN (page)` still read every trace's attribute map across
+every part (1.5 GB at the test seed of 198,000 traces in about 108 parts, against a 100 MB cap).
+`EXPLAIN PIPELINE` puts the filter after `LimitByTransform`. Settings do not help: smaller blocks,
+`read_in_order_use_buffering = 0`, smaller read buffers, `optimize_read_in_order = 0` with external
+sort all still hit the cap. A parameterised view's argument must be a literal or a query
+parameter (a scalar subquery, a `WITH` alias or `arrayMap` is refused, Code 456), so the page's
+ids cannot be handed to a twin within one query.
+
+1. **The twin.** Every `latest-in-order` view whose dedup keys include `TraceId` (`traces`,
+   `trace_metrics`, `simulation_trace_metrics`) gets `<view>__ids`: the view with
+   `WHERE TraceId IN ({lwql_trace_ids:Array(String)})` inside the subquery, before `ORDER BY` and
+   `LIMIT 1 BY`, where a floored twin puts its floor. `TraceId` is a `LIMIT 1 BY` key, so the cut
+   keeps or drops a key's versions together and the twin returns exactly the view's rows of those
+   traces. Provisioned, granted and rebuilt beside the view, like a floored twin.
+2. **The passes.** A key or sample pass that projects more than the row ids sends two queries:
+   the page's row ids over the statement as written, then the page's keys under the same
+   condition, order and limit, restricted to those traces and read through the twin. Exact: a
+   further row of those traces that meets the condition sorts after the page's last row. A page
+   (hydration) pass reads the twin cut by its own trace ids. `LangWatchQLPassRunService` holds
+   this; `executePass` and the memory test both run passes through it.
+3. **Only where the cut cannot change a row.** The statement is sent to the twin only when it is
+   one SELECT over one twin-able view with no join, array join, grouping, window, aggregate,
+   `LIMIT`, `LIMIT BY`, `DISTINCT`, column set or transformer (`COLUMNS`, `REPLACE`, `APPLY`,
+   `EXCEPT`, a qualified star), no reference that would resolve past the twin's alias (the view's
+   name beside an alias, or `db.view.column`), its result's `TraceId` is the view's own, and it
+   does not declare the key step's own parameter. Anything else is read as before, unbounded. A
+   twin refused as missing or not granted is read as written, only when the refusal names it.
+4. **The page stays exact.** Each step evaluates `now()` on its own, so a moving window can drop
+   a picked row before step two. When step two returns other row ids than step one picked, both
+   steps are read again (twice at most), then the page is read as one query. The pass reports the
+   rows and bytes every query read.
+
+Measured on the test seed (ClickHouse 25.8, 100 MB cap, `max_threads = 4`), peak per query: the
+sample pass 70 MiB (row ids) and 21 MiB (keys over the twin, 45,900 rows read); a later key page
+73 MiB and 26 MiB. Before, both passes failed at the cap; uncapped they peaked at 1.5 GB.
+
+**Trade-offs.** One more parameterised view per twin-able view to provision, grant and keep in
+step with its view, read only by passes. A two-step pass costs a second round trip. The row-ids
+step still reads `TraceId` for the tenant's whole history through `LIMIT 1 BY` (70 to 75 MiB
+here), so it still grows with history, though no longer with the attribute maps. `FINAL` stays
+ruled out (decision 1).

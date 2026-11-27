@@ -10,6 +10,8 @@ import {
   storedObjectConfig,
   type WriteStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
+  type LinkUnownedStoredObjectsInput,
+  type LinkUnownedStoredObjectsResult,
   type ImageProxyRequest,
   type ReadStoredObjectResult,
   type StoreStoredObjectFromBytesInput,
@@ -36,6 +38,10 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
 import type { StoredObjectChannels } from "../channels/stored-object.channels.ts";
+import {
+  buildStoredObjectRetentionPipeline,
+  type StoredObjectRetentionPipeline,
+} from "../eventing/stored-object-retention.pipeline.ts";
 import type { StoredObjectBytesRepository } from "../repositories/stored-object-bytes.repository.ts";
 import type { StoredObjectRateLimitRepository } from "../repositories/stored-object-rate-limit.repository.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
@@ -45,6 +51,7 @@ import type {
   StoredObjectFileStreamRead,
 } from "../rules/stored-object-file-access.rules.ts";
 import { ImageProxyService } from "../services/image-proxy.service.ts";
+import { StoredObjectCleanupService } from "../services/stored-object-cleanup.service.ts";
 import {
   type StoredObjectDelivery,
   UnavailableStoredObjectDeliveryService,
@@ -53,7 +60,9 @@ import {
   StoredObjectFileReadService,
   type StoredObjectFileAllowance,
 } from "../services/stored-object-file-read.service.ts";
+import { StoredObjectOwnerLinkBackfillService } from "../services/stored-object-owner-link-backfill.service.ts";
 import { StoredObjectOwnerUnresolvedService } from "../services/stored-object-owner-unresolved.service.ts";
+import { StoredObjectRetentionService } from "../services/stored-object-retention.service.ts";
 import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 import { StoredObjectsTelemetryService } from "../services/stored-objects-telemetry.service.ts";
@@ -94,7 +103,9 @@ type StoredObjectSetup = FeatureSetup<
 
 export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi {
   static readonly contract = StoredObjectApi;
-  static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
+  static readonly dependencies: StoredObjectDependencies = {
+    authz: AuthzApi,
+  };
   static readonly config = storedObjectConfig;
 
   /**
@@ -140,17 +151,35 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     images: ExternalImageChannel;
   }): StoredObjectModule {
     const { infrastructure: parts, repositories } = setup;
+    const storage = StoredObjectService.create({
+      records: repositories.records,
+      ownerLinks: repositories.ownerLinks,
+      storage: parts.storage,
+      delivery: parts.delivery,
+      signer: parts.signer,
+      legacy: parts.files,
+      permissions: setup.permissions,
+      maximumUploadBytes: parts.maximumUploadBytes,
+      uploadExpiryMs: parts.uploadExpiryMs,
+    });
 
     return new StoredObjectModule({
-      storage: StoredObjectService.create({
+      storage,
+      ownerLinkBackfill: StoredObjectOwnerLinkBackfillService.create({
         records: repositories.records,
-        storage: parts.storage,
-        delivery: parts.delivery,
-        signer: parts.signer,
-        legacy: parts.files,
-        permissions: setup.permissions,
-        maximumUploadBytes: parts.maximumUploadBytes,
-        uploadExpiryMs: parts.uploadExpiryMs,
+        ownerLinks: repositories.ownerLinks,
+      }),
+      retention: StoredObjectRetentionService.create({
+        records: repositories.records,
+        ownerLinks: repositories.ownerLinks,
+        cleanup: StoredObjectCleanupService.create({
+          records: repositories.records,
+          ownerLinks: repositories.ownerLinks,
+          storage: parts.storage,
+          deleteObject: (input) => storage.delete(input),
+          now: nowInstant,
+        }),
+        now: nowInstant,
       }),
       owners: parts.owners,
       permissions: setup.permissions,
@@ -160,6 +189,8 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   }
 
   readonly #storage: StoredObjectService;
+  readonly #ownerLinkBackfill: StoredObjectOwnerLinkBackfillService;
+  readonly #retention: StoredObjectRetentionService;
   readonly #owners: StoredObjectOwnerResolver;
   readonly #permissions: AuthzApi;
   readonly #rateLimits: StoredObjectRateLimitRepository;
@@ -168,12 +199,16 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   private constructor(parts: {
     storage: StoredObjectService;
+    ownerLinkBackfill: StoredObjectOwnerLinkBackfillService;
+    retention: StoredObjectRetentionService;
     owners: StoredObjectOwnerResolver;
     permissions: AuthzApi;
     rateLimits: StoredObjectRateLimitRepository;
     images: ImageProxyService;
   }) {
     this.#storage = parts.storage;
+    this.#ownerLinkBackfill = parts.ownerLinkBackfill;
+    this.#retention = parts.retention;
     this.#owners = parts.owners;
     this.#permissions = parts.permissions;
     this.#rateLimits = parts.rateLimits;
@@ -184,6 +219,16 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
       isRecorded: (input) => this.#storage.isRecorded(input),
       resolveOwner: (input) => this.resolveOwner(input),
       readById: (input) => this.readById(input),
+    });
+  }
+
+  /** The pipeline `stored_object_retention` registers: the sweep and the retention follower. */
+  retentionPipeline(input: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): StoredObjectRetentionPipeline {
+    return buildStoredObjectRetentionPipeline({
+      retention: this.#retention,
+      deleteDispatchedBefore: input.deleteDispatchedBefore,
     });
   }
 
@@ -319,6 +364,12 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
     return this.#storage.deleteOwnedBy(input);
+  }
+
+  linkUnownedObjects(
+    input: LinkUnownedStoredObjectsInput,
+  ): Promise<LinkUnownedStoredObjectsResult> {
+    return this.#ownerLinkBackfill.linkUnowned(input);
   }
 
   getStorageDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {

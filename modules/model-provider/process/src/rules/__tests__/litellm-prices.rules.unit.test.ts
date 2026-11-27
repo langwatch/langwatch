@@ -404,3 +404,63 @@ describe("litellmPricingById, cache writes", () => {
     expect(byId["deepseek/deepseek-v4-flash"]).not.toHaveProperty("inputCacheWritePerToken");
   });
 });
+
+describe("mapLitellmModels, a model priced per token and per second", () => {
+  const prices: Record<string, LitellmPriceEntry> = {
+    "gpt-4o-transcribe-diarize": {
+      mode: "audio_transcription",
+      litellm_provider: "openai",
+      input_cost_per_token: 0.0000025,
+      input_cost_per_audio_token: 0.0000025,
+      output_cost_per_token: 0.00001,
+      input_cost_per_second: 0.0001,
+    },
+  };
+
+  /** @scenario "A litellm model with token rates keeps no per-second rate" */
+  it("keeps the token rates and drops the per-second rate", () => {
+    const { entries, unrepresentable } = mapLitellmModels(prices, new Set());
+    expect(unrepresentable).toEqual([]);
+    expect(entries).toHaveLength(1);
+    const entry = entries[0]!;
+    expect(entry.pricing).toEqual({
+      inputCostPerToken: 0.0000025,
+      outputCostPerToken: 0.00001,
+      audioCostPerToken: 0.0000025,
+    });
+    expect(entry.description).toContain("priced per token");
+  });
+
+  it("drops the per-second rate from the pricing the audit compares against", () => {
+    const byId = litellmPricingById(prices);
+    expect(byId["openai/gpt-4o-transcribe-diarize"]?.inputCostPerSecond).toBeUndefined();
+  });
+});
+
+describe("mapLitellmModels, the unit order after tokens", () => {
+  it("keeps the per-character rate over the per-second rate", () => {
+    const byId = litellmPricingById({
+      "speech-model": {
+        mode: "audio_speech",
+        litellm_provider: "openai",
+        input_cost_per_character: 0.000015,
+        input_cost_per_second: 0.0001,
+      },
+    });
+    expect(byId["openai/speech-model"]?.inputCostPerCharacter).toBe(0.000015);
+    expect(byId["openai/speech-model"]?.inputCostPerSecond).toBeUndefined();
+  });
+
+  it("treats a cache-only token rate as token pricing", () => {
+    const byId = litellmPricingById({
+      "cached-model": {
+        mode: "audio_transcription",
+        litellm_provider: "openai",
+        cache_read_input_token_cost: 0.000001,
+        input_cost_per_second: 0.0001,
+      },
+    });
+    expect(byId["openai/cached-model"]?.inputCacheReadPerToken).toBe(0.000001);
+    expect(byId["openai/cached-model"]?.inputCostPerSecond).toBeUndefined();
+  });
+});

@@ -956,14 +956,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ $serverMaxConcurrentQueries | quote }}
 {{- if .Values.clickhouse.client.maxOpenConnections }}
 - name: CLICKHOUSE_MAX_OPEN_CONNECTIONS
-  value: {{ .Values.clickhouse.client.maxOpenConnections | quote }}
+  value: {{ .Values.clickhouse.client.maxOpenConnections | int64 | quote }}
 {{- end }}
 {{- $chCold := (.Values.clickhouse).cold }}
 {{- if $chCold.enabled }}
 - name: CLICKHOUSE_COLD_STORAGE_ENABLED
   value: "true"
 - name: CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS
-  value: {{ $chCold.defaultTtlDays | default "49" | quote }}
+  value: {{ $chCold.defaultTtlDays | default "49" | int64 | quote }}
 {{- end }}
 {{/* Backup-status gauges (system.backup_log) are opt-OUT in the app/worker: an
      unset CLICKHOUSE_BACKUP_METRICS_ENABLED collects, so no deployment can lose
@@ -1181,6 +1181,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # enable dataplane with a real object-storage backend.
 - name: LANGWATCH_LOCAL_STORAGE_PATH
   value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
+{{- else }}
+# Neither a bucket nor the local-filesystem volume: stored objects would land
+# on the pods' ephemeral disk. Trace media then stays inline in ClickHouse
+# instead of being moved there and lost on the next restart.
+- name: RELEASE_TRACE_MEDIA_EXTRACTION
+  value: "0"
 {{- end }}
 
 # NextAuth secret. Lives in sharedEnv (not just the app Deployment) because
@@ -1298,7 +1304,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.app.email.providers.smtp.host | quote }}
 {{- if .Values.app.email.providers.smtp.port }}
 - name: SMTP_PORT
-  value: {{ .Values.app.email.providers.smtp.port | quote }}
+  value: {{ .Values.app.email.providers.smtp.port | int64 | quote }}
 {{- end }}
 {{- /* Emptiness, not truthiness: `secure: false` is a real setting
        (force STARTTLS on 465) and must not be dropped. */}}

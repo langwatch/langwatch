@@ -77,6 +77,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 			RequireHTTPS:   cfg.RequireHTTPSCustomerEndpoints,
 			PublicBaseURL:  cfg.A2APublicBaseURL,
 			Tracer:         deps.TraceBridge.Tracer(),
+			Logger:         deps.Logger,
 		}),
 	})
 

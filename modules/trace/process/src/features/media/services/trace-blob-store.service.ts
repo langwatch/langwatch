@@ -23,11 +23,18 @@ import {
 } from "../../ingestion/rules/trace-spool-location.rules.ts";
 
 /**
- * Cap on a spool object read. The spool holds one over-threshold command and the attribute cap
- * already bounds a span well below this, so the cap exists to stop a corrupt object OOMing the
- * worker rather than to enforce a product limit.
+ * Floor of the spool read cap. The cap exists to stop a corrupt object OOMing the worker rather
+ * than to enforce a product limit, so it never sits below what the intake accepts.
  */
 export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
+
+/**
+ * The read cap for one spooled command: twice the largest accepted export, since one span of it
+ * re-encoded as a JSON command (base64 bytes, escaped strings) can outgrow the wire bytes.
+ */
+export function spoolReadCapBytes({ maxBodyBytes }: { maxBodyBytes: number }): number {
+  return Math.max(MAX_SPOOL_BYTES, 2 * maxBodyBytes);
+}
 
 /**
  * Destination-agnostic storage for the trace spool, injected so `TraceBlobStoreService`
@@ -87,6 +94,17 @@ export class SpoolDestinationUnsupportedError extends Error {
 }
 
 /**
+ * Raised when a command would spool past the read cap. The edge refuses that span rather than
+ * writing an object the worker cannot read back, or sending it inline instead.
+ */
+export class SpoolTooLargeError extends Error {
+  constructor({ byteLength, maxSpoolBytes }: { byteLength: number; maxSpoolBytes: number }) {
+    super(`spooled command of ${byteLength} bytes exceeds the ${maxSpoolBytes} byte read cap`);
+    this.name = "SpoolTooLargeError";
+  }
+}
+
+/**
  * Refuses a destination that cannot bound an orphaned spool object. Write path only: a rule about
  * creating new objects, not about the ones already out there.
  */
@@ -138,35 +156,40 @@ export class TraceBlobStoreService {
     payloads?: TracePayloadReaderRepository;
     spoolStorage?: SpoolStorage;
     logger?: Logger;
+    maxSpoolBytes?: number;
   }): TraceBlobStoreService {
     return new TraceBlobStoreService(options);
   }
 
   /**
-   * `legacySpool` reads back v1 spool refs only, new writes going through the object store.
-   * `payloads` reads an offloaded field back out of its trace event; without it those reads
-   * throw. `spoolStorage` backs spool writes, and `logger` surfaces a refused delete.
+   * `legacySpool` reads v1 spool refs only; `payloads` reads an offloaded field back (without
+   * it those reads throw); `spoolStorage` backs spool writes; `logger` surfaces a refused
+   * delete; `maxSpoolBytes` bounds a spool read ({@link spoolReadCapBytes}).
    */
   private readonly legacySpool: TraceLegacySpool;
   private readonly payloads?: TracePayloadReaderRepository;
   private readonly spoolStorage?: SpoolStorage;
   private readonly logger?: Logger;
+  private readonly maxSpoolBytes: number;
 
   private constructor({
     legacySpool,
     payloads,
     spoolStorage,
     logger,
+    maxSpoolBytes = MAX_SPOOL_BYTES,
   }: {
     legacySpool: TraceLegacySpool;
     payloads?: TracePayloadReaderRepository;
     spoolStorage?: SpoolStorage;
     logger?: Logger;
+    maxSpoolBytes?: number;
   }) {
     this.legacySpool = legacySpool;
     this.payloads = payloads;
     this.spoolStorage = spoolStorage;
     this.logger = logger;
+    this.maxSpoolBytes = maxSpoolBytes;
   }
 
   /**
@@ -261,7 +284,7 @@ export class TraceBlobStoreService {
 
     return TraceStreamBufferService.create().streamToBuffer(
       await objects.read(at),
-      MAX_SPOOL_BYTES,
+      this.maxSpoolBytes,
     );
   }
 
@@ -273,16 +296,16 @@ export class TraceBlobStoreService {
     const body = await this.legacySpool.openRead({ projectId, key: spoolRef });
 
     // Read through the same bounded helper the v2 path uses. `transformToByteArray()`
-    // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
-    // entirely — and a v1 reference points at an object written before this
+    // buffers the whole object first, so it would have skipped the cap
+    // entirely, and a v1 reference points at an object written before this
     // deploy, which is exactly the input the cap exists to distrust.
-    return TraceStreamBufferService.create().streamToBuffer(body, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.create().streamToBuffer(body, this.maxSpoolBytes);
   }
 
   /**
    * Writes the transient spool object for an over-threshold command and returns the reference the
-   * command carries. It lands at whichever backend the project's storage destination names and is
-   * deleted after the event_log INSERT; that prefix must carry a three-day lifecycle rule.
+   * command carries, at the project's storage destination; deleted after the event_log INSERT,
+   * under a three-day lifecycle rule. A body over the read cap is {@link SpoolTooLargeError}.
    */
   async putSpool({
     projectId,
@@ -295,6 +318,12 @@ export class TraceBlobStoreService {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
+    if (body.byteLength > this.maxSpoolBytes) {
+      throw new SpoolTooLargeError({
+        byteLength: body.byteLength,
+        maxSpoolBytes: this.maxSpoolBytes,
+      });
+    }
     const { at, objects } = await this.locateSpool({
       projectId,
       traceId,

@@ -4,6 +4,7 @@ import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
+import type { TraceManagedPromptVersionFloor } from "./features/analytics/trace-managed-prompt-version-floor.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -45,6 +46,7 @@ import type {
   BraidPreview,
   BraidTestTrace,
 } from "./features/braid/trace-braid.schemas.ts";
+import type { ThreadTraceIds } from "./features/content/trace-content-read.service.ts";
 import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
@@ -74,6 +76,7 @@ import type {
   FacetValuesResult,
   TraceListPage,
 } from "./features/list/trace-list-view.ts";
+import type { TraceIngestionCount, TracePresence } from "./features/ops/trace-ops.schemas.ts";
 import type { AiActionResult, AiQueryResult } from "./features/query/trace-ai-query.ts";
 import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
 import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
@@ -234,6 +237,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
   /** Where the span widgets' history starts, from the span_analytics replay's recorded since. */
   getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
+  /**
+   * Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's
+   * ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+   */
+  getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
   /** One named span's chat messages as JSON, and whether the trace holds it. */
   renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */
@@ -478,6 +486,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     withEditOverlay?: boolean;
     maxTraces?: number;
   }): Promise<Trace[]>;
+  /**
+   * The trace ids of the named threads, one list per thread, oldest first. Reads
+   * the trace summaries' keys only: no content, so it needs no protections.
+   * `maxTraces` is the ceiling across all of the threads together.
+   */
+  readThreadsTraceIds(input: {
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]>;
   readSampleTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;
@@ -503,13 +521,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
     authorization?: Authorization;
   }): Promise<Protections>;
   /**
-   * The same redactions for an API-KEY caller: the public branch of every
-   * content category, plus the credential's own `cost:view` grant. A legacy
-   * project key (`principal: null`) predates RBAC and sees costs.
+   * The same redactions for a REST credential: an API key reads the public branch of every
+   * content category, a project-bound access token (`user` principal) reads as its person.
+   * Costs are the credential's own `cost:view` grant; a legacy key (`null`) sees them.
    */
   resolveApiKeyProtections(input: {
     projectId: string;
     principal: PrincipalRef | null;
+    /** The read's proof, folded in for an access token as for its person (ADR-177 decision 9). */
+    authorization?: Authorization;
   }): Promise<Protections>;
   findExistingTraceIds(input: {
     projectId: string;
@@ -1099,6 +1119,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /**
+   * A staff investigation's ingestion figures (ADR-202): one row per asked project, zeros when
+   * nothing arrived in `[since, until)` (epoch ms). Refusals are counted per UTC day, so a range
+   * takes every day it touches.
+   */
+  countIngestionByProject(input: {
+    projectIds: string[];
+    since: number;
+    until: number;
+  }): Promise<TraceIngestionCount[]>;
+  /** Whether a trace id is stored in the project, with counts and arrival times only (ADR-202). */
+  findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {
     projectId: string;

@@ -87,7 +87,7 @@ export class RecordSubscriptionChangedCommand implements CommandHandler<
         data,
         metadata: {},
         occurredAt: data.occurredAt,
-        idempotencyKey: `${data.organizationId}:subscription:${data.hasSubscription}:${data.occurredAt}`,
+        idempotencyKey: subscriptionChangedKeyOf(data),
       }),
     ];
   }
@@ -95,6 +95,18 @@ export class RecordSubscriptionChangedCommand implements CommandHandler<
   static getAggregateId(payload: RecordSubscriptionChangedCommandData): string {
     return payload.organizationId;
   }
+}
+
+/** A catch-up fact is keyed by its read instant, so a re-run of the resync is a new fact. */
+export function subscriptionChangedKeyOf({
+  organizationId,
+  hasSubscription,
+  occurredAt,
+  fromCatchUp,
+}: RecordSubscriptionChangedCommandData): string {
+  return fromCatchUp
+    ? `${organizationId}:subscription:catch-up:${occurredAt}`
+    : `${organizationId}:subscription:${hasSubscription}:${occurredAt}`;
 }
 
 /** Records that a subscription became active; one event per transition, keyed by its instant. */

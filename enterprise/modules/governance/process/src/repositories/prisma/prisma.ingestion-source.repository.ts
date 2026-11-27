@@ -1,5 +1,6 @@
 import {
   INGESTION_SOURCE_LIVE_STATUSES,
+  ingestionSourceAwaitsFirstEvent,
   type GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
@@ -16,6 +17,7 @@ import {
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type ReceivingIngestionSource,
   type UnpricedUsageSourceWindow,
   type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
@@ -89,7 +91,10 @@ function toIngestionSource({
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type IngestionSourceDatabase = Pick<PrismaClient, "ingestionSource" | "$transaction">;
+type IngestionSourceDatabase = Pick<
+  PrismaClient,
+  "ingestionSource" | "$transaction" | "$executeRaw"
+>;
 
 /**
  * Sources as Postgres holds them. `parserConfig.credentials` is sealed on every write and opened
@@ -194,12 +199,41 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return this.toSource(row);
   }
 
-  /** The `where` is `ingestionSourceStatusIsOff` as SQL: a row that is off is never written. */
-  async recordEventReceived(id: string, at: Instant): Promise<void> {
-    await this.database.ingestionSource.updateMany({
-      where: { id, status: { in: [...INGESTION_SOURCE_LIVE_STATUSES] } },
-      data: { lastEventAt: toDate(at), status: "active" },
-    });
+  /**
+   * The first write matches only a source awaiting its first event, so of racing batches exactly
+   * one moves it; a source read as live skips it. The second's `where` is
+   * `ingestionSourceStatusIsOff` as SQL: a row that is off is never written.
+   */
+  async recordEventReceived(
+    { id, status }: ReceivingIngestionSource,
+    at: Instant,
+  ): Promise<{ wentLive: boolean }> {
+    // As SQL: Prisma's updateMany reads the matching ids, then updates by id alone, so a racing
+    // stamp or a disable between the two passed the status check. One statement re-checks the
+    // committed status under the row lock.
+    const lastEventAt = toDate(at);
+    if (ingestionSourceAwaitsFirstEvent(status)) {
+      const first = await this.database.$executeRaw`
+        ${skipTenantCheck({
+          // An ingestion source is addressed by its own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        UPDATE "IngestionSource"
+           SET "lastEventAt" = ${lastEventAt}, "status" = 'active', "updatedAt" = now()
+         WHERE "id" = ${id} AND "status" = 'awaiting_first_event'
+      `;
+      if (first === 1) return { wentLive: true };
+    }
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // An ingestion source is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IngestionSource"
+         SET "lastEventAt" = ${lastEventAt}, "status" = 'active', "updatedAt" = now()
+       WHERE "id" = ${id} AND "status" = ANY(${[...INGESTION_SOURCE_LIVE_STATUSES]})
+    `;
+    return { wentLive: false };
   }
 
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {

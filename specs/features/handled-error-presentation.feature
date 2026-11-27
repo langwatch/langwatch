@@ -170,6 +170,21 @@ Feature: Handled errors — what the customer actually reads
       # docs are an extra destination, not a second phrasing, so they never
       # compete with the description
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: A tip written for an API caller is not shown to a person
+    Given a handled error carries a tip that points at a meta field
+    When it is surfaced, inline or as a toast
+    Then that tip is not shown
+    And the tips a person can act on still are
+      # meta is for agents and logs, never rendered, so a tip naming it is noise
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: Hiding a tip written for an API caller never leaves a person without a next step
+    Given an error code has a tip that points at a meta field
+    When a person meets that error
+    Then they still read a next step, from its description or from a tip written for them
+      # the person's action goes in the registry description or a tip of its own, never beside meta
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: Technical detail stops at the trace id
     Given a handled error carries meta and a chain of reasons

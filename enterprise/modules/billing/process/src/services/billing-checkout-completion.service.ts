@@ -25,6 +25,7 @@ import {
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { SupersededPlanRetirementError } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 
@@ -174,16 +175,21 @@ export class BillingCheckoutCompletionService {
       throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
     }
 
-    await this.lifecycle.syncInvoicePaymentSuccess({
-      subscriptionId,
-      throwOnMissing: true,
-    });
-
-    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
-
     // A failed follow-up still lets the plan land, then fails the delivery so
     // Stripe redelivers it: every step here is safe to repeat.
     const failures: unknown[] = [];
+    try {
+      await this.lifecycle.syncInvoicePaymentSuccess({
+        subscriptionId,
+        throwOnMissing: true,
+      });
+    } catch (err) {
+      if (!(err instanceof SupersededPlanRetirementError)) throw err;
+      failures.push(err);
+    }
+
+    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
+
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
       try {

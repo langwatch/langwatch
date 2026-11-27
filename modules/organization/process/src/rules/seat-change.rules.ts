@@ -19,6 +19,8 @@ const SEAT_KIND_OF_MEMBER_TYPE: Record<MemberType, SeatKind> = {
   FullMember: "full",
   LiteMember: "lite",
   Developer: "developer",
+  // Billing only holds no seat (ADR-205).
+  BillingOnly: "none",
 };
 
 /** The seat a holder takes, by the rule the cap counts by; no member type is no seat. */

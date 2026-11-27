@@ -18,6 +18,8 @@ export type WriteInviteInput = {
   role: OrganizationUserRole;
   /** The user who sent it; null for an invitation a service created. */
   requestedBy?: string | null;
+  /** The Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
 };
 
 /** One listed invitation, with the admin who asked for it. */
@@ -170,6 +172,8 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
+    /** A Billing-only membership (ADR-205): no team, no seat. */
+    billingOnly?: boolean;
   }): Promise<void>;
   /** Throws `InviteNotFoundError`. */
   abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;

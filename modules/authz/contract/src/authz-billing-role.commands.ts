@@ -38,8 +38,11 @@ const authzSetBillingRoleInputSchemaDefinition = z
     actor: ledgerActorSchema,
     /** A retry passes the id it sent first; absent, the writer mints one. */
     commandId: z.string().min(1).optional(),
-    /** `checkout` when finishing a checkout granted it; an administrator's toggle otherwise. */
-    source: z.enum(["grants-service", "checkout"]).optional(),
+    /**
+     * `checkout` when finishing a checkout granted it, `invite` when a Billing-only invitation was
+     * accepted (ADR-205); an administrator's toggle otherwise.
+     */
+    source: z.enum(["grants-service", "checkout", "invite"]).optional(),
   })
   .strict();
 export interface AuthzSetBillingRoleInputSchema extends Named<

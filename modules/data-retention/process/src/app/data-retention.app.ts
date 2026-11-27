@@ -80,6 +80,10 @@ import { SeatRetentionPolicyService } from "../services/seat-retention-policy.se
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
 import { StoredPastRetentionService } from "../services/stored-past-retention.service.ts";
+import {
+  type DataRetentionFactSenders,
+  StoredRetentionWriteService,
+} from "../services/stored-retention-write.service.ts";
 
 const logger = createLogger("langwatch:data-retention:retention-storage");
 
@@ -147,6 +151,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   static readonly config = dataRetentionConfig;
 
   readonly #retention: DataRetentionService;
+  readonly #storedRetention: StoredRetentionWriteService;
   readonly #policy: DataRetentionPolicyService;
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
@@ -162,6 +167,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
 
   private constructor(services: {
     retention: DataRetentionService;
+    storedRetention: StoredRetentionWriteService;
     policy: DataRetentionPolicyService;
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
@@ -176,6 +182,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     driftRequests: RetentionDriftRequestService;
   }) {
     this.#retention = services.retention;
+    this.#storedRetention = services.storedRetention;
     this.#policy = services.policy;
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
@@ -226,6 +233,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
 
     return new DataRetentionModule({
       retention,
+      storedRetention: StoredRetentionWriteService.create({ retention }),
       policy,
       snapshots: DataRetentionSnapshotService.create({
         retention,
@@ -277,7 +285,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     deps: { applyRetryDelayMs?: (params: { attempt: number }) => number } = {},
   ): RetentionExtensionPipelineDefinition {
     return buildRetentionExtensionPipeline({
-      applyCommand: ApplyRetentionExtensionCommand.create({ retention: this.#retention }),
+      applyCommand: ApplyRetentionExtensionCommand.create({ retention: this.#storedRetention }),
       extensions: this.#extensions,
       applyStatusStore: this.#applyStatus,
       ...deps,
@@ -348,6 +356,11 @@ export class DataRetentionModule implements DataRetentionApiContract {
     return input.organizationId
       ? this.#storageRequests.requestOrganization({ organizationId: input.organizationId })
       : this.#storageRequests.requestAll();
+  }
+
+  /** Binds `data_retention_facts`' senders once the pipeline registers in this process. */
+  connectFacts(senders: DataRetentionFactSenders): void {
+    this.#storedRetention.connectFacts(senders);
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
@@ -643,7 +656,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     await this.#policy.assertPlanForProject({ actor, projectId: input.projectId });
     const effective = await this.#retention.getResolvedForProject({ projectId: input.projectId });
     const appliedRetentionDays = effective[input.category];
-    const result = await this.#retention.triggerRetroactiveUpdate({
+    const result = await this.#storedRetention.triggerRetroactiveUpdate({
       projectId: input.projectId,
       category: input.category,
       newRetentionDays: appliedRetentionDays,

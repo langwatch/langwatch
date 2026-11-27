@@ -26,7 +26,6 @@ import {
   aiTargetOf,
   isAiActivityEvent,
   isSelectedSecurityLakeObject,
-  ocsfEventFields,
   parseSecurityLakeNotification,
   type SecurityLakeObjectRef,
   securityLakeRowToEvent,
@@ -34,11 +33,12 @@ import {
 import { tallyWrittenRows } from "../rules/security-lake-health.rules.ts";
 import {
   DEFAULT_DECODE_LIMITS,
-  DecodeLimitError,
   decodeParquetRowGroups,
+  describeParquetFailure,
+  isDecodeLimitError,
   type SecurityLakeDecodeLimits,
   wholeArrayBuffer,
-} from "./security-lake-parquet.service.ts";
+} from "../rules/security-lake-parquet.rules.ts";
 
 /** Security Lake rolls Parquet files every few minutes, so its files stay well under this. */
 const MAX_OBJECT_BYTES = 128 * 1024 * 1024;
@@ -422,8 +422,9 @@ export class SecurityLakeReaderService {
       invalid: 0,
     };
     const latest = this.deps.now() + OCSF_INGEST_MAX_FUTURE_MS;
+    let bytes: Uint8Array;
     try {
-      const bytes = await this.deps.objects.readBytes({
+      bytes = await this.deps.objects.readBytes({
         bucket: object.bucket,
         key: object.key,
         region: config.region,
@@ -432,7 +433,11 @@ export class SecurityLakeReaderService {
         ...(signal === undefined ? {} : { signal }),
         maxBytes: MAX_OBJECT_BYTES,
       });
-      run.bytes += bytes.byteLength;
+    } catch (error) {
+      return { kind: "failed", reason: describeAwsFailure(error) };
+    }
+    run.bytes += bytes.byteLength;
+    try {
       const groups = decodeParquetRowGroups({
         file: wholeArrayBuffer(bytes),
         limits: this.deps.decodeLimits,
@@ -443,8 +448,8 @@ export class SecurityLakeReaderService {
         for (const raw of group) this.keepRow({ raw, scope, latest, read });
       }
     } catch (error) {
-      if (error instanceof DecodeLimitError) return { kind: "refused", reason: error.message };
-      return { kind: "failed", reason: describeAwsFailure(error) };
+      if (isDecodeLimitError(error)) return { kind: "refused", reason: error.message };
+      return { kind: "failed", reason: describeParquetFailure(error) };
     }
     return read;
   }
@@ -466,8 +471,7 @@ export class SecurityLakeReaderService {
       read.invalid += 1;
       return;
     }
-    const fields = ocsfEventFields(mapped.event);
-    if (!isAiActivityEvent(fields)) {
+    if (!isAiActivityEvent(mapped.event)) {
       read.dropped += 1;
       return;
     }
@@ -476,7 +480,7 @@ export class SecurityLakeReaderService {
         ...scope,
         sourceType: SECURITY_LAKE_SOURCE_TYPE,
         event: mapped.event,
-        targetName: aiTargetOf(fields),
+        targetName: aiTargetOf(mapped.event),
       }),
     );
   }

@@ -4,6 +4,7 @@ export * from "./anomaly-rules.trpc.ts";
 export * from "./governance-agents.ts";
 export * from "./features/registry/agent-registry.ts";
 export * from "./features/registry/agent-registry-ard.ts";
+export * from "./features/registry/agent-registry-settings.ts";
 export * from "./features/kill-switch/agent-kill-switch.ts";
 export * from "./features/ingestion/ingestion-source-activity.queries.ts";
 export * from "./admin-workspace-view-audit.ts";

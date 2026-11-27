@@ -16,6 +16,45 @@ export interface DateRangePreset<Key extends string> {
 }
 
 /**
+ * The custom half of the picker on its own: a start and an end as `yyyy-MM-ddTHH:mm` text,
+ * for a surface that lists its presets elsewhere, such as a menu column.
+ */
+export function DateRangeFields({
+  startValue,
+  endValue,
+  onStartChange,
+  onEndChange,
+}: {
+  startValue?: string;
+  endValue?: string;
+  onStartChange: (text: string) => void;
+  onEndChange: (text: string) => void;
+}) {
+  return (
+    <Stack gap="3" minWidth="48">
+      <Field.Root>
+        <Field.Label>Start date</Field.Label>
+        <Input
+          size="sm"
+          type="datetime-local"
+          value={startValue ?? ""}
+          onChange={(e) => onStartChange(e.target.value)}
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>End date</Field.Label>
+        <Input
+          size="sm"
+          type="datetime-local"
+          value={endValue ?? ""}
+          onChange={(e) => onEndChange(e.target.value)}
+        />
+      </Field.Root>
+    </Stack>
+  );
+}
+
+/**
  * Presets as a list, a custom range beside it. Dates travel as the
  * `yyyy-MM-ddTHH:mm` text a datetime-local input holds; the caller parses.
  */
@@ -116,26 +155,12 @@ export function DateRangePicker<Key extends string>({
               ))}
             </Stack>
             {onStartChange && onEndChange && (
-              <Stack gap="3" minWidth="48">
-                <Field.Root>
-                  <Field.Label>Start date</Field.Label>
-                  <Input
-                    size="sm"
-                    type="datetime-local"
-                    value={startValue ?? ""}
-                    onChange={(e) => onStartChange(e.target.value)}
-                  />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>End date</Field.Label>
-                  <Input
-                    size="sm"
-                    type="datetime-local"
-                    value={endValue ?? ""}
-                    onChange={(e) => onEndChange(e.target.value)}
-                  />
-                </Field.Root>
-              </Stack>
+              <DateRangeFields
+                startValue={startValue}
+                endValue={endValue}
+                onStartChange={onStartChange}
+                onEndChange={onEndChange}
+              />
             )}
           </HStack>
         </Popover.Body>

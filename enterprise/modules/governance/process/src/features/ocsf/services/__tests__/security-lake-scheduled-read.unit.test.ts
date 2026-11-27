@@ -21,10 +21,8 @@ import { IngestionPullLifecycleRepository } from "../../../../repositories/inges
 import { MemoryOcsfEventsRepository } from "../../../../repositories/memory/memory.ocsf-events.repository.ts";
 import { toPullLifecycleSource } from "../../../ingestion-pull/rules/pull-schedule.rules.ts";
 import { IngestionPullLifecycleService } from "../../../ingestion-pull/services/ingestion-pull-lifecycle.service.ts";
-import {
-  SECURITY_LAKE_EXTERNAL_ID_KEY,
-  SecurityLakePullerService,
-} from "../security-lake-puller.service.ts";
+import { SECURITY_LAKE_EXTERNAL_ID_KEY } from "../../rules/security-lake-credentials.rules.ts";
+import { SecurityLakePullerService } from "../security-lake-puller.service.ts";
 import { SecurityLakeReaderService } from "../security-lake-reader.service.ts";
 
 const QUEUE_URL = "https://sqs.eu-west-1.amazonaws.com/123456789012/acme-subscriber";

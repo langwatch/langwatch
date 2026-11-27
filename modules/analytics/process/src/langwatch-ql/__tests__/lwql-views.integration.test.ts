@@ -13,7 +13,9 @@ import {
   SHIPPED_LWQL_DEDUP,
   LangWatchQLViewStatementsService,
 } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { clickHouseLiteral } from "../../rules/langwatch-ql-sql-literal.rules.ts";
 import { flooredViewName, flooredViewNames } from "../../rules/lwql-dedup-floor.rules.ts";
+import { hasTraceIdsTwin, traceIdsViewName } from "../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLDedupStrategy } from "../../rules/lwql-view-dedup-shape.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
@@ -419,6 +421,36 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       const rows = await selectRows<{ TenantId: string }>(
         tenantA,
         `SELECT DISTINCT TenantId FROM ${database}.${twin}(lwql_floor = ${wholeHistory})`,
+      );
+      expectOnlyTenantA({ rows, tenantColumn: "TenantId", harness, context: `${twin} twin` });
+    }
+  });
+
+  /** @scenario "A trace-ids twin returns only the calling tenant's rows" */
+  it("returns its own tenant's rows and none of the other tenant's, for every trace-ids twin", async () => {
+    const twins = LWQL_VIEW_CATALOG.filter(hasTraceIdsTwin);
+    expect(twins.map((view) => traceIdsViewName(view.name))).toEqual([
+      "traces__ids",
+      "trace_metrics__ids",
+      "simulation_trace_metrics__ids",
+    ]);
+    for (const view of twins) {
+      const twin = traceIdsViewName(view.name);
+      await recordSeedControl({
+        harness,
+        table: view.sourceTable,
+        database: facts,
+        tenantColumn: "TenantId",
+      });
+      // Both tenants' trace ids: the cut must not be what keeps the other tenant out.
+      const traceIds = await selectRows<{ TraceId: string }>(
+        harness.admin,
+        `SELECT DISTINCT TraceId FROM ${facts}.${view.sourceTable}`,
+      );
+      const ids = traceIds.map(({ TraceId }) => clickHouseLiteral(TraceId)).join(", ");
+      const rows = await selectRows<{ TenantId: string }>(
+        tenantA,
+        `SELECT DISTINCT TenantId FROM ${database}.${twin}(lwql_trace_ids = [${ids}])`,
       );
       expectOnlyTenantA({ rows, tenantColumn: "TenantId", harness, context: `${twin} twin` });
     }

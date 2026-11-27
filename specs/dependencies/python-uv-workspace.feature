@@ -28,3 +28,13 @@ Feature: Python uv workspace
     When the member pyprojects are read
     Then none of them declares exclude-newer or constraint-dependencies
     And the root pyproject carries the security constraint pins
+
+  @unit
+  Scenario: A lock narrower than the members' Python range is declared at the root
+    # A security floor can need a newer Python patch release than the members
+    # accept. The root's environments may only raise the Python floor (and
+    # leave out platforms such as emscripten), and the .python-version files
+    # must ask for an interpreter that floor accepts.
+    When the root pyproject declares lock environments
+    Then each one only raises the Python version floor or leaves out a platform
+    And the root and sdks/python .python-version files ask for at least that floor

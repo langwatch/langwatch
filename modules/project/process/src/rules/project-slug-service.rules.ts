@@ -19,6 +19,8 @@ const RESERVED_TOP_LEVEL_ROUTES = new Set([
   "authorize",
   "cli",
   CODING_AGENTS_SEGMENT,
+  // The organization's Dashboards library (ADR-002 in modules/dashboard).
+  "dashboards",
   "gateway",
   "governance",
   "invite",

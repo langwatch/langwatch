@@ -96,6 +96,42 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And a finish that lands after all bills the page no second time
       And a run row update that fails after the page's spend is written is retried, then logged at error
 
+  # ADR-174 decision 24. Rows that failed to judge are free unless a routed leg was already
+  # paid for them (ADR-190 decision 3): the finish bills what the run's judged pages summed.
+  Rule: A run that fails bills the pages it judged
+
+    @unit
+    Scenario: A run whose page fails on its last attempt bills the pages it judged
+      Given a run whose first two pages were judged and recorded
+      When its third page fails on its last attempt, or with an error the outbox will not retry
+      Then the page's failure is recorded, and the run is not marked finished by the page itself
+      And the run finishes as failed with the failure's code
+      And the finish records one spend record for the tokens and cost the two judged pages summed
+      And the run's free budget hold is released after that record
+      And a failure that cannot be recorded leaves the run to the stall wake, which bills the same totals
+
+    @unit
+    Scenario: A run stopped by a budget between pages bills the pages judged before it
+      Given a run whose judged pages took a blocking gateway budget to its limit
+      When the next page is refused with instant_eval_gateway_budget_exceeded
+      Then the run finishes as failed with instant_eval_gateway_budget_exceeded
+      And the finish bills the tokens and cost of the pages judged before the stop
+
+    @unit
+    Scenario: A run that judged nothing before it failed costs nothing
+      Given a run whose first page fails on its last attempt
+      When the run finishes as failed
+      Then the finish carries no tokens and no cost
+      And no spend record is written, and the run's free budget hold is still released
+
+    @unit
+    Scenario: A failure delivered again is still one spend record
+      Given a run whose page failure is recorded twice
+      When both records reach the run
+      Then both carry the same event key, so the second collapses
+      And the run asks for one failed finish, under the run's one finish key
+      And that finish records its spend under the run's own request id
+
   Rule: The spend page names the judged rows
 
     @unit
@@ -103,6 +139,12 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Given a spend row of request type instant_eval
       When the spend page names its key
       Then it says Instant Evals rather than nothing
+
+    @unit @integration
+    Scenario: A spend row with no virtual key and the own decision model request type reads as Instant Evals on your own model
+      Given a spend row of request type instant_eval_decision_model
+      When the spend page names its key
+      Then it says Instant Evals (own model) rather than nothing
 
   Rule: Instant Eval spend debits gateway budgets like any other spend
 
@@ -188,11 +230,164 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       # later, so reporting early would skip the usage for good. The first
       # report after the meter is mapped carries the month from zero.
 
+    # Stripe bills a meter event no subscription line prices at nothing, so
+    # sending it would advance the checkpoint and lose the charge (ADR-174 decision 18).
+    @unit
+    Scenario: Usage is held while the subscription carries no Instant Evals price
+      Given a Stripe mode whose catalog maps the Instant Evals meter
+      And an organization whose active Growth subscription in dollars has no Instant Evals price
+      And Instant Eval spend this month
+      When the month is reported
+      Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      And no other report is scheduled for it
+      And the billable events meter is reported as usual
+      And a warning names the organization, the meter and the amount held
+
+    @unit
+    Scenario: A Growth subscription in euros holds its Instant Eval usage
+      Given an organization whose active Growth subscription is in euros
+      And Instant Eval spend this month
+      When the month is reported
+      Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      And the billable events meter is reported as usual
+      # The price is in dollars and no euro price exists, so the month is held until one does.
+
+    @unit
+    Scenario: Usage is reported once the subscription carries the Instant Evals price
+      Given an organization whose active subscription has the Instant Evals price
+      And Instant Eval spend of 5.0428 dollars this month
+      When the month is reported
+      Then the Instant Eval meter event's value is 5.0428
+
+    @unit
+    Scenario: The first report after the Instant Evals price is added bills only from the line
+      Given an organization whose usage was held for want of the Instant Evals price
+      And it has no cancelled subscription whose line hands it an earlier start
+      When the price is added to its subscription and the month is reported
+      Then the spend is read from the moment the line was added, never the month's first day
+      # Charges start from the moment the line is added; a cancelled line that ended with no gap
+      # before it hands on its earlier start instead (ADR-174 decision 26).
+
+    # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23, proposed in v22).
+    @unit
+    Scenario: Free use before an upgrade mid-month is not reported
+      Given an organization whose usage-billed subscription started on the 10th of the month
+      And Instant Eval spend both before and after the 10th
+      When the month is reported
+      Then the spend is read from the subscription's start to the month's end
+      And the meter event carries only the spend since the upgrade
+
+    @unit
+    Scenario: A subscription older than the month reports the whole month
+      Given an organization whose usage-billed subscription started before the month
+      When the month is reported
+      Then the spend is read from the month's start to the month's end
+
+    @unit
+    Scenario: A subscription with no recorded start reports the whole month
+      Given an organization whose usage-billed subscription has no start date, or a connected account
+      When the month is reported
+      Then the spend is read from the month's start to the month's end
+
+    @unit
+    Scenario: A month that ended before the subscription started reports nothing
+      Given an organization whose usage-billed subscription started after the month ended
+      When that month is reported
+      Then the spend read covers no time at all
+      And no Instant Eval meter event is sent
+
+    @unit
+    Scenario: A month already reported is not lowered by the subscription window
+      Given a checkpoint that reported 1.5000 dollars, free use before the upgrade included
+      And the window from the subscription's start now reads 0.5000 dollars
+      When the month is reported
+      Then no Instant Eval meter event is sent and the checkpoint stays at 1.5000
+      And spend past 1.5000 since the upgrade is reported as a positive delta
+
+    @unit
+    Scenario: A subscription replaced mid-month keeps the month's window
+      Given an organization whose subscription was replaced by a new one on the 15th after the month was already reported
+      When the month is reported
+      Then the spend is read from the replaced subscription's start
+      And spend since the last report is sent as a positive delta
+      # The window only ever starts earlier within a month, so the floor never swallows new spend.
+
+    @integration
+    Scenario: The billing lookup reads every growth-seat period a month can overlap, newest first
+      Given an organization with a live subscription, an ended one with both dates, a cancelled one with no start and a pending one with no end
+      When its billing lookup is read from Postgres
+      Then the periods are the live one and the ended one, newest start first
+      And a live subscription with no recorded start comes before every dated one
+
+    @unit
+    Scenario: A subscription that cannot be read holds the Instant Eval usage and retries
+      Given an organization whose subscription cannot be read from Stripe
+      And Instant Eval spend this month
+      When the month is reported
+      Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      And the failed read is counted on the meter's checkpoint
+      And another report is scheduled
+
+    @unit
+    Scenario: A price read that keeps failing stops at the circuit breaker
+      Given an organization whose subscription read fails every time
+      When the month is reported again and again
+      Then the read is tried five times, each counted on the meter's checkpoint
+      And then an alarm is logged and no further report is scheduled
+
+    @unit
+    Scenario: A price read that works again clears the failed reads
+      Given an organization whose subscription read failed four times
+      When the next read works and there is nothing to send, held or priced
+      Then the meter's checkpoint counts no failures
+      And a later failed read starts the count from one
+
+    @unit
+    Scenario: A pending total is replayed even while the price is missing
+      Given a meter event whose send was cut off before it was confirmed
+      And a subscription that no longer carries the Instant Evals price
+      When the month is reported
+      Then the pending total is sent again under its own identifier
+      # Stripe forgets an identifier after a day; waiting for the price could count it twice.
+
+    @unit
+    Scenario: A re-priced Instant Evals line is still recognised
+      Given a subscription whose Instant Evals line is on a newer price
+      And that price carries the lookup key or the langwatch_key metadata GROWTH_INSTANT_EVAL_USD
+      When the month is reported
+      Then the usage is reported
+      And a price named like it only in its nickname is not taken for it
+
+    @integration
+    Scenario: Only a subscription with the Instant Evals price reaches the Stripe simulator
+      Given three usage-billed organizations with Instant Eval spend this month
+      And one has a Growth subscription in dollars with no Instant Evals price
+      And one has a Growth subscription in euros
+      And one has a Growth subscription in dollars with the Instant Evals price
+      When the month is reported against the payment simulator
+      Then the simulator holds no Instant Eval usage for the first two
+      And the third's Instant Eval usage equals the month's price in dollars
+
     @unit
     Scenario: A month with no Instant Eval spend reports nothing on that meter
       Given an organization whose Instant Eval spend this month is zero
       When the month is reported
       Then no Instant Eval meter event is sent
+
+    @unit
+    Scenario: Instant Eval spend confirmed after the month's last trace is reported
+      Given an organization whose last trace this month was already reported
+      And a judged run whose spend gateway confirms after it, with no later trace
+      When billing receives the confirmed spend
+      Then the month's report runs and the Instant Eval meter receives the month's total
+      # ADR-174 decision 20: one billing subscriber on gateway's confirmed spend covers runs,
+      # judged queries, the routed judge and hosted Connect spend.
+
+    @unit
+    Scenario: Instant Evals no longer nudges the billing report itself
+      Given a hosted Connect call whose spend is recorded
+      Then Instant Evals dispatches nothing to billing
+      # Billing reports the month from gateway's confirmed spend instead.
 
   Rule: A free organization may spend one dollar in total
 

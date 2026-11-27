@@ -180,3 +180,26 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When traces are filtered by the event metric keys of an event type
     Then the filter tests each event's keys with one hasAny over its key list
     And it keeps exactly the traces whose event of that type carries one of the keys
+
+  # Instant Evals sizing and paging failed at the 1 GB cap on a busy project: the key and sample
+  # passes projected the thread id, a lookup into the trace attributes map, for every trace the
+  # view read, and the view's read-in-order merge held a block of that map per part before the
+  # hash sample and the LIMIT applied. Picking the row ids first was not enough: no filter reaches
+  # below the view's LIMIT 1 BY, so the keys are read over its trace-ids twin (dedup-trace-ids.feature).
+  @integration @regression
+  Scenario: An Instant Evals key or sample pass picks its rows before reading the thread id
+    Given a project whose traces span many parts and carry wide attribute maps
+    And the traces view and its trace-ids twin, as provisioning emits them
+    And an Instant Evals statement projecting the thread id and an eval column
+    When the sample pass and the key pass run over it as the service runs them, every query under a 200 MB memory cap
+    Then both answer under the cap
+    And they return the same keys the single read returns without a cap
+    And the single read that projects the thread id for every trace exceeds the cap
+
+  @unit
+  Scenario: A key or sample pass reads the other key columns only for the page's row ids
+    Given a statement projecting the thread id
+    When the key pass or the sample pass is composed
+    Then the page is picked on the trace id, or the trace and span ids, alone
+    And the outer read restricts the statement to those ids before projecting the thread id
+    And a pass that projects no key column beyond the ids reads the statement once

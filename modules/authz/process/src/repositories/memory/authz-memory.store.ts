@@ -54,6 +54,8 @@ type AuthzMemoryMembershipRow = {
   membershipStamp: string;
   pendingSsoGrantId: string | null;
   createdAt: Instant;
+  /** A Billing-only member (ADR-205). */
+  billingOnly?: boolean;
 };
 
 /** A Group row; its members are `groupMemberships`. */
@@ -65,6 +67,7 @@ type AuthzMemoryApiKeyRow = {
   name: string;
   userId: string | null;
   revokedAt: Instant | null;
+  isSystemManaged?: boolean;
 };
 
 /** A TeamUser row; its organization is its team's. */

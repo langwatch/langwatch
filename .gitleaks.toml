@@ -176,6 +176,22 @@ paths = [
   '''docs/llms-full\.txt''',
 ]
 
+# Placeholder bearer values in the docs' curl examples, as regenerated into
+# `llms-full.txt`: truncated keys (`vk-lw-01JXXX...`), `your_api_key` and
+# `sk-your-litellm-key`. None names a real credential.
+#
+# `condition = "AND"` because the default is OR, and under OR the path alone
+# would allowlist every curl-auth-header finding in this file. No
+# `regexTarget = "line"`: this rule can match across several lines of one
+# example, so a placeholder on a neighbouring line could carry a real token
+# through. The patterns apply to the matched secret itself.
+[[allowlists]]
+description = "Placeholder bearer keys in the docs' curl examples, not credentials"
+targetRules = ["curl-auth-header"]
+condition = "AND"
+paths = ['''docs/llms-full\.txt''']
+regexes = ['''^(?:.*\.\.\.|.*…)$''', '''^your[-_]api[-_]key$''', '''^sk-your-litellm-key$''']
+
 # `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
 # `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
 # before it reaches a log. To prove that, the fixture has to be shaped exactly

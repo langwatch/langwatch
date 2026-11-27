@@ -127,6 +127,19 @@ type ScoredTrace =
 // Service
 // ---------------------------------------------------------------------------
 
+type RunEvaluationParams = {
+  projectId: string;
+  evaluatorType: string;
+  data: DataForEvaluation;
+  settings?: Record<string, unknown>;
+  trace?: Trace;
+  workflowId?: string | null;
+  parentCausalityDepth?: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal | undefined;
+  guardrailDirection?: GuardrailCheckDirection | undefined;
+};
+
 export class EvaluationExecutionService {
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
     return new EvaluationExecutionService(deps);
@@ -313,18 +326,25 @@ export class EvaluationExecutionService {
   // Evaluation execution (built-in vs custom/workflow)
   // ---------------------------------------------------------------------------
 
-  private async runEvaluation(params: {
-    projectId: string;
-    evaluatorType: string;
-    data: DataForEvaluation;
-    settings?: Record<string, unknown>;
-    trace?: Trace;
-    workflowId?: string | null;
-    parentCausalityDepth?: number;
-    idempotencyKey?: string;
-    signal?: AbortSignal | undefined;
-    guardrailDirection?: GuardrailCheckDirection | undefined;
+  private answerInstantEval({
+    params,
+    dispatch,
+    droppedCategories,
+  }: {
+    params: RunEvaluationParams;
+    dispatch: Extract<ReturnType<typeof instantEvalJudgeOf>, { kind: "instant_eval" }>;
+    droppedCategories: string[];
   }): Promise<SingleEvaluationResult> {
+    return this.instantEvals.answer({
+      ...params,
+      judge: dispatch.judge,
+      ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
+      ...(dispatch.isRoutable ? { isRoutable: true } : {}),
+      droppedCategories,
+    });
+  }
+
+  private async runEvaluation(params: RunEvaluationParams): Promise<SingleEvaluationResult> {
     const {
       projectId,
       evaluatorType,
@@ -359,13 +379,7 @@ export class EvaluationExecutionService {
     // Before any provider lookup, so a project with no model provider can judge too.
     const dispatch = instantEvalJudgeOf({ evaluatorType: builtInType, settings });
     if (dispatch.kind === "instant_eval") {
-      return this.instantEvals.answer({
-        ...params,
-        judge: dispatch.judge,
-        ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
-        data,
-        droppedCategories,
-      });
+      return this.answerInstantEval({ params, dispatch, droppedCategories });
     }
 
     // Native evaluators skip the analysis service; both kinds run through the shared

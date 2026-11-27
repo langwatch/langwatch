@@ -3,6 +3,7 @@ import type { ExhaustedOutcome } from "@langwatch/group-queue";
 import type { Event } from "../domain/types.ts";
 import type { EventLogPageCursor } from "../stores/event-log-page-order.ts";
 import type { EventLogProbe } from "../stores/repositories/eventRepository.types.ts";
+import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -37,7 +38,7 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   key?: (event: E) => string;
 
   /** Optional processing behavior configuration. */
-  options?: FoldProjectionOptions;
+  options?: FoldProjectionOptions<E>;
 
   /**
    * Key name for the LastEventOccurredAt field on the state.
@@ -88,9 +89,19 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
 }
 
 /**
- * Options for configuring fold projection processing behavior.
+ * Fold enqueue-time filter seam, mirroring the map's: filter must never reject what apply()
+ * would change (superset safe, subset is silent data loss). Derive both from one declaration.
  */
-export interface FoldProjectionOptions {
+export type FoldEnqueueDispatchOptions<E extends Event = Event> = Pick<
+  EnqueueDispatchOptions<E>,
+  "filter"
+>;
+
+/**
+ * Options for configuring fold projection processing behavior. Generic in the
+ * projection's own event type for typed filters.
+ */
+export interface FoldProjectionOptions<E extends Event = Event> {
   /** Disable this projection in the assembled runtime. */
   disabled?: boolean;
   // `occurredAt` (default) follows business time; `acceptedAt` follows
@@ -103,7 +114,12 @@ export interface FoldProjectionOptions {
   // time; unwindowed retry is the correctness net. Omit for non-partitioned reads.
   // `fallbackLookbackStepsMs`: on a miss, re-read reaching each step back from the event,
   // narrowest first, instead of one unbounded read; a miss at the widest is final.
-  readWindow?: { widthMs: number; fallbackLookbackStepsMs?: readonly number[] };
+  readWindow?: {
+    widthMs: number;
+    fallbackLookbackStepsMs?: readonly number[];
+    /** A business time the window must also cover when occurredAt is an arrival time. */
+    anchorOf?: (event: Event) => number | undefined;
+  };
   // Re-fold from event log on store miss; transitional only for rows predating
   // read-back columns. See ADR-066; requires eventLoaderUpTo and RedisCachedFoldStore.
   refoldOnStoreMiss?: boolean;
@@ -119,6 +135,12 @@ export interface FoldProjectionOptions {
   resendOnRedelivery?: boolean;
   // A spent fold job blocks its group (default) or is dead-lettered; order-tolerant folds only.
   onExhausted?: ExhaustedOutcome;
+  /**
+   * Enqueue-time gate: an event this fold would leave unchanged never mints a job.
+   * Evaluated at fan-out after the event-type match; a replay or re-fold still hands
+   * apply() every event, so apply() must ignore what the filter declines.
+   */
+  enqueue?: FoldEnqueueDispatchOptions<E>;
 }
 
 // ADR-146: `empty` until the first event is folded.

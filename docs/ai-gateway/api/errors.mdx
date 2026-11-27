@@ -133,8 +133,13 @@ Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC c
 | `a2a_rate_limited`            | -32021        | 429  | The key is over its requests-per-minute or requests-per-day limit.                 |
 | `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
 | `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
+| `a2a_public_url_unset`        | -32024        | 503  | The gateway has no `A2A_PUBLIC_BASE_URL`, so it refuses Agent Card calls.          |
 
-The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the agent's host, or the IP address it resolves to, is in `ALLOWED_PROXY_HOSTS`. Listing an IP address therefore admits every hostname that resolves to it. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`.
+
+An entry in `ALLOWED_PROXY_HOSTS` matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname.
+
+A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
 
 ## Streaming errors
 

@@ -5,7 +5,10 @@
  */
 
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
-import { PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import {
+  PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS,
+  PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS,
+} from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,7 +20,7 @@ import {
   piiRedactionModelOfferOf,
   piiRedactionModelPrice,
   ruleSaveConfirmation,
-  STRICT_FALLBACK_NOTE,
+  strictFallbackNote,
   STRICT_RULE_BASED_NOTES,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
@@ -39,6 +42,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         isSaaS: false,
         modelFlag,
         freeFlag: false,
+        splitFlag: true,
         licence,
         mayManageLicence,
       });
@@ -49,6 +53,7 @@ describe("given the deployment and the PII redaction model flags", () => {
         kind: "model",
         free: true,
         licensed: true,
+        split: false,
       });
     });
 
@@ -99,17 +104,56 @@ describe("given the deployment and the PII redaction model flags", () => {
 
   describe("when the deployment is LangWatch Cloud", () => {
     it("offers the model only with the flag, priced unless the organization is free", () => {
-      const cloud = ({ modelFlag, freeFlag }: { modelFlag: boolean; freeFlag: boolean }) =>
+      const cloud = ({
+        modelFlag,
+        freeFlag,
+        splitFlag = false,
+      }: {
+        modelFlag: boolean;
+        freeFlag: boolean;
+        splitFlag?: boolean;
+      }) =>
         piiRedactionModelOfferOf({
           isSaaS: true,
           modelFlag,
           freeFlag,
+          splitFlag,
           licence: "none",
           mayManageLicence: true,
         });
       expect(cloud({ modelFlag: false, freeFlag: true })).toBeNull();
-      expect(cloud({ modelFlag: true, freeFlag: false })).toEqual({ kind: "model", free: false });
-      expect(cloud({ modelFlag: true, freeFlag: true })).toEqual({ kind: "model", free: true });
+      expect(cloud({ modelFlag: true, freeFlag: false })).toEqual({
+        kind: "model",
+        free: false,
+        split: false,
+      });
+      expect(cloud({ modelFlag: true, freeFlag: true })).toEqual({
+        kind: "model",
+        free: true,
+        split: false,
+      });
+    });
+
+    /** @scenario The settings page names the model's own length limit */
+    it("carries the organization's split flag on Cloud, never self-hosted", () => {
+      const cloud = piiRedactionModelOfferOf({
+        isSaaS: true,
+        modelFlag: true,
+        freeFlag: false,
+        splitFlag: true,
+        licence: "none",
+        mayManageLicence: true,
+      });
+      expect(cloud).toEqual({ kind: "model", free: false, split: true });
+      const selfHosted = piiRedactionModelOfferOf({
+        isSaaS: false,
+        modelFlag: true,
+        freeFlag: false,
+        splitFlag: true,
+        licence: "enterprise",
+        mayManageLicence: true,
+      });
+      expect(selfHosted).toMatchObject({ kind: "model", split: false });
     });
   });
 });
@@ -243,16 +287,37 @@ describe("given a change of the organization's level", () => {
 describe("given the fallback note", () => {
   /** @scenario The settings page names the model's own length limit */
   it("names the limit the process routes by, on a span's text combined", () => {
-    expect(STRICT_FALLBACK_NOTE).toContain(
+    const note = strictFallbackNote({ split: false });
+    expect(note).toContain(
       `over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters in total`,
     );
-    expect(STRICT_FALLBACK_NOTE).toContain("rule-based detector (Presidio)");
-    expect(STRICT_FALLBACK_NOTE).toContain("Google Cloud DLP");
+    expect(note).toContain("rule-based detector (Presidio)");
+    expect(note).toContain("Google Cloud DLP");
+    expect(note).not.toContain("several parts");
+  });
+
+  /** @scenario The settings page names the model's own length limit */
+  it("names the split limit and how a split span is billed when splitting is on", () => {
+    const note = strictFallbackNote({ split: true });
+    expect(note).toContain(
+      `over ${PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS.toLocaleString("en-US")} characters in total`,
+    );
+    expect(note).toContain("billed once on its own characters");
+    expect(note).toContain("the overlap between parts is free");
+  });
+
+  /** @scenario With long-span splitting on, the small print names the split limit and how a split span is billed */
+  it("names no billing for a split span where Strict is included", () => {
+    const note = strictFallbackNote({ split: true, free: true });
+    expect(note).toContain(
+      `A span over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters is sent to the model in several parts.`,
+    );
+    expect(note).not.toContain("billed");
   });
 });
 
 describe("given a rule saved from the drawer", () => {
-  const model = { kind: "model", free: false } as const;
+  const model = { kind: "model", free: false, split: false } as const;
 
   describe("when it turns Strict on where Strict is the model at a price", () => {
     it("asks with the price", () => {
@@ -272,7 +337,7 @@ describe("given a rule saved from the drawer", () => {
     expect(ruleSaveConfirmation({ offer: model, before: strict, after: strict })).toBeNull();
     expect(
       ruleSaveConfirmation({
-        offer: { kind: "model", free: true },
+        offer: { kind: "model", free: true, split: false },
         before: undefined,
         after: strict,
       }),

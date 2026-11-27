@@ -6,23 +6,41 @@ Weekly digest emails: folds the week's usage, picks a template per person and se
 
 ## At a glance
 
-|                |                                       |
-| -------------- | ------------------------------------- |
-| Classification | enterprise (`modules/catalogue.json`) |
-| Subjects       | digest                                |
-| Halves         | [process](process/README.md)          |
-| Api token      | none                                  |
-| Installed by   | –                                     |
+|                |                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| Classification | enterprise (`modules/catalogue.json`)                                                            |
+| Subjects       | digest                                                                                           |
+| Halves         | [contract](contract) · [process](process/README.md)                                              |
+| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:38` (6 operations) |
+| Installed by   | api, worker, tasks (process)                                                                     |
 
 ## What digest owns
 
-No table, store, secret or config: digest declares none.
+| Kind            | Name                            | Declared at                                                                   |
+| --------------- | ------------------------------- | ----------------------------------------------------------------------------- |
+| Postgres table  | `DigestCohortOrganization`      | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
+| Postgres table  | `DigestSubscription`            | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
+| Postgres table  | `DigestSettings`                | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
+| Postgres table  | `DigestProjectWeek`             | `process/src/repositories/prisma/prisma.digest-project-week.repository.ts:24` |
+| Postgres table  | `DigestSend`                    | `process/src/repositories/prisma/prisma.digest-send.repository.ts:16`         |
+| Postgres table  | `DigestUserWeek`                | `process/src/repositories/prisma/prisma.digest-user-week.repository.ts:24`    |
+| Stores required |                                 | `process/src/channels/http/http.digest.channels.ts:10`                        |
+| Stores required | prisma, redis                   | `process/src/repositories/live/live.digest.repositories.ts:11`                |
+| Secrets         | `unsubscribe` (NEXTAUTH_SECRET) | `process/src/app/digest.app.ts:69`                                            |
+| Config          | `publicBaseUrl` (BASE_HOST)     | `contract/src/digest.config.ts:5`                                             |
 
 Anything else digest needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-None: digest declares no peers.
+| Name            | Token             | Module                                                  |
+| --------------- | ----------------- | ------------------------------------------------------- |
+| `authz`         | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
+| `entitlement`   | `EntitlementApi`  | [entitlement](../../../modules/entitlement/README.md)   |
+| `ops`           | `OpsApi`          | [ops](../../../modules/ops/README.md)                   |
+| `organizations` | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
+| `projects`      | `ProjectApi`      | [project](../../../modules/project/README.md)           |
+| `users`         | `UserApi`         | [user](../../../modules/user/README.md)                 |
 
 ## Who depends on digest
 

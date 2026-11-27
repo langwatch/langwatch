@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:77`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceRegistryTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(ingestionSourceLifecycleEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:79`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:211`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:215`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -582,6 +582,22 @@ ingestionSourceValidateOttl(input: { statements: string[] }): Promise<OttlValida
 ingestionSourceOttlStarter(input: { sourceType: string }): OttlStarterTemplate;
 ```
 
+#### `ingestionSourceTestAgentListing`
+
+Lists the provider's agents for an unsaved configuration, recording nothing.
+
+```typescript
+ingestionSourceTestAgentListing(input: TestAgentListingInput): Promise<TestAgentListingResult>;
+```
+
+#### `ingestionSourceTestAgentListingForSource`
+
+Lists a saved source's agents, recording nothing; another organisation's source is a 404.
+
+```typescript
+ingestionSourceTestAgentListingForSource(input: { organizationId: string; sourceId: string; }): Promise<TestAgentListingResult>;
+```
+
 #### `governanceSetupState`
 
 ```typescript
@@ -713,7 +729,7 @@ cliBootstrap(input: { organizationId: string }, by: GovernanceCaller): Promise<C
 The organisation's agent registry, a page at a time (specs/agent-registry.feature).
 
 ```typescript
-listRegistryAgents(input: { organizationId: string; limit: number; cursor?: string; updatedSince?: string; status?: AgentRegistryStatus; }): Promise<AgentRegistryPage>;
+listRegistryAgents(input: { organizationId: string; limit: number; cursor?: string; updatedSince?: string; status?: AgentRegistryStatus; posture?: AgentRegistryPosture; }): Promise<AgentRegistryPage>;
 ```
 
 #### `getRegistryAgent`
@@ -750,6 +766,20 @@ getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest>;
 
 ```typescript
 searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; }): Promise<ArdSearchResponse>;
+```
+
+#### `getRegistrySettings`
+
+The organisation's dormancy window; 30 days until it saves one.
+
+```typescript
+getRegistrySettings(input: { organizationId: string }): Promise<AgentRegistrySettings>;
+```
+
+#### `saveRegistrySettings`
+
+```typescript
+saveRegistrySettings(input: { organizationId: string; dormantAfterDays: number; }): Promise<AgentRegistrySettings>;
 ```
 
 #### `findAgentKillSwitchSummaries`
@@ -1078,7 +1108,7 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/agent-registry.rest.ts:38` |
+| Declared at | `src/transport/agent-registry.rest.ts:40` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | organization                              |
@@ -1087,78 +1117,79 @@ type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/feat
 
 List the organisation's agent registry
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:45`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:47`.
 
 Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
 
 ```typescript
-// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:173
+// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:193
 interface Query {
   limit?: number;
   cursor?: string;
   updated_since?: string;
   status?: "active" | "removed";
+  posture?: "governed" | "shadow" | "dormant";
 }
-type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:183
+type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
 ```
 
 #### `GET /api/governance/registry/agents/:agentId` · `getRegistryAgent`
 
 Get one registry agent
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:68`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:71`.
 
 Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
 
 ```typescript
-// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:191
+// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:211
 interface Params {
   agentId: string;
 }
-type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:198
+type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:218
 ```
 
 #### `GET /api/governance/registry/agents/:agentId/versions` · `listRegistryAgentVersions`
 
 List one registry agent's versions
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:89`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:92`.
 
 Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
 
 ```typescript
-type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:191
-// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:218
+type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:211
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:238
 interface Query {
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:229
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:249
 ```
 
 #### `GET /api/governance/registry/events` · `listRegistryEvents`
 
 Read the registry change feed
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:116`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:119`.
 
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
 ```typescript
-type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:218
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:229
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:238
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:249
 ```
 
 #### `GET /api/governance/registry/schema` · `getRegistrySchema`
 
 Get the registry's JSON Schemas
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:137`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:140`.
 
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
 ```typescript
-// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:241
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:261
 interface Response {
   entry: Record<string, unknown>;
   event: Record<string, unknown>;
@@ -1169,7 +1200,7 @@ interface Response {
 
 Get the registry as an ARD manifest
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:151`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:154`.
 
 Answers at `/api/governance/registry/ard.json`, `/api/v1/governance/registry/ard.json`.
 
@@ -1181,7 +1212,7 @@ type Response = z.infer<typeof ardManifestSchema>; // ../contract/src/features/r
 
 Search the registry (ARD search)
 
-Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:165`.
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:168`.
 
 Answers at `/api/governance/registry/ard/search`, `/api/v1/governance/registry/ard/search`.
 
@@ -1197,6 +1228,39 @@ interface Body {
   pageToken?: string;
 }
 type Response = z.infer<typeof ardSearchResponseSchema>; // ../contract/src/features/registry/agent-registry-ard.ts:70
+```
+
+#### `GET /api/governance/registry/settings` · `getRegistrySettings`
+
+Get the registry settings
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:187`.
+
+Answers at `/api/governance/registry/settings`, `/api/v1/governance/registry/settings`.
+
+```typescript
+// Response: agentRegistrySettingsResponseSchema, ../contract/src/features/registry/agent-registry-settings.ts:39
+interface Response {
+  data: {
+    dormant_after_days: number;
+  };
+}
+```
+
+#### `PUT /api/governance/registry/settings` · `saveRegistrySettings`
+
+Save the registry settings
+
+Permission `ingestionSources:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-registry.rest.ts:203`.
+
+Answers at `/api/governance/registry/settings`, `/api/v1/governance/registry/settings`.
+
+```typescript
+// Body: agentRegistrySettingsSchema, ../contract/src/features/registry/agent-registry-settings.ts:29
+interface Body {
+  dormant_after_days: number;
+}
+type Response = z.infer<typeof agentRegistrySettingsResponseSchema>; // ../contract/src/features/registry/agent-registry-settings.ts:39
 ```
 
 ### `governanceCliRest`
@@ -1559,7 +1623,7 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
 
 ```typescript
-// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:87
+// Query: ocsfEventsQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:102
 interface Query {
   limit?: number;
   since?: string;
@@ -1568,7 +1632,7 @@ interface Query {
   source_type?: string;
   source_id?: string;
 }
-// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:122
+// Response: ocsfEventsPageSchema, ../contract/src/features/ocsf/ocsf-siem.ts:137
 interface Response {
   ocsf_version: string;
   data: Record<string, unknown>[];
@@ -1586,7 +1650,7 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
 
 ```typescript
-// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:96
+// Query: ocsfTracesQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:111
 interface Query {
   limit?: number;
   since?: string;
@@ -1594,7 +1658,7 @@ interface Query {
   cursor?: string;
   project_id?: string;
 }
-type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:137
 ```
 
 #### `GET /api/governance/ocsf/audit` · `listOcsfAudit`
@@ -1606,14 +1670,14 @@ Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPO
 Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
 
 ```typescript
-// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:104
+// Query: ocsfAuditQuerySchema, ../contract/src/features/ocsf/ocsf-siem.ts:119
 interface Query {
   limit?: number;
   since?: string;
   until?: string;
   cursor?: string;
 }
-type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:122
+type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:137
 ```
 
 #### `POST /api/governance/ocsf/ingest` · `ingestOcsfEvents`
@@ -1625,8 +1689,8 @@ Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`)
 Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
 
 ```typescript
-type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:168
-// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:179
+type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features/ocsf/ocsf-siem.ts:183
+// Response: ocsfIngestResponseSchema, ../contract/src/features/ocsf/ocsf-siem.ts:194
 interface Response {
   accepted: number;
 }
@@ -2158,7 +2222,7 @@ type Output = z.infer<typeof governanceWriteAcknowledgedSchema>; // ../contract/
 
 ### `governanceAgents`
 
-Contract `../contract/src/governance-agents.ts:82`, router `src/transport/governance-agents.trpc.ts:9`.
+Contract `../contract/src/governance-agents.ts:96`, router `src/transport/governance-agents.trpc.ts:9`.
 
 | Procedure                         | Kind     | Gate                           | Input               | Output                            |
 | --------------------------------- | -------- | ------------------------------ | ------------------- | --------------------------------- |
@@ -2168,19 +2232,19 @@ Contract `../contract/src/governance-agents.ts:82`, router `src/transport/govern
 
 ```typescript
 // governanceAgents.list
-// Input: organizationScope, ../contract/src/governance-agents.ts:20
+// Input: organizationScope, ../contract/src/governance-agents.ts:22
 interface Input {
   organizationId: string;
 }
-// Output: governanceAgentRowSchema.array() (inline, ../contract/src/governance-agents.ts:85)
+// Output: governanceAgentRowSchema.array() (inline, ../contract/src/governance-agents.ts:99)
 
 // governanceAgents.syncSources
-type Input = z.infer<typeof organizationScope>; // ../contract/src/governance-agents.ts:20
-// Output: agentSyncSourceListingSchema.array() (inline, ../contract/src/governance-agents.ts:89)
+type Input = z.infer<typeof organizationScope>; // ../contract/src/governance-agents.ts:22
+// Output: agentSyncSourceListingSchema.array() (inline, ../contract/src/governance-agents.ts:103)
 
 // governanceAgents.requestListing
-type Input = z.infer<typeof organizationScope>; // ../contract/src/governance-agents.ts:20
-// Output: agentListingRequestResultSchema, ../contract/src/governance-agents.ts:50
+type Input = z.infer<typeof organizationScope>; // ../contract/src/governance-agents.ts:22
+// Output: agentListingRequestResultSchema, ../contract/src/governance-agents.ts:52
 interface Output {
   requested: number;
   sources: {
@@ -2195,13 +2259,13 @@ interface Output {
 
 Contract `../contract/src/features/cost/governance-cost.trpc.ts:15`, router `src/transport/governance-cost.trpc.ts:13`.
 
-| Procedure                        | Kind  | Gate                                                | Input                                    | Output                                     |
-| -------------------------------- | ----- | --------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| `governanceCost.summary`         | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostSummarySchema`              |
-| `governanceCost.dailyByProvider` | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostProviderDayBreakdownSchema` |
-| `governanceCost.spendByModel`    | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostModelBreakdownSchema`       |
-| `governanceCost.periodRecords`   | query | Permission `governanceCost:view`                    | `governanceCostPeriodRecordsInputSchema` | `governanceCostDayRecordsSchema`           |
-| `governanceCost.spenders`        | query | Permission `governanceCost:view or governance:view` | `governanceCostWindowInputSchema`        | `governanceSpenderBreakdownSchema`         |
+| Procedure                        | Kind  | Gate                                                 | Input                                    | Output                                     |
+| -------------------------------- | ----- | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| `governanceCost.summary`         | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostSummarySchema`              |
+| `governanceCost.dailyByProvider` | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostProviderDayBreakdownSchema` |
+| `governanceCost.spendByModel`    | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostModelBreakdownSchema`       |
+| `governanceCost.periodRecords`   | query | Permission `governanceCost:view`                     | `governanceCostPeriodRecordsInputSchema` | `governanceCostDayRecordsSchema`           |
+| `governanceCost.spenders`        | query | Permission `governanceCost:view and governance:view` | `governanceCostWindowInputSchema`        | `governanceSpenderBreakdownSchema`         |
 
 ```typescript
 // governanceCost.summary
@@ -2458,6 +2522,32 @@ interface Output {
 }
 ```
 
+### `governanceRegistry`
+
+Contract `../contract/src/features/registry/agent-registry-settings.ts:43`, router `src/transport/governance-registry.trpc.ts:12`.
+
+| Procedure                         | Kind     | Gate                                 | Input               | Output                        |
+| --------------------------------- | -------- | ------------------------------------ | ------------------- | ----------------------------- |
+| `governanceRegistry.settings`     | query    | Permission `governance:view`         | `organizationScope` | `agentRegistrySettingsSchema` |
+| `governanceRegistry.saveSettings` | mutation | Permission `ingestionSources:manage` | inline              | `agentRegistrySettingsSchema` |
+
+```typescript
+// governanceRegistry.settings
+// Input: organizationScope, ../contract/src/features/registry/agent-registry-settings.ts:41
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof agentRegistrySettingsSchema>; // ../contract/src/features/registry/agent-registry-settings.ts:29
+
+// governanceRegistry.saveSettings
+// Input: inline, ../contract/src/features/registry/agent-registry-settings.ts:49
+interface Input {
+  organizationId: string;
+  dormant_after_days: number;
+}
+type Output = z.infer<typeof agentRegistrySettingsSchema>; // ../contract/src/features/registry/agent-registry-settings.ts:29
+```
+
 ### `governance`
 
 Contract `../contract/src/governance.trpc.ts:26`, router `src/transport/governance.trpc.ts:13`.
@@ -2495,7 +2585,7 @@ type Output = {
 interface Input {
   organizationId: string;
 }
-// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:54
+// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:56
 interface Output {
   persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
   destination: string;
@@ -2507,7 +2597,7 @@ interface Output {
 
 // governance.setupState
 type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:24
-// Output: governanceSetupStateSchema, ../contract/src/governance.ts:63
+// Output: governanceSetupStateSchema, ../contract/src/governance.ts:66
 interface Output {
   hasPersonalVKs: boolean;
   hasRoutingPolicies: boolean;
@@ -2655,7 +2745,7 @@ interface Output {
 
 ### `ingestionSources`
 
-Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:75`, router `src/transport/ingestion-sources.trpc.ts:12`.
+Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:106`, router `src/transport/ingestion-sources.trpc.ts:12`.
 
 | Procedure                                           | Kind     | Gate                                                                                   | Input                              | Output                             |
 | --------------------------------------------------- | -------- | -------------------------------------------------------------------------------------- | ---------------------------------- | ---------------------------------- |
@@ -2673,6 +2763,8 @@ Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:75`, rout
 | `ingestionSources.archive`                          | mutation | Permission `ingestionSources:manage`                                                   | `sourceInOrganization`             | `ingestionSourceDtoSchema`         |
 | `ingestionSources.validateOttl`                     | mutation | Permission `ingestionSources:manage`                                                   | inline                             | `ottlValidationResultSchema`       |
 | `ingestionSources.ottlStarter`                      | query    | Permission `ingestionSources:view`                                                     | inline                             | `ottlStarterTemplateSchema`        |
+| `ingestionSources.testAgentListing`                 | mutation | Permission `ingestionSources:manage`                                                   | `testAgentListingInputSchema`      | `testAgentListingResultSchema`     |
+| `ingestionSources.testAgentListingForSource`        | mutation | Permission `ingestionSources:manage`                                                   | inline                             | `testAgentListingResultSchema`     |
 
 ```typescript
 // ingestionSources.list
@@ -2680,7 +2772,7 @@ Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:75`, rout
 interface Input {
   organizationId: string;
 }
-// Output: ingestionSourceDtoSchema.array() (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:78)
+// Output: ingestionSourceDtoSchema.array() (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:109)
 
 // ingestionSources.get
 // Input: sourceInOrganization, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:28
@@ -2710,11 +2802,11 @@ interface Input {
 type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.securityLakeCreate
-// Input: z.object({ ...organizationScope.shape, ...securityLakeSourceCreateInputSchema.shape }) (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:93)
+// Input: z.object({ ...organizationScope.shape, ...securityLakeSourceCreateInputSchema.shape }) (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:124)
 type Output = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
 
 // ingestionSources.securityLakeUpdate
-// Input: z.object({ ...sourceInOrganization.shape, ...securityLakeSourceUpdateInputSchema.shape }) (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:98)
+// Input: z.object({ ...sourceInOrganization.shape, ...securityLakeSourceUpdateInputSchema.shape }) (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:129)
 type Output = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
 
 // ingestionSources.securityLakeGet
@@ -2722,7 +2814,7 @@ type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/i
 type Output = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
 
 // ingestionSources.securityLakeTestConnection
-// Input: z.object({ ...sourceInOrganization.shape, ...securityLakeConnectionTestInputSchema.shape … (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:108)
+// Input: z.object({ ...sourceInOrganization.shape, ...securityLakeConnectionTestInputSchema.shape … (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:139)
 type Output = z.infer<typeof securityLakeConnectionTestSchema>; // ../contract/src/features/ocsf/security-lake.ts:168
 
 // ingestionSources.securityLakeHealth
@@ -2751,7 +2843,7 @@ type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/i
 type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.validateOttl
-// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:130
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:161
 interface Input {
   organizationId: string;
   statements: string[];
@@ -2759,7 +2851,7 @@ interface Input {
 type Output = z.infer<typeof ottlValidationResultSchema>; // ../contract/src/features/ingestion/ottl.ts:45
 
 // ingestionSources.ottlStarter
-// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:135
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:166
 interface Input {
   organizationId: string;
   sourceType: string;
@@ -2770,6 +2862,18 @@ interface Output {
   statements: string[];
   enabledSourceTypes: string[];
 }
+
+// ingestionSources.testAgentListing
+type Input = z.infer<typeof testAgentListingInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:86
+type Output = z.infer<typeof testAgentListingResultSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:103
+
+// ingestionSources.testAgentListingForSource
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:174
+interface Input {
+  organizationId: string;
+  sourceId: string;
+}
+type Output = z.infer<typeof testAgentListingResultSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:103
 ```
 
 ### `ingestionTemplates`
@@ -3011,6 +3115,15 @@ Declared at `src/eventing/ingestion-pull.pipeline.ts:105`. Events: `ingestionPul
 | Postgres projection | `≈ IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore)` | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:123` |
 | retention           | `≈ this.options.retention`                                                       | –                                                 | `src/eventing/ingestion-pull.pipeline.ts:136` |
 
+### Pipeline `governance_ingestion_source` (aggregate `governance_ingestion_source`)
+
+Declared at `src/eventing/ingestion-source-lifecycle.pipeline.ts:128`. Events: `ingestionSourceCreatedEventSchema`, `ingestionSourceWentLiveEventSchema`.
+
+| Kind    | Name                            | Handles | Declared at                                               |
+| ------- | ------------------------------- | ------- | --------------------------------------------------------- |
+| command | `recordIngestionSourceCreated`  | –       | `src/eventing/ingestion-source-lifecycle.pipeline.ts:133` |
+| command | `recordIngestionSourceWentLive` | –       | `src/eventing/ingestion-source-lifecycle.pipeline.ts:134` |
+
 ### Pipeline `pulled_usage_processing` (aggregate `pulled_usage`)
 
 Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObservedEventSchema`, `pulledUsageRetractedEventSchema`, `pulledUsagePricedEventSchema`.
@@ -3056,34 +3169,37 @@ Declared at `src/features/ocsf/eventing/ocsf-push.pipeline.ts:40`.
 
 ### Pipeline `governance_agent_registry` (aggregate `global`)
 
-Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
+Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:92`.
 
-| Kind            | Name                                    | Handles                                                                                                                             | Declared at                                                     |
-| --------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:107` |
-| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                       | `src/features/registry/eventing/agent-registry.pipeline.ts:124` |
-| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                | `src/features/registry/eventing/agent-registry.pipeline.ts:95`  |
-| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                               | `src/features/registry/eventing/agent-registry.pipeline.ts:101` |
+| Kind            | Name                                    | Handles                                                                                                                                                   | Declared at                                                     |
+| --------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| process manager | `agentRegistryDelivery`                 | every 1 d (`AGENT_REGISTRY_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestShadowAlert`, `requestDelivery` (outbox) | `src/features/registry/eventing/agent-registry.pipeline.ts:110` |
+| process manager | `agentRegistryTraffic`                  | every 15 min (`AGENT_REGISTRY_TRAFFIC_INTERVAL_MS = 15 * 60 * 1000`); intents `pass` (outbox)                                                             | `src/features/registry/eventing/agent-registry.pipeline.ts:130` |
+| peer subscriber | `reconcileAgentRegistryOnAgentChanged`  | `lw.agent.changed` from [agent](../../../../modules/agent/README.md)                                                                                      | `src/features/registry/eventing/agent-registry.pipeline.ts:98`  |
+| peer subscriber | `reconcileAgentRegistryOnAgentArchived` | `lw.agent.archived` from [agent](../../../../modules/agent/README.md)                                                                                     | `src/features/registry/eventing/agent-registry.pipeline.ts:104` |
 
 ## Configuration
 
-| Kind   | Leaf                       | Environment variable                  | Declared at                               |
-| ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:589`           |
-| config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
-| config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
-| config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |
-| config | `blockLocalHttpCalls`      | `BLOCK_LOCAL_HTTP_CALLS`              | `../contract/src/governance.config.ts:45` |
-| config | `allowedProxyHosts`        | `ALLOWED_PROXY_HOSTS`                 | `../contract/src/governance.config.ts:46` |
-| config | `openAiAdminApiBase`       | `OPENAI_ADMIN_API_BASE`               | `../contract/src/governance.config.ts:48` |
-| config | `anthropicAdminApiBase`    | `ANTHROPIC_ADMIN_API_BASE`            | `../contract/src/governance.config.ts:49` |
-| config | `microsoftLoginBase`       | `MICROSOFT_LOGIN_BASE`                | `../contract/src/governance.config.ts:50` |
-| config | `microsoftGraphApiBase`    | `MICROSOFT_GRAPH_API_BASE`            | `../contract/src/governance.config.ts:51` |
-| config | `databricksWorkspaceBase`  | `DATABRICKS_WORKSPACE_BASE`           | `../contract/src/governance.config.ts:53` |
-| config | `dataverseEnvironmentBase` | `DATAVERSE_ENVIRONMENT_BASE`          | `../contract/src/governance.config.ts:55` |
-| config | `bedrockAgentEndpoint`     | `BEDROCK_AGENT_ENDPOINT`              | `../contract/src/governance.config.ts:57` |
-| config | `isSaas`                   | `IS_SAAS`                             | `../contract/src/governance.config.ts:59` |
-| config | `publicBaseUrl`            | `BASE_HOST`                           | `../contract/src/governance.config.ts:61` |
-| config | `ingestRateLimitDisabled`  | `LW_INGEST_RATE_LIMIT_DISABLED`       | `../contract/src/governance.config.ts:63` |
+| Kind   | Leaf                              | Environment variable                  | Declared at                               |
+| ------ | --------------------------------- | ------------------------------------- | ----------------------------------------- |
+| secret | `–`                               | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:611`           |
+| config | `gatewayPublicUrl`                | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
+| config | `gatewayInternalUrl`              | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
+| config | `gatewayLegacyUrl`                | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |
+| config | `blockLocalHttpCalls`             | `BLOCK_LOCAL_HTTP_CALLS`              | `../contract/src/governance.config.ts:45` |
+| config | `allowedProxyHosts`               | `ALLOWED_PROXY_HOSTS`                 | `../contract/src/governance.config.ts:46` |
+| config | `openAiAdminApiBase`              | `OPENAI_ADMIN_API_BASE`               | `../contract/src/governance.config.ts:48` |
+| config | `anthropicAdminApiBase`           | `ANTHROPIC_ADMIN_API_BASE`            | `../contract/src/governance.config.ts:49` |
+| config | `microsoftLoginBase`              | `MICROSOFT_LOGIN_BASE`                | `../contract/src/governance.config.ts:50` |
+| config | `microsoftGraphApiBase`           | `MICROSOFT_GRAPH_API_BASE`            | `../contract/src/governance.config.ts:51` |
+| config | `databricksWorkspaceBase`         | `DATABRICKS_WORKSPACE_BASE`           | `../contract/src/governance.config.ts:53` |
+| config | `dataverseEnvironmentBase`        | `DATAVERSE_ENVIRONMENT_BASE`          | `../contract/src/governance.config.ts:55` |
+| config | `bedrockAgentEndpoint`            | `BEDROCK_AGENT_ENDPOINT`              | `../contract/src/governance.config.ts:57` |
+| config | `bedrockAgentCoreControlEndpoint` | `BEDROCK_AGENTCORE_CONTROL_ENDPOINT`  | `../contract/src/governance.config.ts:59` |
+| config | `googleOauthTokenBase`            | `GOOGLE_OAUTH_TOKEN_BASE`             | `../contract/src/governance.config.ts:61` |
+| config | `vertexAiApiBase`                 | `VERTEX_AI_API_BASE`                  | `../contract/src/governance.config.ts:63` |
+| config | `isSaas`                          | `IS_SAAS`                             | `../contract/src/governance.config.ts:65` |
+| config | `publicBaseUrl`                   | `BASE_HOST`                           | `../contract/src/governance.config.ts:67` |
+| config | `ingestRateLimitDisabled`         | `LW_INGEST_RATE_LIMIT_DISABLED`       | `../contract/src/governance.config.ts:69` |
 
 <!-- readme:generated:end -->

@@ -95,16 +95,24 @@ const logRequestType = root.opentelemetry.proto.collector.logs.v1.ExportLogsServ
 const metricsRequestType =
   root.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
 
-function toArrayBuffer(buf: Buffer): ArrayBuffer {
-  return new Uint8Array(buf).buffer as ArrayBuffer;
+/** The bytes as their own ArrayBuffer, copied only when the view does not span its whole buffer. */
+function toArrayBuffer(buf: Uint8Array): ArrayBuffer {
+  const whole =
+    buf.buffer instanceof ArrayBuffer &&
+    buf.byteOffset === 0 &&
+    buf.byteLength === buf.buffer.byteLength;
+  return whole ? (buf.buffer as ArrayBuffer) : (new Uint8Array(buf).buffer as ArrayBuffer);
 }
 
 /**
- * The read cap and the post-decompress cap, as one number — a compressed
+ * The default read cap and post-decompress cap, as one number: a compressed
  * body's expansion ratio is chosen by the sender and cannot be trusted.
  * Applied here because the governance ingest routes carry no `bodyLimit`.
  */
 export const OTLP_MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+/** The cap a caller reads one body under; {@link OTLP_MAX_BODY_BYTES} when it names none. */
+export type OtlpBodyLimit = Readonly<{ maxBytes?: number }>;
 
 /**
  * Node reports the cap as a RangeError with this code rather than anything
@@ -191,7 +199,10 @@ function acquireReader(
 }
 
 /** Drain the reader, refusing the body the moment it passes the byte bound. */
-async function drainWithinLimit(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<Buffer> {
+async function drainWithinLimit(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number,
+): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   let held = 0;
 
@@ -200,12 +211,9 @@ async function drainWithinLimit(reader: ReadableStreamDefaultReader<Uint8Array>)
     if (done) break;
 
     held += value.byteLength;
-    if (held > OTLP_MAX_BODY_BYTES) {
+    if (held > maxBytes) {
       await cancelQuietly(reader);
-      throw new OtlpBodyTooLargeError({
-        maxBytes: OTLP_MAX_BODY_BYTES,
-        encoding: null,
-      });
+      throw new OtlpBodyTooLargeError({ maxBytes, encoding: null });
     }
     chunks.push(value);
   }
@@ -213,14 +221,14 @@ async function drainWithinLimit(reader: ReadableStreamDefaultReader<Uint8Array>)
   return Buffer.concat(chunks);
 }
 
-async function readWireBody(req: OtlpBodySource): Promise<Buffer> {
+async function readWireBody(req: OtlpBodySource, maxBytes: number): Promise<Buffer> {
   const stream = req.body;
   if (!stream) return Buffer.alloc(0);
 
   const reader = acquireReader(stream);
 
   try {
-    return await drainWithinLimit(reader);
+    return await drainWithinLimit(reader, maxBytes);
   } catch (error) {
     // The size refusal is our own verdict and keeps its own status; anything
     // else ended the read from the other end of the connection.
@@ -237,29 +245,36 @@ export type OtlpBodySource = Pick<Request, "body" | "headers">;
 /**
  * Reads the request body and decompresses it (see {@link decodeOtlpBody}). The
  * body is read before the encoding is known, since its magic bytes may decide
- * it; the read is already bounded by {@link OTLP_MAX_BODY_BYTES}.
+ * it; the read is already bounded by the cap.
  */
-export async function readOtlpBody(req: OtlpBodySource): Promise<ArrayBuffer> {
-  return decodeOtlpBody(await readWireBody(req), req.headers.get("content-encoding"));
+export async function readOtlpBody(
+  req: OtlpBodySource,
+  { maxBytes = OTLP_MAX_BODY_BYTES }: OtlpBodyLimit = {},
+): Promise<ArrayBuffer> {
+  return decodeOtlpBody(await readWireBody(req, maxBytes), req.headers.get("content-encoding"), {
+    maxBytes,
+  });
 }
 
 /**
  * Decompresses by the body's magic bytes (gzip, zstd), falling back to the
  * `Content-Encoding` header. Throws on an unsupported encoding or a body over
- * {@link OTLP_MAX_BODY_BYTES}, bounded by each decoder's `maxOutputLength`.
+ * the cap, bounded by each decoder's `maxOutputLength`.
  */
 export async function decodeOtlpBody(
   bytes: Uint8Array,
   headerEncoding: string | null,
+  { maxBytes = OTLP_MAX_BODY_BYTES }: OtlpBodyLimit = {},
 ): Promise<ArrayBuffer> {
-  if (bytes.byteLength > OTLP_MAX_BODY_BYTES) {
-    throw new OtlpBodyTooLargeError({ maxBytes: OTLP_MAX_BODY_BYTES, encoding: headerEncoding });
+  if (bytes.byteLength > maxBytes) {
+    throw new OtlpBodyTooLargeError({ maxBytes, encoding: headerEncoding });
   }
-  const raw = Buffer.from(bytes);
+  // A view, not a copy: a trace export may be tens of MiB.
+  const raw = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const encoding = sniffEncoding(raw) ?? headerEncoding;
 
   if (!encoding || encoding === "identity") {
-    return toArrayBuffer(raw);
+    return toArrayBuffer(bytes);
   }
 
   if (!isSupportedEncoding(encoding)) {
@@ -272,13 +287,10 @@ export async function decodeOtlpBody(
   const decompress: Decompressor = DECOMPRESSORS[encoding];
 
   try {
-    return toArrayBuffer(await decompress(raw, { maxOutputLength: OTLP_MAX_BODY_BYTES }));
+    return toArrayBuffer(await decompress(raw, { maxOutputLength: maxBytes }));
   } catch (error) {
     if (isOutputLimitExceeded(error)) {
-      throw new OtlpBodyTooLargeError({
-        maxBytes: OTLP_MAX_BODY_BYTES,
-        encoding,
-      });
+      throw new OtlpBodyTooLargeError({ maxBytes, encoding });
     }
     // Anything else the decoder raises here is a body that does not decompress —
     // truncated by a disconnect, or not the encoding it claimed. Both are the

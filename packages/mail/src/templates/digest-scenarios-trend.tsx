@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { DigestFrame, digestCommonFields, formatCount, formatPercent } from "./digest-parts.tsx";
 import { ActionRow, DetailTable } from "./email-layout.tsx";
-import { defineTemplate } from "./registry.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const digestScenariosTrendProps = z.object({
   ...digestCommonFields,
@@ -125,3 +125,11 @@ export const digestScenariosTrendTemplate = defineTemplate({
     },
   },
 });
+
+/** Rendered by the digest module, which owns the envelope and its one-click unsubscribe. */
+export const renderDigestScenariosTrendEmail = async (
+  props: DigestScenariosTrendProps,
+): Promise<{ subject: string; html: string }> => {
+  const { subject, html } = await renderMailTemplate(digestScenariosTrendTemplate, props);
+  return { subject, html };
+};

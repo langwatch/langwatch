@@ -36,11 +36,12 @@ func (f *fixture) serve(req *http.Request, client *http.Client) *httptest.Respon
 		client = f.upstream.Client()
 	}
 	h := New(Config{
-		Registry: f.registry,
-		Scanner:  f.scanner,
-		Bundle:   func(context.Context) *domain.Bundle { return f.bundle },
-		Client:   client,
-		Tracer:   sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(f.spans)).Tracer("test"),
+		Registry:      f.registry,
+		Scanner:       f.scanner,
+		Bundle:        func(context.Context) *domain.Bundle { return f.bundle },
+		Client:        client,
+		Tracer:        sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(f.spans)).Tracer("test"),
+		PublicBaseURL: testPublicBaseURL,
 	})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -80,6 +81,7 @@ func TestPathThatLeavesTheBaseIsRefused(t *testing.T) {
 		"/a2a/billing/tasks/x%3Fadmin=1",
 		"/a2a/billing/tasks/x%23frag",
 		"/a2a/billing/tasks/x%5C..",
+		"/a2a/billing/a%2Fb/message:send",
 	} {
 		t.Run(path, func(t *testing.T) {
 			for _, method := range []string{http.MethodGet, http.MethodPost} {
@@ -87,6 +89,7 @@ func TestPathThatLeavesTheBaseIsRefused(t *testing.T) {
 				rec := f.do(method, path, sendMessage("SendMessage", "hi"))
 				assert.Equal(t, http.StatusBadRequest, rec.Code, method+" "+rec.Body.String())
 				assert.Equal(t, "a2a_invalid_request", httpError(t, rec))
+				assert.Contains(t, rec.Body.String(), `"message":"the A2A path is not allowed"`)
 				assert.Empty(t, f.upstreamCalls())
 			}
 		})
@@ -123,7 +126,7 @@ func TestKnownOperationsAreNamed(t *testing.T) {
 		{http.MethodPost, "/tasks/abc/pushNotificationConfigs", "CreateTaskPushNotificationConfig"},
 		{http.MethodDelete, "/tasks/abc/pushNotificationConfigs/c1", "DeleteTaskPushNotificationConfig"},
 	} {
-		got, ok := restMethod(c.method, c.path)
+		got, ok := restMethod(c.method, c.path, c.path)
 		assert.True(t, ok, c.path)
 		assert.Equal(t, c.want, got)
 	}
@@ -348,13 +351,6 @@ func TestReadEventsDropsAnUnfinishedEventAtEOF(t *testing.T) {
 	}
 }
 
-// @scenario "a path refusal says the path is not allowed"
-func TestUnsafePathSaysThePathIsRefused(t *testing.T) {
-	f := newFixture(t)
-	rec := f.do(http.MethodPost, "/a2a/billing/a%2Fb/message:send", `{}`)
-	assert.Contains(t, rec.Body.String(), `"message":"the A2A path is not allowed"`)
-}
-
 func TestCardAndRefusalRepliesForbidSniffing(t *testing.T) {
 	f := newFixture(t)
 	card := f.do(http.MethodGet, "/a2a/billing/.well-known/agent-card.json", "")
@@ -364,4 +360,45 @@ func TestCardAndRefusalRepliesForbidSniffing(t *testing.T) {
 	refused := f.do(http.MethodPost, "/a2a/unknown", sendMessage("SendMessage", "hello"))
 	assert.Equal(t, "nosniff", refused.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "no-store", refused.Header().Get("Cache-Control"))
+}
+
+// @scenario "a task id with an escaped colon is a task id, not an action"
+func TestEscapedColonInTaskIDIsNotAnAction(t *testing.T) {
+	f := newFixture(t)
+	rec := f.do(http.MethodGet, "/a2a/billing/tasks/team%3A42", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	rec = f.do(http.MethodPost, "/a2a/billing/tasks/team%3A42:cancel", "{}")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	calls := f.upstreamCalls()
+	require.Len(t, calls, 2)
+	assert.Equal(t, "/a2a/tasks/team:42", calls[0].path)
+	assert.Equal(t, "/a2a/tasks/team:42:cancel", calls[1].path)
+
+	refused := f.do(http.MethodGet, "/a2a/billing/tasks/team%3A42:cancel", "")
+	assert.Equal(t, "a2a_operation_not_supported", httpError(t, refused), "a literal :cancel is still the action")
+}
+
+// @scenario "caller headers named in Connection are not forwarded"
+func TestCallerFieldsNamedByConnectionAreNotForwarded(t *testing.T) {
+	f := newFixture(t)
+	var got http.Header
+	f.reply = func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"task":{"id":"t1"}}`)
+	}
+	body := `{"message":{"parts":[{"text":"hi"}]}}`
+	headers := []string{"Connection", "keep-alive, A2A-Extensions", "A2A-Extensions", "https://ext.test/caller", "A2A-Version", "1.0"}
+
+	rec := f.do(http.MethodPost, "/a2a/billing/message:send", body, headers...)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Empty(t, got.Values("A2A-Extensions"), "a field the caller named in Connection is hop-by-hop")
+	assert.Equal(t, "1.0", got.Get("A2A-Version"))
+
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamHeaders["A2A-Extensions"] = "https://ext.test/target" })
+	rec = f.do(http.MethodPost, "/a2a/billing/message:send", body, headers...)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{"https://ext.test/target"}, got.Values("A2A-Extensions"), "the target's own headers still apply")
 }

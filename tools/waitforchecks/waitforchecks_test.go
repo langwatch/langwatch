@@ -32,6 +32,10 @@ type fakeAPI struct {
 	// repeats); none means no workflow runs. They do not count in calls.
 	workflowRuns  [][]run
 	workflowCalls int
+	// rules are the branch's required status check names; statuses the
+	// commit statuses (context and state). Neither counts in calls.
+	rules    []string
+	statuses []run
 }
 
 type response struct {
@@ -40,6 +44,23 @@ type response struct {
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.Contains(r.URL.Path, "/rules/branches/") {
+		checks := make([]run, 0, len(f.rules))
+		for _, name := range f.rules {
+			checks = append(checks, run{"context": name})
+		}
+		_ = json.NewEncoder(w).Encode([]run{
+			{"type": "pull_request"},
+			{"type": "required_status_checks", "parameters": run{"required_status_checks": checks}},
+		})
+
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/status") {
+		_ = json.NewEncoder(w).Encode(map[string]any{"statuses": f.statuses})
+
+		return
+	}
 	if strings.HasSuffix(r.URL.Path, "/actions/runs") {
 		f.mu.Lock()
 		var page []run
@@ -102,7 +123,7 @@ func workflowRun(workflow, suite int64) run {
 	return run{"workflow_id": workflow, "check_suite_id": suite}
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestWaitProceedsWhenEveryCheckPassed(t *testing.T) {
 	skipped := run{"name": "s", "status": "completed", "conclusion": "skipped"}
 	api := &fakeAPI{responses: []response{{200, []run{ok("a"), skipped}}}}
@@ -110,7 +131,7 @@ func TestWaitProceedsWhenEveryCheckPassed(t *testing.T) {
 	require.NoError(t, waiter(t, api, time.Second).Wait(context.Background()))
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestWaitKeepsPollingWhileACheckIsPending(t *testing.T) {
 	api := &fakeAPI{responses: []response{
 		{200, []run{ok("a"), pending("b")}},
@@ -121,7 +142,7 @@ func TestWaitKeepsPollingWhileACheckIsPending(t *testing.T) {
 	assert.Equal(t, 2, api.calls)
 }
 
-// @scenario "a failed check fails the review job"
+// @scenario "A failed required check fails the review job"
 func TestWaitFailsNamingTheFailedCheck(t *testing.T) {
 	api := &fakeAPI{responses: []response{{200, []run{ok("a"), failed("go-ci"), pending("b")}}}}
 
@@ -131,7 +152,7 @@ func TestWaitFailsNamingTheFailedCheck(t *testing.T) {
 	assert.Contains(t, err.Error(), "another check failed: go-ci (failure); fix it and push")
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestWaitTimeoutNamesThePendingChecks(t *testing.T) {
 	api := &fakeAPI{responses: []response{{200, []run{ok("a"), pending("slow-one")}}}}
 
@@ -142,7 +163,7 @@ func TestWaitTimeoutNamesThePendingChecks(t *testing.T) {
 	assert.Contains(t, err.Error(), "slow-one")
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestWaitRetriesATransientAPIError(t *testing.T) {
 	api := &fakeAPI{responses: []response{
 		{status: http.StatusBadGateway},
@@ -173,7 +194,7 @@ func TestWaitFailsWhenAPIErrorsPersistPastTheDeadline(t *testing.T) {
 	assert.Contains(t, err.Error(), "500")
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestWaitExcludesTheReviewJobsOwnCheck(t *testing.T) {
 	api := &fakeAPI{responses: []response{{200, []run{ok("a"), pending("review")}}}}
 
@@ -181,7 +202,7 @@ func TestWaitExcludesTheReviewJobsOwnCheck(t *testing.T) {
 }
 
 // A full first page means more may follow; a failure only on page 2 must show.
-// @scenario "a failed check fails the review job"
+// @scenario "A failed required check fails the review job"
 func TestWaitReadsEveryPageOfCheckRuns(t *testing.T) {
 	full := make([]run, 100)
 	for i := range full {
@@ -196,7 +217,7 @@ func TestWaitReadsEveryPageOfCheckRuns(t *testing.T) {
 	assert.Equal(t, 2, api.calls)
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestWaitRetriesAForbiddenThatIsARateLimit(t *testing.T) {
 	for name, headers := range map[string]map[string]string{
 		"retry-after": {"Retry-After": "1"},
@@ -354,4 +375,92 @@ func TestWaitReadsEveryPageOfWorkflowRuns(t *testing.T) {
 
 	require.NoError(t, waiter(t, api, time.Second).Wait(context.Background()))
 	assert.Equal(t, 2, api.workflowCalls)
+}
+func onBranch(w waitforchecks.Waiter) waitforchecks.Waiter {
+	w.Branch = "main"
+
+	return w
+}
+
+func status(context, state string) run { return run{"context": context, "state": state} }
+
+// @scenario "A check the branch does not require never holds the review"
+func TestWaitIgnoresChecksTheBranchDoesNotRequire(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{ok("pr conventions"), pending("lighthouse"), failed("go-ci")}}},
+		rules:     []string{"pr conventions", "review"},
+	}
+
+	require.NoError(t, onBranch(waiter(t, api, time.Second)).Wait(context.Background()))
+	assert.Equal(t, 1, api.calls)
+}
+
+// @scenario "A required check that has not reported yet keeps the review waiting"
+func TestWaitKeepsWaitingForARequiredCheckThatHasNotReported(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{ok("ci-complete")}}},
+		rules:     []string{"ci-complete", "pr conventions"},
+	}
+
+	err := onBranch(waiter(t, api, 300*time.Millisecond)).Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "pr conventions (not reported yet)")
+}
+
+// @scenario "A required check that has not reported yet keeps the review waiting"
+func TestWaitProceedsOnceTheRequiredCheckReports(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{}}, {200, []run{pending("pr conventions")}}, {200, []run{ok("pr conventions")}}},
+		rules:     []string{"pr conventions"},
+	}
+
+	require.NoError(t, onBranch(waiter(t, api, time.Second)).Wait(context.Background()))
+	assert.Equal(t, 3, api.calls)
+}
+
+// @scenario "A required check posted as a commit status counts"
+func TestWaitReadsARequiredCommitStatus(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{ok("ci-complete")}}},
+		rules:     []string{"ci-complete", "codeql-complete"},
+		statuses:  []run{status("codeql-complete", "success"), status("optional", "failure")},
+	}
+
+	require.NoError(t, onBranch(waiter(t, api, time.Second)).Wait(context.Background()))
+}
+
+// @scenario "A required check posted as a commit status counts"
+// @scenario "A failed required check fails the review job"
+func TestWaitFailsOnAFailedRequiredCommitStatus(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{ok("ci-complete")}}},
+		rules:     []string{"ci-complete", "codeql-complete"},
+		statuses:  []run{status("codeql-complete", "failure")},
+	}
+
+	err := onBranch(waiter(t, api, time.Second)).Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "another check failed: codeql-complete (failure); fix it and push")
+}
+
+// @scenario "With no required checks to read, the review waits for every check"
+func TestWaitFallsBackToEveryCheckWhenTheBranchRequiresNone(t *testing.T) {
+	api := &fakeAPI{responses: []response{{200, []run{ok("a"), failed("go-ci")}}}}
+
+	err := onBranch(waiter(t, api, time.Second)).Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "go-ci (failure)")
+}
+
+// @scenario "A check the branch does not require never holds the review"
+func TestWaitWaitsForNothingWhenTheBranchRequiresOnlyTheReview(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{pending("lighthouse"), failed("go-ci")}}},
+		rules:     []string{"review"},
+	}
+
+	require.NoError(t, onBranch(waiter(t, api, time.Second)).Wait(context.Background()))
 }

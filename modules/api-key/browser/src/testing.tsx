@@ -51,6 +51,7 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
   readonly approvals: CliDeviceApproval[] = [];
   readonly denials: string[] = [];
   signOuts = 0;
+  private nextCopyAnswer?: Promise<boolean>;
 
   constructor(
     private readonly options: {
@@ -144,9 +145,20 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
     this.failures.push(failure);
   }
 
+  /** Makes the next copy wait; the returned function settles it. Copies still record. */
+  deferNextCopy(): (ok: boolean) => void {
+    let settle!: (ok: boolean) => void;
+    this.nextCopyAnswer = new Promise<boolean>((done) => {
+      settle = done;
+    });
+    return settle;
+  }
+
   copyToClipboard(request: { text: string; succeeded: ApiKeySuccessNotice }): Promise<boolean> {
     this.copies.push(request);
-    return Promise.resolve(this.options.copySucceeds ?? true);
+    const answer = this.nextCopyAnswer ?? Promise.resolve(this.options.copySucceeds ?? true);
+    this.nextCopyAnswer = undefined;
+    return answer;
   }
 
   recordLeadSourceIfAbsent(source: string): void {

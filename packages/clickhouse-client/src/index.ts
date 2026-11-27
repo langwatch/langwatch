@@ -22,7 +22,7 @@ export type {
   QueryRequest,
   QueryResult,
 } from "./query.ts";
-export type { ClickHouseQueryClientOptions } from "./client.ts";
+export type { ClickHouseQueryClientOptions, TenantSetRouting } from "./client.ts";
 export {
   CLICKHOUSE_COLUMNS_QUERY,
   CLICKHOUSE_COLUMNS_REFRESH_MS,

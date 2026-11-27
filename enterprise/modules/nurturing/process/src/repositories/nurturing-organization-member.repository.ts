@@ -9,7 +9,10 @@ import type {
  * written from the owners' member facts (§9), so the usage mirror reads no other module.
  */
 export interface NurturingOrganizationMemberRepository {
-  /** Keeps the latest time of the change: a redelivered or late fact changes nothing. */
+  /**
+   * Keeps the latest time of the change: a redelivered or late fact changes nothing, and a fact
+   * for an erased account writes no row, however late it lands.
+   */
   recordMembershipChange(
     input: Readonly<{
       organizationId: string;
@@ -18,10 +21,17 @@ export interface NurturingOrganizationMemberRepository {
       at: number;
     }>,
   ): Promise<void>;
-  /** Deletes every membership of an erased account, in every organization. */
+  /**
+   * Marks the account erased and deletes every membership of it, in every organization; no
+   * member fact folded in afterwards writes one again.
+   */
   forgetMember(input: Readonly<{ userId: string }>): Promise<void>;
   /** Every membership, of any organization, of the people with one in `organizationId`. */
   findMembershipsOfMembers(
     input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingMembership[]>;
+  /** Every membership, of any organization, of the named people, with a row here or not. */
+  findMembershipsOfUsers(
+    input: Readonly<{ userIds: readonly string[] }>,
   ): Promise<NurturingMembership[]>;
 }

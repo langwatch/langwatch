@@ -28,6 +28,7 @@ import type { LangySkillGates } from "../../../services/langy-skill-gates.servic
 import type { LangyConversationService } from "../../conversation/services/langy-conversation.service.ts";
 import type { LangySessionKey } from "../../session-key/services/langy-session-key.service.ts";
 import type { LangyUiActionSurface } from "../../ui-action/services/langy-ui-action-surface.service.ts";
+import type { LangyAttachmentService } from "./langy-attachment.service.ts";
 
 /** Supplies feature-flag-derived worker-harness selection. */
 abstract class LangyHarness {
@@ -115,6 +116,8 @@ export interface LangyTurnServiceDeps {
   /** Asked the project's kind: an aggregate takes no turns (ADR-177 decision 8). */
   projects: Pick<ProjectApi, "findById">;
   worker: LangyWorker | null;
+  /** Checks a message's images before the turn is admitted; absent, a turn names none. */
+  attachments?: Pick<LangyAttachmentService, "assertSendable">;
   tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
@@ -146,6 +149,8 @@ export type LangyTurnTechnicalMembers = {
   /** Asked the project's kind: an aggregate takes no turns (ADR-177 decision 8). */
   projects: Pick<ProjectApi, "findById">;
   worker: LangyWorker | null;
+  /** Checks a message's images before the turn is admitted; absent, a turn names none. */
+  attachments?: Pick<LangyAttachmentService, "assertSendable">;
   tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
   harness?: LangyHarness;

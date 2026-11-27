@@ -397,6 +397,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
       excludedOrigins: "omit", // deprecated, unread since queries name their sources (AC200)
+      homeProduct: "omit", // which product's sidebar lists the board; navigation only
+      myDashboardOfUserId: "omit", // marks a member's own default board; navigation only
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -1102,6 +1104,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProviderConfig: { source: "providerConfig", content: "output" },
       FallbackPriorityGlobal: { source: "fallbackPriorityGlobal" },
       LangySkipPermissionsModels: { source: "langySkipPermissionsModels", content: "output" },
+      lastListedModelIds: "omit", // bookkeeping for the model import on save
       HealthStatus: { source: "healthStatus" },
       CircuitOpenedAt: { source: "circuitOpenedAt" },
       LastHealthCheckAt: { source: "lastHealthCheckAt" },

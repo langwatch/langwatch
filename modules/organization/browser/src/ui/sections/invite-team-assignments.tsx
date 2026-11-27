@@ -26,6 +26,7 @@ import {
   type InviteFormValues,
   type TeamOption,
 } from "../../model/add-members-form-model.ts";
+import { BILLING_ONLY_SEAT, type InviteSeat } from "../../model/member-invite-form.ts";
 import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
@@ -49,7 +50,15 @@ type TeamAssignmentsProps = {
  * row per staged team and the button to stage one more. A Developer seat
  * (ADR-171) joins no team, so it gets a notice instead.
  */
-export function InviteTeamAssignments(props: TeamAssignmentsProps) {
+export function InviteTeamAssignments({
+  orgRole,
+  ...props
+}: Omit<TeamAssignmentsProps, "orgRole"> & { orgRole: InviteSeat }) {
+  if (orgRole === BILLING_ONLY_SEAT) return <BillingOnlyNoTeamNotice />;
+  return <SeatTeamAssignments {...props} orgRole={orgRole} />;
+}
+
+function SeatTeamAssignments(props: TeamAssignmentsProps) {
   const { control, teamOptions, orgRole } = props;
   const { fields, append, remove } = useFieldArray({ control, name: "teams" });
   const selectedTeams = useWatch({ control, name: "teams" });
@@ -84,6 +93,15 @@ export function InviteTeamAssignments(props: TeamAssignmentsProps) {
         onAddTeam={addTeam}
       />
     </VStack>
+  );
+}
+
+function BillingOnlyNoTeamNotice() {
+  return (
+    <Text fontSize="xs" color="fg.muted" data-testid="billing-only-no-team">
+      They can upgrade the plan, update the card and download invoices. They take no seat and see no
+      projects.
+    </Text>
   );
 }
 

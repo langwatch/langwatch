@@ -50,5 +50,27 @@ describe("resolveErrorCopy remediation", () => {
         expect(copy.docsUrl).toBe(DOCS_URL);
       });
     });
+
+    describe("when a tip points an API caller at a meta field", () => {
+      /** @scenario "A tip written for an API caller is not shown to a person" */
+      it("drops that tip and keeps the one a person can act on", () => {
+        const copy = resolveErrorCopy({
+          error: wire({
+            code: "enterprise_plan_required",
+            httpStatus: 402,
+            meta: { feature: "OCSF_EXPORT" },
+            tips: [
+              "This part of the API is available on the Enterprise plan; meta.feature names which capability was refused",
+              "Talk to your account team or visit the pricing page to upgrade the organization's plan",
+            ],
+          }),
+          fallbackTitle: "Couldn't add the source",
+        });
+
+        expect(copy.tips).toEqual([
+          "Talk to your account team or visit the pricing page to upgrade the organization's plan",
+        ]);
+      });
+    });
   });
 });

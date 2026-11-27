@@ -33,14 +33,22 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 ## Provider endpoint security
 
-These apply to the base URLs customers configure on their own provider credentials. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
+These apply to the base URLs customers configure on their own provider credentials and to the upstream and Agent Card URLs of A2A targets. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
 
 | Var                              | Default | Purpose                                                                                                                             |
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off. See the matching rule below |
 | `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
+
+An `ALLOWED_PROXY_HOSTS` entry matches the host a URL names, as written: a hostname entry admits that hostname and every address it resolves to, and an IP address entry admits a URL whose host is that IP address. The address a hostname resolves to is never matched, so listing `127.0.0.1` admits `https://127.0.0.1` but not `https://localhost`. Provider endpoints and A2A targets follow the same rule.
+
+## A2A proxy
+
+| Var                   | Default | Purpose                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_PUBLIC_BASE_URL` | unset   | The gateway's public origin, an absolute URL such as `https://gateway.example.com`. The gateway builds the URLs in the Agent Cards it serves on `/a2a` from it. Unset, Agent Card calls are refused with `a2a_public_url_unset`; every other A2A call still works. The chart sets it from `publicUrl` (`gateway.publicUrl` in the langwatch chart) |
 
 ## Browser access
 

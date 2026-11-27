@@ -67,6 +67,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
             return () => ({ data: undefined, isLoading: false, error: null });
           }
           if (property === "useMutation") return mutation;
+          if (property === "useUtils") return () => node(["utils"]);
           return node([...path, property]);
         },
       },
@@ -809,5 +810,56 @@ describe("given an agent that ran and cost nothing", () => {
     expect(within(row).getByText("$0.00")).toBeInTheDocument();
     expect(within(row).getByText("0")).toBeInTheDocument();
     expect(within(row).queryByLabelText(/not measured/i)).toBeNull();
+  });
+});
+
+describe("given agents that run without being registered", () => {
+  const governed = { ...SAMPLE_AGENT_ROWS[0]!, posture: "governed" as const };
+  const shadows = ["pricing-bot", "rogue-7"].map((name) => ({
+    ...SAMPLE_AGENT_ROWS[0]!,
+    id: name,
+    name,
+    source: "traffic" as const,
+    posture: "shadow" as const,
+  }));
+
+  beforeEach(() => {
+    harness.list = {
+      data: [governed, ...shadows],
+      isPending: false,
+      isLoading: false,
+      error: null,
+    };
+  });
+
+  it("marks each row with its posture", () => {
+    renderPage();
+    const postures = screen.getAllByTestId("agent-posture").map((b) => b.dataset.posture ?? "");
+    expect(postures.toSorted(byName)).toEqual(["governed", "shadow", "shadow"]);
+  });
+
+  it("says how many run unregistered and narrows the page to them on request", async () => {
+    renderPage();
+
+    const alert = screen.getByTestId("shadow-agents-alert");
+    expect(alert).toHaveTextContent("2 agents run without being registered");
+    await userEvent.click(within(alert).getByRole("button", { name: "Show shadow agents" }));
+
+    const written = new URLSearchParams(screen.getByTestId("address").textContent ?? "");
+    expect(written.get("posture")).toBe("shadow");
+    expect(rowNames().toSorted(byName)).toEqual(["pricing-bot", "rogue-7"]);
+    expect(screen.queryByTestId("shadow-agents-alert")).toBeNull();
+  });
+
+  it("drops a source filter that would hide them when narrowing to shadow agents", async () => {
+    renderPage({ at: "/governance/agents?source=custom" });
+
+    const alert = screen.getByTestId("shadow-agents-alert");
+    await userEvent.click(within(alert).getByRole("button", { name: "Show shadow agents" }));
+
+    const written = new URLSearchParams(screen.getByTestId("address").textContent ?? "");
+    expect(written.get("source")).toBeNull();
+    expect(written.get("posture")).toBe("shadow");
+    expect(rowNames().toSorted(byName)).toEqual(["pricing-bot", "rogue-7"]);
   });
 });

@@ -82,8 +82,9 @@ func AddressError(ip net.IP, blockLocal, allowlisted bool) error {
 }
 
 // CheckDial applies the policy to the resolved "ip:port" a dialer is about to
-// connect to. Only an exact allowlist entry (the dialed IP itself, or the host
-// it was resolved from) is exempt from BlockLocal.
+// connect to. Only the host the URL names (dialHost, a name or a literal IP)
+// is matched against the allowlist, never the address a name resolves to:
+// listing an IP must not admit every name that points at it.
 func (p Policy) CheckDial(address, dialHost string) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
@@ -93,8 +94,7 @@ func (p Policy) CheckDial(address, dialHost string) error {
 	if ip == nil {
 		return blockedError("customer endpoint did not resolve to an IP address")
 	}
-	allowlisted := p.Allowlisted(ip.String()) || (dialHost != "" && p.Allowlisted(dialHost))
-	return AddressError(ip, p.BlockLocal, allowlisted)
+	return AddressError(ip, p.BlockLocal, dialHost != "" && p.Allowlisted(dialHost))
 }
 
 // Dialer re-checks every resolved address against the policy immediately

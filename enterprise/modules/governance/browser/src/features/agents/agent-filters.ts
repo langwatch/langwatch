@@ -1,12 +1,14 @@
 import {
+  AGENT_REGISTRY_POSTURES,
   AGENT_SOURCES,
+  type AgentRegistryPosture,
   type AgentSource,
   type GovernanceAgentRow,
 } from "@langwatch/enterprise-governance-contract";
 /**
- * The Agents page's three choices (source, ownership, sort) live in the address, so a shared link
- * keeps its filter; defaults stay out of the URL. Sorting and filtering are pure functions over
- * rows.
+ * The Agents page's four choices (source, posture, ownership, sort) live in the address, so a
+ * shared link keeps its filter; defaults stay out of the URL. Sorting and filtering are pure
+ * functions over rows.
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
 import { useCallback } from "react";
@@ -17,6 +19,16 @@ import { AGENT_SOURCE_LABELS } from "./agent-rows";
 /** The source chip's "no filter" value, and the value left out of the URL. */
 export const ALL_SOURCES = "all";
 export type SourceFilter = typeof ALL_SOURCES | AgentSource;
+
+/** The posture chip's "no filter" value, and the value left out of the URL. */
+export const ALL_POSTURES = "all";
+export type PostureFilter = typeof ALL_POSTURES | AgentRegistryPosture;
+
+export const AGENT_POSTURE_LABELS: Record<AgentRegistryPosture, string> = {
+  governed: "Governed",
+  shadow: "Shadow",
+  dormant: "Dormant",
+};
 
 export const OWNERSHIP_FILTERS = ["all", "unclaimed"] as const;
 export type OwnershipFilter = (typeof OWNERSHIP_FILTERS)[number];
@@ -37,12 +49,14 @@ export const AGENT_SORT_LABELS: Record<AgentSort, string> = {
 
 export const DEFAULT_AGENT_FILTERS: AgentFilters = {
   source: ALL_SOURCES,
+  posture: ALL_POSTURES,
   ownership: "all",
   sort: "spend",
 };
 
 export interface AgentFilters {
   source: SourceFilter;
+  posture: PostureFilter;
   ownership: OwnershipFilter;
   sort: AgentSort;
 }
@@ -56,6 +70,10 @@ export function coerceSource(value: string | null): SourceFilter {
   return ALL_SOURCES;
 }
 
+export function coercePosture(value: string | null): PostureFilter {
+  return AGENT_REGISTRY_POSTURES.find((posture) => posture === value) ?? ALL_POSTURES;
+}
+
 export function coerceOwnership(value: string | null): OwnershipFilter {
   return OWNERSHIP_FILTERS.find((option) => option === value) ?? "all";
 }
@@ -67,6 +85,21 @@ export function coerceSort(value: string | null): AgentSort {
 /** The label the source chip shows for the current choice. */
 export function sourceLabel(source: SourceFilter): string {
   return source === ALL_SOURCES ? "All sources" : AGENT_SOURCE_LABELS[source];
+}
+
+/** The label the posture chip shows for the current choice. */
+export function postureLabel(posture: PostureFilter): string {
+  return posture === ALL_POSTURES ? "All postures" : AGENT_POSTURE_LABELS[posture];
+}
+
+/** The postures present in the rows, in fixed order, so the chip never offers an empty view. */
+export function posturesPresentIn(rows: readonly GovernanceAgentRow[]): AgentRegistryPosture[] {
+  return AGENT_REGISTRY_POSTURES.filter((posture) => rows.some((row) => row.posture === posture));
+}
+
+/** How many rows run as shadow agents: traced, and listed by no source. */
+export function countShadowAgents(rows: readonly GovernanceAgentRow[]): number {
+  return rows.filter((row) => row.posture === "shadow").length;
 }
 
 /**
@@ -106,8 +139,12 @@ function compareAgents(sort: AgentSort, a: GovernanceAgentRow, b: GovernanceAgen
   return descending(a.costUsd30d, b.costUsd30d);
 }
 
-function matchesFilters(row: GovernanceAgentRow, { source, ownership }: AgentFilters): boolean {
+function matchesFilters(
+  row: GovernanceAgentRow,
+  { source, posture, ownership }: AgentFilters,
+): boolean {
   if (source !== ALL_SOURCES && row.source !== source) return false;
+  if (posture !== ALL_POSTURES && row.posture !== posture) return false;
   if (ownership === "unclaimed" && row.owner !== null) return false;
   return true;
 }
@@ -130,10 +167,12 @@ export function useAgentFilters(): {
   filters: AgentFilters;
   setFilter: <K extends keyof AgentFilters>(key: K, value: AgentFilters[K]) => void;
   clearFilters: () => void;
+  showOnlyPosture: (posture: AgentRegistryPosture) => void;
 } {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters: AgentFilters = {
     source: coerceSource(searchParams.get("source")),
+    posture: coercePosture(searchParams.get("posture")),
     ownership: coerceOwnership(searchParams.get("ownership")),
     sort: coerceSort(searchParams.get("sort")),
   };
@@ -154,15 +193,16 @@ export function useAgentFilters(): {
   );
 
   /**
-   * The way back from having filtered everything out of view. Source and ownership only. Sort is
-   * not a filter — it hides nothing — so resetting it here would reorder the cards as a side effect
-   * of a button that promised to bring them back.
+   * The way back from having filtered everything out of view. Source, posture and ownership only.
+   * Sort is not a filter — it hides nothing — so resetting it here would reorder the cards as a
+   * side effect of a button that promised to bring them back.
    */
   const clearFilters = useCallback(() => {
     setSearchParams(
       (previous) => {
         const next = new URLSearchParams(previous);
         next.delete("source");
+        next.delete("posture");
         next.delete("ownership");
         return next;
       },
@@ -170,5 +210,19 @@ export function useAgentFilters(): {
     );
   }, [setSearchParams]);
 
-  return { filters, setFilter, clearFilters };
+  /** One posture across every source and owner: a source filter would hide traced-only agents. */
+  const showOnlyPosture = (posture: AgentRegistryPosture) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("source");
+        next.delete("ownership");
+        next.set("posture", posture);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  return { filters, setFilter, clearFilters, showOnlyPosture };
 }

@@ -301,7 +301,7 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
   @integration
   Scenario: Stop is available the moment I send
     Given I send a message to Langy
-    Then the composer shows Stop while the turn is still starting up
+    Then Stop shows on the working row above the composer while the turn is still starting up
     And I do not have to wait for Langy to answer before I can stop it
 
   @unit @integration

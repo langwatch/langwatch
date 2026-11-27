@@ -3,6 +3,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { ClickHouseTraceBraidReadsRepository } from "../../features/braid/repositories/clickhouse/clickhouse.trace-braid-reads.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
+import { MANAGED_PROMPT_VERSION_REPLAY_STEP_ID } from "../../rules/managed-prompt-version-replay.rules.ts";
+import { SPAN_ANALYTICS_REPLAY_STEP_ID } from "../../rules/trace-widget-columns.rules.ts";
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
 import { ClickHouseTraceAttributedRollupRepository } from "../clickhouse/clickhouse.trace-attributed-rollup.repository.ts";
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse/clickhouse.trace-clustering-sample.repository.ts";
@@ -34,6 +36,7 @@ import { PrismaTraceAnnotationScoresRepository } from "./prisma.trace-annotation
 import { PrismaTraceAnnotationsRepository } from "./prisma.trace-annotations.repository.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
 import { PrismaTraceIngestSourceBillingRepository } from "./prisma.trace-ingest-source-billing.repository.ts";
+import { PrismaTracePlanLimitRefusalsRepository } from "./prisma.trace-plan-limit-refusals.repository.ts";
 import { PrismaTraceTopicNamesRepository } from "./prisma.trace-topic-names.repository.ts";
 
 /**
@@ -71,6 +74,7 @@ export class PostgresTraceRepositories {
       ingestSourceBilling: PrismaTraceIngestSourceBillingRepository.create({
         prisma: members.prisma,
       }),
+      planLimitRefusals: PrismaTracePlanLimitRefusalsRepository.create({ prisma: members.prisma }),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({
@@ -81,7 +85,14 @@ export class PostgresTraceRepositories {
         readYourWrites: members.evaluationAnalyticsQuorumReads,
       }),
       spanAnalytics: SpanAnalyticsClickHouseRepository.create({ resolveClient: traceClickHouse }),
-      spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create(members.prisma),
+      spanAnalyticsFloor: PrismaSpanAnalyticsFloorRepository.create({
+        prisma: members.prisma,
+        stepId: SPAN_ANALYTICS_REPLAY_STEP_ID,
+      }),
+      managedPromptVersionLedger: PrismaSpanAnalyticsFloorRepository.create({
+        prisma: members.prisma,
+        stepId: MANAGED_PROMPT_VERSION_REPLAY_STEP_ID,
+      }),
       spanStorage: SpanStorageClickHouseRepository.create(storage),
       spanTree: ClickHouseTraceSpanRepository.create(storage),
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),

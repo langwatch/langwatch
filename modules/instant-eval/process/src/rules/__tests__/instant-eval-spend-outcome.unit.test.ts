@@ -122,6 +122,6 @@ describe("instantEvalPricedSpend", () => {
   it("names the product customers read in billing, never an internal backend id", () => {
     const { model } = instantEvalPricedSpend({ record: record(), attribution, requestId: "req-1" });
 
-    expect(model).toBe("langwatch-evals-preview");
+    expect(model).toBe("langwatch-instant-preview");
   });
 });

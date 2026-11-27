@@ -31,6 +31,7 @@ function license(overrides: Partial<License> = {}): License {
     source: "BACKOFFICE",
     revokedAt: null,
     revokedReason: null,
+    supersededAt: null,
     replacesId: null,
     services: ["instant_evals"],
     seatRateCents: null,
@@ -89,6 +90,13 @@ describe("LicensesTable", () => {
       renderTable([license({})]);
 
       expect(screen.getByText("never synced")).toBeTruthy();
+    });
+
+    it("says a bound replacement waits for its install rather than never synced", () => {
+      renderTable([license({ id: "il_4", replacesId: "il_1", hasPendingDelivery: true })]);
+
+      expect(screen.getByText("waiting for sync")).toBeTruthy();
+      expect(screen.queryByText("never synced")).toBeNull();
     });
   });
 

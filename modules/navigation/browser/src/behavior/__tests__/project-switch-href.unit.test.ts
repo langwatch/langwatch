@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { projectSwitchHref } from "../use-project-pick-groups.ts";
+import { projectPickHref, projectSwitchHref } from "../use-project-pick-groups.ts";
 
 describe("projectSwitchHref", () => {
   describe("given I am on a project sub-route", () => {
@@ -60,6 +60,38 @@ describe("projectSwitchHref", () => {
           nextSlug: "beta",
         }),
       ).toBe("/beta");
+    });
+  });
+});
+
+describe("projectPickHref", () => {
+  const pick = (pathname: string, isProjectShared: boolean | null) =>
+    projectPickHref({
+      pathname,
+      routePattern: "/:project/dashboards/:dashboardId",
+      currentSlug: "shop",
+      nextSlug: "beta",
+      openBoard: isProjectShared === null ? null : { homeProduct: "llm-ops", isProjectShared },
+    });
+
+  describe("given a board that reads the project in view, at a project's address", () => {
+    it("keeps the board open in the next project", () => {
+      expect(pick("/shop/dashboards/board_1", false)).toBe("/beta/dashboards/board_1");
+    });
+  });
+
+  describe("given a board shared with its project", () => {
+    it.each(["/shop/dashboards/board_1", "/dashboards/board_1"])(
+      "opens the next project's LLM Ops home from %s",
+      (pathname) => {
+        expect(pick(pathname, true)).toBe("/beta");
+      },
+    );
+  });
+
+  describe("given no board open", () => {
+    it("keeps the project switch's own rule", () => {
+      expect(pick("/shop/dashboards/board_1", null)).toBe("/beta/dashboards");
     });
   });
 });

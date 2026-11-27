@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
+import { PrismaAgentRegistrySettingsRepository } from "./prisma.agent-registry-settings.repository.ts";
 import { PrismaAgentRegistryRepository } from "./prisma.agent-registry.repository.ts";
 import { PrismaAgentStopClaimRepository } from "./prisma.agent-stop-claim.repository.ts";
 import { PrismaAgentStopPlanRepository } from "./prisma.agent-stop-plan.repository.ts";
@@ -54,6 +55,7 @@ export class PostgresGovernanceRepositories {
   > {
     return {
       agentRegistry: PrismaAgentRegistryRepository.create(prisma),
+      agentRegistrySettings: PrismaAgentRegistrySettingsRepository.create(prisma),
       agentStopPlans: PrismaAgentStopPlanRepository.create(prisma),
       agentStopClaims: PrismaAgentStopClaimRepository.create(prisma),
       agentStopTargetPriorStates: PrismaAgentStopTargetPriorStateRepository.create(prisma),

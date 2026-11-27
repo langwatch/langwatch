@@ -14,6 +14,10 @@ class RecordingModelList extends ModelProviderModelList {
     super();
   }
 
+  findListedModels(): Promise<null> {
+    return Promise.resolve(null);
+  }
+
   findServedModelIds(input: {
     provider: string;
     customKeys: Record<string, unknown>;

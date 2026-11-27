@@ -108,6 +108,9 @@ function racingAfterRead({
     findPageByPurpose: (input) => records.findPageByPurpose(input),
     findTenantsWithExpiredUploads: (input) => records.findTenantsWithExpiredUploads(input),
     delete: (input) => records.delete(input),
+    findReusable: (input) => records.findReusable(input),
+    markDeletedIfUnheld: (input) => records.markDeletedIfUnheld(input),
+    addAudience: (input) => records.addAudience(input),
   };
 }
 

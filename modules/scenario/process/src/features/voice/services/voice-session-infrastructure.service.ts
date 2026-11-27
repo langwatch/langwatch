@@ -72,6 +72,8 @@ export interface VoiceSessionServices {
   recordCallTraces: VoiceSessionInfrastructure["recordCallTraces"];
   /** Writes the finished call down as a run — `VoiceCallRunService`. */
   writeCallRun: VoiceSessionInfrastructure["writeCallRun"];
+  /** The Free run cap a fresh scenario call asks — `ScenarioCreationCapService`. */
+  assertRunAllowed: VoiceSessionInfrastructure["assertRunAllowed"];
   /** Signs the claims a browser carries from mint to finish. The deployment's
    *  secret is resolved once, at composition, and travels as a value. */
   signSessionToken: VoiceSessionInfrastructure["signSessionToken"];
@@ -150,6 +152,7 @@ function createVoiceSessionInfrastructureFromServices({
   simulations,
   recordCallTraces,
   writeCallRun,
+  assertRunAllowed,
   signSessionToken,
   registry,
 }: VoiceSessionServices): VoiceSessionInfrastructure {
@@ -199,6 +202,8 @@ function createVoiceSessionInfrastructureFromServices({
     recordCallTraces,
 
     writeCallRun,
+
+    assertRunAllowed,
 
     // A "Call it myself" run lands in the set the scenario's runs live in:
     // the scenario's test-suite set when it is filed in one, else the

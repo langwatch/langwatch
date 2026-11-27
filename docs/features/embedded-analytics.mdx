@@ -29,6 +29,7 @@ curl -X POST "$ENDPOINT" \
     {
      "startDate": 1708434000000,
      "endDate": 1710939600000,
+     "timeZone": "UTC",
      "filters": {},
      "series": [
        {
@@ -42,6 +43,24 @@ EOF
 ```
 
     4. Execute the `curl` command. If successful, LangWatch will return the custom analytics data in the response.
+
+## Filters
+
+`filters` narrows the query the same way the filter sidebar narrows the dashboard. Each key is a filter field. Most fields take a list of the options to keep. Keyed fields, such as `metadata.value`, take an object whose key is what the filter selects by:
+
+```json
+{
+  "filters": {
+    "traces.error": ["true"],
+    "metadata.user_id": ["user-123"],
+    "metadata.value": { "environment": ["production"] }
+  }
+}
+```
+
+Send the option's value (`field` in the filter options), not the label shown in the interface. `traces.error`, `annotations.hasAnnotation` and `evaluations.passed` accept only `"true"` and `"false"`. A label such as `"Traces with error"` is refused with a 422 and the code `analytics_filter_value_unsupported`, which names the field and lists the values it accepts.
+
+`metadata.value` needs its metadata key, and `events.metrics.value` needs its event type and metric key. Sent as a plain list, they are refused with the code `analytics_filter_key_required` and an example of the nested shape. An unknown filter field is refused too, with the list of accepted fields.
 
 ## Screenshots on how to get the JSON data.
 

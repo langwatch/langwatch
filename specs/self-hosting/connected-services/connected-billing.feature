@@ -170,6 +170,15 @@ Feature: Billing a connected self-hosted customer
     When usage is reported for the month
     Then the spend is reported to the hosted usage meter for the billing customer of "ACME"
 
+  # Which meter the quarterly price bills is unchecked against Stripe (ADR-174 decision 18).
+  @unit
+  Scenario: Hosted usage is reported without a price check until its meter is confirmed
+    Given "ACME" was onboarded
+    And hosted spend was recorded under "ACME"
+    When usage is reported for the month
+    Then the subscription is not asked for any Instant Evals price
+    And the spend is reported as before
+
   @integration
   Scenario: A connected customer is not skipped for lacking a Cloud plan
     Given "ACME" is a self-hosted customer with no LangWatch Cloud plan
@@ -385,3 +394,59 @@ Feature: Billing a connected self-hosted customer
     Given the spend ledger cannot be read
     When an operator opens the customer in the admin console
     Then the drawn down amount is shown as unavailable rather than zero
+
+  # ============================================================================
+  # Starting billing from the license drawer
+  # ============================================================================
+  # A license with no billing account is a trial. Billing dates follow the
+  # license: starting billing signs the paid term on the license first.
+
+  @integration
+  Scenario: A license with no billing account reads as a trial
+    Given a license whose organization was never onboarded
+    When an operator opens it in the license drawer
+    Then the Billing section is one line saying it is not billed and when the trial ends
+    And it offers Start billing instead of a billing form
+
+  @integration
+  Scenario: Starting billing signs the paid term on the license, then onboards
+    Given a trial license ending Dec 14
+    When an operator starts billing for a paid term ending Dec 14 next year
+    Then the license is reissued to end Dec 14 next year
+    And the customer is onboarded for the same term after that
+
+  @integration
+  Scenario: Starting billing stops before onboarding when the license cannot be signed
+    Given a trial license
+    When an operator starts billing and the license reissue is refused
+    Then nothing is onboarded
+    And the drawer says the license step failed
+
+  @integration
+  Scenario: Billing that stopped part way stays on Start billing
+    Given onboarding opened the billing account but failed before the annual invoice
+    When an operator opens the license in the drawer
+    Then the Billing section says billing did not finish and offers Start billing
+    And it does not offer Renew
+
+  @integration
+  Scenario: Retrying billing that stopped part way bills the term the account holds
+    Given onboarding opened the billing account for a term and failed before the annual invoice
+    When an operator starts billing again
+    Then the onboarding is sent for the term the account already holds
+    And the license is not signed again
+
+  @integration
+  Scenario: A paid term with an empty end day cannot be submitted
+    Given a trial license with Start billing open
+    When the operator clears the day the paid term ends
+    Then the drawer asks for both days of the paid term
+    And Start billing is disabled
+
+  @integration
+  Scenario: Retrying after billing failed bills the term that was signed
+    Given a trial license ending Dec 14
+    And starting billing signed the license to Dec 14 next year but onboarding failed
+    When the license now ends Dec 14 next year and the operator tries again
+    Then the license is not signed again
+    And the customer is onboarded for the term ending Dec 14 next year

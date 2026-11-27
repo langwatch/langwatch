@@ -28,7 +28,10 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 from langevals_topic_clustering.utils import fill_embeddings
-from langevals_topic_clustering.failures import configured_model, failure_answer
+from langevals_topic_clustering.failures import (
+    configured_model,
+    failure_answer,
+)
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.incremental")

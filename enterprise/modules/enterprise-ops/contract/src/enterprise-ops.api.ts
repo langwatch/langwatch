@@ -6,6 +6,7 @@ import type {
   ActivationCodePage,
   ActivationCodeView,
   IssuedActivationCode,
+  IssuedLicenseChain,
   IssuedLicenseFilters,
   IssuedLicensePage,
   IssuedLicenseView,
@@ -39,6 +40,10 @@ export interface EnterpriseOpsApi {
     } & IssuedLicenseFilters,
   ): Promise<IssuedLicensePage>;
   getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<IssuedLicenseView>;
+  getIssuedLicenseChain(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseChain>;
   issueLicense(input: {
     customer: LicenseCustomer;
     email: string;
@@ -60,6 +65,7 @@ export interface EnterpriseOpsApi {
   revokeIssuedLicense(input: {
     id: string;
     reason: string;
+    unusedOnly?: boolean;
     operator: OpsOperator | null;
   }): Promise<IssuedLicenseView>;
   reissueLicense(input: {

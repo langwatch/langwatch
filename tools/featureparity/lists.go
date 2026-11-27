@@ -102,7 +102,6 @@ var (
 		"modules/authz/specs/access-reviews.feature",
 		"modules/authz/specs/agent-principals.feature",
 		"modules/authz/specs/authz-passports.feature",
-		"modules/dashboard/specs/dashboards-organization-area.feature",
 		"specs/agents/create-workflow-agent.feature",
 		"specs/agents/workflow-agent-editor.feature",
 		"specs/ai-gateway/budgets-principal-cascade.feature",

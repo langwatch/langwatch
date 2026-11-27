@@ -1,4 +1,10 @@
-import { clickhouseCluster, Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
+import {
+  clickhouseCluster,
+  Config,
+  type ConfigOf,
+  installMethod,
+  publicBaseUrl,
+} from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -17,6 +23,8 @@ export const analyticsServerConfig = Config.define((c) => ({
     sqlSingleNode: c.env("LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", z.string().optional()),
     /** The replicas' cluster, so the credential probe reads on each one (#8858). */
     clickhouseCluster,
+    /** On a Helm install the chart hands the passwords, so none are derived. */
+    installMethod,
     /** Members one group project's statement may name; never above the key set's 10,000. */
     aggregateMaxMembers: c.env(
       "LWQL_AGGREGATE_MAX_MEMBERS",

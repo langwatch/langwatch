@@ -33,6 +33,7 @@ const baseInput: PersonaResolverInput = {
   // matrices read cleanly. The gate is exercised explicitly below.
   hasGovernanceUi: true,
   firstProjectSlug: null,
+  planHome: null,
 };
 
 describe("resolvePersonaHome", () => {
@@ -431,5 +432,42 @@ describe("resolvePersonaHomeSafe", () => {
     expect(
       resolvePersonaHome({ ...baseInput, firstProjectSlug: "team-prod" }).firstProjectSlug,
     ).toBe("team-prod");
+  });
+});
+
+describe("given a Billing-only member (planHome set, ADR-205)", () => {
+  const payer: PersonaResolverInput = { ...baseInput, planHome: "/settings/subscription" };
+
+  /** @scenario "The home page sends someone who only pays to the plan page" */
+  it("goes to the plan page whatever the coding-agents flag, intent or org-wide keys say", () => {
+    const cases: PersonaResolverInput[] = [
+      payer,
+      { ...payer, hasGovernanceUi: false },
+      { ...payer, organizationIntent: "LLM_OPS" },
+      { ...payer, organizationIntent: "AGENT_GOVERNANCE" },
+      { ...payer, setupState: { ...payer.setupState, hasPersonalVKs: true } },
+      { ...payer, planHome: "/settings/license" },
+    ];
+    expect(cases.map((input) => resolvePersonaHome(input).destination)).toEqual([
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/subscription",
+      "/settings/license",
+    ]);
+  });
+
+  it("answers as an override, so a pin or a remembered product cannot beat it", () => {
+    const pinned = resolvePersonaHome({ ...payer, userLastHomePath: "/coding-agents" });
+    expect(pinned.destination).toBe("/settings/subscription");
+    expect(pinned.isOverride).toBe(true);
+  });
+
+  it("changes nothing for a reader with no planHome", () => {
+    expect(resolvePersonaHome(baseInput).destination).toBe("/coding-agents");
+    expect(resolvePersonaHome({ ...baseInput, hasGovernanceUi: false }).destination).toBe(
+      "/onboarding/welcome",
+    );
   });
 });

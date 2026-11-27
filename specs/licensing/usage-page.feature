@@ -1,7 +1,7 @@
 Feature: Usage page
   The Usage page shows what an organization used this month against what its plan
-  includes: the plan and its next step, the month's events day by day, each project's
-  share and the seats in use. Plan & billing is where the plan is changed and paid.
+  includes: the plan and its next step, the month's events day by day and by type, each
+  project's share and the seats in use. Plan & billing is where the plan is changed and paid.
 
   Background:
     Given I am logged in as an organization admin on the hosted product
@@ -81,6 +81,31 @@ Feature: Usage page
     And no daily bars and no "By project" section are shown
     And nothing says the count could not be loaded
 
+  # By type
+
+  @integration
+  Scenario: The month's events are split by type
+    Given the organization sent spans, logs, metrics, evaluations and experiments this month and no scenarios
+    When I open the Usage page
+    Then "By type" lists Spans, Logs, Metrics, Evaluations, Experiments and Scenarios in that order with their counts
+    And Scenarios reads "0"
+    And Metrics says "1 per series per hour"
+
+  @integration
+  Scenario: The page says when the split by type cannot be read
+    Given the per-type read failed for an events-metered organization
+    When I open the Usage page
+    Then it says "The month by type could not be loaded."
+    And no "By type" section is shown
+    And the day and project breakdowns are still shown
+
+  @integration
+  Scenario: A trace-metered organization sees no split by type
+    Given the organization is on a legacy tiered plan metered in traces
+    When I open the Usage page
+    Then no "By type" section is shown
+    And nothing says the split by type could not be loaded
+
   # Seats
 
   @integration
@@ -119,6 +144,33 @@ Feature: Usage page
     When the month breakdown is read
     Then it answers no daily series
     And it still answers each project's count
+
+  @unit
+  Scenario: The month breakdown counts an events-metered organization's month by kind
+    Given an events-metered organization that sent spans, log records, metric series, evaluations, experiment steps and scenario steps this month
+    When the month breakdown is read
+    Then it answers spans, logs, metrics, evaluations, experiments and scenarios in that order with their counts
+    And a kind with no events this month answers zero
+
+  @unit
+  Scenario: A trace-metered organization gets no breakdown by kind
+    Given an organization metered in traces
+    When the month breakdown is read
+    Then it answers no breakdown by kind and does not mark it unavailable
+
+  @unit
+  Scenario: The breakdown by kind is marked unavailable when its read fails
+    Given an events-metered organization whose per-kind meter read fails
+    When the month breakdown is read
+    Then it answers no breakdown by kind and marks it unavailable
+    And the daily series and the projects are still answered
+
+  @unit
+  Scenario: Every billable event type maps to one kind
+    Given the event types the meter bills
+    When each is mapped to the kind the usage page shows
+    Then every one has a kind, experiment and scenario steps grouped under experiments and scenarios
+    And an event type the meter does not bill has none
 
   @unit
   Scenario: Only organization administrators read the month breakdown

@@ -9,6 +9,7 @@ import {
 } from "../stored-object-legacy-source.repository.ts";
 import type { StoredObjectRepositories } from "../stored-object.repositories.ts";
 import { StoredObjectsRepository } from "../stored-objects.repository.ts";
+import { MemoryStoredObjectOwnerLinkRepository } from "./memory.stored-object-owner-link.repository.ts";
 import { MemoryStoredObjectRateLimitRepository } from "./memory.stored-object-rate-limit.repository.ts";
 import { MemoryStoredObjectRecordRepository } from "./memory.stored-object-record.repository.ts";
 import { MemoryStoredObjectSealRepository } from "./memory.stored-object-seal.repository.ts";
@@ -59,8 +60,11 @@ export class MemoryStoredObjectRepositories {
   static create({
     objectStorage,
   }: Readonly<{ objectStorage: ObjectStorage }>): StoredObjectRepositories {
+    const ownerLinks = MemoryStoredObjectOwnerLinkRepository.create();
+
     return {
-      records: MemoryStoredObjectRecordRepository.create(),
+      records: MemoryStoredObjectRecordRepository.create([], ownerLinks),
+      ownerLinks,
       bytes: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }),
       legacyIndex: MemoryStoredObjectsRepository.create(),
       legacyStorage: ObjectStorageStoredObjectLegacyStorageRepository.create(objectStorage),

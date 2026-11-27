@@ -11,6 +11,12 @@ Feature: Refusing work past the monthly usage allowance
     And the refusal carries the count, the allowance and the plan name
 
   @unit @entitlements
+  Scenario: Log records and metric series count toward the monthly allowance
+    Given an organization whose month is made of log records and metric series-hours
+    When its month is counted from the meter
+    Then the log records and metric series-hours are in the count the allowance is checked against
+
+  @unit @entitlements
   Scenario: An organization within its monthly allowance is let through
     Given an organization whose month's volume is below its plan's allowance
     When a caller asserts the organization is within its usage limit

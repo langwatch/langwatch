@@ -76,10 +76,7 @@ export type {
 // The Stripe webhook, moved off
 // `platform/app/src/server/app-layer/billing/`.
 export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";
-export type {
-  CancelledSubscription,
-  SubscriptionWithOrg,
-} from "./repositories/billing-webhook-subscription.repository.ts";
+export type { SubscriptionWithOrg } from "./repositories/billing-webhook-subscription.repository.ts";
 export {
   runTieredFreeToSeatEventMigration,
   TieredFreeToSeatEventMigrateTask,

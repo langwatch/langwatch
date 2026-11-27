@@ -16,6 +16,9 @@ export const AGENT_REGISTRY_SOURCES = [
   "langwatch",
   "databricks",
   "copilot_studio",
+  "aws",
+  "gcp",
+  "ard",
   "traffic",
 ] as const;
 export type AgentRegistrySource = (typeof AGENT_REGISTRY_SOURCES)[number];
@@ -27,6 +30,13 @@ export type AgentRegistrySource = (typeof AGENT_REGISTRY_SOURCES)[number];
 export const AGENT_REGISTRY_MANAGEMENT = ["managed", "discovered", "observed"] as const;
 export const AGENT_REGISTRY_STATUSES = ["active", "removed"] as const;
 export type AgentRegistryStatus = (typeof AGENT_REGISTRY_STATUSES)[number];
+
+/**
+ * `governed`: listed and, when old enough, seen in traces within the dormancy window. `shadow`:
+ * seen in traces while no source lists it. `dormant`: listed, with no trace in the window.
+ */
+export const AGENT_REGISTRY_POSTURES = ["governed", "shadow", "dormant"] as const;
+export type AgentRegistryPosture = (typeof AGENT_REGISTRY_POSTURES)[number];
 
 const jsonSchemaObject = z.record(z.string(), z.unknown());
 
@@ -80,6 +90,15 @@ const agentRegistryEntrySchemaDefinition = z.object({
   status: z.enum(AGENT_REGISTRY_STATUSES),
   /** Seen in traffic while no listed source (a LangWatch agent or a governance source) names it. */
   shadow: z.boolean(),
+  /** Listed, old enough for the dormancy window, and no trace named it within that window. */
+  dormant: z.boolean(),
+  posture: z.enum(AGENT_REGISTRY_POSTURES),
+  /** Where the agent runs at its source: `aws_bedrock`, `aws_agentcore`, `gcp_vertex`, `ard`. */
+  platform: z.string().nullable(),
+  /** The tags or labels the source holds on the agent. */
+  labels: z.record(z.string(), z.string()),
+  /** The owner the source's tags name (`owner`, `Owner` or `team`); not a LangWatch user. */
+  owner_label: z.string().nullable(),
   /** The registry's version: one more on every material change. */
   version: z.number().int().positive(),
   /** The version the source itself names, when it names one. */
@@ -165,6 +184,7 @@ const agentRegistryListQuerySchemaDefinition = z.object({
   cursor: z.string().min(1).optional(),
   updated_since: z.iso.datetime({ offset: true }).optional(),
   status: z.enum(AGENT_REGISTRY_STATUSES).optional(),
+  posture: z.enum(AGENT_REGISTRY_POSTURES).optional(),
 });
 export interface AgentRegistryListQuerySchema extends Named<
   typeof agentRegistryListQuerySchemaDefinition

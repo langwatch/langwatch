@@ -84,6 +84,7 @@ function harness(
     summary: TraceSummaryReader;
     evaluationRuns: MemoryTraceEvaluationRunsRepository;
     otherProjectLookup: Pick<TraceOtherProjectLookupService, "locate">;
+    resolveForApiKey: TraceViewerProtectionService["resolveForApiKey"];
   }> = {},
 ) {
   const tryGetById = vi.fn<TraceLegacyRead["findById"]>(
@@ -136,6 +137,8 @@ function harness(
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
         findTraceCosts: async () => [],
+        countTracesByProject: async () => [],
+        findTracePresence: async () => [],
       },
       read: read as TraceLegacyRead,
       spans: spans as TracesSpanReader,
@@ -163,7 +166,7 @@ function harness(
     exportBounds: null,
     publicBaseUrl: "https://app.example.test",
     protections: createApiFixture<TraceViewerProtectionService>(
-      { resolveForApiKey: async () => PROTECTIONS },
+      { resolveForApiKey: reads.resolveForApiKey ?? (async () => PROTECTIONS) },
       "viewer protections",
     ),
     ...(reads.otherProjectLookup
@@ -656,6 +659,45 @@ describe("TraceModule", () => {
 
         expect(answer.trace_id).toBe("trace-1");
         expect(answer.project).toEqual({ id: OTHER.id, slug: OTHER.slug, name: OTHER.name });
+      });
+    });
+
+    describe("given a project-bound access token whose trace is only in another project", () => {
+      /** @scenario "A project-bound access token reads another project's trace as the public" */
+      it("resolves the other project's content as the public, not as the person", async () => {
+        const resolveForApiKey = vi.fn<TraceViewerProtectionService["resolveForApiKey"]>(
+          async () => PROTECTIONS,
+        );
+        const { app } = harness({
+          findById: async ({ projectId }) =>
+            projectId === OTHER.id ? traceRow("trace-1") : undefined,
+          otherProjectLookup: {
+            locate: async () => ({
+              located: { project: OTHER },
+              searchedProjectSlugs: [OTHER.slug],
+            }),
+          },
+          resolveForApiKey,
+        });
+        const person = { type: "user" as const, id: "admin-1" };
+
+        await app.getTraceByIdForApiKey({
+          projectId: "project-own",
+          traceId: "trace-1",
+          format: "json",
+          projectSlug: "own-slug",
+          principal: person,
+        });
+
+        expect(resolveForApiKey).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "project-own", principal: person }),
+        );
+        expect(resolveForApiKey).not.toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "project-own", readsAsPerson: false }),
+        );
+        expect(resolveForApiKey).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: OTHER.id, principal: person, readsAsPerson: false }),
+        );
       });
     });
 

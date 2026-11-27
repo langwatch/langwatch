@@ -25,6 +25,7 @@ import {
   withTenantCapability,
 } from "../../rules/langwatch-ql-tenant-capability.rules.ts";
 import { isFlooredViewName } from "../../rules/lwql-dedup-floor.rules.ts";
+import { isTraceIdsViewName } from "../../rules/lwql-dedup-trace-ids.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -33,6 +34,7 @@ import {
 } from "../langwatch-ql-executor.repository.ts";
 import {
   extractBadQueryParameter,
+  isClickHouseAuthenticationError,
   isClickHouseBadQueryParameterError,
   isClickHouseInvalidQueryError,
   isClickHouseObjectAccessDeniedError,
@@ -83,13 +85,25 @@ function namesAnAppFunction(sql: string): boolean {
   return lwqlAppFunctionNames().some((name) => new RegExp(`\\b${name}\\s*\\(`, "i").test(sql));
 }
 
+/** Which ClickHouse an executor dials: the shared one, or one organization's own. */
+export type LangWatchQLTarget = "shared" | "private";
+
 /**
- * The refusal names, as an unknown table function, a floored twin this statement reads.
- * Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
+ * On an organization's own ClickHouse, an unknown identity or a missing LangWatchQL object means
+ * nobody provisioned it there yet: that organization's gap, not the deployment's.
  */
-function namesMissingFlooredTwin({ error, sql }: { error: unknown; sql: string }): boolean {
+function isPrivateTargetNotSetUp(error: unknown): boolean {
+  return isClickHouseAuthenticationError(error) || isClickHouseObjectMissingError(error);
+}
+
+/**
+ * The refusal names, as an unknown table function, a floored or trace-ids twin the statement
+ * reads. Matched on the twin's own name: the rewrite keeps the caller's quoting of the database.
+ */
+function namesMissingTwin({ error, sql }: { error: unknown; sql: string }): boolean {
   const twin = extractUnknownTableFunction(error)?.split(".").at(-1);
-  return twin !== undefined && isFlooredViewName(twin) && sql.includes(`${twin}(`);
+  const isTwin = twin !== undefined && (isFlooredViewName(twin) || isTraceIdsViewName(twin));
+  return isTwin && sql.includes(`${twin}(`);
 }
 
 /** What a failed governed run is reported as. */
@@ -97,11 +111,20 @@ function refusalFor({
   error,
   durationMs,
   sql,
+  target,
 }: {
   error: unknown;
   durationMs: number;
   sql: string;
+  target: LangWatchQLTarget;
 }): unknown {
+  if (target === "private" && isPrivateTargetNotSetUp(error)) {
+    return new LangWatchQLUnavailableError({
+      message: "LangWatchQL is not set up on this organization's ClickHouse yet.",
+      reasons: [toError(error)],
+    });
+  }
+
   if (isClickHouseObjectMissingError(error)) {
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
@@ -136,9 +159,9 @@ function refusalFor({
     return new LangWatchQLBusyError({ reasons: [toError(error)] });
   }
 
-  // A floored twin not provisioned yet is read as a table function the server lacks: the
+  // A twin not provisioned yet is read as a table function the server lacks: the
   // deployment is missing an object, as code 60 says for a plain view, so the floor falls back.
-  if (namesMissingFlooredTwin({ error, sql })) {
+  if (namesMissingTwin({ error, sql })) {
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
 
@@ -164,11 +187,14 @@ function refusalFor({
 export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutorRepository {
   static create({
     connection,
+    target = "shared",
   }: {
     connection: LangWatchQLConnection;
+    target?: LangWatchQLTarget;
   }): ClickHouseLangWatchQLExecutorRepository {
     return new ClickHouseLangWatchQLExecutorRepository(
       connection,
+      target,
       createClient({
         url: connection.url,
         username: connection.username,
@@ -185,6 +211,7 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
 
   private constructor(
     private readonly connection: LangWatchQLConnection,
+    private readonly target: LangWatchQLTarget,
     private readonly client: ClickHouseClient,
   ) {
     super();
@@ -232,6 +259,7 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         error: withoutCapability({ error, capability: tenantCapability }),
         durationMs: nowInstant().epochMilliseconds - startedAt,
         sql,
+        target: this.target,
       });
     }
   }

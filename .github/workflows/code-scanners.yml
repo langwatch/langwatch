@@ -55,6 +55,7 @@ jobs:
   # keeps the weekly cron (where the report-only scanners are actually
   # actioned), merge_group, push and workflow_dispatch running everything.
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       go: ${{ github.event_name != 'pull_request' || steps.filter.outputs.go }}

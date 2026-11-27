@@ -6,6 +6,11 @@ import {
   CLAUDE_COMPLIANCE_FIELDS,
   OPENAI_ADMIN_FIELDS,
 } from "./admin-api-parser-fields.ts";
+import {
+  ARD_REGISTRY_FIELDS,
+  AWS_BEDROCK_AGENTS_FIELDS,
+  GCP_VERTEX_AGENT_ENGINE_FIELDS,
+} from "./cloud-agent-parser-fields.ts";
 import { COPILOT_STUDIO_DATAVERSE_FIELDS } from "./copilot-studio-parser-fields.ts";
 import type { FieldDef } from "./parser-field-controls.ts";
 
@@ -96,6 +101,9 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   openai_admin: OPENAI_ADMIN_FIELDS,
   claude_compliance: CLAUDE_COMPLIANCE_FIELDS,
   anthropic_admin: ANTHROPIC_ADMIN_FIELDS,
+  aws_bedrock_agents: AWS_BEDROCK_AGENTS_FIELDS,
+  gcp_vertex_agent_engine: GCP_VERTEX_AGENT_ENGINE_FIELDS,
+  ard_registry: ARD_REGISTRY_FIELDS,
   databricks_genie: [
     {
       key: "workspaceUrl",

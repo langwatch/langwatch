@@ -73,3 +73,24 @@ describe("toCanonicalCustomModelList", () => {
     });
   });
 });
+
+describe("given an entry that states max tokens and parameters", () => {
+  it("keeps them, so a save from the drawer never drops them", () => {
+    expect(
+      toCanonicalCustomModelList(
+        [
+          {
+            modelId: "m",
+            displayName: "M",
+            mode: "chat",
+            maxTokens: 8192,
+            supportedParameters: ["reasoning"],
+          },
+        ],
+        "chat",
+      ),
+    ).toEqual([
+      { id: "m", label: "M", type: "chat", maxTokens: 8192, supportedParameters: ["reasoning"] },
+    ]);
+  });
+});

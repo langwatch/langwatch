@@ -1,11 +1,10 @@
 /**
  * The catalogue's chips, shared by the templates finder and the "Add a widget" picker: category
  * chips in their trunk's colour, and agent-type chips. Each row picks one value; clicking the
- * picked chip again clears it. With them, the finder's plain search; the picker has the ask bar.
+ * picked chip again clears it. The ask bar is the one search box; the finder has none of its own.
  */
 
-import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
-import { SearchInput } from "@langwatch/design-system/search-input";
+import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Activity, BadgeCheck, DollarSign, type LucideIcon, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -32,36 +31,6 @@ export const TRUNK_ICONS: Readonly<Record<Trunk, LucideIcon>> = {
   Protect: ShieldCheck,
   Trust: BadgeCheck,
 };
-
-/** The agent types a chip row offers; coding-agent boards and widgets live elsewhere. */
-const CHIP_KINDS = AGENT_KINDS.filter((kind) => kind !== "coding");
-
-/** The finder's plain, centred search box. */
-export function CatalogueSearch({
-  value,
-  placeholder,
-  onChange,
-}: {
-  value: string;
-  /** Also the box's accessible name. */
-  placeholder: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    // A grid stretches the inline search group, so the whole placeholder shows.
-    <Box display="grid" width="full" maxWidth="640px">
-      <SearchInput
-        aria-label={placeholder}
-        placeholder={placeholder}
-        height="40px"
-        borderRadius="full"
-        textStyle="body"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </Box>
-  );
-}
 
 function ChipRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -185,7 +154,7 @@ export function AgentKindChips({
 }) {
   return (
     <ChipRow label="Agent types">
-      {CHIP_KINDS.flatMap((kind) => {
+      {AGENT_KINDS.flatMap((kind) => {
         const count = countOf(kind);
         const isPicked = picked === kind;
         if (count === 0 && !isPicked) return [];

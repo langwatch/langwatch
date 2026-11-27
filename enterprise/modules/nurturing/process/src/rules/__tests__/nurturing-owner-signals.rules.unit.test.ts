@@ -64,6 +64,28 @@ describe("guidedOnboardingSignal", () => {
   });
 });
 
+describe("guidedOnboardingSignal for Langy's governance start", () => {
+  describe("when guided onboarding records the call start", () => {
+    /** @scenario "Langy's start choice reaches nurturing as a guided progress signal" */
+    it("raises a progress signal carrying the start and the state that holds it", () => {
+      const state = { ...recorded.state, langyStart: "call" as const };
+
+      expect(
+        guidedOnboardingSignal({
+          aggregateId: "org-1",
+          data: { ...recorded, event: "start_chosen", payload: { start: "call" }, state },
+        }),
+      ).toMatchObject({
+        kind: "guided_onboarding_progress",
+        sourceEventId: "org-1:start_chosen:1700000000000",
+        event: "start_chosen",
+        payload: { start: "call" },
+        state: { langyStart: "call" },
+      });
+    });
+  });
+});
+
 describe("guidedOnboardingSignal for the steps only PostHog is told of", () => {
   it("raises a provider skip and a tour replay as progress, with the current path", () => {
     for (const event of ["provider_skipped", "tour_replayed"] as const) {
@@ -136,13 +158,19 @@ describe("evaluationCompletedSignal", () => {
       evaluationCompletedSignal({
         latest,
         count: 2,
-        organization: { adminUserId: "admin-1", seeded: false, evaluationCount: 3 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: "admin-1",
+          seeded: false,
+          evaluationCount: 3,
+        },
       }),
     ).toMatchObject([
       {
         kind: "evaluation_completed",
         sourceEventId: "project-1:eval-1",
         userId: "admin-1",
+        organizationId: "org-1",
         evaluationsCounted: 2,
         organizationEvaluationCount: 3,
         first: false,
@@ -155,7 +183,12 @@ describe("evaluationCompletedSignal", () => {
       const [signal] = evaluationCompletedSignal({
         latest,
         count: 2,
-        organization: { adminUserId: "admin-1", seeded: false, evaluationCount: 2 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: "admin-1",
+          seeded: false,
+          evaluationCount: 2,
+        },
       });
 
       expect(signal).toMatchObject({ first: true, organizationEvaluationCount: 2 });
@@ -166,7 +199,12 @@ describe("evaluationCompletedSignal", () => {
       const [signal] = evaluationCompletedSignal({
         latest,
         count: 1,
-        organization: { adminUserId: "admin-1", seeded: true, evaluationCount: 1 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: "admin-1",
+          seeded: true,
+          evaluationCount: 1,
+        },
       });
 
       expect(signal).toMatchObject({ first: false, organizationEvaluationCount: 1 });
@@ -178,7 +216,12 @@ describe("evaluationCompletedSignal", () => {
       evaluationCompletedSignal({
         latest,
         count: 1,
-        organization: { adminUserId: null, seeded: false, evaluationCount: 1 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: null,
+          seeded: false,
+          evaluationCount: 1,
+        },
       }),
     ).toEqual([]);
   });

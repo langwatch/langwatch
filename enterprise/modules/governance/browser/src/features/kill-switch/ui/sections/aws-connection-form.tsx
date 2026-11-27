@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { Button, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import type { AwsConnectionView } from "@langwatch/enterprise-governance-contract";
 
 import {
   type ConnectionFieldBinding,
@@ -60,7 +61,8 @@ export function AwsConnectionForm({
   onDone,
 }: {
   organizationId: string;
-  onDone: () => void;
+  /** Called with the new connection once it is saved, and with nothing on cancel. */
+  onDone: (created?: AwsConnectionView) => void;
 }) {
   const form = useAwsConnectionForm({ organizationId, onDone });
 
@@ -87,7 +89,7 @@ export function AwsConnectionForm({
         </Text>
       ) : null}
       <HStack justify="end" gap={2}>
-        <Button size="sm" variant="ghost" disabled={form.isSaving} onClick={onDone}>
+        <Button size="sm" variant="ghost" disabled={form.isSaving} onClick={() => onDone()}>
           Cancel
         </Button>
         <Button

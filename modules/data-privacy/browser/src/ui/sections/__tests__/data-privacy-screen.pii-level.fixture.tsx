@@ -92,7 +92,7 @@ export function snapshotWith({
       teams: [{ id: "team-1", name: "Platform" }],
       projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
     },
-    audienceOptions: { groups: [] },
+    audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
     effective: resolved(level, entities),
     effectiveTeam: resolved(level, entities),
     effectiveOrganization: resolved(level, entities),
@@ -164,6 +164,7 @@ export function renderScreen({
   screenElement,
   flagOn,
   free = false,
+  splitFlag = false,
   isSaaS = true,
   licence = "enterprise",
   mayManageLicence = true,
@@ -172,6 +173,8 @@ export function renderScreen({
   screenElement: ReactElement;
   flagOn: boolean;
   free?: boolean;
+  /** The organization's release_pii_redaction_model_split_enabled flag (ADR-207). */
+  splitFlag?: boolean;
   isSaaS?: boolean;
   licence?: PrivacyLicence;
   mayManageLicence?: boolean;
@@ -181,6 +184,7 @@ export function renderScreen({
   const answers: Record<string, boolean> = {
     release_pii_redaction_model_enabled: flagOn,
     release_pii_redaction_model_free: free,
+    release_pii_redaction_model_split_enabled: splitFlag,
   };
   const flags: UiFlags = { flag: ({ name }) => answers[name] ?? false };
   const services: UiHostServices = {

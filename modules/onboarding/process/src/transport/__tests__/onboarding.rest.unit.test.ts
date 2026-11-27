@@ -146,6 +146,36 @@ describe("given a project whose organization recorded llmops and gateway", () =>
   });
 });
 
+describe("given Langy's governance opener was answered", () => {
+  describe("when the start is recorded with the project's credential", () => {
+    /** @scenario "the REST route records Langy's start for the project's organization" */
+    it("records the start on the project's organization and refuses an unknown start", async () => {
+      const recordLangyStart = vi.fn(async () => ({
+        paths: ["governance"],
+        donePaths: [],
+        langyStart: "call",
+      }));
+      const { send } = mount({ onboarding: { recordLangyStart: recordLangyStart as never } });
+
+      const response = await send("POST", "/api/onboarding/guided/start/call");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ langyStart: "call" });
+      expect(recordLangyStart).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        userId: "user-1",
+        start: "call",
+      });
+
+      const refused = await send("POST", "/api/onboarding/guided/start/meeting");
+
+      expect(refused.status).toBe(422);
+      await expect(refused.json()).resolves.toMatchObject({ code: "validation_error" });
+      expect(recordLangyStart).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 describe("given a key that holds only the project's read permissions", () => {
   const readOnly = (permission: string) => permission.endsWith(":view");
 
@@ -205,10 +235,10 @@ describe("given a project API key that names no user", () => {
   });
 
   describe("given the published API document", () => {
-    it("leaves both guided routes out, because only Langy's CLI calls them", () => {
+    it("leaves every guided route out, because only Langy's CLI calls them", () => {
       const hidden = onboardingRest.router().routes.map((route) => route.docs?.hide);
 
-      expect(hidden).toEqual([true, true]);
+      expect(hidden).toEqual([true, true, true]);
     });
   });
 });

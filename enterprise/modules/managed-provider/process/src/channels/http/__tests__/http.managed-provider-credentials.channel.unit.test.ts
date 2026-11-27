@@ -1,5 +1,5 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpManagedProviderCredentialsChannel } from "../http.managed-provider-credentials.channel.ts";
 
@@ -9,8 +9,10 @@ const sts = vi.hoisted(() => ({
     endpoint?: string;
     credentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
   }[],
-  assumed: [] as { clientIndex: number; roleArn: string }[],
+  assumed: [] as { clientIndex: number; roleArn: string; abortSignal?: AbortSignal }[],
   proxyReturnsCredentials: true,
+  proxyStalls: false,
+  proxyAnswersLate: false,
 }));
 
 vi.mock("@aws-sdk/client-sts", () => {
@@ -30,12 +32,29 @@ vi.mock("@aws-sdk/client-sts", () => {
       sts.clients.push(config);
     }
 
-    async send(command: AssumeRoleCommand): Promise<{
+    async send(
+      command: AssumeRoleCommand,
+      options?: { abortSignal?: AbortSignal },
+    ): Promise<{
       Credentials?: { AccessKeyId?: string; SecretAccessKey?: string; SessionToken?: string };
     }> {
-      sts.assumed.push({ clientIndex: this.index, roleArn: command.input.RoleArn });
+      sts.assumed.push({
+        clientIndex: this.index,
+        roleArn: command.input.RoleArn,
+        abortSignal: options?.abortSignal,
+      });
 
       if (this.index === 0) {
+        if (sts.proxyAnswersLate) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
+        if (sts.proxyStalls) {
+          return new Promise((_resolve, reject) => {
+            options?.abortSignal?.addEventListener("abort", () =>
+              reject(options.abortSignal?.reason),
+            );
+          });
+        }
         if (!sts.proxyReturnsCredentials) {
           return {};
         }
@@ -76,6 +95,12 @@ describe("HttpManagedProviderCredentialsChannel", () => {
     sts.clients.length = 0;
     sts.assumed.length = 0;
     sts.proxyReturnsCredentials = true;
+    sts.proxyStalls = false;
+    sts.proxyAnswersLate = false;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("given a managed Bedrock configuration naming both roles", () => {
@@ -105,6 +130,51 @@ describe("HttpManagedProviderCredentialsChannel", () => {
           secretAccessKey: "customer-secret",
           sessionToken: "customer-token",
         });
+      });
+    });
+
+    describe("when the proxy role hop never answers", () => {
+      /** @scenario "A stalled role hop gives up inside the gateway's config fetch" */
+      it("gives up at 1.5s, inside the gateway's 2s config fetch, without reaching the customer role", async () => {
+        vi.useFakeTimers();
+        sts.proxyStalls = true;
+        const outcome = HttpManagedProviderCredentialsChannel.create()
+          .assumeCustomerRole(CONFIG)
+          .then(
+            () => "resolved",
+            (error: { code?: string }) => error.code,
+          );
+
+        await vi.advanceTimersByTimeAsync(1499);
+        const early = await Promise.race([outcome, Promise.resolve("still waiting")]);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(early).toBe("still waiting");
+        await expect(outcome).resolves.toBe("managed_role_hop_timeout");
+        expect(sts.assumed.map((call) => call.roleArn)).toEqual([CONFIG.proxyRoleArn]);
+      });
+
+      it("gives up at the deadline even while the SDK waits out a retry backoff", async () => {
+        vi.useFakeTimers();
+        sts.proxyAnswersLate = true;
+        const outcome = HttpManagedProviderCredentialsChannel.create()
+          .assumeCustomerRole(CONFIG)
+          .then(
+            () => "resolved",
+            (error: { code?: string }) => error.code,
+          );
+
+        await vi.advanceTimersByTimeAsync(1500);
+
+        await expect(outcome).resolves.toBe("managed_role_hop_timeout");
+      });
+
+      it("bounds both hops with one deadline", async () => {
+        await HttpManagedProviderCredentialsChannel.create().assumeCustomerRole(CONFIG);
+
+        const [proxyHop, customerHop] = sts.assumed;
+        expect(proxyHop?.abortSignal).toBeInstanceOf(AbortSignal);
+        expect(customerHop?.abortSignal).toBe(proxyHop?.abortSignal);
       });
     });
 

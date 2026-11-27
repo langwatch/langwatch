@@ -14,6 +14,10 @@ Feature: Persona-aware home resolver
        admins onto /governance).
 
   Plus an override: `User.lastHomePath` (when explicitly set by user pinning).
+  One override outranks it and every signal: a Billing-only member (ADR-205) lands on the plan
+  page, `/settings/subscription` on Cloud or `/settings/license` self-hosted. Its scenario is
+  "The home page sends someone who only pays to the plan page" in
+  specs/licensing/billing-only-invite.feature.
 
   Spec scope: the resolver function contract and its 4 personas. Implementation
   in `enterprise/modules/governance/contract/src/persona-home.ts`. UI plumbing

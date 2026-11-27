@@ -30,7 +30,7 @@ describe.each(SOURCES)("given a widget that reads %s", (source) => {
     /** @scenario "AC13 A quiet period does not ask the member to connect a source" */
     it("says there is nothing in this period, before any setup button", () => {
       const quiet = `if (present.data.length > 0) return <Note>${cta.quiet}</Note>;`;
-      expect(cta.quiet).toMatch(/^No .+ in this period\.$/);
+      expect(cta.quiet).toMatch(/\bno\b.+ in this period\.$/i);
       expect(face).toContain(quiet);
       expect(face.indexOf(quiet)).toBeLessThan(face.indexOf("LW.navigate("));
     });

@@ -214,10 +214,14 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
       attributes: ctx.bag.attrs,
       resourceAttributes: ctx.resourceAttributes,
     });
+    // A subagent span without a session names the subagent as its conversation;
+    // the prompt names the session.
     if (declaredSession !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, declaredSession);
       ctx.setAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, declaredSession);
       fired = true;
     } else if (sessionId !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId);
       fired = true;
     }

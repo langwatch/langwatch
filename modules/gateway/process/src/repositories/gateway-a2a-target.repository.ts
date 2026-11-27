@@ -6,6 +6,14 @@ import type {
 
 import type { GatewayPersistenceTransaction } from "./gateway-transaction.repository.ts";
 
+/** The stored upstream an edit was checked against: its URL and whether headers are saved. */
+export type GatewayA2aTargetUpstream = { upstreamUrl: string; hasUpstreamHeaders: boolean };
+
+/** An edit; with `expectedUpstream` it lands only while the stored row still matches it. */
+export type GatewayA2aTargetUpdate = UpdateGatewayA2aTargetInput & {
+  expectedUpstream?: GatewayA2aTargetUpstream;
+};
+
 /** A2A targets of an organization; the live tier seals upstream headers at rest. */
 export abstract class GatewayA2aTargetRepository {
   /**
@@ -29,8 +37,9 @@ export abstract class GatewayA2aTargetRepository {
     input: CreateGatewayA2aTargetInput,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayA2aTargetResource>;
+  /** Refuses with `gateway_a2a_target_headers_need_replacing` once `expectedUpstream` fails. */
   abstract update(
-    input: UpdateGatewayA2aTargetInput,
+    input: GatewayA2aTargetUpdate,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayA2aTargetResource>;
   abstract archive(

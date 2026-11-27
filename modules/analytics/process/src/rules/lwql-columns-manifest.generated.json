@@ -6555,6 +6555,16 @@
           "name": "EvaluationRowsDigest",
           "type": "String",
           "comment": ""
+        },
+        {
+          "name": "LastUsedPromptVersionId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "AppVersion",
+          "type": "String",
+          "comment": ""
         }
       ]
     },

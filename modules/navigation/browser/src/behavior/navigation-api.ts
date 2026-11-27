@@ -17,6 +17,12 @@ export type NavigationHomeResolution = {
   governanceUiEnabled: boolean;
 };
 
+/**
+ * The dashboard contract's `homeProduct`, spelled out: importing it from the analytics client
+ * would pull that package into every procedure map's type graph (ADR-130).
+ */
+type BoardHomeProduct = "llm-ops" | "me" | "gateway" | "governance";
+
 export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   organization: {
     /**
@@ -184,6 +190,24 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   workflow: {
     getAll: {
       query: { input: { projectId: string }; output: { id: string; name: string }[] };
+    };
+  };
+
+  boards: {
+    /**
+     * The board a Dashboards address opens, by the library's rule (ADR-002): the shell draws its
+     * home product's chrome, and a project pick keeps it open unless its project owns its view.
+     */
+    resolve: {
+      query: {
+        input: { organizationId: string; dashboardId: string };
+        output: {
+          homeProduct: BoardHomeProduct;
+          scope: string;
+          /** The owning project, named only where the reader may read it. */
+          project: { id: string; slug: string } | null;
+        };
+      };
     };
   };
 

@@ -4,7 +4,6 @@
  * whole body before in-handler auth, so the declared cap is what keeps an
  * unauthenticated oversized POST from allocating pod memory.
  */
-import { resolveRequestBound } from "@langwatch/plans";
 import { describe, expect, it } from "vitest";
 
 import { otlpIngestRest } from "../otlp-ingest.rest.ts";
@@ -15,13 +14,12 @@ const RECEIVERS = ["ingestOtlpTraces"];
 
 describe("the OTLP receiver family", () => {
   describe("given the declaration a process mounts", () => {
-    it("caps every receiver's wire body at the registry's bulk bound", () => {
-      const caps = Object.fromEntries(
-        declaration.routes.map((route) => [route.operation, route.bodyLimit?.maxBytes]),
-      );
-
+    it("caps every receiver's wire body at the deployment's trace body setting", () => {
       for (const operation of RECEIVERS) {
-        expect(caps[operation]).toBe(resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE"));
+        const cap = declaration.routes.find((route) => route.operation === operation)?.bodyLimit;
+        expect(typeof cap?.maxBytes).toBe("function");
+        const resolve = cap?.maxBytes as (app: { otlpTracesMaxBodyBytes(): number }) => number;
+        expect(resolve({ otlpTracesMaxBodyBytes: () => 12_345 })).toBe(12_345);
       }
     });
 

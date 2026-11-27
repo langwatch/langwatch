@@ -2,8 +2,11 @@ import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 
+import { evaluatorErrorCodeSql } from "../../rules/evaluator-error-code.rules.ts";
 import {
   MonitorPerformanceRepository,
+  type EvaluatorOutcomeRow,
+  type EvaluatorOutcomeRowQuery,
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository.ts";
@@ -41,13 +44,15 @@ const queryForTimeZone = (timeZone: string): string => `
     sum(ifNull(Score, 0)) AS ScoreSum,
     count(Score) AS ScoreCount,
     sum(ifNull(Passed, 0)) AS PassSum,
-    count(Passed) AS PassCount
+    count(Passed) AS PassCount,
+    sumMap([ifNull(Label, '')], [toUInt64(1)]) AS LabelCounts
   FROM (
     SELECT
       evaluations.EvaluatorId AS EvaluatorId,
       evaluations.Status AS Status,
       evaluations.Score AS Score,
       evaluations.Passed AS Passed,
+      evaluations.Label AS Label,
       traces.TraceOccurredAt AS TraceOccurredAt
     FROM (
       SELECT
@@ -67,12 +72,13 @@ const queryForTimeZone = (timeZone: string): string => `
         tupleElement(Latest, 2) AS EvaluatorId,
         tupleElement(Latest, 3) AS Status,
         tupleElement(Latest, 4) AS Score,
-        tupleElement(Latest, 5) AS Passed
+        tupleElement(Latest, 5) AS Passed,
+        tupleElement(Latest, 6) AS Label
       FROM (
         SELECT
           TenantId,
           EvaluationId,
-          argMax(tuple(TraceId, EvaluatorId, Status, Score, Passed), UpdatedAt) AS Latest
+          argMax(tuple(TraceId, EvaluatorId, Status, Score, Passed, Label), UpdatedAt) AS Latest
         FROM evaluation_runs
         WHERE TenantId = {tenantId:String}
           AND EvaluatorId IN {evaluatorIds:Array(String)}
@@ -89,6 +95,60 @@ const queryForTimeZone = (timeZone: string): string => `
   ORDER BY EvaluatorId, Period, Day
 `;
 
+const outcomeErrorCode = evaluatorErrorCodeSql({ column: "Error" });
+
+/** Each run at its latest revision; the error text becomes its code inside ClickHouse. */
+const OUTCOME_QUERY = `
+  SELECT
+    EvaluatorId,
+    any(EvaluatorType) AS EvaluatorType,
+    ErrorCode,
+    count() AS Runs,
+    countIf(Status = 'error') AS Errors,
+    countIf(Status = 'skipped') AS Skipped,
+    maxIf(toUnixTimestamp64Milli(SettledAt), Status = 'error') AS LastErrorAt
+  FROM (
+    SELECT
+      tupleElement(Latest, 1) AS EvaluatorId,
+      tupleElement(Latest, 2) AS EvaluatorType,
+      tupleElement(Latest, 3) AS Status,
+      tupleElement(Latest, 4) AS ErrorCode,
+      tupleElement(Latest, 5) AS SettledAt
+    FROM (
+      SELECT
+        EvaluationId,
+        argMax(
+          tuple(
+            EvaluatorId,
+            EvaluatorType,
+            Status,
+            if(Status = 'error', ${outcomeErrorCode.sql}, ''),
+            coalesce(CompletedAt, UpdatedAt)
+          ),
+          UpdatedAt
+        ) AS Latest
+      FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
+        AND ScheduledAt >= {since:DateTime64(3)}
+        AND ScheduledAt < {until:DateTime64(3)}
+      GROUP BY TenantId, EvaluationId
+    )
+  )
+  GROUP BY EvaluatorId, ErrorCode
+  ORDER BY EvaluatorId, ErrorCode
+  LIMIT {limit:UInt32}
+`;
+
+type ClickHouseOutcomeRow = {
+  EvaluatorId: string;
+  EvaluatorType: string;
+  ErrorCode: string;
+  Runs: string;
+  Errors: string;
+  Skipped: string;
+  LastErrorAt: string;
+};
+
 type ClickHouseMonitorPerformanceRow = {
   EvaluatorId: string;
   Period: "current" | "previous";
@@ -97,6 +157,20 @@ type ClickHouseMonitorPerformanceRow = {
   ScoreCount: string;
   PassSum: string;
   PassCount: string;
+  /** sumMap's answer: the labels seen and, in step, how often each was seen. */
+  LabelCounts: [string[], (number | string)[]];
+};
+
+/** Unlabelled results land under the empty key; that key is not a label. */
+const toLabelCounts = (
+  counts: ClickHouseMonitorPerformanceRow["LabelCounts"] | undefined,
+): Record<string, number> => {
+  const [labels, occurrences] = counts ?? [[], []];
+  return Object.fromEntries(
+    labels.flatMap((label, index) =>
+      label === "" ? [] : [[label, Number(occurrences[index] ?? 0)] as const],
+    ),
+  );
 };
 
 /** Private parity query for the online-evaluation performance chart. */
@@ -140,6 +214,7 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
           scoreCount: Number(row.ScoreCount),
           passSum: Number(row.PassSum),
           passCount: Number(row.PassCount),
+          labelCounts: toLabelCounts(row.LabelCounts),
         }),
       );
     } catch (error) {
@@ -153,5 +228,38 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
       );
       throw error;
     }
+  }
+
+  async findOutcomeRows(input: EvaluatorOutcomeRowQuery): Promise<EvaluatorOutcomeRow[]> {
+    if (input.until <= input.since) return [];
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseMonitorPerformanceRepository.findOutcomeRows",
+    );
+    const client = await this.options.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: OUTCOME_QUERY,
+      query_params: {
+        ...outcomeErrorCode.params,
+        tenantId: input.tenantId,
+        since: clickHouseMomentOf(input.since),
+        until: clickHouseMomentOf(input.until),
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+      clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+    });
+    return (await result.json<ClickHouseOutcomeRow>()).map((row): EvaluatorOutcomeRow => {
+      const lastErrorAt = Number(row.LastErrorAt);
+      return {
+        evaluatorId: row.EvaluatorId,
+        evaluatorType: row.EvaluatorType,
+        errorCode: row.ErrorCode,
+        runs: Number(row.Runs),
+        errors: Number(row.Errors),
+        skipped: Number(row.Skipped),
+        lastErrorAt: lastErrorAt > 0 ? lastErrorAt : null,
+      };
+    });
   }
 }

@@ -142,6 +142,14 @@ Admits a statement, or throws the refusal. The verdict is what a caller storing 
 validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
 ```
 
+#### `validateLangWatchQLForRun`
+
+Admits a statement for a run about to start: the placement gate, then the project's route, then the statement judged against the route's database. A saved statement uses `validateLangWatchQL`, which needs no route.
+
+```typescript
+validateLangWatchQLForRun(input: LangWatchQLValidationInput): Promise<LangWatchQLAcceptedStatement>;
+```
+
 #### `describeLangWatchQLJudgements`
 
 The judged columns a hydration plan asks for, in the catalogue's own vocabulary. Derived here because the catalogue is LangWatchQL's: which option of an eval function is its threshold, range or list is its answer.
@@ -328,7 +336,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:268
+type Body = z.infer<typeof lwqlKeyStatementSchema>; // ../contract/src/features/lwql/analytics-lwql.schemas.ts:279
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
 ```
 
@@ -360,16 +368,17 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:134`, router `src/transport/analytics-lwql.trpc.ts:85`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:153`, router `src/transport/analytics-lwql.trpc.ts:88`.
 
-| Procedure                         | Kind     | Gate                        | Input                    | Output                          |
-| --------------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
-| `analytics.lwql.availability`     | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema` |
-| `analytics.lwql.schema`           | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`             |
-| `analytics.lwql.validate`         | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`    |
-| `analytics.lwql.spanDataFloor`    | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlSpanDataFloorSchema`       |
-| `analytics.lwql.readableProjects` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlReadableProjectsSchema`    |
-| `analytics.lwql.query`            | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`  |
+| Procedure                                  | Kind     | Gate                        | Input                    | Output                                |
+| ------------------------------------------ | -------- | --------------------------- | ------------------------ | ------------------------------------- |
+| `analytics.lwql.availability`              | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema`       |
+| `analytics.lwql.schema`                    | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`                   |
+| `analytics.lwql.validate`                  | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`          |
+| `analytics.lwql.spanDataFloor`             | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlSpanDataFloorSchema`             |
+| `analytics.lwql.managedPromptVersionFloor` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlManagedPromptVersionFloorSchema` |
+| `analytics.lwql.readableProjects`          | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `lwqlReadableProjectsSchema`          |
+| `analytics.lwql.query`                     | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`        |
 
 ```typescript
 // analytics.lwql.availability
@@ -377,7 +386,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:134`, router `src
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:528
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:530
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
@@ -407,6 +416,15 @@ type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features
 interface Output {
   from: string | null;
   rebuilding: boolean;
+}
+
+// analytics.lwql.managedPromptVersionFloor
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
+// Output: lwqlManagedPromptVersionFloorSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:148
+interface Output {
+  from: string | null;
+  rebuilding: boolean;
+  unknown: boolean;
 }
 
 // analytics.lwql.readableProjects
@@ -503,21 +521,22 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:495`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:496`           |
-| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:497`           |
-| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:498`           |
-| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:499`           |
-| config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
-| config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
-| config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |
-| config | `langwatchQl.tenantSetting`       | `LWQL_TENANT_SETTING`                     | `../contract/src/analytics.config.ts:14` |
-| config | `langwatchQl.postgresHost`        | `LWQL_POSTGRES_HOST`                      | `../contract/src/analytics.config.ts:15` |
-| config | `langwatchQl.accessModelMode`     | `LWQL_ACCESS_MODEL_MODE`                  | `../contract/src/analytics.config.ts:16` |
-| config | `langwatchQl.sqlSingleNode`       | `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`       | `../contract/src/analytics.config.ts:17` |
-| config | `langwatchQl.clickhouseCluster`   | `CLICKHOUSE_CLUSTER`                      | `../contract/src/analytics.config.ts:19` |
-| config | `langwatchQl.aggregateMaxMembers` | `LWQL_AGGREGATE_MAX_MEMBERS`              | `../contract/src/analytics.config.ts:21` |
-| config | `tenantAnalyticsConcurrency`      | `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` | `../contract/src/analytics.config.ts:27` |
-| config | `publicBaseUrl`                   | `BASE_HOST`                               | `../contract/src/analytics.config.ts:32` |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:574`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:575`           |
+| secret | `queryHashKey`                    | `API_KEY_PEPPER`                          | `src/app/analytics.app.ts:576`           |
+| secret | `queryHashKeyFallback`            | `CREDENTIALS_SECRET`                      | `src/app/analytics.app.ts:577`           |
+| secret | `queryHashKeyLastFallback`        | `NEXTAUTH_SECRET`                         | `src/app/analytics.app.ts:578`           |
+| config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:17` |
+| config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:18` |
+| config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:19` |
+| config | `langwatchQl.tenantSetting`       | `LWQL_TENANT_SETTING`                     | `../contract/src/analytics.config.ts:20` |
+| config | `langwatchQl.postgresHost`        | `LWQL_POSTGRES_HOST`                      | `../contract/src/analytics.config.ts:21` |
+| config | `langwatchQl.accessModelMode`     | `LWQL_ACCESS_MODEL_MODE`                  | `../contract/src/analytics.config.ts:22` |
+| config | `langwatchQl.sqlSingleNode`       | `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`       | `../contract/src/analytics.config.ts:23` |
+| config | `langwatchQl.clickhouseCluster`   | `CLICKHOUSE_CLUSTER`                      | `../contract/src/analytics.config.ts:25` |
+| config | `langwatchQl.installMethod`       | `INSTALL_METHOD`                          | `../contract/src/analytics.config.ts:27` |
+| config | `langwatchQl.aggregateMaxMembers` | `LWQL_AGGREGATE_MAX_MEMBERS`              | `../contract/src/analytics.config.ts:29` |
+| config | `tenantAnalyticsConcurrency`      | `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` | `../contract/src/analytics.config.ts:35` |
+| config | `publicBaseUrl`                   | `BASE_HOST`                               | `../contract/src/analytics.config.ts:40` |
 
 <!-- readme:generated:end -->

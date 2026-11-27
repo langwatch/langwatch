@@ -1,6 +1,7 @@
 /**
  * Langy's turns as the dashboards demo makes them: one trace per turn of gateway chat spans with
- * origin "langy", in the shape the mirror sends and the shape an asking project receives.
+ * origin "langy": the mirror's copy under a langy.turn root naming the source tenant, and the
+ * calls alone, as an asking project receives them.
  * @see specs/setup/dashboards-demo-seed.feature
  */
 import { describe, expect, it } from "vitest";
@@ -14,11 +15,19 @@ const NOW = Date.UTC(2026, 9, 8, 15);
 const DAYS = demoDays({ days: 30, todayStart: Math.floor(NOW / DAY_MS) * DAY_MS });
 const MIRROR_PROJECT = "langy-mirror-project";
 const SOURCE_ORGANIZATION = "organization-that-asked";
+const SOURCE_PROJECTS = ["project-that-asked", "another-project-that-asked"];
 
+const attributeSchema = z.object({
+  key: z.string(),
+  value: z.object({
+    stringValue: z.string().optional(),
+    intValue: z.string().optional(),
+  }),
+});
 const exportSchema = z.object({
   resourceSpans: z.array(
     z.object({
-      resource: z.object({ attributes: z.array(z.looseObject({ key: z.string() })) }),
+      resource: z.object({ attributes: z.array(attributeSchema) }),
       scopeSpans: z.array(
         z.object({
           scope: z.object({ name: z.string() }),
@@ -29,15 +38,7 @@ const exportSchema = z.object({
               parentSpanId: z.string(),
               name: z.string(),
               status: z.object({ code: z.number() }),
-              attributes: z.array(
-                z.object({
-                  key: z.string(),
-                  value: z.object({
-                    stringValue: z.string().optional(),
-                    intValue: z.string().optional(),
-                  }),
-                }),
-              ),
+              attributes: z.array(attributeSchema),
             }),
           ),
         }),
@@ -54,23 +55,34 @@ const messagesSchema = z.array(
   }),
 );
 
-/** A turn's spans, each with its attributes by key. */
+const byKey = (attributes: readonly z.infer<typeof attributeSchema>[]) =>
+  Object.fromEntries(
+    attributes.map(({ key, value }) => [key, value.stringValue ?? value.intValue]),
+  );
+
+/** A turn's spans, each with its own and its resource's attributes by key. */
+function spansOf(turn: LangyTurn) {
+  return exportSchema.parse(turn.export).resourceSpans.flatMap(({ resource, scopeSpans }) =>
+    scopeSpans.flatMap(({ spans }) =>
+      spans.map((span) => ({
+        ...span,
+        attribute: byKey(span.attributes),
+        resource: byKey(resource.attributes),
+      })),
+    ),
+  );
+}
+
+/** A turn's gateway model calls. */
 function callsOf(turn: LangyTurn) {
-  return exportSchema
-    .parse(turn.export)
-    .resourceSpans.flatMap(({ scopeSpans }) => scopeSpans.flatMap(({ spans }) => spans))
-    .map((span) => ({
-      ...span,
-      attribute: Object.fromEntries(
-        span.attributes.map(({ key, value }) => [key, value.stringValue ?? value.intValue]),
-      ),
-    }));
+  return spansOf(turn).filter(({ name }) => name === "gen_ai.chat");
 }
 
 const mirrored = DAYS.flatMap((day) =>
   langyMirrorTurnsOn({
     projectId: MIRROR_PROJECT,
     organizationId: SOURCE_ORGANIZATION,
+    sourceProjectIds: SOURCE_PROJECTS,
     day,
     scale: 1,
     now: NOW,
@@ -100,17 +112,29 @@ describe("given the Langy turns the demo makes for the mirror project", () => {
     });
 
     /** @scenario "Langy history lands in the Langy mirror project" */
-    it("finds the mirror's shape: no turn root span, and the organization the turn came from", () => {
-      const calls = mirrored.flatMap(callsOf);
-      const spanIds = new Set(calls.map(({ spanId }) => spanId));
+    it("finds the mirror's shape: a langy.turn root over the calls, naming the source tenant", () => {
+      for (const turn of mirrored) {
+        const spans = spansOf(turn);
+        const roots = spans.filter(({ name }) => name === "langy.turn");
+        const [root] = roots;
 
-      expect(calls.filter(({ parentSpanId }) => spanIds.has(parentSpanId))).toEqual([]);
-      expect(new Set(calls.map(({ attribute }) => attribute["langwatch.project_id"]))).toEqual(
-        new Set([MIRROR_PROJECT]),
-      );
-      expect(new Set(calls.map(({ attribute }) => attribute["langwatch.organization_id"]))).toEqual(
-        new Set([SOURCE_ORGANIZATION]),
-      );
+        expect(roots).toHaveLength(1);
+        expect(root?.parentSpanId).toBe("");
+        expect(root?.status.code).toBe(turn.failed ? 2 : 1);
+        expect(callsOf(turn).every(({ parentSpanId }) => parentSpanId === root?.spanId)).toBe(true);
+        expect(root?.attribute["langwatch.origin"]).toBeUndefined();
+        for (const span of spans) {
+          expect(span.resource["langwatch.organization_id"]).toBe(SOURCE_ORGANIZATION);
+          expect(SOURCE_PROJECTS).toContain(span.resource["langwatch.project_id"]);
+          expect(span.resource["langwatch.project_id"]).not.toBe(MIRROR_PROJECT);
+          expect(span.attribute["langwatch.organization_id"]).toBeUndefined();
+        }
+      }
+      expect(
+        new Set(
+          mirrored.flatMap(callsOf).map(({ attribute }) => attribute["langwatch.project_id"]),
+        ),
+      ).toEqual(new Set([MIRROR_PROJECT]));
     });
 
     /** @scenario "Langy history lands in the Langy mirror project" */
@@ -167,6 +191,7 @@ describe("given the Langy turns the demo makes for the mirror project", () => {
         langyMirrorTurnsOn({
           projectId: MIRROR_PROJECT,
           organizationId: SOURCE_ORGANIZATION,
+          sourceProjectIds: SOURCE_PROJECTS,
           day,
           scale: 1,
           now: NOW,
@@ -184,7 +209,9 @@ describe("given the Langy turns the demo makes inside a normal project", () => {
       const calls = askedIn.flatMap(callsOf);
 
       expect(askedIn.length).toBeGreaterThan(100);
-      expect(new Set(calls.map(({ name }) => name))).toEqual(new Set(["gen_ai.chat"]));
+      expect(new Set(askedIn.flatMap(spansOf).map(({ name }) => name))).toEqual(
+        new Set(["gen_ai.chat"]),
+      );
       expect(new Set(calls.map(({ attribute }) => attribute["langwatch.origin"]))).toEqual(
         new Set(["langy"]),
       );
@@ -192,6 +219,8 @@ describe("given the Langy turns the demo makes inside a normal project", () => {
         new Set(["dashboards-demo-care"]),
       );
       expect(calls.filter(({ attribute }) => "langwatch.organization_id" in attribute)).toEqual([]);
+      expect(calls.filter(({ resource }) => "langwatch.organization_id" in resource)).toEqual([]);
+      expect(calls.filter(({ resource }) => "langwatch.project_id" in resource)).toEqual([]);
     });
 
     /** @scenario "Langy's own turns sit beside a normal project's traces" */

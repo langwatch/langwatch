@@ -20,6 +20,7 @@ export const reads = {
     "docs/features/instant-evals/limits-and-cost.mdx",
     "docs/features/braids.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
+    "docs/ai-governance/cloud-agent-discovery.mdx",
     "docs/workflows/overview.mdx",
     "docs/governance/agent-registry.mdx",
     "docs/governance/kill-switch.mdx",
@@ -48,6 +49,7 @@ export const reads = {
     "apps/*/package.json",
     "charts/langwatch/**/*",
     "docs/self-hosting/**/*",
+    "infra/compose.yml",
     "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
     ".env.example",
   ],
@@ -70,7 +72,12 @@ export const reads = {
     "services/langyagent/internal/assets/AGENTS.md",
     "pnpm-workspace.yaml",
   ],
-  "@langwatch/skills": ["services/langyagent/**/*", "docs/**/*", "feature-map.json"],
+  "@langwatch/skills": [
+    "services/langyagent/**/*",
+    "docs/**/*",
+    "feature-map.json",
+    "apps/docs/specs/published-urls.txt",
+  ],
   langwatch: [
     "skills/**/*",
     "packages/redaction/**/*",
@@ -189,6 +196,8 @@ export const reads = {
     "pnpm-lock.yaml",
     "pyproject.toml",
     "uv.lock",
+    ".python-version",
+    "sdks/python/.python-version",
     "tsconfig*.json",
     "pnpm-workspace.yaml",
   ],
@@ -230,7 +239,7 @@ export const reads = {
   ],
   "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
   "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
-  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*"],
+  "@langwatch/docs-site": ["docs/**/*", "skills/_compiled/**/*", "CHANGELOG.md"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

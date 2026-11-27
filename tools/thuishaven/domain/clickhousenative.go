@@ -16,6 +16,12 @@ const ClickHouseNativeVersion = "25.8.33.6"
 // apart from the container's, so the two never share data, config or a port.
 const ClickHouseNativeDir = "clickhouse-native"
 
+// ClickHouseNativeStdoutLogMax is the most the native server's stdout.log may
+// grow to before haven empties it. ClickHouse rotates its own logs (100M x 3),
+// but its stdout and stderr go to the one file haven opened, which nothing else
+// bounds: left alone, a single run filled it to 37GB and the disk with it.
+const ClickHouseNativeStdoutLogMax int64 = 100 << 20
+
 // PinnedArtifact is one pinned release download and the sha256 it must match.
 // Member names the binary inside a tar.gz or .zip asset; empty means the
 // asset is it.

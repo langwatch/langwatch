@@ -150,6 +150,7 @@ describe("the tasks process installation", () => {
         "require-password-reset",
         "slack-alert",
         "tiered-free-to-seat-event",
+        "customer-io-plan-resync",
         "stripe-prices-sync",
         "retention-storage-report",
         "retention-drift-check",

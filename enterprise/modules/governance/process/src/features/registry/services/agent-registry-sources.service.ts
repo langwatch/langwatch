@@ -5,11 +5,13 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import type { AgentRegistrySettingsRepository } from "../../../repositories/agent-registry-settings.repository.ts";
 import type { DiscoveredAgentRepository } from "../../../repositories/discovered-agent.repository.ts";
 import { AGENT_SOURCE_BY_PROVIDER } from "../../agents/rules/agent-inventory.rules.ts";
 import { memberNames } from "../../identity/rules/member-names.rules.ts";
 import {
   discoveredAgentDraft,
+  type DiscoveredRegistrySource,
   langwatchAgentDraft,
   type RegistryDraft,
 } from "../rules/registry-entry.rules.ts";
@@ -18,10 +20,27 @@ import {
   keepsTrafficInWindow,
   REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
   REGISTRY_TRAFFIC_WINDOW_MS,
+  registryTrafficReadWindowMs,
+  seenSince,
   trafficAgentDrafts,
+  withDormancy,
 } from "../rules/registry-traffic.rules.ts";
 
 const AGENTS_PAGE_LIMIT = 200;
+
+const DISCOVERED_REGISTRY_SOURCES: ReadonlySet<string> = new Set<DiscoveredRegistrySource>([
+  "databricks",
+  "copilot_studio",
+  "aws",
+  "gcp",
+  "ard",
+]);
+
+function isDiscoveredRegistrySource(
+  source: string | undefined,
+): source is DiscoveredRegistrySource {
+  return source !== undefined && DISCOVERED_REGISTRY_SOURCES.has(source);
+}
 
 export type AgentRegistrySourcesDependencies = {
   discoveredAgents: Pick<DiscoveredAgentRepository, "findForRegistry">;
@@ -29,6 +48,8 @@ export type AgentRegistrySourcesDependencies = {
   projects: Pick<ProjectApi, "findLiveNonGovernanceIdsByOrganization" | "listNamesByIds">;
   organizations: Pick<OrganizationApi, "findMembersWithDepartments">;
   traces: Pick<TraceApi, "findAgentsSeen">;
+  /** The organisation's dormancy window. */
+  settings: Pick<AgentRegistrySettingsRepository, "getDormantAfterDays">;
   publicBaseUrl: string;
   now: () => Instant;
 };
@@ -54,18 +75,20 @@ export class AgentRegistrySourcesService {
     const projectIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
       organizationId,
     });
-    const [{ agents, incompleteProjects }, discovered, members, projects] = await Promise.all([
-      this.agentsOf(projectIds),
-      this.deps.discoveredAgents.findForRegistry({ organizationId }),
-      this.deps.organizations.findMembersWithDepartments({ organizationId }),
-      projectIds.length > 0
-        ? this.deps.projects.listNamesByIds({ projectIds })
-        : Promise.resolve([]),
-    ]);
+    const [{ agents, incompleteProjects }, discovered, members, projects, dormantAfterDays] =
+      await Promise.all([
+        this.agentsOf(projectIds),
+        this.deps.discoveredAgents.findForRegistry({ organizationId }),
+        this.deps.organizations.findMembersWithDepartments({ organizationId }),
+        projectIds.length > 0
+          ? this.deps.projects.listNamesByIds({ projectIds })
+          : Promise.resolve([]),
+        this.deps.settings.getDormantAfterDays({ organizationId }),
+      ]);
     const names = memberNames(members);
     const slugs = new Map(projects.map((project) => [project.id, project.slug]));
 
-    const listed: RegistryDraft[] = agents.map((agent) => {
+    const described: RegistryDraft[] = agents.map((agent) => {
       const slug = slugs.get(agent.projectId);
       return langwatchAgentDraft({
         agent,
@@ -82,28 +105,31 @@ export class AgentRegistrySourcesService {
     });
     for (const row of discovered) {
       const source = AGENT_SOURCE_BY_PROVIDER.get(row.provider);
-      if (source === "databricks" || source === "copilot_studio") {
-        listed.push(discoveredAgentDraft({ ...row, source }));
+      if (isDiscoveredRegistrySource(source)) {
+        described.push(discoveredAgentDraft({ ...row, source }));
       }
     }
 
-    const since = this.deps.now().epochMilliseconds - REGISTRY_TRAFFIC_WINDOW_MS;
-    const seen = await Promise.all(
-      projectIds.map(async (projectId) => ({
-        projectId,
-        agents: await this.deps.traces.findAgentsSeen({
-          projectId,
-          sinceMs: since,
-          limit: REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
-        }),
-      })),
-    );
+    const nowMs = this.deps.now().epochMilliseconds;
+    const since = nowMs - REGISTRY_TRAFFIC_WINDOW_MS;
+    const read = await this.trafficOf({
+      projectIds,
+      sinceMs: nowMs - registryTrafficReadWindowMs(dormantAfterDays),
+    });
     const unsettled = new Set([
       ...incompleteProjects,
-      ...seen
+      ...read
         .filter(({ agents }) => agents.length >= REGISTRY_TRAFFIC_LIMIT_PER_PROJECT)
         .map(({ projectId }) => projectId),
     ]);
+    const listed = withDormancy({
+      listed: described,
+      seen: read,
+      nowMs,
+      dormantAfterDays,
+      unsettledProjectIds: unsettled,
+    });
+    const seen = seenSince({ seen: read, sinceMs: since });
     const keepTraffic = keepsTrafficInWindow({
       sinceMs: since,
       projectIds,
@@ -119,6 +145,20 @@ export class AgentRegistrySourcesService {
           held.entry.project_id !== null &&
           incompleteProjects.has(held.entry.project_id)),
     };
+  }
+
+  /** The agents each project's traces named since `sinceMs`, capped per project. */
+  private trafficOf({ projectIds, sinceMs }: { projectIds: readonly string[]; sinceMs: number }) {
+    return Promise.all(
+      projectIds.map(async (projectId) => ({
+        projectId,
+        agents: await this.deps.traces.findAgentsSeen({
+          projectId,
+          sinceMs,
+          limit: REGISTRY_TRAFFIC_LIMIT_PER_PROJECT,
+        }),
+      })),
+    );
   }
 
   /**

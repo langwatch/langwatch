@@ -67,6 +67,7 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStoreRe
       id: string;
       organizationId: string;
       principalUserId: string | null;
+      traceProjectId: string | null;
       lastUsedAt: Instant | null;
     }[]
   > {
@@ -76,6 +77,7 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStoreRe
         id: key.id,
         organizationId: key.organizationId,
         principalUserId: key.principalUserId ?? null,
+        traceProjectId: key.traceProjectId ?? null,
         lastUsedAt: key.lastUsedAt ?? null,
       }));
   }

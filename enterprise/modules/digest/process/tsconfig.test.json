@@ -23,6 +23,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

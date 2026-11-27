@@ -1,5 +1,5 @@
 /**
- * One projection, six commands and one process manager. The judgements have no
+ * One projection, seven commands and one process manager. The judgements have no
  * map projection on purpose: a page writes up to fifteen hundred rows itself.
  * @see dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md
  */
@@ -24,6 +24,7 @@ import {
   instantEvalCancelRequestedEventSchema,
   instantEvalFinishedEventSchema,
   instantEvalLatePageBilledEventSchema,
+  instantEvalPageFailedEventSchema,
 } from "@langwatch/instant-eval-contract";
 
 import type { InstantEvalModule } from "../app/instant-eval.app.ts";
@@ -71,6 +72,7 @@ function buildInstantEvalProcessingPipeline(
       instantEvalCancelRequestedEventSchema,
       instantEvalFinishedEventSchema,
       instantEvalLatePageBilledEventSchema,
+      instantEvalPageFailedEventSchema,
     ])
     .withPostgresProjection(createInstantEvalRunProjection({ store: deps.instantEvalRunStore }))
     .withCommand("requestRun", commands.requestRun)
@@ -84,6 +86,7 @@ function buildInstantEvalProcessingPipeline(
     .withCommand("requestCancel", commands.requestCancel)
     .withCommand("recordFinished", commands.recordFinished)
     .withCommand("recordLatePageBilled", commands.recordLatePageBilled)
+    .withCommand("recordPageFailed", commands.recordPageFailed)
     .withProcessManager(INSTANT_EVAL_PROCESS_NAME, instantEvalProcessManager(deps.dispatch))
     .build();
 }

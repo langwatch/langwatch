@@ -48,6 +48,10 @@ export const langyTurnHandoffSchema = z
     /** No permit is reserved any more; kept so a replica on the previous release still parses. */
     permitReserved: z.boolean().optional(),
     resumeToken: z.string().optional(),
+    /** The user message's images, read back as bytes each time the turn is dispatched. */
+    imageRefs: z
+      .array(z.object({ objectId: z.string(), filename: z.string(), mediaType: z.string() }))
+      .optional(),
   })
   .strict();
 export type LangyTurnHandoff = z.infer<typeof langyTurnHandoffSchema>;

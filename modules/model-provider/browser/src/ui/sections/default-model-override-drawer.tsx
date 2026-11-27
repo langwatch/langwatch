@@ -18,6 +18,8 @@ import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
+  canonicalModelId,
+  isLangWatchDecisionModelId,
   isModelAllowedForFeature,
   LANGWATCH_DECISION_MODEL_ID,
   LATEST_ALIAS_PROVIDERS,
@@ -62,7 +64,7 @@ const ROLE_BLURB: Record<ModelRole, string> = {
   LANGY: "The model Langy chats and works with.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
   INSTANT_EVALS:
-    "The decision model Instant Evals answer with. LangWatch Evals Preview unless you pick your own.",
+    "The decision model Instant Evals answer with. LangWatch Instant (preview) unless you pick your own.",
   JUDGE: "The model scenario runs judge with. Uses the Default model unless you pick one.",
 };
 
@@ -623,12 +625,10 @@ function RoleRow({
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
 }) {
-  // A pinned Evals Preview the column no longer offers reads as unset, as the table cell does.
-  const stored = config[role] ?? "";
+  // A pinned LangWatch model the column no longer offers reads as unset, as the table cell does.
+  const stored = canonicalModelId(config[role] ?? "");
   const current =
-    role === "INSTANT_EVALS" &&
-    stored === LANGWATCH_DECISION_MODEL_ID &&
-    !modelOptions.includes(stored)
+    role === "INSTANT_EVALS" && isLangWatchDecisionModelId(stored) && !modelOptions.includes(stored)
       ? ""
       : stored;
   const pickerOptions = pickerFor(
@@ -671,7 +671,9 @@ function RoleRow({
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={unsetDefault && !current ? undefined : roleInherit}
             disabled={unsupportedAtScope}
-            labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
+            labelFor={(fullModelId) =>
+              modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
+            }
           />
         </Box>
         {canExpand ? (
@@ -784,7 +786,7 @@ function FeatureRow({
       <Box flex={1} />
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
-          model={override || unsetDefault || ""}
+          model={canonicalModelId(override || unsetDefault || "")}
           query={{
             data: featureRowModelOptions({
               options: modelOptions,
@@ -794,7 +796,9 @@ function FeatureRow({
           }}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={unsetDefault && !override ? undefined : inheritOption}
-          labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
+          labelFor={(fullModelId) =>
+            modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
+          }
         />
       </Box>
       <Box width="24px" flexShrink={0} />
@@ -805,7 +809,7 @@ function FeatureRow({
 export type InheritOptionShape = {
   model?: string;
   label: string;
-  /** The model an unset role runs on and the picker lists itself (Instant Evals: Evals Preview). */
+  /** The model an unset role runs on, listed by the picker (Instant Evals: LangWatch Instant). */
   isUnsetDefault?: boolean;
 };
 
@@ -846,7 +850,7 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
  * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
- * inherit; Instant Evals falls back to Evals Preview, or "Not set" where it is not offered.
+ * inherit; Instant Evals falls back to LangWatch Instant (preview), or "Not set" if not offered.
  */
 export function buildInheritOption(
   entry: InheritedEntry,
@@ -875,7 +879,7 @@ export function roleInheritOption({
   role: ModelRole;
   inherited: Record<string, InheritedEntry>;
   config: Record<string, string>;
-  /** Whether Evals Preview may be offered; not, the unset Instant Evals column reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, unset reads "Not set". */
   isHostedOffered?: boolean;
 }): InheritOptionShape {
   const own = inheritHitOption(inherited[role] ?? null);

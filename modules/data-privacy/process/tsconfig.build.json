@@ -54,6 +54,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/limiter/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -82,6 +85,9 @@
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"

@@ -34,6 +34,11 @@ jobs:
       docs: ${{ steps.filter.outputs.docs || steps.force.outputs.all }}
       codeql: ${{ steps.filter.outputs.codeql || steps.force.outputs.all }}
       clickhouse-serverless: ${{ steps.filter.outputs.clickhouse-serverless || steps.force.outputs.all }}
+      # The merge commit's tree, and whether a run of this pull request already
+      # passed on that exact tree (a re-run, a reopen, a push that restores an
+      # earlier tree). Then every call is skipped and ci-complete passes.
+      tree: ${{ steps.tree.outputs.tree }}
+      passed: ${{ steps.pass.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,19 +65,94 @@ jobs:
         if: github.event_name != 'pull_request'
         id: force
         run: echo "all=true" >> "$GITHUB_OUTPUT"
+      - name: Read the merge commit's tree
+        id: tree
+        run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      # Only this repository's own pull requests: a pass marker lives in the
+      # pull request's cache scope, and ci-complete writes it only after a run
+      # that passed with nothing skipped for being a draft.
+      - name: Look for a pass on this tree
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          !contains(github.event.pull_request.labels.*.name, 'ci:full')
+        id: pass
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-pass
+          key: ci-pass-${{ steps.tree.outputs.tree }}
+          lookup-only: true
 
+  # The small checks that read a pull request, in one job instead of one
+  # workflow each: no committed screenshots, and the coding agent usage
+  # comment. It runs at once beside `changes`, so their findings show within
+  # a minute. In the merge queue it has nothing to read and passes.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          # Both checks read the diff and scripts under .github/, never file contents.
+          sparse-checkout: .github
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+      # Spec: specs/ci/no-committed-screenshots.feature
+      - name: Check for committed screenshots
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: ./.github/scripts/check-added-images.sh "origin/${BASE_REF}"
+      # Spec: specs/ci/pr-token-usage.feature. Describes what the work cost and
+      # never judges it: a LangWatch outage warns and the step stays green.
+      # A fork's token is read-only and gets no secrets, so it is skipped.
+      - name: Test the usage comment builder
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        run: node --test --experimental-strip-types .github/scripts/pr-token-usage.test.ts
+      - name: Build and upsert the usage comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_PR_USAGE_API_KEY }}
+          PR_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node --experimental-strip-types .github/scripts/pr-token-usage.ts
+
+  # A Dependabot bump of Go modules or Docker images changes no TypeScript:
+  # go-ci, go-services and the image builds cover it, so the app suites and
+  # e2e are skipped for it. A github-actions bump still runs app, the main
+  # user of the bumped actions.
   app:
     needs: changes
-    if: needs.changes.outputs.app == 'true'
+    if: >-
+      needs.changes.outputs.app == 'true' && needs.changes.outputs.passed != 'true' &&
+      !(github.event.pull_request.user.login == 'dependabot[bot]' &&
+        (startsWith(github.head_ref, 'dependabot/go_modules/') || startsWith(github.head_ref, 'dependabot/docker/')))
     uses: ./.github/workflows/langwatch-app-ci.yml
     secrets: inherit
     permissions:
       contents: read
       actions: write
+      id-token: write # the Nx cache role (nx-remote-cache action)
 
   e2e:
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: >-
+      needs.changes.outputs.e2e == 'true' && needs.changes.outputs.passed != 'true' &&
+      !(github.event.pull_request.user.login == 'dependabot[bot]' &&
+        (startsWith(github.head_ref, 'dependabot/go_modules/') || startsWith(github.head_ref, 'dependabot/docker/') ||
+         startsWith(github.head_ref, 'dependabot/github_actions/')))
     uses: ./.github/workflows/e2e-ci.yml
     secrets: inherit
     permissions:
@@ -81,44 +161,44 @@ jobs:
 
   nlp:
     needs: changes
-    if: needs.changes.outputs.nlp == 'true'
+    if: needs.changes.outputs.nlp == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/langwatch-nlp-ci.yml
     secrets: inherit
 
   langevals:
     needs: changes
-    if: needs.changes.outputs.langevals == 'true'
+    if: needs.changes.outputs.langevals == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/langevals-ci.yml
     secrets: inherit
 
   mcp:
     needs: changes
-    if: needs.changes.outputs.mcp == 'true'
+    if: needs.changes.outputs.mcp == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/mcp-javascript-ci.yml
     secrets: inherit
 
   sdk-go:
     needs: changes
-    if: needs.changes.outputs.sdk-go == 'true'
+    if: needs.changes.outputs.sdk-go == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/sdk-go-ci.yml
     secrets: inherit
 
   sdk-javascript:
     needs: changes
-    if: needs.changes.outputs.sdk-javascript == 'true'
+    if: needs.changes.outputs.sdk-javascript == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/sdk-javascript-ci.yml
     secrets: inherit
 
   docs:
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.docs == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/docs-ci.yml
     secrets: inherit
 
   # CodeQL scans pull requests into main only.
   codeql:
     needs: changes
-    if: needs.changes.outputs.codeql == 'true' && (github.event_name != 'pull_request' || github.base_ref == 'main')
+    if: needs.changes.outputs.codeql == 'true' && needs.changes.outputs.passed != 'true' && (github.event_name != 'pull_request' || github.base_ref == 'main')
     uses: ./.github/workflows/codeql.yml
     secrets: inherit
     permissions:
@@ -129,7 +209,7 @@ jobs:
 
   clickhouse-serverless:
     needs: changes
-    if: needs.changes.outputs.clickhouse-serverless == 'true'
+    if: needs.changes.outputs.clickhouse-serverless == 'true' && needs.changes.outputs.passed != 'true'
     uses: ./.github/workflows/clickhouse-serverless.yml
     secrets: inherit
 
@@ -139,6 +219,7 @@ jobs:
     needs:
       [
         changes,
+        checks,
         app,
         e2e,
         nlp,
@@ -189,18 +270,40 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
           allowed-skips: app, e2e, nlp, langevals, mcp, sdk-go, sdk-javascript, docs, codeql, clickhouse-serverless
+      # Remembers that this tree passed, for the next run of this pull request
+      # on the same tree. Not on a draft or a release-please PR, whose heavy
+      # jobs skip, and not from a fork, whose run reads only its own scope.
+      - name: Write the pass marker
+        if: >-
+          success() &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.draft == false &&
+          !startsWith(github.head_ref, 'release-please--') &&
+          needs.changes.outputs.passed != 'true'
+        run: echo "${{ needs.changes.outputs.tree }}" > .ci-pass
+      - if: >-
+          success() &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.draft == false &&
+          !startsWith(github.head_ref, 'release-please--') &&
+          needs.changes.outputs.passed != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-pass
+          key: ci-pass-${{ needs.changes.outputs.tree }}
 
   # The LLM review, last so it spends tokens only on a change CI passed. The
   # ruleset requires a check named `review`.
   #
-  # ci-complete covers only the calls of this workflow. The separate workflows
-  # that also run on a pull_request (pr-conventions, go-ci, sdk-python-ci,
-  # code-scanners, ...) can still be running, so a step before the review
-  # waits until every other check run on the head commit has finished, and
-  # fails this job if any failed. A new push cancels this run (concurrency
-  # above), and with it the wait. A wait that times out fails the job too: the
-  # ruleset requires this check, and a silent pass would let an unreviewed
-  # change merge.
+  # ci-complete covers only the calls of this workflow. The job holds no
+  # runner while it is queued behind ci-complete; then a step waits only for
+  # the checks the base branch requires (pr conventions, ...), which have
+  # reported by then, and fails this job if any failed. Optional workflows
+  # never hold it. A new push cancels this run (concurrency above), and with it
+  # the wait. A wait that times out fails the job too: the ruleset requires
+  # this check, and a silent pass would let an unreviewed change merge.
   review:
     needs: ci-complete
     # !cancelled() replaces the implicit success(). On a job, success() checks
@@ -238,17 +341,19 @@ jobs:
           cache-dependency-path: "*/go.sum"
       # A failed or timed-out wait fails this job, so the review step below
       # never runs on a red or unfinished change (tools/waitforchecks).
-      - name: Wait for every other check on the head commit
+      - name: Wait for the required checks on the head commit
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          # Its rules name the required checks; optional ones are not waited for.
+          REQUIRED_FROM_BRANCH: ${{ github.base_ref }}
           # This job's own check run would wait on itself.
           EXCLUDE_CHECK: review
         run: go run ./cmd/waitforchecks
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
-      - uses: langwatch/langwatch-pr-review-bot@05d6c298cb28b0f67e2e7fda075b916a0294af5b # main 2026-10-24
+      - uses: langwatch/langwatch-pr-review-bot@87e7c462dfe93e9144b890053542870dc8291782 # main 2026-11-25
         with:
           slack_notify: "false"
           # Bounds each of the bot's two claude calls (review and brief); the

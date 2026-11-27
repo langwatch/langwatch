@@ -39,7 +39,11 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs.
+
+On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
+
+Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
 ```text
 You are evaluating a business coaching assistant.
@@ -74,6 +78,17 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 </Frame>
 </Step>
 </Steps>
+
+## Judge with Instant Evals
+
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. That model runs on LangWatch's key, so it needs no model provider or key of your own.
+
+The decision models on your own keys follow it, as in [Run Instant Evals on your own decision model](/features/instant-evals/own-model). A self-hosted install can judge only on its own decision model. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+
+- **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
+- **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
+- **What it costs on LangWatch's model.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
+- **What it costs on your own decision model.** Your provider bills the call and LangWatch does not, so the result's cost is zero. The billing events ledger still records its tokens, with **Instant Evals (own model)** in the **Virtual key** column. These calls do not count toward the 1 USD.
 
 ## Calibrate the judge
 

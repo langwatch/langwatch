@@ -49,7 +49,10 @@ import {
   RecordMemberDisabledCommand,
   RecordMemberEnabledCommand,
   RecordMemberRemovedCommand,
+  RecordMemberListedCommand,
   RecordMemberDepartmentChangedCommand,
+  RecordMemberRoleChangedCommand,
+  RecordMemberAdmittedCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPersonalTeamCreatedCommand,
   RecordPersonalWorkspaceArchivedCommand,
@@ -69,7 +72,10 @@ import {
   organizationMemberDisabledEventSchema,
   organizationMemberEnabledEventSchema,
   organizationMemberRemovedEventSchema,
+  organizationMemberListedEventSchema,
   organizationMemberDepartmentChangedEventSchema,
+  organizationMemberRoleChangedEventSchema,
+  organizationMemberAdmittedEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
@@ -138,7 +144,10 @@ function lifecycleCommands() {
       organizationMemberEnabledEventSchema,
       organizationMemberRemovedEventSchema,
       organizationMemberDepartmentChangedEventSchema,
+      organizationMemberRoleChangedEventSchema,
+      organizationMemberAdmittedEventSchema,
       organizationCreatedEventSchema,
+      organizationMemberListedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
@@ -162,7 +171,10 @@ function lifecycleCommands() {
     .withCommand("recordMemberEnabled", RecordMemberEnabledCommand)
     .withCommand("recordMemberRemoved", RecordMemberRemovedCommand)
     .withCommand("recordMemberDepartmentChanged", RecordMemberDepartmentChangedCommand)
-    .withCommand("recordCreated", RecordCreatedCommand);
+    .withCommand("recordMemberRoleChanged", RecordMemberRoleChangedCommand)
+    .withCommand("recordMemberAdmitted", RecordMemberAdmittedCommand)
+    .withCommand("recordCreated", RecordCreatedCommand)
+    .withCommand("recordMemberListed", RecordMemberListedCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<
@@ -298,5 +310,8 @@ export const organizationLifecycleEventing = defineEventingModule({
   pipeline: ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   build: ({ app }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
     app.lifecyclePipeline(),
-  connect: ({ app, commands }) => app.connectLifecycle(commands),
+  connect: ({ app, commands }) => {
+    app.connectLifecycle(commands);
+    app.connectMemberListing(commands);
+  },
 });

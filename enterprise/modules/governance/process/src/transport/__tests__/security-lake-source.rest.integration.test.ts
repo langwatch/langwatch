@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildApi, KEY } from "./ocsf-siem.rest.fixtures.ts";
+import { buildApi, KEY, ORG } from "./ocsf-siem.rest.fixtures.ts";
 
 const body = {
   name: "ACME Security Lake",
@@ -31,6 +31,24 @@ describe("POST /api/governance/security-lake/sources", () => {
       const stored = await repositories.ingestionSources.findById(id);
       expect(stored?.createdById).toBeNull();
     });
+  });
+
+  describe("given a schedule that is empty or not a cron expression", () => {
+    /** @scenario "A Security Lake source with an empty or non-cron schedule is refused" */
+    it.each(["", "every five minutes", "*/5 * * *"])(
+      "refuses the schedule %j and stores nothing",
+      async (schedule) => {
+        const { post, repositories } = await buildApi({ grants: ["ingestionSources:manage"] });
+
+        const response = await post("/api/governance/security-lake/sources", {
+          ...body,
+          config: { ...body.config, schedule },
+        });
+
+        expect(response.status).toBe(422);
+        expect(await repositories.ingestionSources.findAll(ORG)).toEqual([]);
+      },
+    );
   });
 });
 

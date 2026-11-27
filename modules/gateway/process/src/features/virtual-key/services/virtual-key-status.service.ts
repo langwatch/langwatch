@@ -218,6 +218,7 @@ export class VirtualKeyStatusService {
         await this.governanceSignals?.emitVirtualKeyLifecycle({
           virtualKey: vk,
           action: "revoked",
+          actorUserId: input.actorUserId,
         });
 
         return vk;
@@ -285,6 +286,7 @@ export class VirtualKeyStatusService {
         await this.governanceSignals?.emitVirtualKeyLifecycle({
           virtualKey: vk,
           action: "disabled",
+          actorUserId: input.actorUserId,
           reason: input.reason ?? null,
         });
 
@@ -348,6 +350,7 @@ export class VirtualKeyStatusService {
         await this.governanceSignals?.emitVirtualKeyLifecycle({
           virtualKey: vk,
           action: "enabled",
+          actorUserId: input.actorUserId,
         });
 
         return vk;

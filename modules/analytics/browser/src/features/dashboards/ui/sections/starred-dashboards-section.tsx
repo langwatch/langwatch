@@ -1,90 +1,54 @@
 /**
  * The sidebar's "Dashboards" section, lent through `StarredDashboardsToken` (§10.1): the
- * dashboards the member pinned to the project (their stars there), the first 7 then
- * "All pinned (N)", and a "+" that makes a pinned dashboard and opens "Add a widget".
+ * member's pins in the project, the first 7 then "All pinned (N)", and a "+" that opens a new
+ * dashboard with "Add a widget" open, pinned once its first edit stores it.
  * @see modules/navigation/specs/product-sidebars.feature
  */
 
-import type { StarredDashboardsProject, StarredDashboardsProps } from "@langwatch/analytics-client";
-import {
-  UiHostServicesContextProvider,
-  useOptionalUiHostServices,
-} from "@langwatch/browser-host/capabilities";
+import type { StarredDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { LayoutDashboard, Plus } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
+import { LayoutDashboard } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
-import {
-  analyticsHostInProject,
-  uiAnalyticsInProject,
-} from "../../../../model/analytics-host-in-project.ts";
-import { AnalyticsHostProvider, useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
+import { InProject } from "../../../../behavior/in-project.tsx";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
+import { useStartDraft } from "../../behavior/use-draft-board.ts";
 import { useFavourites } from "../../behavior/use-favourites.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { dashboardsPath, myDashboardId } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
-import { type SidebarBoard, type StarredLink, starredLinks } from "../../model/sidebar-boards.ts";
+import {
+  isOpenStar,
+  type SidebarBoard,
+  type StarredLink,
+  starredLinks,
+} from "../../model/sidebar-boards.ts";
+import { AddDashboardRow } from "../blocks/add-dashboard-row.tsx";
 import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
+import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 
 /** Rows shown before the rest sit behind "All pinned (N)": the sidebar stays short. */
 const PINNED_SHOWN_MAX = 7;
 
 /** What the create path offers: the "+" and the empty-state item both run `onAdd`. */
-type CreateControls = { isCreating: boolean; onAdd: () => void };
+type CreateControls = { onAdd: () => void };
 
 export function StarredDashboardsSection({ project }: StarredDashboardsProps) {
   if (!project) return <PinnedDashboards />;
   return (
     <InProject project={project}>
-      <PinnedDashboards projectName={project.name} />
+      <PinnedDashboards />
     </InProject>
   );
 }
 
-/** Scopes every read, write, grant and product event below to the project navigation named. */
-function InProject({
-  project: { id, slug, name },
-  children,
-}: {
-  project: StarredDashboardsProject;
-  children: ReactNode;
-}) {
-  const host = useAnalyticsHost();
-  const pageProjectId = host.project()?.id;
-  const services = useOptionalUiHostServices();
-  const scoped = useMemo(
-    () => analyticsHostInProject({ host, project: { id, slug, name } }),
-    [host, id, slug, name],
-  );
-  const scopedServices = useMemo(
-    () =>
-      services?.analytics
-        ? {
-            ...services,
-            analytics: uiAnalyticsInProject({
-              analytics: services.analytics,
-              projectId: id,
-              pageProjectId,
-            }),
-          }
-        : void 0,
-    [services, id, pageProjectId],
-  );
-  const section = <AnalyticsHostProvider value={scoped}>{children}</AnalyticsHostProvider>;
-  if (!scopedServices) return section;
-  return (
-    <UiHostServicesContextProvider value={scopedServices}>{section}</UiHostServicesContextProvider>
-  );
-}
-
-/** The section over the project in scope; a `projectName` is said in its title. */
-function PinnedDashboards({ projectName }: { projectName?: string }) {
+/** The section over the project in scope. */
+function PinnedDashboards() {
   const host = useAnalyticsHost();
   const favourites = useFavourites();
   const { mayCreate } = useBoardReader();
@@ -97,57 +61,54 @@ function PinnedDashboards({ projectName }: { projectName?: string }) {
   // A member who may not add one sees the section only for what it lists.
   if (!mayCreate && links.length === 0) return null;
   const frame = (create?: CreateControls) => (
-    <SectionFrame
-      projectName={projectName}
-      links={links}
-      isLoaded={isLoaded}
-      projectSlug={projectSlug}
-      create={create}
-    />
+    <SectionFrame links={links} isLoaded={isLoaded} projectSlug={projectSlug} create={create} />
   );
-  // The create path reads the board list to name the new one; only members who may create mount it.
+  // Only members who may create mount the create path.
   return mayCreate ? <WithCreate>{frame}</WithCreate> : frame();
 }
 
 function WithCreate({ children }: { children: (create: CreateControls) => ReactNode }) {
-  const saved = useSavedDashboards();
+  const host = useAnalyticsHost();
+  const startDraft = useStartDraft();
+  const project = host.project();
   return children({
-    isCreating: saved.isCreating,
-    // Pinned on creation; drop `pin` to stop pinning.
-    onAdd: () => saved.createBoard({ pin: true, addWidget: true }),
+    // Pinned once stored; drop `pin` to stop pinning.
+    onAdd: () =>
+      startDraft({
+        projectId: project?.id ?? "",
+        projectSlug: project?.slug ?? "",
+        pin: true,
+        addWidget: true,
+      }),
   });
 }
 
 function SectionFrame({
-  projectName,
   links,
   isLoaded,
   projectSlug,
   create,
 }: {
-  projectName: string | undefined;
   links: StarredLink[];
   isLoaded: boolean;
   projectSlug: string;
   create?: CreateControls;
 }) {
   const shown = links.slice(0, PINNED_SHOWN_MAX);
-  const label = projectName ? `Dashboards · ${projectName}` : "Dashboards";
+  // One title in every product (G13); the project shows in the top bar, not here.
+  const label = "Dashboards";
 
   return (
     <VStack as="section" aria-label={label} align="stretch" gap={0.5} width="full">
       {/* The same frame and label as navigation's own groups, so it reads like "Build". */}
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
-        {/* A long project name is clipped, never pushing the "+" out of the column. */}
-        <Box minWidth={0} overflow="hidden" title={projectName}>
+        <Box minWidth={0} overflow="hidden">
           <SidebarSectionLabel label={label} />
         </Box>
-        {create && <NewDashboardButton isCreating={create.isCreating} onCreate={create.onAdd} />}
+        {create && <NewDashboardButton onCreate={create.onAdd} />}
       </HStack>
       <VStack as="ul" align="stretch" gap={0.5} margin={0} padding={0}>
-        {create && isLoaded && links.length === 0 && (
-          <AddDashboardRow isCreating={create.isCreating} onAdd={create.onAdd} />
-        )}
+        {create && isLoaded && links.length === 0 && <AddDashboardRow onAdd={create.onAdd} />}
         {shown.map((link) =>
           link.board ? (
             <PinnedBoardRow key={link.key} link={link} board={link.board} />
@@ -156,45 +117,13 @@ function SectionFrame({
           ),
         )}
         {links.length > PINNED_SHOWN_MAX && (
-          <AllPinnedRow
+          <SidebarLinkRow
             name={`All pinned (${links.length})`}
             href={dashboardsPath({ projectSlug })}
           />
         )}
       </VStack>
     </VStack>
-  );
-}
-
-/** The dotted-outline first item while nothing is pinned; it does what the "+" does. */
-function AddDashboardRow({ isCreating, onAdd }: { isCreating: boolean; onAdd: () => void }) {
-  return (
-    <Box as="li" listStyleType="none" width="full">
-      <Box
-        as="button"
-        display="flex"
-        alignItems="center"
-        gap={2}
-        width="full"
-        borderRadius="lg"
-        borderWidth="1px"
-        borderStyle="dashed"
-        borderColor="border.emphasized"
-        paddingX={2}
-        paddingY="3px"
-        textStyle="bodySm"
-        color="fg.subtle"
-        cursor="pointer"
-        _hover={{ color: "fg", background: "border/50" }}
-        aria-disabled={isCreating || void 0}
-        onClick={() => {
-          if (!isCreating) onAdd();
-        }}
-      >
-        <Plus size={14} aria-hidden />
-        Add dashboard
-      </Box>
-    </Box>
   );
 }
 
@@ -212,11 +141,12 @@ function PinnedBoardRow({ link, board }: { link: StarredLink; board: SidebarBoar
 /** The "⋮" menu with only Unpin: a From LangWatch board, or one the member only reads. */
 function PinnedStarRow({ link }: { link: StarredLink }) {
   const favourites = useFavourites();
+  const { params } = useAnalyticsHost().route();
   return (
     <SavedDashboardRow
       name={link.name}
       href={link.href}
-      isActive={false}
+      isActive={isOpenStar({ star: link.star, params })}
       icon={<PinnedIcon />}
       actions={{
         isStarred: favourites.isStarred(link.star),
@@ -230,7 +160,7 @@ function PinnedStarRow({ link }: { link: StarredLink }) {
 }
 
 function PinnedIcon() {
-  return <LayoutDashboard size={14} strokeWidth={1.9} aria-hidden />;
+  return <LayoutDashboard size={SIDEBAR_ROW_ICON_SIZE} strokeWidth={1.9} aria-hidden />;
 }
 
 /** The saved-dashboards row menu on a pinned board: what this member may do with it. */
@@ -249,21 +179,22 @@ function ManagedBoardRow({
   const fromTemplate = useBoardFromTemplate();
   const [isRenaming, setIsRenaming] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  // My dashboard keeps its name and cannot be deleted.
+  // My dashboard cannot be deleted, and keeps its name only until it is marked theirs.
   const isMine = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
+  const keepsName = isMine && !board.myDashboardOfUserId;
   return (
     <>
       <SavedDashboardRow
         name={link.name}
         href={link.href}
-        isActive={false}
+        isActive={isOpenStar({ star: link.star, params: host.route().params })}
         icon={<PinnedIcon />}
         actions={{
           isStarred: favourites.isStarred(link.star),
           onToggleStar: () => favourites.toggleStar(link.star),
           isRenaming,
           ...(access.canEdit
-            ? { rename: isMine ? {} : { onStart: () => setIsRenaming(true) } }
+            ? { rename: keepsName ? {} : { onStart: () => setIsRenaming(true) } }
             : {}),
           ...(access.canDuplicate
             ? {
@@ -303,37 +234,5 @@ function ManagedBoardRow({
         }
       />
     </>
-  );
-}
-
-/** The "All pinned (N)" row: a plain link into Dashboards, with no board behind it. */
-function AllPinnedRow({ name, href }: { name: string; href: string }) {
-  const host = useAnalyticsHost();
-  return (
-    <Box as="li" listStyleType="none" width="full">
-      <ChakraLink
-        href={href}
-        display="flex"
-        alignItems="center"
-        gap={2}
-        width="full"
-        borderRadius="lg"
-        paddingX={2}
-        paddingY="4px"
-        textStyle="bodySm"
-        color="fg.subtle"
-        textDecoration="none"
-        _hover={{ color: "fg", background: "border/50" }}
-        onClick={(event) => {
-          if (opensElsewhere(event)) return;
-          event.preventDefault();
-          host.navigate(href);
-        }}
-      >
-        <Text as="span" truncate minWidth={0}>
-          {name}
-        </Text>
-      </ChakraLink>
-    </Box>
   );
 }

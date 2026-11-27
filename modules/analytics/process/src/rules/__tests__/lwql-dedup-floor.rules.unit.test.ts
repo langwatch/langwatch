@@ -11,10 +11,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLViewDedupService } from "../../features/provisioning/services/langwatch-ql-view-dedup.service.ts";
-import {
-  LangWatchQLViewStatementsService,
-  SHIPPED_LWQL_DEDUP,
-} from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "../../features/provisioning/services/langwatch-ql-view-twin-statements.service.ts";
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { floorLangWatchQLDedup, flooredViewNames } from "../lwql-dedup-floor.rules.ts";
@@ -346,7 +344,7 @@ const NAMES: LangWatchQLNames = {
 };
 
 describe("given every view the catalog deduplicates", () => {
-  const viewStatements = LangWatchQLViewStatementsService.create();
+  const twinStatements = LangWatchQLViewTwinStatementsService.create();
   const catalogShapes = LangWatchQLCatalogShapesService.create();
   const viewDedup = LangWatchQLViewDedupService.create();
   // A PostgreSQL-resident view holds one row per key and renders no dedup.
@@ -378,7 +376,7 @@ describe("given every view the catalog deduplicates", () => {
   it("provisions a floored twin for each view that declares a floor column", () => {
     const floored = deduplicated.filter((view) => view.dedup.floorColumn !== undefined);
     const twinsOf = (view: (typeof floored)[number]) =>
-      viewStatements.flooredViewStatements({
+      twinStatements.flooredViewStatements({
         names: NAMES,
         sourceDatabase: "langwatch",
         view,

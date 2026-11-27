@@ -5,6 +5,7 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
+  BillingOnlyNoTeamAccessError,
   organizationJoinSettingSchema,
   type OrganizationJoinSetting,
   OrganizationHasNoTeamError,
@@ -38,6 +39,7 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationActiveMemberPage,
   type OrganizationOperatorQuery,
   type OrganizationOperatorRow,
 } from "../organization.repository.ts";
@@ -140,6 +142,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       },
       take: limit,
     });
+  }
+
+  async findActiveMemberPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationActiveMemberPage> {
+    const organizations = await this.database.organization.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      ...(afterId === null ? {} : { where: { id: { gt: afterId } } }),
+      take: limit,
+    });
+    const ids = organizations.map(({ id }) => id);
+    if (ids.length === 0) return { lastOrganizationId: null, organizations: 0, members: [] };
+    const members = await this.database.organizationUser.findMany({
+      where: { organizationId: { in: ids }, disabledAt: null, user: { deactivatedAt: null } },
+      select: { organizationId: true, userId: true, createdAt: true },
+      orderBy: [{ organizationId: "asc" }, { userId: "asc" }],
+    });
+    return {
+      lastOrganizationId: ids.at(-1) ?? null,
+      organizations: ids.length,
+      members: members.map(({ organizationId, userId, createdAt }) => ({
+        organizationId,
+        userId,
+        joinedAt: fromDate(createdAt),
+      })),
+    };
   }
 
   async countUsage({
@@ -629,15 +662,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     expiresAt: Instant;
     validatedAt: Instant | null;
   }): Promise<void> {
-    const { count } = await this.database.organization.updateMany({
-      where: { id: input.organizationId },
-      data: {
-        license: input.licenseKey,
-        licenseExpiresAt: toDate(input.expiresAt),
-        licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
-      },
+    // The organization row is locked first, as licensing's conditional write does, and
+    // licensing's row is read under a share lock, so a key it stores meanwhile is seen.
+    const found = await this.database.$transaction(async (transaction) => {
+      const organizations = await transaction.$queryRaw<{ id: string }[]>`
+        ${skipTenantCheck({
+          // An organization is addressed by its own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT "id" FROM "Organization" WHERE "id" = ${input.organizationId} FOR UPDATE
+      `;
+      if (organizations.length === 0) return false;
+      const held = await transaction.$queryRaw<{ licenseKey: string | null }[]>`
+        ${skipTenantCheck({
+          // Licensing's row is keyed by the organization's own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT "licenseKey" FROM "OrganizationLicense"
+         WHERE "organizationId" = ${input.organizationId} FOR SHARE
+      `;
+      if (held[0]?.licenseKey !== input.licenseKey) return true;
+      await transaction.organization.update({
+        where: { id: input.organizationId },
+        data: {
+          license: input.licenseKey,
+          licenseExpiresAt: toDate(input.expiresAt),
+          licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
+        },
+      });
+      return true;
     });
-    if (count === 0) throw new OrganizationNotFoundError();
+    if (!found) throw new OrganizationNotFoundError();
   }
 
   async clearLicense(input: { organizationId: string }): Promise<void> {
@@ -698,6 +753,16 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<EnsuredPersonalTeam> {
     try {
       return await this.database.$transaction(async (transaction) => {
+        const membership = await transaction.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: input.workspace.userId,
+              organizationId: input.workspace.organizationId,
+            },
+          },
+          select: { billingOnly: true },
+        });
+        if (membership?.billingOnly) throw new BillingOnlyNoTeamAccessError();
         const existing = await this.tryFindPersonalTeam(transaction, input.workspace);
         if (existing) return existing;
 

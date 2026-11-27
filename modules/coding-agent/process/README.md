@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:63`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:65`; nothing else in this package is public.
 
 #### `findBySessionId`
 

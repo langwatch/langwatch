@@ -4,6 +4,11 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import {
+  type ListedModel,
+  readModelListing,
+  readModelListingText,
+} from "../../../rules/model-listing.rules.ts";
+import {
   type AuthStrategy,
   type DeployedBaseUrls,
   NOT_PROBEABLE,
@@ -18,11 +23,19 @@ import type { ModelProviderEgress } from "../../credential-probe/services/ssrf-m
 
 /** Asks a provider which models its credential can call, through the process's egress fence. */
 export abstract class ModelProviderModelList {
-  /** The bare model ids the provider lists; empty when it was not asked or did not answer. */
-  abstract findServedModelIds(input: {
+  /** The models the provider lists, with what each entry states; null when it gave no listing. */
+  abstract findListedModels(input: {
     provider: string;
     customKeys: Record<string, unknown>;
-  }): Promise<string[]>;
+  }): Promise<ListedModel[] | null>;
+
+  /** The bare model ids the provider lists; empty when it was not asked or did not answer. */
+  async findServedModelIds(input: {
+    provider: string;
+    customKeys: Record<string, unknown>;
+  }): Promise<string[]> {
+    return ((await this.findListedModels(input)) ?? []).map((model) => model.id);
+  }
 }
 
 /** How long one listing may take before the picker stops waiting for it. */
@@ -45,24 +58,10 @@ function withWholePage(url: string, strategy: string): string {
 
 const asString = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-function entriesOf(body: unknown): unknown[] {
-  if (typeof body !== "object" || body === null) return [];
-  const { data, models } = body as { data?: unknown; models?: unknown };
-  if (Array.isArray(data)) return data;
-  return Array.isArray(models) ? models : [];
-}
-
-function bareIdOf(entry: unknown): string {
-  if (typeof entry !== "object" || entry === null) return "";
-  const { id, name } = entry as { id?: unknown; name?: unknown };
-  return (asString(id) || asString(name)).replace(/^models\//, "");
-}
-
 /** The ids in a models answer: OpenAI and Anthropic say `data[].id`, Gemini `models[].name`. */
 export function modelIdsFromListing(body: unknown): string[] {
-  return entriesOf(body)
-    .map(bareIdOf)
-    .filter((id) => id !== "");
+  const read = readModelListing(body);
+  return read.kind === "listing" ? read.models.map((model) => model.id) : [];
 }
 
 type ListingTarget =
@@ -126,12 +125,12 @@ export class HttpModelProviderModelListService extends ModelProviderModelList {
     super();
   }
 
-  async findServedModelIds(input: {
+  async findListedModels(input: {
     provider: string;
     customKeys: Record<string, unknown>;
-  }): Promise<string[]> {
+  }): Promise<ListedModel[] | null> {
     const target = listingTargetOf({ ...input, deployedBaseUrls: this.deployedBaseUrls });
-    if (!target.listable) return [];
+    if (!target.listable) return null;
     const candidates = buildProbeCandidates({
       provider: input.provider,
       strategy: target.strategy,
@@ -141,13 +140,15 @@ export class HttpModelProviderModelListService extends ModelProviderModelList {
       apiRoot: target.deployedBaseUrl ? undefined : providerApiRoots[input.provider],
     });
     const deadline = AbortSignal.timeout(LIST_BUDGET_MS);
+    let emptyListing: ListedModel[] | null = null;
     for (const candidate of candidates) {
       if (deadline.aborted || (candidate.method ?? "GET") !== "GET") break;
       const url = withWholePage(candidate.url, target.strategy);
-      const ids = await this.#ask({ url, candidate, deadline });
-      if (ids.length > 0) return ids;
+      const models = await this.#ask({ url, candidate, deadline });
+      if (models && models.length > 0) return models;
+      emptyListing ??= models;
     }
-    return [];
+    return emptyListing;
   }
 
   async #ask({
@@ -158,17 +159,18 @@ export class HttpModelProviderModelListService extends ModelProviderModelList {
     url: string;
     candidate: { headers: Record<string, string> };
     deadline: AbortSignal;
-  }): Promise<string[]> {
+  }): Promise<ListedModel[] | null> {
     try {
       const response = await this.egress.fetch(url, {
         method: "GET",
         headers: candidate.headers,
         signal: deadline,
       });
-      if (!response.ok) return [];
-      return modelIdsFromListing(JSON.parse(await response.text()) as unknown);
+      if (!response.ok) return null;
+      const read = readModelListingText(await response.text());
+      return read.kind === "listing" ? read.models : null;
     } catch {
-      return [];
+      return null;
     }
   }
 }

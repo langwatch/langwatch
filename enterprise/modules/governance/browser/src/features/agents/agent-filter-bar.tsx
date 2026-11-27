@@ -1,34 +1,44 @@
 import { MenuItem } from "@langwatch/design-system/menu";
-import { type AgentSource } from "@langwatch/enterprise-governance-contract";
-import { Plug, UserRoundX } from "lucide-react";
+import {
+  type AgentRegistryPosture,
+  type AgentSource,
+} from "@langwatch/enterprise-governance-contract";
+import { Plug, ShieldCheck, UserRoundX } from "lucide-react";
 
 import { FilterChip, FilterChipRow, SortChip } from "../../ui/elements/governance-filter-chip.tsx";
 import {
+  AGENT_POSTURE_LABELS,
   AGENT_SORT_LABELS,
   AGENT_SORTS,
   type AgentFilters,
+  ALL_POSTURES,
   ALL_SOURCES,
   OWNERSHIP_FILTERS,
   OWNERSHIP_LABELS,
+  postureLabel,
   sourceLabel,
 } from "./agent-filters";
 import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
 /**
- * The Agents filter row: source, ownership, sort, on the section's `FilterChip`. `sources` lists
- * only sources present in the rows, so no chip leads to an empty page.
+ * The Agents filter row: source, posture, ownership, sort, on the section's `FilterChip`.
+ * `sources` and `postures` list only what the rows hold, so no chip leads to an empty page.
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
 export function AgentFilterBar({
   filters,
   sources,
+  postures,
   onSourceChange,
+  onPostureChange,
   onOwnershipChange,
   onSortChange,
 }: {
   filters: AgentFilters;
   sources: AgentSource[];
+  postures: AgentRegistryPosture[];
   onSourceChange: (value: AgentFilters["source"]) => void;
+  onPostureChange: (value: AgentFilters["posture"]) => void;
   onOwnershipChange: (value: AgentFilters["ownership"]) => void;
   onSortChange: (value: AgentFilters["sort"]) => void;
 }) {
@@ -44,6 +54,23 @@ export function AgentFilterBar({
           </MenuItem>
         ))}
       </FilterChip>
+
+      {(postures.length > 0 || filters.posture !== ALL_POSTURES) && (
+        <FilterChip
+          icon={<ShieldCheck size={12} />}
+          label="Posture"
+          value={postureLabel(filters.posture)}
+        >
+          <MenuItem value={ALL_POSTURES} onClick={() => onPostureChange(ALL_POSTURES)}>
+            All postures
+          </MenuItem>
+          {postures.map((posture) => (
+            <MenuItem key={posture} value={posture} onClick={() => onPostureChange(posture)}>
+              {AGENT_POSTURE_LABELS[posture]}
+            </MenuItem>
+          ))}
+        </FilterChip>
+      )}
 
       <FilterChip
         icon={<UserRoundX size={12} />}

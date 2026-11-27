@@ -20,7 +20,7 @@ Data privacy: per-scope rules and the PII redaction level a project runs at.
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Postgres table                 | `DataPrivacyPolicy`                                                                                                                                                                                                                                            | `process/src/repositories/prisma/prisma.data-privacy.repository.ts:15`           |
 | Postgres, accessed not claimed | `Department`, `Group`, `Organization`, `OrganizationUser`, `Project`, `Team`                                                                                                                                                                                   | `process/src/repositories/prisma/prisma.data-privacy-directory.repository.ts:17` |
-| Stores required                |                                                                                                                                                                                                                                                                | `process/src/channels/http/http.data-privacy.channels.ts:18`                     |
+| Stores required                |                                                                                                                                                                                                                                                                | `process/src/channels/http/http.data-privacy.channels.ts:20`                     |
 | Secrets                        | `googleApplicationCredentials` (GOOGLE_APPLICATION_CREDENTIALS), `requestIdKey` (API_KEY_PEPPER), `requestIdKeyFallback` (CREDENTIALS_SECRET), `requestIdKeyLastFallback` (NEXTAUTH_SECRET)                                                                    | `process/src/app/data-privacy.app.ts:142`                                        |
 | Config                         | `googleDlpDisabled` (LANGWATCH_DISABLE_GOOGLE_DLP), `enforcement` (LANGWATCH_DATA_PRIVACY_ENFORCEMENT), `nodeEnvironment` (NODE_ENV), `langevalsEndpoint` (LANGEVALS_ENDPOINT), `piiRedactionModelEndpoint` (PII_REDACTION_MODEL_ENDPOINT), `isSaas` (IS_SAAS) | `contract/src/data-privacy.config.ts:11`                                         |
 
@@ -83,6 +83,7 @@ organization.
   fallback reason) and `durationMs`; an error adds its class name only. It never holds a text, a
   finding's value or an error message. Fallbacks are also counted by `reason` on
   `pii_redaction_model_fallbacks` (`too_long`, `timeout`, `throttled`, `error`, `breaker_open`,
+  `busy`, `unplaceable`,
   and `routing_error` when the flag or the project could not be read). A model call counts on
   `pii_checks` under `method="pii_redaction_model"`, and its duration and outcome go on
   `evaluation_duration_milliseconds` and `evaluation_status_counter` under
@@ -92,9 +93,20 @@ organization.
   without the flag, the only new work is one flag read per batch and one project read per project
   per minute; the batch goes to Presidio as before and the model is never called.
 - **Long batches.** A batch with more than 8,000 characters in all its texts
-  (`PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS`) skips the model and goes to Presidio, logged and
-  counted as `too_long`. The limit is per batch, not per text: one batch is one invoke, and the
-  model's time grows with every character in it, so many short texts are as slow as one long one.
+  (`PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS`) is too long for one call: the model's time grows
+  with every character in it, so many short texts are as slow as one long one. Unless it is
+  split, it skips the model and goes to Presidio, logged and counted as `too_long`.
+- **Split batches.** Where the model is a Lambda function (`PII_REDACTION_MODEL_ENDPOINT` an ARN)
+  and the organization has `release_pii_redaction_model_split_enabled`, a batch of 8,001 to
+  32,000 characters (`PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS`) is cut into pieces of about
+  4,000 that overlap by 200, sent on two calls at once per process, and merged by widest range
+  (ADR-207). Split calls go to the same endpoint as single calls, each naming its context; what
+  differs by context sits in one table, `MODEL_CALL_RULES`. A piece with a backslash or a
+  trimmed edge, or whose findings do not rebuild the model's own masked text, sends the whole
+  batch to Presidio as `unplaceable`; so do a busy process (`busy`), a call that fails and a
+  span over its 50 s budget (the usual reasons). Split calls have their own cool-down, and the
+  batch is billed once on its characters. Over 32,000 characters, a model reached over HTTP, or
+  the flag off, stays `too_long`.
 - **Cool-down after a timeout.** When a model call times out, or Lambda throttles it
   (`TooManyRequestsException`), the process skips the model for 2 minutes
   (`PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS`): every routed batch goes straight to Presidio,

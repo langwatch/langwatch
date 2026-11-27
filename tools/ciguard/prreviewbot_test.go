@@ -28,6 +28,8 @@ const prWorkflowPermissionsBlock = `permissions:
 
 // prReviewBotWaitStep is the review job's wait step.
 const prReviewBotWaitStep = `      - run: go run ./cmd/waitforchecks
+        env:
+          REQUIRED_FROM_BRANCH: ${{ github.base_ref }}
         timeout-minutes: 50
 `
 
@@ -256,7 +258,7 @@ func TestPRReviewBotTriggersOnReadyForReview(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
 }
 
-// @scenario "The review waits for every other check on the head commit"
+// @scenario "The review waits for every required check on the head commit"
 func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotWaitStep, "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
@@ -268,9 +270,22 @@ func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), `no step running "go run ./cmd/waitforchecks"`)
 }
 
+// Without the base branch the wait reads every check, so an optional workflow
+// holds the review's runner again.
+// @scenario "A check the branch does not require never holds the review"
+func TestPRReviewBotWaitsOnlyForTheRequiredChecks(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "          REQUIRED_FROM_BRANCH: ${{ github.base_ref }}\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken)
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "REQUIRED_FROM_BRANCH")
+}
+
 // A failed wait fails the job, so the only way the bot runs on a red change is
 // to run before the wait.
-// @scenario "The review does not start when another check failed"
+// @scenario "The review does not start when a required check failed"
 func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
 	botAt := strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch")
 	require.GreaterOrEqual(t, botAt, 0)
@@ -288,7 +303,7 @@ func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
 }
 
 // A wait that cannot fail, or can be skipped, lets the bot run on a red change.
-// @scenario "The review does not start when another check failed"
+// @scenario "The review does not start when a required check failed"
 func TestPRReviewBotRejectsAWaitThatCannotFailTheJob(t *testing.T) {
 	const wait = "go run ./cmd/waitforchecks"
 	cases := map[string]struct{ step, want string }{
@@ -339,7 +354,7 @@ func TestPRReviewBotRejectsAWaitThatCannotFailTheJob(t *testing.T) {
 	}
 }
 
-// @scenario "The review does not start when another check failed"
+// @scenario "The review does not start when a required check failed"
 func TestPRReviewBotRequiresTheBotStepAfterTheWait(t *testing.T) {
 	botAt := strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch")
 	require.GreaterOrEqual(t, botAt, 0)

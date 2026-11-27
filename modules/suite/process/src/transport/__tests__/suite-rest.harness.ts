@@ -385,6 +385,7 @@ export function memoryScenarioApi(world: SuiteWorld, commands: CollapsingRunComm
         parameters: {},
         secretParameters: {},
       })),
+    assertSimulationRunAllowed: async () => {},
     queueSimulationRun: (input) => commands.queueSimulationRun(input),
   });
 }

@@ -29,6 +29,13 @@ export type LicenseBillingSectionProps = {
   seatRateCents: number | null;
   seatCurrency: "USD" | "EUR" | null;
   commitUsdCents: number;
+  /** Told once the section knows: no billing account means the license is a trial. */
+  onBillingState?: (state: "trial" | "billed") => void;
+  /**
+   * Signs the license to the paid term's end before billing starts or renews, so
+   * billing dates follow the license. False when licensing refused; nothing is billed then.
+   */
+  signPaidTerm?: (input: { expiresAt: string }) => Promise<boolean>;
 };
 
 /** The organization a page is about; the banner reads the case and the reader's grants itself. */

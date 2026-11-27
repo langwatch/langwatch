@@ -461,6 +461,7 @@ describe("authz engine decide()", () => {
       expect(denied.denialReason).toBe("developer-restricted");
     });
 
+    /** @scenario "A Developer seat can open the library" */
     it("still receives the organization floor at organization scope", () => {
       const grants = makeGrants({ organizationRole: "DEVELOPER" });
       expect(

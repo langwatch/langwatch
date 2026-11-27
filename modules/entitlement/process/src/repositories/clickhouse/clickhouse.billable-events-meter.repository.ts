@@ -5,6 +5,8 @@ import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
   type DayMeterCount,
+  type EventTypeFilter,
+  type EventTypeMeterCount,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
@@ -14,6 +16,8 @@ const TABLE_NAME = "billable_events" as const;
 type TotalRow = { total: string | number };
 type ProjectRow = { projectId: string; total: string | number };
 type DayRow = { day: string; total: string | number };
+type FirstRow = { firstAt: string | number | null; total: string | number };
+type TypeRow = { eventType: string; total: string | number };
 
 /** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
@@ -80,6 +84,101 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     return numberOf(result.rows[0]?.total);
   }
 
+  async countEventType(input: EventTypeFilter & MeterWindow): Promise<number> {
+    const result = await this.#clickhouse.query<TotalRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT countDistinct(DeduplicationKeyHash) as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND EventType = {eventType:String}
+          AND EventTimestamp >= {startDate:DateTime64(3)}
+          AND EventTimestamp < {endDate:DateTime64(3)}
+      `,
+      params: {
+        organizationId: input.organizationId,
+        eventType: input.eventType,
+        startDate: input.startDate,
+        endDate: input.endDate,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return numberOf(result.rows[0]?.total);
+  }
+
+  async hasDeduplicationKey(input: {
+    organizationId: string;
+    projectId: string;
+    deduplicationKey: string;
+  }): Promise<boolean> {
+    const result = await this.#clickhouse.query<TotalRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT count() as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND TenantId = {projectId:String}
+          AND DeduplicationKeyHash = cityHash64({deduplicationKey:String})
+          AND DeduplicationKey = {deduplicationKey:String}
+      `,
+      params: {
+        organizationId: input.organizationId,
+        projectId: input.projectId,
+        deduplicationKey: input.deduplicationKey,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return numberOf(result.rows[0]?.total) > 0;
+  }
+
+  async findDeduplicationKeys(input: {
+    organizationId: string;
+    deduplicationKeys: readonly string[];
+  }): Promise<Set<string>> {
+    if (input.deduplicationKeys.length === 0) return new Set();
+    const result = await this.#clickhouse.query<{ key: string }>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT DISTINCT DeduplicationKey as key
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND DeduplicationKeyHash IN (SELECT cityHash64(arrayJoin({keys:Array(String)})))
+          AND DeduplicationKey IN {keys:Array(String)}
+      `,
+      params: { organizationId: input.organizationId, keys: [...input.deduplicationKeys] },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return new Set(result.rows.map((row) => row.key));
+  }
+
+  async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
+    const result = await this.#clickhouse.query<FirstRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT toUnixTimestamp64Milli(min(EventTimestamp)) as firstAt, count() as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND EventType = {eventType:String}
+      `,
+      params: {
+        organizationId: input.organizationId,
+        eventType: input.eventType,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    const row = result.rows[0];
+    if (!row || numberOf(row.total) === 0 || row.firstAt === null) return null;
+    return numberOf(row.firstAt);
+  }
+
   /** Billing's former `findByProjectApprox`, kept `uniq` so enforcement's numbers do not move. */
   async countByProjects(input: {
     organizationId: string;
@@ -144,6 +243,42 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
       SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({ day: row.day, count: numberOf(row.total) }));
+  }
+
+  /** Counted `uniq` per type, as `countByDay` counts per day, so the page's figures agree. */
+  async countByType({
+    organizationId,
+    projectIds,
+    window,
+  }: {
+    organizationId: string;
+    projectIds: readonly string[];
+    window: MeterWindow;
+  }): Promise<EventTypeMeterCount[]> {
+    if (projectIds.length === 0) return [];
+    const result = await this.#clickhouse.query<TypeRow>({
+      tenantId: "",
+      organizationId,
+      sql: `
+      SELECT EventType as eventType, uniq(DeduplicationKeyHash) as total
+      FROM ${TABLE_NAME}
+      WHERE OrganizationId = {organizationId:String}
+        AND TenantId IN {projectIds:Array(String)}
+        AND EventTimestamp >= {startDate:DateTime64(3)}
+        AND EventTimestamp < {endDate:DateTime64(3)}
+      GROUP BY EventType
+      ORDER BY EventType
+    `,
+      params: {
+        organizationId,
+        projectIds: [...projectIds],
+        startDate: window.startDate,
+        endDate: window.endDate,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return result.rows.map((row) => ({ eventType: row.eventType, count: numberOf(row.total) }));
   }
 }
 

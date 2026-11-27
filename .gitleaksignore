@@ -75,3 +75,26 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # It was never a credential; the test now builds it with sha("pw"), so only
 # this pull request's history still carries the literal.
 394229f593f12061ac86dc2c53b294cb27b8a6d8:infra/clickhouse-serverless/internal/access/caps_test.go:generic-api-key:218
+
+# A crash-redaction test asserted that a token assigned in a crash message is
+# masked, using a made-up twenty-character value that clears the generic-api-key
+# bar beside a `token=` or `api_key=` name. It was never a credential; the test
+# now builds the value at runtime, so only this pull request's history carries it.
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:15
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:18
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:56
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:75
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:76
+
+# The migration-compat ClickHouse grant step passed the CI service container's
+# throwaway password to curl -u. It now reads CLICKHOUSE_BASE_URL, so the tree
+# is clean and only this pull request's history still carries the literal.
+5660559ce9c3120aecb6ee6cb4a3709f1eb01efb:.github/workflows/migration-compat.yml:curl-auth-user:219
+5660559ce9c3120aecb6ee6cb4a3709f1eb01efb:.github/workflows/migration-compat.yml:curl-auth-user:590
+
+# A Developer seats drawer test stubbed the reissued license as
+# `eyJkZXYiOjd9.signature`, base64 for {"dev":7} plus a placeholder signature,
+# which clears the generic-api-key bar beside a `licenseKey:` key. It was never
+# a credential; the stub now reads `signed-dev-seats`, so only this pull
+# request's history still carries the literal.
+913bf65da63f16c127d03e9484c997f5652feb5a:modules/ops/browser/src/features/admin/__tests__/license-developer-seats.integration.test.tsx:generic-api-key:91

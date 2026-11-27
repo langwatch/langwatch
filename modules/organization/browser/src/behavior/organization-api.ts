@@ -191,6 +191,8 @@ export type OrganizationInviteReading = {
   inviteCode: string;
   expiration: NonNullable<OrganizationInvite["expiration"]>;
   teamIds: string;
+  /** Billing only: the Billing grant and no seat (ADR-205). */
+  billingOnly?: boolean;
 };
 
 /** A custom role, as the role pickers offer one. */

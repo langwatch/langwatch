@@ -1,8 +1,15 @@
 import type { ModelProviderApi, ModelProviderExecution } from "@langwatch/model-provider-contract";
-import { TopicClusteringModels } from "@langwatch/topic-contract";
+import {
+  CLUSTERING_ERROR_CODES,
+  ClusteringError,
+  TopicClusteringModels,
+} from "@langwatch/topic-contract";
 
 const CLUSTERING_LLM_FEATURE_KEY = "analytics.topic_clustering_llm";
 const CLUSTERING_EMBEDDINGS_FEATURE_KEY = "analytics.topic_clustering_embeddings";
+
+const notConfigured = (message: string): ClusteringError =>
+  new ClusteringError(CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED, message);
 
 type TopicClusteringModelProviders = Pick<
   ModelProviderApi,
@@ -40,14 +47,11 @@ export class ModelProviderTopicClusteringModelsService extends TopicClusteringMo
       featureKey: CLUSTERING_EMBEDDINGS_FEATURE_KEY,
     });
     const provider = resolved.model.split("/")[0];
-    if (!provider) throw new Error("Embeddings provider not set");
+    if (!provider) throw notConfigured("Embeddings provider not set");
 
     const modelProvider = (await this.findExecutionProviders(projectId))[provider];
     if (!modelProvider) {
-      throw new Error(`Embeddings model provider ${provider} not found`);
-    }
-    if (!modelProvider.enabled) {
-      throw new Error(`Embeddings model provider ${provider} is not enabled`);
+      throw notConfigured(`Embeddings model provider ${provider} not found`);
     }
     return { model: resolved.model, modelProvider };
   }

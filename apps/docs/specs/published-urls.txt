@@ -11,6 +11,7 @@
 /agent-testing/linking-your-traces
 /agent-testing/other-ways-to-connect
 /agent-testing/overview
+/agent-testing/owasp-red-team
 /agent-testing/red-team-open-source
 /agent-testing/red-team-templates
 /agent-testing/red-teaming
@@ -27,6 +28,7 @@
 /agent-testing/test-suites
 /agent-testing/voice-agents
 /ai-gateway
+/ai-gateway/a2a-proxy
 /ai-gateway/api
 /ai-gateway/api/audio
 /ai-gateway/api/chat-completions
@@ -115,6 +117,7 @@
 /ai-governance/api
 /ai-governance/cli
 /ai-governance/cli-debug
+/ai-governance/cloud-agent-discovery
 /ai-governance/compliance-architecture
 /ai-governance/control-plane
 /ai-governance/getting-started-admin
@@ -343,10 +346,12 @@
 /api-reference/governance-agent-registry/get-one-registry-agent
 /api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest
 /api-reference/governance-agent-registry/get-the-registry-s-json-schemas
+/api-reference/governance-agent-registry/get-the-registry-settings
 /api-reference/governance-agent-registry/list-one-registry-agent-s-versions
 /api-reference/governance-agent-registry/list-the-organisation-s-agent-registry
 /api-reference/governance-agent-registry/overview
 /api-reference/governance-agent-registry/read-the-registry-change-feed
+/api-reference/governance-agent-registry/save-the-registry-settings
 /api-reference/governance-agent-registry/search-the-registry-ard-search
 /api-reference/governance-kill-switch/approve-a-pending-stop
 /api-reference/governance-kill-switch/deny-a-pending-stop

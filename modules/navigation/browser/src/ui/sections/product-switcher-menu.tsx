@@ -4,7 +4,7 @@ import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-sys
 import { Check, ChevronsUpDown, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useProductHome } from "../../behavior/use-product-home.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { writeDashboardsSidebarHint } from "../../model/dashboards-sidebar-hint.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
@@ -64,7 +64,7 @@ function SwitcherEntry({
 export function ProductSwitcherMenu({ activeProductId }: { activeProductId: ProductId }) {
   const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();
-  const projectSlug = useLlmOpsProjectSlug();
+  const homeOf = useProductHome();
 
   const active = productById(activeProductId);
   const ActiveIcon = active.icon;
@@ -74,7 +74,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
 
   const openProduct = (product: ProductDefinition) => {
     if (product.id === activeProductId) return;
-    const home = product.homeHref({ projectSlug });
+    const home = homeOf(product);
     if (!home) return;
     // Choosing Dashboards means its own sidebar, whatever page the reader left.
     if (product.id === "dashboards")
@@ -94,7 +94,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
       <Portal>
         <Menu.Content minWidth="280px" padding={1.5}>
           {options.map((product) => {
-            const home = product.homeHref({ projectSlug });
+            const home = homeOf(product);
             const isActive = product.id === activeProductId;
             return (
               <Menu.Item

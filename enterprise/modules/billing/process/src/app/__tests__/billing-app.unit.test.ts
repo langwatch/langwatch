@@ -92,7 +92,7 @@ function lifecycleRecording() {
     waitUntilReady: async () => {},
   });
   const lifecycle = BillingLifecycleAnnouncerService.create({
-    subscriptions: { findLastNonCancelled: async () => null },
+    subscriptions: { findActive: async () => null },
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },

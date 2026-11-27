@@ -167,11 +167,11 @@ const (
 	defaultSessionsRoot       = "/workspace/sessions"
 	defaultWorkspaceRoot      = "/workspace"
 	defaultGracefulSeconds    = 10
-	// defaultMaxBodyBytes caps the /chat body at 1MB so a hostile
-	// manager-internal caller can't OOM the pod. Deliberately far below the
-	// shared config.DefaultMaxRequestBodyBytes (128 MiB) — /chat carries a short
-	// prompt + credentials, never large-context LLM payloads.
-	defaultMaxBodyBytes = 1_000_000
+	// defaultMaxBodyBytes caps a turn body at 32 MiB: room for the largest
+	// allowed images (domain.MaxTurnImages of domain.MaxTurnImageBytes, ~27 MiB
+	// as base64) plus prompt, history seed and credentials, while still bounding
+	// what a hostile manager-internal caller can make the pod buffer.
+	defaultMaxBodyBytes = 32 << 20
 	// ADR-048 shutdown-handoff budgets (ms). Defaults sum to 8s, comfortably
 	// under the 10s default graceful window; the operator sizes
 	// terminationGracePeriodSeconds above the graceful window.

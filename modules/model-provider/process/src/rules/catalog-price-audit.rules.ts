@@ -11,6 +11,7 @@ const FIELD_UNITS = {
   inputCostPerToken: "token",
   outputCostPerToken: "token",
   audioCostPerToken: "token",
+  audioOutputCostPerToken: "token",
   imageCostPerToken: "token",
   imageOutputCostPerToken: "token",
   inputCacheReadPerToken: "token",
@@ -65,6 +66,19 @@ export function findUnpricedModels(models: Record<string, LLMModelEntry>): strin
     .toSorted();
 }
 
+/**
+ * Entries that price more than one unit. A span can report tokens and a duration at once, so
+ * such an entry charges the same request twice. Sorted by id.
+ */
+export function findMultiUnitModels(
+  models: Record<string, LLMModelEntry>,
+): { modelId: string; units: string[] }[] {
+  return Object.entries(models)
+    .map(([modelId, entry]) => ({ modelId, units: pricedUnits(entry.pricing).toSorted() }))
+    .filter(({ units }) => units.length > 1)
+    .toSorted((a, b) => a.modelId.localeCompare(b.modelId));
+}
+
 type UnitMismatch = {
   modelId: string;
   origin: "overlay" | "generated";
@@ -87,6 +101,8 @@ type PriceDisagreement = {
 export type AuditReport = {
   unpriced: string[];
   unitMismatch: UnitMismatch[];
+  /** Entries priced in two or more units. Always blocking: no baseline accepts them. */
+  multiUnit: { modelId: string; units: string[] }[];
   /** Hand-written overlay rates that disagree with upstream. */
   drift: PriceDisagreement[];
   /** Generated rates that disagree between the two upstream sources. */
@@ -233,6 +249,7 @@ export function auditCatalog({
   return {
     unpriced: findUnpricedModels({ ...overlay, ...generated }),
     unitMismatch,
+    multiUnit: findMultiUnitModels({ ...generated, ...overlay }),
     drift,
     crossSource,
     overriding: overriding.toSorted(),
@@ -284,6 +301,11 @@ export function blockingFindings(report: AuditReport, baseline: AuditBaseline): 
       );
     }
   }
+  for (const m of report.multiUnit) {
+    blocking.push(
+      `two units: ${m.modelId} prices ${m.units.join("+")}, a request would be charged twice`,
+    );
+  }
   for (const d of report.drift) {
     const key = `${d.modelId}::${d.field}`;
     if (!baseline.disagreements?.[key]) {
@@ -314,6 +336,7 @@ export function renderAuditMarkdown(report: AuditReport, blocking: string[]): st
   const nothing =
     report.unpriced.length === 0 &&
     report.unitMismatch.length === 0 &&
+    report.multiUnit.length === 0 &&
     report.drift.length === 0 &&
     report.crossSource.length === 0 &&
     report.unrepresentable.length === 0;
@@ -358,6 +381,17 @@ export function renderAuditMarkdown(report: AuditReport, blocking: string[]): st
         (m) =>
           `| \`${m.modelId}\` | ${m.catalogUnits.join(", ")} | ${m.upstreamUnits.join(", ")} | ${m.source} |`,
       ),
+    );
+  }
+
+  if (report.multiUnit.length > 0) {
+    out.push(
+      "",
+      `### Priced in more than one unit (${report.multiUnit.length})`,
+      "",
+      "A request reporting both quantities is charged twice. Keep the token rates and drop the rest.",
+      "",
+      ...report.multiUnit.map((m) => `- \`${m.modelId}\`: ${m.units.join(", ")}`),
     );
   }
 

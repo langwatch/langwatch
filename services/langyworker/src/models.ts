@@ -137,6 +137,10 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
     if (entry.reasoning === undefined && REASONING_BY_DEFAULT.has(model.api)) {
       entry.reasoning = true;
     }
+    // pi defaults an unknown model to text-only input, and pi-ai then swaps every
+    // image for "(image omitted: model does not support images)". Langy's chat
+    // models see images, so assume they do; config's own `input` still wins.
+    if (entry.input === undefined) entry.input = ["text", "image"];
     const compat = uncataloguedCompat(model);
     return compat ? { ...entry, compat } : entry;
   }

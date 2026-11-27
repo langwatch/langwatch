@@ -10,10 +10,11 @@ import { useLangyPromptLink } from "../../../../behavior/use-langy-prompt-link.t
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   LANGY_DOCK_GAP,
-  LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
+  SIDEBAR_PANEL_WIDTH,
 } from "../../../../model/langy-panel-layout.ts";
 import { LangyProvider, useLangy } from "../../../tools/ui/sections/langy-page-context.tsx";
+import { useLangyDockWidthPx } from "../../behavior/panel/use-langy-panel-layout.ts";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useLangyWebPush } from "../../behavior/use-langy-web-push.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
@@ -79,26 +80,34 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
   const panelMode = useLangyStore((s) => s.panelMode);
   const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const setDockShifted = useLangyStore((s) => s.setDockShifted);
+  const setDockWidthPx = useLangyStore((s) => s.setDockWidthPx);
+  const dockWidthPx = useLangyDockWidthPx();
   // While a drawer is open the panel rides beside it as a floating companion
   // (see LangyPanel), so the dock's reservation releases and the page gets
   // its width back underneath the overlay pair.
-  const { currentDrawer } = useDrawer();
+  const { currentDrawer, inPlaceDrawerOpen } = useDrawer();
   // Only Sidebar mode reserves room (pushes content left). Floating mode
   // overlays the page — content stays full width and the card floats over it.
-  const shifted = showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
+  const shifted =
+    showLangy && isOpen && panelMode === "sidebar" && !currentDrawer && !inPlaceDrawerOpen;
   // Publish the reservation truth for a claiming shell (see the store): this
   // wrapper owns the visibility gate, the shell only consumes the result.
   useEffect(() => {
     setDockShifted(shifted);
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
+  // The user can drag the dock wider; the shell reads the width from the store to keep its room.
+  // Published before paint so the shell's room never lags the panel by a frame.
+  useLayoutEffect(() => {
+    setDockWidthPx(dockWidthPx);
+  }, [dockWidthPx, setDockWidthPx]);
   const reservation = dockReservation({ shifted, shellClaimed });
   // Without a claiming shell (the Studio), a drawer still opens beside the docked panel,
-  // as on main.
+  // as on main. The panel drops to its default width beside a drawer, so yield that width.
   const yieldsToDock = showLangy && isOpen && panelMode === "sidebar" && !shellClaimed;
   useLayoutEffect(() => {
     if (!yieldsToDock) return;
-    setDrawerEndInset(LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP + 8);
+    setDrawerEndInset(SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP + 8);
     return () => setDrawerEndInset(0);
   }, [yieldsToDock]);
   // The box sits in the shell's page body and passes its flex height on,
@@ -112,7 +121,7 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
         display="flex"
         flexDirection="column"
         data-langy-dock={reservation}
-        paddingRight={reservation === "page" ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        paddingRight={reservation === "page" ? `${dockWidthPx}px` : 0}
         transition={`padding-right ${LANGY_TRANSITION}`}
       >
         {children}

@@ -28,3 +28,15 @@ export function keyRunTelemetry({
   if (reach.kind === "apiKey" && reach.isLangySessionKey === true) return { caller: "langy" };
   return { caller: door };
 }
+
+/** A staff key runs charged eval() functions only when its session was approved to spend. */
+export function keyMaySpend(reach: LangWatchQLKeyReach): boolean {
+  if (reach.kind !== "apiKey" || reach.isStaffAccessKey !== true) return true;
+  return reach.staffSpendApproved === true;
+}
+
+/** The project a key resolved to on its own, for a failed run's line; empty for a wider key. */
+export function keyReachProjectIds({ reach }: { reach: LangWatchQLKeyReach }): readonly string[] {
+  if (reach.kind === "project" || reach.kind === "cliAccessToken") return [reach.projectId];
+  return reach.resolvedProject ? [reach.resolvedProject.id] : [];
+}

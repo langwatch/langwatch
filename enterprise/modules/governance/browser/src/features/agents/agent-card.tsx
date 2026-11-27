@@ -11,6 +11,7 @@ import {
   formatAgentLastActive,
   formatAgentRequests,
 } from "./agent-figure";
+import { AgentPostureBadge } from "./agent-posture-badge";
 import type { AgentRowExtras } from "./agent-row-extras";
 import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
@@ -36,6 +37,7 @@ export function AgentCard({
         <AgentEnvironment environment={agent.environment} />
         {added?.status}
         <Box flex="1" />
+        <AgentPostureBadge posture={agent.posture} />
         <Badge size="xs" variant="subtle" colorPalette="purple">
           {AGENT_SOURCE_LABELS[agent.source]}
         </Badge>

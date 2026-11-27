@@ -26,6 +26,7 @@ function billedLookup(organizationId: string): BillingReportOrganizationLookup {
       stripeCustomerId: `cus_${organizationId}`,
       subscriptions: [{ id: `sub_${organizationId}` }],
       contract: "cloud",
+      growthSeatPeriods: [],
     },
   };
 }
@@ -34,7 +35,7 @@ function billedLookup(organizationId: string): BillingReportOrganizationLookup {
 function billingAnnouncer({ billed }: { billed: Set<string> }) {
   let nowMs = Date.UTC(2026, 9, 7, 9);
   const announcer = BillingLifecycleAnnouncerService.create({
-    subscriptions: { findLastNonCancelled: async () => null },
+    subscriptions: { findActive: async () => null },
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },

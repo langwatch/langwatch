@@ -5,15 +5,10 @@ import type {
   ProjectionStoreContext,
 } from "@langwatch/eventing";
 
-import {
-  emptyProjectUsage,
-  foldProjectUsage,
-  type NurturingProjectUsageState,
-} from "../../rules/nurturing-project-usage.rules.ts";
-import {
-  EVALUATION_ACTIVITY_OWNER,
-  type NurturingProjectUsageOwner,
-  type NurturingProjectUsageRepository,
+import type { NurturingProjectUsageState } from "../../rules/nurturing-project-usage.rules.ts";
+import type {
+  NurturingProjectUsageOwner,
+  NurturingProjectUsageRepository,
 } from "../nurturing-project-usage.repository.ts";
 
 type Row = { state: NurturingProjectUsageState; appliedEventIds: string[] };
@@ -50,16 +45,6 @@ export class MemoryNurturingProjectUsageRepository implements NurturingProjectUs
         });
       },
     };
-  }
-
-  async recordEvaluationDay({
-    projectId,
-    occurredAt,
-  }: Readonly<{ projectId: string; occurredAt: number }>): Promise<void> {
-    const key = rowKey(EVALUATION_ACTIVITY_OWNER, projectId);
-    const current = this.#rows.get(key)?.state ?? emptyProjectUsage(projectId);
-    const state = foldProjectUsage(current, { kind: "evaluation_completed", occurredAt });
-    this.#rows.set(key, { state, appliedEventIds: [] });
   }
 
   async findForProjects({

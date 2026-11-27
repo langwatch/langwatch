@@ -8,6 +8,7 @@ export * from "./model-provider-registry.ts";
 export * from "./model-provider-routing-handle.ts";
 export * from "./model-provider-display-names.ts";
 export * from "./model-provider-list-entry.ts";
+export * from "./model-listing-import.ts";
 export * from "./model-provider.compatibility.ts";
 export * from "./model-provider.trpc-schemas.ts";
 export * from "./model-provider.trpc.ts";

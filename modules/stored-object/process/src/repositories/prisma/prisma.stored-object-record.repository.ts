@@ -16,15 +16,16 @@ import type {
   StoredObjectSource,
 } from "../stored-object-record.repository.ts";
 
-/** The model delegate, and raw SQL for the one sweep that spans every tenant. */
-type StoredObjectRecordDatabase = Pick<PrismaClient, "storedObject" | "$queryRaw">;
+/** The model delegate, and raw SQL for the tenant sweep, the guarded transition, the
+ * conditional delete and the audience append. */
+type StoredObjectRecordDatabase = Pick<PrismaClient, "storedObject" | "$queryRaw" | "$executeRaw">;
 
 /**
- * Declared rather than inherited from `PrismaRepository.for`: the upload reaper's
- * tenant sweep is SQL, and that base class's model-scoped client has no `$queryRaw`.
+ * Declared rather than inherited from `PrismaRepository.for`: the raw SQL here needs
+ * `$queryRaw` and `$executeRaw`, which that base class's model-scoped client has not.
  */
 export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRepository {
-  static readonly tables = prismaTables("StoredObject");
+  static readonly tables = prismaTables("StoredObject", "StoredObjectOwner");
 
   static create({
     prisma,
@@ -66,22 +67,45 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
     return result.count === 1;
   }
 
+  /**
+   * SQL, not `updateMany`: Prisma compiles that to an id subquery, and a racing write parked on
+   * the row lock re-checks only the id, so a confirm and the reaper could both win.
+   */
   async transition(input: {
     expected: Pick<StoredObjectRecord, "status" | "generation">;
     next: StoredObjectRecord;
   }): Promise<boolean> {
-    const { tenantId, id, ...data } = toRow(input.next);
-    const result = await this.prisma.storedObject.updateMany({
-      where: {
-        tenantId,
-        id,
-        status: input.expected.status,
-        generation: input.expected.generation,
-      },
-      data,
-    });
+    const row = toRow(input.next);
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "StoredObject"
+         SET "status" = ${row.status},
+             "purpose" = ${row.purpose},
+             "ownerKind" = ${row.ownerKind},
+             "ownerId" = ${row.ownerId},
+             "filename" = ${row.filename},
+             "sha256" = ${row.sha256},
+             "sizeBytes" = ${row.sizeBytes},
+             "mediaType" = ${row.mediaType},
+             "mediaTypeVerified" = ${row.mediaTypeVerified},
+             "storageProvider" = ${row.storageProvider},
+             "storageDestinationId" = ${row.storageDestinationId},
+             "storageProviderRelativeId" = ${row.storageProviderRelativeId},
+             "generation" = ${row.generation},
+             "audiences" = ${JSON.stringify(row.audiences)}::jsonb,
+             "expiresAt" = ${row.expiresAt},
+             "availableAt" = ${row.availableAt},
+             "deletedAt" = ${row.deletedAt},
+             "source" = ${row.source},
+             "legacyFingerprint" = ${row.legacyFingerprint},
+             "createdAt" = ${row.createdAt},
+             "updatedAt" = ${row.updatedAt}
+       WHERE "tenantId" = ${row.tenantId}
+         AND "id" = ${row.id}
+         AND "status" = ${input.expected.status}
+         AND "generation" = ${input.expected.generation}
+    `;
 
-    return result.count === 1;
+    return updated === 1;
   }
 
   async countActive(input: {
@@ -114,7 +138,30 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
           : {
               status: typeof input.status === "string" ? input.status : { in: [...input.status] },
             }),
+        ...(input.purpose ? { purpose: input.purpose } : {}),
         ...(input.expiresBefore ? { expiresAt: { lte: toDate(input.expiresBefore) } } : {}),
+      },
+      orderBy: { id: "asc" },
+      take: input.limit,
+    });
+
+    return rows.map((row) => fromRow(row));
+  }
+
+  async findReusable(input: {
+    tenantId: StoredObjectProjectId;
+    purpose: string;
+    sha256: string;
+    mediaType: string;
+    limit: number;
+  }): Promise<StoredObjectRecord[]> {
+    const rows = await this.prisma.storedObject.findMany({
+      where: {
+        tenantId: input.tenantId,
+        purpose: input.purpose,
+        sha256: input.sha256,
+        mediaType: input.mediaType,
+        status: "available",
       },
       orderBy: { id: "asc" },
       take: input.limit,
@@ -177,6 +224,54 @@ export class PrismaStoredObjectRecordRepository implements StoredObjectRecordRep
     await this.prisma.storedObject.deleteMany({
       where: { tenantId: input.tenantId, id: input.id },
     });
+  }
+
+  /** One UPDATE whose NOT EXISTS reads the owner links, so no live link is missed between them. */
+  async markDeletedIfUnheld(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    now: Instant;
+  }): Promise<boolean> {
+    const now = toDate(input.now);
+    const count = await this.prisma.$executeRaw`
+      UPDATE "StoredObject" AS o
+         SET "status" = 'deleted',
+             "generation" = o."generation" + 1,
+             "deletedAt" = ${now},
+             "expiresAt" = ${now},
+             "updatedAt" = ${now}
+       WHERE o."tenantId" = ${input.tenantId}
+         AND o."id" = ${input.id}
+         AND o."status" = 'available'
+         AND NOT EXISTS (
+           SELECT 1
+             FROM "StoredObjectOwner" AS l
+            WHERE l."tenantId" = o."tenantId"
+              AND l."objectId" = o."id"
+              AND (l."retainUntil" IS NULL OR l."retainUntil" > ${now})
+         )
+    `;
+
+    return count > 0;
+  }
+
+  /** A jsonb append conditional on the row: no read-modify-write a delete could overtake. */
+  async addAudience(input: {
+    tenantId: StoredObjectProjectId;
+    id: StoredObjectId;
+    audience: StoredObjectDeliveryAudience;
+    at: Instant;
+  }): Promise<void> {
+    const audience = JSON.stringify([input.audience]);
+    await this.prisma.$executeRaw`
+      UPDATE "StoredObject"
+         SET "audiences" = "audiences" || ${audience}::jsonb,
+             "updatedAt" = ${toDate(input.at)}
+       WHERE "tenantId" = ${input.tenantId}
+         AND "id" = ${input.id}
+         AND "status" = 'available'
+         AND NOT ("audiences" @> ${audience}::jsonb)
+    `;
   }
 }
 

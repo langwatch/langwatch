@@ -18,8 +18,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuListTree } from "react-icons/lu";
 
+import { useHoverReveal } from "../../../behavior/batch-evaluation-results/use-hover-reveal.ts";
 import {
   COLLAPSED_CELL_HEIGHT_PX,
+  collapsedPreviewOf,
   DEFAULT_ROW_HEIGHT,
   type RowHeight,
 } from "../../../model/batch-evaluation-results.row-height.ts";
@@ -29,6 +31,7 @@ import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluatio
 import {
   type BatchCellFailure,
   type DescribeBatchCellFailure,
+  expandedPositionOf,
   formatLatency,
   type RenderBatchEvaluatorResult,
   type RenderTracePeek,
@@ -89,19 +92,6 @@ const cellFailureOf = ({
   if (described) return described;
   const { error } = targetOutput;
   return error ? { title: error, description: "", raw: error } : null;
-};
-
-/**
- * Where the expanded overlay opens: over this value's own position (a diff-mode td holds
- * several values), at least the td's width, and pulled left rather than past the viewport.
- */
-const expandedPositionOf = (cell: HTMLDivElement) => {
-  const rect = cell.getBoundingClientRect();
-  const tdWidth = cell.closest("td")?.getBoundingClientRect().width ?? rect.width;
-  const width = Math.max(rect.width, tdWidth) + 24;
-  const safetyMargin = 32;
-  const maxLeft = window.innerWidth - width - safetyMargin;
-  return { top: rect.top, left: Math.min(rect.left - 12, maxLeft), width };
 };
 
 const useExpandedCell = () => {
@@ -212,8 +202,8 @@ const CollapsedOutput = ({
   rowHeight: RowHeight;
   onExpand: () => void;
 }) => {
-  const isTruncated = output.length > MAX_DISPLAY_CHARS;
-  const isLikelyOverflowing = isTextLikelyOverflowing(output);
+  const { preview, isCut } = collapsedPreviewOf({ text: output, rowHeight });
+  const isLikelyOverflowing = isCut || isTextLikelyOverflowing(output);
   return (
     <Box position="relative">
       <Box
@@ -223,7 +213,7 @@ const CollapsedOutput = ({
         cursor={isLikelyOverflowing ? "pointer" : undefined}
         onClick={isLikelyOverflowing ? onExpand : undefined}
       >
-        <OutputText text={output.slice(0, MAX_DISPLAY_CHARS)} isTruncated={isTruncated} />
+        <OutputText text={preview} isTruncated={false} />
       </Box>
       {isLikelyOverflowing && (
         <Box
@@ -413,6 +403,8 @@ const CopyButton = ({
 
 type CellBodyProps = Omit<BatchTargetCellProps, "rowHeight" | "describeFailure"> & {
   expanded: boolean;
+  /** The collapsed cell draws its action bar only once it was hovered or focused. */
+  showActions?: boolean;
   rowHeight: RowHeight;
   failure: BatchCellFailure | null;
   output: string;
@@ -428,7 +420,7 @@ const CellBody = (props: CellBodyProps) => {
   const traceId = showOutput ? targetOutput.traceId : null;
   return (
     <>
-      {(showOutput || showCostAndLatency) && (
+      {(expanded || props.showActions) && (showOutput || showCostAndLatency) && (
         <HStack
           position="absolute"
           top={-1}
@@ -497,6 +489,7 @@ export function BatchTargetCell({
   ...rest
 }: BatchTargetCellProps) {
   const { cellRef, isExpanded, position, expand, close } = useExpandedCell();
+  const { isRevealed, revealHandlers } = useHoverReveal({ onExpand: expand });
   // {output: "hello"} reads "hello"; {pizza: false} reads as formatted JSON.
   const output = formatTargetOutput(targetOutput.output);
   const { hasCopied, copy } = useCopyText(output);
@@ -530,9 +523,12 @@ export function BatchTargetCell({
         position="relative"
         align="stretch"
         gap={2}
-        css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
+        css={{ "&:hover .cell-action-btn, &:focus-within .cell-action-btn": { opacity: 1 } }}
+        {...revealHandlers}
+        aria-label={`Result for ${targetOutput.targetId}, press Enter to expand`}
+        data-testid={`target-cell-${targetOutput.targetId}`}
       >
-        <CellBody {...body} expanded={false} />
+        <CellBody {...body} expanded={false} showActions={isRevealed} />
       </VStack>
 
       {isExpanded && (

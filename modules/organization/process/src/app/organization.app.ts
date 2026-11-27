@@ -27,10 +27,12 @@ import {
   AuditTrailDeniedError,
   isOrganizationApiCustomRole,
   LiteMemberViewerOnlyError,
+  OrganizationNotFoundError,
   OrganizationApi,
   type OrganizationIdPage,
   type OrganizationOperatorSummary,
   type OrganizationIdPageInput,
+  type OrganizationOpsSnapshot,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
@@ -197,6 +199,11 @@ import { OrganizationJoinRequestsService } from "../services/organization-join-r
 import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
 import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
+import {
+  OrganizationMemberListingService,
+  type OrganizationMemberListingPage,
+  type OrganizationMemberListingSenders,
+} from "../services/organization-member-listing.service.ts";
 import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationOperatorDirectoryService } from "../services/organization-operator-directory.service.ts";
@@ -433,6 +440,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizations: setup.repositories.organization,
       membership,
     });
+    application.#memberListing = OrganizationMemberListingService.create({
+      organizations: setup.repositories.organization,
+    });
     application.#privateDataplanes = PrivateDataplaneRecordService.create({
       routes: setup.repositories.privateClickHouseRoutes,
       accounts: setup.repositories.privateS3Accounts,
@@ -651,6 +661,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   #privateDataplanes!: PrivateDataplaneRecordService;
+  #memberListing!: OrganizationMemberListingService;
   #operatorDirectory!: OrganizationOperatorDirectoryService;
   #seatRequests!: SeatRequestService;
   #seatPeak!: SeatPeakService;
@@ -1109,6 +1120,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         admission,
       })
       .catch((error: unknown) => this.#infrastructure.signals.reportError(error));
+    // A held seat is recorded when it is given (admitWaitingMember); a repeat call adds nothing.
+    if (admission.outcome === "created" && !admission.pending) {
+      this.#infrastructure.lifecycle.memberAdmitted({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: admission.seat,
+        via: "create_membership",
+      });
+    }
     return admission;
   }
 
@@ -1169,6 +1189,30 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organizationIds: readonly string[];
   }): Promise<OrganizationOperatorSummary[]> {
     return this.#operatorDirectory.find(input);
+  }
+
+  /** Ids, counts and a creation time only: the snapshot a staff investigation reads (ADR-202). */
+  async getOpsSnapshot(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationOpsSnapshot> {
+    const { organizationId } = input;
+    const row = await this.#operatorDirectory.findRow({ organizationId });
+    if (!row) throw new OrganizationNotFoundError(organizationId);
+    const [members, invites, teams, projectIds] = await Promise.all([
+      this.listMembers({ organizationId, includeDisabled: true, limit: 1 }),
+      this.listPendingInvitations({ organizationId }),
+      this.listTeams({ organizationId, page: 1, limit: 1 }),
+      this.#dependencies.organizations.listProjectIds(organizationId),
+    ]);
+    return {
+      organizationId,
+      createdAt: row.createdAt.epochMilliseconds,
+      membersCount: members.totalCount,
+      pendingInvitesCount: invites.filter(({ displayStatus }) => displayStatus === "PENDING")
+        .length,
+      teamsCount: teams.pagination.total,
+      projectIds: projectIds.toSorted(),
+    };
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {
@@ -1903,6 +1947,22 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {
     this.#infrastructure.lifecycle.connect(senders);
+  }
+
+  /** The member listing's sender, from the same pipeline. */
+  connectMemberListing(senders: OrganizationMemberListingSenders): void {
+    this.#memberListing.connect(senders);
+  }
+
+  /**
+   * The `organization:list-member-facts` step's page: one page of organizations' active members.
+   */
+  listMemberFactsPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<OrganizationMemberListingPage> {
+    return this.#memberListing.listPage(input);
   }
 
   /** organization_audit: audit facts committed with their change; audit-log reacts (§9). */

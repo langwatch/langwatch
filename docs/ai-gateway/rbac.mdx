@@ -24,6 +24,7 @@ The gateway adds its own resources to that model. Provider credentials, the audi
 | `routingPolicies` | Routing policies. | `view`, `manage` |
 | `gatewayGuardrails` | Attaching and detaching guardrails on a key. | `view`, `attach`, `detach`, `manage` |
 | `gatewayCacheRules` | Cache rules, and `/api/gateway/v1/cache-rules*`. | `view`, `create`, `update`, `delete`, `manage` |
+| `gatewayA2aTargets` | The [A2A agents](/ai-gateway/a2a-proxy) the gateway may call, and the upstream headers it sends them. | `view`, `manage` |
 | `gatewayUsage` | The Usage page and `GET /api/gateway/v1/virtual-keys/:id/spend`. | `view` |
 | `gatewaySpend` | Spend events and spend summaries under `/api/gateway/v1/spend-events*`, `/api/gateway/v1/spend-summaries` and `/api/gateway/v1/end-users/:id/spend`. Organization tier only. | `view`, `manage` |
 | `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
@@ -53,6 +54,8 @@ Team roles apply on the teams and projects the binding names. Organization roles
 | `gatewayGuardrails:attach`, `detach`, `manage` | | | yes | |
 | `gatewayCacheRules:view` | yes | yes | yes | |
 | `gatewayCacheRules:create`, `update`, `delete`, `manage` | | | yes | |
+| `gatewayA2aTargets:view` | yes | yes | yes | |
+| `gatewayA2aTargets:manage` | | | yes | |
 | `gatewayUsage:view` | yes | yes | yes | |
 | `auditLog:view` | | | yes | |
 | `gatewaySpend:view`, `manage` | | | | yes |

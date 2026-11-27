@@ -1,5 +1,6 @@
 import type { Named } from "@langwatch/module";
 import { fixed64Schema } from "@langwatch/otlp/trace-request";
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -37,6 +38,7 @@ import {
   piiRedactionLevelSchema,
   recordTraceSpanEventDataSchema,
 } from "./trace-processing.commands.ts";
+import { firstUsableAnchor } from "./trace-storage-anchor.ts";
 
 export {
   isSpanReceivedEvent,
@@ -187,6 +189,22 @@ function parseStartTimeUnixMs(value: unknown): number | null {
 
   if (!Number.isFinite(nano) || nano <= 0) return null;
   return Math.floor(nano / 1e6);
+}
+
+/**
+ * The business time a trace fold's read window also covers (ADR-087 amendment): a span's own
+ * start time, where a backfilled trace's first span filed its row, since a span's occurredAt is
+ * its arrival. Every other event, and a span with no usable start, keeps its occurredAt.
+ */
+export function traceFoldReadAnchorMs(
+  event: { type: string; occurredAt: number; data?: unknown },
+  now: number = nowInstant().epochMilliseconds,
+): number {
+  if (!isSpanReceivedEvent(event)) return event.occurredAt;
+  const span: Partial<SpanReceivedEvent["data"]["span"]> =
+    (event.data as Partial<SpanReceivedEvent["data"]> | undefined)?.span ?? {};
+  const startTimeUnixMs = parseStartTimeUnixMs(span.startTimeUnixNano) ?? undefined;
+  return firstUsableAnchor({ candidates: [startTimeUnixMs, event.occurredAt], now });
 }
 
 /**

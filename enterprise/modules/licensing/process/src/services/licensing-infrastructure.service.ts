@@ -14,7 +14,12 @@ type LicenseFacts = Pick<LicensingCustomerFactsService, "licenseStored" | "licen
 type LicenseRows = OrganizationLicenseReads &
   Pick<
     OrganizationLicenseRepository,
-    "organizationExists" | "findLicense" | "saveLicense" | "clearLicense" | "restoreLicense"
+    | "organizationExists"
+    | "findLicense"
+    | "saveLicense"
+    | "replaceLicense"
+    | "clearLicense"
+    | "restoreLicense"
   >;
 
 type SeatCounts = Readonly<{
@@ -49,6 +54,7 @@ export class LicensingInfrastructureService {
         organizationExists: () => Promise.reject(unavailable()),
         findLicense: () => Promise.reject(unavailable()),
         saveLicense: () => Promise.reject(unavailable()),
+        replaceLicense: () => Promise.reject(unavailable()),
         clearLicense: () => Promise.reject(unavailable()),
         restoreLicense: () => Promise.reject(unavailable()),
       },
@@ -71,6 +77,7 @@ export class LicensingInfrastructureService {
         findOrganizationsWithLicense: () => licenses.findOrganizationsWithLicense(),
         organizationExists: (organizationId) => licenses.organizationExists(organizationId),
         storeLicense: (organizationId, license) => writer.store({ organizationId, license }),
+        replaceLicense: (input) => writer.replace(input),
         removeLicense: (organizationId) => writer.remove({ organizationId }),
         getMemberCount: (organizationId) => options.getMemberCount(organizationId),
         getMembersLiteCount: (organizationId) => options.getMembersLiteCount(organizationId),

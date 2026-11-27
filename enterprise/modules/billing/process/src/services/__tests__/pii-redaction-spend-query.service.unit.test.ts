@@ -36,6 +36,7 @@ describe("given an organization whose two projects spent 1.10 dollars on PII red
     const result = await service.queryPiiRedactionSpendTotal({
       organizationId: "org_1",
       billingMonth: "2026-02",
+      usageBilledSinceMs: null,
     });
 
     expect(result).toEqual({ outcome: "counted", total: 11_000 });
@@ -45,6 +46,22 @@ describe("given an organization whose two projects spent 1.10 dollars on PII red
       fromMs: utcMs("2026-02-01"),
       toMs: utcMs("2026-03-01"),
     });
+  });
+
+  /** @scenario "A PII redaction line added mid-month bills only from that moment" */
+  it("reads from the moment the PII redaction line was added when that is later", async () => {
+    const { service, sumSpendNanoUsdByRequestType } = serviceWith({ nanoUsd: 500_000_000 });
+    const lineAddedAtMs = Date.UTC(2026, 1, 10, 9);
+
+    await service.queryPiiRedactionSpendTotal({
+      organizationId: "org_1",
+      billingMonth: "2026-02",
+      usageBilledSinceMs: lineAddedAtMs,
+    });
+
+    expect(sumSpendNanoUsdByRequestType).toHaveBeenCalledWith(
+      expect.objectContaining({ fromMs: lineAddedAtMs, toMs: utcMs("2026-03-01") }),
+    );
   });
 });
 
@@ -58,6 +75,7 @@ describe("given a deployment with no spend ledger", () => {
       await service.queryPiiRedactionSpendTotal({
         organizationId: "org_1",
         billingMonth: "2026-02",
+        usageBilledSinceMs: null,
       }),
     ).toEqual({ outcome: "unavailable" });
     expect(sumSpendNanoUsdByRequestType).not.toHaveBeenCalled();

@@ -26,11 +26,6 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-/** An OCSF event's fields as a plain record, for the rules that read them by name. */
-export function ocsfEventFields(event: OcsfIngestEvent): Json {
-  return isRecord(event) ? event : {};
-}
-
 /** S3 event notification keys are URL encoded with '+' for a space; EventBridge keys are not. */
 function decodeS3Key(key: string): string {
   try {

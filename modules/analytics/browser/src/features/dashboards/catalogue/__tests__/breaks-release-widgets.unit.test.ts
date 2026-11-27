@@ -24,7 +24,8 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.types).toContain("argMin(");
     expect(sql.rate).toContain("countIf(HasError) / count()");
     expect(sql.changes).toContain("FROM prompt_versions");
-    expect(sql.changes).toContain("FROM model_usage_by_minute");
+    expect(sql.changes).toContain("arrayJoin(Models) AS ChangedModel");
+    expect(sql.changes).not.toContain("model_usage_by_minute");
     expect(code).toContain("<ReferenceLine");
     expect(code).toContain('stackId="bars"');
   });
@@ -77,7 +78,7 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.daily).toContain(
       "GROUP BY sipHash128(TraceId, ifNull(ParentSpanId, ''), if(SpanType = 'llm', 'llm', SpanName))",
     );
-    expect(sql.totals).toContain("sum(CostSum)");
+    expect(sql.totals).toContain("sum(TotalCost) AS cost");
     expect(code).toContain("Cost of the repeats");
     expect(sql.daily).toContain("countIf(unpriced) AS uncosted");
     expect(sql.daily).toContain("countIf(Cost IS NULL AND StatusCode = 2) AS uncosted");
@@ -100,9 +101,10 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.main?.match(/AND SpanType = 'tool'/g)).toHaveLength(5);
     expect(sql.main).toContain("HAVING top_level > 0 AND countIf(ParentSpanId IS NOT NULL) = 0");
     expect(sql.main).not.toContain("SpanAttributes");
-    expect(code).toContain("Tool error rate");
-    expect(code).toContain("Recovered, of ");
-    expect(code).toContain("Worst tool");
+    expect(code).toContain("Tool calls that failed: ");
+    expect(code).toContain("Agent recovered from ");
+    expect(code).toContain('label="Users saw most failures"');
+    expect(code).toContain("const seen = (tool) => tool.failures - tool.recovered;");
   });
 
   /** @scenario "AC64 Where my agent breaks: wrong tool rate reads one named judge" */
@@ -111,7 +113,7 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.trend).toContain("EvaluatorName = 'Tool choice'");
     expect(sql.halves).toContain("EvaluatorName = 'Tool choice'");
     expect(sql.changes).toContain("FROM prompt_versions");
-    expect(code).toContain('Add an evaluator named "Tool choice"');
+    expect(code).toContain('Add a check named "Tool choice"');
     expect(code).toContain('LW.navigate("onlineEvaluations", {})');
   });
 });
@@ -128,7 +130,7 @@ describe("given the Release check widgets", () => {
     expect(sql.costs).toContain("if(c.ScenarioRunId = '', NULL, c.cost) AS cost");
     expect(sql.costs).not.toContain("ifNull(c.cost, 0)");
     expect(code).toContain("Math.min(current, 1 - current)");
-    expect(code).toContain('"Scenarios worse"');
+    expect(code).toContain('"Tests that got worse"');
     expect(code).not.toContain("Hold the newest run");
   });
 
@@ -148,12 +150,7 @@ describe("given the Release check widgets", () => {
     expect(sql.main).toContain("ORDER BY started_at DESC\nLIMIT 5");
     expect(sql.main).toContain("length(s.MetCriteria)");
     expect(code).toContain("runs[Math.min(1, runs.length - 1)]");
-    for (const label of [
-      "Scenarios passed",
-      "Criteria met",
-      "Cost per scenario",
-      "Typical run time",
-    ]) {
+    for (const label of ["Tests passed", "Checks met", "Cost per test", "Typical test time"]) {
       expect(code).toContain(label);
     }
   });
@@ -165,7 +162,15 @@ describe("given the Release check widgets", () => {
     expect(sql.traffic).toContain("subtractDays(after_end, 7) AS before_end");
     expect(sql.checks).toContain("after_even_rate");
     expect(sql.checks).toContain("before_judged * after_passed / after_judged");
-    expect(code).toContain("No prompt or model change in this period to compare around.");
+    expect(sql.traffic).toContain("AppVersion");
+    // evaluation_metrics has its own Model and Version columns: projecting either name in the
+    // change subqueries would make the checks query report them missing on every evaluation.
+    for (const query of [sql.changes, sql.traffic, sql.checks]) {
+      expect(query).not.toMatch(/\b(?:AS |SELECT )(?:Model|Version)\b/);
+    }
+    expect(code).toContain(
+      "No new release, prompt version or model in this period, so nothing to compare.",
+    );
   });
 
   /** @scenario "AC69 Release check: models are compared from experiments that ran them side by side" */
@@ -182,7 +187,7 @@ describe("given the Release check widgets", () => {
     const { code, sql } = buildOf("rag-dataset-versions");
     expect(sql.main).not.toContain("Origin IN");
     expect(sql.main).toContain("weighted_rate");
-    expect(code).toContain("weighted to real traffic");
+    expect(code).toContain("With real traffic's topics");
   });
 
   /** @scenario "AC71 Release check: field accuracy per test run reads two named evaluators" */
@@ -191,6 +196,6 @@ describe("given the Release check widgets", () => {
     expect(sql.main).toContain("EvaluatorName = 'Field precision'");
     expect(sql.main).toContain("EvaluatorName = 'Field recall'");
     expect(sql.main).toContain("LIMIT 12");
-    expect(code).toContain('evaluators named \\"Field precision\\" and \\"Field recall\\"');
+    expect(code).toContain('checks \\"Field precision\\" and \\"Field recall\\"');
   });
 });

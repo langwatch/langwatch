@@ -47,6 +47,10 @@ const VERBATIM_LINES = {
   "the gateway closer":
     "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.",
   "the governance line": "Let me know if I can help you with anything! You can ask here",
+  "the governance opener":
+    "Hi {firstName}, I am Langy. There are two ways to start.\n\nYou can track your own coding agent right now: one command, and in a minute your personal page shows your sessions, tokens and spend. That is also what each person in your company would see.\n\nOr you can connect a company source, like Claude or OpenAI compliance exports, to see AI spend across teams. We set that one up with you on a short call.",
+  "the booking line":
+    "Pick a time that works for you: [Book 20 minutes](https://cal.com/langwatch/meet-the-langwatch-team)\n\nIn the meantime, you can track your own coding agent with one command: `npx langwatch claude`.",
   "the skipped tour line":
     "No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.",
   "the mid-setup line":
@@ -193,7 +197,7 @@ describe("the guided-onboarding skill", () => {
         "a turn whose lines were all said this way ends with no reply text at all",
       );
       expect(rendered).toContain(
-        "The proposal is the one exception: it is the `question` field of its bare question.",
+        "The proposal and the governance opener are the two exceptions: each is the `question` field of its bare question, never said with `say`.",
       );
       // Every verbatim line is introduced by a say instruction, at its moment.
       for (const key of [
@@ -236,16 +240,44 @@ describe("the guided-onboarding skill", () => {
       expect(closingLine).toBeGreaterThan(notify);
     });
 
-    /** @scenario "The governance path ends with one line" */
-    it("closes the governance path with no question and no page opened, then the one line", () => {
+    /** @scenario "The governance path asks how to start, records it, and ends with one line" */
+    it("asks the one start question, records the answer, then closes with the one line", () => {
+      const section = rendered.slice(rendered.indexOf("## governance: Governance"));
+      expect(section).toContain("no page opened, no command on the pages");
+      expect(section).not.toContain("langwatch navigate");
+      expect(section).toContain("Ask with the `question` tool with `bare: true`");
+      expect(section.match(/`question` tool/g)).toHaveLength(1);
+
+      const opener = section.indexOf(VERBATIM_LINES["the governance opener"]);
+      const coding = section.indexOf('1. "Track my coding agent"');
+      const call = section.indexOf('2. "Book a call for the company setup"');
+      const recordCoding = section.indexOf(
+        '`langwatch onboarding start coding` on "Track my coding agent"',
+      );
+      const recordCall = section.indexOf(
+        '`langwatch onboarding start call` on "Book a call for the company setup"',
+      );
+      const close = section.indexOf("langwatch onboarding complete-path governance");
+      const line = section.indexOf(VERBATIM_LINES["the governance line"]);
+      expect(opener).toBeGreaterThan(-1);
+      expect(coding).toBeGreaterThan(opener);
+      expect(call).toBeGreaterThan(coding);
+      expect(recordCoding).toBeGreaterThan(call);
+      expect(recordCall).toBeGreaterThan(call);
+      expect(close).toBeGreaterThan(recordCall);
+      expect(line).toBeGreaterThan(close);
+    });
+
+    /** @scenario "The governance call start is a choice, never a booking" */
+    it("records a call as the choice of one, forbids calling it booked, and hands over the link", () => {
       const section = rendered.slice(rendered.indexOf("## governance: Governance"));
       expect(section).toContain(
-        "this path has no setup of its own: no question, no page opened, no command on the pages",
+        '"call" means the person chose the call, not that a call is booked: nothing books it, so never say or imply that a call is booked, scheduled or confirmed, or that someone will reach out.',
       );
-      expect(section).not.toContain("`question`");
-      expect(section).not.toContain("langwatch navigate");
-      expect(section).toContain(VERBATIM_LINES["the governance line"]);
-      expect(section.indexOf(VERBATIM_LINES["the governance line"])).toBeGreaterThan(
+      expect(section).toContain("The command records the choice and nothing else.");
+      const booking = section.indexOf(VERBATIM_LINES["the booking line"]);
+      expect(booking).toBeGreaterThan(section.indexOf("`langwatch onboarding start call`"));
+      expect(booking).toBeLessThan(
         section.indexOf("langwatch onboarding complete-path governance"),
       );
     });

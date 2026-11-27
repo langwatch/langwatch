@@ -664,6 +664,32 @@ Rule: Categorical facet selection logic
     When the user checks "Error" and "Warning" under Status and "gpt-4o" under Model
     Then the query is "(@status:error OR @status:warning) AND @model:gpt-4o"
 
+  @unit
+  Scenario: A value a group in the search bar makes optional is marked as in group
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" or "@status:error OR @model:gpt-5-mini"
+    Then the "Error" row under Status and the "gpt-5-mini" row under Model are neither included nor excluded
+    And each says "in group", titled "Part of a group in the search bar" and then what a click does
+    And clicking such a row does what it did before
+
+  @unit
+  Scenario: Values every result must match keep their include or exclude mark
+    When the user searches for "@status:error AND @model:gpt-5-mini", "NOT (@status:error OR @model:gpt-5-mini)" or "@status:error OR @status:warning"
+    Then each named row shows include or exclude as before, with no "in group" label
+
+  @unit
+  Scenario: The exclude button on a row in a group says what a click does
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" and hovers the "Error" row
+    Then its exclude button reads "Remove Error from the group" and is not pressed, because a click removes "Error" from that group, which can widen or narrow what it hides
+    And the same holds for "NOT (@evaluator:abc AND @evaluatorVerdict:fail)" and the "gpt-5-mini" row of "@status:error AND NOT (@status:error AND @model:gpt-5-mini)"
+    And on a row in a group the query names plainly, as in "@status:error OR @model:gpt-5-mini", the button reads "Exclude <value>", because a click excludes it from every result
+
+  @unit
+  Scenario: Attribute, metadata and event rows a group makes optional also say in group
+    When a group in the search bar makes an attribute, metadata or event value optional, as "NOT (@status:error AND @attribute.metadata.customer:acme)" does for the "acme" row under Metadata
+    Then its row in the sidebar says "in group" and is neither included nor excluded
+    And its title and accessible name say what a click does: "remove from the group" for a negated term, "exclude" for a plain one
+    And clicking it does what it did before
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RANGE FACETS
@@ -1647,6 +1673,36 @@ Rule: Enter routes a sentence
     When the router runs
     Then the query is `service:api AND "cannot connect to database"`
     And no model is called
+
+  # A question is never a literal string to look for: nobody types "Was the
+  # customer frustrated?" hoping a trace contains those words.
+  @unit
+  Scenario: A question the classifier or the model calls a phrase is judged instead
+    Given Instant Evals are available for the project
+    And the classifier, or the model without one, answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the result is an Instant Eval on that question, rewritten by the FAST model like any judgement
+    And a sentence that is not a question, such as "cannot connect to database", is still searched as one phrase
+
+  @unit
+  Scenario: A question no model could route is judged as typed
+    Given Instant Evals are available for the project
+    And no classifier answered and the FAST model fails or is not configured
+    When the user submits "Was the customer frustrated?"
+    Then the result is an Instant Eval whose question is "Was the customer frustrated?"
+    And it says the model failed, as a judgement without a model does
+
+  @unit
+  Scenario: A question stays a phrase search while Instant Evals are unavailable
+    Given Instant Evals are not available for the project
+    And the classifier answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+
+  @unit
+  Scenario: A sentence reads as a question when it asks one
+    Then "Was the customer frustrated?" and "did the agent call the refund tool" read as questions
+    And "cannot connect to database", "how", "is" and "?" do not
 
   @unit
   Scenario: A question for the assistant goes to Langy with the view attached

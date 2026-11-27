@@ -27,6 +27,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { UserApi } from "@langwatch/user-contract";
@@ -85,6 +86,7 @@ async function relayRoute() {
       onboarding: createApiFixture<OnboardingApi>(),
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
+      storedObjects: createApiFixture<StoredObjectApi>(),
     },
     config: {
       agentUrl: undefined,

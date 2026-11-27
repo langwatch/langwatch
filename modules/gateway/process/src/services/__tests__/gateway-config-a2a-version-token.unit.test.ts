@@ -9,6 +9,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { memoryProjectWithTeam } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { memoryGatewayService } from "../../__tests__/support/memory.gateway-service.ts";
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
 import { MemoryGatewayA2aTargetRepository } from "../../repositories/memory/memory.gateway-a2a-target.repository.ts";
@@ -31,6 +32,14 @@ const assembly: GatewayConfigAssembly = {
   buildCredentials: notReached,
 };
 
+/** A directory placing every project in the key's organization, as a target write checks. */
+function projectsOf(organizationId: string): ProjectApi {
+  return createApiFixture<ProjectApi>({
+    findWithTeam: async (projectId) =>
+      memoryProjectWithTeam({ projectId, teamId: `team_${projectId}`, organizationId }),
+  });
+}
+
 describe("GatewayConfigMaterialiserService.versionToken", () => {
   describe("given a key whose trace project no longer resolves", () => {
     /** @scenario "the config version token reads the same A2A targets as the bundle" */
@@ -48,6 +57,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
         repository: MemoryGatewayA2aTargetRepository.create(),
         changeEvents: MemoryGatewayChangeEventsRepository.create(),
         auditLog: { append: async () => {} },
+        projects: projectsOf(vk.organizationId),
         transactions: { run: (work) => work({}) },
       });
       await a2aTargets.create({ ...target, projectId: null });
@@ -65,7 +75,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
         projects,
         chRepo: null,
         budgetDecisions: memoryGatewayService({ store, projects }).service,
-        modelProviders: createApiFixture<ModelProviderApi>(),
+        modelProviders: createApiFixture<ModelProviderApi>({ getGatewayKeysEpoch: () => "" }),
         assembly,
         a2aTargets,
       });
@@ -90,6 +100,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
         repository: MemoryGatewayA2aTargetRepository.create(),
         changeEvents: MemoryGatewayChangeEventsRepository.create(),
         auditLog: { append: async () => {} },
+        projects: projectsOf(vk.organizationId),
         transactions: { run: (work) => work({}) },
       });
       await a2aTargets.create({
@@ -119,7 +130,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
         projects,
         chRepo: null,
         budgetDecisions: memoryGatewayService({ store, projects }).service,
-        modelProviders: createApiFixture<ModelProviderApi>(),
+        modelProviders: createApiFixture<ModelProviderApi>({ getGatewayKeysEpoch: () => "" }),
         assembly,
         a2aTargets,
       });

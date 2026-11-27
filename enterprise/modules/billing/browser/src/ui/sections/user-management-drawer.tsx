@@ -75,6 +75,7 @@ const SEAT_BADGE: Record<MemberType, { tone: string; label: string }> = {
   FullMember: { tone: "blue", label: "Full Member" },
   LiteMember: { tone: "yellow", label: "Lite Member" },
   Developer: { tone: "teal", label: "Developer" },
+  BillingOnly: { tone: "gray", label: "Billing only" },
 };
 
 const PRICE_FAILED = "The price for this change did not load";

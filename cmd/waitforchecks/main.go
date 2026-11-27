@@ -1,5 +1,5 @@
-// Command waitforchecks blocks until every other check run on a commit has
-// finished and none failed, for the review job of pr.yml.
+// Command waitforchecks blocks until the checks a branch requires have
+// finished on a commit and none failed, for the review job of pr.yml.
 //
 // Usage:
 //
@@ -7,6 +7,8 @@
 //
 // It reads GITHUB_REPOSITORY, SHA and GH_TOKEN, and the name of the check to
 // ignore (the caller's own) from EXCLUDE_CHECK. All four are required.
+// REQUIRED_FROM_BRANCH (the pull request's base) limits the wait to the
+// checks that branch's rules require; unset, it waits on every check.
 //
 // Spec: specs/ci/pr-review-bot.feature
 package main
@@ -28,6 +30,7 @@ func main() {
 		SHA:        os.Getenv("SHA"),
 		Token:      os.Getenv("GH_TOKEN"),
 		Exclude:    os.Getenv("EXCLUDE_CHECK"),
+		Branch:     os.Getenv("REQUIRED_FROM_BRANCH"),
 		HTTP:       &http.Client{Timeout: 30 * time.Second},
 		Interval:   30 * time.Second,
 		Timeout:    45 * time.Minute,

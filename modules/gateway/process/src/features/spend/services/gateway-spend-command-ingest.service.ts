@@ -29,6 +29,7 @@ import {
   providerUsageCommandData,
   rejectedRecordIdentity,
 } from "../../../rules/gateway-spend-command.rules.ts";
+import type { GatewayGovernanceEventsService } from "../../../services/gateway-governance-events.service.ts";
 import type {
   GatewayInternalSpendPipeline,
   GatewaySpendCommandSender,
@@ -44,6 +45,8 @@ type GatewaySpendCommandIngestMembers = Readonly<{
   projects: Pick<ProjectApi, "listNamesByIds" | "findWithTeam">;
   /** The stored provider row a platform call ran on, when its caller did not name one. */
   providerRows?: Pick<ModelProviderApi, "findRowServingModel" | "getExecutionProviders">;
+  /** Records a key's first admitted request; absent records none. */
+  firstRequests?: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest">;
 }>;
 
 export class GatewaySpendCommandIngestService {
@@ -62,6 +65,8 @@ export class GatewaySpendCommandIngestService {
     await enrichAttributedCommands({
       store: this.members.store,
       projects: this.members.projects,
+      // Only an admission can be a key's first request.
+      firstRequests: perCommand.admitSpend.length > 0 ? this.members.firstRequests : undefined,
       admits: perCommand.admitSpend,
       outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
     });
@@ -290,6 +295,7 @@ type AttributionVirtualKey = {
   id: string;
   organizationId: string;
   principalUserId: string | null;
+  traceProjectId: string | null;
   lastUsedAt: Instant | null;
 };
 
@@ -313,6 +319,23 @@ async function touchAdmittedVirtualKeys(
   // billing records over it would cost the drainer a retry of records that
   // already appended.
   await store.touchVirtualKeysLastUsed({ virtualKeyIds: staleIds, now });
+}
+
+/**
+ * An admitted key whose `lastUsedAt` is still empty is serving its first request. Best effort
+ * like the touch: the recorder logs its own failure, and its idempotency key makes two batches
+ * that both saw the key unused record it once.
+ */
+async function recordFirstRequests(
+  firstRequests: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest"> | undefined,
+  virtualKeys: AttributionVirtualKey[],
+): Promise<void> {
+  if (!firstRequests) return;
+  await Promise.all(
+    virtualKeys
+      .filter((vk) => vk.lastUsedAt === null)
+      .map((vk) => firstRequests.recordVkFirstRequest(vk)),
+  );
 }
 
 /**
@@ -351,11 +374,13 @@ function reportAttributionGaps({
 async function enrichAttributedCommands({
   store,
   projects: projectDirectory,
+  firstRequests,
   admits,
   outcomes,
 }: {
   store: GatewayInternalStoreRepository;
   projects: Pick<ProjectApi, "listNamesByIds">;
+  firstRequests: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest"> | undefined;
   admits: Record<string, unknown>[];
   outcomes: Record<string, unknown>[];
 }): Promise<void> {
@@ -397,11 +422,9 @@ async function enrichAttributedCommands({
   // a second time, so touching on both would double the writes to say the same
   // thing.
   const admittedKeyIds = new Set(identities.slice(0, admits.length).map((i) => i.virtualKeyId));
-  await touchAdmittedVirtualKeys(
-    store,
-    virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
-    nowInstant(),
-  );
+  const admittedKeys = virtualKeys.filter((vk) => admittedKeyIds.has(vk.id));
+  await recordFirstRequests(firstRequests, admittedKeys);
+  await touchAdmittedVirtualKeys(store, admittedKeys, nowInstant());
 }
 
 /**

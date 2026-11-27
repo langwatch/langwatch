@@ -230,6 +230,7 @@ function installation({
             protections: { catalogue: { permissions: [] } },
           }),
           validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
+          validateLangWatchQLForRun: async () => ({ parameters: [], appFunctions: [] }),
           describeLangWatchQLJudgements: () => [JUDGEMENT],
           executeLangWatchQLPass: async () => execution([]),
           ...analytics,
@@ -270,7 +271,8 @@ function installation({
           isEnabled: async (flagKey) =>
             flagKey === INSTANT_EVALS_HOSTED_DISABLED_FLAG ? isHostedOff : isReleased,
         }),
-        // A project runs on LangWatch Evals Preview unless a test names its own model (ADR-182).
+        // A project runs on LangWatch Instant (preview) unless a test names its own model
+        // (ADR-182).
         "model-provider": createApiFixture<ModelProviderApi>({
           resolveDecisionModel: async () => decisionModel,
         }),
@@ -522,7 +524,7 @@ describe("given a process that installs Instant Evals over the memory tier", () 
     it("hands the gate each target's statement with every parameter it declares bound", async () => {
       const gated: { sql: string; parameters: Record<string, unknown> }[] = [];
       const analytics: Partial<AnalyticsApi> = {
-        validateLangWatchQL: ({ sql, parameters = {} }) => {
+        validateLangWatchQLForRun: async ({ sql, parameters = {} }) => {
           const declared = [...sql.matchAll(/\{(\w+):/g)].map((match) => match[1] ?? "");
           const unbound = declared.filter((name) => !(name in parameters));
           if (unbound.length > 0) throw new Error(`unbound parameters: ${unbound.join(", ")}`);
@@ -946,7 +948,7 @@ describe("given an organization LangWatch switched its hosted model off for", ()
     });
   });
 
-  describe("when a project on Evals Preview has text classified", () => {
+  describe("when a project on LangWatch Instant (preview) has text classified", () => {
     it("skips as not configured and never reaches LangWatch's classifier", async () => {
       const leaf = judgeLeaf();
 

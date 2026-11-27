@@ -142,6 +142,37 @@ describe("given a query over a view that keeps an origin", () => {
     );
   });
 
+  it("leaves a select that reads the parameter itself as written, but not a select nested in it", () => {
+    const sql = readSources(
+      "SELECT t FROM trace_metrics WHERE x NOT IN (SELECT x FROM trace_metrics) " +
+        `GROUP BY t HAVING countIf(Source NOT IN ${SOURCES}) = 0`,
+    );
+
+    expect(sql).toBe(
+      `SELECT t FROM trace_metrics WHERE x NOT IN (SELECT x FROM trace_metrics WHERE trace_metrics.Source IN ${SOURCES}) ` +
+        `GROUP BY t HAVING countIf(Source NOT IN ${SOURCES}) = 0`,
+    );
+  });
+
+  it("refuses a direct join of a trace view in a select that reads the parameter itself", () => {
+    expect(() =>
+      readSources(
+        "SELECT t FROM trace_metrics JOIN spans ON a = b " +
+          `GROUP BY t HAVING countIf(Source NOT IN ${SOURCES}) = 0`,
+      ),
+    ).toThrow("joins spans directly");
+  });
+
+  it("keeps a select to the sources when only a select nested in it reads the parameter", () => {
+    const sql = readSources(
+      `SELECT n FROM trace_metrics WHERE a IN (SELECT a FROM numbers WHERE has(${SOURCES}, a))`,
+    );
+
+    expect(sql).toBe(
+      `SELECT n FROM trace_metrics WHERE trace_metrics.Source IN ${SOURCES} AND ( a IN (SELECT a FROM numbers WHERE has(${SOURCES}, a)))`,
+    );
+  });
+
   /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("keeps the Source column in the list on evaluation_metrics too", () => {
     expect(readSources("SELECT 1 FROM evaluation_metrics GROUP BY x")).toBe(

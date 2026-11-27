@@ -20,6 +20,13 @@ Feature: A failed turn of the guided onboarding conversation reaches PostHog thr
     Then PostHog tracks "guided_onboarding_turn_failed" without the experiment property
 
   @unit
+  Scenario: A failed guided turn of an erased user is not tracked
+    Given the conversation's user was erased
+    When langy's failed-turn fact for them lands afterwards
+    Then PostHog tracks nothing
+    And Customer.io is told nothing
+
+  @unit
   Scenario: A redelivered failed-turn fact is tracked once
     Given langy recorded a failed turn of the guided conversation
     When nurturing handles the same fact twice

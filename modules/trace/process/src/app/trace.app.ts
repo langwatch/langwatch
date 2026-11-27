@@ -78,6 +78,7 @@ import {
   type SharedTraceDto,
   type Span,
   type SpanAnalyticsFloor,
+  type TraceManagedPromptVersionFloor,
   type SpanDetail,
   type BraidActivity,
   type BraidAttributeKeys,
@@ -159,6 +160,8 @@ import {
   type TraceModelSpend,
   type TraceModelSpendWindow,
   type TraceSpendSummary,
+  type TraceIngestionCount,
+  type TracePresence,
   type TraceUsageCount,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
@@ -184,6 +187,7 @@ import {
   type TraceTopicClusteringPageInput,
   type TraceServerConfig,
   traceConfig,
+  DEFAULT_OTLP_TRACES_MAX_BODY_BYTES,
   TraceIdAmbiguousError,
   TraceNotFoundError,
   type TraceListTracesInput,
@@ -193,6 +197,8 @@ import {
   type TraceReadOrderedSpansInput,
   type TraceReadThreadTracesInput,
   type TraceReadThreadsTracesInput,
+  type TraceReadThreadsTraceIdsInput,
+  type ThreadTraceIds,
   type TraceReadSampleTracesInput,
   TrackedEventInvalidError,
   trackEventRESTParamsValidatorSchema,
@@ -292,6 +298,7 @@ import { TraceEdgeSpoolService } from "../features/ingestion/services/trace-edge
 import { TraceIngestAllowanceService } from "../features/ingestion/services/trace-ingest-allowance.service.ts";
 import { TraceIngestCredentialService } from "../features/ingestion/services/trace-ingest-credential.service.ts";
 import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
+import { TraceIngestionCountService } from "../features/ingestion/services/trace-ingestion-count.service.ts";
 import {
   TraceIngestionService,
   type CodingAgentIngestFilter,
@@ -330,11 +337,21 @@ import {
   TraceLegacyReadService,
   type BlobResolutionDeps,
 } from "../features/legacy/services/trace-legacy-read.service.ts";
-import { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import {
+  spoolReadCapBytes,
+  TraceBlobStoreService,
+} from "../features/media/services/trace-blob-store.service.ts";
 import { TraceEdgeMediaPayloadService } from "../features/media/services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../features/media/services/trace-edge-media-telemetry.service.ts";
+import {
+  TraceMediaOwnerLinkBackfillService,
+  type TraceMediaOwnerLinkOutcome,
+} from "../features/media/services/trace-media-owner-link-backfill.service.ts";
+import {
+  TRACE_CONTENT_MEDIA,
+  TraceMediaStoreService,
+} from "../features/media/services/trace-media-store.service.ts";
 import { TraceScenarioEventMediaService } from "../features/media/services/trace-scenario-event-media.service.ts";
-import { TraceStoredMediaStoreService } from "../features/media/services/trace-stored-media-store.service.ts";
 import {
   IO_PREVIEW_BYTES,
   utf8Preview,
@@ -435,6 +452,7 @@ import {
   TraceEvaluationOutcomesMigrationService,
 } from "../services/trace-evaluation-outcomes-migration.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
+import { TraceManagedPromptVersionFloorService } from "../services/trace-managed-prompt-version-floor.service.ts";
 import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
@@ -1054,7 +1072,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         braidPlans: dependencies.plans,
         braidSettings: dependencies.authz,
         braidDirectory: { authz: dependencies.authz, projects: dependencies.projects },
-        ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
+        ingestAllowance: TraceIngestAllowanceService.create({
+          entitlement: dependencies.plans,
+          refusals: repositories.planLimitRefusals,
+        }),
         exportBounds: TraceExportBoundsService.create({
           entitlement: dependencies.plans,
           projects: dependencies.projects,
@@ -1079,8 +1100,15 @@ export class TraceModule implements TraceApi, CollectorApp {
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
+    app.#ingestionCounts = TraceIngestionCountService.create({
+      existence: setup.repositories.existence,
+      refusals: setup.repositories.planLimitRefusals,
+    });
     app.#agentTraffic = setup.repositories.agentTraffic;
     app.#spanAnalyticsFloor = setup.repositories.spanAnalyticsFloor;
+    app.#managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({
+      ledger: setup.repositories.managedPromptVersionLedger,
+    });
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
       evaluators: setup.dependencies.evaluators,
@@ -1099,6 +1127,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       resolve: (tenantId) =>
         setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
     };
+    app.#otlpTracesMaxBodyBytes = setup.config.otlpTracesMaxBodyBytes;
+    app.#mediaOwnerLinks = TraceMediaOwnerLinkBackfillService.create({
+      storedObjects: setup.dependencies.storedObjects,
+      retention: setup.dependencies.dataRetention,
+    });
     app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
     const authorizeFoldRead = foldReadAuthorizer({
       authz: setup.dependencies.authz,
@@ -1154,10 +1187,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     channels: Pick<TraceSetup["channels"], "legacySpool">;
     config: Pick<
       TraceSetup["config"],
-      "objectRetentionConfirmed" | "legacySpoolRetentionConfirmed"
+      "objectRetentionConfirmed" | "legacySpoolRetentionConfirmed" | "otlpTracesMaxBodyBytes"
     >;
   }): TraceBlobStoreService {
     return TraceBlobStoreService.create({
+      maxSpoolBytes: spoolReadCapBytes({ maxBodyBytes: config.otlpTracesMaxBodyBytes }),
       legacySpool: channels.legacySpool,
       payloads: repositories.eventPayloads,
       spoolStorage: {
@@ -1196,7 +1230,11 @@ export class TraceModule implements TraceApi, CollectorApp {
             hasContentDropRules: (projectId) =>
               options.protections.dataPrivacy.dropsAnyContent({ projectId }),
             telemetry: TraceEdgeMediaTelemetryService.create(),
-            service: TraceStoredMediaStoreService.create(options.storedObjects),
+            store: TraceMediaStoreService.create({
+              storedObjects: options.storedObjects,
+              purpose: TRACE_CONTENT_MEDIA,
+              retention: options.dataRetention,
+            }),
           },
           logger: createLogger("langwatch:traces:edge-media-extraction"),
           next: edgeSpool,
@@ -1465,15 +1503,19 @@ export class TraceModule implements TraceApi, CollectorApp {
   #milestones: TraceProjectMilestonesService | null = null;
   #traceMonthIds: TraceMonthIdsMigrationService | null = null;
   #evaluationOutcomesBackfill: TraceEvaluationOutcomesMigrationService | null = null;
+  #mediaOwnerLinks: TraceMediaOwnerLinkBackfillService | null = null;
   #retention: RetentionPolicyResolver | null = null;
+  #otlpTracesMaxBodyBytes = DEFAULT_OTLP_TRACES_MAX_BODY_BYTES;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
+  #ingestionCounts: TraceIngestionCountService | null = null;
   #agentTraffic: TraceAgentTrafficRepository | null = null;
   #spanAnalyticsFloor: SpanAnalyticsFloorRepository | null = null;
+  #managedPromptVersionFloor = TraceManagedPromptVersionFloorService.create({ ledger: null });
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
   readPreconditionSampleTraces(
@@ -1518,6 +1560,17 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the month trace ids migration");
     }
     return this.#traceMonthIds.sendMonthTraceIds(input);
+  }
+
+  /** Links one project's trace media stored before owner links, for the upgrade step. */
+  linkUnownedTraceMedia(input: {
+    tenantId: string;
+    signal?: AbortSignal;
+  }): Promise<TraceMediaOwnerLinkOutcome> {
+    if (!this.#mediaOwnerLinks) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace media owner links");
+    }
+    return this.#mediaOwnerLinks.linkProject(input);
   }
 
   /** Records the last 62 days of evaluation outcomes on their traces, for the upgrade step. */
@@ -1817,6 +1870,10 @@ export class TraceModule implements TraceApi, CollectorApp {
   async getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor> {
     const records = this.#spanAnalyticsFloor ? await this.#spanAnalyticsFloor.findReplayStep() : [];
     return spanAnalyticsFloorOf(records);
+  }
+
+  getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor> {
+    return this.#managedPromptVersionFloor.getFloor();
   }
 
   async renderSpanMessages(input: {
@@ -2230,6 +2287,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const protections = await this.resolveApiKeyProtections({
       projectId: input.projectId,
       principal: input.principal,
+      authorization: input.authorization,
     });
     const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
     const result = await this.readFacetValues({
@@ -2458,6 +2516,17 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
     });
   }
+  async readThreadsTraceIds(input: TraceReadThreadsTraceIdsInput): Promise<ThreadTraceIds[]> {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
+
+    return this.#contentReader.readThreadsTraceIds({
+      ...input,
+      authorization: await this.#authorizeContentRead({
+        projectId: input.projectId,
+        route: "TraceApi.readThreadsTraceIds",
+      }),
+    });
+  }
   async readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]> {
     const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
 
@@ -2493,10 +2562,25 @@ export class TraceModule implements TraceApi, CollectorApp {
   resolveApiKeyProtections(input: {
     projectId: string;
     principal: PrincipalRef | null;
+    authorization?: Authorization;
   }): Promise<Protections> {
     if (!this.#dependencies.protections)
       throw new Error("Trace protections service is unavailable");
     return this.#dependencies.protections.resolveForApiKey(input);
+  }
+
+  /** A credential's read of another project: an access token is capped at its own project. */
+  #publicProtectionsElsewhere(input: {
+    projectId: string;
+    principal: PrincipalRef | null;
+  }): Promise<Protections> {
+    if (!this.#dependencies.protections)
+      throw new Error("Trace protections service is unavailable");
+    return this.#dependencies.protections.resolveForApiKey({
+      projectId: input.projectId,
+      principal: input.principal,
+      readsAsPerson: false,
+    });
   }
 
   /**
@@ -3809,6 +3893,21 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#modelSpend;
   }
 
+  countIngestionByProject(input: {
+    projectIds: string[];
+    since: number;
+    until: number;
+  }): Promise<TraceIngestionCount[]> {
+    if (!this.#ingestionCounts) {
+      throw new TraceCapabilityUnavailableError("this process", "the ingestion count read");
+    }
+    return this.#ingestionCounts.countIngestionByProject(input);
+  }
+
+  findTracePresence(input: { projectId: string; traceId: string }): Promise<TracePresence[]> {
+    return this.#dependencies.traces.existence.findTracePresence(input);
+  }
+
   #usageCountRead(): TraceUsageCountRepository {
     if (!this.#usageCount) {
       throw new TraceCapabilityUnavailableError("this process", "the trace count read");
@@ -4022,6 +4121,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           ...input,
           projectId: located.project.id,
           projectSlug: located.project.slug,
+          outsideOwnProject: true,
         });
         return {
           ...served,
@@ -4048,8 +4148,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     format: "digest" | "json";
     projectSlug: string;
     principal: PrincipalRef | null;
+    outsideOwnProject?: boolean;
   }): Promise<Record<string, unknown>> {
-    const protections = await this.resolveApiKeyProtections(input);
+    const protections = input.outsideOwnProject
+      ? await this.#publicProtectionsElsewhere(input)
+      : await this.resolveApiKeyProtections(input);
     const trace = await this.#getTraceByIdOrPrefix({
       ...input,
       protections,
@@ -4494,6 +4597,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     }
 
     return this.#dependencies.ingestCredential.resolveForOtlp(input);
+  }
+
+  otlpTracesMaxBodyBytes(): number {
+    return this.#otlpTracesMaxBodyBytes;
   }
 
   otlpMarkCredentialUsed(input: { apiKeyId: string }): void {

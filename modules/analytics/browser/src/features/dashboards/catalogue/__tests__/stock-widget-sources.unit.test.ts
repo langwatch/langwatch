@@ -4,16 +4,19 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC202, AC202b, AC202c, AC202f
  */
 
-import { DEFAULT_WIDGET_SOURCES, TRACE_SOURCES } from "@langwatch/analytics-contract";
+import {
+  DEFAULT_WIDGET_SOURCES,
+  readsSourcesParameter,
+  TRACE_SOURCES,
+} from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
+import { namedViews, PRESENCE_QUERY, VIEWS_WITH_ORIGIN } from "../../model/sources-parameter.ts";
 import {
-  namedViews,
-  PRESENCE_QUERY,
-  readsSourcesParameter,
-  VIEWS_WITH_ORIGIN,
-} from "../../model/sources-parameter.ts";
-import { SOURCES_DO_NOT_APPLY_LINE, widgetSourcesLine } from "../../model/widget-sources.ts";
+  SOURCES_DO_NOT_APPLY_LINE,
+  widgetCardSourcesLine,
+  widgetSourcesLine,
+} from "../../model/widget-sources.ts";
 import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../index.ts";
 
 const widgets = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
@@ -58,6 +61,12 @@ describe("given the stock widgets of the catalogue", () => {
     expect(
       readsSourcesParameter("SELECT 1 WHERE Source IN {dashboard_context_sources:Array(String)}"),
     ).toBe(true);
+    expect(
+      readsSourcesParameter(
+        "SELECT '--' AS label FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}",
+      ),
+    ).toBe(true);
+    expect(namedViews("SELECT '--' AS label FROM trace_metrics")).toEqual(["trace_metrics"]);
   });
 
   /** @scenario "AC202b Stock widgets: each stock widget declares its own list of sources" */
@@ -91,7 +100,7 @@ describe("given the stock widgets of the catalogue", () => {
     }
   });
 
-  /** @scenario "AC202f Stock widgets: a widget that reads a view with no origin says that sources do not apply" */
+  /** @scenario "AC202f Stock widgets: a widget that reads a view with no origin stores no sources and its editor says they do not apply" */
   it("says sources do not apply on a widget none of whose queries reads them", () => {
     const none = widgets.filter(({ definition }) =>
       definition.queries.every(
@@ -105,10 +114,45 @@ describe("given the stock widgets of the catalogue", () => {
     }
   });
 
+  /** @scenario "AC240b Card sources line: a widget whose views keep no origin shows no sources line" */
+  it("shows no sources line on the card of a widget none of whose queries reads them", () => {
+    const none = widgets.filter(({ definition }) =>
+      definition.queries.every(
+        ({ name, sql }) => name === PRESENCE_QUERY || !readsSourcesParameter(sql),
+      ),
+    );
+
+    for (const { key, definition } of none) {
+      expect(widgetCardSourcesLine(definition.queries), key).toBe("");
+    }
+  });
+
   /** @scenario "AC202b Stock widgets: each stock widget declares its own list of sources" */
   it("no longer exports the shared catalogue sources constant", async () => {
     const module = await import("../../templates/model/template-widget.ts");
 
     expect(module).not.toHaveProperty("CATALOGUE_QUERY_SOURCES");
+  });
+});
+
+/** The views that keep no origin, so a widget reading them would count every source. */
+const ORIGIN_LESS_ROLLUPS = ["model_usage_by_minute", "trace_metrics_by_minute"];
+
+describe("given a stock widget that keeps to its sources", () => {
+  /** @scenario "A widget that keeps to its sources reads no view without an origin" */
+  it("reads no per-minute rollup in any of its queries", () => {
+    const keeping = widgets.filter(({ definition }) =>
+      definition.queries.some(({ sql }) => readsSourcesParameter(sql)),
+    );
+
+    expect(keeping.length).toBeGreaterThan(0);
+    for (const { key, definition } of keeping) {
+      for (const { name, sql } of definition.queries.filter((q) => q.name !== PRESENCE_QUERY)) {
+        expect(
+          namedViews(sql).filter((view) => ORIGIN_LESS_ROLLUPS.includes(view)),
+          `${key}/${name}`,
+        ).toEqual([]);
+      }
+    }
   });
 });

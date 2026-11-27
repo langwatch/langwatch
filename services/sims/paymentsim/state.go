@@ -472,6 +472,7 @@ var catalogMeterEvents = map[string]string{
 // catalogMetered are priced per unit yet metered, on the named meter; the file does not say so.
 var catalogMetered = map[string]string{
 	"CONNECTED_HOSTED_USAGE_QUARTERLY": "BILLABLE_EVENTS",
+	"GROWTH_INSTANT_EVAL_USD":          "INSTANT_EVAL_USD",
 	"GROWTH_PII_REDACTION_USD":         "PII_REDACTION_USD",
 	"RETENTION_STORAGE_EUR_MONTHLY":    "RETENTION_STORAGE_GB",
 	"RETENTION_STORAGE_EUR_ANNUAL":     "RETENTION_STORAGE_GB",

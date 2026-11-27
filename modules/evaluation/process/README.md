@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:54`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:55`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -112,6 +112,14 @@ The seven-day trend of every monitor the project has; none when it has no monito
 
 ```typescript
 findMonitorPerformance(input: MonitorPerformanceForProjectInput): Promise<OnlineEvaluationPerformance[]>;
+```
+
+#### `countEvaluatorOutcomes`
+
+Online evaluator runs scheduled in `[since, until)` per project: counts and codes only.
+
+```typescript
+countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]>;
 ```
 
 #### `runEvaluator`
@@ -255,9 +263,9 @@ Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluat
 interface Params {
   evaluator: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:189
+// Body: inline, src/transport/evaluations-legacy.rest.ts:190
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:194
+// Response: inline, src/transport/evaluations-legacy.rest.ts:195
 type Response = unknown;
 ```
 
@@ -265,7 +273,7 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:218`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:219`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
@@ -275,9 +283,9 @@ interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:226
+// Body: inline, src/transport/evaluations-legacy.rest.ts:228
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:231
+// Response: inline, src/transport/evaluations-legacy.rest.ts:233
 type Response = unknown;
 ```
 
@@ -285,15 +293,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:255`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:257`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:17
-// Body: inline, src/transport/evaluations-legacy.rest.ts:259
+// Body: inline, src/transport/evaluations-legacy.rest.ts:262
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:262
+// Response: inline, src/transport/evaluations-legacy.rest.ts:265
 type Response = unknown;
 ```
 
@@ -303,14 +311,14 @@ type Response = unknown;
 
 Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluation.trpc.ts:10`.
 
-| Procedure                                     | Kind     | Gate                                            | Input                                     | Output                       |
-| --------------------------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- |
-| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
-| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | inline                       |
-| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                 | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
-| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
-| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
-| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                        | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
+| Procedure                                     | Kind     | Gate                                             | Input                                     | Output                       |
+| --------------------------------------------- | -------- | ------------------------------------------------ | ----------------------------------------- | ---------------------------- |
+| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                    | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
+| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                    | `evaluationProjectScopeSchema`            | inline                       |
+| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                  | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
+| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                    | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
+| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view and analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
+| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                         | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
 
 ```typescript
 // evaluations.availableEvaluators
@@ -347,19 +355,12 @@ interface Output {
 }
 
 // evaluations.getMonitorPerformanceForProject
-// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:53
+// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:84
 interface Input {
   projectId: string;
   timeZone?: string;
 }
-// Output: inline, ../contract/src/evaluation.trpc.ts:60
-type Output = {
-  monitorId: string;
-  metric: "score" | "pass_rate";
-  points: number[];
-  current: number | null;
-  previous: number | null;
-}[];
+// Output: onlineEvaluationPerformanceSchema.array() (inline, ../contract/src/evaluation.trpc.ts:60)
 
 // evaluations.getEvaluationInputs
 // Input: evaluationInputsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:29

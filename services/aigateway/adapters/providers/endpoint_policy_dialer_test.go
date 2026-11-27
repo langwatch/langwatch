@@ -22,7 +22,7 @@ func TestAllowsDialAddressHonoursOnlyExactAllowlistEntries(t *testing.T) {
 		wantError bool
 	}{
 		{name: "allowlisted exact IP", address: "10.0.0.5:443", dialHost: "10.0.0.5"},
-		{name: "allowlisted exact IP dialed through an unlisted name", address: "10.0.0.5:443", dialHost: "other.internal"},
+		{name: "allowlisted exact IP dialed through an unlisted name", address: "10.0.0.5:443", dialHost: "other.internal", wantError: true},
 		{name: "address resolved from an allowlisted host", address: "10.0.0.9:443", dialHost: "llm.internal"},
 		{name: "other private IP", address: "10.0.0.6:443", dialHost: "10.0.0.6", wantError: true},
 		{name: "private IP from an unlisted host", address: "10.0.0.9:443", dialHost: "evil.example.com", wantError: true},

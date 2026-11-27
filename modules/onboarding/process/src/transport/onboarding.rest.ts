@@ -12,6 +12,8 @@ import {
 import {
   guidedPathCompleteRestInputSchema,
   guidedPathRestParamsSchema,
+  guidedStartRestInputSchema,
+  guidedStartRestParamsSchema,
   guidedStateOutputSchema,
   guidedStateWithVariantOutputSchema,
   onboardingRestCredentialSchema,
@@ -56,5 +58,24 @@ export const onboardingRest = defineRestRouter(OnboardingApi)
   })
   .handle(async ({ app, input }, credential) =>
     app.completePath({ ...credential, path: input.path }),
+  )
+
+  .post("/guided/start/:start", "postApiOnboardingGuidedStart")
+  .keepsRecords()
+  .withAudit("onboarding.recordLangyStart")
+  .withParams(guidedStartRestParamsSchema)
+  .withInput(guidedStartRestInputSchema)
+  // A write, held by the member and Langy's key, as completing a path is.
+  .withPermission("traces:create")
+  .withOutput(guidedStateOutputSchema)
+  .withMiddlewareContext(onboardingRestCredential)
+  .withDocs({
+    hide: true,
+    tags: ["Onboarding"],
+    description:
+      "Record the start the person picked on Langy's governance opener: coding or call. A call records the choice only; it books nothing.",
+  })
+  .handle(async ({ app, input }, credential) =>
+    app.recordLangyStart({ ...credential, start: input.start }),
   )
   .build();

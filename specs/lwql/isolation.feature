@@ -17,11 +17,35 @@ Feature: LangWatchQL never answers across a tenant or an instance
     Then the gate lets the query through to the executor
 
   @unit
-  Scenario: An organisation routed to its own ClickHouse is refused before any SQL runs
-    Given an organisation whose data is on a private instance or its own ClickHouse
+  Scenario: A routed organisation whose server is provisioned is answered on its own server
+    Given an organisation whose data is on its own ClickHouse
+    And that server holds the access model, as its own reader login finds it
+    When it runs a LangWatchQL query, a pass, or a run's validation
+    Then the gate lets it through and the statement runs on that server as the organisation's derived reader
+    And the shared server's answer is never taken for the private one, even at the same origin
+
+  @unit
+  Scenario: An organisation routed to a private ClickHouse that is not provisioned is refused before any SQL runs
+    Given an organisation whose data is on its own ClickHouse
+    And that server refuses the reader's login or grants, or shows the reader rows with no capability
     When it runs a LangWatchQL query
     Then it is refused with error code lwql_not_provisioned
     And the executor is never called, so the shared server is never queried for it
+
+  @unit
+  Scenario: A routed organisation is refused before its routed executor is built
+    Given an organisation whose data is on its own ClickHouse, not provisioned
+    When it runs a LangWatchQL query, a pass, or a run's validation
+    Then it is refused with error code lwql_not_provisioned
+    And no executor is built for its ClickHouse to run a statement, so no statement reaches it
+
+  @unit
+  Scenario: A private server that cannot be probed refuses rather than falling back
+    Given an organisation whose data is on its own ClickHouse
+    And the gate cannot reach that server to probe it
+    When it runs a LangWatchQL query
+    Then it is refused with error code lwql_unavailable
+    And the executor is never called
 
   @unit
   Scenario: A gate that cannot decide refuses rather than falling back
@@ -48,10 +72,11 @@ Feature: LangWatchQL never answers across a tenant or an instance
   @unit
   Scenario: Every LangWatchQL entry point passes the gate
     Given the API, saved charts, the workbench and the CLI verbs that run LangWatchQL
-    When each runs a query for an organisation routed to its own ClickHouse
+    When each runs a query for an organisation routed to its own ClickHouse that is not provisioned
     Then each refuses with error code lwql_not_provisioned
+    And once that server is provisioned, each answers
 
-  # --- The capability stays on the LangWatchQL server ----------------------
+  # --- No provisioning writes a capability to a server a customer controls ---
 
   @unit
   Scenario: A routed project's key-map row is written only to the LangWatchQL server

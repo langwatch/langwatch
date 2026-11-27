@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzBillingGrantRepository } from "../../repositories/memory/memory.authz-billing-grant.repository.ts";
+import { MemoryAuthzManagedGrantRepository } from "../../repositories/memory/memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../../repositories/memory/memory.authz-user-standing.repository.ts";
 import { AuthzBillingRoleService, type BillingGrantLedger } from "../authz-billing-role.service.ts";
 
@@ -61,13 +62,16 @@ function addMember({
   memory,
   userId,
   disabled = false,
+  billingOnly = false,
 }: {
   memory: AuthzMemoryStore;
   userId: string;
   disabled?: boolean;
+  billingOnly?: boolean;
 }) {
   memory.memberships.set(memory.membershipKey(ORG, userId), {
-    role: "MEMBER",
+    role: billingOnly ? "EXTERNAL" : "MEMBER",
+    billingOnly,
     disabled,
     membershipStamp: `stamp-${userId}`,
     pendingSsoGrantId: null,
@@ -90,6 +94,7 @@ describe("AuthzBillingRoleService", () => {
     service = AuthzBillingRoleService.create({
       grants: MemoryAuthzBillingGrantRepository.create({ memory }),
       standings: MemoryAuthzUserStandingRepository.create({ memory }),
+      bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
       ledger: memoryLedger(memory),
       permissions: {
         async findPermissionsBeyondCaller(input) {
@@ -212,5 +217,44 @@ describe("AuthzBillingRoleService", () => {
     });
     expect(asked).toHaveLength(0);
     expect(await service.listMembers({ organizationId: ORG })).toEqual([{ userId: MEMBER }]);
+  });
+
+  /** @scenario "Billing cannot be taken from a Billing-only member" */
+  it("refuses to take Billing from a Billing-only member and keeps the grant", async () => {
+    addMember({ memory, userId: MEMBER, billingOnly: true });
+    await service.setRole({
+      organizationId: ORG,
+      userId: MEMBER,
+      holds: true,
+      caller: ADMIN,
+      actor: ADMIN,
+    });
+
+    await expect(
+      service.setRole({
+        organizationId: ORG,
+        userId: MEMBER,
+        holds: false,
+        caller: ADMIN,
+        actor: ADMIN,
+      }),
+    ).rejects.toMatchObject({ code: "billing_only_keeps_billing" });
+    expect(await service.listMembers({ organizationId: ORG })).toEqual([{ userId: MEMBER }]);
+  });
+
+  /** @scenario "A Billing-only member whose Billing grant is missing can be repaired" */
+  it("lets a revoke through for a Billing-only member whose grant is already gone", async () => {
+    addMember({ memory, userId: MEMBER, billingOnly: true });
+
+    await expect(
+      service.setRole({
+        organizationId: ORG,
+        userId: MEMBER,
+        holds: false,
+        caller: ADMIN,
+        actor: ADMIN,
+      }),
+    ).resolves.toBeUndefined();
+    expect(await service.listMembers({ organizationId: ORG })).toEqual([]);
   });
 });

@@ -141,6 +141,14 @@ export const { publicBaseUrl } = Config.define((c) => ({
   ),
 }));
 
+/**
+ * How this install was deployed (`helm`, `docker`), as the chart and compose file name it: ops
+ * reports it, analytics leaves LangWatchQL's passwords to the chart on a Helm install.
+ */
+export const { installMethod } = Config.define((c) => ({
+  installMethod: c.env("INSTALL_METHOD", z.string().optional()),
+}));
+
 /** The replicated ClickHouse's cluster: analytics probes and ops reads backups on each replica. */
 export const { clickhouseCluster } = Config.define((c) => ({
   clickhouseCluster: c.env("CLICKHOUSE_CLUSTER", z.string().optional()),

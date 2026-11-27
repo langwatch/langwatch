@@ -12,6 +12,7 @@ import {
   FilterValueRefusedError,
   type LangWatchQLTraceFilter,
   type LangWatchQLTraceFilterValue,
+  TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   type TagToken,
   type TranslationContext,
@@ -50,7 +51,7 @@ const STRING_FIELDS: Readonly<Record<string, LangWatchQLTraceFilterField>> = {
   traceId: { expression: "TraceId", param: "traceId" },
   user: { expression: "Attributes['langwatch.user_id']", param: "userId", facetKey: "user" },
   conversation: {
-    expression: "Attributes['gen_ai.conversation.id']",
+    expression: TRACE_CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
     param: "conversationId",
     facetKey: "conversation",
   },

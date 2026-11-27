@@ -11,9 +11,14 @@ import { describe, expect, it, vi } from "vitest";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import type { NurturingErasedUserRepository } from "../../repositories/nurturing-erased-user.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
-import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { memberCopyOf, unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 const scenarioCreated: NurturingSignal = {
   kind: "scenario_created",
@@ -37,8 +42,11 @@ const firstTrace: NurturingSignal = {
   sdkFramework: "unknown",
 };
 
-/** Customer.io over a recording fetch: each call is kept as its path and body. */
-function customerIo(status = 200) {
+/**
+ * Customer.io over a recording fetch: each call is kept as its path and body. `emails` overrides
+ * the user module's addresses (null: none).
+ */
+function customerIo(status = 200, emails: Readonly<Record<string, string | null>> = {}) {
   const sent: { path: string; body: unknown }[] = [];
   const reported: Error[] = [];
   const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -47,6 +55,7 @@ function customerIo(status = 200) {
     return new Response(null, { status });
   });
   const service = NurturingService.create({
+    users: peopleWithEmails({ emails: { "user-1": "jane@example.com", ...emails } }),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn,
@@ -56,23 +65,69 @@ function customerIo(status = 200) {
   return { service, sent, reported };
 }
 
+/** The address the recording Customer.io's user module holds: user-1 is Jane, as in users(). */
+function emailOf(userId: string): string {
+  return userId === "user-1" ? "jane@example.com" : `${userId}@example.com`;
+}
+
+/**
+ * A track as nurturing sends it: the person's addressed identify in its own batch, awaited,
+ * then the track in a batch of its own (the order Customer.io does not promise within one batch).
+ */
+function trackRequests(track: Record<string, unknown> & { userId: string }) {
+  return [
+    {
+      path: "/v1/batch",
+      body: {
+        batch: [
+          { type: "identify", userId: track.userId, traits: { email: emailOf(track.userId) } },
+        ],
+      },
+    },
+    {
+      path: "/v1/batch",
+      body: { batch: [expect.objectContaining({ type: "track", ...track })] },
+    },
+  ];
+}
+
+/** The tracks among recorded requests: each one rides its own batch (see trackRequests). */
+function tracksOf(sent: readonly { path: string; body: unknown }[]) {
+  return sent.filter(
+    ({ path, body }) =>
+      path === "/v1/batch" &&
+      (body as { batch: { type: string }[] }).batch.some(({ type }) => type === "track"),
+  );
+}
+
 /** Lets the fire-and-forget sends settle before the assertions read them. */
 async function settle(): Promise<void> {
   for (let tick = 0; tick < 3; tick++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** A delivery over memory PostHog and a recording Customer.io. */
-function deliveryOverBothSinks() {
+type ErasureMarks = Pick<NurturingErasedUserRepository, "findErased">;
+
+/**
+ * A delivery over memory PostHog and a recording Customer.io; `members` is nurturing's copy and
+ * `erasedUsers` its erasure marks.
+ */
+function deliveryOverBothSinks(
+  members = MemoryNurturingOrganizationMemberRepository.create(),
+  erasedUsers: ErasureMarks = MemoryNurturingErasedUserRepository.create(),
+) {
   const posthog = MemoryPostHogChannel.create();
   const cio = customerIo();
+  const claimed = claims();
   const delivery = NurturingDeliveryService.create({
-    claims: claims(),
+    erasedUsers,
+    claims: claimed,
     users: users(),
     memberFacts: unplacedMemberFacts(),
+    members,
     customerIo: cio.service,
     posthog,
   });
-  return { posthog, cio, delivery };
+  return { posthog, cio, delivery, claimed };
 }
 
 const source = { tenantId: "project-1", occurredAt: Date.UTC(2026, 8, 29) };
@@ -114,9 +169,11 @@ describe("NurturingDeliveryService", () => {
       const posthog = MemoryPostHogChannel.create();
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -128,14 +185,11 @@ describe("NurturingDeliveryService", () => {
         { userId: "user-1", event: "scenario_created", properties: { projectId: "project-1" } },
       ]);
       expect(cio.sent).toEqual([
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            userId: "user-1",
-            event: "scenario_created",
-            properties: { scenario_id: "scenario-1", project_id: "project-1" },
-          }),
-        },
+        ...trackRequests({
+          userId: "user-1",
+          event: "scenario_created",
+          properties: { scenario_id: "scenario-1", project_id: "project-1" },
+        }),
       ]);
     });
   });
@@ -146,9 +200,11 @@ describe("NurturingDeliveryService", () => {
       const posthog = MemoryPostHogChannel.create();
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog,
       });
@@ -158,7 +214,40 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toHaveLength(1);
-      expect(cio.sent).toHaveLength(1);
+      expect(tracksOf(cio.sent)).toHaveLength(1);
+    });
+  });
+
+  describe("when a signal about an erased person is delivered after their erasure", () => {
+    /** @scenario "A signal about an erased account, delivered late, sends them nothing" */
+    it("sends neither Customer.io nor PostHog anything", async () => {
+      const erasedUsers = MemoryNurturingErasedUserRepository.create();
+      await erasedUsers.markErased({ userId: "user-1" });
+      const { posthog, cio, delivery } = deliveryOverBothSinks(undefined, erasedUsers);
+
+      await delivery.deliver({ key: "scenario_created:event-1", signal: scenarioCreated });
+      await settle();
+
+      expect(cio.sent).toEqual([]);
+      expect([...posthog.tracked, ...posthog.identified]).toEqual([]);
+    });
+  });
+
+  describe("when the erasure marks cannot be read", () => {
+    /** @scenario "A signal whose erasure marks cannot be read fails before any claim or send" */
+    it("rejects, takes no claim and sends nothing, so the fact is retried", async () => {
+      const down = new Error("the database is down");
+      const unreadable: ErasureMarks = { findErased: () => Promise.reject(down) };
+      const { posthog, cio, delivery, claimed } = deliveryOverBothSinks(undefined, unreadable);
+
+      await expect(
+        delivery.deliver({ key: "scenario_created:event-1", signal: scenarioCreated }),
+      ).rejects.toBe(down);
+      await settle();
+
+      expect(claimed.claim).not.toHaveBeenCalled();
+      expect(cio.sent).toEqual([]);
+      expect([...posthog.tracked, ...posthog.identified]).toEqual([]);
     });
   });
 
@@ -188,20 +277,19 @@ describe("NurturingDeliveryService", () => {
               sdk_language: "python",
               sdk_framework: "unknown",
               first_trace_at: 1_792_664_000,
+              email: "admin-1@example.com",
             },
           }),
         },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            event: "first_trace_integrated",
-            properties: {
-              sdk_language: "python",
-              sdk_framework: "unknown",
-              project_id: "project-1",
-            },
-          }),
-        },
+        ...trackRequests({
+          userId: "admin-1",
+          event: "first_trace_integrated",
+          properties: {
+            sdk_language: "python",
+            sdk_framework: "unknown",
+            project_id: "project-1",
+          },
+        }),
         {
           path: "/v1/batch",
           body: {
@@ -209,7 +297,11 @@ describe("NurturingDeliveryService", () => {
               {
                 type: "identify",
                 userId: "admin-1",
-                traits: { has_traces: true, last_trace_at: 1_792_664_000 },
+                traits: {
+                  has_traces: true,
+                  last_trace_at: 1_792_664_000,
+                  email: "admin-1@example.com",
+                },
               },
             ],
           },
@@ -348,15 +440,16 @@ describe("NurturingDeliveryService", () => {
       expect(cio.sent).toEqual([
         {
           path: "/v1/identify",
-          body: expect.objectContaining({ userId: "user-1", traits: { workflow_count: 2 } }),
-        },
-        {
-          path: "/v1/track",
           body: expect.objectContaining({
-            event: "workflow_created",
-            properties: { workflow_id: "workflow-1", project_id: "project-1" },
+            userId: "user-1",
+            traits: { workflow_count: 2, email: "jane@example.com" },
           }),
         },
+        ...trackRequests({
+          userId: "user-1",
+          event: "workflow_created",
+          properties: { workflow_id: "workflow-1", project_id: "project-1" },
+        }),
       ]);
     });
   });
@@ -449,9 +542,11 @@ describe("NurturingDeliveryService", () => {
       }
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -467,7 +562,9 @@ describe("NurturingDeliveryService", () => {
 
   describe("when a subscription change is delivered", () => {
     it("tells Customer.io every member's trait and tracks nothing in PostHog", async () => {
-      const { posthog, cio, delivery } = deliveryOverBothSinks();
+      const { posthog, cio, delivery } = deliveryOverBothSinks(
+        await memberCopyOf({ organizationId: "org-1", userIds: ["user-1", "user-2"] }),
+      );
 
       await delivery.deliver({
         key: "subscription_changed:event-21",
@@ -483,7 +580,56 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toEqual([]);
-      expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/batch",
+          body: {
+            batch: [
+              {
+                type: "identify",
+                userId: "user-1",
+                traits: { has_subscription: true, email: "jane@example.com" },
+              },
+              {
+                type: "identify",
+                userId: "user-2",
+                traits: { has_subscription: true, email: "user-2@example.com" },
+              },
+            ],
+          },
+        },
+      ]);
+    });
+
+    it("fails and gives its claim back when the admin read fails, so the retry sends", async () => {
+      const cio = customerIo();
+      const memberFacts = unplacedMemberFacts();
+      vi.spyOn(memberFacts, "adminOf").mockRejectedValueOnce(new Error("milestones unavailable"));
+      const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
+        claims: MemoryNurturingClaimRepository.create(),
+        users: users(),
+        memberFacts,
+        members: await memberCopyOf({ organizationId: "org-1", userIds: ["user-1"] }),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+      const signal: NurturingSignal = {
+        kind: "subscription_changed",
+        sourceEventId: "event-22",
+        ...source,
+        organizationId: "org-1",
+        memberUserIds: ["user-1"],
+        hasSubscription: true,
+      };
+
+      await expect(
+        delivery.deliver({ key: "subscription_changed:event-22", signal }),
+      ).rejects.toThrow("milestones unavailable");
+      expect(cio.sent).toEqual([]);
+      await delivery.deliver({ key: "subscription_changed:event-22", signal });
+
+      expect(cio.sent.map(({ path }) => path)).toEqual(["/v1/batch"]);
     });
   });
 
@@ -532,9 +678,11 @@ describe("NurturingDeliveryService", () => {
     it("tracks nothing and does not throw when PostHog is not configured", async () => {
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -555,9 +703,11 @@ describe("NurturingDeliveryService", () => {
         identify(): void {}
       }
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -578,20 +728,27 @@ describe("NurturingDeliveryService", () => {
       const sent: string[] = [];
       const reported: Error[] = [];
       const service = NurturingService.create({
+        users: peopleWithEmails(),
         channel: HttpCustomerIoChannel.create({
           config: { customerIoApiKey: "key", customerIoRegion: "us" },
-          fetchFn: async (url) => {
+          fetchFn: async (url, init) => {
             const path = new URL(url instanceof Request ? url.url : url).pathname;
             sent.push(path);
-            return new Response(null, { status: path === "/v1/track" ? 500 : 200 });
+            const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+            const tracks = (body.batch ?? []).some(
+              (call: { type: string }) => call.type === "track",
+            );
+            return new Response(null, { status: tracks ? 500 : 200 });
           },
           errorReporter: { capture: (error) => reported.push(error) },
         }),
       });
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: service,
         posthog: undefined,
       });
@@ -604,7 +761,7 @@ describe("NurturingDeliveryService", () => {
       ).resolves.toBeUndefined();
       await settle();
 
-      expect(sent).toEqual(expect.arrayContaining(["/v1/identify", "/v1/track"]));
+      expect(sent).toEqual(expect.arrayContaining(["/v1/identify", "/v1/batch"]));
       expect(reported.length).toBeGreaterThan(0);
 
       // The failed track keeps its hourly limit: a second session sends nothing more.
@@ -632,14 +789,61 @@ describe("NurturingDeliveryService", () => {
           path: "/v1/identify",
           body: expect.objectContaining({
             userId: "user-app-active",
-            traits: { last_active_at: expect.any(Number) },
+            traits: { last_active_at: expect.any(Number), email: "user-app-active@example.com" },
           }),
         },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({ userId: "user-app-active", event: "app_active" }),
-        },
+        ...trackRequests({ userId: "user-app-active", event: "app_active" }),
       ]);
+    });
+  });
+
+  describe("when a rule decides an id-only identify", () => {
+    const session = {
+      kind: "session_started",
+      ...source,
+      hasOrganization: true,
+      sourceEventId: "event-60",
+    } as const;
+
+    /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+    it("reaches Customer.io with the person's email, read fresh", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "session_started:event-60",
+        signal: { ...session, userId: "user-with-email" },
+      });
+      await settle();
+
+      expect(cio.sent[0]).toEqual({
+        path: "/v1/identify",
+        body: {
+          userId: "user-with-email",
+          traits: { last_active_at: expect.any(Number), email: "user-with-email@example.com" },
+        },
+      });
+    });
+
+    /** @scenario "Every Customer.io identify carries the person's email, or is not sent" */
+    it("sends a person with no email no identify and no track", async () => {
+      const cio = customerIo(200, { "user-no-email": null });
+      const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
+        claims: claims(),
+        users: users(),
+        memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+
+      await delivery.deliver({
+        key: "session_started:event-61",
+        signal: { ...session, sourceEventId: "event-61", userId: "user-no-email" },
+      });
+      await settle();
+
+      expect(cio.sent).toEqual([]);
     });
   });
 
@@ -647,13 +851,19 @@ describe("NurturingDeliveryService", () => {
     const at = { tenantId: "project-1", occurredAt: 1_792_664_000_123 };
     const seconds = 1_792_664_000;
 
+    /** The identify and group traits sent; a track's batches (see trackRequests) are not one. */
     async function identifiedTraits(signal: NurturingSignal): Promise<unknown[]> {
       const { cio, delivery } = deliveryOverBothSinks();
       await delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
       await settle();
       return cio.sent.flatMap(({ path, body }) => {
         if (path === "/v1/batch") {
-          return (body as { batch: { traits: unknown }[] }).batch.map(({ traits }) => traits);
+          const { batch } = body as { batch: { type: string; traits: unknown }[] };
+          if (batch.some(({ type }) => type === "track")) return [];
+          // The address-only identify that precedes a track is not a fact.
+          return batch
+            .map(({ traits }) => traits)
+            .filter((traits) => Object.keys(traits as object).join() !== "email");
         }
         if (path !== "/v1/identify" && path !== "/v1/group") return [];
         return [(body as { traits: unknown }).traits];
@@ -670,7 +880,9 @@ describe("NurturingDeliveryService", () => {
         projectId: "project-1",
       });
 
-      expect(traits).toEqual([{ has_traces: true, last_trace_at: seconds }]);
+      expect(traits).toEqual([
+        { has_traces: true, last_trace_at: seconds, email: "admin-1@example.com" },
+      ]);
     });
 
     /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -684,10 +896,15 @@ describe("NurturingDeliveryService", () => {
       } as const;
 
       expect(await identifiedTraits({ ...run, sourceEventId: "run-40", first: true })).toEqual([
-        { has_simulations: true, simulation_count: 1, first_simulation_at: seconds },
+        {
+          has_simulations: true,
+          simulation_count: 1,
+          first_simulation_at: seconds,
+          email: "admin-1@example.com",
+        },
       ]);
       expect(await identifiedTraits({ ...run, sourceEventId: "run-41", first: false })).toEqual([
-        { simulation_count: 1, last_simulation_at: seconds },
+        { simulation_count: 1, last_simulation_at: seconds, email: "admin-1@example.com" },
       ]);
     });
 
@@ -704,10 +921,19 @@ describe("NurturingDeliveryService", () => {
 
       expect(
         await identifiedTraits({ ...evaluation, sourceEventId: "eval-40", first: true }),
-      ).toEqual([{ has_evaluations: true, evaluation_count: 1, first_evaluation_at: seconds }]);
+      ).toEqual([
+        {
+          has_evaluations: true,
+          evaluation_count: 1,
+          first_evaluation_at: seconds,
+          email: "admin-1@example.com",
+        },
+      ]);
       expect(
         await identifiedTraits({ ...evaluation, sourceEventId: "eval-41", first: false }),
-      ).toEqual([{ evaluation_count: 1, last_evaluation_at: seconds }]);
+      ).toEqual([
+        { evaluation_count: 1, last_evaluation_at: seconds, email: "admin-1@example.com" },
+      ]);
     });
 
     /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -722,7 +948,12 @@ describe("NurturingDeliveryService", () => {
 
       expect(cio.sent[0]?.body).toEqual(
         expect.objectContaining({
-          traits: { email: "jane@example.com", name: "Jane Doe", createdAt: seconds },
+          traits: {
+            email: "jane@example.com",
+            name: "Jane Doe",
+            first_name: "Jane",
+            createdAt: seconds,
+          },
         }),
       );
       expect(posthog.identified).toEqual([
@@ -789,14 +1020,12 @@ describe("NurturingDeliveryService", () => {
           }),
         },
       ]);
-      expect(cio.sent.filter((call) => call.path === "/v1/track")).toEqual([
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            userId: "user-1",
-            event: "self_hosted_license_expiring",
-          }),
-        },
+      expect(cio.sent.filter((call) => call.path === "/v1/batch")).toEqual([
+        ...trackRequests({
+          userId: "user-1",
+          event: "self_hosted_license_expiring",
+          properties: { instance_id: "instance-1" },
+        }),
       ]);
     });
   });
@@ -806,9 +1035,11 @@ describe("NurturingDeliveryService", () => {
     it("claims nothing and sends nothing", async () => {
       const claim = claims();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claim,
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog: undefined,
       });
@@ -824,9 +1055,11 @@ describe("NurturingDeliveryService", () => {
     it("resolves and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -844,9 +1077,11 @@ describe("NurturingDeliveryService", () => {
     it("sends Customer.io the update once", async () => {
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -878,6 +1113,7 @@ describe("NurturingDeliveryService", () => {
         userId: "admin-1",
         projectId: "project-1",
         evaluationId: "eval-3",
+        organizationId: "org-1",
         score: 1,
         passed: true,
         evaluationsCounted: 3,
@@ -899,19 +1135,21 @@ describe("NurturingDeliveryService", () => {
 
       expect(cio.sent).toEqual([
         {
+          path: "/v1/group",
+          body: expect.objectContaining({ userId: "admin-1", groupId: "org-1" }),
+        },
+        {
           path: "/v1/identify",
           body: expect.objectContaining({
             userId: "admin-1",
-            traits: expect.objectContaining({ evaluation_count: 7 }),
+            traits: expect.objectContaining({ evaluation_count: 7, email: "admin-1@example.com" }),
           }),
         },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({
-            event: "evaluation_ran",
-            properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
-          }),
-        },
+        ...trackRequests({
+          userId: "admin-1",
+          event: "evaluation_ran",
+          properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
+        }),
       ]);
       expect(posthog.tracked).toEqual([
         {
@@ -920,6 +1158,107 @@ describe("NurturingDeliveryService", () => {
           properties: { count: 3, projectId: "project-1" },
         },
       ]);
+    });
+
+    /** @scenario "A counted evaluation tells the organization's Company it has evaluation results and its count" */
+    it("tells the organization's Company it has evaluation results and its count", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
+      await settle();
+
+      const groups = cio.sent.filter((call) => call.path === "/v1/group");
+      expect(groups).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            userId: "admin-1",
+            groupId: "org-1",
+            traits: { has_evaluation_results: true, evaluation_count: 7 },
+          }),
+        },
+      ]);
+    });
+
+    /** @scenario "The organization's first counted evaluations set first_evaluation_at on its Company" */
+    it("sets first_evaluation_at on the Company for the organization's first evaluations", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-2",
+        signal: counted("project-1:eval-2", {
+          evaluationId: "eval-2",
+          evaluationsCounted: 2,
+          organizationEvaluationCount: 2,
+          first: true,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            groupId: "org-1",
+            traits: {
+              has_evaluation_results: true,
+              evaluation_count: 2,
+              first_evaluation_at: expect.any(Number),
+            },
+          }),
+        },
+      ]);
+    });
+
+    /** @scenario "A debounced evaluation batch still updates the organization's Company" */
+    it("updates the Company for a batch whose person-level update is debounced", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-4",
+        signal: counted("project-1:eval-4", {
+          evaluationId: "eval-4",
+          organizationEvaluationCount: 9,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ evaluation_count: 7 }),
+          }),
+        },
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ evaluation_count: 9 }),
+          }),
+        },
+      ]);
+      expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
+      expect(tracksOf(cio.sent)).toHaveLength(1);
+    });
+
+    /** @scenario "An evaluation signal recorded before it named its organization updates no Company" */
+    it("updates no Company for a signal recorded before it named its organization", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3", { organizationId: undefined }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([]);
     });
 
     /** @scenario "The batch that counts an organization's first evaluations sends its milestone once" */
@@ -937,18 +1276,23 @@ describe("NurturingDeliveryService", () => {
       });
       await settle();
 
-      expect(cio.sent.slice(0, 2)).toEqual([
-        {
-          path: "/v1/identify",
-          body: expect.objectContaining({
-            traits: expect.objectContaining({ has_evaluations: true, evaluation_count: 2 }),
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toHaveLength(1);
+      const sent = cio.sent.filter((call) => call.path !== "/v1/group");
+      expect(sent[0]).toEqual({
+        path: "/v1/identify",
+        body: expect.objectContaining({
+          traits: expect.objectContaining({
+            has_evaluations: true,
+            evaluation_count: 2,
+            email: "admin-1@example.com",
           }),
-        },
-        {
-          path: "/v1/track",
-          body: expect.objectContaining({ userId: "admin-1", event: "first_evaluation_created" }),
-        },
-      ]);
+        }),
+      });
+      expect(sent).toEqual(
+        expect.arrayContaining(
+          trackRequests({ userId: "admin-1", event: "first_evaluation_created" }),
+        ),
+      );
     });
   });
 
@@ -986,9 +1330,11 @@ describe("NurturingDeliveryService", () => {
     it("session_started: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1013,9 +1359,11 @@ describe("NurturingDeliveryService", () => {
     it("workflow_created: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1042,9 +1390,11 @@ describe("NurturingDeliveryService", () => {
     it("integration_method_chosen: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1069,9 +1419,11 @@ describe("NurturingDeliveryService", () => {
     it("prompt_created: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1097,9 +1449,11 @@ describe("NurturingDeliveryService", () => {
     it("signed_up: returns normally and reports the failure", async () => {
       const cio = customerIo(500);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1127,9 +1481,11 @@ describe("NurturingDeliveryService", () => {
     it("paths_selected: returns normally and reports the failure", async () => {
       const cio = customerIo(503);
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1160,9 +1516,11 @@ describe("NurturingDeliveryService", () => {
     /** @scenario "Signup with no Customer.io key configured completes without errors" */
     it("signed_up: makes no request at all and raises nothing", async () => {
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog: MemoryPostHogChannel.create(),
       });
@@ -1186,9 +1544,11 @@ describe("NurturingDeliveryService", () => {
     it("guided onboarding: reaches PostHog only, and raises nothing", async () => {
       const posthog = MemoryPostHogChannel.create();
       const delivery = NurturingDeliveryService.create({
+        erasedUsers: MemoryNurturingErasedUserRepository.create(),
         claims: claims(),
         users: users(),
         memberFacts: unplacedMemberFacts(),
+        members: MemoryNurturingOrganizationMemberRepository.create(),
         customerIo: undefined,
         posthog,
       });

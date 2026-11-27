@@ -89,6 +89,46 @@ describe("memory gateway twins", () => {
       expect(await keys.findByHashedSecret("hash_vk_1")).toBeNull();
     });
 
+    it("lists every organization's live keys of one purpose used since an instant, by id", async () => {
+      const keys = MemoryGatewayVirtualKeyRepository.create(MemoryGatewayStore.create());
+      const since = Temporal.Instant.from("2026-11-19T00:00:00Z");
+      for (const id of ["vk_used", "vk_old", "vk_revoked", "vk_disabled", "vk_never"]) {
+        await keys.create(keyInput(id));
+      }
+      await keys.create({ ...keyInput("vk_other_org"), organizationId: "org_2" });
+      await keys.create({ ...keyInput("vk_langy"), purpose: "LANGY" });
+      for (const id of ["vk_used", "vk_revoked", "vk_disabled", "vk_other_org", "vk_langy"]) {
+        await keys.recordUsage(id, since);
+      }
+      await keys.recordUsage("vk_old", since.subtract({ milliseconds: 1 }));
+      await keys.revoke({ id: "vk_revoked", organizationId: ORG, revokedById: "usr_1" });
+      await keys.setDisabled({
+        id: "vk_disabled",
+        organizationId: ORG,
+        disabled: true,
+        reason: "paused",
+      });
+
+      const used = await keys.findLiveUsedSince({ purpose: "USER", since });
+
+      expect(used).toEqual([
+        {
+          id: "vk_other_org",
+          organizationId: "org_2",
+          name: "vk_other_org",
+          principalUserId: null,
+          traceProjectId: null,
+        },
+        {
+          id: "vk_used",
+          organizationId: ORG,
+          name: "vk_used",
+          principalUserId: null,
+          traceProjectId: null,
+        },
+      ]);
+    });
+
     it("refuses a second key holding the same external id in the organization", async () => {
       const keys = MemoryGatewayVirtualKeyRepository.create(MemoryGatewayStore.create());
       await keys.create(keyInput("vk_1", { externalId: "ext" }));
@@ -334,7 +374,13 @@ describe("memory gateway twins", () => {
   });
 
   describe("given debits in the budget ledger twin", () => {
-    const debit = (overrides: { gatewayRequestId: string; amountNanoUsd: number; at: string }) => ({
+    const debit = (overrides: {
+      gatewayRequestId: string;
+      amountNanoUsd: number;
+      at: string;
+      model?: string;
+      status?: "SUCCESS" | "PROVIDER_ERROR";
+    }) => ({
       tenantId: PROJECT,
       budgetId: "budget_1",
       scope: "PROJECT" as const,
@@ -345,8 +391,8 @@ describe("memory gateway twins", () => {
       tokensOutput: 1,
       tokensCacheRead: 0,
       tokensCacheWrite: 0,
-      model: "gpt-5",
-      status: "SUCCESS" as const,
+      model: overrides.model ?? "gpt-5",
+      status: overrides.status ?? ("SUCCESS" as const),
       gatewayRequestId: overrides.gatewayRequestId,
       amountNanoUsd: overrides.amountNanoUsd,
       occurredAt: Temporal.Instant.from(overrides.at),
@@ -403,6 +449,36 @@ describe("memory gateway twins", () => {
       );
 
       expect(spend?.spentNanoUsd).toBe(2_000);
+    });
+
+    it("sums successful spend per model from the floor, a replayed request once", async () => {
+      const ledger = MemoryGatewayBudgetSpendRepository.create();
+      const at = "2026-10-10T00:00:00Z";
+      await ledger.insertDebit([debit({ gatewayRequestId: "r1", amountNanoUsd: 400, at })]);
+      await ledger.insertDebit([debit({ gatewayRequestId: "r1", amountNanoUsd: 9_999, at })]);
+      await ledger.insertDebit([debit({ gatewayRequestId: "r2", amountNanoUsd: 220, at })]);
+      await ledger.insertDebit([
+        debit({ gatewayRequestId: "r3", amountNanoUsd: 380, at, model: "claude" }),
+      ]);
+      await ledger.insertDebit([
+        debit({ gatewayRequestId: "r4", amountNanoUsd: 5_000, at, status: "PROVIDER_ERROR" }),
+      ]);
+      await ledger.insertDebit([
+        debit({ gatewayRequestId: "r5", amountNanoUsd: 5_000, at: "2026-10-02T00:00:00Z" }),
+      ]);
+
+      const spend = await ledger.findModelSpendForTarget({
+        tenantIds: [PROJECT],
+        target: {
+          ...target,
+          periodFloorMs: Temporal.Instant.from("2026-10-05T00:00:00Z").epochMilliseconds,
+        },
+      });
+
+      expect(spend.toSorted((a, b) => (a.model < b.model ? -1 : 1))).toEqual([
+        { model: "claude", spentNanoUsd: 380n },
+        { model: "gpt-5", spentNanoUsd: 620n },
+      ]);
     });
   });
 

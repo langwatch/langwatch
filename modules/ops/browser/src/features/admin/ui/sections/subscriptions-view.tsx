@@ -23,6 +23,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
 import { AdminDate, EmptyCell, dateInputToISO, formatDate } from "../elements/admin-cells.tsx";
+import { PendingLimitsNotice } from "../elements/pending-limits-notice.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 
 /** The controls a failed submit can land on; wrappers that carry the state are skipped. */
@@ -456,6 +457,11 @@ function SubscriptionDrawer({
               />
             </Field.Root>
           </HStack>
+
+          <PendingLimitsNotice
+            status={form.status}
+            hasLimits={LIMIT_FIELDS.some((f) => form[f.key as LimitKey].trim() !== "")}
+          />
 
           {GROUPED_LIMITS.map(([group, fields]) => (
             <VStack key={group} gap={3} align="stretch">

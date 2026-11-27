@@ -64,7 +64,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   async createWidget(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRow> {
     const { projectId, dashboardId } = input;
     if (dashboardId !== undefined && !this.#ownsBoard({ projectId, dashboardId })) {
-      throw new DashboardNotFoundError(projectId);
+      throw new DashboardNotFoundError({ projectId });
     }
     const rows = this.#rows.filter(
       (row) =>
@@ -137,7 +137,7 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput): Promise<DashboardWidgetRow> {
-    if (!this.#ownsBoard(input)) throw new DashboardNotFoundError(input.projectId);
+    if (!this.#ownsBoard(input)) throw new DashboardNotFoundError({ projectId: input.projectId });
     const current = this.#require(input);
     const onDashboard = this.#rows.filter(
       (row) => row.projectId === input.projectId && row.dashboardId === input.dashboardId,

@@ -6,9 +6,8 @@ interface UseOverflowVisibilityOptions {
   /** Container whose right edge defines the visibility cutoff. */
   scrollerRef: RefObject<HTMLElement | null>;
   /**
-   * The full ordered list of item ids that may render in the row. The
-   * hook re-measures whenever this reference changes — pass a memoized
-   * array (or just the source state) so we don't thrash.
+   * The full ordered list of item ids that may render in the row. The hook
+   * re-measures when the ids change, so a fresh array with the same ids is fine.
    */
   items: readonly string[];
   /**
@@ -118,13 +117,15 @@ export function useOverflowVisibility({
 }: UseOverflowVisibilityOptions): ReadonlySet<string> {
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(EMPTY_SET);
   const [measureSeq, setMeasureSeq] = useState(0);
+  // Keyed by value: a caller passing a fresh array each render must not loop the reset.
+  const itemsKey = items.join("\u0000");
 
   // Reset on items / active-id change — the active item moving can
   // free up room or push another item over the edge.
   useEffect(() => {
     setHiddenIds(EMPTY_SET);
     setMeasureSeq((s) => s + 1);
-  }, [items, activeId, remeasureKey]);
+  }, [itemsKey, activeId, remeasureKey]);
 
   // Reset on container resize so a wider parent can re-show items.
   useEffect(() => {
@@ -145,7 +146,7 @@ export function useOverflowVisibility({
 
     const next = measureOverflow({ root, attribute, reservePx, activeId });
     if (next) setHiddenIds(next);
-  }, [measureSeq, hiddenIds, items, scrollerRef, activeId, attribute, reservePx]);
+  }, [measureSeq, hiddenIds, itemsKey, scrollerRef, activeId, attribute, reservePx]);
 
   return hiddenIds;
 }

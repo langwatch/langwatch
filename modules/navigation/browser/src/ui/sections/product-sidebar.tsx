@@ -1,21 +1,31 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
-import type { StarredDashboardsProject } from "@langwatch/analytics-client";
+import type { DashboardHomeProduct, StarredDashboardsProject } from "@langwatch/analytics-client";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
+import { ResizeHandle } from "@langwatch/design-system/resize-handle";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, LayoutDashboard, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
+import {
+  ProductDashboards,
+  SavedDashboards,
+  StarredDashboards,
+} from "../../behavior/lent-saved-dashboards.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
+import { useSidebarWidthStore } from "../../behavior/sidebar-width.store.ts";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
+import {
+  useHasOrganizationLibrary,
+  useOrganizationLibrary,
+} from "../../behavior/use-product-home.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { useSettingsMenu } from "../../behavior/use-settings-menu.ts";
@@ -26,8 +36,11 @@ import { useNavigationHost } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
 import {
   isAdminShellRoute,
+  isOrganizationDashboardsPath,
+  isOrganizationLibraryPath,
   isPathUnder,
   OPERATIONS_CONSOLE,
+  ORGANIZATION_DASHBOARDS_PATH,
   type ProductId,
 } from "../../model/products.ts";
 import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
@@ -46,6 +59,9 @@ import {
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
+  SHELL_SIDEBAR_WIDTH_MAX,
+  SHELL_SIDEBAR_WIDTH_MIN,
+  shellSidebarWidth,
 } from "../../model/shell-layout.ts";
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SupportMenu } from "../blocks/support-menu.tsx";
@@ -164,6 +180,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   const organization = host.organization();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
+  const hasOrganizationLibrary = useHasOrganizationLibrary();
   // Refused /ops view: the remembered product is not where the viewer came from.
   const isRefusedOps = isPathUnder({ pathname: host.pathname(), base: "/ops" });
   if (isRefusedOps && !host.opsAccess().hasAccess) return null;
@@ -174,6 +191,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
       : null,
     reachableProducts,
     projectSlug,
+    hasOrganizationLibrary,
   });
 
   return (
@@ -327,12 +345,35 @@ function SectionItemsNav({
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
+  const hasOrganizationArea = useOrganizationLibrary();
+  if (isOrganizationDashboardsPath(host.pathname())) {
+    return <OrganizationDashboardsSidebarBody showExpanded={showExpanded} />;
+  }
   const pattern = toProjectRoutePattern({
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
-  if (!showExpanded) return null;
+  if (!showExpanded || hasOrganizationArea === void 0) return null;
+  // The pinned list is the flag-off sidebar; with the area on, boards list as in every product.
+  if (hasOrganizationArea) return <ProductDashboards product="llm-ops" />;
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+}
+
+/**
+ * The Dashboards sidebar in the organization's area: the library alone. Templates read LLM Ops
+ * data, so they are offered only in LLM Ops (owner, 2026-11-23).
+ */
+function OrganizationDashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
+  const host = useNavigationHost();
+  return (
+    <SideMenuLink
+      icon={LayoutDashboard}
+      label="All dashboards"
+      href={ORGANIZATION_DASHBOARDS_PATH}
+      isActive={isOrganizationLibraryPath(host.pathname())}
+      showLabel={showExpanded}
+    />
+  );
 }
 
 /** The sidebars that may show the Dashboards section only with every product's flag on. */
@@ -342,10 +383,11 @@ const DASHBOARDS_SECTION_FLAGGED_SURFACES: ReadonlySet<SidebarSurface> = new Set
 const GRANTS_STALE_TIME_MS = 30_000;
 
 /**
- * The Dashboards section analytics lends, for a member who can reach Dashboards: in LLM Ops,
- * and with `release_dashboards_in_every_product` in Gateway and Coding agents too.
+ * The Dashboards section analytics lends. With the organization's area on, each product lists its
+ * own boards (ADR-002, decision 8); off, LLM Ops keeps the pinned section. Outside LLM Ops both
+ * ask `release_dashboards_in_every_product` too.
  */
-function StarredDashboardsGroup({
+function SidebarDashboardsSection({
   surface,
   showExpanded,
 }: {
@@ -354,14 +396,35 @@ function StarredDashboardsGroup({
 }) {
   const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();
-  const llmOpsProject = useLlmOpsProject();
+  const hasOrganizationArea = useOrganizationLibrary();
   const everyProduct = host.featureFlag(FrontendFlags.release_dashboards_in_every_product);
-  if (!showExpanded) return null;
+  if (!showExpanded || hasOrganizationArea === void 0) return null;
   if (surface === "llm-ops") {
-    return reachableProducts.includes("dashboards") ? <StarredDashboards /> : null;
+    if (!reachableProducts.includes("dashboards")) return null;
+    return hasOrganizationArea ? <ProductDashboards product="llm-ops" /> : <StarredDashboards />;
   }
-  if (!everyProduct.enabled || !DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
-  // These pages are about no project: the section works in the one LLM Ops would open.
+  if (!everyProduct.enabled) return null;
+  const product = homeProductOf(surface);
+  if (hasOrganizationArea) return product ? <ProductDashboards product={product} /> : null;
+  if (!DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
+  return <InLlmOpsProject />;
+}
+
+/** The sidebars that list their own boards, each surface its own home product. */
+const HOME_PRODUCT_SURFACES: ReadonlyMap<SidebarSurface, DashboardHomeProduct> = new Map([
+  ["llm-ops", "llm-ops"],
+  ["me", "me"],
+  ["gateway", "gateway"],
+  ["governance", "governance"],
+]);
+
+function homeProductOf(surface: SidebarSurface): DashboardHomeProduct | undefined {
+  return HOME_PRODUCT_SURFACES.get(surface);
+}
+
+/** Gateway and Coding agents with the area off: the section works in the project LLM Ops opens. */
+function InLlmOpsProject() {
+  const llmOpsProject = useLlmOpsProject();
   if (!llmOpsProject) return null;
   const { id, slug, name } = llmOpsProject;
   return <StarredDashboardsInProject project={{ id, slug, name }} />;
@@ -434,10 +497,13 @@ export function SidebarContent({
   surface,
   showExpanded,
   isFullWidth = false,
+  expandedWidth = SHELL_SIDEBAR_WIDTH_EXPANDED,
 }: {
   surface: SidebarSurface;
   showExpanded: boolean;
   isFullWidth?: boolean;
+  /** The width the reader dragged the column to, when they did. */
+  expandedWidth?: string;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   const scrollEdges = useScrollEdges({ axis: "y" });
@@ -452,7 +518,7 @@ export function SidebarContent({
       gap={0}
       height="100%"
       align="start"
-      width={isFullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
+      width={isFullWidth ? "full" : expandedWidth}
       justifyContent="space-between"
     >
       <Box
@@ -515,7 +581,7 @@ export function SidebarContent({
           }}
         >
           <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
-          <StarredDashboardsGroup surface={surface} showExpanded={showExpanded} />
+          <SidebarDashboardsSection surface={surface} showExpanded={showExpanded} />
         </VStack>
         <ScrollEdgeFade edge="top" visible={scrollEdges.start} color="bg.page" />
         <ScrollEdgeFade edge="bottom" visible={scrollEdges.end} color="bg.page" />
@@ -540,8 +606,12 @@ export function ProductSidebar({
   isCompact: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const { rememberedWidth, setRememberedWidth, resetWidth } = useSidebarWidthStore();
   const showExpanded = !isCompact || isHovered;
-  const columnWidth = isCompact ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED;
+  // The dragged width is the wide screen's: small screens keep their hover-out column.
+  const draggedWidth = shellSidebarWidth({ remembered: rememberedWidth });
+  const expandedWidth = isCompact ? SHELL_SIDEBAR_WIDTH_EXPANDED : `${draggedWidth}px`;
+  const columnWidth = isCompact ? SHELL_SIDEBAR_WIDTH_COMPACT : expandedWidth;
   const fullHeight = `calc(100vh - ${APP_HEADER_HEIGHT}px)`;
 
   return (
@@ -561,14 +631,28 @@ export function ProductSidebar({
           zIndex={isCompact ? 100 : "auto"}
           top={0}
           left={0}
-          width={showExpanded ? SHELL_SIDEBAR_WIDTH_EXPANDED : SHELL_SIDEBAR_WIDTH_COMPACT}
+          width={showExpanded ? expandedWidth : SHELL_SIDEBAR_WIDTH_COMPACT}
           height={fullHeight}
           background="bg.page"
-          transition="width 0.15s ease-in-out"
+          transition={isCompact ? "width 0.15s ease-in-out" : void 0}
           overflow="hidden"
         >
-          <SidebarContent surface={surface} showExpanded={showExpanded} />
+          <SidebarContent
+            surface={surface}
+            showExpanded={showExpanded}
+            expandedWidth={expandedWidth}
+          />
         </Box>
+        {!isCompact && (
+          <ResizeHandle
+            label="Resize sidebar"
+            value={draggedWidth}
+            min={SHELL_SIDEBAR_WIDTH_MIN}
+            max={SHELL_SIDEBAR_WIDTH_MAX}
+            onChange={setRememberedWidth}
+            onReset={resetWidth}
+          />
+        )}
       </Box>
     </SideMenuDensityProvider>
   );

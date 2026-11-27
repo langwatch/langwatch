@@ -198,8 +198,7 @@
       "pricing": {
         "inputCostPerToken": 2.5e-6,
         "outputCostPerToken": 1e-5,
-        "audioCostPerToken": 2.5e-6,
-        "inputCostPerSecond": 0.0001
+        "audioCostPerToken": 2.5e-6
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -220,8 +219,7 @@
       "pricing": {
         "inputCostPerToken": 1.25e-6,
         "outputCostPerToken": 5e-6,
-        "audioCostPerToken": 1.25e-6,
-        "inputCostPerSecond": 5e-5
+        "audioCostPerToken": 1.25e-6
       },
       "contextLength": 0,
       "maxCompletionTokens": null,

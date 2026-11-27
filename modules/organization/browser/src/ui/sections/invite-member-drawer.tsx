@@ -10,6 +10,7 @@ import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useInviteActions } from "../../behavior/use-invite-actions.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { BILLING_ONLY_SEAT } from "../../model/member-invite-form.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import { AddMembersForm } from "./add-members-form.tsx";
 
@@ -19,6 +20,7 @@ const INVITE_FORM_ID = "invite-members-form";
 export function InviteMemberDrawer({
   open = true,
   initialEmail = "",
+  initialSeat,
 }: UiInviteMemberDrawerProps): React.ReactElement | null {
   const { organization } = useOrganizationTeamProject();
   const host = useOrganizationHost();
@@ -79,6 +81,8 @@ export function InviteMemberDrawer({
     >
       {organization && (
         <AddMembersForm
+          // The limit dialog can reopen this drawer on Billing only while it is already open.
+          key={initialSeat ?? "default"}
           teamOptions={teamOptions}
           organizationId={organization.id}
           onSubmit={onSubmit}
@@ -88,6 +92,7 @@ export function InviteMemberDrawer({
           onClose={closeDrawer}
           isInviterAdmin={isAdmin}
           initialEmails={initialEmail}
+          {...(initialSeat === BILLING_ONLY_SEAT ? { initialSeat: BILLING_ONLY_SEAT } : {})}
         />
       )}
     </Drawer>

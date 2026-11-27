@@ -16,6 +16,11 @@ import {
   type UiSession,
   type UiSuccessNotice,
 } from "./capabilities.ts";
+import {
+  UiAnalytics,
+  type UiAnalyticsEvent,
+  type UiExceptionReport,
+} from "./telemetry/analytics.ts";
 
 /** What a feature host double answers, loosely enough for every family's port. */
 export type UiTestHost = {
@@ -121,4 +126,24 @@ export function createUiHostServicesFromHost(
     navigation: new HostUiNavigation(host),
     feedback: new HostUiFeedback(host),
   };
+}
+
+/** An analytics destination that keeps what a screen reports instead of sending it. */
+export class RecordingUiAnalytics extends UiAnalytics {
+  readonly events: UiAnalyticsEvent[] = [];
+  readonly exceptions: UiExceptionReport[] = [];
+
+  track(event: UiAnalyticsEvent): void {
+    this.events.push(event);
+  }
+
+  override captureException(report: UiExceptionReport): void {
+    this.exceptions.push(report);
+  }
+
+  identify(): void {}
+
+  group(): void {}
+
+  reset(): void {}
 }

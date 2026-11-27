@@ -17,6 +17,7 @@ import {
   IMPLEMENTED_WIDGET_IDS,
   implementedWidget,
   PICKER_SECTIONS,
+  RETIRED_PICKER_WIDGETS,
 } from "../index.ts";
 import { isCodingWidget } from "../model/catalogue-widgets.ts";
 
@@ -91,9 +92,10 @@ describe("given every built catalogue widget", () => {
     for (const { key, definition } of offered) {
       expect(definition.prompt, key).toBe(pickerPrompts.get(key));
     }
-    // The picker leaves coding-agent widgets out; they carry their own prompt all the same.
+    // The picker leaves coding-agent and retired widgets out; each carries its own prompt anyway.
     for (const { key, definition } of leftOut) {
-      expect(isCodingWidget(CATALOGUE_WIDGETS.find(({ id }) => id === key)!), key).toBe(true);
+      const widget = CATALOGUE_WIDGETS.find(({ id }) => id === key)!;
+      expect(isCodingWidget(widget) || RETIRED_PICKER_WIDGETS.has(key), key).toBe(true);
       expect(definition.prompt, key).toBeTruthy();
     }
     for (const { key, definition } of built) {

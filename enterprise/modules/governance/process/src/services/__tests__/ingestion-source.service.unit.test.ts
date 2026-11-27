@@ -15,6 +15,7 @@ import {
   findPullCredentialComplaints,
 } from "../../features/ingestion-pull/rules/pull-config-shape.rules.ts";
 import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
+import { IngestionSourceFactsService } from "../../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import { IngestionSourceReadService } from "../../features/ingestion-source/services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -91,7 +92,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
     this.row = source({ ...this.row, ...rowPatchOf(input) });
     return this.row;
   });
-  recordEventReceived = vi.fn(async () => undefined);
+  recordEventReceived = vi.fn(async () => ({ wentLive: false }));
   getUnpricedUsageWindow = vi.fn(async () => ({ since: null, through: null }));
   updateUnpricedUsageWindow = vi.fn(async () => undefined);
   findUnpricedUsageWindows = vi.fn(async () => []);
@@ -158,6 +159,7 @@ function harness({ ottl = MemoryOttlTransformChannel.create() } = {}) {
     diagnostics: new FakeDiagnostics(),
     ottl,
     now: () => NOW,
+    facts: IngestionSourceFactsService.create({ reportError: () => {} }),
   });
   return { service, repository, projects, findWithTeam, entitlements, lifecycle };
 }
@@ -1032,6 +1034,36 @@ describe("IngestionSourceService", () => {
         expect(findPullConfigComplaints({ adapter })).toEqual([]);
         expect(findPullCredentialComplaints({ adapter })).toEqual([]);
       }
+    });
+  });
+
+  describe("given a Google Cloud source holding a service account key", () => {
+    describe("when an admin reads it back", () => {
+      /** @scenario "The service account key is sealed and never read back" */
+      it("shows the source without the key's value", async () => {
+        const { service, repository, projects } = harness();
+        repository.row = source({
+          sourceType: "gcp_vertex_agent_engine",
+          parserConfig: {
+            adapter: "gcp_vertex_agent_engine",
+            targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+            credentials: { serviceAccountJson: '{"private_key":"-----BEGIN KEY-----"}' },
+          },
+        });
+        const reads = IngestionSourceReadService.create({
+          sources: service,
+          pullRuns: MemoryIngestionPullRunRepository.create(),
+          projects,
+        });
+
+        const [listed] = await reads.list("org-1");
+
+        expect(listed?.parserConfig).toEqual({
+          adapter: "gcp_vertex_agent_engine",
+          targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+        });
+        expect(JSON.stringify(listed)).not.toContain("BEGIN KEY");
+      });
     });
   });
 });

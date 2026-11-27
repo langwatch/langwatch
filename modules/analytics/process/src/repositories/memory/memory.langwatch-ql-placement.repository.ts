@@ -41,6 +41,7 @@ export class MemoryLangWatchQLPlacementRepository extends LangWatchQLPlacementRe
     return Promise.resolve({
       recordedPrivate: this.recordedPrivate.has(tenantId),
       routedPrivately,
+      organizationId: routedPrivately ? tenantId : null,
       origin: routedPrivately ? `http://${tenantId}.memory.invalid:8123` : this.sharedOrigin,
     });
   }

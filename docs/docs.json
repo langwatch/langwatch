@@ -153,6 +153,7 @@
               },
               "agent-testing/voice-agents",
               "agent-testing/red-teaming",
+              "agent-testing/owasp-red-team",
               "agent-testing/red-team-templates",
               "agent-testing/red-team-open-source"
             ]
@@ -650,7 +651,8 @@
               "ai-gateway/overview",
               "ai-gateway/quickstart",
               "ai-gateway/cap-spend-per-team",
-              "ai-gateway/concepts"
+              "ai-gateway/concepts",
+              "ai-gateway/a2a-proxy"
             ]
           },
           {
@@ -873,7 +875,8 @@
               "ai-governance/ingestion-sources/s3-custom",
               "ai-governance/ingestion-sources/copilot-studio",
               "ai-governance/ingestion-sources/openai-compliance",
-              "ai-governance/ingestion-sources/claude-compliance"
+              "ai-governance/ingestion-sources/claude-compliance",
+              "ai-governance/cloud-agent-discovery"
             ]
           },
           {
@@ -1459,9 +1462,11 @@
               "api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest",
               "api-reference/governance-agent-registry/read-the-registry-change-feed",
               "api-reference/governance-agent-registry/get-the-registry-s-json-schemas",
+              "api-reference/governance-agent-registry/get-the-registry-settings",
               "api-reference/governance-agent-registry/search-the-registry-ard-search",
               "api-reference/governance-agent-registry/get-one-registry-agent",
-              "api-reference/governance-agent-registry/list-one-registry-agent-s-versions"
+              "api-reference/governance-agent-registry/list-one-registry-agent-s-versions",
+              "api-reference/governance-agent-registry/save-the-registry-settings"
             ]
           },
           {

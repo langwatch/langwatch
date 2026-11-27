@@ -467,7 +467,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended."
+          "documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended. The expiry sweep reads it through a partial\nindex (20261126190001_session_impersonation_expiry_index), raw SQL since\nPrisma cannot express one."
         },
         {
           "name": "lastSeenAt",
@@ -3553,6 +3553,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Department assignment for spend attribution (the people lens).\nSingle-valued, org-scoped, accounting-only (never gates access).\nPlain column ref (relationMode=\"prisma\"); the service validates the\nid belongs to this org. See departments.feature."
+        },
+        {
+          "name": "billingOnly",
+          "columnName": "billingOnly",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A Billing-only member (ADR-205): role EXTERNAL, the Billing grant, no team and\nno seat. Any role change clears it. See billing-only-invite.feature."
         },
         {
           "name": "disabledAt",
@@ -8100,6 +8109,15 @@
           "documentation": ""
         },
         {
+          "name": "billingOnly",
+          "columnName": "billingOnly",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Invites the person who pays with the Billing grant and no seat (ADR-205)."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",
@@ -9445,6 +9463,79 @@
       ]
     },
     {
+      "name": "DashboardSidebarOrder",
+      "tableName": "DashboardSidebarOrder",
+      "documentation": "One member's own order of a product sidebar's Dashboards section in one organization.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "homeProduct",
+          "columnName": "homeProduct",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The product whose sidebar section this orders: llm-ops, me, gateway or governance."
+        },
+        {
+          "name": "dashboardIds",
+          "columnName": "dashboardIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "Board ids in the member's order; a board not named lists after them, by name."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "DashboardsV2",
       "tableName": "DashboardsV2",
       "documentation": "A Dashboards v2 board, apart from the Analytics Reports boards in Dashboard. Boards\nmade before the split were copied here with their ids, so stars and insight\npointers still name them. No relation, per the database rule.",
@@ -9514,6 +9605,24 @@
           "isList": false,
           "isOptional": true,
           "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before."
+        },
+        {
+          "name": "homeProduct",
+          "columnName": "homeProduct",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,\ndecision 8). Every board made before homes existed is llm-ops."
+        },
+        {
+          "name": "myDashboardOfUserId",
+          "columnName": "myDashboardOfUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member whose own My dashboard this is, whatever it is named; null on every other\nboard. Rows made before the column are filled by dashboard:mark-my-dashboards."
         },
         {
           "name": "excludedOrigins",
@@ -12437,6 +12546,15 @@
         {
           "name": "customEmbeddingsModels",
           "columnName": "customEmbeddingsModels",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastListedModelIds",
+          "columnName": "lastListedModelIds",
           "type": "Json",
           "kind": "scalar",
           "isList": false,
@@ -15637,6 +15755,53 @@
           "name": "recordedAt",
           "columnName": "recordedAt",
           "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "TracePlanLimitRefusal",
+      "tableName": "TracePlanLimitRefusal",
+      "documentation": "Ingestion batches refused for the plan limit, one row per project and UTC day, owned by trace.",
+      "primaryKey": [
+        "projectId",
+        "day"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "refusals",
+          "columnName": "refusals",
+          "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
@@ -21619,7 +21784,7 @@
     {
       "name": "NurturingUncopiedProject",
       "tableName": "NurturingUncopiedProject",
-      "documentation": "A project nurturing saw traces of with no placement copy, and when it first did: every worker\nretries its trace batches only within one window from then, across restarts. Deleted when the\ncopy lands.",
+      "documentation": "retired: unread since v3.28.0. The trace-day folds count a trace with no placement copy, so no\nretry clock reads or writes this table; an operator step may drop it once old writers are gone.",
       "primaryKey": [
         "projectId"
       ],
@@ -21720,6 +21885,225 @@
         {
           "name": "createdAt",
           "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingOrganizationPlan",
+      "tableName": "NurturingOrganizationPlan",
+      "documentation": "Each organization's plan, folded from billing's subscription_changed facts: nurturing's own\ncopy. The newest fact wins, and a real fact wins a tie over a catch-up; Customer.io hears a\nfact only when it changes this row.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "plan",
+          "columnName": "plan",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "fromCatchUp",
+          "columnName": "fromCatchUp",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids folded in, so a redelivery folds once."
+        },
+        {
+          "name": "winnerEventId",
+          "columnName": "winnerEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The fact that last changed the row; only it may tell Customer.io."
+        }
+      ]
+    },
+    {
+      "name": "NurturingVirtualKey",
+      "tableName": "NurturingVirtualKey",
+      "documentation": "Each gateway virtual key, folded from gateway's vk_lifecycle facts: nurturing's own copy. The\ncreator comes from the created fact alone; the holder and purpose are each the latest non-null\nvalue by the fact's time (stamped beside them); the state times keep their latest.",
+      "primaryKey": [
+        "virtualKeyId"
+      ],
+      "fields": [
+        {
+          "name": "virtualKeyId",
+          "columnName": "virtualKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "keyCreatedAt",
+          "columnName": "keyCreatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "creatorUserId",
+          "columnName": "creatorUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "principalUserId",
+          "columnName": "principalUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "principalUserIdAt",
+          "columnName": "principalUserIdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "purpose",
+          "columnName": "purpose",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "purposeAt",
+          "columnName": "purposeAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "disabledAt",
+          "columnName": "disabledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "enabledAt",
+          "columnName": "enabledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "revokedAt",
+          "columnName": "revokedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingErasedUser",
+      "tableName": "NurturingErasedUser",
+      "documentation": "Each account nurturing erased, as a SHA-256 of its id and never the id: a gateway key fact\nnaming it, however late it lands, stores no creator or holder. Platform-wide, like the erasure.",
+      "primaryKey": [
+        "userIdHash"
+      ],
+      "fields": [
+        {
+          "name": "userIdHash",
+          "columnName": "userIdHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "erasedAt",
+          "columnName": "erasedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
@@ -21854,6 +22238,15 @@
           "documentation": ""
         },
         {
+          "name": "adminAt",
+          "columnName": "adminAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",
@@ -21867,7 +22260,7 @@
     {
       "name": "NurturingProjectUsageView",
       "tableName": "NurturingProjectUsageView",
-      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDay.",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDayCount.",
       "primaryKey": [
         "projectId",
         "owner"
@@ -21889,7 +22282,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),\nor `evaluation`: the project's evaluation days, written by a subscriber, at most once a day."
+          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation).\nEvaluation days are not kept here: the evaluation-days map and its replay write them to\nNurturingProjectEvaluationDay."
         },
         {
           "name": "folded",
@@ -21932,7 +22325,7 @@
     {
       "name": "NurturingProjectTraceDay",
       "tableName": "NurturingProjectTraceDay",
-      "documentation": "Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a\nroot span being one trace, one row per project and UTC day of append time, incremented in place\nby each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.",
+      "documentation": "retired: unread since v3.28.0. Replaced by NurturingProjectTraceDayCount, which the trace-day\npeer folds write and a replay rebuilds; an operator step may drop it once old writers are gone.",
       "primaryKey": [
         "projectId",
         "day"
@@ -21991,6 +22384,128 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Append time of the newest trace_failed."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectTraceDayCount",
+      "tableName": "NurturingProjectTraceDayCount",
+      "documentation": "Nurturing's own trace counts (ARCHITECTURE §9), one row per project, UTC day of append time and\nsource: `spans` from trace's span_received peer fold (a customer root span is one trace),\n`failures` from trace_failed's. Each fold owns its rows, so the two never overwrite each other;\nreaders sum a day's sources. Rebuilt by a projection replay. Kept 30 days.",
+      "primaryKey": [
+        "projectId",
+        "day",
+        "source"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD` of the facts' append time."
+        },
+        {
+          "name": "source",
+          "columnName": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The peer fold that wrote the row: `spans` or `failures`."
+        },
+        {
+          "name": "traceCount",
+          "columnName": "traceCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "errorCount",
+          "columnName": "errorCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest root span."
+        },
+        {
+          "name": "lastFailedTraceAt",
+          "columnName": "lastFailedTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest trace_failed."
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A row of another version reads as undecodable and is left out of the read."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectEvaluationDay",
+      "tableName": "NurturingProjectEvaluationDay",
+      "documentation": "Each project and UTC day with a completed evaluation, from evaluation's lifecycle_completed,\nwritten insert-ignore. Replaces the `evaluation` rows of NurturingProjectUsageView.",
+      "primaryKey": [
+        "projectId",
+        "day"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD`."
         }
       ]
     },
@@ -27660,6 +28175,82 @@
       ]
     },
     {
+      "name": "StoredObjectOwner",
+      "tableName": "StoredObjectOwner",
+      "documentation": "",
+      "primaryKey": [
+        "tenantId",
+        "objectId",
+        "ownerKind",
+        "ownerId"
+      ],
+      "fields": [
+        {
+          "name": "tenantId",
+          "columnName": "tenantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "objectId",
+          "columnName": "objectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerKind",
+          "columnName": "ownerKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerId",
+          "columnName": "ownerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "retainUntil",
+          "columnName": "retainUntil",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "DiscoveredPerson",
       "tableName": "DiscoveredPerson",
       "documentation": "A name-text seen on a provider's cost or audit rows: \"the provider told us\nsomeone called m.silva exists\". One row per provider-scoped identity.\n\nThis is the unit of GDPR erasure (ADR-128 §9), and deliberately so: most of\nthese people have no LangWatch login at all - contractors, seat holders who\nnever signed in, anyone whose email a provider put on a cost row - so there\nis no platform user to key on and a user-deletion event can never fire for\nthem.",
@@ -27892,6 +28483,88 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DiscoveredAgentListing",
+      "tableName": "DiscoveredAgentListing",
+      "documentation": "One source's presence fact for one discovered agent. An agent is gone only when every\nsource that listed it marked it gone; an agent no source listed (older sightings) never is.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ingestionSourceId",
+          "columnName": "ingestionSourceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "discoveredAgentId",
+          "columnName": "discoveredAgentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastListedAt",
+          "columnName": "lastListedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "goneAt",
+          "columnName": "goneAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set when this source's listing stopped naming the agent; cleared when it names it again."
         },
         {
           "name": "createdAt",
@@ -28160,6 +28833,43 @@
         {
           "name": "baselinedAt",
           "columnName": "baselinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "AgentRegistrySettings",
+      "tableName": "AgentRegistrySettings",
+      "documentation": "An organisation's agent registry settings. No row reads as the defaults.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "dormantAfterDays",
+          "columnName": "dormantAfterDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Days without traffic after which a listed agent reads as dormant."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,
@@ -30053,6 +30763,1024 @@
           "isList": false,
           "isOptional": false,
           "documentation": "The last sso event applied: the row's idempotency guard and its version."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StaffAccessRequester",
+      "tableName": "StaffAccessRequester",
+      "documentation": "An operator's enrolled coding agent (ADR-202, staff-access module). Its key `lwsr_<lookupId>_<secret>`\ncan only create, poll, redeem and end its own staff access requests; the secret is stored as its SHA-256 hash.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lookupId",
+          "columnName": "lookupId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "hashedSecret",
+          "columnName": "hashedSecret",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "revokedAt",
+          "columnName": "revokedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastUsedAt",
+          "columnName": "lastUsedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StaffAccessChallenge",
+      "tableName": "StaffAccessChallenge",
+      "documentation": "A single-use WebAuthn challenge staff access issued to one person, for one purpose.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "purpose",
+          "columnName": "purpose",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "challenge",
+          "columnName": "challenge",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "usedAt",
+          "columnName": "usedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StaffAccessRequest",
+      "tableName": "StaffAccessRequest",
+      "documentation": "One staff access request and, once redeemed, the one-hour session it became.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "requesterId",
+          "columnName": "requesterId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopes",
+          "columnName": "scopes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "functions",
+          "columnName": "functions",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The ops functions the approval named; the passkey signed this list."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "organizationName",
+          "columnName": "organizationName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "reason",
+          "columnName": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "codeChallenge",
+          "columnName": "codeChallenge",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "machine",
+          "columnName": "machine",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "requestIp",
+          "columnName": "requestIp",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "approvedAt",
+          "columnName": "approvedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "spendApproved",
+          "columnName": "spendApproved",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "approvalCredentialId",
+          "columnName": "approvalCredentialId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "approvalSignature",
+          "columnName": "approvalSignature",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "signedHash",
+          "columnName": "signedHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "redeemedAt",
+          "columnName": "redeemedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "pinnedIp",
+          "columnName": "pinnedIp",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "apiKeyId",
+          "columnName": "apiKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "hashedOpsToken",
+          "columnName": "hashedOpsToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "opsTokenLookupId",
+          "columnName": "opsTokenLookupId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "accessExpiresAt",
+          "columnName": "accessExpiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "revokedAt",
+          "columnName": "revokedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "revokedByUserId",
+          "columnName": "revokedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "revokeCause",
+          "columnName": "revokeCause",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "endAuditedAt",
+          "columnName": "endAuditedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "StaffAccessEvent",
+      "tableName": "StaffAccessEvent",
+      "documentation": "The trail: one row per call a staff session made, written before its handler ran.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "requestId",
+          "columnName": "requestId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "at",
+          "columnName": "at",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "method",
+          "columnName": "method",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "path",
+          "columnName": "path",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "operation",
+          "columnName": "operation",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "functionName",
+          "columnName": "functionName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The ops function called, its input as JSON, and how many rows it answered."
+        },
+        {
+          "name": "functionInput",
+          "columnName": "functionInput",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "rowCount",
+          "columnName": "rowCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "permissions",
+          "columnName": "permissions",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "errorCode",
+          "columnName": "errorCode",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "durationMs",
+          "columnName": "durationMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "ipAddress",
+          "columnName": "ipAddress",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "userAgent",
+          "columnName": "userAgent",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DigestCohortOrganization",
+      "tableName": "DigestCohortOrganization",
+      "documentation": "An organization enrolled in the weekly digest. No row: not enrolled, so nothing sends.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "enrolledBy",
+          "columnName": "enrolledBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "enrolledAt",
+          "columnName": "enrolledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DigestSubscription",
+      "tableName": "DigestSubscription",
+      "documentation": "A person's opt-out of the digest. No row, or no `unsubscribedAt`: subscribed.",
+      "primaryKey": [
+        "userId"
+      ],
+      "fields": [
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "unsubscribedAt",
+          "columnName": "unsubscribedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "unsubscribedFromSendId",
+          "columnName": "unsubscribedFromSendId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The send whose unsubscribe link or one-click header the person used."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DigestProjectWeek",
+      "tableName": "DigestProjectWeek",
+      "documentation": "A project's ISO week, folded from its owners' events. The id is the fold's aggregate key.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "isoWeek",
+          "columnName": "isoWeek",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "state",
+          "columnName": "state",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The fold state: counts, sums, a fixed-bucket latency histogram, capped model and evaluator maps."
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DigestUserWeek",
+      "tableName": "DigestUserWeek",
+      "documentation": "A person's ISO week of coding-agent activity in one organization, folded from the agents' facts.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "isoWeek",
+          "columnName": "isoWeek",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "state",
+          "columnName": "state",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Sessions (a capped set of ids) and the agents' metric series, converged last-write-wins."
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DigestSend",
+      "tableName": "DigestSend",
+      "documentation": "One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "isoWeek",
+          "columnName": "isoWeek",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "templateId",
+          "columnName": "templateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sentAt",
+          "columnName": "sentAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DigestSettings",
+      "tableName": "DigestSettings",
+      "documentation": "The digest's one settings row. `armed` is the weekly send's master switch; it starts off.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "armed",
+          "columnName": "armed",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastPlannedWeek",
+          "columnName": "lastPlannedWeek",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
         },
         {
           "name": "updatedAt",

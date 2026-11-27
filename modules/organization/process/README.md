@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:275`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:276`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -1158,6 +1158,14 @@ The same summaries for these ids; an id with no organization is left out.
 findForOperators(input: Readonly<{ organizationIds: readonly string[] }>): Promise<OrganizationOperatorSummary[]>;
 ```
 
+#### `getOpsSnapshot`
+
+One organization for a staff investigation: ids, counts and its creation time, never a name, slug or address (ADR-202, ops functions). Throws `OrganizationNotFoundError`.
+
+```typescript
+getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
+```
+
 ## REST transport
 
 ### `groupsRest`
@@ -1962,45 +1970,33 @@ Contract `../contract/src/invite.trpc.ts:27`, router `src/transport/invite.trpc.
 
 ```typescript
 // invite.createInvites
-type Input = z.infer<typeof organizationApiCreateInvitesInputSchema>; // ../contract/src/organization.trpc-schemas.ts:197
-type Output = z.infer<typeof organizationInvitesCreatedSchema>; // ../contract/src/organization.responses.ts:68
+type Input = z.infer<typeof organizationApiCreateInvitesInputSchema>; // ../contract/src/organization.trpc-schemas.ts:199
+type Output = z.infer<typeof organizationInvitesCreatedSchema>; // ../contract/src/organization.responses.ts:70
 
 // invite.deleteInvite
-// Input: organizationApiInviteScopeSchema, ../contract/src/organization.trpc-schemas.ts:210
+// Input: organizationApiInviteScopeSchema, ../contract/src/organization.trpc-schemas.ts:212
 interface Input {
   inviteId: string;
   organizationId: string;
 }
 
 // invite.resendInvite
-type Input = z.infer<typeof organizationApiInviteScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:210
-type Output = z.infer<typeof organizationInviteResentSchema>; // ../contract/src/organization.responses.ts:71
+type Input = z.infer<typeof organizationApiInviteScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:212
+type Output = z.infer<typeof organizationInviteResentSchema>; // ../contract/src/organization.responses.ts:73
 
 // invite.getOrganizationPendingInvites
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:114
+type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:116
 
 // invite.acceptInvite
-// Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:259
+// Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:261
 interface Input {
   inviteCode: string;
 }
-// Output: organizationInviteAcceptedSchema, ../contract/src/organization.responses.ts:128
-interface Output {
-  success: true;
-  invite: {
-    organization: {
-      id: string;
-      name: string;
-    };
-  };
-  project: {
-    slug: string;
-  } | null;
-}
+type Output = z.infer<typeof organizationInviteAcceptedSchema>; // ../contract/src/organization.responses.ts:132
 
 // invite.upgradeWithInvites
-// Input: organizationApiSeatCheckoutInputSchema, ../contract/src/organization.trpc-schemas.ts:236
+// Input: organizationApiSeatCheckoutInputSchema, ../contract/src/organization.trpc-schemas.ts:238
 interface Input {
   organizationId: string;
   baseUrl: string;
@@ -2013,7 +2009,7 @@ interface Input {
     role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   }[];
 }
-// Output: organizationSeatCheckoutRedirectSchema, ../contract/src/organization.trpc-schemas.ts:249
+// Output: organizationSeatCheckoutRedirectSchema, ../contract/src/organization.trpc-schemas.ts:251
 interface Output {
   url: string | null;
 }
@@ -2021,7 +2017,7 @@ interface Output {
 // invite.myPendingInvitation
 // Input: inline, ../contract/src/invite.trpc.ts:57
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:158
+// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:162
 interface Output {
   inviteCode: string | null;
 }
@@ -2029,7 +2025,7 @@ interface Output {
 // invite.pendingForMe
 // Input: inline, ../contract/src/invite.trpc.ts:62
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:197
+// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:201
 type Output = {
   inviteCode: string;
   organizationName: string;
@@ -2128,13 +2124,13 @@ interface Output {
 }
 
 // organization.deleteMember
-// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:450
+// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:459
 interface Input {
   organizationId: string;
   userId: string;
   giveSeatToUserId?: string | null;
 }
-// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:467
+// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:476
 interface Output {
   success: true;
   seatGivenToUserId: string | null;
@@ -2147,7 +2143,7 @@ interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:490
+// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:499
 interface Output {
   holdsFullSeat: boolean;
   seatFreesAt: unknown | null;
@@ -2160,7 +2156,7 @@ interface Output {
 
 // organization.listHeldSeats
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:513
+// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:522
 interface Output {
   heldSeats: {
     userId: string;
@@ -2193,9 +2189,9 @@ interface Input {
 type Output = unknown[];
 
 // organization.getScopeGraph
-// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:66
+// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:68
 type Input = Record<string, unknown>;
-type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:71
+type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:73
 
 // organization.update
 // Input: organizationApiUpdateInputSchema, ../contract/src/organization.trpc-schemas.ts:160
@@ -2219,11 +2215,11 @@ interface Input {
   organizationId: string;
   includeDeactivated?: boolean;
 }
-type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:305
+type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:313
 
 // organization.getDirectoryCounts
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:322
+// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:330
 interface Output {
   members: number;
   openInvites: number;
@@ -2234,18 +2230,18 @@ interface Output {
 
 // organization.getMemberById
 type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:37
-type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:270
+type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:276
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:425
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:434
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
 }
 
 // organization.updateTeamMemberRole
-// Input: organizationApiUpdateTeamMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:324
+// Input: organizationApiUpdateTeamMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:326
 interface Input {
   teamId: string;
   userId: string;
@@ -2256,7 +2252,7 @@ type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/org
 
 // organization.getAllOrganizationMembers
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:246
+// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:250
 type Output = {
   id: string;
   name: string | null;
@@ -2265,7 +2261,7 @@ type Output = {
 }[];
 
 // organization.updateMemberRole
-// Input: organizationApiUpdateMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:283
+// Input: organizationApiUpdateMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:285
 interface Input {
   userId: string;
   organizationId: string;
@@ -2277,7 +2273,7 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:336
+// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:344
 interface Output {
   success: true;
   teamsLeftWithoutAdmin: {
@@ -2288,7 +2284,7 @@ interface Output {
 
 // organization.getDocsPlaygroundPolicy
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:268
+// Output: docsPlaygroundPolicySchema, ../contract/src/organization.ts:293
 interface Output {
   docsPlaygroundSessionsEnabled: boolean;
   docsPlaygroundSessionsDisabledAt: unknown | null;
@@ -2303,7 +2299,7 @@ interface Input {
 type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:14
 
 // organization.getAuditLogs
-// Input: organizationApiAuditLogsInputSchema, ../contract/src/organization.trpc-schemas.ts:348
+// Input: organizationApiAuditLogsInputSchema, ../contract/src/organization.trpc-schemas.ts:350
 interface Input {
   organizationId: string;
   projectId?: string;
@@ -2316,7 +2312,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:388
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:397
 ```
 
 ### `personalWorkspaceFeatures`
@@ -2535,27 +2531,30 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:120`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationDocsPlaygroundSessionsDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationCreatedEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:126`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationDocsPlaygroundSessionsDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationMemberRoleChangedEventSchema`, `organizationMemberAdmittedEventSchema`, `organizationCreatedEventSchema`, `organizationMemberListedEventSchema`.
 
 | Kind    | Name                                     | Handles | Declared at                                           |
 | ------- | ---------------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:143` |
-| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:144` |
-| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:145` |
-| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:146` |
-| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:147` |
-| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:148` |
-| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:149` |
-| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:150` |
-| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:151` |
-| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
-| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
-| command | `recordDocsPlaygroundSessionsDisabled`   | –       | `src/eventing/organization-lifecycle.pipeline.ts:157` |
-| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:161` |
-| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:162` |
-| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:163` |
-| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:164` |
-| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:165` |
+| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:152` |
+| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:153` |
+| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:154` |
+| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
+| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
+| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:157` |
+| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:158` |
+| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:159` |
+| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:160` |
+| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:164` |
+| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:165` |
+| command | `recordDocsPlaygroundSessionsDisabled`   | –       | `src/eventing/organization-lifecycle.pipeline.ts:166` |
+| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:170` |
+| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:171` |
+| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:172` |
+| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:173` |
+| command | `recordMemberRoleChanged`                | –       | `src/eventing/organization-lifecycle.pipeline.ts:174` |
+| command | `recordMemberAdmitted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:175` |
+| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:176` |
+| command | `recordMemberListed`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:177` |
 
 ### Pipeline `organization_private_dataplane_recorder` (aggregate `global`)
 
@@ -2596,7 +2595,7 @@ Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSc
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:335`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:342`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

@@ -14,18 +14,20 @@ import type {
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_PROMPT_VERSION,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-derived.projection.ts";
 import type { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
 
 /**
- * The projection stamps `getWithApplied` will decode: the current shape, the one before it (no
- * outcomes or metadata columns; its read-back state is otherwise the same), and the pre-split
- * shape it can read unambiguously. Everything older is a store miss.
+ * The projection stamps `getWithApplied` will decode: the current shape, the two before it (no
+ * prompt version; no outcomes or metadata columns; their read-back state is otherwise the same),
+ * and the pre-split shape it can read unambiguously. Everything older is a store miss.
  */
 const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_PROMPT_VERSION,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 ]);

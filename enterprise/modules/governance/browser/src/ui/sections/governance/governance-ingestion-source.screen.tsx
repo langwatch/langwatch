@@ -18,7 +18,10 @@ import {
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
-import { ingestionSourceIsLive } from "@langwatch/enterprise-governance-contract";
+import {
+  ingestionSourceIsLive,
+  SECURITY_LAKE_SOURCE_TYPE,
+} from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
@@ -34,7 +37,6 @@ import { confirmArchiveSource } from "../../../features/ingestion-sources/model/
 import {
   needsIngestSecret,
   SOURCE_TYPE_OPTIONS,
-  type SourceType,
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   runCompleteness,
@@ -84,6 +86,9 @@ function isNotFoundError(error: unknown): boolean {
   return readHandledError(error)?.httpStatus === 404;
 }
 
+/** Where a Security Lake source is edited: its own section on the Sources tab. */
+const SECURITY_LAKE_SETTINGS_HREF = "/governance/inventory?tab=sources";
+
 const fmtRelative = (iso: string | null): string =>
   iso ? (formatTimeAgo(toEpochMs(iso)) ?? "-") : "-";
 
@@ -91,8 +96,8 @@ function formatMoment(value: TimeInput): string {
   return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value))).toLocaleString();
 }
 
-/** Back link, name, status, and the two manage-only controls. */
-function SourceDetailHeader({
+/** Back link, name, status, and the manage-only controls. */
+export function SourceDetailHeader({
   source,
   canManage,
   isRotating,
@@ -141,12 +146,19 @@ function SourceDetailHeader({
           `ingestionSources:manage`. */}
       {canManage && (
         <>
-          <PageLayout.HeaderButton onClick={onEdit} title="Edit this source's configuration">
-            <Pencil size={14} /> Edit
-          </PageLayout.HeaderButton>
-          {needsIngestSecret({
-            sourceType: source.sourceType as SourceType,
-          }) && (
+          {source.sourceType === SECURITY_LAKE_SOURCE_TYPE ? (
+            <PageLayout.HeaderButton
+              onClick={() => router.push(SECURITY_LAKE_SETTINGS_HREF)}
+              title="Security Lake sources are edited in their own section"
+            >
+              <Pencil size={14} /> Edit in Security Lake settings
+            </PageLayout.HeaderButton>
+          ) : (
+            <PageLayout.HeaderButton onClick={onEdit} title="Edit this source's configuration">
+              <Pencil size={14} /> Edit
+            </PageLayout.HeaderButton>
+          )}
+          {needsIngestSecret({ sourceType: source.sourceType }) && (
             <PageLayout.HeaderButton
               onClick={onRotate}
               loading={isRotating}

@@ -23,7 +23,7 @@ Feature: Langy's chart skill follows the Dashboards flag
   Scenario: Langy places a chart on the dashboard in context and asks when none is
     Given either chart skill, `dashboard-widgets` or `lwql-charts`
     When Langy is about to place a chart on a dashboard
-    Then the skill says to use the dashboard in the user's context
+    Then the skill says to use the dashboard the user named, or else the one they are on
     And when no dashboard is in context, to ask which board with the question tool
     And never to pick one from `langwatch analytics-report list` or `langwatch dashboard list` on its own
 

@@ -12,7 +12,10 @@ import type {
 } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceLogRecordReader } from "../../../claude-code/rules/claude-code-log-enrichment.rules.ts";
+import type {
+  TraceLogRecordBatchReader,
+  TraceLogRecordReader,
+} from "../../../claude-code/rules/claude-code-log-enrichment.rules.ts";
 
 const {
   mockGetTracesWithSpans,
@@ -150,8 +153,24 @@ function refusingEvaluations<T extends object>(): T {
   ) as T;
 }
 
+/** A batch reader answering each trace through the single-trace double, so both count reads. */
+function batchOver(
+  getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"],
+): TraceLogRecordBatchReader["getLogsByTraceIds"] {
+  return async ({ tenantId, traces }) =>
+    new Map(
+      await Promise.all(
+        traces.map(
+          async ({ traceId, occurredAtMs }) =>
+            [traceId, await getLogsByTraceId({ tenantId, traceId, occurredAtMs })] as const,
+        ),
+      ),
+    );
+}
+
 function makeService(
   getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"],
+  getLogsByTraceIds: TraceLogRecordBatchReader["getLogsByTraceIds"] = batchOver(getLogsByTraceId),
 ): TraceLegacyReadService {
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
@@ -176,7 +195,7 @@ function makeService(
       "legacy trace mapping",
     ),
     editOverlay: {} as TraceEditOverlayService,
-    logRecordStorage: { getLogsByTraceId },
+    logRecordStorage: { getLogsByTraceId, getLogsByTraceIds },
     // The enrichment join reads no evaluation; a refusing double proves it.
     evaluationRuns: refusingEvaluations(),
   });
@@ -361,6 +380,50 @@ describe("TraceService — multi-trace read enrichment", () => {
 
       expect(getLogs).not.toHaveBeenCalled();
       expect(traces[0]?.spans?.[0]?.input ?? null).toBeNull();
+    });
+  });
+
+  describe("when a thread read answers 95 coding-agent traces", () => {
+    /** @scenario "A page of coding-agent traces reads its logs a batch at a time" */
+    it("reads their logs in 10 batched reads, one at a time, and none trace by trace", async () => {
+      const traceIds = Array.from({ length: 95 }, (_, index) =>
+        index.toString(16).padStart(32, "0"),
+      );
+      mockGetTracesWithSpansByThreadIds.mockResolvedValue(
+        traceIds.map((traceId) => ({
+          ...makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan({ trace_id: traceId })] }),
+          trace_id: traceId,
+        })),
+      );
+      const getLogs = vi.fn().mockResolvedValue([]);
+      let inFlight = 0;
+      let peakInFlight = 0;
+      const batchSizes: number[] = [];
+      const getLogsBatch = vi.fn<TraceLogRecordBatchReader["getLogsByTraceIds"]>(
+        async ({ traces }) => {
+          inFlight += 1;
+          peakInFlight = Math.max(peakInFlight, inFlight);
+          batchSizes.push(traces.length);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          inFlight -= 1;
+          return new Map(traces.map(({ traceId }) => [traceId, CLAUDE_LOG_ROWS]));
+        },
+      );
+      const service = makeService(getLogs, getLogsBatch);
+
+      const traces = await service.getTracesWithSpansByThreadIds({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        threadIds: ["thread-1"],
+        protections,
+      });
+
+      expect(getLogsBatch).toHaveBeenCalledTimes(10);
+      expect(batchSizes).toEqual([10, 10, 10, 10, 10, 10, 10, 10, 10, 5]);
+      expect(peakInFlight).toBe(1);
+      expect(getLogs).not.toHaveBeenCalled();
+      expect(traces).toHaveLength(95);
+      expect(traces.every((trace) => trace.spans?.[0]?.input !== null)).toBe(true);
     });
   });
 

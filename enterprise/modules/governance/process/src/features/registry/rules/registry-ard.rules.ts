@@ -65,6 +65,8 @@ function ardEntryOf({
       "langwatch:source": entry.source,
       "langwatch:management": entry.management,
       "langwatch:status": entry.status,
+      "langwatch:posture": entry.posture,
+      ...(entry.platform ? { "langwatch:platform": entry.platform } : {}),
     },
   };
 }

@@ -12,6 +12,11 @@ import {
   buildOpenAiAdminPullConfig,
 } from "./admin-api-pull-config.ts";
 import {
+  buildArdRegistryPullConfig,
+  buildAwsBedrockAgentsPullConfig,
+  buildGcpVertexAgentEnginePullConfig,
+} from "./cloud-agent-pull-config.ts";
+import {
   buildCopilotStudioDataversePullConfig,
   copilotStudioRefusalCopy,
 } from "./copilot-studio-pull-config.ts";
@@ -45,6 +50,9 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "openai_admin",
   "anthropic_admin",
   "claude_compliance",
+  "aws_bedrock_agents",
+  "gcp_vertex_agent_engine",
+  "ard_registry",
 ] as const;
 
 type PullConfigBuilderSourceType = (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
@@ -88,6 +96,23 @@ export function resolvePullConfig(
       shouldRequireCredentials
         ? "The workspace API key is required: without it every run authenticates with an unresolved template."
         : "Leave the workspace API key blank to keep the current one.",
+    ],
+    aws_bedrock_agents: [
+      () => buildAwsBedrockAgentsPullConfig(composer),
+      "Missing required AWS fields",
+      "Pick an AWS connection and add at least one region, such as eu-west-1.",
+    ],
+    gcp_vertex_agent_engine: [
+      () => buildGcpVertexAgentEnginePullConfig(composer, { shouldRequireCredentials }),
+      "Missing required Google Cloud fields",
+      shouldRequireCredentials
+        ? "Add a project and a location such as europe-west4 to each row, and paste the service account key."
+        : "Add a project and a location such as europe-west4 to each row. Leave the key blank to keep the saved one.",
+    ],
+    ard_registry: [
+      () => buildArdRegistryPullConfig(composer),
+      "Missing registry address",
+      "The registry's domain or https address is required.",
     ],
     anthropic_admin: [
       () => buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),

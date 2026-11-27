@@ -45,6 +45,7 @@ import {
   type ModelDefaultScope,
   type ModelDefaultSnapshot,
   type ModelProvider,
+  type ModelProviderSave,
   type ModelProviderAlternateResolution,
   type ModelProviderCodexGatewayRefresh,
   type ModelProviderCodexGatewayRefreshInput,
@@ -113,6 +114,7 @@ import {
   HttpModelProviderModelListService,
   type ModelProviderModelList,
 } from "../features/served-models/services/http-model-provider-model-list.service.ts";
+import { ModelProviderModelImportService } from "../features/served-models/services/model-provider-model-import.service.ts";
 import { ModelProviderServedModelsService } from "../features/served-models/services/model-provider-served-models.service.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
@@ -490,6 +492,12 @@ export class ModelProviderModule implements ModelProviderApi {
       ids: infrastructure.ids,
       codexTokenRefresher: infrastructure.codexTokenRefresher,
       connectionRateLimiter: infrastructure.connectionRateLimiter,
+      modelImport: infrastructure.modelList
+        ? ModelProviderModelImportService.create({
+            modelList: infrastructure.modelList,
+            connectionRateLimiter: infrastructure.connectionRateLimiter,
+          })
+        : undefined,
       isOwnDecisionModelAllowed: ({ organizationId }) =>
         dependencies.featureFlags.isEnabled("release_instant_evals_own_decision_model", {
           kind: "organization",
@@ -641,7 +649,10 @@ export class ModelProviderModule implements ModelProviderApi {
   }
 
   /** Stores or replaces a provider row, attributed to the caller. */
-  async upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
+  async upsert(
+    input: ModelProviderWriteRequest,
+    by: ModelProviderCaller,
+  ): Promise<ModelProviderSave> {
     const saved = await this.#modelProviders.upsert({ ...input, actorId: by.id });
     this.#refreshServedModels(saved);
     return saved;
@@ -666,7 +677,7 @@ export class ModelProviderModule implements ModelProviderApi {
    * the key was already held to `project:update` on its one project. The provider
    * string names that project's own row, as main's did.
    */
-  async upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
+  async upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProviderSave> {
     const saved = await this.#modelProviders.upsertByProviderKey(input);
     this.#refreshServedModels(saved);
     return saved;
@@ -827,6 +838,14 @@ export class ModelProviderModule implements ModelProviderApi {
 
   getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
     return this.#modelProviders.getCustomKeys(input);
+  }
+
+  getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
+    return this.#modelProviders.getGatewayCustomKeys(input);
+  }
+
+  getGatewayKeysEpoch(input: { organizationId: string }): string {
+    return this.#modelProviders.getGatewayKeysEpoch(input);
   }
 
   async platformProviderChain(): Promise<PlatformProviderEntry[]> {

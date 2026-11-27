@@ -72,6 +72,41 @@ const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; descripti
   },
 };
 
+/**
+ * Whether a server remediation tip is for a person. A tip that points at a `meta` field is written
+ * for an API caller, who can read that field; a person never sees `meta` (ADR-045).
+ */
+export function isTipForPeople(tip: string): boolean {
+  return !/\bmeta\./.test(tip);
+}
+
+/** The tips for people that add something the description didn't already say. */
+export function supplementalTips({
+  tips,
+  description,
+}: {
+  tips: readonly string[];
+  description: string;
+}): string[] {
+  const forPeople = tips.filter(isTipForPeople);
+  const target = normaliseProse(description);
+  if (!target) return forPeople;
+
+  return forPeople.filter((tip) => {
+    const candidate = normaliseProse(tip);
+    if (!candidate) return false;
+    return !target.includes(candidate);
+  });
+}
+
+/** Words only: two sentences that say the same thing must compare equal. */
+function normaliseProse(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -200,6 +235,41 @@ const reachableSentence = (error: HandledErrorShape): string => {
 const strEq = (error: HandledErrorShape, key: string, expected: string): boolean =>
   str(error, key, "") === expected;
 
+/** Why the outbound policy refused a base URL, and what lifts it, keyed by `meta.refusal`. */
+const ENDPOINT_REFUSAL_COPY: Readonly<Record<string, { title: string; remedy: string }>> = {
+  cloud_internal_domain: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses cloud provider internal domains such as amazonaws.com, and no setting allows them. Point a DNS name of your own at the endpoint, such as a CNAME to the load balancer, and use that as the base URL.",
+  },
+  on_premise_domain: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses .local and .localhost names unless each is allowed by name. On a self-hosted instance, an administrator can add this exact host to ALLOWED_PROXY_HOSTS.",
+  },
+  private_address: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses private and local addresses. On a self-hosted instance, an administrator can add this exact host to ALLOWED_PROXY_HOSTS.",
+  },
+  metadata_endpoint: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "It points at a cloud metadata endpoint, which is always refused. Use the address the provider serves.",
+  },
+  unresolvable_host: {
+    title: "That base URL's host wasn't found",
+    remedy: "Its hostname doesn't resolve. Check the base URL is spelled correctly.",
+  },
+  invalid_url: {
+    title: "That base URL can't be used",
+    remedy: "Use a full http or https address, such as https://inference.acme.internal/v1.",
+  },
+};
+
+const endpointRefusal = (error: HandledErrorShape) =>
+  ENDPOINT_REFUSAL_COPY[str(error, "refusal", "")];
+
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[str(error, "request_type", "")] ??
   "Set the model where this endpoint expects it, then try again.";
@@ -227,7 +297,7 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 /** Creation caps the cloud Free plan sets, named as the pricing page does. */
 const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
-  scenarioSets: "simulations",
+  scenarioRuns: "scenario runs a month",
   evaluators: "custom evaluators",
   testSuites: "suites",
 };
@@ -673,9 +743,9 @@ const presentations = {
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
   lwql_not_provisioned: {
-    title: "Custom SQL isn't set up where this data lives",
+    title: "Dashboards aren't available for this data yet",
     describe: () =>
-      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+      "Dashboards and custom SQL aren't available yet for the data this organisation keeps on its own server. Nothing is wrong with your account, and trying again won't help. Your workspace administrator or LangWatch support can tell you when it will be switched on.",
   },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
@@ -730,6 +800,10 @@ const presentations = {
   dashboard_not_found: {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  dashboard_home_needs_org_scope: {
+    title: "Only an LLM Ops dashboard can be shared with a project",
+    describe: () => "Share it with everyone in the organization, or keep it to yourself.",
   },
   dashboard_read_only_here: {
     title: "This dashboard is read-only here",
@@ -1383,6 +1457,11 @@ const presentations = {
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
+  passkey_assertion_refused: {
+    title: "That passkey didn't confirm it was you",
+    describe: () =>
+      "Use a passkey registered to your own account, unlock it with your fingerprint, face or PIN, then try again.",
+  },
   password_auth_not_available: {
     title: "Passwords aren't used here",
     describe: () =>
@@ -1678,11 +1757,16 @@ const presentations = {
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
   model_provider_invalid: {
+    // `meta.refusal` names why the outbound policy refused the base URL, the same reason the
+    // credential probe reports as `provider_endpoint_refused`, so both say the same thing.
     title: "That provider can't be saved",
-    describe: (error) =>
-      strEq(error, "reason", "endpoint_not_allowed")
+    describe: (error) => {
+      const refusal = endpointRefusal(error);
+      if (refusal) return `${refusal.title}, so nothing was saved. ${refusal.remedy}`;
+      return strEq(error, "reason", "endpoint_not_allowed")
         ? "The base URL can't be used. Check it is a full address such as https://inference.acme.internal/v1 that resolves to a public host, then save again."
-        : "Check the provider's fields, then save again.",
+        : "Check the provider's fields, then save again.";
+    },
   },
   model_provider_custom_keys_missing: {
     title: "This provider has no credentials saved",
@@ -1827,6 +1911,19 @@ const presentations = {
     title: "That endpoint redirects somewhere else",
     describe: () =>
       "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
+  },
+  provider_endpoint_refused: {
+    // Not "we couldn't reach it": nothing was sent. The instance's outbound policy refused the
+    // base URL, and `meta.refusal` says which part of the policy, so the copy names what lifts
+    // it instead of sending an operator to debug a network that works.
+    title: "This instance doesn't send requests to that base URL",
+    titleFor: (error) => endpointRefusal(error)?.title,
+    describe: (error) => {
+      const refusal = endpointRefusal(error);
+      return refusal
+        ? `Nothing was sent, so this API key was not checked. ${refusal.remedy}`
+        : "Its outbound policy refused the base URL, so nothing was sent and this API key was not checked.";
+    },
   },
   provider_key_missing: {
     title: "No API key to check",
@@ -2036,6 +2133,11 @@ const presentations = {
   license_expiry_in_past: {
     title: "That end date has already passed",
     describe: () => "A license can only end on a future date. Pick a later one and try again.",
+  },
+  license_in_use: {
+    title: "An install is using this license",
+    describe: () =>
+      "An install started using this license, so its key keeps working. The new license reaches that install on its next sync.",
   },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
@@ -2915,6 +3017,125 @@ const presentations = {
     describe: () =>
       "The development secrets source could not be read. Sign in to it and try again.",
   },
+  staff_access_unavailable: {
+    title: "Staff access is not available here",
+    describe: () =>
+      "This request came from a LangWatch staff key, and this server cannot record it, so it was refused.",
+  },
+  staff_access_revoked: {
+    title: "This staff access was revoked",
+    describe: () => "An operator ended this staff access, so its key no longer works.",
+  },
+  staff_access_expired: {
+    title: "This staff access has ended",
+    describe: () => "Staff access lasts one hour and this one has run out.",
+  },
+  staff_access_ip_mismatch: {
+    title: "This key is used from another address",
+    describe: () => "Staff access is pinned to the address that redeemed it.",
+  },
+  staff_access_operator_lost: {
+    title: "The approver is no longer an operator",
+    describe: () =>
+      "The operator who approved this access no longer holds the platform operator grant, so it stopped.",
+  },
+  staff_spend_not_approved: {
+    title: "This access cannot start or change runs",
+    describe: () =>
+      "Runs, evaluators, monitors, scenarios and dashboards spend the organization's money, and this access was approved without that. It may change datasets only.",
+  },
+  staff_content_not_approved: {
+    title: "This access cannot read content",
+    describe: () =>
+      "Run results and stored files hold what the organization's users wrote, and this access was approved without content.",
+  },
+  staff_function_unknown: {
+    title: "No such ops function",
+    describe: () =>
+      "The function name is not in the registry. List the functions to see every name.",
+  },
+  staff_function_not_approved: {
+    title: "This function was not approved",
+    describe: () =>
+      "A staff session calls only the functions its approval named. Ask for a new approval that names it.",
+  },
+  staff_function_scope_mismatch: {
+    title: "This function needs another scope",
+    describe: () =>
+      "Lookup and platform functions need ops:read; organization functions need an organization scope.",
+  },
+  staff_function_bad_input: {
+    title: "The function input is not valid",
+    describe: () =>
+      "The input does not match the function's schema, or its time range is longer than 31 days.",
+  },
+  staff_function_bad_cursor: {
+    title: "The page cursor is not valid",
+    describe: () => "Pass the nextCursor of the previous page of this same function, unchanged.",
+  },
+  staff_function_not_found: {
+    title: "Not found in this organization",
+    describe: () =>
+      "The project or record the function asked for is not in the approved organization.",
+  },
+  staff_write_not_allowed: {
+    title: "Staff access cannot make this change",
+    describe: () =>
+      "Staff access never removes or switches off a record, and only changes what it was approved for.",
+  },
+  staff_access_audit_unavailable: {
+    title: "Staff access could not be recorded",
+    describe: () =>
+      "Every staff request is recorded before it runs, and the record could not be written, so the request was refused.",
+  },
+  already_redeemed: {
+    title: "This request was already used",
+    describe: () =>
+      "An approved request gives out its key once, and this one was already redeemed.",
+  },
+  staff_access_not_configured: {
+    title: "Staff access is not set up on this server",
+    describe: () =>
+      "The server has no public base URL, so it cannot build the approval link an operator opens.",
+  },
+  staff_access_already_ended: {
+    title: "This session already ended",
+    describe: () =>
+      "The session was revoked, expired or ended by its agent, so there is nothing to revoke.",
+  },
+  staff_access_confirmation_mismatch: {
+    title: "Confirmation did not match",
+    describe: () => "Type the words exactly as shown to revoke every staff session.",
+  },
+  invalid_code_verifier: {
+    title: "The code verifier does not match",
+    describe: () =>
+      "The agent that redeems a request must present the verifier behind the challenge it sent.",
+  },
+  organization_name_mismatch: {
+    title: "The organization name does not match",
+    describe: () => "This approval needs the organization's name typed exactly as shown.",
+  },
+  passkey_required: {
+    title: "Add a passkey first",
+    describe: () => "Staff access is approved with a passkey, and this account has none.",
+  },
+  staff_access_rate_limited: {
+    title: "Too many access requests",
+    describe: () => "An agent may make five access requests an hour.",
+  },
+  request_not_pending: {
+    title: "This request was already decided",
+    describe: () => "Someone approved or denied this access request already.",
+  },
+  request_expired: {
+    title: "This request expired",
+    describe: () => "An access request waits ten minutes for an approval.",
+  },
+  request_not_approved: {
+    title: "This request is not approved",
+    describe: () => "Only an approved access request can be redeemed.",
+  },
   ops_confirmation_required: {
     title: "Confirm before running this",
     describe: () => "This action can't be undone, so it has to be confirmed first.",
@@ -2939,6 +3160,11 @@ const presentations = {
     describe: (error) => {
       const limitType = str(error, "limitType", "");
       const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
+      if (limitType === "scenarioRuns") {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : "a monthly number of scenario runs";
+        return `Your plan includes ${included} and this month's are used. Upgrade your plan to keep running scenarios, or wait for the count to start again next month.`;
+      }
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
@@ -3249,6 +3475,18 @@ const presentations = {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
   },
+  billing_only_keeps_billing: {
+    // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
+    title: "A Billing-only member always pays",
+    describe: () =>
+      "Billing only is the whole of their membership. To stop them paying, remove them from the organization, or move them to a seat role first.",
+  },
+  billing_only_no_team_access: {
+    // The Billing-only person reaches the plan and invoices, never a project (ADR-205).
+    title: "A Billing-only member joins no team",
+    describe: () =>
+      "Billing only covers the plan, the card and the invoices. To give them a team, invite them with a seat role, or change a current member's role to a seat role first.",
+  },
   billing_plan_price_missing: {
     // fault: platform. The plan the customer picked has no price set up on our
     // side, so there is nothing for them to correct — and telling them to
@@ -3406,6 +3644,19 @@ const presentations = {
     title: "Reports and alerts aren't available on a group project yet",
     describe: () =>
       "Open the chart on the group project to see it, or set the report or alert up on a member project.",
+  },
+  analytics_filter_key_required: {
+    title: "This filter needs a key",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" filters by a key, ` +
+      "such as a metadata key or a metric, so a plain list can't be applied. " +
+      "Pick the key, then the values.",
+  },
+  analytics_filter_value_unsupported: {
+    title: "This filter value isn't one of its options",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" accepts only its option values, ` +
+      "such as true or false. Pick one of the options listed for it.",
   },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
@@ -4200,6 +4451,12 @@ const presentations = {
       return `${need} Ask an administrator, or set the rule on a scope you manage.`.trim();
     },
   },
+  data_privacy_api_key_add_forbidden: {
+    // ADR-208: the caller may edit this rule and keep its keys; only adding one is refused.
+    title: "Only an organization admin can add an API key",
+    describe: () =>
+      "You can still change this rule and keep the keys it names. Ask an organization admin to add the key.",
+  },
   data_privacy_config_invalid: {
     // `meta.reason` is the service's own line naming the offending pattern.
     // It is the only part the reader can act on, so it is what they read.
@@ -4692,6 +4949,47 @@ const presentations = {
       "Another annotation queue in this project already uses it. Pick a different name.",
   },
 
+  // ---- weekly digest emails ----
+  digest_member_not_found: {
+    title: "Member not found",
+    describe: () =>
+      "Only active members of this organization can get a test digest. Pick someone else.",
+  },
+  digest_link_invalid: {
+    title: "This link isn't valid",
+    describe: () => "It may have expired or been changed. Use the link from the latest email.",
+  },
+  digest_nothing_to_send: {
+    title: "Nothing to send this week",
+    describe: () =>
+      "This member's weekly email has no new items to show this week, so nothing was sent.",
+  },
+  digest_links_unavailable: {
+    title: "Unsubscribe links are unavailable",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_operator_address_missing: {
+    title: "Your account has no email address",
+    describe: () => "Add an email address to your account, then send the test again.",
+  },
+  digest_organization_not_enrolled: {
+    title: "Organization not enrolled",
+    describe: () => "Enrol this organization in the digest before sending a test.",
+  },
+  digest_member_unsubscribed: {
+    title: "Member opted out",
+    describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",
+  },
+  digest_public_base_url_missing: {
+    title: "Public address not configured",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_unsubscribe_rate_limited: {
+    // Read on the digest's unsubscribe page, by someone with no session and nothing to fix.
+    title: "Too many attempts just now",
+    describe: () => "Wait a minute, then open the link again.",
+  },
+
   // ---- automations & notifications ----
   automation_not_found: {
     title: "Automation not found",
@@ -5076,6 +5374,16 @@ const presentations = {
   langy_conversation_not_owned: {
     title: "This conversation belongs to someone else",
     describe: () => "You can view shared conversations but only the owner can continue them.",
+  },
+  langy_attachment_refused: {
+    title: "Langy can't take that file",
+    describe: (error) => {
+      const reason = str(error, "reason", "");
+      if (reason === "not_an_image") return "Attach a PNG, JPEG, GIF or WebP image.";
+      if (reason === "too_large") return "Attach an image of 5 MB or less.";
+      if (reason === "too_many") return "Send at most four images in one message.";
+      return "Attach the image again, then send.";
+    },
   },
   langy_empty_message: {
     title: "Nothing to send",
@@ -5869,7 +6177,7 @@ const presentations = {
   checkup_lwql_not_provisionable: {
     title: "LWQL functions cannot be provisioned",
     describe: () =>
-      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+      "Set user_defined_zookeeper_path on every ClickHouse replica so functions live in Keeper.",
   },
   checkup_model_provider_refused: {
     title: "A model provider refused the test call",
@@ -6478,6 +6786,10 @@ const presentations = {
   invalid_conversation_id: {
     title: "Conversation not found",
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
+  },
+  invalid_images: {
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
   },
   agent_session_not_found: {
     title: "The session was lost",

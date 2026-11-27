@@ -1,10 +1,15 @@
-import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
+import type {
+  GatewayVirtualKeyRecord,
+  GatewayVirtualKeyScope,
+  VirtualKeyPurpose,
+} from "@langwatch/gateway-contract";
 import { identityPatchData } from "@langwatch/gateway-contract";
 /**
  * Data-access for VirtualKey. Post-collapse: organization-scoped + reachable
  * from N (scopeType, scopeId) VirtualKeyScope entries. dbMultiTenancyProtection
  * enforces every where-clause carries organizationId, an id, a secret, or scopes.
  */
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -14,6 +19,7 @@ import {
   GatewayVirtualKeyRepository,
   type CreateGatewayVirtualKeyInput,
   type GatewayLicensedKey,
+  type GatewayRecentlyUsedKey,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../../repositories/gateway-virtual-key.repository.ts";
@@ -213,6 +219,26 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
         orderBy: { createdAt: "desc" },
       }),
     );
+  }
+
+  async findLiveUsedSince(input: {
+    purpose: VirtualKeyPurpose;
+    since: Instant;
+  }): Promise<GatewayRecentlyUsedKey[]> {
+    const rows = await this.client().$queryRaw<unknown[]>`
+      SELECT "id", "organizationId", "name", "principalUserId", "traceProjectId"
+        FROM "VirtualKey"
+       WHERE "purpose" = ${input.purpose}::"VirtualKeyPurpose"
+         AND "status" = 'ACTIVE'
+         AND "revokedAt" IS NULL
+         AND "lastUsedAt" >= ${toDate(input.since)}
+       ORDER BY "id"
+      ${skipTenantCheck({
+        // The 6-hourly unbudgeted-spend sweep spans every organization; it reads no secret column.
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
+    return recentlyUsedKeyRowsSchema.parse(rows);
   }
 
   /**
@@ -613,6 +639,16 @@ function toVirtualKeyRecord<Row extends StoredKeyMoments>(
     lastUsedAt: row.lastUsedAt ? fromDate(row.lastUsedAt) : null,
   };
 }
+
+const recentlyUsedKeyRowsSchema = z.array(
+  z.object({
+    id: z.string(),
+    organizationId: z.string(),
+    name: z.string(),
+    principalUserId: z.string().nullable(),
+    traceProjectId: z.string().nullable(),
+  }),
+);
 
 function jsonInput(value: unknown): Prisma.InputJsonValue {
   return z.json().parse(value) as Prisma.InputJsonValue;

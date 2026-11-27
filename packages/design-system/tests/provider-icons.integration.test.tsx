@@ -27,7 +27,7 @@ function artworkOf(provider: ProviderKey): string {
 describe("provider icons", () => {
   describe("given LangWatch's hosted decision model id", () => {
     it("names LangWatch as the provider", () => {
-      expect(inferProvider("langwatch/instant-evals")).toBe("langwatch");
+      expect(inferProvider("langwatch/instant-preview")).toBe("langwatch");
     });
   });
 

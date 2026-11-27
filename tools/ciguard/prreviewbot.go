@@ -232,10 +232,19 @@ func minutes(value any) (int, bool) {
 	return n, n > 0
 }
 
+// prReviewBotRequiredFromBranch is the wait step's env var naming the branch
+// whose required checks it waits for; without it the wait reads every check.
+const prReviewBotRequiredFromBranch = "REQUIRED_FROM_BRANCH"
+
 // waitStepProblems reports every way the wait step can pass while the checks
 // it waits for have not: a swallowed failure, or a condition that skips it.
+// It also requires the base branch, so an optional workflow never holds it.
 func waitStepProblems(step ciscan.Step) []string {
 	var problems []string
+	if strings.TrimSpace(step.Env[prReviewBotRequiredFromBranch]) == "" {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wait step sets no %s, so it waits for every optional check too", PRReviewBotWorkflow, prReviewBotRequiredFromBranch))
+	}
 	if coe := step.ContinueOnError; coe != nil && fmt.Sprint(coe) != "false" {
 		problems = append(problems, fmt.Sprintf(
 			"%s review job's wait step sets continue-on-error, so a failed check would not stop the bot", PRReviewBotWorkflow))

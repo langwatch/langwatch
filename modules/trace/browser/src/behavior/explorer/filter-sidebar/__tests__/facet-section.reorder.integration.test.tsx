@@ -3,6 +3,7 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { FacetState } from "@langwatch/trace-contract";
 import { cleanup, fireEvent } from "@testing-library/react";
 import { Compass } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +19,7 @@ vi.mock("../../../../features/facet/behavior/use-facet-search.ts", () => ({
 
 import { useFacetLensStore } from "../../../../features/facet/behavior/facet-lens.store.ts";
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
-import type { FacetItem, FacetValueState } from "../types.ts";
+import type { FacetItem } from "../types.ts";
 
 beforeEach(() => {
   // Facets collapse by default now; force ORIGIN open via the lens override
@@ -38,7 +39,7 @@ const ITEMS: FacetItem[] = [
 ];
 
 const tree = (activeValues: ReadonlySet<string>) => {
-  const getValueState = (value: string): FacetValueState =>
+  const getValueState = (value: string): FacetState =>
     activeValues.has(value) ? "include" : "neutral";
   return (
     <FacetSection

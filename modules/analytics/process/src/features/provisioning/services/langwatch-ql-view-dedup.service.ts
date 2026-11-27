@@ -3,6 +3,7 @@
  * `WHERE` clause of the in-tuple form, the FROM relation of the engine-level forms and the
  * grouping of the settled form (analytics ADR-005, ADR-006, ADR-007).
  */
+import { LWQL_TRACE_ID_COLUMN } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
@@ -135,11 +136,14 @@ export class LangWatchQLViewDedupService {
     view,
     relation,
     floor,
+    traceIds,
   }: {
     view: LangWatchQLViewDefinition;
     relation: string;
     /** The floored twin's lower bound on the floor column; absent, every version is read. */
     floor?: string;
+    /** The trace-ids twin's traces; absent, every trace is read. */
+    traceIds?: string;
   }): string {
     const { versionColumn, tieBreakColumns = [], stableColumns = [] } = view.dedup;
     if (!versionColumn || view.dedup.aggregating || view.join) {
@@ -163,8 +167,15 @@ export class LangWatchQLViewDedupService {
     const newestFirst = [versionColumn, ...tieBreakColumns].map(
       (column) => `${sqlText.quotedColumn(column)} DESC`,
     );
-    const floorCondition = this.floorCondition({ view, floor });
-    const where = floorCondition === undefined ? "" : `  WHERE ${floorCondition}\n`;
+    // The trace is a LIMIT 1 BY key, so cutting by it keeps or drops a key's versions together.
+    const traceCondition =
+      traceIds === undefined
+        ? undefined
+        : `${sqlText.quotedColumn(catalogShapes.physicalColumn(view, LWQL_TRACE_ID_COLUMN))} IN (${traceIds})`;
+    const conditions = [this.floorCondition({ view, floor }), traceCondition].filter(
+      (condition) => condition !== undefined,
+    );
+    const where = conditions.length === 0 ? "" : `  WHERE ${conditions.join(" AND ")}\n`;
     return (
       `(\n  SELECT ${columns.join(", ")}\n` +
       `  FROM ${relation}\n` +
@@ -248,6 +259,7 @@ export class LangWatchQLViewDedupService {
     strategy,
     engineDedup,
     floor,
+    traceIds,
   }: {
     view: LangWatchQLViewDefinition;
     relation: string;
@@ -255,13 +267,24 @@ export class LangWatchQLViewDedupService {
     engineDedup: boolean;
     /** The floored twin's lower bound, read by the strategies that take one. */
     floor?: string;
+    /** The trace-ids twin's traces, read by `latest-in-order` alone. */
+    traceIds?: string;
   }): string {
     const aliased = `${relation} AS ${LWQL_SOURCE_ALIAS}`;
+    if (traceIds !== undefined && (!engineDedup || strategy !== "latest-in-order")) {
+      throw new Error(
+        `LangWatchQL view ${view.name} has no trace-ids twin: it is not latest-in-order`,
+      );
+    }
     if (!engineDedup) return aliased;
     if (strategy === "final") return `${aliased} FINAL`;
     if (strategy === "latest-in-order") {
-      const floored = floor === undefined ? {} : { floor };
-      return this.latestInOrderRelation({ view, relation, ...floored });
+      return this.latestInOrderRelation({
+        view,
+        relation,
+        ...(floor === undefined ? {} : { floor }),
+        ...(traceIds === undefined ? {} : { traceIds }),
+      });
     }
     return aliased;
   }

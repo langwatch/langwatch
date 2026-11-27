@@ -8,16 +8,23 @@ from attrs import define as _attrs_define
 from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_management import (
     GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataManagement,
 )
+from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_posture import (
+    GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture,
+)
 from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_source import (
     GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataSource,
 )
 from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_status import (
     GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataStatus,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_endpoints_item import (
         GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataEndpointsItem,
+    )
+    from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_labels import (
+        GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels,
     )
     from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_model_type_0 import (
         GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataModelType0,
@@ -59,6 +66,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
         last_seen_at (None | str):
         updated_at (str):
         removed_at (None | str):
+        dormant (bool | Unset):
+        posture (GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture | Unset):
+        platform (None | str | Unset):
+        labels (GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels | Unset):
+        owner_label (None | str | Unset):
     """
 
     id: str
@@ -83,6 +95,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
     last_seen_at: None | str
     updated_at: str
     removed_at: None | str
+    dormant: bool | Unset = UNSET
+    posture: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture | Unset = UNSET
+    platform: None | str | Unset = UNSET
+    labels: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels | Unset = UNSET
+    owner_label: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_model_type_0 import (
@@ -157,6 +174,28 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
         removed_at: None | str
         removed_at = self.removed_at
 
+        dormant = self.dormant
+
+        posture: str | Unset = UNSET
+        if not isinstance(self.posture, Unset):
+            posture = self.posture.value
+
+        platform: None | str | Unset
+        if isinstance(self.platform, Unset):
+            platform = UNSET
+        else:
+            platform = self.platform
+
+        labels: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = self.labels.to_dict()
+
+        owner_label: None | str | Unset
+        if isinstance(self.owner_label, Unset):
+            owner_label = UNSET
+        else:
+            owner_label = self.owner_label
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -185,6 +224,16 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
                 "removed_at": removed_at,
             }
         )
+        if dormant is not UNSET:
+            field_dict["dormant"] = dormant
+        if posture is not UNSET:
+            field_dict["posture"] = posture
+        if platform is not UNSET:
+            field_dict["platform"] = platform
+        if labels is not UNSET:
+            field_dict["labels"] = labels
+        if owner_label is not UNSET:
+            field_dict["owner_label"] = owner_label
 
         return field_dict
 
@@ -192,6 +241,9 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_endpoints_item import (
             GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataEndpointsItem,
+        )
+        from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_labels import (
+            GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels,
         )
         from ..models.get_api_governance_registry_ard_manifest_response_200_entries_item_data_model_type_0 import (
             GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataModelType0,
@@ -327,6 +379,40 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
 
         removed_at = _parse_removed_at(d.pop("removed_at"))
 
+        dormant = d.pop("dormant", UNSET)
+
+        _posture = d.pop("posture", UNSET)
+        posture: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture | Unset
+        if isinstance(_posture, Unset):
+            posture = UNSET
+        else:
+            posture = GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataPosture(_posture)
+
+        def _parse_platform(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        platform = _parse_platform(d.pop("platform", UNSET))
+
+        _labels = d.pop("labels", UNSET)
+        labels: GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels | Unset
+        if isinstance(_labels, Unset):
+            labels = UNSET
+        else:
+            labels = GetApiGovernanceRegistryArdManifestResponse200EntriesItemDataLabels.from_dict(_labels)
+
+        def _parse_owner_label(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        owner_label = _parse_owner_label(d.pop("owner_label", UNSET))
+
         get_api_governance_registry_ard_manifest_response_200_entries_item_data = cls(
             id=id,
             source=source,
@@ -350,6 +436,11 @@ class GetApiGovernanceRegistryArdManifestResponse200EntriesItemData:
             last_seen_at=last_seen_at,
             updated_at=updated_at,
             removed_at=removed_at,
+            dormant=dormant,
+            posture=posture,
+            platform=platform,
+            labels=labels,
+            owner_label=owner_label,
         )
 
         return get_api_governance_registry_ard_manifest_response_200_entries_item_data

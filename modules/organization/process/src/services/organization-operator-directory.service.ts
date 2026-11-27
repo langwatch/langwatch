@@ -2,6 +2,7 @@ import type { OrganizationOperatorSummary } from "@langwatch/organization-contra
 
 import type {
   OrganizationOperatorQuery,
+  OrganizationOperatorRow,
   OrganizationRepository,
 } from "../repositories/organization.repository.ts";
 import type { OrganizationMembershipService } from "./organization-membership.service.ts";
@@ -33,6 +34,16 @@ export class OrganizationOperatorDirectoryService {
   ): Promise<OrganizationOperatorSummary[]> {
     if (input.organizationIds.length === 0) return Promise.resolve([]);
     return this.#summaries({ organizationIds: [...new Set(input.organizationIds)] });
+  }
+
+  /** The one organization's row with no administrator read; null when there is none. */
+  async findRow(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationOperatorRow | null> {
+    const [row] = await this.options.organizations.findOperatorRows({
+      organizationIds: [input.organizationId],
+    });
+    return row ?? null;
   }
 
   async #summaries(query: OrganizationOperatorQuery): Promise<OrganizationOperatorSummary[]> {

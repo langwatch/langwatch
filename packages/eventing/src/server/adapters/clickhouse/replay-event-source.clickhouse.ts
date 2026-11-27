@@ -687,6 +687,13 @@ function eventPageWhere({
 
 const PAGE_LIMIT = "LIMIT {batchSize:UInt32}";
 
+/**
+ * A page decompresses every payload granule holding one of its rows, whole; parallel streams read
+ * one such granule per part at once and multiply its memory. One stream bounds a page near one
+ * granule plus its own rows.
+ */
+const PAGE_READ_SETTINGS = { max_threads: 1 } as const;
+
 /** One sized row of a page: its `(EventTimestamp, EventId)` position and its payload bytes. */
 export interface SizedRow {
   timestamp: number;
@@ -760,6 +767,7 @@ async function payloadBoundedEnd({
     sql: `SELECT EventTimestamp, EventId, length(EventPayload) AS payloadBytes ${where.sql}
     ${PAGE_LIMIT}`,
     params: where.params,
+    settings: PAGE_READ_SETTINGS,
   });
   const fit = rowsWithinPayload({
     rows: rows.map((row) => ({
@@ -805,6 +813,7 @@ export async function batchLoadAggregateEvents({
     ${where.sql}
     ${maxPayloadBytes === undefined ? PAGE_LIMIT : ""}`,
     params: where.params,
+    settings: PAGE_READ_SETTINGS,
   });
 
   return rows.map((row) => rowToEvent(row, lean));

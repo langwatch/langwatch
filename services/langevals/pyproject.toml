@@ -85,10 +85,9 @@ override-dependencies = [
   # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
   # server-side file read; patched in 0.8.18.
   "langsmith>=0.8.18",
-  # Force a patched strawberry-graphql. The highest fix across its advisories
-  # is 0.327.2 (a HIGH covering <=0.326.0 and a LOW below 0.327.2).
-  # arize-phoenix pins strawberry exactly, so without this the pin decides
-  # the version.
+  # strawberry-graphql: the highest fix across its advisories is 0.327.2 (a
+  # HIGH covering <=0.326.0 and a LOW below 0.327.2). Nothing here pulls it
+  # today; the floor makes any dependency that brings it back take a fixed one.
   "strawberry-graphql>=0.327.2",
   "pydantic-settings>=2.14.2", # security: pydantic-settings advisory (#1517)
   # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
@@ -114,8 +113,8 @@ override-dependencies = [
   # closed in 3.10.1 and 3.10.3, then the critical and high advisories fixed in
   # 3.10.4 (GHSA-x8q7-6c7m-52gw and others).
   "nltk>=3.10.4",
-  # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
-  # (CRITICAL) and further advisories, all fixed by 1.9.1.
+  # authlib: JWS empty-signature validation (CRITICAL) and further advisories,
+  # all fixed by 1.9.1. Nothing here pulls it today; the floor holds if one does.
   "authlib>=1.9.1",
   # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0, then GHSA-vvf4-9x63-8xvv,
   # fixed in 2.9.2.
@@ -134,8 +133,9 @@ override-dependencies = [
   "setuptools>=84.1.0",
   # torch: deserialization advisory in torch.load.
   "torch>=2.13.0",
-  # tornado: HTTP header, multipart and chunked body advisories (#3331-#3333).
-  "tornado>=6.6",
+  # tornado: HTTP header, multipart and chunked body advisories (#3331-#3333),
+  # then the triple-slash open redirect covering <=6.6.0 (GHSA-5cjw-f85j-cv6r).
+  "tornado>=6.6.1",
   # httpx2: two advisories fixed in 2.11.0 and one in 2.12.0.
   "httpx2>=2.12.0",
   #
@@ -158,15 +158,12 @@ constraint-dependencies = [
   "langgraph>=1.2.14", # LangGraph SDK v3 streaming identifiers advisory (#3302)
   "joserfc>=1.7.7", # joserfc advisories covering <1.7.5 (high) and <1.7.6, then JWE recipients and compact JWS size (#3364, #3365)
   "filelock>=4.2.1", # filelock lock-file advisories covering <=4.2.0 (#3303, #3304)
-  # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
-  # openai extra needs openai>=3.8.0, whose jiter requirement every
-  # instructor release (a dependency of the notebooks and tutorials) excludes
-  # with `jiter<0.15`. The advisories fixed in 2.44.0, 2.52.0 and 2.53.0 stay
-  # open until instructor lifts that cap. Without this floor in range the
-  # resolver satisfies a higher one by walking arize-phoenix back to 14.x.
-  "pydantic-ai-slim>=2.30.0",
+  # pydantic-ai-slim advisories covering <2.53.0 (#2770-#2772, #2774, #2775). Nothing
+  # here needs it now; a dependency that pulls it back must take a fixed release.
+  "pydantic-ai-slim>=2.53.0",
   "certifi>=2026.10.19", # certifi advisory covering <2026.10.19 (GHSA-6q48-6c7w-9gw2, critical)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2828)
+  "opentelemetry-api>=1.45.2", # quadratic-time traceparent parsing covering <=1.45.1 (#3465)
 ]
 
 [tool.uv.workspace]

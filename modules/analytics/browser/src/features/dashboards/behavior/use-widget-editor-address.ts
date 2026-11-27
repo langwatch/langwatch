@@ -8,6 +8,11 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 
 export const WIDGET_EDITOR_QUERY_KEY = "editWidget";
 
+/** A board's address with the editor open on arrival on the widget `target` names. */
+export function withWidgetEditorOpen({ path, target }: { path: string; target: string }): string {
+  return `${path}?${WIDGET_EDITOR_QUERY_KEY}=${encodeURIComponent(target)}`;
+}
+
 export function useWidgetEditorAddress() {
   const host = useAnalyticsHost();
   const query = host.route().query;

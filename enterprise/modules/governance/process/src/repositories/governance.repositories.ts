@@ -5,6 +5,7 @@ import type { ProcessStore } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 
 import type { ActivityMonitorRepository } from "./activity-monitor.repository.ts";
+import type { AgentRegistrySettingsRepository } from "./agent-registry-settings.repository.ts";
 import type { AgentRegistryRepository } from "./agent-registry.repository.ts";
 import type { AgentStopClaimRepository } from "./agent-stop-claim.repository.ts";
 import type { AgentStopPlanRepository } from "./agent-stop-plan.repository.ts";
@@ -153,6 +154,7 @@ export interface GovernanceOcsfEventWriter {
 export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
   readonly agentRegistry: AgentRegistryRepository;
+  readonly agentRegistrySettings: AgentRegistrySettingsRepository;
   /** The kill switch: plans, claims, target prior states, AWS connections, the AgentStop projection. */
   readonly agentStopPlans: AgentStopPlanRepository;
   readonly agentStopClaims: AgentStopClaimRepository;

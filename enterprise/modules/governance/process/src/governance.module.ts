@@ -18,6 +18,7 @@ import { governanceActivityMonitorEventing } from "./eventing/governance-activit
 import { GOVERNANCE_COST_CHARGE_PROJECTION_NAME } from "./eventing/governance-cost-charge.projection.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
+import { ingestionSourceLifecycleEventing } from "./eventing/ingestion-source-lifecycle.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
 import { agentStopEventing } from "./features/kill-switch/eventing/agent-stop.pipeline.ts";
@@ -36,6 +37,7 @@ import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts
 import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
 import { governanceKillSwitchTrpcTransport } from "./transport/governance-kill-switch.trpc.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
+import { governanceRegistryTrpcTransport } from "./transport/governance-registry.trpc.ts";
 import { governanceRest } from "./transport/governance.rest.ts";
 import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
 import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
@@ -98,6 +100,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
       sessionPolicyTrpcTransport,
       governancePeopleTrpcTransport,
       governanceAgentsTrpcTransport,
+      governanceRegistryTrpcTransport,
       governanceCostTrpcTransport,
     )
     // The member behind the project credential, which surface asked, and the CLI token door. A
@@ -140,6 +143,7 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withEventing(ingestionPullReconcileEventing)
     .withEventing(governanceActivityMonitorEventing)
     .withEventing(codingAssistantBillingEventing)
+    .withEventing(ingestionSourceLifecycleEventing)
     .withEventing(agentRegistryEventing)
     .withEventing(agentStopEventing)
     .withEventing(ocsfPushEventing)

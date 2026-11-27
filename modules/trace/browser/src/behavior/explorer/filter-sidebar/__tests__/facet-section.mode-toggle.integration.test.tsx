@@ -4,6 +4,7 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { FacetState } from "@langwatch/trace-contract";
 import { cleanup, fireEvent } from "@testing-library/react";
 import { Compass } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +19,7 @@ vi.mock("../../../../features/facet/behavior/use-facet-search.ts", () => ({
 }));
 
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
-import type { FacetItem, FacetValueState } from "../types.ts";
+import type { FacetItem } from "../types.ts";
 
 afterEach(() => cleanup());
 
@@ -29,7 +30,7 @@ const ITEMS: FacetItem[] = [
 
 const setup = (mode: "discrete" | "range") => {
   const onToggleMode = vi.fn();
-  const getValueState = (): FacetValueState => "neutral";
+  const getValueState = (): FacetState => "neutral";
   const utils = renderWithDesignSystem(
     <FacetSection
       title="VERSION"
@@ -85,7 +86,7 @@ describe("<FacetSection /> mode toggle", () => {
   describe("given a facet without modeToggleProps (non-eligible)", () => {
     /** @scenario "Non-eligible facets render no mode toggle at all" */
     it("renders no toggle button (slider-only facets stay slider-only)", () => {
-      const getValueState = (): FacetValueState => "neutral";
+      const getValueState = (): FacetState => "neutral";
       const { queryByRole } = renderWithDesignSystem(
         <FacetSection
           title="DURATION"

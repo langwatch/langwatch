@@ -917,5 +917,44 @@ describe("createProjectMetadataHandler()", () => {
         expect(mockRecordSignal).not.toHaveBeenCalled();
       });
     });
+
+    describe("when the trace came in through a governance ingestion source", () => {
+      const governanceState = () =>
+        createFoldState({ attributes: { "langwatch.origin.kind": "ingestion_source" } });
+
+      it("returns false", () => {
+        expect(isRealFirstIngest(governanceState())).toBe(false);
+      });
+
+      /** @scenario A governance-ingested trace is not the project's first trace */
+      it("leaves the governance project unmarked and records no milestone", async () => {
+        mockProjects.findById.mockResolvedValue({
+          id: tenantId,
+          firstMessage: false,
+          integrated: false,
+        });
+        const subscriber = createProjectMetadataHandler(deps);
+
+        await subscriber(createEvent(tenantId), createContext(tenantId, governanceState()));
+
+        expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
+        expect(mockRecordSignal).not.toHaveBeenCalled();
+      });
+
+      /** @scenario A governance-ingested trace is not the project's first trace */
+      it("records no later trace on a project that already traced", async () => {
+        mockProjects.findById.mockResolvedValue({
+          id: tenantId,
+          firstMessage: true,
+          integrated: true,
+        });
+        const subscriber = createProjectMetadataHandler(deps);
+
+        await subscriber(createEvent(tenantId), createContext(tenantId, governanceState()));
+
+        expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
+        expect(mockRecordSignal).not.toHaveBeenCalled();
+      });
+    });
   });
 });

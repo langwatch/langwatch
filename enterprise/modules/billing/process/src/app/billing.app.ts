@@ -76,7 +76,7 @@ import { LicensePurchaseService } from "../features/license-purchase/services/li
 import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
-import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
+import { priceLineOf } from "../rules/price-line.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
   planLimitCooldown,
@@ -247,7 +247,7 @@ export class BillingModule
     };
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices, stamps);
     const lifecycle = BillingLifecycleAnnouncerService.create({
-      subscriptions: setup.repositories.webhookSubscriptions,
+      subscriptions: setup.repositories.subscriptions,
       organizations: setup.repositories.organizations,
       resourceLimitAlerts,
       planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
@@ -976,6 +976,20 @@ export class BillingModule
     return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
   }
 
+  /** The Customer.io plan resync for one organization, for the customer-io-plan-resync task. */
+  async catchUpCustomerIoPlan({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ members: number }> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle.customerIoPlanCaughtUp({ organizationId, isDryRun });
+  }
+
   /** Records billing's pricing-model fact, for the tiered-free-to-seat-event hand-run task. */
   async pricingModelChanged(input: {
     organizationId: string;
@@ -1013,8 +1027,8 @@ export class BillingModule
   connectReporting(
     reportUsageForMonth: EventingCommandSender<ReportUsageForMonthCommandData>,
   ): void {
-    this.#reporting.connectSelfDispatch(async (data) => {
-      await reportUsageForMonth.send(data);
+    this.#reporting.connectSelfDispatch(async (data, options) => {
+      await reportUsageForMonth.send(data, options);
     });
   }
 
@@ -1073,14 +1087,16 @@ export class BillingModule
       isInstantEvalMeterProvisioned: () => meters().INSTANT_EVAL_USD !== undefined,
       queryPiiRedactionSpendTotal: (input) => piiRedactionSpend.queryPiiRedactionSpendTotal(input),
       isPiiRedactionMeterProvisioned: () => meters().PII_REDACTION_USD !== undefined,
-      hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
-        stripeSubscriptions !== void 0 &&
-        carriesPiiRedactionPrice({
-          subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
-            customerId: stripeCustomerId,
-          }),
-          priceId: catalogue().prices.GROWTH_PII_REDACTION_USD,
-        }),
+      subscriptionPriceLine: async ({ stripeCustomerId, price, billingMonth }) =>
+        stripeSubscriptions === void 0
+          ? { carried: false }
+          : priceLineOf({
+              subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
+                customerId: stripeCustomerId,
+              }),
+              prices: [{ priceName: price, priceId: catalogue().prices[price] }],
+              billingMonth,
+            }),
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

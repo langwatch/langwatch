@@ -158,7 +158,7 @@ Feature: Every query door takes the same parameters and says what it ran with
       When it runs with sources ["application"]
       Then it returns the rows of every origin
       And params has no dashboard_context_sources key
-      And diagnostics holds SOURCES_IGNORED with the message "This query doesn't read {dashboard_context_sources}, so it counts every origin."
+      And diagnostics holds SOURCES_IGNORED with the message "This query doesn't read the sources you picked, so they change nothing it counts."
       # Evidence: the REST answer quoted with seeded traces of each origin
 
     @unit

@@ -16,6 +16,8 @@ export function useLicenseCommands() {
   });
   return {
     revoke: api.licenseRegistry.revoke.useMutation(after("License revoked")),
+    /** A revoke that reports nothing itself: the dialog reports the whole chain once. */
+    revokeQuietly: api.licenseRegistry.revoke.useMutation(),
     resetInstanceBinding: api.licenseRegistry.resetInstanceBinding.useMutation(
       after("Instance binding reset"),
     ),

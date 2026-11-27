@@ -73,7 +73,7 @@ export class LangWatchQLSchemaService {
   /**
    * A runnable query over one dataset.
    */
-  exampleSql({ database, view }: { database: string; view: LangWatchQLViewDefinition }): string {
+  exampleSql({ view }: { view: LangWatchQLViewDefinition }): string {
     // The column's own gates, not the combined dataset-plus-column ones: a
     // dataset gated as a whole is only *visible* to a caller who already holds
     // its gates, so its ungated columns are runnable for everyone who can see
@@ -90,8 +90,8 @@ export class LangWatchQLSchemaService {
       // caller who can see the dataset is a count. No ORDER BY — an aggregate
       // without GROUP BY has nothing to order.
       return lookback
-        ? `SELECT count() AS rows\nFROM ${database}.${view.name}\n${lookback}`
-        : `SELECT count() AS rows\nFROM ${database}.${view.name}`;
+        ? `SELECT count() AS rows\nFROM ${view.name}\n${lookback}`
+        : `SELECT count() AS rows\nFROM ${view.name}`;
     }
 
     if (!lookback) {
@@ -101,7 +101,7 @@ export class LangWatchQLSchemaService {
 
       return (
         `SELECT ${projection.join(", ")}\n` +
-        `FROM ${database}.${view.name}\n` +
+        `FROM ${view.name}\n` +
         `${orderBy}` +
         `LIMIT ${EXAMPLE_ROW_LIMIT}`
       );
@@ -109,7 +109,7 @@ export class LangWatchQLSchemaService {
 
     return (
       `SELECT ${projection.join(", ")}\n` +
-      `FROM ${database}.${view.name}\n` +
+      `FROM ${view.name}\n` +
       `${lookback}\n` +
       `ORDER BY ${view.timeColumn} DESC\n` +
       `LIMIT ${EXAMPLE_ROW_LIMIT}`
@@ -122,12 +122,10 @@ export class LangWatchQLSchemaService {
    * endpoint cannot publish one as available that the validator would refuse.
    */
   describeAppFunctions({
-    database,
     protections,
     appFunctions = LWQL_APP_FUNCTION_CATALOG,
     isInstantEvalsEnabled = false,
   }: {
-    database: string;
     protections: LangWatchQLProtections;
     appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
     /** Whether this project may call an eval function. Off unless it is asked. */
@@ -152,7 +150,7 @@ export class LangWatchQLSchemaService {
       available:
         definition.gates.every((gate) => held.has(gate)) &&
         (definition.kind !== "eval" || isInstantEvalsEnabled),
-      exampleSql: definition.example(database),
+      exampleSql: definition.example(),
     }));
   }
 
@@ -176,7 +174,7 @@ export class LangWatchQLSchemaService {
       database,
       functions: LWQL_ALLOWED_FUNCTION_NAMES,
       views: catalogShapes.visibleViews({ protections, views, catalog }).map((view) => ({
-        name: `${database}.${view.name}`,
+        name: view.name,
         description: view.description,
         grain: view.grain,
         joinKeys: view.joinKeys,
@@ -190,9 +188,9 @@ export class LangWatchQLSchemaService {
           gates: publishedLwqlGates(catalogShapes.columnGates({ view, column })),
           available: !withheld.has(column.name),
         })),
-        exampleSql: this.exampleSql({ database, view }),
+        exampleSql: this.exampleSql({ view }),
       })),
-      appFunctions: this.describeAppFunctions({ database, protections, isInstantEvalsEnabled }),
+      appFunctions: this.describeAppFunctions({ protections, isInstantEvalsEnabled }),
     };
   }
 }

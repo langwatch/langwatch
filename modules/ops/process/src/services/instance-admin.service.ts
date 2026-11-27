@@ -5,6 +5,7 @@ import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contrac
 import {
   ORGANIZATION_DATASET_ATTACHMENT_MAX_MB_REFUSAL,
   adminOperationInputSchema,
+  adminUserSortFieldSchema,
   type AdminOperationInput,
   type AdminOperationResult,
 } from "@langwatch/ops-contract";
@@ -116,8 +117,21 @@ export class InstanceAdminService {
     });
   }
 
+  /** The users list orders in SQL, so only a known column may name the order. */
+  private refuseUnknownUserSort(input: AdminOperationInput): void {
+    if (input.resource !== "user" || input.method !== "getList") return;
+    const field = input.params.sort?.field;
+    if (field === undefined || adminUserSortFieldSchema.validate(field)) return;
+    throw new ValidationError("The users list cannot be sorted by that field", {
+      meta: {
+        fieldErrors: { sort: [`Sort by one of: ${adminUserSortFieldSchema.options.join(", ")}.`] },
+      },
+    });
+  }
+
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
     const parsed = adminOperationInputSchema.parse(input);
+    this.refuseUnknownUserSort(parsed);
     if (parsed.resource === "user") await this.refuseUserWrite(parsed);
     if (
       "traceSharingEnabled" in (parsed.params.data ?? {}) &&

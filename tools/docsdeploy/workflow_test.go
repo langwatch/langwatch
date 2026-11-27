@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// deployJob is docs-site.yml's deploy job, up to the next job.
+// deployJob is docs-site.yml's deploy job, its last job.
 func deployJob(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "docs-site.yml"))
@@ -19,12 +19,7 @@ func deployJob(t *testing.T) string {
 	if start < 0 {
 		t.Fatal("docs-site.yml has no deploy job")
 	}
-	end := strings.Index(wf[start+1:], "\n  docs-site-complete:\n")
-	if end < 0 {
-		t.Fatal("the deploy job is not followed by docs-site-complete")
-	}
-
-	return wf[start : start+1+end]
+	return wf[start:]
 }
 
 // steps returns each `- name:` step of the job with its body.

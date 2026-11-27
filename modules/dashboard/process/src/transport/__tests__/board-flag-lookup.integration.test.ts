@@ -16,6 +16,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,6 +24,7 @@ import {
   createDashboardTestAuthz,
   createDashboardTestAutomation,
   createDashboardTestProjects,
+  createDashboardTestUsers,
 } from "../../app/__tests__/dashboard.fixture.ts";
 import { dashboardProcessModule } from "../../dashboard.module.ts";
 
@@ -78,6 +80,7 @@ async function installedApi() {
       testPeer({ token: AuthzApi, instance: createDashboardTestAuthz() }),
       testPeer({ token: AutomationApi, instance: createDashboardTestAutomation() }),
       testPeer({ token: ProjectApi, instance: createDashboardTestProjects() }),
+      testPeer({ token: UserApi, instance: createDashboardTestUsers() }),
     ],
     surface: () => {
       rest = RestHost.create({

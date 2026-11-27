@@ -346,13 +346,13 @@ spec:
             - name: BACKUP_INCREMENTAL_SCHEDULE
               value: {{ .Values.backup.incremental.schedule | quote }}
             - name: BACKUP_RETENTION_DAYS
-              value: {{ .Values.backup.retentionDays | quote }}
+              value: {{ .Values.backup.retentionDays | int64 | quote }}
             - name: STALE_BACKUP_HOURS
-              value: {{ .Values.backup.staleHours | quote }}
+              value: {{ .Values.backup.staleHours | int64 | quote }}
             - name: BACKUP_MAX_BANDWIDTH
               value: {{ .Values.backup.maxBandwidth | int64 | quote }}
             - name: BACKUP_RUNNER_ORDINAL
-              value: {{ .Values.backup.sidecar.runnerOrdinal | quote }}
+              value: {{ .Values.backup.sidecar.runnerOrdinal | int64 | quote }}
             - name: BACKUP_METRICS_LISTEN
               value: {{ printf "0.0.0.0:%v" .Values.backup.sidecar.metricsPort | quote }}
             {{- if gt $replicas 1 }}

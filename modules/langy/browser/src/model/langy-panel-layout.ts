@@ -6,9 +6,6 @@ import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
  */
 export const SIDEBAR_PANEL_WIDTH = LANGY_DOCK_WIDTH_PX;
 
-/** What the page reserves for the flush full-height dock (no-shell pages). */
-export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
-
 /**
  * The strip of page ground between the content card and the docked panel when
  * an app shell claims the dock, the gray breathing room that makes the panel
@@ -59,10 +56,7 @@ export const FLOATING_PANEL_VIEWPORT_GUTTER = 24;
 
 export const FLOATING_PANEL_VIEWPORT_SHARE = 0.74;
 
-/**
- * CSS owns ordinary resizing; this equivalent numeric resolver is used only by
- * the drawer-crossing animation, which needs the card's real width in pixels.
- */
+/** The floating card's default width in pixels for a viewport. */
 export function resolveFloatingPanelWidth(viewportWidth: number): number {
   if (viewportWidth <= 0) return FLOATING_PANEL_MAX_WIDTH;
 
@@ -72,8 +66,6 @@ export function resolveFloatingPanelWidth(viewportWidth: number): number {
     Math.max(0, viewportWidth - FLOATING_PANEL_VIEWPORT_GUTTER),
   );
 }
-
-export const FLOATING_PANEL_CSS_WIDTH = `min(${FLOATING_PANEL_MAX_WIDTH}px, max(${FLOATING_PANEL_MIN_WIDTH}px, ${FLOATING_PANEL_VIEWPORT_SHARE * 100}vw), calc(100vw - ${FLOATING_PANEL_VIEWPORT_GUTTER}px))`;
 
 /** The inspector drawer's visible width. */
 export const INSPECTOR_WIDTH = 380;
@@ -105,6 +97,7 @@ export function resolveInspectorFrame({
   floating,
   dockShellClaimed,
   panelHeightPx,
+  panelWidthPx,
 }: {
   floating: boolean;
   /** An app shell holds the dock below its header (sidebar mode only). */
@@ -115,10 +108,12 @@ export function resolveInspectorFrame({
    * panel's own resting silhouette so nothing jumps when the number lands.
    */
   panelHeightPx: number | null;
+  /** The panel's resolved width, which the user may have resized. */
+  panelWidthPx: number;
 }): LangyInspectorFrame {
   if (floating) {
     return {
-      right: `calc(${FLOATING_PANEL_CSS_WIDTH} + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
+      right: `calc(${panelWidthPx}px + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
       top: null,
       bottom: `${FLOATING_PANEL_INSET}px`,
       height:
@@ -131,7 +126,7 @@ export function resolveInspectorFrame({
     };
   }
   return {
-    right: `${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK}px`,
+    right: `${panelWidthPx - INSPECTOR_TUCK}px`,
     // Exactly the dock's own span: below the shell header when one claims the
     // dock, the full viewport edge on a no-shell page.
     top: `${dockShellClaimed ? APP_HEADER_HEIGHT : 0}px`,

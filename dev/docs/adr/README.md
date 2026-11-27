@@ -115,6 +115,11 @@ Reusable framework decisions live with their packages:
 | [198](./198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files                            | Accepted                  |
 | [199](./199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
 | [201](./201-pii-redaction-model-call-is-metered.md)                                   | A PII redaction model call is priced per character and metered like Instant Evals                                          | Proposed                  |
+| [202](./202-ops-agent-access.md)                                                      | The ops agent reaches a customer organization only through a passkey-approved, one-hour key                                | Accepted                  |
+| [205](./205-billing-only-is-a-flagged-membership.md)                                  | Billing only is a flagged Lite membership, not a new organization role                                                     | Proposed                  |
+| [206](./206-nx-remote-cache-in-s3.md)                                                 | Nx remote cache in S3, trusted by who wrote it                                                                             | Accepted                  |
+| [207](./207-a-long-strict-span-is-split-across-model-calls-by-the-caller.md)          | A long Strict span is split across PII redaction model calls by the caller                                                 | Accepted                  |
+| [208](./208-a-privacy-rule-may-name-api-keys.md)                                      | A privacy rule may name API keys among who sees its restricted content                                                     | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

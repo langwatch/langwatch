@@ -33,7 +33,6 @@ function mount() {
     readAgentCallGraphForViewer: vi.fn<TraceApi["readAgentCallGraphForViewer"]>(async () => ({
       nodes: [],
       edges: [],
-      a2aSpans: [],
     })),
     readSpanResourcesForViewer: vi.fn<TraceApi["readSpanResourcesForViewer"]>(async () => ({
       rootSpanId: null,

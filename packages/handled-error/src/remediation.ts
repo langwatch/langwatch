@@ -33,6 +33,19 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_keeps_billing: {
+    tips: [
+      "To stop a Billing-only member paying, remove them from the organization",
+      "To keep them in the organization without Billing, change their organization role to a seat role first, then turn Billing off",
+    ],
+  },
+  billing_only_no_team_access: {
+    tips: [
+      "Send the Billing-only invite with no `teams` and no `teamIds`",
+      "For someone not yet in the organization who needs a team, invite them with a seat role instead, which uses a seat",
+      "For a current Billing-only member, change their organization role to a seat role first, then add them to the team",
+    ],
+  },
   projects_unreadable: {
     tips: [
       "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
@@ -55,6 +68,12 @@ const registry = {
   },
 
   // ---- identity ----
+  passkey_assertion_refused: {
+    tips: [
+      "meta.reason names the refusal: unknown_credential, wrong_user, user_verification_missing or bad_signature",
+      "Sign with a passkey registered to your own account and unlock it with a fingerprint, face or PIN; a fresh request gets a fresh challenge",
+    ],
+  },
   identity_password_reset_required: {
     tips: [
       "This password may no longer be used; request a reset link from the forgot-password screen and choose a new password",
@@ -691,7 +710,9 @@ const registry = {
     docsPath: "/governance/kill-switch",
   },
   governance_aws_connection_not_found: {
-    tips: ["Create the AWS connection on the Agents page before naming it in a stop plan"],
+    tips: [
+      "Create the AWS connection on the Agents page before naming it in a stop plan or an AWS agent source",
+    ],
     docsPath: "/governance/kill-switch",
   },
   agent_offline: {
@@ -959,6 +980,16 @@ const registry = {
     docsPath: "/platform/model-providers",
   },
 
+  provider_endpoint_refused: {
+    tips: [
+      "meta.refusal names the part of the outbound policy that refused the base URL; nothing was sent to it",
+      "private_address and on_premise_domain are lifted on a self-hosted instance by naming the exact host in ALLOWED_PROXY_HOSTS",
+      "cloud_internal_domain (amazonaws.com, .internal) is never lifted; point a DNS name of your own at the endpoint instead",
+      "metadata_endpoint is never lifted, whatever name points at it; use the address the provider serves",
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
   model_provider_unavailable: {
     tips: [
       "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",
@@ -1065,6 +1096,9 @@ const registry = {
       "The same idempotency key was reused with different content; mint a fresh key for every new send",
     ],
   },
+  langy_attachment_refused: {
+    tips: ["Attach a PNG, JPEG, GIF or WebP image of 5 MB or less, at most four per message"],
+  },
   langy_empty_message: {
     tips: ["Send a message with actual text content"],
   },
@@ -1150,6 +1184,11 @@ const registry = {
   },
 
   // ---- licensing ----
+  license_in_use: {
+    tips: [
+      "Reload the license: it now shows the install, and the new license waits for its next sync",
+    ],
+  },
   license_signing_key_not_pem: {
     tips: [
       "Provide the whole private key, including its BEGIN and END lines (PRIVATE KEY, RSA PRIVATE KEY and EC PRIVATE KEY are all accepted)",
@@ -1302,6 +1341,84 @@ const registry = {
     tips: [
       "The report expired or was never stored; ask the install to send the step's diagnostics again",
     ],
+  },
+  staff_access_unavailable: {
+    tips: ["Staff access is off on this deployment; ask a platform operator"],
+  },
+  staff_access_revoked: {
+    tips: ["Ask an operator to approve a new request"],
+  },
+  staff_access_expired: {
+    tips: ["Ask an operator to approve a new request"],
+  },
+  staff_access_ip_mismatch: {
+    tips: ["Use the key from the machine that redeemed it, or request access again"],
+  },
+  staff_access_operator_lost: {
+    tips: ["Ask a current operator to approve a new request"],
+  },
+  staff_spend_not_approved: {
+    tips: ["Request support access again and ask the operator to allow runs"],
+  },
+  staff_content_not_approved: {
+    tips: ["Request access again with the org:content scope"],
+  },
+  staff_function_unknown: {
+    tips: ["Run langwatch ops functions to list every function"],
+  },
+  staff_function_not_approved: {
+    tips: ["Request access again naming this function with --function"],
+  },
+  staff_function_scope_mismatch: {
+    tips: ["Ask ops:read for lookup and platform functions, an org scope for org functions"],
+  },
+  staff_function_bad_input: {
+    tips: ["Check the input against the schema langwatch ops functions prints"],
+  },
+  staff_function_bad_cursor: {
+    tips: ["Start again without a cursor"],
+  },
+  staff_function_not_found: {
+    tips: ["Check the id against the organization's projects"],
+  },
+  staff_write_not_allowed: {
+    tips: ["Ask a member of the organization to make this change"],
+  },
+  staff_access_audit_unavailable: {
+    tips: ["Try again in a moment"],
+  },
+  already_redeemed: {
+    tips: ["Request access again from the agent"],
+  },
+  staff_access_not_configured: {
+    tips: ["Set the public base URL (BASE_HOST) on this deployment"],
+  },
+  staff_access_already_ended: {
+    tips: ["Refresh the page to see the session's current state"],
+  },
+  staff_access_confirmation_mismatch: {
+    tips: ['Type "revoke all" exactly'],
+  },
+  invalid_code_verifier: {
+    tips: ["Redeem from the same agent run that made the request"],
+  },
+  organization_name_mismatch: {
+    tips: ["Type the organization name exactly as the page shows it"],
+  },
+  passkey_required: {
+    tips: ["Add a passkey in your account settings, then try again"],
+  },
+  staff_access_rate_limited: {
+    tips: ["Wait an hour, or approve one of the pending requests"],
+  },
+  request_not_pending: {
+    tips: ["Ask the agent to request access again if it still needs it"],
+  },
+  request_expired: {
+    tips: ["Ask the agent to request access again"],
+  },
+  request_not_approved: {
+    tips: ["Wait for an operator to approve it, or request again"],
   },
 } as const satisfies Record<string, RemediationEntry>;
 

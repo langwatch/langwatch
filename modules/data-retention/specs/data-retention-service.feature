@@ -118,6 +118,27 @@ Feature: Data Retention service boundary
     Then it routes the mutation through that project's ClickHouse tenant
     And it updates every table belonging to the requested category
 
+  # Stored Objects follows this fact to re-time trace media (stored-object ADR-002).
+  @unit
+  Scenario: Applying retention to existing data records a fact other modules can follow
+    Given a project has a new resolved retention value for a category
+    When the retroactive update is triggered for that category
+    Then a "retention_applied_to_existing_data" fact names the project, the category and the applied days
+    And no fact is recorded when the update is refused
+
+  @unit
+  Scenario: Raising or applying stored retention records the same fact
+    Given a project's stored rows are raised or rewritten to its resolved retention
+    When the rewrite lands
+    Then a "retention_applied_to_existing_data" fact names the project, the category and the resolved days
+    And a raise marks the fact as a raise, so followers never shorten what the rows still keep
+
+  @unit
+  Scenario: Two retention facts in the same millisecond are both recorded
+    Given a project's traces retention is applied twice within one millisecond with different days
+    When both facts are recorded
+    Then each fact has its own idempotency key, and a redelivered fact keeps its key
+
   @unit
   Scenario: The memory and Postgres data retention repositories answer alike
     Given the same retention policies and trace pins written to each backend

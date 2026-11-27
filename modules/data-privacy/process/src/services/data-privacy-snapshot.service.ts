@@ -3,6 +3,7 @@
  */
 import {
   dataPrivacyConfigSchema,
+  namedApiKeyIds,
   resolveDataPrivacy,
   type DataPrivacyPolicy,
   type DataPrivacyRow,
@@ -11,9 +12,15 @@ import {
   type DataPrivacyScopeType,
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
+import { createLogger } from "@langwatch/observability";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
+import type { OrganizationApiKeys } from "../channels/data-privacy.channels.ts";
+import { offerableApiKeys } from "../rules/audience-api-keys.rules.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
+
+const logger = createLogger("langwatch:data-privacy:snapshot");
 
 /**
  * The two policy reads the snapshot stands on. Named structurally rather than as
@@ -40,15 +47,31 @@ export class DataPrivacySnapshotService {
     policies: DataPrivacySnapshotPolicies;
     directory: DataPrivacyDirectoryReader;
     permissions: DataPrivacyPermissionsService;
+    apiKeys: OrganizationApiKeys;
+    clock?: () => Instant;
   }): DataPrivacySnapshotService {
-    return new DataPrivacySnapshotService(options.policies, options.directory, options.permissions);
+    return new DataPrivacySnapshotService({ clock: nowInstant, ...options });
   }
 
-  private constructor(
-    private readonly policies: DataPrivacySnapshotPolicies,
-    private readonly directory: DataPrivacyDirectoryReader,
-    private readonly permissions: DataPrivacyPermissionsService,
-  ) {}
+  private readonly policies: DataPrivacySnapshotPolicies;
+  private readonly directory: DataPrivacyDirectoryReader;
+  private readonly permissions: DataPrivacyPermissionsService;
+  private readonly apiKeys: OrganizationApiKeys;
+  private readonly clock: () => Instant;
+
+  private constructor(options: {
+    policies: DataPrivacySnapshotPolicies;
+    directory: DataPrivacyDirectoryReader;
+    permissions: DataPrivacyPermissionsService;
+    apiKeys: OrganizationApiKeys;
+    clock: () => Instant;
+  }) {
+    this.policies = options.policies;
+    this.directory = options.directory;
+    this.permissions = options.permissions;
+    this.apiKeys = options.apiKeys;
+    this.clock = options.clock;
+  }
 
   async getSnapshot(input: { userId: string; projectId: string }): Promise<DataPrivacySnapshot> {
     const { userId, projectId } = input;
@@ -88,13 +111,13 @@ export class DataPrivacySnapshotService {
       this.permissions.canManageOrganization({ userId, organizationId }),
     ]);
 
-    const [teamManage, projectUpdate] = await Promise.all([
+    const [teamManage, projectManage] = await Promise.all([
       this.permissions.canManageTeams({
         userId,
         organizationId,
         teamIds: directory.teams.map((team) => team.id),
       }),
-      this.permissions.canUpdateProjects({
+      this.permissions.canManageProjects({
         userId,
         organizationId,
         projectIds: directory.projects.map((candidate) => candidate.id),
@@ -106,9 +129,18 @@ export class DataPrivacySnapshotService {
       organizationName,
       canManageOrganization,
       teamManage,
-      projectUpdate,
+      projectManage,
+    });
+    const available = this.availableScopes({
+      directory,
+      organizationId,
+      organizationName,
+      canManageOrganization,
+      teamManage,
+      projectManage,
     });
     const allRows = this.parseRows(rows);
+    const rules = this.visibleRules({ rows: allRows, lens });
     const baselines = this.baselineCascades({
       rows: allRows,
       organizationId,
@@ -120,17 +152,52 @@ export class DataPrivacySnapshotService {
       effective: input.effective,
       effectiveTeam: baselines.effectiveTeam,
       effectiveOrganization: baselines.effectiveOrganization,
-      rules: this.visibleRules({ rows: allRows, lens }),
-      available: this.availableScopes({
-        directory,
-        organizationId,
-        organizationName,
-        canManageOrganization,
-        teamManage,
-        projectUpdate,
-      }),
-      audienceOptions: { groups: [...directory.groups] },
+      rules,
+      available,
+      audienceOptions: {
+        groups: [...directory.groups],
+        ...(await this.offerableKeys({
+          organizationId,
+          available,
+          canManageOrganization,
+          rules,
+        })),
+        canAddApiKeys: canManageOrganization,
+      },
     };
+  }
+
+  /**
+   * ADR-208: an organization admin, who sees every key on the API keys page, is offered them
+   * all; another editor only the keys the rules they can read already name; others none.
+   */
+  private async offerableKeys(input: {
+    organizationId: string;
+    available: DataPrivacyScopeAvailable;
+    canManageOrganization: boolean;
+    rules: readonly DataPrivacyRule[];
+  }): Promise<{ apiKeys: { id: string; name: string }[]; apiKeysUnavailable?: true }> {
+    const { available } = input;
+    const canEditARule =
+      available.organization !== null ||
+      available.departments.length > 0 ||
+      available.teams.length > 0 ||
+      available.projects.length > 0;
+    if (!canEditARule) return { apiKeys: [] };
+    const named = new Set(input.rules.flatMap((rule) => namedApiKeyIds(rule.config)));
+    if (!input.canManageOrganization && named.size === 0) return { apiKeys: [] };
+    try {
+      const keys = await this.apiKeys.listAll({ organizationId: input.organizationId });
+      const offered = offerableApiKeys({ keys, now: this.clock() });
+      return {
+        apiKeys: input.canManageOrganization ? offered : offered.filter((key) => named.has(key.id)),
+      };
+    } catch (error) {
+      // The page still opens; the picker offers no key until api-key answers again, and never
+      // calls a key the rule names gone meanwhile.
+      logger.warn({ error, organizationId: input.organizationId }, "API keys unavailable");
+      return { apiKeys: [], apiKeysUnavailable: true };
+    }
   }
 
   /** Who may read a scope's rule, and what that scope is called on the page. */
@@ -139,9 +206,9 @@ export class DataPrivacySnapshotService {
     organizationName: string | null;
     canManageOrganization: boolean;
     teamManage: ReadonlyMap<string, boolean>;
-    projectUpdate: ReadonlyMap<string, boolean>;
+    projectManage: ReadonlyMap<string, boolean>;
   }): ScopeLens {
-    const { directory, organizationName, canManageOrganization, teamManage, projectUpdate } = input;
+    const { directory, organizationName, canManageOrganization, teamManage, projectManage } = input;
     const departmentName = new Map(directory.departments.map((row) => [row.id, row.name]));
     const teamName = new Map(directory.teams.map((row) => [row.id, row.name]));
     const projectName = new Map(directory.projects.map((row) => [row.id, row.name]));
@@ -156,7 +223,7 @@ export class DataPrivacySnapshotService {
           return teamManage.get(scopeId) === true;
         }
 
-        return projectUpdate.get(scopeId) === true;
+        return projectManage.get(scopeId) === true;
       },
       nameOf: (scopeType, scopeId) => {
         if (scopeType === "ORGANIZATION") {
@@ -248,7 +315,7 @@ export class DataPrivacySnapshotService {
     organizationName: string | null;
     canManageOrganization: boolean;
     teamManage: ReadonlyMap<string, boolean>;
-    projectUpdate: ReadonlyMap<string, boolean>;
+    projectManage: ReadonlyMap<string, boolean>;
   }): DataPrivacyScopeAvailable {
     const { directory, organizationId, organizationName, canManageOrganization } = input;
 
@@ -266,7 +333,7 @@ export class DataPrivacySnapshotService {
         .filter((team) => input.teamManage.get(team.id) === true)
         .map(({ id, name }) => ({ id, name })),
       projects: directory.projects
-        .filter((candidate) => input.projectUpdate.get(candidate.id) === true)
+        .filter((candidate) => input.projectManage.get(candidate.id) === true)
         .map(({ id, name, teamId }) => ({ id, name, teamId })),
     };
   }
@@ -281,7 +348,7 @@ export class DataPrivacySnapshotService {
     effective: DataPrivacySnapshot["effective"];
     project: { name: string; teamId: string | null } | null;
   }): Promise<DataPrivacySnapshot> {
-    const writable = await this.permissions.canUpdateProjects({
+    const writable = await this.permissions.canManageProjects({
       userId: input.userId,
       organizationId: null,
       projectIds: [input.projectId],
@@ -308,7 +375,7 @@ export class DataPrivacySnapshotService {
             ]
           : [],
       },
-      audienceOptions: { groups: [] },
+      audienceOptions: { groups: [], apiKeys: [], canAddApiKeys: false },
     };
   }
 }

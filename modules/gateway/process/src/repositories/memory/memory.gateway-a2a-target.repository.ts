@@ -1,14 +1,17 @@
 import {
+  GatewayA2aTargetHeadersNeedReplacingError,
   GatewayA2aTargetNameTakenError,
   createGatewayA2aTargetInputSchema,
   gatewayA2aTargetResourceSchema,
   type CreateGatewayA2aTargetInput,
   type GatewayA2aTargetResource,
-  type UpdateGatewayA2aTargetInput,
 } from "@langwatch/gateway-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import { GatewayA2aTargetRepository } from "../gateway-a2a-target.repository.ts";
+import {
+  GatewayA2aTargetRepository,
+  type GatewayA2aTargetUpdate,
+} from "../gateway-a2a-target.repository.ts";
 
 /** A2A targets in memory; headers held in plaintext like the other memory twins. */
 export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository {
@@ -73,9 +76,22 @@ export class MemoryGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return structuredClone(row);
   }
 
-  async update(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
+  async update(input: GatewayA2aTargetUpdate): Promise<GatewayA2aTargetResource> {
     const existing = this.#live(input);
-    const { id: _id, organizationId: _org, actorUserId: _actor, ...changes } = input;
+    const {
+      id: _id,
+      organizationId: _org,
+      actorUserId: _actor,
+      expectedUpstream,
+      ...changes
+    } = input;
+    if (
+      expectedUpstream &&
+      (existing.upstreamUrl !== expectedUpstream.upstreamUrl ||
+        Object.keys(existing.upstreamHeaders).length > 0 !== expectedUpstream.hasUpstreamHeaders)
+    ) {
+      throw new GatewayA2aTargetHeadersNeedReplacingError();
+    }
     const defined = Object.fromEntries(
       Object.entries(changes).filter(([, value]) => value !== undefined),
     );

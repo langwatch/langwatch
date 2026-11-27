@@ -42,7 +42,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
 
 import AgentsPage from "../agents.tsx";
 
-const CONTROLS = ["Source", "Ownership", "Sort"];
+const CONTROLS = ["Source", "Posture", "Ownership", "Sort"];
 
 const control = (label: string) => {
   const found = screen.getAllByRole("button").find((b) => b.textContent?.startsWith(label));
@@ -55,7 +55,7 @@ afterEach(() => cleanup());
 
 describe("given a governance page with filters and a sort control", () => {
   /** @scenario "Every filter and sort control sits in one row above the content it narrows" */
-  it("holds the source, ownership and sort chips in one left-aligned row above every agent row, with nothing else filtered between it and the header", () => {
+  it("holds the source, posture, ownership and sort chips in one left-aligned row above every agent row, with nothing else filtered between it and the header", () => {
     renderWithGovernanceHost(
       <MemoryRouter>
         <AgentsPage />

@@ -17,9 +17,9 @@ export const INSTANT_EVAL_PRICING: InstantEvalPricing = {
 
 /**
  * The model the ledger names for an unrouted judgement. Customers read it in billing, so it is
- * the product name, never a backend id; rows written before this name carry `jev`.
+ * the product name, never a backend id; earlier rows carry `langwatch-evals-preview` or `jev`.
  */
-export const INSTANT_EVAL_SPEND_MODEL = "langwatch-evals-preview";
+export const INSTANT_EVAL_SPEND_MODEL = "langwatch-instant-preview";
 
 /**
  * The request type every Instant Eval spend row carries on `gateway_spend`, the one the meter

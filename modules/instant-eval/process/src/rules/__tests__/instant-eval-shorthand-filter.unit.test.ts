@@ -38,7 +38,6 @@ const expand = ({
       questions: [{ kind: "boolean", instructions: "The customer is annoyed" }],
       ...shorthand,
     },
-    database: "analytics",
     now: NOW,
     ...(filter ? { filter } : {}),
     ...(selection ? { selection } : {}),
@@ -62,7 +61,7 @@ describe("given a compiled filter", () => {
       const { sql } = expand({ shorthand: { target: "threads" }, filter: SERVICE });
 
       expect(sql).toContain("TraceId IN (");
-      expect(sql).toContain("FROM analytics.traces");
+      expect(sql).toContain("FROM traces");
       expect(sql).toContain("OccurredAt >= {start_at:DateTime64(3, 'UTC')}");
     });
 

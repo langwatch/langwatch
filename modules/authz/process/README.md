@@ -641,7 +641,7 @@ listBillingMembers(args: Billing.AuthzListBillingMembersInput): Promise<readonly
 
 #### `setBillingRole`
 
-Grants or revokes the Billing role; idempotent. Refuses a person with no membership.
+Grants or revokes the Billing role; idempotent. Refuses a person with no membership, and taking a held grant from a Billing-only member (`billing_only_keeps_billing`, ADR-205).
 
 ```typescript
 setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;

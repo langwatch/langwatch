@@ -3,7 +3,13 @@
  * The A2A target routes: who may call each one, and what each hands the UI.
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authorization";
+import { ALL_PERMISSIONS, type AuthzPermission } from "@langwatch/authorization";
+import {
+  AuthzEngine,
+  type AuthzScopeRef,
+  type CollectedBinding,
+  type CollectedGrants,
+} from "@langwatch/authz-contract";
 import {
   GatewayOrganizationNotFoundError,
   gatewayA2aTargetTrpc,
@@ -83,16 +89,141 @@ function mounted(app: ReturnType<typeof fakeApp>) {
   return { permissions, handlers, audits, accesses };
 }
 
+const engine = new AuthzEngine();
+const TEAM_ID = "team_1";
+const PROJECT: AuthzScopeRef = {
+  type: "project",
+  id: "p1",
+  teamId: TEAM_ID,
+  organizationId: ORG_ID,
+};
+const ORGANIZATION: AuthzScopeRef = { type: "organization", id: ORG_ID };
+const VIRTUAL_KEY_MANAGER = ALL_PERMISSIONS.filter((permission) =>
+  permission.startsWith("virtualKeys:"),
+);
+
+function grantsOf({
+  binding,
+  organizationRole = "MEMBER",
+  customPermissions = [],
+}: {
+  binding: Omit<CollectedBinding, "viaGroupId">;
+  organizationRole?: CollectedGrants["organizationRole"];
+  customPermissions?: readonly string[];
+}): CollectedGrants {
+  return {
+    principal: { type: "user", id: actor.id },
+    organizationId: ORG_ID,
+    organizationRole,
+    isOrgMember: true,
+    membershipDisabled: false,
+    bindings: [{ ...binding, viaGroupId: null }],
+    customRolePermissions: new Map([["role", customPermissions]]),
+  };
+}
+
+/** Every procedure the door would let these grants through, asked at its own scope. */
+function passedProcedures(grants: CollectedGrants): string[] {
+  const { accesses } = mounted(fakeApp());
+  return Object.entries(accesses)
+    .filter(([name, access]) => {
+      const { permission } = access as { permission: AuthzPermission };
+      const scope = name.endsWith("ForProject") ? PROJECT : ORGANIZATION;
+      return engine.decide({ grants, permission, scope }).allowed;
+    })
+    .map(([name]) => name)
+    .toSorted();
+}
+
+const PROJECT_PROCEDURES = [
+  "archiveForProject",
+  "listForProject",
+  "setBlockedForProject",
+  "updateForProject",
+];
+
 describe("the gatewayA2aTargets tRPC declaration", () => {
+  describe("given a caller who manages virtual keys but holds no A2A target permission", () => {
+    /** @scenario "A2A targets have their own permission, apart from virtual keys" */
+    it("refuses every procedure, at the project and at the organization", () => {
+      for (const scopeType of ["PROJECT", "ORGANIZATION"] as const) {
+        const grants = grantsOf({
+          binding: {
+            roleKey: "custom:role",
+            scopeType,
+            scopeId: scopeType === "PROJECT" ? "p1" : ORG_ID,
+          },
+          customPermissions: VIRTUAL_KEY_MANAGER,
+        });
+
+        expect(passedProcedures(grants)).toEqual([]);
+      }
+    });
+
+    /** @scenario "A2A targets have their own permission, apart from virtual keys" */
+    it("lets a holder of gatewayA2aTargets:manage through every procedure", () => {
+      const grants = grantsOf({
+        binding: { roleKey: "custom:role", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+        customPermissions: ["gatewayA2aTargets:manage"],
+      });
+
+      expect(passedProcedures(grants)).toEqual(
+        Object.keys(gatewayA2aTargetTrpc.members).toSorted(),
+      );
+    });
+
+    /** @scenario "A2A targets have their own permission, apart from virtual keys" */
+    it("lets a holder of gatewayA2aTargets:view list and change nothing", () => {
+      const grants = grantsOf({
+        binding: { roleKey: "custom:role", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+        customPermissions: ["gatewayA2aTargets:view"],
+      });
+
+      expect(passedProcedures(grants)).toEqual(["list", "listForProject"]);
+    });
+  });
+
+  describe("given the built-in roles", () => {
+    /** @scenario "The built-in roles hold the A2A target permissions they hold on cache rules" */
+    it("lets a team viewer and member list the project's targets and change none", () => {
+      for (const roleKey of ["viewer", "member"] as const) {
+        const grants = grantsOf({ binding: { roleKey, scopeType: "TEAM", scopeId: TEAM_ID } });
+
+        expect(passedProcedures(grants)).toEqual(["listForProject"]);
+      }
+    });
+
+    /** @scenario "The built-in roles hold the A2A target permissions they hold on cache rules" */
+    it("lets a team admin manage the project's targets", () => {
+      const grants = grantsOf({
+        binding: { roleKey: "admin", scopeType: "TEAM", scopeId: TEAM_ID },
+      });
+
+      expect(passedProcedures(grants)).toEqual(PROJECT_PROCEDURES);
+    });
+
+    /** @scenario "The built-in roles hold the A2A target permissions they hold on cache rules" */
+    it("lets an organization admin manage every target", () => {
+      const grants = grantsOf({
+        organizationRole: "ADMIN",
+        binding: { roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+      });
+
+      expect(passedProcedures(grants)).toEqual(
+        Object.keys(gatewayA2aTargetTrpc.members).toSorted(),
+      );
+    });
+  });
+
   describe("given the project-scoped target procedures", () => {
     /** @scenario "a project admin manages the project's own targets" */
     it("checks the permission on the project named in the input", () => {
       const { accesses } = mounted(fakeApp());
       const expected = {
-        listForProject: "virtualKeys:view",
-        updateForProject: "virtualKeys:manage",
-        setBlockedForProject: "virtualKeys:manage",
-        archiveForProject: "virtualKeys:manage",
+        listForProject: "gatewayA2aTargets:view",
+        updateForProject: "gatewayA2aTargets:manage",
+        setBlockedForProject: "gatewayA2aTargets:manage",
+        archiveForProject: "gatewayA2aTargets:manage",
       };
 
       for (const [name, permission] of Object.entries(expected)) {
@@ -155,11 +286,11 @@ describe("the gatewayA2aTargets tRPC declaration", () => {
         ].toSorted(),
       );
       expect(permissions).toMatchObject({
-        list: "virtualKeys:view",
-        create: "virtualKeys:manage",
-        update: "virtualKeys:manage",
-        setBlocked: "virtualKeys:manage",
-        archive: "virtualKeys:manage",
+        list: "gatewayA2aTargets:view",
+        create: "gatewayA2aTargets:manage",
+        update: "gatewayA2aTargets:manage",
+        setBlocked: "gatewayA2aTargets:manage",
+        archive: "gatewayA2aTargets:manage",
       });
     });
 

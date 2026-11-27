@@ -87,7 +87,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
           },
           "columnTypes": {
             "type": "array",
@@ -139,7 +139,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
           }
         },
         "required": [
@@ -17094,7 +17094,10 @@
                                           "seatRequests:manage",
                                           "members:view",
                                           "braids:manage",
-                                          "spans:braided"
+                                          "spans:braided",
+                                          "gatewayA2aTargets:view",
+                                          "gatewayA2aTargets:manage",
+                                          "opsRead:view"
                                         ]
                                       }
                                     ]
@@ -17324,7 +17327,10 @@
                                     "seatRequests:manage",
                                     "members:view",
                                     "braids:manage",
-                                    "spans:braided"
+                                    "spans:braided",
+                                    "gatewayA2aTargets:view",
+                                    "gatewayA2aTargets:manage",
+                                    "opsRead:view"
                                   ]
                                 }
                               ]
@@ -17954,7 +17960,10 @@
                                                   "seatRequests:manage",
                                                   "members:view",
                                                   "braids:manage",
-                                                  "spans:braided"
+                                                  "spans:braided",
+                                                  "gatewayA2aTargets:view",
+                                                  "gatewayA2aTargets:manage",
+                                                  "opsRead:view"
                                                 ]
                                               }
                                             ]
@@ -18184,7 +18193,10 @@
                                             "seatRequests:manage",
                                             "members:view",
                                             "braids:manage",
-                                            "spans:braided"
+                                            "spans:braided",
+                                            "gatewayA2aTargets:view",
+                                            "gatewayA2aTargets:manage",
+                                            "opsRead:view"
                                           ]
                                         }
                                       ]
@@ -18635,7 +18647,10 @@
                                         "seatRequests:manage",
                                         "members:view",
                                         "braids:manage",
-                                        "spans:braided"
+                                        "spans:braided",
+                                        "gatewayA2aTargets:view",
+                                        "gatewayA2aTargets:manage",
+                                        "opsRead:view"
                                       ]
                                     }
                                   ]
@@ -54110,8 +54125,13 @@
                               "failed": {
                                 "type": "number"
                               },
-                              "passRate": {
+                              "errored": {
+                                "description": "Cells where the evaluator crashed and gave no verdict",
                                 "type": "number"
+                              },
+                              "passRate": {
+                                "type": "number",
+                                "description": "Percentage of verdicts that passed; 0 when passed and failed are both 0"
                               },
                               "avgScore": {
                                 "type": "number"
@@ -76409,6 +76429,9 @@
                               "langwatch",
                               "databricks",
                               "copilot_studio",
+                              "aws",
+                              "gcp",
+                              "ard",
                               "traffic"
                             ]
                           },
@@ -76441,6 +76464,38 @@
                           },
                           "shadow": {
                             "type": "boolean"
+                          },
+                          "dormant": {
+                            "type": "boolean"
+                          },
+                          "posture": {
+                            "type": "string",
+                            "enum": [
+                              "governed",
+                              "shadow",
+                              "dormant"
+                            ]
+                          },
+                          "platform": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "labels": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "owner_label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "version": {
                             "type": "integer",
@@ -76672,6 +76727,11 @@
                           "description",
                           "status",
                           "shadow",
+                          "dormant",
+                          "posture",
+                          "platform",
+                          "labels",
+                          "owner_label",
                           "version",
                           "source_version",
                           "project_id",
@@ -77117,7 +77177,7 @@
             }
           }
         },
-        "description": "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant.",
+        "description": "Every agent LangWatch sees for the organisation: agents defined in its projects, agents a governance source listed (Databricks Genie, Copilot Studio, AWS Bedrock, Google Vertex AI, an ARD registry) and agents its traces name in `gen_ai.agent.name`. Ordered by last change, oldest first; pass `next_cursor` back as `cursor`. `updated_since` returns only entries changed at or after that instant. `posture` returns only `governed`, `shadow` or `dormant` entries.",
         "summary": "List the organisation's agent registry",
         "tags": [
           "Governance / Agent Registry"
@@ -77174,6 +77234,18 @@
                 "removed"
               ]
             }
+          },
+          {
+            "in": "query",
+            "name": "posture",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "governed",
+                "shadow",
+                "dormant"
+              ]
+            }
           }
         ]
       }
@@ -77201,6 +77273,9 @@
                             "langwatch",
                             "databricks",
                             "copilot_studio",
+                            "aws",
+                            "gcp",
+                            "ard",
                             "traffic"
                           ]
                         },
@@ -77233,6 +77308,38 @@
                         },
                         "shadow": {
                           "type": "boolean"
+                        },
+                        "dormant": {
+                          "type": "boolean"
+                        },
+                        "posture": {
+                          "type": "string",
+                          "enum": [
+                            "governed",
+                            "shadow",
+                            "dormant"
+                          ]
+                        },
+                        "platform": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "labels": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "owner_label": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "version": {
                           "type": "integer",
@@ -77464,6 +77571,11 @@
                         "description",
                         "status",
                         "shadow",
+                        "dormant",
+                        "posture",
+                        "platform",
+                        "labels",
+                        "owner_label",
                         "version",
                         "source_version",
                         "project_id",
@@ -78098,6 +78210,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -78130,6 +78245,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -78361,6 +78508,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -79035,6 +79187,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -79067,6 +79222,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -79298,6 +79485,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -80256,6 +80448,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -80288,6 +80483,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -80519,6 +80746,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -80986,6 +81218,9 @@
                                   "langwatch",
                                   "databricks",
                                   "copilot_studio",
+                                  "aws",
+                                  "gcp",
+                                  "ard",
                                   "traffic"
                                 ]
                               },
@@ -81018,6 +81253,38 @@
                               },
                               "shadow": {
                                 "type": "boolean"
+                              },
+                              "dormant": {
+                                "type": "boolean"
+                              },
+                              "posture": {
+                                "type": "string",
+                                "enum": [
+                                  "governed",
+                                  "shadow",
+                                  "dormant"
+                                ]
+                              },
+                              "platform": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "labels": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "owner_label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "version": {
                                 "type": "integer",
@@ -81249,6 +81516,11 @@
                               "description",
                               "status",
                               "shadow",
+                              "dormant",
+                              "posture",
+                              "platform",
+                              "labels",
+                              "owner_label",
                               "version",
                               "source_version",
                               "project_id",
@@ -81802,6 +82074,874 @@
                 },
                 "required": [
                   "query"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/governance/registry/settings": {
+      "get": {
+        "operationId": "getApiGovernanceRegistrySettings",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dormant_after_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 365
+                        }
+                      },
+                      "required": [
+                        "dormant_after_days"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "The organisation's dormancy window: the days without a trace after which a listed agent reads as `dormant`. 30 until the organisation saves another value.",
+        "summary": "Get the registry settings",
+        "tags": [
+          "Governance / Agent Registry"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "governance:view"
+          ]
+        }
+      },
+      "put": {
+        "operationId": "putApiGovernanceRegistrySettings",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dormant_after_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 365
+                        }
+                      },
+                      "required": [
+                        "dormant_after_days"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "traceId": {
+                          "type": "string"
+                        },
+                        "spanId": {
+                          "type": "string"
+                        },
+                        "traceUrl": {
+                          "type": "string"
+                        },
+                        "logsUrl": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Sets the organisation's dormancy window, 1 to 365 days. The next reconcile applies it to every listed agent. Needs `ingestionSources:manage`.",
+        "summary": "Save the registry settings",
+        "tags": [
+          "Governance / Agent Registry"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "ingestionSources:manage"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dormant_after_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  }
+                },
+                "required": [
+                  "dormant_after_days"
                 ]
               }
             }
@@ -90035,7 +91175,7 @@
             }
           }
         },
-        "description": "The organisation's governance events as OCSF 1.9.0 API Activity (6003) events, oldest first: traces from ingestion sources, events pulled from provider audit APIs, admin workspace views and OCSF events pushed in from other sources (`source_type` `ocsf_push`, returned as received). Each LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.",
+        "description": "The organisation's governance events as OCSF 1.9.0 API Activity (6003) events, oldest first: traces from ingestion sources, events pulled from provider audit APIs, admin workspace views and OCSF events pushed in from other sources (`source_type` `ocsf_push`, returned as received). Each LangWatch event carries `ai_model`, `ai_agent` and `message_context` token counts when known, and the cost under `unmapped.langwatch`. Filter with `source_type` and `source_id`. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.",
         "summary": "Export governance events as OCSF 1.9.0",
         "tags": [
           "Governance / OCSF SIEM"
@@ -90566,7 +91706,7 @@
             }
           }
         },
-        "description": "The traces of the organisation's projects as OCSF 1.9.0 API Activity events, one per trace, with `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.",
+        "description": "The traces of the organisation's projects as OCSF 1.9.0 API Activity events, one per trace, with `ai_model`, `ai_agent`, token counts and cost. A trace updated again is exported again under the same `metadata.uid`; deduplicate on it. `project_id` limits the read to one project of the organisation. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.",
         "summary": "Export project traces as OCSF 1.9.0",
         "tags": [
           "Governance / OCSF SIEM"
@@ -91088,7 +92228,7 @@
             }
           }
         },
-        "description": "The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.",
+        "description": "The organisation's audit log as OCSF 1.9.0 API Activity events, oldest first: who did what, on which target, from which address, and whether it failed. Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601 with an offset, 1970-01-01T00:00:00Z or later) starts the first read and a cursor carries its own position. `until` (same format and lower bound) is not in the cursor: send it with every page.",
         "summary": "Export the audit log as OCSF 1.9.0",
         "tags": [
           "Governance / OCSF SIEM"
@@ -116321,7 +117461,8 @@
             "project_api_key"
           ],
           "permissions": [
-            "prompts:update"
+            "prompts:update",
+            "prompts:manage"
           ]
         },
         "parameters": [
@@ -128609,6 +129750,880 @@
         }
       }
     },
+    "/api/v1/staff-access/requests": {
+      "post": {
+        "operationId": "createStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "approvalUrl": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "requestId",
+                    "approvalUrl",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scopes": {
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ops:read",
+                        "org:metadata",
+                        "org:content",
+                        "org:support"
+                      ]
+                    }
+                  },
+                  "organization": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "codeChallenge": {
+                    "type": "string",
+                    "minLength": 43,
+                    "maxLength": 43,
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  },
+                  "codeChallengeMethod": {
+                    "type": "string",
+                    "const": "S256"
+                  },
+                  "machine": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "functions": {
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  }
+                },
+                "required": [
+                  "scopes",
+                  "reason",
+                  "codeChallenge",
+                  "codeChallengeMethod",
+                  "machine"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}": {
+      "get": {
+        "operationId": "getStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "denied",
+                        "redeemed",
+                        "expired",
+                        "revoked"
+                      ]
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "accessExpiresAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "requestId",
+                    "status",
+                    "expiresAt",
+                    "accessExpiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}/redeem": {
+      "post": {
+        "operationId": "redeemStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiKey": {
+                      "type": "string"
+                    },
+                    "opsToken": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "ops:read",
+                          "org:metadata",
+                          "org:content",
+                          "org:support"
+                        ]
+                      }
+                    },
+                    "functions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "projects",
+                    "scopes",
+                    "functions",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "codeVerifier": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._~-]{43,128}$"
+                  }
+                },
+                "required": [
+                  "codeVerifier"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}/end": {
+      "post": {
+        "operationId": "endStaffAccessSession",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ended": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ended"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/requests/{requestId}/withdraw": {
+      "post": {
+        "operationId": "withdrawStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "withdrawn": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "withdrawn"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/functions": {
+      "get": {
+        "operationId": "listStaffAccessFunctions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "lookup",
+                              "platform",
+                              "org"
+                            ]
+                          },
+                          "answers": {
+                            "type": "string"
+                          },
+                          "personal": {
+                            "type": "boolean"
+                          },
+                          "inputSchema": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "title",
+                          "scope",
+                          "answers",
+                          "personal",
+                          "inputSchema"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "truncated",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        }
+      }
+    },
+    "/api/v1/staff-access/functions/{functionName}": {
+      "post": {
+        "operationId": "callStaffAccessFunction",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "output": {}
+                  },
+                  "required": [
+                    "name",
+                    "rows",
+                    "output"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "input": {}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "functionName",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/ops/organizations": {
+      "get": {
+        "operationId": "listStaffAccessOrganizations",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "truncated",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsRead:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/ops/organizations/{organization}/usage": {
+      "get": {
+        "operationId": "getStaffAccessOrganizationUsage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organization": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "at": {
+                      "type": "string"
+                    },
+                    "codingAgentSessions": {
+                      "type": "object",
+                      "properties": {
+                        "last7Days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "last30Days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "lastSessionAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "last7Days",
+                        "last30Days",
+                        "lastSessionAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "gateway": {
+                      "type": "object",
+                      "properties": {
+                        "requests30Days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "spendUsd30Days": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "requests30Days",
+                        "spendUsd30Days"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "traces30Days": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "apiKeys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "lastUsedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "lastUsedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "membersSignedIn": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "classification": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "organization",
+                    "at",
+                    "codingAgentSessions",
+                    "gateway",
+                    "traces30Days",
+                    "apiKeys",
+                    "membersSignedIn",
+                    "classification"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsRead:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/ops/queues": {
+      "get": {
+        "operationId": "getStaffAccessQueueSummary",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "pendingGroupCount": {
+                            "type": "number"
+                          },
+                          "blockedGroupCount": {
+                            "type": "number"
+                          },
+                          "activeGroupCount": {
+                            "type": "number"
+                          },
+                          "parkedGroupCount": {
+                            "type": "number"
+                          },
+                          "totalPendingJobs": {
+                            "type": "number"
+                          },
+                          "dlqCount": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "displayName",
+                          "pendingGroupCount",
+                          "blockedGroupCount",
+                          "activeGroupCount",
+                          "parkedGroupCount",
+                          "totalPendingJobs",
+                          "dlqCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "queues"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": [
+            "opsRead:view"
+          ]
+        }
+      }
+    },
     "/api/v1/stored-objects/uploads": {
       "post": {
         "operationId": "createStoredObjectUpload",
@@ -128624,7 +130639,7 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "uploadUrl": {
                       "type": "string",
@@ -128691,7 +130706,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                   },
                   "purpose": {
                     "type": "string",
@@ -128743,13 +130758,13 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "id": {
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "sha256": {
                       "type": "string",
@@ -128809,7 +130824,9 @@
                         "governanceCost:view",
                         "sso:view",
                         "seatRequests:view",
-                        "members:view"
+                        "members:view",
+                        "gatewayA2aTargets:view",
+                        "opsRead:view"
                       ]
                     }
                   },
@@ -128854,7 +130871,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           }
@@ -128870,7 +130887,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                   }
                 },
                 "required": [
@@ -128901,13 +130918,13 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 255,
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                          "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                         },
                         "id": {
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 255,
-                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                          "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                         },
                         "sha256": {
                           "type": "string",
@@ -128981,7 +130998,9 @@
                               "governanceCost:view",
                               "sso:view",
                               "seatRequests:view",
-                              "members:view"
+                              "members:view",
+                              "gatewayA2aTargets:view",
+                              "opsRead:view"
                             ]
                           }
                         },
@@ -129113,7 +131132,9 @@
                             "governanceCost:view",
                             "sso:view",
                             "seatRequests:view",
-                            "members:view"
+                            "members:view",
+                            "gatewayA2aTargets:view",
+                            "opsRead:view"
                           ]
                         },
                         "generation": {
@@ -129168,7 +131189,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           },
@@ -129179,7 +131200,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           },
@@ -129228,7 +131249,9 @@
                 "governanceCost:view",
                 "sso:view",
                 "seatRequests:view",
-                "members:view"
+                "members:view",
+                "gatewayA2aTargets:view",
+                "opsRead:view"
               ]
             },
             "required": true
@@ -129249,7 +131272,7 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255,
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                     },
                     "generation": {
                       "type": "integer",
@@ -129299,7 +131322,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 255,
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+              "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
             },
             "required": true
           }
@@ -129315,7 +131338,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._:-]*$"
                   },
                   "idempotencyKey": {
                     "type": "string",

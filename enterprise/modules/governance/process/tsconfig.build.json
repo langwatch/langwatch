@@ -63,6 +63,9 @@
       "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/notification/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {

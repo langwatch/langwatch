@@ -1063,7 +1063,16 @@ describe("LangyPanel stopping a turn", () => {
       await sendMessage();
 
       expect(await stopButton()).toBeEnabled();
-      expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+      expect((await stopButton()).closest('[data-testid="langy-turn-working-row"]')).not.toBeNull();
+    });
+
+    /** @scenario The composer keeps Send while Langy is working */
+    it("keeps Send in the composer while Stop sits on the working row", async () => {
+      await sendMessage();
+
+      const stop = await stopButton();
+      expect(stop.closest('[data-testid="langy-turn-working-row"]')).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
     });
 
     /** @scenario Stop during startup is kept and dispatched when the turn is identified */

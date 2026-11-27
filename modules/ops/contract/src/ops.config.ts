@@ -3,6 +3,7 @@ import {
   clickhouseCluster,
   Config,
   environmentOneOrTrueSchema,
+  installMethod,
   grafana,
   isSaas,
   nodeEnvironment,
@@ -41,7 +42,7 @@ export const opsConfig = Config.define((c) => ({
   ),
   usageStats: {
     disabled: c.env("DISABLE_USAGE_STATS", environmentOneOrTrueSchema),
-    installMethod: c.env("INSTALL_METHOD", z.string().optional()),
+    installMethod,
     /** The Helm chart release, which moves separately from the app. */
     chartVersion: c.env("LANGWATCH_CHART_VERSION", z.string().optional()),
   },

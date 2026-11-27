@@ -11,6 +11,7 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
   isLangyCallStoppedText,
+  LANGY_IMAGE_CHIP_TEXT,
 } from "@langwatch/langy-contract";
 import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import type { UIMessage } from "ai";
@@ -34,6 +35,9 @@ import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
+import { useLangyImageUrl } from "../../../composer/behavior/use-langy-image-url.ts";
+import { LangyInlineImageChip } from "../../../composer/ui/elements/langy-image-chip.tsx";
+import { LangyImageThumb } from "../../../composer/ui/elements/langy-image-thumb.tsx";
 import {
   type GuidedPullRequest,
   guidedPathCompletedIn,
@@ -68,9 +72,9 @@ import {
   type LangyTranscriptRun,
   langyTranscriptRuns,
 } from "../../../transcript/model/langy-transcript.ts";
-import { LangyDerivedCardView } from "../../../transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
+import { LangyDerivedCardView } from "./derived-cards/langy-derived-card-view.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
 import { LangyGuidedPrCard } from "./github/langy-guided-pr-card.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
@@ -169,6 +173,39 @@ function MessageContentImpl(props: MessageContentProps) {
   return <AssistantMessage {...props} />;
 }
 
+/** One image a sent message carries, drawn from its signed URL once it is minted. */
+function SentImageThumb({ url, name }: { url: string; name: string }) {
+  const image = useLangyImageUrl({ url });
+  if (image.status === "failed") {
+    return <LangyImageThumb name={name} status="failed" error="This image can't be shown" />;
+  }
+  if (image.status === "pending") return <LangyImageThumb name={name} status="uploading" />;
+  return <LangyImageThumb name={name} src={image.url} status="ready" />;
+}
+
+/** The images a message carries as file parts, in order. */
+function messageImages(message: UIMessage): { url: string; filename: string }[] {
+  return message.parts.flatMap((part) =>
+    part.type === "file" && part.mediaType.startsWith("image/")
+      ? [{ url: part.url, filename: part.filename ?? "image" }]
+      : [],
+  );
+}
+
+/** The person's words with each image chip drawn where it was written. */
+function TextWithImageChips({ text }: { text: string }) {
+  const pieces: ReactNode[] = [];
+  let at = 0;
+  for (const match of text.matchAll(LANGY_IMAGE_CHIP_TEXT)) {
+    const start = match.index;
+    if (start > at) pieces.push(text.slice(at, start));
+    pieces.push(<LangyInlineImageChip key={`chip:${start}`} label={match[0]} />);
+    at = start + match[0].length;
+  }
+  if (at < text.length) pieces.push(text.slice(at));
+  return <>{pieces}</>;
+}
+
 /** The text parts of a message, one paragraph apart; `reasoning` never joins the answer. */
 function messageText(message: UIMessage): string {
   return message.parts
@@ -210,8 +247,23 @@ function PlainMessage({
       </Text>
     );
   }
+  const images = messageImages(message);
   return (
-    <Box alignSelf="flex-end" maxWidth="85%">
+    <Box
+      alignSelf="flex-end"
+      maxWidth="85%"
+      display="flex"
+      flexDirection="column"
+      alignItems="flex-end"
+      gap={1.5}
+    >
+      {images.length > 0 ? (
+        <Box display="flex" gap={2} flexWrap="wrap" justifyContent="flex-end">
+          {images.map((image) => (
+            <SentImageThumb key={image.url} url={image.url} name={image.filename} />
+          ))}
+        </Box>
+      ) : null}
       <Box
         data-testid="langy-user-message"
         paddingX={3}
@@ -229,7 +281,7 @@ function PlainMessage({
         lineHeight="1.5"
         whiteSpace="pre-wrap"
       >
-        {text}
+        <TextWithImageChips text={text} />
       </Box>
     </Box>
   );

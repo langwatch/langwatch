@@ -80,6 +80,7 @@ const scopeProjectRowsSchema = z.array(scopeProjectRowSchema);
 const groupMemberRowsSchema = z.array(groupMemberRowSchema);
 const userGroupRowsSchema = z.array(userGroupRowSchema);
 const nullableOrganizationRoleRowSchema = organizationRoleRowSchema.nullable();
+const nullableBillingOnlyRowSchema = z.object({ billingOnly: z.boolean() }).nullable();
 const nullableManagedBindingRowSchema = managedBindingRowSchema.nullable();
 const managedBindingRowsSchema = z.array(managedBindingRowSchema);
 const assignableRoleRowsSchema = z.array(assignableRoleRowSchema);
@@ -344,6 +345,21 @@ export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     return membership?.role ?? null;
   }
 
+  async isBillingOnlyMember({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const membership = await this.database.organizationUser.findFirst({
+      where: { organizationId, userId },
+      select: { billingOnly: true },
+    });
+
+    return nullableBillingOnlyRowSchema.parse(membership)?.billingOnly === true;
+  }
+
   async isGroupInOrganization({
     organizationId,
     groupId,
@@ -366,7 +382,8 @@ export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     apiKeyId: string;
   }): Promise<boolean> {
     const apiKey = await this.database.apiKey.findFirst({
-      where: { id: apiKeyId, organizationId },
+      // A system-managed key's reach is set by its owner module alone, never by a grant.
+      where: { id: apiKeyId, organizationId, isSystemManaged: false },
       select: { id: true },
     });
     return apiKey !== null;

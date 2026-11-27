@@ -91,6 +91,7 @@ export function view(
     cursor: null,
     cursorSpanId: null,
     hasNextPage: false,
+    errorCode: null,
     ...overrides,
   };
 }

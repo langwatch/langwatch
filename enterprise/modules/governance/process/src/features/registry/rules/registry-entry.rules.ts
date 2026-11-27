@@ -20,6 +20,7 @@ export type RegistryDraft = Omit<
   AgentRegistryEntry,
   | "id"
   | "status"
+  | "posture"
   | "version"
   | "tools"
   | "first_seen_at"
@@ -30,6 +31,10 @@ export type RegistryDraft = Omit<
   sourceKey: string;
   /** Ids a traced agent's `gen_ai.agent.id` may carry for this agent; never stored. */
   matchIds?: readonly string[];
+  /** When the source says it created the agent; the dormancy window counts from the earlier. */
+  sourceCreatedAt?: Instant | null;
+  /** The traffic read could not judge dormancy; the held entry's answer stands. */
+  dormancyUnsettled?: boolean;
   tools: RegistryDraftTool[];
   firstSeenAt: Instant;
   lastSeenAt: Instant | null;
@@ -245,6 +250,10 @@ export function langwatchAgentDraft({
     source: "langwatch",
     management: "managed",
     shadow: false,
+    dormant: false,
+    platform: null,
+    labels: {},
+    owner_label: null,
     kind: agent.type,
     name: agent.name,
     ...describedBy(agent),
@@ -260,9 +269,15 @@ export function langwatchAgentDraft({
   };
 }
 
+/** The registry sources a governance source's sightings enter as. */
+export type DiscoveredRegistrySource = Extract<
+  AgentRegistrySource,
+  "databricks" | "copilot_studio" | "aws" | "gcp" | "ard"
+>;
+
 type DiscoveredRegistryRecord = {
   id: string;
-  source: Extract<AgentRegistrySource, "databricks" | "copilot_studio">;
+  source: DiscoveredRegistrySource;
   rawAgentId: string;
   displayText: string;
   metadata: Readonly<Record<string, unknown>>;
@@ -270,7 +285,7 @@ type DiscoveredRegistryRecord = {
   lastSeenAt: Instant;
 };
 
-const DISCOVERED_KIND: Readonly<Record<DiscoveredRegistryRecord["source"], string>> = {
+const DISCOVERED_KIND: Readonly<Record<"databricks" | "copilot_studio", string>> = {
   databricks: "genie_space",
   copilot_studio: "copilot_bot",
 };
@@ -280,26 +295,79 @@ function metadataText(metadata: DiscoveredRegistryRecord["metadata"], field: str
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
-/** A provider-listed agent as a registry draft: what the provider named, nothing guessed. */
+/** A metadata field holding JSON, parsed; anything that does not parse reads as absent. */
+function metadataJson(metadata: DiscoveredRegistryRecord["metadata"], field: string): unknown {
+  const text = metadataText(metadata, field);
+  if (text === null) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function labelsOf(metadata: DiscoveredRegistryRecord["metadata"]): Record<string, string> {
+  const parsed = metadataJson(metadata, "tags");
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).filter((pair): pair is [string, string] => typeof pair[1] === "string"),
+  );
+}
+
+function matchIdsOf(agent: DiscoveredRegistryRecord): string[] {
+  const parsed = metadataJson(agent.metadata, "matchIds");
+  const listed = Array.isArray(parsed)
+    ? parsed.filter((id): id is string => typeof id === "string" && id !== "")
+    : [];
+  return [...new Set([agent.rawAgentId, ...listed])];
+}
+
+/** The source's creation date as an instant; absent or unreadable reads as no date. */
+function sourceCreatedAtOf(text: string | null): Pick<RegistryDraft, "sourceCreatedAt"> {
+  if (text === null) return {};
+  try {
+    return { sourceCreatedAt: Temporal.Instant.from(text) };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * A provider-listed agent as a registry draft: what the provider named, nothing guessed. The
+ * cloud owner tag is a label, never a LangWatch owner. Spec: specs/cloud-agent-discovery.feature
+ */
 export function discoveredAgentDraft(agent: DiscoveredRegistryRecord): RegistryDraft {
-  const kind = DISCOVERED_KIND[agent.source];
+  const { metadata } = agent;
+  const platform = metadataText(metadata, "platform");
+  const kind =
+    agent.source === "databricks" || agent.source === "copilot_studio"
+      ? DISCOVERED_KIND[agent.source]
+      : (platform ?? agent.source);
   const place =
-    metadataText(agent.metadata, "environmentUrl") ?? metadataText(agent.metadata, "workspaceUrl");
+    metadataText(metadata, "consoleUrl") ??
+    metadataText(metadata, "environmentUrl") ??
+    metadataText(metadata, "workspaceUrl");
+  const model = metadataText(metadata, "model");
   return {
     sourceKey: `discovered:${agent.id}`,
-    matchIds: [agent.rawAgentId],
+    matchIds: matchIdsOf(agent),
+    ...sourceCreatedAtOf(metadataText(metadata, "createdAt")),
     source: agent.source,
     management: "discovered",
     shadow: false,
+    dormant: false,
+    platform,
+    labels: labelsOf(metadata),
+    owner_label: metadataText(metadata, "owner"),
     kind,
     name: agent.displayText,
-    description: null,
-    source_version: metadataText(agent.metadata, "modifiedOn"),
+    description: metadataText(metadata, "description"),
+    source_version: metadataText(metadata, "modifiedOn") ?? metadataText(metadata, "updatedAt"),
     project_id: null,
     environment: null,
     owner: null,
     endpoints: place ? [{ kind: "console", url: place, protocol: "https" }] : [],
-    model: null,
+    model: model ? { provider: null, model, parameters: {} } : null,
     instructions: null,
     capabilities: [kind],
     tools: [],

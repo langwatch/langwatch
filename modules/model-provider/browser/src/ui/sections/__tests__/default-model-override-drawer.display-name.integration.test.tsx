@@ -48,7 +48,7 @@ vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
-    // Not answered yet: Evals Preview stays offered, as before the read lands.
+    // Not answered yet: LangWatch Instant (preview) stays offered, as before the read lands.
     instantEval: { access: { useQuery: () => ({ data: undefined, isLoading: true }) } },
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {

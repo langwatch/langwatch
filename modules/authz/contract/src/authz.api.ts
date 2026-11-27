@@ -296,7 +296,10 @@ export interface AuthzApi {
   listBillingMembers(
     args: Billing.AuthzListBillingMembersInput,
   ): Promise<readonly Billing.AuthzBillingMember[]>;
-  /** Grants or revokes the Billing role; idempotent. Refuses a person with no membership. */
+  /**
+   * Grants or revokes the Billing role; idempotent. Refuses a person with no membership, and
+   * taking a held grant from a Billing-only member (`billing_only_keeps_billing`, ADR-205).
+   */
   setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
   /** The escalation rule every door shares: what of these the caller lacks at that scope. */
   findPermissionsBeyondCaller(

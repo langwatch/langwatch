@@ -633,6 +633,17 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             path: "/gateway/webhooks",
             page: "pages/gateway/webhooks",
           },
+
+          // The organization's Dashboards area: no project in the address, so no project chip
+          // (ADR-002). With its flag off `/dashboards` forwards to the reader's project, as
+          // before; with Dashboards off in the organization the shell answers not-found.
+          { path: "/dashboards", page: "pages/dashboards/index" },
+          { path: "/dashboards/templates", page: "pages/dashboards/templates" },
+          {
+            path: "/dashboards/curated/:templateId",
+            page: "pages/dashboards/curated/[templateId]",
+          },
+          { path: "/dashboards/:dashboardId", page: "pages/dashboards/[dashboardId]" },
           ...uiLegacyRedirectRoutes,
         ],
       },
@@ -928,6 +939,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/feature-flags",
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
+      // Agent access: an operator's agents and the passkey approval page a request links to.
+      { path: "/ops/agents", page: "pages/ops/agents" },
+      {
+        path: "/ops/agents/approve/:requestId",
+        page: "pages/ops/agents/approve/[requestId]",
+      },
       {
         // Organization steps are the Organizations tab of the Upgrades page.
         path: "/ops/migrations",

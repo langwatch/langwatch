@@ -122,7 +122,8 @@ describe("InviteService resilience", () => {
         expect(ledger.attachBindings).not.toHaveBeenCalled();
       });
 
-      it("repairs instead of refusing when the loser is the winner racing itself", async () => {
+      /** @scenario "A delayed second accept writes no grant" */
+      it("answers the winner racing itself without writing any grant", async () => {
         mockPrisma.$executeRaw.mockResolvedValue(0);
         mockPrisma.organizationInvite.findUnique.mockResolvedValue({
           status: "ACCEPTED",
@@ -131,12 +132,15 @@ describe("InviteService resilience", () => {
           userId: "user-winner",
         });
 
-        await service.applyInvite({
-          userId: "user-winner",
-          invite: makePendingInvite(),
-        });
+        await expect(
+          service.applyInvite({
+            userId: "user-winner",
+            invite: makePendingInvite(),
+          }),
+        ).resolves.toBeUndefined();
 
-        expect(ledger.attachBindings).toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+        expect(mockPrisma.organizationUser.createMany).not.toHaveBeenCalled();
       });
     });
   });

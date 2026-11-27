@@ -14,6 +14,12 @@ members = ["sdks/python", "packages/ksuid-python"]
 # uv 0.9.25+ supports the exclude-newer-package emergency exceptions (dev/docs/best_practices/dependency-age-gates.md).
 required-version = ">=0.9.25"
 exclude-newer = "7 days"
+# soupsieve 4 (the security floor below) needs Python 3.11.5+, so the lock
+# resolves for that range only instead of forking an ancient beautifulsoup4
+# onto 3.11.0-3.11.4. Emscripten is left out: with environments set, uv needs
+# a wheel per environment, and faiss-cpu ships none for it (ADR-145).
+# .python-version asks for the same Python floor.
+environments = ["python_full_version >= '3.11.5' and sys_platform != 'emscripten'"]
 
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently
@@ -28,9 +34,9 @@ constraint-dependencies = [
   "onnx>=1.22.0", # security: onnx advisory (#1560)
   "transformers>=5.10.0", # security: transformers advisory (#2196)
   "mistune>=3.3.3", # security: mistune advisory (#2216)
-  "tornado>=6.6", # security: tornado advisories covering <=6.5.8 (#2803-#2805) and <6.6 (#3334-#3336)
+  "tornado>=6.6.1", # security: tornado advisories covering <=6.5.8 (#2803-#2805), <6.6 (#3334-#3336) and the <=6.6.0 open redirect (GHSA-5cjw-f85j-cv6r)
   "anyio>=4.14.2", # security: anyio advisories (#2434, #2435)
-  "soupsieve>=2.9.0", # security: soupsieve advisories (#2422, #2423)
+  "soupsieve>=4.0.0", # security: soupsieve advisories (#2422, #2423), then selector DoS and recursion advisories covering <4.0.0 (#3446, #3456, #3466, #3467)
   "accelerate>=1.15.0", # security: accelerate advisory covers <=1.14.0 (#2787)
   "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2788-#2798, #2802, #2806, #2819)
   "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2799-#2801)
@@ -46,4 +52,5 @@ constraint-dependencies = [
   "pyasn1>=0.6.5", # security: pyasn1 decoder advisories covering <=0.6.4 (#3370-#3373)
   "filelock>=4.2.1", # security: filelock advisories covering 3.20.4-4.2.0 (#3208)
   "setuptools>=84.1.0", # security: setuptools advisory covering <84.1.0 (#3207)
+  "opentelemetry-api>=1.45.2", # security: quadratic-time traceparent parsing covering <=1.45.1 (#3468)
 ]

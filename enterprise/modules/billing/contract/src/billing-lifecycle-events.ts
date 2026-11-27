@@ -22,13 +22,20 @@ export const SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE = "lw.billing.seat_checkouts_ab
 export const OVER_PLAN_CHANGED_EVENT_TYPE = "lw.billing.over_plan_changed" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
-/** An organization gained or lost its subscription, with the members who carry the fact. */
+/**
+ * An organization gained or lost its subscription, with the members who carry the fact. A catch-up
+ * fact restates it from billing's own reads, for the customer-io-plan-resync task.
+ */
 const subscriptionChangedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
   organizationId: z.string().min(1),
   memberUserIds: z.array(z.string().min(1)),
   hasSubscription: z.boolean(),
+  /** The active subscription's plan type, FREE when none; absent on facts stored before it. */
+  plan: z.string().min(1).optional(),
+  /** Recorded by the resync from billing's reads, not by a change to a subscription. */
+  fromCatchUp: z.boolean().optional(),
 });
 export interface SubscriptionChangedEventDataSchema extends Named<
   typeof subscriptionChangedEventDataSchemaDefinition

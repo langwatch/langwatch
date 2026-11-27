@@ -120,9 +120,9 @@ describe("filter-translator", () => {
         expect(Object.values(result.params)).toContain("metadata.key.with.dots");
       });
 
-      it("matches nothing for a metadata.value filter without a key", () => {
-        expect(translateFilter({ field: "metadata.value", values: ["value"] }).whereClause).toBe(
-          "1=0",
+      it("refuses a metadata.value filter without a key", () => {
+        expect(() => translateFilter({ field: "metadata.value", values: ["value"] })).toThrow(
+          expect.objectContaining({ code: "analytics_filter_key_required" }),
         );
       });
     });

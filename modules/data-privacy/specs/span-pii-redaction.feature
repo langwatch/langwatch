@@ -372,11 +372,136 @@ Feature: Redacting personal data out of a span at ingestion
 
   @unit
   Scenario: A long batch skips the model and goes to Presidio
-    Given an organization allowlisted for the PII redaction model
+    Given an organization allowlisted for the PII redaction model, with splitting off
     When a strict batch holds more than 8,000 characters in all its texts
     Then Presidio answers it and the model is not called
     And a batch of many short texts counts the same as one long text
     And its usage line records the outcome too_long
+
+  # ADR-207: a long Strict span split across model calls by the caller.
+
+  @unit
+  Scenario: With splitting on, a long batch is split across model calls and masked where the model found it
+    Given an organization allowlisted for the PII redaction model, with splitting on
+    When a strict batch holds between 8,001 and 32,000 characters in all its texts
+    Then every split call to the model carries at most 4,000 characters
+    And a text over 4,000 characters is cut at whitespace into pieces, each repeating at least the last 200 characters of the one before it
+    And a piece that would be under 2,000 characters is cut inside a word instead, the overlap covering that cut
+    And only after a whitespace run longer than 800 characters may the next piece repeat less, as no value spans it
+    And texts of 4,000 characters or less are packed whole into calls
+    And every finding is masked on the characters the model found it on
+    And Presidio is not called
+
+  @unit
+  Scenario: The 8,000 and 32,000 character limits route a batch to one call, split calls or Presidio
+    Given an organization allowlisted for the PII redaction model, with splitting on
+    When a strict batch holds 8,000, 8,001, 32,000 or 32,001 characters, counted after Essential masking as today
+    Then 8,000 goes to the model in one call, 8,001 and 32,000 are split, and 32,001 goes to Presidio
+
+  @unit
+  Scenario: A whole text in a split call keeps the model's own masked text
+    Given a split batch that also holds a short JSON text and a short spared text, each sent whole
+    When the model answers them
+    Then each keeps exactly the masking a single call would give it
+
+  @unit
+  Scenario: A name, an address or an IBAN across a cut is masked whole and nothing found is left unmasked
+    Given a split batch with names, addresses and IBANs planted at the 4,000 and 8,000 character cuts and across the overlap
+    When the model finds each of them in the pieces it sees
+    Then the masked text equals the text with each planted value replaced by its marker, and every other character unchanged
+    And a name found short in one piece and whole in the next is masked over the widest range, labelled by the higher-scoring finding
+
+  @unit
+  Scenario: A batch over 32,000 characters skips the model even with splitting on
+    Given an organization allowlisted for the PII redaction model, with splitting on
+    When a strict batch holds more than 32,000 characters in all its texts
+    Then Presidio answers it and no model is called
+    And its usage line records the outcome too_long
+
+  @unit
+  Scenario: A piece the model could reshape sends the whole span to Presidio
+    Given a split batch
+    When one of its pieces holds a backslash inside it, such as an escaped JSON line
+    Then Presidio answers the whole batch and no piece's findings are used
+    And a piece is never cut to start or end on a character the model trims, U+0085 included
+
+  @unit
+  Scenario: A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio
+    Given a split batch whose piece the model answers with findings that do not rebuild its own masked text
+    Then Presidio answers the whole batch
+    And a piece with an emoji before a name still places the name's mask on the name
+
+  @unit
+  Scenario: One failed split call sends the whole span to Presidio and nothing is stored unmasked
+    Given a split batch with two calls in flight
+    When one call fails, times out or is throttled while the other is still running
+    Then Presidio's answer for the whole batch is returned without waiting for the other call
+    And no answer of the other call is used
+    And a call the model refuses (not configured, a result missing or failed) counts as failed
+
+  @unit
+  Scenario: With no free split slot, a long batch goes to Presidio at once as busy
+    Given a process whose split slots are all taken by other spans
+    When a split batch arrives
+    Then Presidio answers it without waiting for a slot
+    And its usage line records the outcome busy
+
+  @unit
+  Scenario: A split span runs two calls at once and its later pieces on the slots it holds
+    Given a split batch of five pieces and two free split slots
+    Then at most two of its calls are in flight at once and all five pieces are sent
+    And with one free slot its pieces are sent one after another
+    And a batch whose pieces cannot fit the 50 second budget goes to Presidio before any call
+
+  @unit
+  Scenario: A split span gets 50 seconds for all its calls, then goes to Presidio
+    Given a split batch whose calls do not all answer within 50 seconds of the first one starting
+    When the 50 seconds pass
+    Then Presidio answers the whole batch
+    And its usage line records the outcome timeout
+
+  @unit
+  Scenario: A split call's timeout or throttle never stops short batches reaching the model
+    Given a split call that timed out or was throttled
+    When a batch of 8,000 characters or less arrives next
+    Then the model is called for it
+    And the next split batch goes to Presidio as breaker_open until two minutes have passed, then tries split calls again
+
+  @unit
+  Scenario: An aborted split call holds its slot until the model's own deadline has passed
+    Given a split call aborted at its time cap
+    Then the split slots count that call as in flight until 60 seconds after it started
+    And free it at 60 seconds
+
+  @unit
+  Scenario: A spared text in a split span keeps its names and places but still masks an IBAN they overlap
+    Given a split batch whose text is a model, provider or tool name, spared from name and place findings
+    When a higher-scoring name finding overlaps an IBAN in one of its pieces
+    Then every character of the IBAN is masked, shared ones included, and only the name's characters outside it stay
+
+  @unit
+  Scenario: A split span's usage line counts its calls
+    Given a split batch the model answers in several calls
+    Then one usage log line records the texts, the characters, the findings, the outcome ok and the number of split calls it was sent
+
+  @unit
+  Scenario: Splitting is on only where the model is a Lambda function and the organization's split flag is on
+    Given an organization allowlisted for the PII redaction model
+    When the model is reached over HTTP, or the organization's release_pii_redaction_model_split_enabled flag is off
+    And a strict batch of 8,001 characters arrives
+    Then Presidio answers it as today, with the outcome too_long
+    When the flag cannot be read
+    Then Presidio answers it as too_long, with one warning, and nothing is priced
+    When the model is reached as a Lambda function and the flag is on
+    Then the batch is split
+
+  @unit
+  Scenario: Split calls go to the model's one endpoint, each naming its context
+    Given an organization allowlisted for the PII redaction model, with splitting on
+    When a strict batch of 8,000 characters and one of 20,000 characters are analysed
+    Then both reach the model through the one channel PII_REDACTION_MODEL_ENDPOINT configures
+    And the short batch's call names the context single and each call of the long batch names the context split
+    And no second model setting exists
 
   @unit
   Scenario: One setting names the model by Lambda ARN or by address

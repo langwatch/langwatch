@@ -91,3 +91,31 @@ Feature: Dashboard refresh after a Langy turn
   Scenario: Every resource in the capability catalogue is mapped or declared unrefreshed
     Given the capability catalogue lists every CLI resource
     Then each resource names the app query routers it refreshes, or is declared as having none
+
+  # A board Langy makes must be reachable at once: its link opens it, and a reader on a
+  # dashboards page is taken there.
+  @unit
+  Scenario: A board Langy makes refreshes the boards list
+    Given the Langy panel is mid-turn
+    When Langy's "langwatch dashboard create" call returns its result
+    Then the boards queries are invalidated
+    And the sidebar lists the new board and its link opens it without a reload
+
+  @unit
+  Scenario: A board Langy makes opens when the reader is on a dashboards page
+    Given the reader is on a dashboard with the Langy panel mid-turn
+    When Langy's "langwatch dashboard create" call returns the new board
+    Then the browser goes to the new board, in the same dashboards area
+
+  @unit
+  Scenario: A board Langy makes off the dashboards pages leaves the reader where they are
+    Given the reader is on the traces page with the Langy panel mid-turn
+    When Langy's "langwatch dashboard create" call returns the new board
+    Then the browser stays on the traces page
+    And the new board card's link opens the board
+
+  @unit
+  Scenario: A widget Langy adds does not move the reader
+    Given the reader is on a dashboard with the Langy panel mid-turn
+    When Langy's "langwatch dashboard widget add" call returns its result
+    Then the browser stays on the dashboard

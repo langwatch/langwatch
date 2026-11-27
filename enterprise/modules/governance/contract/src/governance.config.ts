@@ -55,6 +55,12 @@ export const governanceConfig = Config.define((c) => ({
   dataverseEnvironmentBase: c.env("DATAVERSE_ENVIRONMENT_BASE", optionalVendorBase),
   /** A Bedrock Agents control-plane endpoint in place of AWS's own, for tests and dogfood. */
   bedrockAgentEndpoint: c.env("BEDROCK_AGENT_ENDPOINT", optionalVendorBase),
+  /** A Bedrock AgentCore control-plane endpoint in place of AWS's own, for tests and dogfood. */
+  bedrockAgentCoreControlEndpoint: c.env("BEDROCK_AGENTCORE_CONTROL_ENDPOINT", optionalVendorBase),
+  /** Google's OAuth token endpoint origin in place of oauth2.googleapis.com, for tests and dogfood. */
+  googleOauthTokenBase: c.env("GOOGLE_OAUTH_TOKEN_BASE", optionalVendorBase),
+  /** Replaces `https://{location}-aiplatform.googleapis.com` for every location, for tests and dogfood. */
+  vertexAiApiBase: c.env("VERTEX_AI_API_BASE", optionalVendorBase),
   /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
   isSaas,
   /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */

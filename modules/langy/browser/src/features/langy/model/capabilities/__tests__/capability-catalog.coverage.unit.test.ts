@@ -30,6 +30,8 @@ const EXCLUDED_COMMANDS = new Set([
   "login",
   "logout",
   "whoami",
+  // Staff access for the LangWatch ops agent: operator-only credential plumbing.
+  "ops",
   // User-global CLI configuration (~/.langwatch/config.json), not platform data.
   "config",
   // Opens a browser / prints local status — no result document to card.

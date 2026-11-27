@@ -490,25 +490,49 @@ describe("a failed step", () => {
     });
   });
 
-  describe("given a failure no retry can fix", () => {
+  describe("given a sandbox step that needs GitHub, which Langy has no access to", () => {
     const notConnected = failedStep({
       id: "gh-1",
       command: "gh pr list",
       errorText: "To get started with GitHub CLI, please run:  gh auth login",
     });
 
-    /** @scenario "A failure no retry can fix keeps its card" */
-    it("keeps the card while the turn runs", () => {
-      renderActivity({ parts: [notConnected], live: true });
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("is no card while the turn runs", () => {
+      const { container } = renderActivity({ parts: [ls, notConnected], live: true });
 
-      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(container.textContent).not.toContain("Install the GitHub App");
     });
 
-    /** @scenario "A failure no retry can fix keeps its card" */
-    it("keeps the card after the turn answered", () => {
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("folds into the record after the turn answered", () => {
       renderActivity({ parts: [notConnected, reply], live: false });
 
-      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(receiptSteps().getByText("gh pr list")).toBeTruthy();
+    });
+
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("stays folded when the turn ended on it", () => {
+      renderActivity({ parts: [ls, notConnected], live: false });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(receiptSteps().getByText("gh pr list")).toBeTruthy();
+    });
+
+    /** @scenario "A sandbox step that needs GitHub folds while the connect card asks" */
+    it("opens into what was missing, with no install tip of its own", async () => {
+      const user = userEvent.setup();
+      const { container } = renderActivity({ parts: [notConnected, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("Langy has no GitHub access here");
+      expect(container.textContent).not.toContain("Settings, under Integrations");
+      expect(container.textContent).not.toContain("Install the GitHub App");
+      expect(container.textContent).not.toContain("gh auth login");
+      expect(container.textContent).toContain("$ gh pr list");
     });
   });
 

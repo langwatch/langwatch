@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/data-privacy-contract";
 import {
   PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS,
+  PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS,
   PII_REDACTION_NANO_USD_PER_CHARACTER,
 } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 
@@ -57,7 +58,22 @@ export function includedFor({ licensed }: { licensed: boolean }): string {
 export function strictFreeNote({ licensed }: { licensed: boolean }): string {
   return licensed ? STRICT_LICENSED_NOTE : STRICT_FREE_NOTE;
 }
-export const STRICT_FALLBACK_NOTE = `If the model is unavailable or a span's text is over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters in total, that span is redacted by our rule-based detector (Presidio) instead. If that detector fails, the text can be sent to Google Cloud DLP.`;
+const STRICT_SPLIT_NOTE = `A span over ${PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS.toLocaleString("en-US")} characters is sent to the model in several parts`;
+
+/**
+ * When a span falls back, by the limit the process routes by: the split one where it splits, and
+ * how a split span is billed unless Strict is included.
+ */
+export function strictFallbackNote({ split, free = false }: { split: boolean; free?: boolean }) {
+  const limit = split
+    ? PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS
+    : PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS;
+  const note = `If the model is unavailable or a span's text is over ${limit.toLocaleString("en-US")} characters in total, that span is redacted by our rule-based detector (Presidio) instead. If that detector fails, the text can be sent to Google Cloud DLP.`;
+  if (!split) return note;
+  return free
+    ? `${note} ${STRICT_SPLIT_NOTE}.`
+    : `${note} ${STRICT_SPLIT_NOTE} and billed once on its own characters; the overlap between parts is free.`;
+}
 const STRICT_RULE_BASED = "Strict here uses the rule-based detector.";
 
 /** Self-hosted Strict without the model: why, and what to do. Never names LangWatch Cloud. */
@@ -75,7 +91,8 @@ export const STRICT_BILLED_NOTE =
  * self-hosted), the rule-based detector with a note, or null for today's page.
  */
 export type PiiRedactionModelOffer =
-  | { kind: "model"; free: boolean; licensed?: boolean }
+  /** `split`: the organization's long spans go to the model in parts (ADR-207); Cloud only. */
+  | { kind: "model"; free: boolean; licensed?: boolean; split: boolean }
   | { kind: "rule-based"; note: Exclude<StrictRuleBasedNote, "licence"> }
   /** `activate`: this reader may activate a license, so the advert links there. */
   | { kind: "rule-based"; note: "licence"; activate: boolean }
@@ -90,6 +107,7 @@ export function piiRedactionModelOfferOf({
   isSaaS,
   modelFlag,
   freeFlag,
+  splitFlag,
   licence,
   mayManageLicence,
 }: {
@@ -97,15 +115,17 @@ export function piiRedactionModelOfferOf({
   /** `undefined` while the flags are not answered yet: no offer then, so nothing flashes. */
   modelFlag: boolean | undefined;
   freeFlag: boolean;
+  splitFlag: boolean;
   licence: PrivacyLicence;
   mayManageLicence: boolean;
 }): PiiRedactionModelOffer {
-  if (isSaaS) return modelFlag === true ? { kind: "model", free: freeFlag } : null;
+  if (isSaaS)
+    return modelFlag === true ? { kind: "model", free: freeFlag, split: splitFlag } : null;
   if (licence === "loading" || licence === "unknown" || modelFlag === undefined) return null;
   if (licence === "none")
     return { kind: "rule-based", note: "licence", activate: mayManageLicence };
   return modelFlag
-    ? { kind: "model", free: true, licensed: true }
+    ? { kind: "model", free: true, licensed: true, split: false }
     : { kind: "rule-based", note: "turn-on" };
 }
 

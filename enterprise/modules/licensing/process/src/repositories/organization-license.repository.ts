@@ -69,6 +69,13 @@ export interface OrganizationLicenseRepository extends OrganizationLicenseReads 
     }>,
   ): Promise<void>;
   saveLicense(input: Readonly<{ organizationId: string; license: StoredLicense }>): Promise<void>;
+  /**
+   * Writes the licence in one statement only while the row still holds `replacing`, or
+   * while there is no row yet; whether it wrote. Two racing syncs get one winner.
+   */
+  replaceLicense(
+    input: Readonly<{ organizationId: string; license: StoredLicense; replacing: string | null }>,
+  ): Promise<boolean>;
   /** Keeps the row with no key, so a cleared licence never falls back to organization's columns. */
   clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
   /** One page of up to `limit` organizations in id order, each beside its row here. */

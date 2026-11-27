@@ -11,7 +11,7 @@ import {
 import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { BraidedOwner, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -41,7 +41,7 @@ import {
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
-import { a2aSpanIdsOf } from "../../../../model/agent-call-graph-layout.ts";
+import { a2aSpanIdsOf, keepsAgentsTab } from "../../../../model/agent-call-graph-layout.ts";
 import type { VizTab } from "../../../../model/trace-drawer-params.ts";
 import { AgentCallGraphPane } from "../../../blocks/agent-call-graph/agent-call-graph-pane.tsx";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
@@ -175,6 +175,10 @@ const TABS: VizTabDef[] = [
   },
 ];
 
+const TABS_WITHOUT_AGENTS = TABS.filter((t) => t.value !== "agents");
+const TAB_IDS = TABS.map((t) => t.value);
+const TAB_IDS_WITHOUT_AGENTS = TABS_WITHOUT_AGENTS.map((t) => t.value);
+
 /**
  * The tab row. When the container is too narrow for every tab, the ones that
  * would clip fold into an overflow menu after the visible tabs.
@@ -191,11 +195,8 @@ function VizTabStrip({
   showsAgents: boolean;
 }) {
   const tabScrollerRef = useRef<HTMLDivElement>(null);
-  const tabs = useMemo(
-    () => (showsAgents ? TABS : TABS.filter((t) => t.value !== "agents")),
-    [showsAgents],
-  );
-  const tabIds = useMemo(() => tabs.map((t) => t.value), [tabs]);
+  const tabs = showsAgents ? TABS : TABS_WITHOUT_AGENTS;
+  const tabIds = showsAgents ? TAB_IDS : TAB_IDS_WITHOUT_AGENTS;
   const hiddenTabIds = useOverflowVisibility({
     scrollerRef: tabScrollerRef,
     items: tabIds,
@@ -410,9 +411,8 @@ export function VizPlaceholder({
   // params just for an icon.
   const selectedPromptSpanId = trace?.selectedPromptSpanId;
   const lastUsedPromptSpanId = trace?.lastUsedPromptSpanId;
-  const promptSpanIds = useMemo(
-    () => new Set([selectedPromptSpanId, lastUsedPromptSpanId].filter((id): id is string => !!id)),
-    [selectedPromptSpanId, lastUsedPromptSpanId],
+  const promptSpanIds = new Set(
+    [selectedPromptSpanId, lastUsedPromptSpanId].filter((id): id is string => !!id),
   );
 
   // When the detail pane is hidden, surface a "Show details" affordance
@@ -424,12 +424,17 @@ export function VizPlaceholder({
   const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
 
   const { showsAgents, isSettled: isAgentGraphSettled } = agentsTab;
-  const a2aSpanIds = useMemo(() => a2aSpanIdsOf({ spans }), [spans]);
-  const hidesAgentsTab = vizTab === "agents" && !showsAgents;
+  const a2aSpanIds = a2aSpanIdsOf({ spans });
+  const offersAgentsTab = keepsAgentsTab({
+    isAgentsSelected: vizTab === "agents",
+    showsAgents,
+    isSettled: isAgentGraphSettled,
+  });
+  const hidesAgentsTab = vizTab === "agents" && !offersAgentsTab;
   const effectiveVizTab: VizTab = hidesAgentsTab ? "waterfall" : vizTab;
   useEffect(() => {
-    if (hidesAgentsTab && isAgentGraphSettled) onVizTabChange("waterfall");
-  }, [hidesAgentsTab, isAgentGraphSettled, onVizTabChange]);
+    if (hidesAgentsTab) onVizTabChange("waterfall");
+  }, [hidesAgentsTab, onVizTabChange]);
 
   const viz = useVizHeight({ fillParent, hasData: spans.length > 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -470,7 +475,7 @@ export function VizPlaceholder({
             vizTab={effectiveVizTab}
             traceId={traceId}
             onVizTabChange={onVizTabChange}
-            showsAgents={showsAgents}
+            showsAgents={offersAgentsTab}
           />
           {!fillParent && (
             <ResizeCycleButton
@@ -556,7 +561,7 @@ const WATERFALL_ROWS = [
 
 function WaterfallSkeleton() {
   return (
-    <Flex direction="row" height="full" position="relative">
+    <Flex direction="row" height="full" position="relative" data-testid="waterfall-skeleton">
       <VStack
         align="stretch"
         gap={1.5}
@@ -628,8 +633,26 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
   );
 }
 
+/** The Agents tab reads its own graph, so it renders without waiting for the span tree. */
+function AgentsPane({
+  agentsTab,
+  onSelectSpan,
+}: {
+  agentsTab: AgentsTab;
+  onSelectSpan: (spanId: string) => void;
+}) {
+  return (
+    <AgentCallGraphPane
+      graph={agentsTab.graph}
+      isError={agentsTab.isGraphError}
+      onRetry={agentsTab.retryGraph}
+      onSelectSpan={onSelectSpan}
+    />
+  );
+}
+
 /** Whichever visualisation the current tab asks for, once spans have arrived. */
-function VizBody({
+export function VizBody({
   braidedOwners,
   isCollapsed,
   isLoading,
@@ -655,6 +678,8 @@ function VizBody({
   vizTab: VizTab;
 }) {
   if (spans.length === 0) {
+    if (isLoading && vizTab === "agents")
+      return <AgentsPane agentsTab={agentsTab} onSelectSpan={onSelectSpan} />;
     if (isLoading) return <VizSkeleton vizTab={vizTab} />;
     return (
       <Flex align="center" justify="center" height="full">
@@ -678,16 +703,7 @@ function VizBody({
       </Suspense>
     );
   }
-  if (vizTab === "agents") {
-    return (
-      <AgentCallGraphPane
-        graph={agentsTab.graph}
-        isError={agentsTab.isGraphError}
-        onRetry={agentsTab.retryGraph}
-        onSelectSpan={onSelectSpan}
-      />
-    );
-  }
+  if (vizTab === "agents") return <AgentsPane agentsTab={agentsTab} onSelectSpan={onSelectSpan} />;
   if (vizTab === "flame") {
     return (
       <FlameView

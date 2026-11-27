@@ -39,7 +39,6 @@ const graph: AgentCallGraph = {
       firstSpanId: "span-a",
     },
   ],
-  a2aSpans: [],
 };
 
 describe("<AgentCallGraphView/>", () => {
@@ -100,7 +99,6 @@ describe("AgentCallGraphView with many callees", () => {
         graph={{
           nodes: [node("root"), ...ids.map((id) => node(id))],
           edges: ids.map((id) => edge(id)),
-          a2aSpans: [],
         }}
         onSelectSpan={() => {}}
       />,
@@ -123,7 +121,6 @@ describe("AgentCallGraphView with many callees", () => {
             edge("slow", { totalDurationMs: 3000, maxDurationMs: 3000 }),
             edge("fast", { totalDurationMs: 50 }),
           ],
-          a2aSpans: [],
         }}
         onSelectSpan={() => {}}
       />,

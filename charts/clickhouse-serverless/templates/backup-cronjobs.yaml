@@ -74,9 +74,9 @@ spec:
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
                 - name: STALE_BACKUP_HOURS
-                  value: {{ .Values.backup.staleHours | quote }}
+                  value: {{ .Values.backup.staleHours | int64 | quote }}
                 - name: BACKUP_RETENTION_DAYS
-                  value: {{ .Values.backup.retentionDays | quote }}
+                  value: {{ .Values.backup.retentionDays | int64 | quote }}
                 # The chain limit follows the full cadence (ADR-199).
                 - name: BACKUP_FULL_SCHEDULE
                   value: {{ .Values.backup.full.schedule | quote }}
@@ -153,9 +153,9 @@ spec:
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
                 - name: STALE_BACKUP_HOURS
-                  value: {{ .Values.backup.staleHours | quote }}
+                  value: {{ .Values.backup.staleHours | int64 | quote }}
                 - name: BACKUP_RETENTION_DAYS
-                  value: {{ .Values.backup.retentionDays | quote }}
+                  value: {{ .Values.backup.retentionDays | int64 | quote }}
                 # The chain limit follows the full cadence (ADR-199).
                 - name: BACKUP_FULL_SCHEDULE
                   value: {{ .Values.backup.full.schedule | quote }}

@@ -27,9 +27,9 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     useContext: () => ({ licenseRegistry: { invalidate: vi.fn() } }),
     licenseRegistry: {
-      getById: {
+      getChain: {
         useQuery: (_input: unknown, opts?: { enabled?: boolean }) => ({
-          data: opts?.enabled ? byId.current : undefined,
+          data: opts?.enabled && byId.current ? { licenses: [byId.current] } : undefined,
           error: null,
           isLoading: false,
         }),
@@ -38,10 +38,12 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
       changeSeats: { useMutation: idle },
       resetInstanceBinding: { useMutation: idle },
       linkToOrganization: { useMutation: idle },
-      revoke: { useMutation: idle },
+      revoke: {
+        useMutation: () => ({ mutate: vi.fn(), mutateAsync: async () => ({}), isPending: false }),
+      },
       registerLegacy: { useMutation: idle },
       issue: { useMutation: () => ({ mutate: issue, isPending: false }) },
-      reissue: { useMutation: () => ({ mutate: reissue, isPending: false }) },
+      reissue: { useMutation: () => ({ mutate: reissue, mutateAsync: reissue, isPending: false }) },
     },
   },
 }));
@@ -63,6 +65,7 @@ function license(overrides: Partial<License> = {}): License {
     source: "BACKOFFICE",
     revokedAt: null,
     revokedReason: null,
+    supersededAt: null,
     replacesId: null,
     services: [],
     seatRateCents: null,
@@ -84,7 +87,8 @@ function license(overrides: Partial<License> = {}): License {
 
 beforeEach(() => {
   issue.mockClear();
-  reissue.mockClear();
+  reissue.mockReset();
+  reissue.mockResolvedValue({ licenseKey: "signed-dev-seats" });
 });
 
 describe("LicenseIssueDrawer, Developer seats", () => {
@@ -120,52 +124,74 @@ describe("LicenseDetailDrawer, Developer seats", () => {
     );
   }
 
+  function openSeats() {
+    fireEvent.click(screen.getByRole("button", { name: "Change seats" }));
+    return screen.getByRole("spinbutton", { name: "Developer seats" });
+  }
+
   /** @scenario The admin console states and shows Developer seats */
   it("reads the Developer seats, and 0 when the licence states none", () => {
     renderDrawer(license());
-    expect(screen.getByText("50 full, 5 lite, 4 Developer")).toBeTruthy();
+    expect(screen.getByText("50 full · 5 lite · 4 Developer")).toBeTruthy();
   });
 
   it("reads 0 Developer seats for a licence that states none", () => {
     renderDrawer(license({ maxMembersDeveloper: null }));
-    expect(screen.getByText("50 full, 5 lite, 0 Developer")).toBeTruthy();
+    expect(screen.getByText("50 full · 5 lite · 0 Developer")).toBeTruthy();
   });
 
   /** @scenario The admin console states and shows Developer seats */
-  it("starts the reissue at the current Developer seats and sends the typed count", () => {
+  it("starts the change at the current Developer seats and reissues the typed count", async () => {
     renderDrawer(license());
-    const developers = screen.getByRole("spinbutton", { name: "Developer seats" });
+    const developers = openSeats();
     expect(developers).toHaveValue(4);
 
     fireEvent.change(developers, { target: { value: "7" } });
-    fireEvent.change(screen.getByLabelText("New term end"), { target: { value: "2028-01-01" } });
-    fireEvent.click(screen.getByRole("button", { name: "Reissue license" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change to 7 Developer seats" }));
 
-    expect(reissue).toHaveBeenCalledTimes(1);
-    expect(reissue.mock.calls[0]?.[0]).toMatchObject({ id: "il_1", maxMembersDeveloper: 7 });
+    await waitFor(() => expect(reissue).toHaveBeenCalledTimes(1));
+    expect(reissue.mock.calls[0]?.[0]).toMatchObject({
+      id: "il_1",
+      maxMembersDeveloper: 7,
+      expiresAt: "2027-09-19T12:00:00.000Z",
+    });
   });
 
-  it("will not reissue while the Developer seats field is empty", () => {
+  it("will not change seats while the Developer seats field is empty", () => {
     renderDrawer(license());
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Developer seats" }), {
-      target: { value: "" },
-    });
-    fireEvent.change(screen.getByLabelText("New term end"), { target: { value: "2028-01-01" } });
+    fireEvent.change(openSeats(), { target: { value: "" } });
 
-    expect(screen.getByRole("button", { name: "Reissue license" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save seats" })).toBeDisabled();
+  });
+
+  it("changes full seats and Developer seats one at a time", () => {
+    renderDrawer(license());
+    fireEvent.change(openSeats(), { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText("Full seats"), { target: { value: "60" } });
+
+    expect(screen.getByRole("button", { name: "Save seats" })).toBeDisabled();
+    expect(screen.getByTestId("change-seats-form").textContent).toContain(
+      "Change full seats and Developer seats one at a time.",
+    );
+  });
+
+  /** @scenario The admin console states and shows Developer seats */
+  it("reads a typed 00 Developer seats as the 0 the licence states, so full seats can change", () => {
+    renderDrawer(license({ maxMembersDeveloper: null }));
+    fireEvent.change(openSeats(), { target: { value: "00" } });
+    fireEvent.change(screen.getByLabelText("Full seats"), { target: { value: "60" } });
+
+    expect(screen.getByRole("button", { name: "Change to 60 seats" })).toBeEnabled();
   });
 
   /** @scenario The admin console states and shows Developer seats */
   it.each(["-1", "1.5", "2147483648"])(
-    "will not reissue %s Developer seats, and says why",
+    "will not change to %s Developer seats, and says why",
     (typed) => {
       renderDrawer(license());
-      fireEvent.change(screen.getByRole("spinbutton", { name: "Developer seats" }), {
-        target: { value: typed },
-      });
-      fireEvent.change(screen.getByLabelText("New term end"), { target: { value: "2028-01-01" } });
+      fireEvent.change(openSeats(), { target: { value: typed } });
 
-      expect(screen.getByRole("button", { name: "Reissue license" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save seats" })).toBeDisabled();
       expect(screen.getByRole("spinbutton", { name: "Developer seats" })).toHaveAttribute(
         "aria-invalid",
         "true",

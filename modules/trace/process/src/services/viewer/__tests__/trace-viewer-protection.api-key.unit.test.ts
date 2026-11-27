@@ -55,7 +55,7 @@ const costsAtProject = {
 
 describe("TraceViewerProtectionService.resolveForApiKey", () => {
   describe("given a caller holding an api key", () => {
-    it("resolves the project anonymously and takes costs from the key's own grant", async () => {
+    it("resolves the project as no person, names the key, and takes costs from its own grant", async () => {
       const can = vi.fn<AuthzApi["can"]>(async () => true);
       const { service, resolve } = serviceWith(can);
 
@@ -70,6 +70,8 @@ describe("TraceViewerProtectionService.resolveForApiKey", () => {
         projectId: "project-1",
         userId: undefined,
         publiclyShared: false,
+        // ADR-208: a rule's audience may name the key.
+        apiKeyId: "key-1",
       });
       expect(can).toHaveBeenCalledWith({
         principal: { type: "apiKey", id: "key-1" },

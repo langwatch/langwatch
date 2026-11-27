@@ -69,6 +69,8 @@ export interface OrganizationSeatLicense {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
+    /** The member is Billing only now (ADR-205): any new role enters a pool. */
+    currentBillingOnly?: boolean;
     role: string;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void>;
@@ -134,6 +136,7 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
+    currentBillingOnly?: boolean;
     role: string;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void> {
@@ -142,15 +145,17 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     // carries none, and a custom one is gated on the plan by the door, not on
     // a seat. That is the platform's own call, kept.
     const oldRole = input.currentRole as OrganizationUserRole;
+    const billingOnly = input.currentBillingOnly ?? false;
     const change = getRoleChangeType({
       oldRole,
       oldPermissions: input.userPermissions,
+      oldBillingOnly: billingOnly,
       newRole: input.role as OrganizationUserRole,
       newPermissions: undefined,
     });
     await this.assertSeatForChange({
       change,
-      wasFull: isFullMember(oldRole, input.userPermissions),
+      wasFull: isFullMember(oldRole, input.userPermissions, { billingOnly }),
       organizationId: input.organizationId,
       plan,
     });

@@ -31,6 +31,12 @@ import type {
 } from "./features/local-control/langy.local-control-protocol.ts";
 import type * as jsonModule from "./json.ts";
 import type {
+  LangyAttachment,
+  LangyAttachmentConfirmInput,
+  LangyAttachmentUpload,
+  LangyAttachmentUploadInput,
+} from "./langy-attachments.ts";
+import type {
   LangyConversationDetail,
   LangyConversationEventPage,
   LangyConversationListPage,
@@ -434,6 +440,9 @@ export interface LangyApi {
   archiveConversation(
     input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
   ): Promise<{ success: boolean }>;
+  /** Refuses a file that is not an image Langy reads, or is too large, before it uploads. */
+  createAttachmentUpload(input: LangyAttachmentUploadInput): Promise<LangyAttachmentUpload>;
+  confirmAttachmentUpload(input: LangyAttachmentConfirmInput): Promise<LangyAttachment>;
   renameConversation(
     input: LangyPanelCall<typeof langyRenameInputSchema>,
   ): Promise<LangyConversationDetailDto>;

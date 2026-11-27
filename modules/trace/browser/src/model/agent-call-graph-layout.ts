@@ -18,6 +18,22 @@ export function a2aSpanIdsOf({ spans }: { spans: readonly AgentMarks[] }): Reado
   return new Set(spans.filter((span) => span.isA2aCall).map((span) => span.spanId));
 }
 
+/**
+ * Whether the viz pane offers the Agents tab: when it shows, or while it is the
+ * selected tab and its visibility is not final yet (the span tree still loading).
+ */
+export function keepsAgentsTab({
+  isAgentsSelected,
+  showsAgents,
+  isSettled,
+}: {
+  isAgentsSelected: boolean;
+  showsAgents: boolean;
+  isSettled: boolean;
+}): boolean {
+  return showsAgents || (isAgentsSelected && !isSettled);
+}
+
 /** A graph worth drawing has more than one agent. */
 export function hasMultipleAgents({
   graph,

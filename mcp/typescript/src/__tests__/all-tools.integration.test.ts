@@ -1176,7 +1176,8 @@ describe("All MCP tools integration", () => {
         const result = await formatSchema("lwql");
 
         expect(result).toContain("## Analytics SQL");
-        expect(result).toContain("analytics.traces");
+        expect(result).toContain("FROM traces");
+        expect(result).not.toContain("analytics.traces");
         expect(result).toContain("OccurredAt");
         expect(result).toContain("```sql");
       });
@@ -1282,7 +1283,7 @@ describe("All MCP tools integration", () => {
       it("sends the statement unchanged and renders a markdown table", async () => {
         const { handleRunQuery } = await import("../tools/run-query.ts");
         const sql =
-          "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
+          "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
         const result = await handleRunQuery({ sql });
 
         expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).sql).toBe(sql);

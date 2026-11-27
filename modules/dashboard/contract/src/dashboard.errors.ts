@@ -13,14 +13,22 @@ type DashboardValidationErrorSource = Readonly<{
   };
 }>;
 
-/** A dashboard the project does not have. */
+/** Where a board was looked for: a project, or the organization's area (ADR-002). */
+export type DashboardNotFoundPlace =
+  | Readonly<{ projectId: string }>
+  | Readonly<{ organizationId: string }>;
+
+/**
+ * A dashboard the project does not have, or, named by its organization, one the organization's
+ * area does not show the reader (ADR-002): either answers exactly as a board that never existed.
+ */
 export class DashboardNotFoundError extends HandledError {
   declare readonly code: "dashboard_not_found";
 
-  constructor(projectId: string) {
+  constructor(place: DashboardNotFoundPlace) {
     super("dashboard_not_found", "Dashboard not found", {
       httpStatus: 404,
-      meta: { projectId },
+      meta: { ...place },
     });
     this.name = "DashboardNotFoundError";
   }
@@ -54,12 +62,29 @@ export class DashboardScopeAuthorOnlyError extends HandledError {
   }
 }
 
-/** A Dashboards-area procedure called while `release_dashboards` is off for the project. */
+/** A board outside LLM Ops made or set to Project: no project lists it (ADR-002, decision 8). */
+export class DashboardHomeNeedsOrgScopeError extends HandledError {
+  declare readonly code: "dashboard_home_needs_org_scope";
+
+  constructor(homeProduct: string) {
+    super(
+      "dashboard_home_needs_org_scope",
+      "Only an LLM Ops dashboard can be shared with its project",
+      { httpStatus: 422, fault: "customer", meta: { homeProduct } },
+    );
+    this.name = "DashboardHomeNeedsOrgScopeError";
+  }
+}
+
+/**
+ * A Dashboards-area procedure called while `release_dashboards` is off for the project, or, for
+ * the organization's library, off in every project of the organization.
+ */
 export class DashboardsNotEnabledError extends HandledError {
   declare readonly code: "dashboards_not_enabled";
 
-  constructor() {
-    super("dashboards_not_enabled", "Dashboards are not enabled for this project", {
+  constructor({ scope = "project" }: { scope?: "project" | "organization" } = {}) {
+    super("dashboards_not_enabled", `Dashboards are not enabled for this ${scope}`, {
       httpStatus: 403,
     });
     this.name = "DashboardsNotEnabledError";
