@@ -78,11 +78,8 @@ func (w *Waiter) waitOne(ctx context.Context, name string) error {
 	status := notCreated
 	for {
 		if state, err := w.Docker.State(ctx, name); err == nil {
-			if state.Health == "healthy" {
-				return nil
-			}
-			if state.Status == "exited" || state.Status == "dead" {
-				return fmt.Errorf("%s stopped before it became healthy (status %q)", name, state.Status)
+			if done, result := settled(name, state); done {
+				return result
 			}
 			status = describe(state)
 		}
@@ -92,6 +89,18 @@ func (w *Waiter) waitOne(ctx context.Context, name string) error {
 		case <-time.After(w.Interval):
 		}
 	}
+}
+
+// settled reports whether a state ends the wait: healthy (nil), or stopped (an error).
+func settled(name string, state State) (bool, error) {
+	switch {
+	case state.Health == "healthy":
+		return true, nil
+	case state.Status == "exited" || state.Status == "dead":
+		return true, fmt.Errorf("%s stopped before it became healthy (status %q)", name, state.Status)
+	}
+
+	return false, nil
 }
 
 // describe names a container's state the way the timeout error reports it.
