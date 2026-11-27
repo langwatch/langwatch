@@ -19,6 +19,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import { PostgresStaffAccessRepositories } from "../../repositories/prisma/prisma.staff-access.repositories.ts";
 import type { StaffAccessRepositories } from "../../repositories/staff-access.repositories.ts";
+import { COPY_AUDIT_NAMES_MAX } from "../../rules/staff-access-copy.rules.ts";
 import {
   ACME,
   AGENT_IP,
@@ -288,6 +289,26 @@ function scenarios(backend: Backend): void {
         });
       });
 
+      /** @scenario "An audit row past the name cap says how many items it leaves unnamed" */
+      it("marks a planned-copy audit row truncated when the plan has more items than the cap", async () => {
+        const w = world();
+        const project = w.copy.addProject({ organizationId: ACME.id, name: "many-datasets" });
+        for (let index = 0; index < COPY_AUDIT_NAMES_MAX; index++) {
+          w.copy.addDataset({ projectId: project.id, name: `set-${index}` });
+        }
+        const { source, target } = await pairedApprovals(w);
+
+        await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [project.id], dryRun: true },
+        });
+
+        const row = w.state.audit.find((entry) => entry.action === "staffAccess.orgCopyPlanned");
+        expect(row?.metadata).toMatchObject({ itemsTruncated: true, itemsOmitted: 1 });
+        const metadata = row?.metadata as { items?: string[] } | undefined;
+        expect(metadata?.items).toHaveLength(COPY_AUDIT_NAMES_MAX);
+      });
+
       /** @scenario "A revoked approval stops a running copy" */
       it("stops at the next item once the source session is revoked mid-run", async () => {
         const w = world();
@@ -435,6 +456,29 @@ function scenarios(backend: Backend): void {
         expect(report.stoppedBecause).toBe("source_approval_ended");
         const stopped = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyStopped");
         expect(stopped.map((row) => row.organizationId)).toEqual([ACME.id, GLOBEX.id]);
+      });
+
+      /** @scenario "Projects copied into an organization with no shared team share one new team" */
+      it("makes one team for every project and reuses it on a rerun", async () => {
+        const w = world();
+        const names = ["alpha", "beta", "gamma"];
+        const projects = names.map((name) => w.copy.addProject({ organizationId: ACME.id, name }));
+        const { source, target } = await pairedApprovals(w);
+        const copyProjects = (ids: string[]) =>
+          w.app.copyOrganization({
+            session: target.session,
+            body: { sourceOpsToken: source.opsToken, projects: ids },
+          });
+
+        await copyProjects(projects.map((project) => project.id));
+        const later = w.copy.addProject({ organizationId: ACME.id, name: "delta" });
+        await copyProjects([later.id]);
+
+        const teams = w.copy.data.teams.filter((team) => team.organizationId === GLOBEX.id);
+        const made = w.copy.data.projects.filter((p) => p.organizationId === GLOBEX.id);
+        expect(teams).toHaveLength(1);
+        expect(made).toHaveLength(4);
+        expect(new Set(made.map((project) => project.teamId))).toEqual(new Set([teams[0]?.id]));
       });
 
       /** @scenario "A rerun copies only what is new" */

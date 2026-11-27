@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   auditedPlan,
+  COPY_AUDIT_NAMES_MAX,
   COPY_SOURCE_SCOPES,
   COPY_TARGET_SCOPES,
   copyTotals,
@@ -88,7 +89,21 @@ describe("copyTotals and auditedPlan", () => {
     expect(auditedPlan({ items })).toEqual({
       counts: { project: 1, prompt: 1 },
       names: ["project: support-bot", "prompt: reply"],
+      namesOmitted: 0,
     });
+  });
+
+  /** @scenario "An audit row past the name cap says how many items it leaves unnamed" */
+  it("names at most the cap and counts the rest as omitted", () => {
+    const items = Array.from({ length: COPY_AUDIT_NAMES_MAX + 3 }, (_, index) =>
+      item({ sourceId: `prompt_${index}`, name: `reply-${index}` }),
+    );
+
+    const plan = auditedPlan({ items });
+
+    expect(plan.names).toHaveLength(COPY_AUDIT_NAMES_MAX);
+    expect(plan.namesOmitted).toBe(3);
+    expect(plan.counts).toEqual({ prompt: COPY_AUDIT_NAMES_MAX + 3 });
   });
 
   /** @scenario "A stopped copy's audit rows name every target the run made" */
@@ -103,6 +118,7 @@ describe("copyTotals and auditedPlan", () => {
     expect(auditedPlan({ items, select: "made" })).toEqual({
       counts: { project: 1, dataset: 1 },
       names: ["project: support-bot", "dataset: golden"],
+      namesOmitted: 0,
     });
   });
 });

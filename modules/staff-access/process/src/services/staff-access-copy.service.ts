@@ -331,6 +331,9 @@ export class StaffAccessCopyService {
           targetApproval: target.row.id,
           counts: plan.counts,
           items: plan.names,
+          ...(plan.namesOmitted > 0
+            ? { itemsTruncated: true, itemsOmitted: plan.namesOmitted }
+            : {}),
           monitorsCreatedPaused: true,
           ...(stoppedBecause ? { stoppedBecause } : {}),
         },

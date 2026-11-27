@@ -96,6 +96,13 @@ Feature: Copying an organization's setup into another organization
     When a copy plans every project of ACME
     Then only the application project is planned
 
+  @integration
+  Scenario: Projects copied into an organization with no shared team share one new team
+    Given Globex has no shared team
+    When a copy makes three projects in Globex and a rerun makes a fourth
+    Then Globex has exactly one new team
+    And all four projects are in it
+
   @unit
   Scenario: A copied project joins the target's existing shared team
     Given Globex already has a shared team
@@ -126,6 +133,13 @@ Feature: Copying an organization's setup into another organization
     When the copy runs again
     Then the project is skipped with "copy_interrupted"
     And nothing in it is planned or made
+
+  @unit @integration
+  Scenario: An audit row past the name cap says how many items it leaves unnamed
+    Given a copy plans more items than an audit row names
+    When the copy writes its audit rows
+    Then each row names the first items up to the cap
+    And it says the list is truncated and how many items it leaves out, which its counts still include
 
   @unit
   Scenario: A ledger write that fails fails the item

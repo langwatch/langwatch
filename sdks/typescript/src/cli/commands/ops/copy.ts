@@ -5,8 +5,7 @@ import { commandValidationError } from "../../utils/errorOutput";
 import { formatTable, sanitizeTerminalText } from "../../utils/formatting";
 import { createPkcePair, describeMachine } from "../../utils/opsSession";
 import type { CommandResult } from "../../utils/output";
-import { requireRequesterKey, staffAccessFetch } from "./_shared";
-import { refuseUndecided, waitForDecision } from "./access";
+import { refuseUndecided, requireRequesterKey, staffAccessFetch, waitForDecision } from "./_shared";
 
 interface CreatedRequest {
   requestId: string;
@@ -159,7 +158,6 @@ const endSides = async ({
 };
 
 /** Copy sessions this run could not end: they stay live until they lapse. */
-/** Names the sessions left live; the failure that ended the copy first, if any, is its cause. */
 const sessionsStillLiveError = (requestIds: readonly string[], cause?: unknown): Error => {
   const message = `Could not end copy session ${requestIds.join(", ")}; it stays live until it lapses. The approver can revoke it on its approval page.`;
   return Object.assign(new Error(message, cause === undefined ? {} : { cause }), {

@@ -95,6 +95,8 @@ export class StaffAccessCopyMakeService {
         language: work.source.language,
         framework: work.source.framework,
       });
+      // The first project made with a new team makes the shared team every later project joins.
+      run.teams.teamId ??= created.teamId;
       return { targetId: created.id, targetProjectId: created.id };
     }
     const projectId = targetProjectId as string;

@@ -100,6 +100,8 @@ export function auditedPlan({
 }): {
   counts: Record<string, number>;
   names: string[];
+  /** How many chosen items are past the name cap and named only in `counts`. */
+  namesOmitted: number;
 } {
   const chosen = items.filter((item) =>
     select === "planned"
@@ -109,7 +111,7 @@ export function auditedPlan({
   const counts: Record<string, number> = {};
   for (const item of chosen) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
   const names = chosen.slice(0, COPY_AUDIT_NAMES_MAX).map((item) => `${item.kind}: ${item.name}`);
-  return { counts, names };
+  return { counts, names, namesOmitted: chosen.length - names.length };
 }
 
 /** The reason an error gives the report: its handled code, or a plain "unexpected_error". */
