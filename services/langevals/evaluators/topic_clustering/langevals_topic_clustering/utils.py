@@ -13,6 +13,7 @@ from tenacity import (
 
 from langevals_topic_clustering.types import Trace, TraceWithEmbeddings
 from langevals_topic_clustering._logger import get_logger
+from langevals_topic_clustering.refusals import is_auth_refusal
 
 logger = get_logger("topic_clustering.utils")
 
@@ -98,6 +99,11 @@ def generate_embeddings_threaded(
                     result = future.result()
                     embeddings.append(result)
                 except Exception as e:
+                    if is_auth_refusal(e):
+                        logger.warning("Embedding refused for its key, not retrying", error_type=type(e).__name__)
+                        for pending in futures:
+                            pending.cancel()
+                        raise
                     embeddings.append(None)
                     errors += 1
                     last_error = e
@@ -145,14 +151,14 @@ def _embed_batch(
 def _refusal_among(
     futures: list[concurrent.futures.Future],
 ) -> Optional[BaseException]:
-    """The first auth or rate-limit error among the batches that finished."""
+    """The first key or rate-limit error among the batches that finished."""
     for future in futures:
         if not future.done() or future.cancelled():
             continue
         error = future.exception()
-        if isinstance(
-            error,
-            (litellm.exceptions.AuthenticationError, litellm.exceptions.RateLimitError),
+        if error is not None and (
+            is_auth_refusal(error)
+            or isinstance(error, litellm.exceptions.RateLimitError)
         ):
             return error
     return None
@@ -202,11 +208,11 @@ def generate_embeddings(
             try:
                 embeddings += future.result()
             except Exception as e:
+                # A missing or refused key fails every later call the same way.
+                if is_auth_refusal(e):
+                    logger.warning("Embedding refused for its key, not retrying", error_type=type(e).__name__)
+                    raise
                 if batch_size > 1:
-                    # Don't fallback for auth errors — same key will fail for every individual request
-                    if isinstance(e, litellm.exceptions.AuthenticationError):
-                        logger.warning("Embedding authentication failed, not retrying", error=str(e))
-                        raise
                     # Still limited after its retries: one call per input would only add load.
                     if isinstance(e, litellm.exceptions.RateLimitError):
                         logger.warning("Embedding still rate limited after retries", error=str(e))

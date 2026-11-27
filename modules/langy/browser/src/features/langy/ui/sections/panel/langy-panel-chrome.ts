@@ -1,10 +1,8 @@
 import {
   APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   LANGY_TRANSITION,
   PANEL_LAYOUT_TRANSITION,
-  SIDEBAR_PANEL_WIDTH,
 } from "../../../../../model/langy-panel-layout.ts";
 
 /** How much of the viewport the floating card may claim once its conversation has earned it. */
@@ -25,7 +23,7 @@ const FLOATING_CLOSED = {
 const SIDEBAR_CLOSED = {
   opacity: 0,
   scale: 1,
-  x: SIDEBAR_PANEL_WIDTH,
+  x: "100%",
   y: 0,
   visibility: "hidden",
 } as const;
@@ -92,16 +90,18 @@ export function panelTransition({
 export function panelSizeCss({
   floating,
   reduceMotion,
+  resizing,
 }: {
   floating: boolean;
   reduceMotion: boolean;
+  /** A drag in progress: the width must follow the pointer, not ease after it. */
+  resizing: boolean;
 }) {
+  const width = resizing ? "" : `, width ${SIZE_EASE}`;
   if (!floating) {
-    return reduceMotion
-      ? undefined
-      : { transition: `translate ${LANGY_TRANSITION}, width ${SIZE_EASE}` };
+    return reduceMotion ? undefined : { transition: `translate ${LANGY_TRANSITION}${width}` };
   }
-  const transition = `min-height ${SIZE_EASE}, max-height ${SIZE_EASE}, width ${SIZE_EASE}, translate ${LANGY_TRANSITION}`;
+  const transition = `min-height ${SIZE_EASE}, max-height ${SIZE_EASE}, translate ${LANGY_TRANSITION}${width}`;
   return {
     ...(reduceMotion ? {} : { transition }),
     "@media (max-height: 620px)": {
@@ -200,15 +200,4 @@ export function panelPlacementChrome({
   if (isDrawerCompanion) return DRAWER_COMPANION_CHROME;
   if (floating) return floatingChrome({ dodgesDrawer, minHeightPx });
   return dockShellClaimed ? SHELL_DOCK_CHROME : FLUSH_DOCK_CHROME;
-}
-
-/** The dock is slimmer than the floating card; the drawer companion keeps the dock width. */
-export function panelWidth({
-  floating,
-  isDrawerCompanion,
-}: {
-  floating: boolean;
-  isDrawerCompanion: boolean;
-}): string {
-  return isDrawerCompanion || !floating ? `${SIDEBAR_PANEL_WIDTH}px` : FLOATING_PANEL_CSS_WIDTH;
 }

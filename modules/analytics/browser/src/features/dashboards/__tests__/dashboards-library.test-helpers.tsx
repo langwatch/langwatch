@@ -28,6 +28,8 @@ export const row = ({
   project = SHOP,
   createdById = "someone",
   ownerName = null,
+  description = null,
+  updatedAt = "2026-11-01T00:00:00.000Z",
 }: {
   id: string;
   name: string;
@@ -36,15 +38,17 @@ export const row = ({
   project?: typeof SHOP | null;
   createdById?: string;
   ownerName?: string | null;
+  description?: string | null;
+  updatedAt?: string;
 }) => ({
   id,
   name,
-  description: null,
+  description,
   createdById,
   ownerName,
   scope,
   homeProduct,
-  updatedAt: new Date("2026-11-01"),
+  updatedAt: new Date(updatedAt),
   project,
   openProject: project ?? IN_VIEW,
 });
