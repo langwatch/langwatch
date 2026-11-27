@@ -17,10 +17,11 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type {
-  OrganizationApi,
-  OrganizationUserRole,
-  SignUpVerdict,
+import {
+  type OrganizationApi,
+  type OrganizationUserRole,
+  signUpRefusalFor,
+  type SignUpVerdict,
 } from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
@@ -123,10 +124,8 @@ async function refuseRestrictedSignUp({
   logger.warn({ reason: verdict.reason }, "Refused sign-up: the installation restricts it");
   // Thrown rather than returned false, so Better Auth carries the code to the
   // sign-in screen as `?error=`.
-  throw APIError.from("FORBIDDEN", {
-    code: SIGN_UP_RESTRICTED_CODE,
-    message: SIGN_UP_RESTRICTED_CODE,
-  });
+  const { code } = signUpRefusalFor({ reason: verdict.reason });
+  throw APIError.from("FORBIDDEN", { code, message: code });
 }
 
 /** The code the sign-in screen and the passkey ceremony read a restricted sign-up by. */

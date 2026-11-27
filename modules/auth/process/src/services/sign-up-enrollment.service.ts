@@ -4,7 +4,7 @@ import {
   type RoutingDecision,
   type SignInMethod,
 } from "@langwatch/identity-contract";
-import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
+import { signUpRefusalFor, type SignUpVerdict } from "@langwatch/organization-contract";
 
 import { decideLocalSignUp, isSettledByRouting } from "../rules/local-sign-up.rules.ts";
 
@@ -78,7 +78,7 @@ export class SignUpEnrollmentService {
     if (decision.outcome !== "enroll") return decision;
 
     const verdict = await this.deps.checkSignUp({ email });
-    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
+    if (!verdict.allowed) throw signUpRefusalFor({ reason: verdict.reason });
 
     return decision;
   }

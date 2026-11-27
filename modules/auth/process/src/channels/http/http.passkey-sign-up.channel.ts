@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SignUpVerdict } from "@langwatch/organization-contract";
+import { signUpRefusalFor, type SignUpVerdict } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
@@ -174,10 +174,8 @@ async function refuseIfPolicyRefuses({
   const verdict = await policy.checkSignUp({ email });
   if (verdict.allowed) return;
 
-  throw new APIError("FORBIDDEN", {
-    code: PASSKEY_SIGNUP_RESTRICTED,
-    message: "Accounts on this installation are created by invitation.",
-  });
+  const refusal = signUpRefusalFor({ reason: verdict.reason });
+  throw new APIError("FORBIDDEN", { code: refusal.code, message: refusal.message });
 }
 
 /**

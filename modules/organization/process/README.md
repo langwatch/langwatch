@@ -2609,13 +2609,14 @@ Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSc
 
 ## Configuration
 
-| Kind   | Leaf                          | Environment variable      | Declared at                                 |
-| ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:342`           |
-| config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
-| config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
-| config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |
-| config | `publicBaseUrl`               | `BASE_HOST`               | `../contract/src/organization.config.ts:22` |
-| config | `isSaas`                      | `IS_SAAS`                 | `../contract/src/organization.config.ts:24` |
+| Kind   | Leaf                          | Environment variable        | Declared at                                 |
+| ------ | ----------------------------- | --------------------------- | ------------------------------------------- |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`     | `src/app/organization.app.ts:343`           |
+| config | `signUp.mode`                 | `SIGN_UP_MODE`              | `../contract/src/organization.config.ts:21` |
+| config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS`   | `../contract/src/organization.config.ts:22` |
+| config | `signUp.adminEmails`          | `ADMIN_EMAILS`              | `../contract/src/organization.config.ts:23` |
+| config | `signUp.disposableEmails`     | `SIGN_UP_DISPOSABLE_EMAILS` | `../contract/src/organization.config.ts:25` |
+| config | `publicBaseUrl`               | `BASE_HOST`                 | `../contract/src/organization.config.ts:33` |
+| config | `isSaas`                      | `IS_SAAS`                   | `../contract/src/organization.config.ts:35` |
 
 <!-- readme:generated:end -->

@@ -1,8 +1,8 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Who may create an account here, and who may found an organization, from
- * `SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS` and `ADMIN_EMAILS`.
- * Spec: specs/auth/sign-up-restriction.feature
+ * `SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`, `SIGN_UP_DISPOSABLE_EMAILS` and `ADMIN_EMAILS`.
+ * Specs: specs/auth/sign-up-restriction.feature, specs/auth/sign-up-disposable-email.feature
  */
 import {
   OrganizationCreationRestrictedError,
@@ -13,6 +13,7 @@ import {
 } from "@langwatch/organization-contract";
 
 import type { SignUpPolicyRepository } from "../repositories/sign-up-policy.repository.ts";
+import { isDisposableEmailDomain } from "../rules/disposable-email.rules.ts";
 
 export interface SignUpPolicySettings {
   mode: SignUpMode;
@@ -20,6 +21,8 @@ export interface SignUpPolicySettings {
   allowedDomains: readonly string[];
   /** `ADMIN_EMAILS`, as written. */
   adminEmails: readonly string[];
+  /** Whether a new address on a disposable email domain is refused. */
+  refuseDisposableEmails: boolean;
 }
 
 interface SignUpPolicyDependencies {
@@ -55,12 +58,18 @@ export class SignUpPolicyService {
     email: string;
     hasAnyAccount: boolean;
   }): Promise<SignUpVerdict> {
-    const { mode, allowedDomains } = this.dependencies.settings;
+    const { mode, allowedDomains, refuseDisposableEmails } = this.dependencies.settings;
     const address = email.trim().toLowerCase();
+    const domain = domainOf(address);
+    // A domain the operator lists in SIGN_UP_ALLOWED_DOMAINS is their decision, not a throwaway.
+    const disposable =
+      refuseDisposableEmails &&
+      !allowedDomains.includes(domain) &&
+      isDisposableEmailDomain({ domain });
 
-    // The default configuration answers without a database read.
+    // The default configuration answers a permanent address without a database read.
     const inviteOnly = mode === "invite_only";
-    if (!inviteOnly && allowedDomains.length === 0) {
+    if (!inviteOnly && allowedDomains.length === 0 && !disposable) {
       return { allowed: true, via: "open" };
     }
     if (this.adminEmails.includes(address)) {
@@ -71,8 +80,11 @@ export class SignUpPolicyService {
     if (invited.length > 0) {
       return { allowed: true, via: "invitation" };
     }
-    if (allowedDomains.length > 0 && !allowedDomains.includes(domainOf(address))) {
+    if (allowedDomains.length > 0 && !allowedDomains.includes(domain)) {
       return { allowed: false, reason: "domain_not_allowed" };
+    }
+    if (disposable) {
+      return { allowed: false, reason: "disposable_email" };
     }
     if (!inviteOnly) {
       return { allowed: true, via: "open" };

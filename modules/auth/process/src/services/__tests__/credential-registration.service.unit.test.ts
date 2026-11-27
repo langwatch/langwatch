@@ -122,6 +122,24 @@ describe("registering through auth's door", () => {
     });
   });
 
+  describe("when the sign-up policy refuses the address as a disposable one", () => {
+    /** @scenario "A disposable address submitting the registration form writes no account" */
+    it("refuses with the disposable code before the proof is spent or the account written", async () => {
+      const { users, organizations, auth, service } = doors();
+      organizations.checkSignUp.mockResolvedValueOnce({
+        allowed: false,
+        reason: "disposable_email",
+      });
+
+      await expect(service.register(signUp({ email: "sam@euploading.com" }))).rejects.toMatchObject(
+        { code: "auth_sign_up_disposable_email" },
+      );
+      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
+      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
+      expect(users.registerCredentialAccount).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the installation's sign-up policy refuses the address", () => {
     /** @scenario "A refused registration spends no address proof and writes no account" */
     it("refuses with the restricted code before the proof is spent or the account written", async () => {

@@ -27,6 +27,9 @@ const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
 /** The server's code for an address the installation's sign-up policy refuses. */
 const SIGN_UP_RESTRICTED = "auth_sign_up_restricted";
 
+/** The sign-up policy's refusal of an address on a disposable email domain. */
+const SIGN_UP_DISPOSABLE_EMAIL = "auth_sign_up_disposable_email";
+
 /** The passkey sign-up's 403 for an address that must use its organization's sign-in. */
 const REGISTRATION_NOT_ALLOWED = "REGISTRATION_NOT_ALLOWED";
 
@@ -89,8 +92,8 @@ function readRefusal(error: { status: number } & object): Refusal {
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
   // The installation's sign-up policy refused the address; the registry has
   // the words for it.
-  if (code === SIGN_UP_RESTRICTED) {
-    return { kind: "report", error: { error: SIGN_UP_RESTRICTED } };
+  if (code === SIGN_UP_RESTRICTED || code === SIGN_UP_DISPOSABLE_EMAIL) {
+    return { kind: "report", error: { error: code } };
   }
   // Routed to single sign-on, or offered no passkey: not a passkey fault, so not that copy.
   if (code === REGISTRATION_NOT_ALLOWED) {

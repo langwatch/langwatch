@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * @see specs/auth/sign-up-restriction.feature
+ * @see specs/auth/sign-up-disposable-email.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -56,7 +57,12 @@ describe("SignUpPolicyService", () => {
 
   beforeEach(() => {
     repository = new CountingRepository();
-    settings = { mode: "open", allowedDomains: [], adminEmails: [] };
+    settings = {
+      mode: "open",
+      allowedDomains: [],
+      adminEmails: [],
+      refuseDisposableEmails: false,
+    };
     accounts = 1;
     operators = new Set();
     proven = {};
@@ -274,6 +280,66 @@ describe("SignUpPolicyService", () => {
         allowed: true,
         via: "invitation",
       });
+    });
+  });
+
+  describe("when the installation refuses disposable email addresses", () => {
+    beforeEach(() => {
+      settings = { ...settings, refuseDisposableEmails: true };
+    });
+
+    /** @scenario "A new address on a disposable email domain is refused" */
+    it("refuses a new address on a disposable domain", async () => {
+      await expect(
+        policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: false, reason: "disposable_email" });
+    });
+
+    /** @scenario "A new address on a permanent email domain is admitted" */
+    it("admits a permanent domain without reading anything", async () => {
+      await expect(
+        policy().checkSignUp({ email: "sam@acme.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: true, via: "open" });
+      expect(repository.reads + reads).toBe(0);
+    });
+
+    /** @scenario "A disposable domain is refused whatever its case and on any subdomain" */
+    it("refuses any case or subdomain of a listed domain, and no look-alike", async () => {
+      for (const email of ["Sam@EUploading.COM", "sam@mx.euploading.com", " sam@fldubai.com "]) {
+        await expect(policy().checkSignUp({ email, hasAnyAccount: accounts > 0 })).resolves.toEqual(
+          { allowed: false, reason: "disposable_email" },
+        );
+      }
+      await expect(
+        policy().checkSignUp({ email: "sam@noteuploading.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: true, via: "open" });
+    });
+
+    /** @scenario "An invited address on a disposable domain is admitted" */
+    it("admits an invited address on a disposable domain", async () => {
+      repository.invited.add("contractor@euploading.com");
+
+      await expect(
+        policy().checkSignUp({ email: "contractor@euploading.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: true, via: "invitation" });
+    });
+
+    it("admits a disposable domain the operator lists in SIGN_UP_ALLOWED_DOMAINS", async () => {
+      settings = { ...settings, allowedDomains: ["euploading.com"] };
+
+      await expect(
+        policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: true, via: "open" });
+    });
+  });
+
+  describe("when the installation allows disposable email addresses", () => {
+    /** @scenario "An installation that allows disposable addresses admits them" */
+    it("admits an address on a disposable domain", async () => {
+      await expect(
+        policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: true, via: "open" });
+      expect(repository.reads + reads).toBe(0);
     });
   });
 });

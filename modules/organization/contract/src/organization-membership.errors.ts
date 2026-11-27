@@ -1,5 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
+import type { SignUpRefusalReason } from "./organization.ts";
+
 export class OrganizationNotFoundForTeamError extends NotFoundError {
   declare readonly code: "organization_not_found_for_team";
 
@@ -206,6 +208,33 @@ export class SignUpRestrictedError extends HandledError {
     });
     this.name = "SignUpRestrictedError";
   }
+}
+
+/**
+ * The address is on a disposable (throwaway) email domain and the installation
+ * refuses those for a new account. The answer depends on the domain alone.
+ */
+export class DisposableEmailRefusedError extends HandledError {
+  declare readonly code: "auth_sign_up_disposable_email";
+
+  constructor() {
+    super("auth_sign_up_disposable_email", "Please use a permanent email address.", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "DisposableEmailRefusedError";
+  }
+}
+
+/** The handled refusal for a sign-up verdict that said no, chosen by its reason. */
+export function signUpRefusalFor({
+  reason,
+}: {
+  reason: SignUpRefusalReason;
+}): SignUpRestrictedError | DisposableEmailRefusedError {
+  return reason === "disposable_email"
+    ? new DisposableEmailRefusedError()
+    : new SignUpRestrictedError(reason);
 }
 
 /**

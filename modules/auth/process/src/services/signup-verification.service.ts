@@ -11,7 +11,7 @@ import {
   normalizeIdentifierValue,
   type RoutingDecision,
 } from "@langwatch/identity-contract";
-import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
+import { signUpRefusalFor, type SignUpVerdict } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { EmailAlreadyRegisteredError, type UserApi } from "@langwatch/user-contract";
 
@@ -147,7 +147,7 @@ export class SignUpVerificationService {
     // sign-up policy is asked of a new address alone.
     if (state === "unknown") {
       const verdict = await this.deps.checkSignUp({ email });
-      if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
+      if (!verdict.allowed) throw signUpRefusalFor({ reason: verdict.reason });
     }
 
     const budget = await this.deps.isWithinBudget({

@@ -58,6 +58,12 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
       "Ask an administrator to invite your email address, then use the link in the invitation to create your account.",
   },
 
+  auth_sign_up_disposable_email: {
+    title: "Please use a permanent email address",
+    describe: () =>
+      "Sign-up does not accept addresses from disposable email services. Use your work or personal email instead.",
+  },
+
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking at their own
     // account: either a previous sign-up created it and could not sign them in, or they were a

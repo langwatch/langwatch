@@ -2773,6 +2773,11 @@ const presentations = {
     describe: () =>
       "Ask an administrator to invite your email address, then use the link in the invitation to create your account.",
   },
+  auth_sign_up_disposable_email: {
+    title: "Please use a permanent email address",
+    describe: () =>
+      "Sign-up does not accept addresses from disposable email services. Use your work or personal email instead.",
+  },
   organization_creation_restricted: {
     title: "Organizations here are created by an administrator",
     describe: () =>

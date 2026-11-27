@@ -40,7 +40,7 @@ export function organizationModuleSetup(
       billing: peers.billing ?? createApiFixture<BillingApi>({}, "BillingApi"),
     },
     config: {
-      signUp: { mode: "open", allowedDomains: [], adminEmails: [] },
+      signUp: { mode: "open", allowedDomains: [], adminEmails: [], disposableEmails: undefined },
       publicBaseUrl: "https://app.langwatch.test",
       isSaas: false,
     },

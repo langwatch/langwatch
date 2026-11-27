@@ -69,6 +69,8 @@ export const STABLE_AUTH_ERRORS = [
   "sso_issuer_mismatch",
   // The installation's sign-up policy does not admit this address: an invitation has to change.
   "auth_sign_up_restricted",
+  // The address is on a disposable email domain: a permanent address has to be used instead.
+  "auth_sign_up_disposable_email",
   // The connection's arrival policy refused or held a newcomer: an administrator has to act.
   "identity_jit_disabled",
   "identity_link_proposed",

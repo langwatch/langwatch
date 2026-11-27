@@ -69,6 +69,7 @@ The AI Gateway uses three more secrets, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWA
 | `MFA_ENROLLMENT_OPEN` | `on` turns on two-step verification | `off` |
 | `SIGN_UP_MODE` | Who can create an account. `open` lets anybody who can reach the install sign up. `invite_only` lets only invited addresses and `ADMIN_EMAILS` sign up, plus the first account on an install with no users when `ADMIN_EMAILS` is empty. See [Restricting sign-up](#restricting-sign-up). | `open` |
 | `SIGN_UP_ALLOWED_DOMAINS` | Comma-separated email domains that can sign up, such as `acme.com,acme.io`. Empty allows any domain. Invited addresses and `ADMIN_EMAILS` can sign up whatever their domain. | - |
+| `SIGN_UP_DISPOSABLE_EMAILS` | `refuse` stops a new account on a disposable (throwaway) email domain, from a maintained list. `allow` admits it. Invited addresses, `ADMIN_EMAILS` and domains in `SIGN_UP_ALLOWED_DOMAINS` can always sign up. Existing accounts are not affected. | `allow` |
 
 A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `AUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
 
@@ -78,6 +79,7 @@ By default anybody who can reach the install can create an account and then crea
 
 - `SIGN_UP_MODE=invite_only` allows an account only for an address with a pending invitation. Members join the organizations that invited them. Only the operators in `ADMIN_EMAILS` can create a new organization, apart from the first organization on an install that has none.
 - `SIGN_UP_ALLOWED_DOMAINS` allows an account only for the listed email domains. It works with either mode.
+- `SIGN_UP_DISPOSABLE_EMAILS=refuse` refuses a new account on a disposable email domain, such as a throwaway inbox service. It works with either mode.
 
 An invited address can always sign up, whatever its domain, from the invitation link or from the sign-in screen. Either way it lands on its invitation. An address in `ADMIN_EMAILS` can always sign up.
 

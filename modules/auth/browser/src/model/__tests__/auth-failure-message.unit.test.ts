@@ -118,6 +118,24 @@ describe("authFailureMessage", () => {
     });
   });
 
+  describe("when a sign-up is refused for a disposable email address", () => {
+    /** @scenario "The sign-up screen asks for a permanent email address" */
+    it("asks for a permanent address, and never says something broke", () => {
+      const message = authFailureMessage({
+        code: "auth_sign_up_disposable_email",
+        message: "auth_sign_up_disposable_email",
+        status: 403,
+      });
+
+      expect(registryCopy("auth_sign_up_disposable_email")).toBe(
+        "Please use a permanent email address",
+      );
+      expect(message).toContain("Please use a permanent email address");
+      expect(message).not.toContain("auth_sign_up_disposable_email");
+      expect(message).not.toBe("Sign in did not go through. Please try again.");
+    });
+  });
+
   describe("when a passkey sign-up is refused for an address that must use its organization's sign-in", () => {
     it("says an account cannot be created here, and never that the passkey failed", () => {
       expect(

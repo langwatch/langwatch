@@ -185,6 +185,7 @@ import type { OrganizationMembershipRepository } from "../repositories/organizat
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type { OrganizationTeamProject } from "../repositories/organization.repository.ts";
+import { refusesDisposableEmails } from "../rules/disposable-email.rules.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
@@ -464,7 +465,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
     // --- end seat-peak corrections ---
     application.#signUpPolicy = SignUpPolicyService.create({
-      settings: setup.config.signUp,
+      settings: {
+        ...setup.config.signUp,
+        refuseDisposableEmails: refusesDisposableEmails({
+          setting: setup.config.signUp.disposableEmails,
+          isSaas: setup.config.isSaas,
+        }),
+      },
       repository: setup.repositories.signUpPolicy,
       authorization: setup.dependencies.permissions,
       // The addresses accepting an invitation takes; an account identity has not resolved yet

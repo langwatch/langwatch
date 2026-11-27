@@ -65,7 +65,8 @@ function makeService({
   decision?: RoutingDecision;
   budgetAllowed?: boolean;
   emailUnconfigured?: boolean;
-  signUpRefused?: boolean;
+  /** `true` refuses as invite-only; a reason refuses with that reason. */
+  signUpRefused?: boolean | "disposable_email";
   mailer?: SignUpVerificationMailChannel;
 } = {}) {
   const memory = MemoryAuthDatabase.create();
@@ -96,8 +97,12 @@ function makeService({
     revokeAllBrowserSessions: async ({ userId }) => {
       revoked.push(userId);
     },
-    checkSignUp: async () =>
-      signUpRefused ? { allowed: false, reason: "invite_only" } : { allowed: true, via: "open" },
+    checkSignUp: async () => {
+      if (signUpRefused === "disposable_email") return { allowed: false, reason: signUpRefused };
+      return signUpRefused
+        ? { allowed: false, reason: "invite_only" }
+        : { allowed: true, via: "open" };
+    },
     isWithinBudget: async ({ key }) => {
       budgets.push(key);
       return budgetAllowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 };
@@ -528,6 +533,19 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
       await harness.service.requestNewAccountVerification({ email: "sam@acme.com" });
 
       expect(harness.mail.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when the sign-up policy refuses the address as a disposable one", () => {
+    /** @scenario "A disposable address is refused before a confirmation link is sent" */
+    it("refuses by the disposable code and mails nothing", async () => {
+      const harness = makeService({ signUpRefused: "disposable_email" });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "sam@euploading.com" }),
+      ).rejects.toMatchObject({ code: "auth_sign_up_disposable_email" });
+      expect(harness.mail.sent).toEqual([]);
+      expect(harness.budgets).toEqual([]);
     });
   });
 
