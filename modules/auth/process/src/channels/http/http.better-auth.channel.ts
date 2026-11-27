@@ -100,11 +100,13 @@ import { socialProviderBasesPlugin } from "./http.social-provider-bases.channel.
 const logger = createLogger("langwatch:better-auth");
 
 /**
- * Return addresses better-auth's origin check refuses ("Invalid callbackURL: ..."): the caller
- * is answered and needs nothing from us.
+ * Return addresses better-auth's origin check refuses ("Invalid callbackURL: ..."), and a sign-in
+ * whose address already has an account under another method (`account_not_linked`, which the
+ * error screen explains): the caller is answered and needs nothing from us.
  */
 const CALLER_REFUSAL_MESSAGES = [
   /^Invalid (?:callbackURL|errorCallbackURL|newUserCallbackURL|redirectURL)\b/,
+  /^account_not_linked$/,
 ];
 
 /**
