@@ -4073,12 +4073,20 @@ def seeded_customer():
     created_order_ids = []
     customer["created_order_ids"] = created_order_ids
 
+    # your test appends ids the agent creates to created_order_ids
     yield customer
 
-    # Clean up: delete only what this run created, even if the test failed
+    # Clean up: delete only what this run created, even if the test failed.
+    # Try every delete, orders before the customer, then report any failures.
+    errors = []
     for order_id in created_order_ids:
-        delete_order(order_id)
+        try:
+            delete_order(order_id)
+        except Exception as error:
+            errors.append(error)
     delete_test_customer(customer["id"])
+    if errors:
+        raise ExceptionGroup("cleanup failed", errors)
 ```
 
 `create_test_customer`, `delete_order` and `delete_test_customer` are your own helpers, for example calls to your API or database.
@@ -4130,16 +4138,15 @@ To run the same scenario in several regions, seed once with a session-scoped fix
 
 ```python
 @pytest.fixture(scope="session")
-def seeded_regions():
-    customers = {
-        region: create_test_customer(name="Test Customer", region=region)
-        for region in ["eu", "us"]
-    }
+def seeded_regions(request):
+    customers = {}
+    for region in ["eu", "us"]:
+        customer = create_test_customer(name="Test Customer", region=region)
+        # Register cleanup right after each create, so a later failure still cleans up
+        request.addfinalizer(lambda id=customer["id"]: delete_test_customer(id))
+        customers[region] = customer
 
-    yield customers
-
-    for customer in customers.values():
-        delete_test_customer(customer["id"])
+    return customers
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("region", ["eu", "us"])
