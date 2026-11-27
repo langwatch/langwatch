@@ -16,7 +16,7 @@ export class ManagedRoleHopTimeoutError extends Error {
   }
 }
 
-/** Both hops share one budget under the gateway's 2s config fetch: a stalled STS fails one row. */
+/** One budget for both hops, inside the gateway's 2s background refresh: a stall fails one row. */
 const ROLE_HOP_BUDGET_MS = 1500;
 
 /**

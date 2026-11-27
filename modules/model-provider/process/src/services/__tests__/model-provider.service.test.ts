@@ -1535,16 +1535,16 @@ describe("ModelProviderService", () => {
     });
 
     /** @scenario "The gateway re-reads a managed row's keys before its session expires" */
-    it("names a new keys window every 45 minutes for a managed organization, none otherwise", () => {
+    it("names a new keys window every five minutes for a managed organization, none otherwise", () => {
       vi.useFakeTimers();
       try {
         const modelProviders = service(new Providers(), new ManagedBedrockCatalog());
-        const windowStart = 665_102 * 45 * 60 * 1000;
+        const windowStart = 5_986_000 * 5 * 60 * 1000;
         vi.setSystemTime(windowStart);
         const first = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
-        vi.setSystemTime(windowStart + 45 * 60 * 1000 - 1);
+        vi.setSystemTime(windowStart + 5 * 60 * 1000 - 1);
         const sameWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
-        vi.setSystemTime(windowStart + 45 * 60 * 1000);
+        vi.setSystemTime(windowStart + 5 * 60 * 1000);
         const nextWindow = modelProviders.getGatewayKeysEpoch({ organizationId: "org_1" });
 
         expect(first).not.toBe("");
