@@ -1,0 +1,74 @@
+/** One heading in the message list and the templates under it, in registry order. */
+export interface TemplateGroup<T> {
+  heading: string;
+  templates: T[];
+}
+
+interface GroupRule {
+  heading: string;
+  ids?: readonly string[];
+  prefix?: string;
+}
+
+const GROUP_RULES: readonly GroupRule[] = [
+  {
+    heading: "Account and sign-in",
+    ids: [
+      "sign-up-verification",
+      "address-confirmation",
+      "reset-password",
+      "organization-mfa-requirement",
+      "platform-operator-change",
+    ],
+  },
+  {
+    heading: "Organisation and team",
+    ids: [
+      "invite",
+      "invite-re-request",
+      "join-request-arrived",
+      "join-request-reminder",
+      "join-request-approved",
+      "join-request-rejected",
+      "join-request-expired",
+      "domain-auto-joined",
+      "seat-request",
+      "idp-refused-sign-in",
+      "sso-domain-proof-wavering",
+      "sso-domain-proof-lapsed",
+      "staff-access-notice",
+    ],
+  },
+  {
+    heading: "Billing and usage",
+    ids: [
+      "license",
+      "connected-statement",
+      "payment-recovery",
+      "budget-increase-request",
+      "usage-limit",
+      "automation-limit",
+    ],
+  },
+  { heading: "Alerts", ids: ["upgrade-alert", "monitor-auto-paused", "trigger-digest"] },
+  { heading: "Weekly digest", prefix: "digest-" },
+];
+
+export const OTHER_HEADING = "Other";
+
+const headingFor = (id: string): string =>
+  GROUP_RULES.find((rule) => rule.ids?.includes(id) || (rule.prefix && id.startsWith(rule.prefix)))
+    ?.heading ?? OTHER_HEADING;
+
+/** The message list's headings in a fixed order; empty ones are left out, unknown ids go last. */
+export const groupTemplates = <T extends { id: string }>({
+  templates,
+}: {
+  templates: readonly T[];
+}): TemplateGroup<T>[] =>
+  [...GROUP_RULES.map((rule) => rule.heading), OTHER_HEADING]
+    .map((heading) => ({
+      heading,
+      templates: templates.filter((template) => headingFor(template.id) === heading),
+    }))
+    .filter((group) => group.templates.length > 0);
