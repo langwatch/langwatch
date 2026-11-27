@@ -203,6 +203,22 @@ export const FEATURE_FLAGS = [
       "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, the judge picker names LangWatch's hosted model LangWatch Evals (preview), and an LLM judge on it (saved as langwatch/instant-evals, or on langwatch/evals-preview) sends the llm_judge route where the project's Instant Evals column is LangWatch's; a judge on langwatch/instant-preview, and any judge answered by an own decision model, is never routed. Off, the picker names it LangWatch Instant (preview), no caller sends a route, and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
+    key: "release_instant_evals_search_router",
+    scope: "PRODUCT",
+    defaultValue: false,
+    selfHostedDefaultValue: false,
+    description:
+      "Sends an organization's judged LangWatchQL queries through the LangWatch Judge router with the search route (ADR-190 decision 13): a decision model answers each question and an LLM answers the ones it is least sure of. Off by default everywhere; enable per organization with a targeting rule. A project on its own decision model, and an install judging through Connect, never send the route; a self-hosted install with its own classifier key routes once an operator switches the flag on. On, each query is held at its cost ceiling and charged at the summed cost of its calls plus the one markup, never past the ceiling. Off, a judged query is the single hosted classifier call at its published rate. Instant Eval runs are never routed by this flag. Separate from release_instant_evals_judge_router, which routes LLM-judge evaluations only.",
+  },
+  {
+    key: "release_langwatch_judge_preview",
+    scope: "PRODUCT",
+    defaultValue: false,
+    selfHostedDefaultValue: false,
+    description:
+      "Offers LangWatch Judge (preview), LangWatch's hosted model for the scenario judge, to an organization. Off by default; turn it on for one organization with a targeting rule { organizationId }. On, the Judge column of Default models and the scenario and suite judge pickers list LangWatch Judge (preview) as pickable, and a run whose judge is langwatch/judge-preview is judged by the LangWatch Judge router: every criterion is routed as its own question, and each billed turn decision and the final verdict is billed as its own Instant Evals spend row under the model langwatch-judge-preview (the verdict row counts the criteria, a turn decision row counts 1). Off, no judge picker lists it, saving it as the Judge default is refused, and a run that holds it (from a scenario, a suite, a run or Default models) is refused before it starts with a message naming the model and the fix. No column but Judge may hold it under either setting. Off by default on a self-hosted install. Turned on there, the pickers list it, but every run that holds it is refused before it starts: the model runs on LangWatch Cloud only. The route table and prices are deploy-time configuration (INSTANT_EVAL_JUDGE_ROUTES and INSTANT_EVAL_JUDGE_PRICING); until the table names a scenarioDecision backend, every run that holds it is refused before it starts, so turn the flag on only after that.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,

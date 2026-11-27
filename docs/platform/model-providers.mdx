@@ -95,6 +95,12 @@ Click **Add config**, pick the scopes and the models. A project config beats a t
 
 The **Instant Evals** column takes only decision models: LangWatch Instant (preview), the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
+The **Judge** column sets the model that judges scenario runs. Unset, it uses the **Default** model.
+
+Where LangWatch Judge (preview) is turned on for your organization on LangWatch Cloud, it is the first choice in this column and in the **Judge** picker of a scenario, a suite and a run. It is LangWatch's own scenario judge (`langwatch/judge-preview`) and needs no provider key. No other column takes it.
+
+LangWatch Judge (preview) is billed with Instant Evals: each turn decision that was paid for is one spend row, and the final verdict is one more. If it cannot reach a verdict, the run ends with an error, never with a made-up verdict. While a run's traces are still arriving, it waits for them once before it judges.
+
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
 </Frame>

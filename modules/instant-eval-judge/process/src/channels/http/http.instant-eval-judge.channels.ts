@@ -12,6 +12,7 @@ import { hostedDecisionsApiKey } from "../instant-eval-hosted-decisions.channel.
 import type { InstantEvalJudgeChannels } from "../instant-eval-judge.channels.ts";
 import {
   llmJudgeAnthropicApiKey,
+  llmJudgeGeminiApiKey,
   llmJudgeOpenAiApiKey,
 } from "../instant-eval-llm-judge.channel.ts";
 import { HttpInstantEvalClassifierChannel } from "./http.instant-eval-classifier.channel.ts";
@@ -53,10 +54,12 @@ export class HttpInstantEvalJudgeChannels {
     });
     const anthropic = await secrets.into(llmJudgeAnthropicApiKey, (k) => cloudKey(k));
     const openAi = await secrets.into(llmJudgeOpenAiApiKey, (k) => cloudKey(k));
+    const gemini = await secrets.into(llmJudgeGeminiApiKey, (k) => cloudKey(k));
     const llmJudge = HttpInstantEvalLlmJudgeChannel.create({
       keys: {
         ...(anthropic.available ? { anthropic_messages: anthropic.apiKey } : {}),
         ...(openAi.available ? { openai_responses: openAi.apiKey } : {}),
+        ...(gemini.available ? { gemini_generate_content: gemini.apiKey } : {}),
       },
     });
     return { classifier, decisionModels, hostedDecisions, llmJudge, spend: bound.spend };

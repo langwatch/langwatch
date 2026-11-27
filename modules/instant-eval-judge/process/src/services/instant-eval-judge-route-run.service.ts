@@ -1,15 +1,18 @@
 /**
  * One routed call's legs for questions of one kind: the plan's primary (a first send it may share
  * with other kinds), then the pair in parallel or an escalation for unsure answers, with fallbacks
- * for a backend that is down. Each kind reads sureness its own way; the legs are the same.
+ * for a backend that is down. A gated plan asks its gate, then the primary or the escalation alone.
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
 import {
   InstantEvalJudgeStoppedError,
   instantEvalSkipped,
+  isInstantEvalJudgeLlmKind,
   isInstantEvalSpendBillable,
+  type InstantEvalJudgeCostCeiling,
   type InstantEvalJudgeRoutePricing,
+  type InstantEvalJudgeRouteGate,
   type InstantEvalJudgeRouteTable,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
@@ -22,22 +25,24 @@ import type {
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
-import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
-  instantEvalDecisionAnswersOf,
-  instantEvalJudgeLegPermitOf,
+  instantEvalJudgeSendWorstCaseNanoUsd,
+  instantEvalJudgeSpendAfterCall,
+} from "../rules/instant-eval-judge-route-cost.rules.ts";
+import {
   instantEvalJudgeLegsJoined,
   instantEvalRoutedVerdictsOf,
   isInstantEvalJudgeLegAnswered,
-  isInstantEvalJudgeLegStop,
   type InstantEvalJudgeAnsweredLeg,
   type InstantEvalJudgeFirstLeg,
   type InstantEvalJudgeLeg as Leg,
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
-import { InstantEvalJudgeLegDeadlineService } from "./instant-eval-judge-leg-deadline.service.ts";
-import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
+import { InstantEvalJudgeBackendSendService } from "./instant-eval-judge-backend-send.service.ts";
+import { InstantEvalJudgeCeilingSendService } from "./instant-eval-judge-ceiling-send.service.ts";
+import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
+import type { InstantEvalScenarioLlmVerdictService } from "./instant-eval-scenario-llm-verdict.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
   table: InstantEvalJudgeRouteTable;
@@ -48,6 +53,28 @@ export type InstantEvalJudgeRouteRunDeps = Readonly<{
   limiter: InstantEvalRateLimiter;
 }>;
 
+/**
+ * A scenario criterion's routed call: its LLM legs read the judge's own verdict call, shared by
+ * every criterion of the judgement, by this criterion's key instead of asking a question.
+ */
+export type InstantEvalJudgeScenarioLeg = Readonly<{
+  criterionKey: string;
+  /** The raw criterion: the gate's task line as the benchmark measured it, unframed. */
+  criterionText: string;
+  verdicts: InstantEvalScenarioLlmVerdictService;
+}>;
+
+type InstantEvalJudgeRouteRunInput = Readonly<{
+  deps: InstantEvalJudgeRouteRunDeps;
+  plan: InstantEvalJudgeRoutePlan;
+  projectId: string;
+  signal: AbortSignal | undefined;
+  logger: Pick<Logger, "error">;
+  scenario?: InstantEvalJudgeScenarioLeg | undefined;
+  /** A judged query's spend cap: each send holds its worst case first (ADR-190 decision 13). */
+  costCeiling?: InstantEvalJudgeCostCeiling | undefined;
+}>;
+
 /** One routed call's legs, the calls they paid for and what the routing reports. */
 export class InstantEvalJudgeRouteRunService {
   private readonly deps: InstantEvalJudgeRouteRunDeps;
@@ -55,52 +82,63 @@ export class InstantEvalJudgeRouteRunService {
   private readonly projectId: string;
   private readonly signal: AbortSignal | undefined;
   private readonly logger: Pick<Logger, "error">;
+  private readonly scenario: InstantEvalJudgeScenarioLeg | undefined;
+  private readonly ceilingSend: InstantEvalJudgeCeilingSendService | undefined;
+  private readonly backends: InstantEvalJudgeBackendSendService;
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
 
-  private constructor(input: {
-    deps: InstantEvalJudgeRouteRunDeps;
-    plan: InstantEvalJudgeRoutePlan;
-    projectId: string;
-    signal: AbortSignal | undefined;
-    logger: Pick<Logger, "error">;
-  }) {
+  private constructor(input: InstantEvalJudgeRouteRunInput) {
     this.deps = input.deps;
     this.plan = input.plan;
     this.projectId = input.projectId;
     this.signal = input.signal;
     this.logger = input.logger;
+    this.scenario = input.scenario;
+    const { costCeiling, logger, scenario } = input;
+    this.backends = InstantEvalJudgeBackendSendService.create({
+      ...input.deps,
+      projectId: input.projectId,
+      plan: input.plan,
+      signal: input.signal,
+      logger,
+      flag: (flag) => this.flags.push(flag),
+      ...(scenario ? { scenario } : {}),
+    });
+    this.ceilingSend = costCeiling
+      ? InstantEvalJudgeCeilingSendService.create({ costCeiling, logger })
+      : undefined;
     const { inputView, isViewMissing, refusedView, longerView } = input.plan;
     if (isViewMissing) this.flags.push(`${inputView}_view_missing`);
     if (refusedView) this.flags.push(`${refusedView}_view_refused`);
     if (longerView) this.flags.push(`${longerView}_view_not_shorter`);
   }
 
-  static create(input: {
-    deps: InstantEvalJudgeRouteRunDeps;
-    plan: InstantEvalJudgeRoutePlan;
-    projectId: string;
-    signal: AbortSignal | undefined;
-    logger: Pick<Logger, "error">;
-  }): InstantEvalJudgeRouteRunService {
+  static create(input: InstantEvalJudgeRouteRunInput): InstantEvalJudgeRouteRunService {
     return new InstantEvalJudgeRouteRunService(input);
   }
 
   /**
-   * One kind's judgement from a first send, its own or one shared with other kinds. A caller's
-   * stop after paid legs carries their spend, so the stopped batch still bills it; any other throw
-   * after paid legs is a skip carrying that spend, so a merged call bills it too.
+   * One kind's judgement from a first send, its own or one shared; a gated plan takes none. A
+   * caller's stop after paid legs carries their spend, so the stopped batch still bills it; any
+   * other throw after paid legs is a skip carrying that spend, so a merged call bills it too.
    */
   async judgeFrom({
     questions,
     first,
   }: {
     questions: readonly InstantEvalQuestion[];
-    first: Promise<InstantEvalJudgeFirstLeg>;
+    first?: Promise<InstantEvalJudgeFirstLeg> | undefined;
   }): Promise<InstantEvalJudgement> {
     try {
-      return await this.judgeLegs({ questions, firstSend: await first });
+      const { gate, escalateTo } = this.plan;
+      // The table refuses a gate with no escalation at boot; without one the plan runs ungated.
+      if (gate && escalateTo) return await this.judgeGated({ questions, gate, escalateTo });
+      return await this.judgeLegs({
+        questions,
+        firstSend: await (first ?? this.firstLeg(questions)),
+      });
     } catch (error) {
       if (!this.isPaid()) throw error;
       if (this.signal?.aborted) {
@@ -145,6 +183,32 @@ export class InstantEvalJudgeRouteRunService {
       return this.result({ questions, legs: [second], escalated: second.answers.size });
     }
     return this.escalateUnsure({ questions, first });
+  }
+
+  /** A gated plan: its gate, then each question's branch alone (ADR-190 decision 11). */
+  private async judgeGated({
+    questions,
+    gate,
+    escalateTo,
+  }: {
+    questions: readonly InstantEvalQuestion[];
+    gate: InstantEvalJudgeRouteGate;
+    escalateTo: string;
+  }): Promise<InstantEvalJudgement> {
+    const { asked, escalated, waitMs } = await InstantEvalJudgeGatedLegsService.create({
+      plan: this.plan,
+      gate,
+      escalateTo,
+      logger: this.logger,
+      flag: (flag) => this.flags.push(flag),
+      ask: (input) => this.ask(input),
+      askOne: (input) => this.askOne(input),
+      taskOf: (question) => this.scenario?.criterionText ?? question.instructions,
+    }).ask(questions);
+    const legs = asked.filter(isInstantEvalJudgeLegAnswered);
+    const failed = asked.findLast((leg) => leg.outcome === "failed");
+    if (legs.length === 0 && failed?.outcome === "failed") return this.nothingAnswered(failed);
+    return this.result({ questions, legs, escalated, waitMs });
   }
 
   /**
@@ -249,163 +313,57 @@ export class InstantEvalJudgeRouteRunService {
   }
 
   private isLlm(backend: string): boolean {
-    const kind = this.deps.table.backends[backend]?.kind;
-    return kind === "anthropic_messages" || kind === "openai_responses";
+    return isInstantEvalJudgeLlmKind(this.deps.table.backends[backend]?.kind);
   }
 
   /**
-   * One backend's answer. Only the caller's stop is rethrown: the leg's own timeout is a leg that
-   * failed, so the paid legs before it stay billed and the page is not retried for it.
+   * One backend's answer. Under a cost ceiling the send first holds its worst case, and a send the
+   * ceiling cannot hold is a failed leg that sends nothing; the hold becomes what the send billed.
    */
-  private async askOne({
-    backend,
-    questions,
-  }: {
+  private async askOne(input: {
     backend: string;
     questions: readonly InstantEvalQuestion[];
+    /** A decision model's own text in place of the plan's view: the gate's framing of the case. */
+    text?: string;
   }): Promise<Leg> {
-    const config = this.deps.table.backends[backend];
-    if (!config) return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    if (config.kind !== "jev" && config.kind !== "decisions") {
-      return this.askLlm({
-        backend,
-        wire: config.kind,
-        model: config.model,
-        questions,
-        timeoutMs: config.timeoutMs,
-      });
-    }
-    const deadline = InstantEvalJudgeLegDeadlineService.create(config.timeoutMs);
-    try {
-      return await this.askDecisionModel({
-        backend,
-        kind: config.kind,
-        model: config.model,
-        questions,
-        deadline,
-      });
-    } catch (error) {
-      if (this.signal?.aborted) throw error;
-      if (!isInstantEvalJudgeLegStop(error))
-        return { outcome: "failed", reason: "classifier_failed", error };
-      this.flags.push(`${backend}_timed_out`);
-      return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    } finally {
-      deadline.stop();
-    }
-  }
-
-  private async askDecisionModel({
-    backend,
-    kind,
-    model,
-    questions,
-    deadline,
-  }: {
-    backend: string;
-    kind: "jev" | "decisions";
-    model: string | undefined;
-    questions: readonly InstantEvalQuestion[];
-    deadline: InstantEvalJudgeLegDeadlineService;
-  }): Promise<Leg> {
-    const text = this.textFor({ backend, kind });
-    const judgement = await this.callDecisionModel({ kind, model, text, questions, deadline });
-    if (!judgement) {
-      this.flags.push(`${backend}_unavailable`);
-      return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    }
-    const { inputTokens, outputTokens = 0 } = judgement;
-    this.paid({ backend, inputTokens, outputTokens });
-    if (judgement.skippedReason) return { outcome: "failed", reason: judgement.skippedReason };
-    const answers = instantEvalDecisionAnswersOf({ questions, judgement, table: this.deps.table });
-    if (answers.size === 0) return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    return {
-      outcome: "answered",
+    const { ceilingSend } = this;
+    if (!ceilingSend)
+      return this.backends.send({ ...input, paid: (spend) => void this.paid(spend) });
+    const { backend, questions, text } = input;
+    const { table, pricing } = this.deps;
+    const heldNanoUsd = instantEvalJudgeSendWorstCaseNanoUsd({
       backend,
-      answers,
-      isTextTruncated: judgement.isTextTruncated,
-      limiterWaitMs: judgement.limiterWaitMs ?? 0,
-    };
-  }
-
-  /**
-   * The decision model's judgement, or undefined when this install holds no channel for it. Each
-   * send waits on the limiter (the hosted classifier's own bucket, a per-kind tenant share for
-   * Decisions) on the caller's stop alone, with the leg's clock paused meanwhile.
-   */
-  private async callDecisionModel({
-    kind,
-    model,
-    text,
-    questions,
-    deadline,
-  }: {
-    kind: "jev" | "decisions";
-    model: string | undefined;
-    text: string;
-    questions: readonly InstantEvalQuestion[];
-    deadline: InstantEvalJudgeLegDeadlineService;
-  }): Promise<InstantEvalJudgement | undefined> {
-    const { classifier, hostedDecisions } = this.deps;
-    const signal = deadline.signalWith(this.signal);
-    const limiter = deadline.pausing({ limiter: this.deps.limiter, signal: this.signal });
-    if (kind === "jev") {
-      return classifier?.classify({ projectId: this.projectId, text, questions, limiter }, signal);
-    }
-    if (!hostedDecisions || !model) return undefined;
-    const { projectId } = this;
-    await limiter.acquire(
-      instantEvalJudgeLegPermitOf({ projectId, pool: "decisions", text, questions }),
-    );
-    return hostedDecisions.classify({ text, questions, model }, signal);
-  }
-
-  /**
-   * The planned view for a leg whose kind the table allows on it, else the full trace: the plan
-   * checks only the primary and pair, so a fallback or a decision-kind escalation is checked here.
-   */
-  private textFor({ backend, kind }: { backend: string; kind: "jev" | "decisions" }): string {
-    const { inputView, text, fullText } = this.plan;
-    if (inputView === "full" || text === fullText) return text;
-    const allowed: readonly string[] = this.deps.table.inputViews.allowedKinds[inputView];
-    if (allowed.includes(kind)) return text;
-    this.flags.push(`${inputView}_view_refused:${backend}`);
-    return fullText;
-  }
-
-  /** One LLM call per question, in parallel; its answer is taken as sure. */
-  private async askLlm({
-    backend,
-    wire,
-    model,
-    questions,
-    timeoutMs,
-  }: {
-    backend: string;
-    wire: "anthropic_messages" | "openai_responses";
-    model: string | undefined;
-    questions: readonly InstantEvalQuestion[];
-    timeoutMs: number;
-  }): Promise<Leg> {
-    // The table refuses an LLM backend with no model at boot; this keeps the type honest.
-    if (!model) return { outcome: "failed", reason: "classifier_not_configured" };
-    const { llmJudge, limiter } = this.deps;
-    const leg = InstantEvalJudgeLlmLegService.create({
-      llmJudge,
-      limiter,
-      projectId: this.projectId,
+      table,
+      pricing,
       job: this.plan.job,
-      text: this.plan.fullText,
-      signal: this.signal,
-      logger: this.logger,
-      paid: (spend) => this.paid({ backend, ...spend }),
+      text: text ?? this.longestPlanText(),
+      questions,
     });
-    const { answers, reason } = await leg.ask({ call: { wire, model, timeoutMs }, questions });
-    if (answers.size === 0) return { outcome: "failed", reason };
-    if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);
-    return { outcome: "answered", backend, answers, isTextTruncated: false, limiterWaitMs: 0 };
+    const sent = await ceilingSend.send({
+      heldNanoUsd,
+      signal: this.signal,
+      backend,
+      send: (bill, unread) =>
+        this.backends.send({
+          ...input,
+          paid: (spend) => {
+            bill(this.paid(spend));
+            if (spend.isUsageUnread) unread();
+          },
+        }),
+    });
+    if (sent.isHeld) return sent.value;
+    this.flags.push(`cost_ceiling:${backend}`);
+    return { outcome: "failed", reason: "query_cost_ceiling" };
   }
 
+  /** The plan's longer text, its view or the full one: what any send of this plan may carry. */
+  private longestPlanText(): string {
+    const { text, fullText } = this.plan;
+    return text.length > fullText.length ? text : fullText;
+  }
+
+  /** Bills one send into the run's spend and answers what it cost us. */
   private paid({
     backend,
     inputTokens,
@@ -414,25 +372,25 @@ export class InstantEvalJudgeRouteRunService {
     backend: string;
     inputTokens: number;
     outputTokens: number;
-  }): void {
-    if (inputTokens <= 0 && outputTokens <= 0) return;
-    this.inputTokens += inputTokens;
-    const cost = instantEvalJudgeCallCostOf({
+  }): number {
+    const before = this.costNanoUsd;
+    const after = instantEvalJudgeSpendAfterCall({
+      spend: { inputTokens: this.inputTokens, costNanoUsd: before },
       backend,
       inputTokens,
       outputTokens,
       pricing: this.deps.pricing,
     });
-    if (cost.outcome === "priced") {
-      this.costNanoUsd += cost.costNanoUsd;
-      return;
-    }
+    this.inputTokens = after.spend.inputTokens;
+    this.costNanoUsd = after.spend.costNanoUsd;
+    if (!after.isUnpriced) return this.costNanoUsd - before;
     this.flags.push(`unpriced:${backend}`);
     // Boot refuses a table with an unpriced reachable backend, so this is a bug, not a deploy slip.
     this.logger.error(
       { backend },
       "Instant Evals router called a backend with no configured price",
     );
+    return 0;
   }
 
   /**
@@ -444,24 +402,31 @@ export class InstantEvalJudgeRouteRunService {
     return { ...instantEvalSkipped(leg.reason), ...this.spent(), routing: this.routing({}) };
   }
 
-  /** The verdicts the legs supplied; a pair's legs waited side by side, so the longer wait. */
+  /**
+   * The verdicts the legs supplied; a pair's legs waited side by side, so the longer wait. A gated
+   * plan gives its branches' wait itself.
+   */
   private result({
     questions,
     legs,
     escalated = 0,
     pick,
+    waitMs,
   }: {
     questions: readonly InstantEvalQuestion[];
     legs: readonly InstantEvalJudgeAnsweredLeg[];
     escalated?: number;
     pick?: (questionId: string) => InstantEvalJudgeAnsweredLeg | undefined;
+    waitMs?: number;
   }): InstantEvalJudgement {
     const { verdicts, answeredBy } = instantEvalRoutedVerdictsOf({ questions, legs, pick });
     const waits = legs.map((leg) => leg.limiterWaitMs);
+    const legsWaitMs =
+      waitMs ?? (pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0));
     return {
       verdicts,
       isTextTruncated: legs.some((leg) => leg.isTextTruncated),
-      limiterWaitMs: pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0),
+      limiterWaitMs: legsWaitMs,
       ...this.spent(),
       routing: this.routing({ answeredBy, escalated }),
     };

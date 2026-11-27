@@ -54,9 +54,16 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
   Scenario: A judged query is held at the dearest rate a route can reach
     Given a route table whose enabled backends have different input rates
     When a judged query's budget hold is priced
-    Then it is priced at the dearest base input rate any enabled backend or fallback reaches
+    Then it is priced at the dearest base input rate any enabled backend or fallback of a search or LLM-judge route reaches
     And never below the classifier's published rate, at the one markup
-    And it is a best-effort hold, not a hard cap on what a routed query can spend
+    And it holds an unrouted query; a routed query is held at its cost ceiling instead (ADR-190 decision 13)
+
+  @unit
+  Scenario: A scenario route's backends never raise a judged query's hold
+    Given a route table whose scenario judging route reaches a backend dearer than any other
+    When a judged query's budget hold is priced
+    Then it is priced over the backends a search or LLM-judge route can reach, a gate's included
+    And the scenario route's backend still needs a price to boot, since its judgements are billed
 
   @unit
   Scenario: A routed cost with no input tokens is still billed
@@ -72,3 +79,12 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     Then the input tokens no routed cost covers are priced at the classifier's rate
     And the routed judgements are priced from their summed cost
     And the two are added
+
+  @unit
+  Scenario: Each call's tokens and cost are added to its judgement's spend
+    Given a judgement's spend so far
+    When one more call is added
+    Then a priced call adds its input tokens and its tokens' cost at the backend's rates
+    And an unpriced call adds its input tokens and no cost, and is flagged as unpriced
+    And a call that billed no tokens changes nothing, priced or not
+    And a call that billed output tokens alone still adds their cost

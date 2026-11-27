@@ -31,10 +31,18 @@ export class InstantEvalCloudJudgeService implements InstantEvalJudgeChannel {
     return new InstantEvalCloudJudgeService(judges);
   }
 
+  /** A routed request's route and cost ceiling go with it; the judge leaf routes it. */
   classify(
-    { projectId, text, questions }: InstantEvalClassifyRequest,
+    { projectId, text, questions, route, costCeiling }: InstantEvalClassifyRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalJudgement> {
-    return this.judges.classify({ projectId, text, questions, ...(signal ? { signal } : {}) });
+    return this.judges.classify({
+      projectId,
+      text,
+      questions,
+      ...(signal ? { signal } : {}),
+      ...(route ? { route } : {}),
+      ...(costCeiling ? { costCeiling } : {}),
+    });
   }
 }

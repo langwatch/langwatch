@@ -2,6 +2,9 @@ import {
   DECISION_MODELS,
   decisionModelPickerTitle,
   isOwnDecisionModelId,
+  LANGWATCH_DECISION_PREVIEWS,
+  LANGWATCH_JUDGE_MODEL_ID,
+  langWatchModelsFillingRole,
   type DecisionModelEntry,
 } from "./catalog/decision-models.ts";
 import { findAliasTarget, isLatestAlias } from "./catalog/latest-aliases.ts";
@@ -43,6 +46,46 @@ export type ModelPickerOption = {
   /** A short tag beside the title, such as "Coming soon". */
   hint?: string;
 };
+
+/**
+ * LangWatch Judge (preview) as a judge picker's first row, where its flag is on. Its label and
+ * the line under it come from the catalogue, so every picker names it the same way.
+ */
+export function langwatchJudgePickerOption(): ModelPickerOption {
+  return langwatchPickerOptionOf(LANGWATCH_JUDGE_MODEL_ID);
+}
+
+/**
+ * A judge picker's rows: the LangWatch models whose catalogue entry fills the Judge column first,
+ * where the judge preview is offered, then the LLMs. Never one of them twice.
+ */
+export function judgePickerOptions({
+  llmOptions,
+  isJudgePreviewOffered,
+}: {
+  llmOptions: readonly ModelPickerOption[];
+  isJudgePreviewOffered: boolean;
+}): ModelPickerOption[] {
+  const judges = judgeColumnModelIds({ isJudgePreviewOffered });
+  const hosted = langWatchModelsFillingRole("JUDGE").map(({ id }) => id);
+  const llms = llmOptions.filter((option) => !hosted.includes(option.value));
+  return [...judges.map(langwatchPickerOptionOf), ...llms];
+}
+
+/** The LangWatch models the Judge column lists ahead of the LLMs: those filling it, if offered. */
+export function judgeColumnModelIds({
+  isJudgePreviewOffered,
+}: {
+  isJudgePreviewOffered: boolean;
+}): string[] {
+  if (!isJudgePreviewOffered) return [];
+  return langWatchModelsFillingRole("JUDGE").map(({ id }) => id);
+}
+
+function langwatchPickerOptionOf(id: string): ModelPickerOption {
+  const preview = LANGWATCH_DECISION_PREVIEWS.find((entry) => entry.id === id);
+  return { label: preview?.label ?? id, value: id, subtitle: preview?.description ?? "" };
+}
 
 /**
  * Alias entries (`<provider>/latest`, `<provider>/latest-mini`) read as

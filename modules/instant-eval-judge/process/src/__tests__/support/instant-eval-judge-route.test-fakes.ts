@@ -118,3 +118,48 @@ export function choiceOf(
 export function yesNo(id: string, instructions: string): InstantEvalBooleanQuestion {
   return { id, kind: "boolean", instructions };
 }
+
+/**
+ * A made-up gated table: on every job the balanced entry asks a gate first, then the Decisions
+ * model alone for an easy case or the LLM alone for the rest; instant is the LLM alone. The
+ * threshold, names and timeouts are invented. `scenarioPrimary` names what scenario judging asks.
+ */
+export function gatedRouteTable(
+  overrides: {
+    backends?: Record<string, unknown>;
+    scenarioPrimary?: string;
+    inputViews?: unknown;
+  } = {},
+): InstantEvalJudgeRouteTable {
+  const gated = {
+    instant: { primary: "llm-b" },
+    balanced: {
+      primary: "decision-a",
+      escalateTo: "llm-b",
+      gate: { backend: "gate-a", question: "difficulty_v1", easyBelow: 1.5 },
+    },
+  };
+  const slots = (slot: unknown) => ({ all: slot, arithmetic: slot });
+  return instantEvalJudgeRouteTableSchema.parse({
+    version: 1,
+    defaultMode: { search: "balanced", llm_judge: "balanced", scenario_judge: "instant" },
+    buckets: [{ name: "all", maxTokens: null }],
+    arithmetic: {
+      maxTokens: 0,
+      source: { search: "request", llm_judge: "request", scenario_judge: "request" },
+    },
+    backends: {
+      "gate-a": { kind: "jev", timeoutMs: 40 },
+      "decision-a": { kind: "decisions", model: "decision-model-a" },
+      "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+      "llm-b": { kind: "openai_responses", model: "llm-model-b", reasoningEffort: "high" },
+      ...overrides.backends,
+    },
+    routes: {
+      search: slots(gated),
+      llm_judge: slots(gated),
+      scenario_judge: slots({ instant: { primary: overrides.scenarioPrimary ?? "llm-b" } }),
+    },
+    ...(overrides.inputViews ? { inputViews: overrides.inputViews } : {}),
+  });
+}

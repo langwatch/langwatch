@@ -141,10 +141,10 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then it says Instant Evals rather than nothing
 
     @unit @integration
-    Scenario: A spend row with no virtual key and the own decision model request type reads as Instant Evals on your own model
+    Scenario: A spend row with no virtual key and the own decision model request type reads as Own model
       Given a spend row of request type instant_eval_decision_model
       When the spend page names its key
-      Then it says Instant Evals (own model) rather than nothing
+      Then it says Own model rather than nothing
 
   Rule: Instant Eval spend debits gateway budgets like any other spend
 

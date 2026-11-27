@@ -63,6 +63,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   // The judge picker names the hosted model LangWatch Evals (preview), the LangWatch Judge router
   // (ADR-190).
   "release_instant_evals_judge_router",
+  // The Judge column and the scenario judge pickers offer LangWatch Judge (preview)
+  // (modules/scenario/specs/judge-preview.feature).
+  "release_langwatch_judge_preview",
   // The Data Privacy page's Essential or Strict organization picker, Strict's
   // price and its example (modules/data-privacy/specs/pii-redaction-level-picker.feature).
   "release_pii_redaction_model_enabled",

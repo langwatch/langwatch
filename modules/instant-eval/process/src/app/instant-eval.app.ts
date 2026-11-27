@@ -108,6 +108,7 @@ import { InstantEvalRowSourceService } from "../services/instant-eval-row-source
 import { InstantEvalRunContextService } from "../services/instant-eval-run-context.service.ts";
 import { InstantEvalRunService } from "../services/instant-eval-run.service.ts";
 import { InstantEvalSampleService } from "../services/instant-eval-sample.service.ts";
+import { InstantEvalSearchRoutingService } from "../services/instant-eval-search-routing.service.ts";
 import {
   InstantEvalSpendService,
   type InstantEvalSpendPeers,
@@ -332,6 +333,11 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       spend: judgedSpend,
       holdPricing: () => setup.channels.judges.queryHoldPricing(),
       queryTokenBudget: setup.config.queryTokenBudget,
+      searchRouting: InstantEvalSearchRoutingService.create({
+        flags: setup.dependencies.featureFlags,
+        projects,
+      }),
+      ownModels: judge,
     });
 
     const classifications = InstantEvalClassifyService.create({ judge });

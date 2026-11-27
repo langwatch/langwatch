@@ -45,6 +45,7 @@ export * from "./features/run/scenario-run-export.errors.ts";
 export * from "./scenario.responses.ts";
 export * from "./scenario-event.schemas.ts";
 export * from "./scenario-generate.schemas.ts";
+export * from "./judge-preview-chat.ts";
 export * from "./scenario-rest.schemas.ts";
 export * from "./features/simulation/simulation-run.schemas.ts";
 export * from "./evaluator-attachments.ts";

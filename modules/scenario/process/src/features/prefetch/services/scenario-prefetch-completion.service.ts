@@ -15,12 +15,14 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { resolveExecuteSyncRoute } from "../../../rules/execute-sync-route.rules.ts";
 import type { ScenarioExecutionLookupService } from "../../../services/scenario-execution-lookup.service.ts";
-import {
-  type ScenarioModelParametersService,
-  type ModelParamsResult,
-} from "../../../services/scenario-model-parameters.service.ts";
+import { type ScenarioModelParametersService } from "../../../services/scenario-model-parameters.service.ts";
 import type { ScenarioRunKeyService } from "../../../services/scenario-run-key.service.ts";
+import type { JudgePreviewModelParametersService } from "../../judge-preview/services/judge-preview-model-parameters.service.ts";
 import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
+import {
+  ScenarioPrefetchModelsService,
+  type PreparedModels,
+} from "./scenario-prefetch-models.service.ts";
 import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -77,16 +79,12 @@ type ResolvedModels =
     }
   | { success: false; result: ScenarioExecutionPrefetchResult };
 
-type PreparedModels = {
-  adapter: ModelParamsResult | undefined;
-  simulator: ModelParamsResult;
-  judge: ModelParamsResult;
-};
-
 type CompletionOptions = {
   config: ScenarioExecutionPrefetchConfig;
   lookups: ScenarioExecutionLookupService;
   modelParameters: ScenarioModelParametersService;
+  /** The judge's parameters when its model is LangWatch Judge (preview). */
+  judgePreview: JudgePreviewModelParametersService;
   traces: TraceApi;
   /** Mints the per-run key a code agent's sandbox holds. */
   runKeys: Pick<ScenarioRunKeyService, "sandboxTokenFor">;
@@ -99,7 +97,11 @@ export class ScenarioPrefetchCompletionService {
     return new ScenarioPrefetchCompletionService(options);
   }
 
-  private constructor(private readonly options: CompletionOptions) {}
+  private readonly modelPreparation: ScenarioPrefetchModelsService;
+
+  private constructor(private readonly options: CompletionOptions) {
+    this.modelPreparation = ScenarioPrefetchModelsService.create(options);
+  }
 
   async complete(input: {
     context: ScenarioExecutionPrefetchInput["context"];
@@ -149,7 +151,11 @@ export class ScenarioPrefetchCompletionService {
       return models.result;
     }
 
-    const prepared = await this.prepareModels(input.context.projectId, models);
+    const prepared = await this.modelPreparation.prepare({
+      projectId: input.context.projectId,
+      models,
+      runKey,
+    });
     const modelFailure = this.modelFailure(input.context, models, prepared);
     if (modelFailure) {
       return modelFailure;
@@ -396,24 +402,6 @@ export class ScenarioPrefetchCompletionService {
         },
       };
     }
-  }
-
-  private async prepareModels(
-    projectId: string,
-    models: Extract<ResolvedModels, { success: true }>,
-  ): Promise<PreparedModels> {
-    const [adapter, simulator, judge] = await Promise.all([
-      models.adapter !== void 0
-        ? this.options.modelParameters.prepare({
-            projectId,
-            model: models.adapter,
-          })
-        : Promise.resolve(void 0),
-      this.options.modelParameters.prepare({ projectId, model: models.simulator }),
-      this.options.modelParameters.prepare({ projectId, model: models.judge }),
-    ]);
-
-    return { adapter, simulator, judge };
   }
 
   private modelFailure(
