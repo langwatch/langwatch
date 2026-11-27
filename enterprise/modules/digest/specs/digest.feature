@@ -626,6 +626,26 @@ Feature: Weekly digest emails
     And the operator is sent nothing
     And an address typed in is never accepted as where to send
 
+  @integration
+  Scenario: A test send to a deactivated person is skipped
+    Given a member whose account is deactivated
+    When the operator sends the member's digests to the person
+    Then each organization is reported as skipped because the account is deactivated
+    And no email is sent
+
+  @integration
+  Scenario: A test send to yourself of a deactivated person's digests still works
+    Given a member whose account is deactivated
+    When the operator sends themself the member's digests
+    Then the operator receives one test per organization
+
+  @integration
+  Scenario: A test send to a person with no email address is skipped
+    Given a member whose account has no email address
+    When the operator sends the member's digests to the person
+    Then each organization is reported as skipped because they have no address
+    And no email is sent
+
   @unit @integration
   Scenario: Staff force one digest for a person, past its threshold
     Given a member whose busiest project had 40 traces this week, below the traces-week threshold

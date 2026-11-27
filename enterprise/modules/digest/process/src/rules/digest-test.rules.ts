@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   type DIGEST_MY_TEST_SKIP_REASONS,
+  DigestMemberAddressMissingError,
+  DigestMemberDeactivatedError,
   DigestMemberNotFoundError,
   DigestMemberUnsubscribedError,
   DigestNothingToSendError,
@@ -16,5 +18,7 @@ export function classifyDigestTestRefusal(error: unknown): DigestMyTestSkipReaso
   if (error instanceof DigestNothingToSendError) return "nothing_to_send";
   if (error instanceof DigestMemberUnsubscribedError) return "opted_out";
   if (error instanceof DigestMemberNotFoundError) return "not_a_member";
+  if (error instanceof DigestMemberDeactivatedError) return "deactivated";
+  if (error instanceof DigestMemberAddressMissingError) return "no_address";
   return undefined;
 }

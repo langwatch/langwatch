@@ -514,6 +514,55 @@ describe("an operator sending themself another person's digests", () => {
     });
   });
 
+  describe("when they deliver the tests to a deactivated person", () => {
+    /** @scenario "A test send to a deactivated person is skipped" */
+    it("skips each organization as deactivated and mails no one", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.deactivated.add(MEMBER);
+
+      const answer = await testsFor({
+        email: emailOf(MEMBER),
+        template: "auto",
+        deliverTo: "person",
+      });
+
+      expect(answer.organizations.map((each) => each.outcome === "skipped" && each.reason)).toEqual(
+        ["deactivated", "deactivated"],
+      );
+      expect(digest.mail).toEqual([]);
+    });
+
+    /** @scenario "A test send to yourself of a deactivated person's digests still works" */
+    it("still previews their digests to the operator", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.deactivated.add(MEMBER);
+
+      const answer = await testsFor({ email: emailOf(MEMBER), template: "auto" });
+
+      expect(answer.organizations.map((each) => each.outcome)).toEqual(["sent", "sent"]);
+      expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(OPERATOR), emailOf(OPERATOR)]);
+    });
+  });
+
+  describe("when they deliver the tests to a person with no email address", () => {
+    /** @scenario "A test send to a person with no email address is skipped" */
+    it("skips each organization as without an address and mails no one", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.withoutAddress.add(MEMBER);
+
+      const answer = await testsFor({
+        email: emailOf(MEMBER),
+        template: "auto",
+        deliverTo: "person",
+      });
+
+      expect(answer.organizations.map((each) => each.outcome === "skipped" && each.reason)).toEqual(
+        ["no_address", "no_address"],
+      );
+      expect(digest.mail).toEqual([]);
+    });
+  });
+
   describe("when they force traces week for a quiet week below its threshold", () => {
     /** @scenario "Staff force one digest for a person, past its threshold" */
     it("sends traces week where there are traces and skips where there are none", async () => {

@@ -166,6 +166,8 @@ export function digestWorld() {
     systemOrganizations: new Set<string>(),
     /** People whose profile is deactivated. */
     deactivated: new Set<string>(),
+    /** People whose account has no email address. */
+    withoutAddress: new Set<string>(),
     projects: [PROJECT],
     /** The projects each person may not view; everyone may view every other. */
     hiddenFrom: new Map<string, readonly string[]>(),
@@ -670,7 +672,7 @@ function projectIdentity(id: string, ownerUserId: string | undefined, aggregate:
 function worldUsers({ world }: { world: ReturnType<typeof digestWorld> }) {
   const profileOf = (id: string | undefined) =>
     id !== undefined && world.users.includes(id)
-      ? userProfile(id, world.deactivated.has(id))
+      ? userProfile(id, world.deactivated.has(id), world.withoutAddress.has(id))
       : null;
   return createApiFixture<Pick<UserApi, "findById" | "findByEmail">>(
     {
@@ -683,12 +685,12 @@ function worldUsers({ world }: { world: ReturnType<typeof digestWorld> }) {
 }
 
 /** A person as the user module answers them: digest reads only the address. */
-function userProfile(id: string, deactivated: boolean) {
+function userProfile(id: string, deactivated: boolean, withoutAddress: boolean) {
   const at = new Date("2026-01-01T00:00:00Z");
   return {
     id,
     name: null,
-    email: emailOf(id),
+    email: withoutAddress ? null : emailOf(id),
     emailVerified: true,
     image: null,
     pendingSsoSetup: false,

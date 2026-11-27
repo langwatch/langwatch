@@ -70,6 +70,10 @@ export const DIGEST_MY_TEST_SKIP_REASONS = [
   "nothing_to_send",
   "opted_out",
   "not_a_member",
+  /** Delivery to the person was asked for, and their account is deactivated. */
+  "deactivated",
+  /** Delivery to the person was asked for, and they have no email address. */
+  "no_address",
   /** A forced template had no data to show for the person here. */
   "no_data_for_template",
 ] as const;

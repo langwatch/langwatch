@@ -61,6 +61,8 @@ const MY_SKIP_LABELS: SkipLabels = {
   nothing_to_send: "Skipped: nothing to show you this week",
   opted_out: "Skipped: you turned the weekly digest off",
   not_a_member: "Skipped: you are no longer a member",
+  deactivated: "Skipped: your account is deactivated",
+  no_address: "Skipped: your account has no email address",
   no_data_for_template: "Skipped: no data for this digest",
 };
 
@@ -68,6 +70,8 @@ const THEIR_SKIP_LABELS: SkipLabels = {
   nothing_to_send: "Skipped: nothing to show them this week",
   opted_out: "Skipped: they turned the weekly digest off",
   not_a_member: "Skipped: they are no longer a member",
+  deactivated: "Skipped: their account is deactivated, so nothing was sent to them",
+  no_address: "Skipped: they have no email address, so nothing was sent to them",
   no_data_for_template: "Skipped: no data for this digest",
 };
 

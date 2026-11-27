@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
+  DigestMemberAddressMissingError,
+  DigestMemberDeactivatedError,
   DigestMemberNotFoundError,
   DigestMemberUnsubscribedError,
   DigestNothingToSendError,
@@ -272,7 +274,14 @@ export class DigestSendService {
     }
     const recipientId = deliverTo === "person" ? userId : operatorId;
     const recipient = await this.deps.users.findById({ id: recipientId });
-    if (!recipient?.email) throw new DigestOperatorAddressMissingError();
+    if (deliverTo === "person" && recipient?.deactivatedAt) {
+      throw new DigestMemberDeactivatedError(userId);
+    }
+    if (!recipient?.email) {
+      throw deliverTo === "person"
+        ? new DigestMemberAddressMissingError(userId)
+        : new DigestOperatorAddressMissingError();
+    }
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
     const week = await this.#weekOf({ organizationId, isoWeek, userId });
