@@ -39,7 +39,7 @@ describe("resolvePanelWidthBounds", () => {
   it("keeps 480px for the page beside a drawer the floating card dodges", () => {
     expect(
       resolvePanelWidthBounds({ placement: "floating", viewportWidth: 1_440, besideDrawer: true }),
-    ).toMatchObject({ min: 340, max: 960 });
+    ).toMatchObject({ min: 340, max: 948 });
   });
 
   /** @scenario "The width stays within a usable range" */
@@ -105,7 +105,7 @@ describe("clampPanelWidth", () => {
         width: 5_000,
         besideDrawer: true,
       }),
-    ).toBe(960);
+    ).toBe(948);
   });
 });
 

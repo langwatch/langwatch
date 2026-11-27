@@ -1,4 +1,5 @@
 import {
+  FLOATING_PANEL_INSET,
   FLOATING_PANEL_MIN_WIDTH,
   FLOATING_PANEL_VIEWPORT_GUTTER,
   LANGY_PAGE_RESERVE_PX,
@@ -27,10 +28,26 @@ const LIMITS = {
   sidebar: { min: SIDEBAR_MIN_WIDTH },
 } as const;
 
+function widestFor({
+  placement,
+  viewportWidth,
+  besideDrawer,
+  fitsViewport,
+}: {
+  placement: LangyResizablePlacement;
+  viewportWidth: number;
+  besideDrawer: boolean;
+  fitsViewport: number;
+}): number {
+  if (placement === "sidebar") return viewportWidth - LANGY_PAGE_RESERVE_PX;
+  if (besideDrawer) return viewportWidth - FLOATING_PANEL_INSET - LANGY_PAGE_RESERVE_PX;
+  return fitsViewport;
+}
+
 /**
- * Width bounds for one viewport, with no fixed pixel cap: the page keeps LANGY_PAGE_RESERVE_PX
- * beside a dock or a dodged drawer; a floating card with no drawer stops at the edge gutter.
- * An unmeasured viewport (<= 0) caps at the default.
+ * Width bounds with no fixed pixel cap: the page keeps LANGY_PAGE_RESERVE_PX beside a dock, or
+ * beside a dodged drawer (the card sits FLOATING_PANEL_INSET in); a card with no drawer stops
+ * at the edge gutter. An unmeasured viewport (<= 0) caps at the default.
  */
 export function resolvePanelWidthBounds({
   placement,
@@ -44,8 +61,7 @@ export function resolvePanelWidthBounds({
   const measured = viewportWidth > 0;
   const fitsViewport = measured ? viewportWidth - FLOATING_PANEL_VIEWPORT_GUTTER : Infinity;
   const min = Math.min(LIMITS[placement].min, fitsViewport);
-  const keepsPageRoom = placement === "sidebar" || besideDrawer;
-  const widest = keepsPageRoom ? viewportWidth - LANGY_PAGE_RESERVE_PX : fitsViewport;
+  const widest = widestFor({ placement, viewportWidth, besideDrawer, fitsViewport });
   const preferred =
     placement === "floating" ? resolveFloatingPanelWidth(viewportWidth) : SIDEBAR_PANEL_WIDTH;
   const max = Math.floor(Math.max(min, measured ? widest : preferred));
