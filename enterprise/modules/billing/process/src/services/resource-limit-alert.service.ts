@@ -88,8 +88,7 @@ export class ResourceLimitAlertService {
   }): Promise<{ sent: boolean }> {
     if (!this.dependencies.isSaas) return { sent: false };
     try {
-      await this.dependencies.notices.sendSlackSeatRequest(input);
-      return { sent: true };
+      return { sent: await this.dependencies.notices.sendSlackSeatRequest(input) };
     } catch (error) {
       logger.error(
         { error, organizationId: input.organizationId },

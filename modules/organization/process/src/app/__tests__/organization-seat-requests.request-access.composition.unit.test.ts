@@ -56,11 +56,12 @@ describe("given a Lite Member refused for want of a full seat", () => {
       const lena = liteMember({ email: "lena@acme.example" });
       await app.requestSeatAccess(scope, lena.caller);
       const mailed = mail.seatRequests.length;
+      const [first] = await openRequests();
 
       const again = await app.requestSeatAccess({ ...scope, reason: "save a prompt" }, lena.caller);
 
       expect(again.status).toBe("open");
-      expect(await openRequests()).toHaveLength(1);
+      expect((await openRequests()).map((open) => open.id)).toEqual([first!.id]);
       expect(mail.seatRequests).toHaveLength(mailed);
     });
   });
@@ -353,7 +354,7 @@ describe("given an organization paying per seat in Stripe with every full seat i
   });
 
   describe("when the request is declined and asked again just as an approval with a seat starts", () => {
-    /** @scenario "A Stripe page from before a decline never approves the request opened again" */
+    /** @scenario "A request declined and asked again as an approval starts approves nothing" */
     it("refuses with seat_request_not_found, buys nothing and leaves the new request open", async () => {
       const { app, lena, seatRequestId, seatBilling, seatRequests, openRequests } =
         await lenaAsking();
@@ -380,10 +381,44 @@ describe("given an organization paying per seat in Stripe with every full seat i
     });
   });
 
-  describe("when a held Lite Member is approved and no Lite seat is free to enable her", () => {
-    /** @scenario "Approve with no seat free on a live Stripe seat subscription adds the seat and approves" */
+  describe("when the request is declined and asked again just as a plain approval starts", () => {
+    /** @scenario "A request declined and asked again as an approval starts approves nothing" */
+    it("refuses with seat_request_not_found and leaves the new request open", async () => {
+      const context = await application({ freeFull: 1 });
+      const lena = context.liteMember({ email: "lena@acme.example" });
+      await context.app.requestSeatAccess(scope, lena.caller);
+      const [request] = await context.openRequests();
+      const seatRequestId = request!.id;
+      const getOpen = context.seatRequests.getOpen.bind(context.seatRequests);
+      let replaced = false;
+      context.seatRequests.getOpen = async (input) => {
+        const row = await getOpen(input);
+        if (!replaced) {
+          replaced = true;
+          await context.app.declineSeatRequest({ ...scope, seatRequestId }, ADA);
+          await new Promise((resolve) => setTimeout(resolve, 2));
+          await context.app.requestSeatAccess(scope, lena.caller);
+        }
+        return row;
+      };
+
+      const refusal = await context.app
+        .approveSeatRequest({ ...scope, seatRequestId }, ADA)
+        .catch((error: unknown) => error);
+
+      expect(codeOf(refusal)).toBe("seat_request_not_found");
+      expect((await context.openRequests()).map((open) => open.id)).toEqual([seatRequestId]);
+      expect(context.membershipOf(lena.userId)?.role).toBe(OrganizationUserRole.EXTERNAL);
+    });
+  });
+
+  describe.each([
+    { pools: "a full seat free", freeFull: 1 },
+    { pools: "no full seat free", freeFull: 0 },
+  ])("when a held Lite Member is approved with no Lite seat free and $pools", ({ freeFull }) => {
+    /** @scenario "A held Lite Member with no Lite seat free is refused without buying a full seat" */
     it("refuses and buys no full seat, which would not free a Lite one", async () => {
-      const context = await application({ ...stripe, freeFull: 1 });
+      const context = await application({ ...stripe, freeFull });
       const hana = context.liteMember({ email: "hana@acme.example" });
       await context.app.requestSeatAccess(scope, hana.caller);
       const [request] = await context.openRequests();

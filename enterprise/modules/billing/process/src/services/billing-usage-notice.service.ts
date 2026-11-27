@@ -287,15 +287,15 @@ export class NotificationService {
     });
   }
 
-  /** Sales hear that a person waits for a seat only they can sell. */
+  /** Sales hear that a person waits for a seat only they can sell. True once it went out. */
   async sendSlackSeatRequest(payload: {
     organizationId: string;
     organizationName: string;
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void> {
-    await this.sendSlackMessage({
+  }): Promise<boolean> {
+    return this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
       message: (origin) =>
         seatRequestedNotice.render({

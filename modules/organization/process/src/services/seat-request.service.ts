@@ -268,7 +268,11 @@ export class SeatRequestService {
       organizationId: input.organizationId,
       id: input.seatRequestId,
     });
-    const resolved = await this.approval.approve(input);
+    // Pinned to the opening read here, so the answer names the request cycle it approved.
+    if (input.openedAt !== undefined && input.openedAt !== request.openedAt) {
+      throw new SeatRequestNotFoundError(request.id);
+    }
+    const resolved = await this.approval.approve({ ...input, openedAt: request.openedAt });
     await this.tellRequester({ request, outcome: "approved" });
     return resolved;
   }

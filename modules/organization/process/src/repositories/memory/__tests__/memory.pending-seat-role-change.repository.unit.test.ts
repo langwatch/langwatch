@@ -38,6 +38,12 @@ describe("MemoryPendingSeatRoleChangeRepository", () => {
       clock.now = 6 * DAY_MS;
       expect(await pending.findById({ organizationId: ORG, id: saved.id })).toEqual([saved]);
       expect(await pending.findWaitingForOrganization({ organizationId: ORG })).toEqual([saved]);
+      expect(await pending.findByPayment({ organizationId: ORG, payment: saved.payment })).toEqual([
+        saved,
+      ]);
+      expect(
+        await pending.findLatestForMember({ organizationId: ORG, userId: saved.userId }),
+      ).toEqual([saved]);
 
       clock.now = 7 * DAY_MS;
       expect(await pending.findById({ organizationId: ORG, id: saved.id })).toEqual([]);

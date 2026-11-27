@@ -620,6 +620,21 @@ Feature: Seat requests when an organization is over its seat limit
       Then it refuses with seat_request_not_found and the new request stays open
 
     @unit
+    Scenario: A request declined and asked again as an approval starts approves nothing
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And an administrator declines the request and Lena asks again just as an approval starts
+      When the approval claims the request
+      Then it refuses with seat_request_not_found, buys no seat and the new request stays open
+
+    @unit
+    Scenario: A held Lite Member with no Lite seat free is refused without buying a full seat
+      Given "hana@acme.example" is a held Lite Member with an open seat request
+      And no Lite seat is free, whether or not a full seat is
+      When an administrator approves with a seat
+      Then the approval refuses with member_seat_limit_reached naming the Lite seat limit
+      And no full seat is bought
+
+    @unit
     Scenario: Asking again while an approval is giving its seat reopens nothing
       Given an administrator approves with a seat and the purchase is still running
       When Lena asks for access again

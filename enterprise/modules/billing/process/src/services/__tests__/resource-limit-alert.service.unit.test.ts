@@ -54,13 +54,13 @@ function alertsFor({
   isSaas = true,
   organizations = [ACME],
   send = async () => {},
-  sendSeatRequest = async () => {},
+  sendSeatRequest = async () => true,
 }: {
   isSaas?: boolean;
   /** Answered in turn, the last one repeating. */
   organizations?: (typeof ACME | null)[];
   send?: (context: ResourceLimitNotificationContext) => Promise<void>;
-  sendSeatRequest?: () => Promise<void>;
+  sendSeatRequest?: () => Promise<boolean>;
 } = {}) {
   const sent: ResourceLimitNotificationContext[] = [];
   const errors = RecordingErrorReporter.create();
@@ -178,6 +178,10 @@ describe("the resource-limit alert", () => {
       sent: false,
     });
     expect(failing.errors.captured).toEqual([failure]);
+    const undelivered = alertsFor({ sendSeatRequest: async () => false });
+    await expect(undelivered.alerts.notifySalesOfSeatRequest(notice)).resolves.toEqual({
+      sent: false,
+    });
   });
 
   it("releases the cooldown when the organization is not found", async () => {

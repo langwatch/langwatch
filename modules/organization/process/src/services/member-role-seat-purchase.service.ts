@@ -29,6 +29,9 @@ const logger = createLogger("langwatch:organization:memberRoleSeatPurchase");
 const UNKNOWN_REFUSAL = "something went wrong on our side";
 /** How often a role write renews its claim, well inside the claim period. */
 const CLAIM_RENEW_MS = 30_000;
+/** How often settling a change a newer role write replaced is tried. */
+const SUPERSEDE_ATTEMPTS = 3;
+const REPLACED = "a later role change for this member replaced it";
 
 type RoleChange = (
   input: Readonly<{
@@ -161,22 +164,48 @@ export class MemberRoleSeatPurchaseService {
       const { teamsLeftWithoutAdmin } = held
         ? await this.underClaim({ organizationId, ...held }, write)
         : await write();
-      if (held) {
-        await this.dependencies.pending.settle({
-          organizationId,
-          id: held.id,
-          status: "seat_only",
-          reason: "a later role change for this member replaced it",
-        });
-      }
+      if (held) await this.supersede({ organizationId, id: held.id });
       return { status: "changed", seatAdded: false, teamsLeftWithoutAdmin };
     } catch (error) {
       const refusal = readSeatRefusal(error);
       if (refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") throw error;
       return undefined;
     } finally {
-      if (held) await this.dependencies.pending.release({ organizationId, ...held });
+      if (held) await this.release({ organizationId, ...held });
     }
+  }
+
+  /**
+   * Settles the change a newer role write replaced. Retried, since a change left waiting would
+   * apply its older role once paid; the role already changed, so a last failure is only logged.
+   */
+  private async supersede({ organizationId, id }: { organizationId: string; id: string }) {
+    for (let attempt = 1; attempt <= SUPERSEDE_ATTEMPTS; attempt++) {
+      try {
+        await this.dependencies.pending.settle({
+          organizationId,
+          id,
+          status: "seat_only",
+          reason: REPLACED,
+        });
+        return;
+      } catch (error) {
+        logger.error(
+          { organizationId, changeId: id, error, attempt },
+          "replaced change not settled",
+        );
+      }
+    }
+  }
+
+  /** Frees a claim; a failed release is logged, the claim lapses on its own. */
+  private async release(claim: { organizationId: string; id: string; token: string }) {
+    await this.dependencies.pending.release(claim).catch((error: unknown) => {
+      logger.warn(
+        { organizationId: claim.organizationId, changeId: claim.id, error },
+        "claim not released",
+      );
+    });
   }
 
   /** Claims the member's waiting change; refuses while its paid write is under way. */
@@ -218,7 +247,10 @@ export class MemberRoleSeatPurchaseService {
     }
   }
 
-  /** The same change asked again reopens its payment page; any other one waits its turn. */
+  /**
+   * The same change asked again reopens its payment page, or answers how it settled; any other
+   * one waits its turn.
+   */
   private resumeWaiting({
     waiting,
     input,
@@ -229,6 +261,13 @@ export class MemberRoleSeatPurchaseService {
     if (waiting.userId !== input.userId || waiting.role !== input.role) {
       throw new SeatPaymentWaitingError();
     }
+    if (waiting.status === "applied") {
+      return { status: "changed", seatAdded: true, teamsLeftWithoutAdmin: [] };
+    }
+    if (waiting.status === "seat_only") {
+      return { status: "seat_only", reason: waiting.reason ?? UNKNOWN_REFUSAL };
+    }
+    if (waiting.status !== "waiting") throw new SeatPaymentWaitingError();
     return { status: "payment_required", changeId: waiting.id, url: waiting.url };
   }
 
@@ -283,7 +322,9 @@ export class MemberRoleSeatPurchaseService {
     if (!record || record.organizationId !== organizationId) {
       throw new NotFoundError("not_found", { resource: "Role change", id: changeId });
     }
-    return this.apply({ record, paid: false });
+    const outcome = await this.apply({ record, paid: false });
+    if (!outcome) throw new NotFoundError("not_found", { resource: "Role change", id: changeId });
+    return outcome;
   }
 
   /**
@@ -299,8 +340,8 @@ export class MemberRoleSeatPurchaseService {
   }): Promise<void> {
     const [record] = await this.dependencies.pending.findByPayment({ organizationId, payment });
     if (!record) return;
-    const { status } = await this.apply({ record, paid: payment.kind === "checkout" });
-    if (status === "waiting") throw new SeatRoleChangeNotAppliedYetError(record.id);
+    const outcome = await this.apply({ record, paid: payment.kind === "checkout" });
+    if (outcome?.status === "waiting") throw new SeatRoleChangeNotAppliedYetError(record.id);
   }
 
   /** Billing's fact that seat checkouts were left unpaid and cancelled: their changes failed. */
@@ -347,7 +388,7 @@ export class MemberRoleSeatPurchaseService {
   }: {
     record: PendingSeatRoleChangeRecord;
     paid: boolean;
-  }): Promise<SeatRoleChangeOutcome> {
+  }): Promise<SeatRoleChangeOutcome | null> {
     if (record.status !== "waiting") return outcomeOf(record);
     const { organizationId, id } = record;
     if (!paid) {
@@ -357,8 +398,11 @@ export class MemberRoleSeatPurchaseService {
       });
       if (status === "open") return { status: "waiting", reason: null };
       if (status === "failed") {
-        await this.dependencies.pending.settle({ organizationId, id, status: "failed" });
-        return { status: "failed", reason: null };
+        if (await this.dependencies.pending.settle({ organizationId, id, status: "failed" })) {
+          return { status: "failed", reason: null };
+        }
+        const [current] = await this.dependencies.pending.findById({ organizationId, id });
+        return current ? outcomeOf(current) : { status: "failed", reason: null };
       }
     }
 
@@ -367,11 +411,13 @@ export class MemberRoleSeatPurchaseService {
       return { status: "waiting", reason: null };
     }
     try {
+      // A change that expired meanwhile is gone: its week is up, so nothing applies.
       const [current] = await this.dependencies.pending.findById({ organizationId, id });
-      if (current && current.status !== "waiting") return outcomeOf(current);
-      return await this.writeRole({ record, token });
+      if (!current) return null;
+      if (current.status !== "waiting") return outcomeOf(current);
+      return await this.writeRole({ record: current, token });
     } finally {
-      await this.dependencies.pending.release({ organizationId, id, token });
+      await this.release({ organizationId, id, token });
     }
   }
 
@@ -395,13 +441,14 @@ export class MemberRoleSeatPurchaseService {
       const [current] = await this.dependencies.pending.findById(ref);
       return current ? outcomeOf(current) : { status, reason: reason ?? null };
     };
+    // A claim that expired during the checks has passed to another applier, which acts instead.
+    const stillHeld = () => this.dependencies.pending.renew({ organizationId, id, token });
+    const waitingOutcome: SeatRoleChangeOutcome = { status: "waiting", reason: null };
     if (!(await this.dependencies.canManage({ organizationId, userId: by.id }))) {
+      if (!(await stillHeld())) return waitingOutcome;
       return settle("seat_only", "the admin who asked can no longer change roles");
     }
-    // A claim that expired during the checks has passed to another applier, which writes instead.
-    if (!(await this.dependencies.pending.renew({ organizationId, id, token }))) {
-      return { status: "waiting", reason: null };
-    }
+    if (!(await stillHeld())) return waitingOutcome;
     try {
       await this.underClaim({ organizationId, id, token }, () =>
         this.dependencies.changeMemberRole({ organizationId, userId, role, planUser: by }, by),

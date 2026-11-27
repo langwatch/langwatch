@@ -216,6 +216,8 @@ export const GrantInputRow = forwardRef<
     organizationRole?: OrganizationUserRole;
     buttonLabel?: string;
     isPending?: boolean;
+    /** Holds the row as it stands, while a change it belongs to is in flight. */
+    disabled?: boolean;
   }
 >(function GrantInputRow(
   {
@@ -225,6 +227,7 @@ export const GrantInputRow = forwardRef<
     organizationRole,
     buttonLabel = "Add",
     isPending = false,
+    disabled = false,
   },
   ref,
 ) {
@@ -333,6 +336,7 @@ export const GrantInputRow = forwardRef<
   return (
     <HStack gap={2} mt={2} flexWrap="wrap">
       <Select.Root
+        disabled={disabled}
         collection={roleCollection}
         value={[roleValue]}
         onValueChange={(e) => {
@@ -361,6 +365,7 @@ export const GrantInputRow = forwardRef<
       </Text>
 
       <Select.Root
+        disabled={disabled}
         collection={scopeTypeCollection}
         value={[scopeType]}
         onValueChange={(e) => {
@@ -389,6 +394,7 @@ export const GrantInputRow = forwardRef<
 
       {scopeType === GrantScopeTier.TEAM && (
         <Select.Root
+          disabled={disabled}
           collection={teamCollection}
           value={scopeId ? [scopeId] : []}
           onValueChange={(e) => {
@@ -431,6 +437,7 @@ export const GrantInputRow = forwardRef<
       {scopeType === GrantScopeTier.PROJECT && (
         <>
           <Select.Root
+            disabled={disabled}
             collection={projectTeamCollection}
             value={projectTeamId ? [projectTeamId] : []}
             onValueChange={(e) => {
@@ -466,6 +473,7 @@ export const GrantInputRow = forwardRef<
 
           {projectTeamId && (
             <Select.Root
+              disabled={disabled}
               collection={projectCollection}
               value={scopeId ? [scopeId] : []}
               onValueChange={(e) => {
@@ -505,7 +513,7 @@ export const GrantInputRow = forwardRef<
         size="sm"
         colorPalette="accent"
         height="9"
-        disabled={!isReady}
+        disabled={disabled || !isReady}
         loading={isPending}
         onClick={handleAdd}
       >

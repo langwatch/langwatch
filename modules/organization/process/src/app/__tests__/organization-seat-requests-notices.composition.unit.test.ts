@@ -93,6 +93,7 @@ describe("given an account-managed cloud organization whose sales notice fails",
 
       sales.down = false;
       await app.requestSeatAccess({ organizationId: ORGANIZATION_ID }, lena.caller);
+      expect(salesNotices).toHaveLength(1);
       await app.requestSeatAccess({ organizationId: ORGANIZATION_ID }, lena.caller);
 
       expect(salesNotices.map((notice) => notice.organizationId)).toEqual([ORGANIZATION_ID]);

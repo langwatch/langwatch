@@ -221,6 +221,7 @@ export function MemberAccessEditor({
             <OrganizationUserRoleField<InviteSeat>
               value={editor.pendingSeat}
               onChange={editor.pickSeat}
+              disabled={editor.seatChangeInFlight}
               roles={seatsOffered({ memberBillingOnly })}
             />
           )}
@@ -246,6 +247,7 @@ export function MemberAccessEditor({
             staged={editor.pendingGrantAdditions}
             removals={editor.pendingGrantRemovals}
             seat={memberRole}
+            locked={editor.seatChangeInFlight}
             onToggle={(id) => editor.setPendingGrantRemovals((prev) => toggled({ set: prev, id }))}
             onUndo={(index) =>
               editor.setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== index))
@@ -259,6 +261,7 @@ export function MemberAccessEditor({
               onReadyChange={editor.setHasDraftGrant}
               organizationRole={editor.pendingRole}
               buttonLabel="Assign role"
+              disabled={editor.seatChangeInFlight}
             />
           </NoAccessNote>
         </Box>
@@ -273,7 +276,11 @@ export function MemberAccessEditor({
 
       {canManage && (
         <HStack justifyContent="flex-end" gap={2}>
-          <Button variant="outline" disabled={!editor.hasChanges} onClick={editor.reset}>
+          <Button
+            variant="outline"
+            disabled={!editor.hasChanges || editor.seatChangeInFlight}
+            onClick={editor.reset}
+          >
             Cancel
           </Button>
           {editor.seatPurchaseOffered ? null : (
@@ -332,6 +339,7 @@ function DirectAssignments({
   staged,
   removals,
   seat,
+  locked,
   onToggle,
   onUndo,
 }: {
@@ -339,6 +347,8 @@ function DirectAssignments({
   staged: PendingGrant[];
   removals: ReadonlySet<string>;
   seat: OrganizationUserRole;
+  /** A paid seat change in flight saves these rows as they stand. */
+  locked: boolean;
   onToggle: (grantId: string) => void;
   onUndo: (index: number) => void;
 }) {
@@ -385,6 +395,7 @@ function DirectAssignments({
                 variant="ghost"
                 color={marked ? "accent.fg" : "fg.muted"}
                 aria-label={marked ? "Undo removal" : "Remove assignment"}
+                disabled={locked}
                 onClick={() => onToggle(b.id)}
               >
                 <X size={14} />
@@ -411,6 +422,7 @@ function DirectAssignments({
             variant="ghost"
             color="fg.muted"
             aria-label="Undo add"
+            disabled={locked}
             onClick={() => onUndo(i)}
           >
             <X size={14} />
@@ -611,31 +623,39 @@ function bindingToCreate(b: PendingGrant) {
  * then keeps the staged rows, so Save retries them.
  */
 function useResetStaged({
+  organizationId,
   userId,
   memberSeat,
   reset,
   setPendingSeat,
 }: {
+  organizationId: string;
   userId: string;
   memberSeat: InviteSeat;
   reset: () => void;
   setPendingSeat: (seat: InviteSeat) => void;
 }) {
   const keepStagedOnRoleRefresh = useRef(false);
-  const stagedFor = useRef(userId);
+  const member = memberKey({ organizationId, userId });
+  const stagedFor = useRef(member);
   const latestReset = useRef(reset);
   useEffect(() => {
     latestReset.current = reset;
   });
   useEffect(() => {
-    const sameMember = stagedFor.current === userId;
-    stagedFor.current = userId;
+    const sameMember = stagedFor.current === member;
+    stagedFor.current = member;
     const keep = sameMember && keepStagedOnRoleRefresh.current;
     keepStagedOnRoleRefresh.current = false;
     if (keep) setPendingSeat(memberSeat);
     else latestReset.current();
-  }, [userId, memberSeat, setPendingSeat]);
+  }, [member, memberSeat, setPendingSeat]);
   return keepStagedOnRoleRefresh;
+}
+
+/** One member in one organization: staging and late answers belong to this pair only. */
+function memberKey({ organizationId, userId }: { organizationId: string; userId: string }): string {
+  return `${organizationId}:${userId}`;
 }
 
 function useMemberAccessEditor({
@@ -675,12 +695,19 @@ function useMemberAccessEditor({
     setPendingGrantAdditions([]);
     setHasDraftGrant(false);
   };
-  const keepStagedOnRoleRefresh = useResetStaged({ userId, memberSeat, reset, setPendingSeat });
+  const keepStagedOnRoleRefresh = useResetStaged({
+    organizationId,
+    userId,
+    memberSeat,
+    reset,
+    setPendingSeat,
+  });
   // The member open now: an answer for a member since closed leaves the editor alone.
-  const openMember = useRef(userId);
+  const thisMember = memberKey({ organizationId, userId });
+  const openMember = useRef(thisMember);
   useEffect(() => {
-    openMember.current = userId;
-  }, [userId]);
+    openMember.current = thisMember;
+  }, [thisMember]);
 
   const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
@@ -744,7 +771,7 @@ function useMemberAccessEditor({
           bindingIdsToDelete: [...pendingGrantRemovals],
           bindingsToCreate: additions.map(bindingToCreate),
         }),
-      stillOpen: () => openMember.current === userId,
+      stillOpen: () => openMember.current === thisMember,
       uncommitted,
       removed: pendingGrantRemovals,
       added: pendingGrantAdditions,
@@ -767,7 +794,7 @@ function useMemberAccessEditor({
         applyStagedGrants,
         refresh: refreshAccessQueries,
         onBatchFailed: (error) => {
-          if (openMember.current === userId) keepStagedOnRoleRefresh.current = true;
+          if (openMember.current === thisMember) keepStagedOnRoleRefresh.current = true;
           showErrorToast({
             error,
             fallbackTitle: "The role changed, but the access rows did not save",
@@ -896,6 +923,8 @@ function useSeatRolePanel({
     // A change waiting on its payment, or still being sent, drops Save until it settles.
     seatPurchaseOffered:
       showSeatPanel && step !== "done" && (offersPurchase || step === "waiting" || step === "busy"),
+    // The staged batch goes as it stood when the change started, so nothing is edited meanwhile.
+    seatChangeInFlight: step === "waiting" || step === "busy",
     pickSeat: (next: InviteSeat) => {
       setPendingSeat(next);
       if (step !== "waiting" && step !== "busy") seat.clear();

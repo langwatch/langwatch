@@ -199,13 +199,16 @@ vi.mock("../../elements/organization-user-role-field.tsx", async (importOriginal
     value,
     onChange,
     roles,
+    disabled,
   }: {
     value: OrganizationUserRole;
     onChange: (role: OrganizationUserRole) => void;
     roles?: readonly string[];
+    disabled?: boolean;
   }) => (
     <button
       type="button"
+      disabled={disabled}
       data-testid="org-role-field"
       data-value={value}
       data-roles={roles?.join(",")}
@@ -249,11 +252,13 @@ vi.mock("../group-grant-input-row.tsx", async () => {
       onAdd,
       onReadyChange,
       organizationRole,
+      disabled,
     }: {
       organizationId: string;
       onAdd: (grant: PendingGrant) => void;
       onReadyChange?: (isReady: boolean) => void;
       organizationRole?: OrganizationUserRole;
+      disabled?: boolean;
     },
     ref: React.Ref<{ flush: () => PendingGrant | null }>,
   ) {
@@ -268,12 +273,18 @@ vi.mock("../group-grant-input-row.tsx", async () => {
     return (
       <>
         <span data-testid="stub-organization-role">{organizationRole}</span>
-        <button type="button" data-testid="stub-add-binding" onClick={() => onAdd(STUB_GRANT)}>
+        <button
+          type="button"
+          data-testid="stub-add-binding"
+          disabled={disabled}
+          onClick={() => onAdd(STUB_GRANT)}
+        >
           Stage grant
         </button>
         <button
           type="button"
           data-testid="stub-add-custom-binding"
+          disabled={disabled}
           onClick={() => onAdd(STUB_CUSTOM_GRANT)}
         >
           Stage custom grant
@@ -281,6 +292,7 @@ vi.mock("../group-grant-input-row.tsx", async () => {
         <button
           type="button"
           data-testid="stub-fill-draft"
+          disabled={disabled}
           onClick={() => {
             isFilled.current = true;
             onReadyChange?.(true);
@@ -911,6 +923,28 @@ describe("<MemberAccessEditor/>", () => {
     });
   });
 
+  describe("when the drawer opens the same member in another organization", () => {
+    /** @scenario "Access rows that do not save after the paid role change are named" */
+    it("drops the rows staged in the first organization", () => {
+      const view = renderEditor();
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      expect(screen.getByRole("button", { name: /undo add/i })).toBeTruthy();
+
+      view.rerender(
+        <MemberAccessEditor
+          organizationId="org-2"
+          userId="user-1"
+          memberRole={OrganizationUserRole.MEMBER}
+          canManage={true}
+          isCurrentUser={false}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+  });
+
   describe("when no changes are pending", () => {
     it("leaves the Save button disabled", () => {
       renderEditor();
@@ -1157,6 +1191,77 @@ describe("<MemberAccessEditor/>", () => {
       expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario "Access rows that do not save after the paid role change are named" */
+    it("never stages a failed draft on the same member opened in another organization", async () => {
+      mockChangeWithSeat.mockResolvedValue({
+        status: "changed",
+        seatAdded: true,
+        teamsLeftWithoutAdmin: [],
+      });
+      let failBatch: () => void = () => {};
+      mockApplyMemberGrants.mockReturnValueOnce(
+        new Promise<void>((_, reject) => {
+          failBatch = () => reject(new Error("boom"));
+        }),
+      );
+      const view = renderLite();
+      fireEvent.click(screen.getByTestId("stub-fill-draft"));
+      pickAdmin();
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+      await vi.waitFor(() => expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1));
+
+      view.rerender(
+        <MemberAccessEditor
+          organizationId="org-2"
+          userId="user-1"
+          memberRole={OrganizationUserRole.EXTERNAL}
+          canManage={true}
+          isCurrentUser={false}
+        />,
+      );
+      await act(async () => failBatch());
+
+      expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+      expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "One click adds the seat and changes the role" */
+    it("holds the role and the access rows as they stand while the paid change is sent", async () => {
+      mockMemberGrantsData.current = [
+        {
+          id: "grant-1",
+          role: "VIEWER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: GrantScopeTier.TEAM,
+          scopeId: "team-9",
+          scopeName: "Team Nine",
+        },
+      ];
+      let answer: (value: unknown) => void = () => {};
+      mockChangeWithSeat.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      );
+      renderLite();
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      pickAdmin();
+      fireEvent.click(screen.getByRole("button", { name: "Buy the seat" }));
+
+      expect(screen.getByTestId("org-role-field")).toBeDisabled();
+      expect(screen.getByTestId("stub-add-binding")).toBeDisabled();
+      expect(screen.getByTestId("stub-fill-draft")).toBeDisabled();
+      expect(screen.getByRole("button", { name: /undo add/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /remove assignment/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled();
+
+      await act(async () =>
+        answer({ status: "changed", seatAdded: true, teamsLeftWithoutAdmin: [] }),
+      );
+      await vi.waitFor(() => expect(screen.getByTestId("org-role-field")).not.toBeDisabled());
+    });
+
     /** @scenario "One click adds the seat and changes the role" */
     it("keeps Save unavailable while the paid change saves its staged access rows", async () => {
       mockChangeWithSeat.mockResolvedValue({
@@ -1205,15 +1310,28 @@ describe("<MemberAccessEditor/>", () => {
       expect(pay.getAttribute("target")).toBe("_blank");
       expect(pay.getAttribute("rel")).toBe("noopener");
 
-      mockCompleteChange.mockResolvedValue({ status: "applied", reason: null });
-      // A focus while an earlier ask is still in flight is skipped, so it is sent until one lands.
-      await vi.waitFor(
-        () => {
-          fireEvent.focus(window);
-          expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("done");
-        },
-        { timeout: 5000 },
+      // The batch goes as the admin left it, so nothing it holds can change while it waits.
+      expect(screen.getByTestId("org-role-field")).toBeDisabled();
+      expect(screen.getByTestId("stub-add-binding")).toBeDisabled();
+
+      // The admin comes back once while the first ask is still out; that ask says waiting.
+      let answerFirst: (value: unknown) => void = () => {};
+      mockCompleteChange.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answerFirst = resolve;
+        }),
       );
+      mockCompleteChange.mockResolvedValue({ status: "applied", reason: null });
+      fireEvent.focus(window);
+      fireEvent.focus(window);
+      expect(mockCompleteChange).toHaveBeenCalledTimes(1);
+      await act(async () => answerFirst({ status: "waiting", reason: null }));
+
+      // The return during that ask is not lost: the editor asks again by itself.
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("seat-role-offer").getAttribute("data-state")).toBe("done");
+      });
+      expect(mockCompleteChange).toHaveBeenCalledTimes(2);
       expect(mockCompleteChange).toHaveBeenCalledWith({
         organizationId: "org-1",
         changeId: "change-1",

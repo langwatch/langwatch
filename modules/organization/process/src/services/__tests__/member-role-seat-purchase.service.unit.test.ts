@@ -96,7 +96,16 @@ function world({
     state.payments.set(key, "paid");
     state.paid += 1;
   };
-  return { state, service, changeMemberRole, addFullSeat, recordBlockedSeatChange, pay, pending };
+  return {
+    state,
+    service,
+    changeMemberRole,
+    addFullSeat,
+    settleSeatPayment,
+    recordBlockedSeatChange,
+    pay,
+    pending,
+  };
 }
 
 describe("MemberRoleSeatPurchaseService", () => {
@@ -445,6 +454,8 @@ describe("MemberRoleSeatPurchaseService", () => {
       pay("in_seat");
       // Another applier wrote the role and settled the change while this one's claim lapsed.
       changeMemberRole.mockImplementationOnce(async () => {
+        state.roles.set(SAM, "ADMIN");
+        state.roleWrites += 1;
         await pending.settle({ organizationId: ORG, id: "change_1", status: "applied" });
         throw new CannotDisableLastAdminError();
       });
@@ -455,7 +466,8 @@ describe("MemberRoleSeatPurchaseService", () => {
       expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
         status: "applied",
       });
-      expect(state.roles.get(SAM)).toBe("EXTERNAL");
+      expect(state.roles.get(SAM)).toBe("ADMIN");
+      expect(state.roleWrites).toBe(1);
     });
 
     /** @scenario "The return applies the change, then the paid fact changes nothing" */
@@ -567,6 +579,126 @@ describe("MemberRoleSeatPurchaseService", () => {
         status: "failed",
       });
       expect(state.roles.get(SAM)).toBe("EXTERNAL");
+    });
+
+    /** @scenario "The return applies the change, then the paid fact changes nothing" */
+    it("answers the settled outcome when a purchase finds its held invoice already settled", async () => {
+      const { state, service, addFullSeat, pending } = world();
+      const held = { status: "payment_required", payment: INVOICE, url: "https://pay.example" };
+      // Another admin's change for the same invoice applied while this purchase was under way.
+      addFullSeat.mockImplementationOnce(async () => {
+        await pending.save({
+          id: "change_first",
+          organizationId: ORG,
+          userId: SAM,
+          role: "ADMIN",
+          requestedBy: { id: ADMIN.id, name: null, email: null },
+          payment: INVOICE,
+          url: held.url,
+          status: "waiting",
+          reason: null,
+          createdAt: 0,
+        });
+        await pending.settle({ organizationId: ORG, id: "change_first", status: "applied" });
+        return held as SeatPurchase;
+      });
+      state.purchase = held as SeatPurchase;
+
+      const answer = await service.changeWithSeat(MAKE_ADMIN, ADMIN);
+
+      expect(answer).toEqual({ status: "changed", seatAdded: true, teamsLeftWithoutAdmin: [] });
+    });
+
+    /** @scenario "A failed or abandoned payment changes nothing" */
+    it("answers the stored outcome when its failed settle loses to another one", async () => {
+      const { service, pending, settleSeatPayment } = await waiting();
+      settleSeatPayment.mockImplementationOnce(async () => {
+        await pending.settle({
+          organizationId: ORG,
+          id: "change_1",
+          status: "seat_only",
+          reason: "x",
+        });
+        return { status: "failed" };
+      });
+
+      expect(await service.complete({ organizationId: ORG, changeId: "change_1" })).toEqual({
+        status: "seat_only",
+        reason: "x",
+      });
+    });
+
+    /** @scenario "A failed or abandoned payment changes nothing" */
+    it("applies nothing when the change expired while it was being claimed", async () => {
+      let clock = 1_000;
+      const { state, service, pay, pending } = await waiting(INVOICE, () => clock);
+      pay("in_seat");
+      const claim = pending.claim.bind(pending);
+      vi.spyOn(pending, "claim").mockImplementation(async (input) => {
+        const granted = await claim(input);
+        clock += 8 * 24 * 60 * 60 * 1000;
+        return granted;
+      });
+
+      await expect(
+        service.complete({ organizationId: ORG, changeId: "change_1" }),
+      ).rejects.toMatchObject({ code: "not_found" });
+      expect(state.roles.get(SAM)).toBe("EXTERNAL");
+      expect(state.roleWrites).toBe(0);
+    });
+
+    /** @scenario "The paid invoice applies the change, then the return changes nothing" */
+    it("answers applied when only freeing the claim fails afterwards", async () => {
+      const { state, service, pay, pending } = await waiting();
+      pay("in_seat");
+      vi.spyOn(pending, "release").mockRejectedValue(new Error("redis down"));
+
+      expect(await service.complete({ organizationId: ORG, changeId: "change_1" })).toEqual({
+        status: "applied",
+        reason: null,
+      });
+      expect(state.roles.get(SAM)).toBe("ADMIN");
+    });
+
+    /** @scenario "A paid change asked by an admin who lost the right changes no role" */
+    it("settles nothing for a lost right once its claim passed to another applier", async () => {
+      const { state, service, pay, pending } = await waiting();
+      pay("in_seat");
+      state.adminCanManage = false;
+      vi.spyOn(pending, "renew").mockResolvedValueOnce(false);
+
+      expect(await service.complete({ organizationId: ORG, changeId: "change_1" })).toEqual({
+        status: "waiting",
+        reason: null,
+      });
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "waiting",
+      });
+    });
+
+    /** @scenario "A newer role change replaces the one waiting on its payment" */
+    it("retries ending the replaced change, and keeps the newer role when that keeps failing", async () => {
+      const once = await waiting();
+      once.state.paid += 1;
+      const settle = once.pending.settle.bind(once.pending);
+      vi.spyOn(once.pending, "settle")
+        .mockRejectedValueOnce(new Error("redis down"))
+        .mockImplementation(settle);
+
+      await once.service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+
+      expect(await once.service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "seat_only",
+      });
+
+      const never = await waiting();
+      never.state.paid += 1;
+      vi.spyOn(never.pending, "settle").mockRejectedValue(new Error("redis down"));
+
+      const newer = await never.service.changeWithSeat({ ...MAKE_ADMIN, role: "MEMBER" }, ADMIN);
+
+      expect(newer).toMatchObject({ status: "changed", seatAdded: false });
+      expect(never.state.roles.get(SAM)).toBe("MEMBER");
     });
 
     it("refuses a change another organization asks about", async () => {

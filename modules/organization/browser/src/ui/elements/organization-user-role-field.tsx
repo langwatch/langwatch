@@ -81,6 +81,7 @@ export function OrganizationUserRoleField<Seat extends InviteSeat = Organization
   width = "200px",
   ariaLabel = "Organization role",
   descriptions,
+  disabled = false,
 }: {
   value: Seat;
   onChange: (role: Seat) => void;
@@ -90,6 +91,8 @@ export function OrganizationUserRoleField<Seat extends InviteSeat = Organization
   ariaLabel?: string;
   /** Lines that replace a seat's usual description, as the plan reads it ("Not on Free"). */
   descriptions?: Partial<Record<InviteSeat, string>>;
+  /** Holds the picked seat while a change to it is in flight. */
+  disabled?: boolean;
 }) {
   const offered: readonly InviteSeat[] =
     roles ??
@@ -109,6 +112,7 @@ export function OrganizationUserRoleField<Seat extends InviteSeat = Organization
         <Select.Root
           collection={roleCollection}
           value={[value]}
+          disabled={disabled}
           onValueChange={(details) => {
             const selectedValue = details.value[0];
             if (selectedValue) {

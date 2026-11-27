@@ -234,17 +234,17 @@ export class SeatRequestApprovalService {
     throw new SeatRequestReleaseError({ claim, refusal, releaseFailure: failure });
   }
 
-  private async assertFullSeatFree({
-    organizationId,
-    by,
+  private async assertSeatFreeFor({
+    give,
+    resource,
   }: {
-    organizationId: string;
-    by: OrganizationPlanUser;
+    give: { organizationId: string; by: OrganizationPlanUser };
+    resource: "members" | "membersLite";
   }): Promise<void> {
     const result = await this.dependencies.seats.checkLimit({
-      organizationId,
-      resource: "members",
-      user: by,
+      organizationId: give.organizationId,
+      resource,
+      user: give.by,
     });
     assertSeatFree(result);
   }
@@ -259,7 +259,7 @@ export class SeatRequestApprovalService {
   }): Promise<SeatRequestResolved["outcome"]> {
     try {
       if (!(give.isFull && give.membership?.disabledAt === null)) {
-        await this.assertFullSeatFree({ organizationId: give.organizationId, by: give.by });
+        await this.assertSeatFreeFor({ give, resource: "members" });
       }
       return await this.giveFullSeat(give);
     } catch (error) {
@@ -267,6 +267,10 @@ export class SeatRequestApprovalService {
       const refusal = readSeatRefusal(error);
       if (!buySeat || refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") {
         throw error;
+      }
+      // A held Lite row is enabled as Lite first: with no Lite seat free, a bought one is wasted.
+      if (!give.isFull && give.membership !== null && give.membership.disabledAt !== null) {
+        await this.assertSeatFreeFor({ give, resource: "membersLite" });
       }
       if (!(await buySeat())) throw error;
       return this.giveFullSeat(give);

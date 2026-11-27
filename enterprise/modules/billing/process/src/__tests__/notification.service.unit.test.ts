@@ -402,6 +402,32 @@ describe("NotificationService", () => {
     });
   });
 
+  describe("sendSlackSeatRequest()", () => {
+    const request = {
+      organizationId: "org_acme",
+      organizationName: "Acme",
+      plan: "ENTERPRISE",
+      seats: 5,
+      requestedSeats: 6,
+    };
+
+    it("answers true once the notice went out", async () => {
+      config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+      await expect(service.sendSlackSeatRequest(request)).resolves.toBe(true);
+      expect(mockSlackSend).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers false when Slack refused it or no channel is set, so a later ask retries", async () => {
+      config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+      mockSlackSend.mockRejectedValueOnce(new Error("webhook error"));
+      await expect(service.sendSlackSeatRequest(request)).resolves.toBe(false);
+
+      config.slackSubscriptionsChannel = undefined;
+      await expect(service.sendSlackSeatRequest(request)).resolves.toBe(false);
+    });
+  });
+
   describe("sendSlackSubscriptionEvent()", () => {
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {
