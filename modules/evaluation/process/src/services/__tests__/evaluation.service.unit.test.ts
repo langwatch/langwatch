@@ -19,6 +19,7 @@ import {
 import {
   MonitorPerformanceRepository,
   type EvaluatorOutcomeRow,
+  type EvaluatorTypeUsageRow,
   type MonitorPerformanceBucket,
 } from "../../repositories/monitor-performance.repository.ts";
 import { EvaluationService } from "../evaluation.service.ts";
@@ -134,6 +135,10 @@ class FakeMonitorPerformanceRepository extends MonitorPerformanceRepository {
   }
 
   async findOutcomeRows(): Promise<EvaluatorOutcomeRow[]> {
+    return [];
+  }
+
+  async findTypeUsageRows(): Promise<EvaluatorTypeUsageRow[]> {
     return [];
   }
 }

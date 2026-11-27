@@ -1,5 +1,6 @@
 export * from "./billing.api.ts";
 export * from "./billing.errors.ts";
+export * from "./billing-ops-facts.ts";
 export * from "./billing-types.ts";
 export * from "./billing-report.commands.ts";
 export * from "./connected-billing.ts";

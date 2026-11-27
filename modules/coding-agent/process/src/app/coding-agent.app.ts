@@ -21,6 +21,7 @@ import {
   type CodingAgentSessionsListInput,
   type CodingAgentSessionCursor,
   type CodingAgentUsageCount,
+  type CodingAgentDailySessionCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
   type CodingAgentTracePullRequestInput,
@@ -445,6 +446,14 @@ export class CodingAgentModule implements CodingAgentApi {
     since?: number;
   }): Promise<CodingAgentUsageCount> {
     return this.#codingAgents.countUsage(input);
+  }
+
+  findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]> {
+    return this.#codingAgents.findDailySessionCounts(input);
   }
 
   /** The project's recent sessions in a window, newest first. */

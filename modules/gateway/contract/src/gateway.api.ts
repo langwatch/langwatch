@@ -576,6 +576,21 @@ export interface GatewayUsageCount {
   readonly firstRequestAt?: number;
 }
 
+/**
+ * One project's gateway requests on one UTC day, per virtual key and provider row, for staff
+ * investigation reads (ADR-202): ids, counts and USD only. `day` is the day's start, epoch ms.
+ */
+export interface GatewayDailyKeySpend {
+  readonly projectId: string;
+  readonly day: number;
+  readonly virtualKeyId: string;
+  /** The model provider row the gateway dispatched to; empty when unresolved. */
+  readonly providerId: string;
+  readonly requests: number;
+  readonly failedRequests: number;
+  readonly spendUsd: number;
+}
+
 /** One UTC day of the metered lane: charged requests at their latest status, nano-USD. */
 export interface GatewaySpendDay {
   readonly day: string;
@@ -1001,6 +1016,12 @@ export interface GatewayApi extends GatewayInternalProtocol {
   }): Promise<GatewaySpendDay[]>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount>;
+  /** Requests in `[since, until)` per project, UTC day, virtual key and provider row. */
+  findDailyKeySpend(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<GatewayDailyKeySpend[]>;
   /** One user's principal-scope ledger totals and most-used model (main's personal usage). */
   getPrincipalSpendSummary(input: {
     projectId: string;

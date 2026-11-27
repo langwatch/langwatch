@@ -81,6 +81,8 @@ const createMockRepository = (): {
 } => ({
   findActive: vi.fn(),
   findLastNonCancelled: vi.fn(),
+  findForOrganization: vi.fn(),
+  findCreatedBetween: vi.fn(),
   hasAnyForOrganization: vi.fn(),
   createPending: vi.fn(),
   updateStatus: vi.fn(),

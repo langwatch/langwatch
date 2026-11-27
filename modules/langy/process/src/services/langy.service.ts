@@ -14,6 +14,8 @@ import {
   type LangyStopTurnInput,
   type LangyTurnResultInput,
   type LangyLocalRecord,
+  type LangyTurnFacts,
+  type LangyTurnOutcomeCount,
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
@@ -117,6 +119,18 @@ export class LangyService {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
     return this.conversations.countUsage(input);
+  }
+
+  findTurnOutcomeCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<LangyTurnOutcomeCount[]> {
+    return this.conversations.findTurnOutcomeCounts(input);
+  }
+
+  getTurnFacts(input: { projectId: string; conversationId: string }): Promise<LangyTurnFacts[]> {
+    return this.conversations.getTurnFacts(input);
   }
 
   getPage(input: {

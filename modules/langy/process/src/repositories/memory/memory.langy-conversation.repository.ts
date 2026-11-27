@@ -5,6 +5,7 @@ import {
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
+import type { LangyTurnFactRow } from "../../rules/langy-turn-facts.rules.ts";
 import {
   LangyConversationRepository,
   type LangyConversationListCursor,
@@ -101,6 +102,53 @@ export class MemoryLangyConversationRepository extends LangyConversationReposito
       activeUsers: owners.size,
       ...(first !== undefined ? { firstTurnAt: first } : {}),
     };
+  }
+
+  async findTurnFactRows(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<LangyTurnFactRow[]> {
+    const projects = new Set(input.projectIds);
+    return this.turnFactRows().filter(
+      (row) =>
+        projects.has(row.projectId) && row.createdAt >= input.since && row.createdAt < input.until,
+    );
+  }
+
+  async findConversationTurnFactRows(input: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LangyTurnFactRow[]> {
+    return this.turnFactRows()
+      .filter(
+        (row) => row.projectId === input.projectId && row.conversationId === input.conversationId,
+      )
+      .toSorted((a, b) => a.createdAt - b.createdAt || compareIds(a.turnId, b.turnId));
+  }
+
+  async conversationExists(input: { projectId: string; conversationId: string }): Promise<boolean> {
+    return this.store.conversations.has(`${input.projectId}:${input.conversationId}`);
+  }
+
+  private turnFactRows(): LangyTurnFactRow[] {
+    return [...this.store.turns.values()].map(({ projectId, projection }) => {
+      const { state } = projection;
+      const owner = this.find(projectId, state.ConversationId)?.state;
+      return {
+        projectId,
+        conversationId: state.ConversationId,
+        turnId: state.TurnId,
+        status: state.Status,
+        error: state.Error,
+        createdAt: projection.createdAt,
+        startedAt: state.StartedAt,
+        endedAt: state.EndedAt,
+        userId: owner?.UserId ?? null,
+        model: owner?.LastModel ?? null,
+        toolCalls: state.ToolCalls,
+      };
+    });
   }
 
   async getVisibleById(params: {

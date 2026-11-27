@@ -45,6 +45,9 @@ function makeConversationRepo(
     getResumeState: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     hasAdmittedTurn: vi.fn().mockResolvedValue(false),
     turnExists: vi.fn().mockResolvedValue(false),
+    findTurnFactRows: vi.fn().mockResolvedValue([]),
+    findConversationTurnFactRows: vi.fn().mockResolvedValue([]),
+    conversationExists: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
 }

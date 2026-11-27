@@ -46,6 +46,8 @@ function repositoryDouble(
   return {
     findActive: vi.fn(),
     findLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
+    findForOrganization: vi.fn(() => Promise.resolve([SUBSCRIPTION])),
+    findCreatedBetween: vi.fn(() => Promise.resolve([SUBSCRIPTION])),
     hasAnyForOrganization: vi.fn(() => Promise.resolve(true)),
     createPending: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
     updateStatus: vi.fn(() => Promise.resolve(SUBSCRIPTION)),

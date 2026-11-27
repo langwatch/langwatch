@@ -19,6 +19,8 @@ import {
   type EvaluationRunLookup,
   type EvaluatorOutcomeCount,
   type EvaluatorOutcomeCountQuery,
+  type EvaluatorTypeUsage,
+  type EvaluatorTypeUsageQuery,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
   type ExecuteEvaluationCommand,
@@ -222,5 +224,9 @@ export class EvaluationService {
 
   countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]> {
     return this.evaluatorOutcomes.countEvaluatorOutcomes(input);
+  }
+
+  countEvaluatorUsageByType(input: EvaluatorTypeUsageQuery): Promise<EvaluatorTypeUsage[]> {
+    return this.evaluatorOutcomes.countEvaluatorUsageByType(input);
   }
 }

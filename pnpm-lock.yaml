@@ -15433,6 +15433,9 @@ importers:
 
   modules/staff-access/process:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -15454,6 +15457,15 @@ importers:
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -15472,12 +15484,21 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
@@ -15490,6 +15511,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/platform-health-contract':
+        specifier: workspace:*
+        version: link:../../platform-health/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -15499,12 +15523,21 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/rum-contract':
+        specifier: workspace:*
+        version: link:../../rum/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/staff-access-contract':
         specifier: workspace:*
         version: link:../contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/topic-contract':
+        specifier: workspace:*
+        version: link:../../topic/contract
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract

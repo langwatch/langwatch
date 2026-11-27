@@ -6,10 +6,15 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import { LangyApi } from "@langwatch/langy-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -17,6 +22,7 @@ import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import { StaffAccessApi } from "@langwatch/staff-access-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -58,6 +64,12 @@ async function boot(role: "api" | "worker") {
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
       testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>() }),
       testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
+      testPeer({ token: BillingApi, instance: createApiFixture<BillingApi>() }),
+      testPeer({ token: LangyApi, instance: createApiFixture<LangyApi>() }),
+      testPeer({ token: InstantEvalApi, instance: createApiFixture<InstantEvalApi>() }),
+      testPeer({ token: ScenarioApi, instance: createApiFixture<ScenarioApi>() }),
+      testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
+      testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

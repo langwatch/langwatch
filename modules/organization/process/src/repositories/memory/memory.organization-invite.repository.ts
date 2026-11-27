@@ -177,6 +177,15 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
       });
   }
 
+  async findAllInvites(input: { organizationId: string }): Promise<OrganizationInvite[]> {
+    return this.#invitesOf(input.organizationId)
+      .toSorted(
+        (a, b) =>
+          b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds || a.id.localeCompare(b.id),
+      )
+      .map((invite) => inviteOfRow(invite));
+  }
+
   async revokeOpenInvite(input: { inviteId: string; organizationId: string }): Promise<number> {
     const invite = this.#inviteIn(input);
     if (!invite || (invite.status !== "PENDING" && invite.status !== "PAYMENT_PENDING")) return 0;

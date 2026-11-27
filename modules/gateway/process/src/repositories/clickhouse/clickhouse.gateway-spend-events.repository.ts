@@ -2,6 +2,7 @@ import type { IdBoundOptions } from "@langwatch/clickhouse-client";
 import {
   type GatewaySpendDay,
   type GatewayUsageCount,
+  type GatewayDailyKeySpend,
   type SpendUsage,
   nanoUsdToDecimalString,
   parseSummedNanoUsd,
@@ -49,6 +50,16 @@ const usageRowsSchema = z.array(
   z.object({ Total: z.string(), SpendNanoUsd: z.string(), FirstMs: z.string() }),
 );
 const TABLE = "gateway_spend" as const;
+const dailyKeyRowsSchema = z.array(
+  z.object({
+    DayMs: z.string(),
+    VirtualKeyId: z.string(),
+    ProviderKey: z.string(),
+    Requests: z.string(),
+    Failed: z.string(),
+    SpendNanoUsd: z.string(),
+  }),
+);
 
 /**
  * Deadline for one page of the rollup walk. Generous, since a closed-month reconciliation is
@@ -1209,5 +1220,48 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       spendUsd: perProject.reduce((sum, project) => sum + project.spendUsd, 0),
       ...(firsts.length === 0 ? {} : { firstRequestAt: Math.min(...firsts) }),
     };
+  }
+
+  /** Per project, so each read routes to the tenant's server; FINAL for the latest status. */
+  async findDailyKeySpend({
+    projectIds,
+    since,
+    until,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<GatewayDailyKeySpend[]> {
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const client = await this.resolveClient(tenantId);
+        const result = await client.query({
+          query: `
+            SELECT toString(toUnixTimestamp(toStartOfDay(OccurredAt, 'UTC')) * 1000) AS DayMs,
+                   VirtualKeyId,
+                   ProviderKey,
+                   toString(count()) AS Requests,
+                   toString(countIf(Status = 'failed')) AS Failed,
+                   toString(sum(CostNanoUSD)) AS SpendNanoUsd
+            FROM ${TABLE} FINAL
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
+              AND OccurredAt < fromUnixTimestamp64Milli({until:Int64})
+            GROUP BY DayMs, VirtualKeyId, ProviderKey`,
+          query_params: { tenantId, since, until },
+          format: "JSONEachRow",
+        });
+        return dailyKeyRowsSchema.parse(await result.json()).map((row) => ({
+          projectId: tenantId,
+          day: Number(row.DayMs),
+          virtualKeyId: row.VirtualKeyId,
+          providerId: row.ProviderKey,
+          requests: Number.parseInt(row.Requests, 10),
+          failedRequests: Number.parseInt(row.Failed, 10),
+          spendUsd: Number(row.SpendNanoUsd) / NANO_PER_USD,
+        }));
+      }),
+    );
+    return perProject.flat();
   }
 }

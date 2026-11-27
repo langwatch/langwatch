@@ -3417,6 +3417,12 @@ const presentations = {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
   },
+  billing_facts_unavailable: {
+    // An ops read of billing on a deployment that runs no subscriptions or holds no Stripe key.
+    title: "Billing facts are not available here",
+    describe: () =>
+      "This deployment does not bill through LangWatch Cloud, so it holds no subscriptions or prices to read.",
+  },
   billing_only_keeps_billing: {
     // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
     title: "A Billing-only member always pays",

@@ -1,6 +1,7 @@
 import type { Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
+  CodingAgentDailySessionCount,
   CodingAgentSessionBranchRecord,
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
@@ -127,4 +128,11 @@ export abstract class CodingAgentSessionRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<CodingAgentUsageCount>;
+
+  /** Sessions started in `[since, until)` per project, UTC day and agent; a refold counts once. */
+  abstract findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]>;
 }

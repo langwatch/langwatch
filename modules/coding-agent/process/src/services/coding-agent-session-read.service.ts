@@ -9,6 +9,7 @@ import {
   codingAgentSessionLookupInputSchema,
   codingAgentTraceSessionLookupInputSchema,
   type CodingAgentUsageCount,
+  type CodingAgentDailySessionCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
   codingAgentUsageTotalsSchema,
@@ -237,6 +238,16 @@ export class CodingAgentSessionReadService {
     since?: number;
   }): Promise<CodingAgentUsageCount> {
     return this.dependencies.sessions.countUsage(input);
+  }
+
+  /** Staff investigation counts (ADR-202): ids, counts and days only. */
+  findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]> {
+    if (input.until <= input.since) return Promise.resolve([]);
+    return this.dependencies.sessions.findDailySessionCounts(input);
   }
 
   async getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {

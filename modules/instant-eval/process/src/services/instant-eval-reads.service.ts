@@ -8,6 +8,7 @@
 import {
   type InstantEvalJudgmentStatus,
   type InstantEvalUsageCount,
+  type InstantEvalDailyRunCount,
   InstantEvalRunNotFoundError,
   type InstantEvalRunProgress,
 } from "@langwatch/instant-eval-contract";
@@ -53,6 +54,16 @@ export class InstantEvalReadsService {
       this.judgments.countUsage(input),
     ]);
     return { ...runs, judgments };
+  }
+
+  /** Staff investigation counts (ADR-202): counts, codes and USD only. */
+  findDailyRunCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<InstantEvalDailyRunCount[]> {
+    if (input.until <= input.since) return Promise.resolve([]);
+    return this.runs.findDailyRunCounts(input);
   }
 
   /** The run, or the refusal naming the id that has none. */

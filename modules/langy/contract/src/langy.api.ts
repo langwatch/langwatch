@@ -45,6 +45,7 @@ import type {
   LangyStartConversationTurnInput,
   LangyTurnResultInput,
 } from "./langy-conversation.ts";
+import type { LangyMirrorSettings } from "./langy-mirror-settings.ts";
 import type {
   langyControlCancelResultSchema,
   langyLocalStartCallRequestSchema,
@@ -95,6 +96,43 @@ export interface LangyUsageCount {
   readonly turns: number;
   readonly activeUsers: number;
   readonly firstTurnAt?: number;
+}
+
+/**
+ * One group of Langy turns for the ops functions (ADR-202): a day (UTC, YYYY-MM-DD), the model the
+ * conversation last ran on, the turn's state and failure code. `users` counts distinct
+ * conversation owners; `toolErrorsByTool` counts failed tool calls by tool label.
+ */
+export interface LangyTurnOutcomeCount {
+  readonly day: string;
+  readonly model: string;
+  readonly turnState: string;
+  readonly failureCode: string | null;
+  readonly toolErrorsByTool: Readonly<Record<string, number>>;
+  readonly turns: number;
+  readonly users: number;
+}
+
+/** One tool call as ids and codes: never its command, arguments, result or error text. */
+export interface LangyToolCallFacts {
+  readonly tool: string;
+  readonly status: string;
+  readonly durationMs: number | null;
+  /** `permission` or `question` when the call put a card up, else null. */
+  readonly waitKind: string | null;
+  readonly targetKind: string | null;
+  readonly targetId: string | null;
+}
+
+/** One turn as ids, codes and epoch millisecond times; tool calls in the order they began. */
+export interface LangyTurnFacts {
+  readonly turnId: string;
+  readonly state: string;
+  readonly failureCode: string | null;
+  readonly createdAt: number;
+  readonly startedAt: number | null;
+  readonly endedAt: number | null;
+  readonly toolCalls: readonly LangyToolCallFacts[];
 }
 
 /** A public Langy REST surface, each behind its own per-project rollout. */
@@ -375,6 +413,14 @@ export interface LangyApi {
   recordPlanUpdated(input: LangyRecordPlanUpdatedInput): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
+  /** Turns created in `[since, until)` epoch ms across `projectIds`, grouped for ops (ADR-202). */
+  findTurnOutcomeCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<LangyTurnOutcomeCount[]>;
+  /** One conversation's turns; `LangyConversationNotFoundError` when the project holds none. */
+  getTurnFacts(input: { projectId: string; conversationId: string }): Promise<LangyTurnFacts[]>;
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
   /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */
@@ -514,6 +560,8 @@ export interface LangyApi {
   setEgressState(
     input: LangyPanelCall<typeof langyEgressSetInputSchema>,
   ): Promise<z.infer<typeof langyEgressStateSchema>>;
+  /** The project Langy's own traces are mirrored to, as this deployment configured it. */
+  getMirrorSettings(): LangyMirrorSettings;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

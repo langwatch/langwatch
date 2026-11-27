@@ -316,6 +316,19 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     }));
   }
 
+  async findAllInvites({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<OrganizationInvite[]> {
+    const invites = await this.prisma.organizationInvite.findMany({
+      where: { organizationId },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+
+    return invites.map((invite) => inviteFromRecord(invite));
+  }
+
   /**
    * The revoke and the acceptance claim meet on one row, so both are SQL with
    * their conditions against the table: through `updateMany` a write parked on

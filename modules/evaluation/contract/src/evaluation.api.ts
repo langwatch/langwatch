@@ -29,7 +29,12 @@ import type {
   ExecuteEvaluationCommand,
   UpsertEvaluationRunCommand,
 } from "./evaluation.commands.ts";
-import type { EvaluatorOutcomeCount, EvaluatorOutcomeCountQuery } from "./evaluation.ops.ts";
+import type {
+  EvaluatorOutcomeCount,
+  EvaluatorOutcomeCountQuery,
+  EvaluatorTypeUsage,
+  EvaluatorTypeUsageQuery,
+} from "./evaluation.ops.ts";
 import type {
   MonitorPerformanceForProjectInput,
   MonitorPerformanceQuery,
@@ -83,6 +88,8 @@ export interface EvaluationApi {
   ): Promise<OnlineEvaluationPerformance[]>;
   /** Online evaluator runs scheduled in `[since, until)` per project: counts and codes only. */
   countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]>;
+  /** Every tenant's runs in `[since, until)` per evaluator type, busiest first (ADR-202). */
+  countEvaluatorUsageByType(input: EvaluatorTypeUsageQuery): Promise<EvaluatorTypeUsage[]>;
 
   // The public evaluation doors: the evaluate paths reach the same capability
   // every other caller does.

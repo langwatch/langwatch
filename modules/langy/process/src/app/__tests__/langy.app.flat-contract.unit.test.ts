@@ -221,8 +221,10 @@ async function createApp({
   repositories = MemoryLangyRepositories.create(),
   channels = MemoryLangyChannels.create(),
   retention = createApiFixture<DataRetentionApi>(),
+  mirrorProjectId,
 }: {
   retention?: DataRetentionApi;
+  mirrorProjectId?: string;
   presence?: PresenceApi;
   secrets?: ScopedSecrets;
   resources?: LangySetupResources;
@@ -261,7 +263,7 @@ async function createApp({
       agentUrl: undefined,
       workerCallbackUrl: undefined,
       workerGatewayUrl: undefined,
-      mirrorProjectId: undefined,
+      mirrorProjectId,
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
@@ -278,6 +280,19 @@ async function createApp({
   app.connectConversationCommands(registered.commands);
   return app;
 }
+
+describe("given a deployment that names a Langy mirror project", () => {
+  /** @scenario "The mirror project id is read as configured, and as unset when blank" */
+  it("answers the project id, and null when none or only spaces are set", async () => {
+    expect((await createApp({ mirrorProjectId: "project_mirror" })).getMirrorSettings()).toEqual({
+      projectId: "project_mirror",
+    });
+    expect((await createApp({ mirrorProjectId: "  " })).getMirrorSettings()).toEqual({
+      projectId: null,
+    });
+    expect((await createApp()).getMirrorSettings()).toEqual({ projectId: null });
+  });
+});
 
 describe("given a private conversation's update published through presence", () => {
   /** @scenario "A private conversation's updates stay with its owner" */

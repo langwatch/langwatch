@@ -16,6 +16,11 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import {
+  type LangyApi,
+  LangyConversationNotFoundError,
+  type LangyTurnOutcomeCount,
+} from "@langwatch/langy-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import type { OpsApi, OpsPlatformOperator } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -28,6 +33,12 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { StaffAccessRepositories } from "../../../repositories/staff-access.repositories.ts";
 import { StaffAccessModule } from "../../staff-access.app.ts";
+import { activityPeers, type ActivityAsk } from "./staff-access-activity-peers.ts";
+import {
+  platformPeers,
+  platformPeerState,
+  type PlatformPeerState,
+} from "./staff-access-platform-peers.ts";
 
 export const OLIVIA = "user_olivia";
 export const PEDRO = "user_pedro";
@@ -91,6 +102,9 @@ export function staffAccessWorld({
     mail: [] as SendEmailCommand[],
     minted: [] as { apiKeyId: string; organizationId: string; kind: string; expiresAt: Date }[],
     revokedKeys: [] as string[],
+    activityAsks: [] as ActivityAsk[],
+    clickHouseErrorAsks: [] as Parameters<OpsApi["findClickHouseQueryErrors"]>[0][],
+    platform: platformPeerState(),
   };
 
   const operators = (): OpsPlatformOperator[] =>
@@ -105,6 +119,7 @@ export function staffAccessWorld({
   const ops = createApiFixture<OpsApi>({
     offersCloudOps: () => state.cloudOps,
     listPlatformOperators: async () => operators(),
+    ...platformPeers.ops(state.platform),
     countQueueGroupsForTenants: async ({ tenantIds }) => [
       {
         queueName: "events",
@@ -117,6 +132,34 @@ export function staffAccessWorld({
         oldestPendingAt: Date.parse("2026-11-02T09:00:00Z"),
       },
     ],
+    findClickHouseQueryErrors: async (input) => {
+      state.clickHouseErrorAsks.push(input);
+      return [
+        {
+          queryShapeId: "1234567890",
+          source: "lwql",
+          code: 241,
+          codeName: "MEMORY_LIMIT_EXCEEDED",
+          count: 5,
+          p95Ms: 812,
+          maxMemoryBytes: 10_000_000,
+          rowsRead: 4_000,
+          projectIds: [`${ACME.id}_project`],
+          lastAt: Date.parse("2026-11-02T09:45:00Z"),
+        },
+      ];
+    },
+    getClickHouseHealth: async () => ({
+      nodes: 2,
+      replicas: { tables: 4, readonly: 0, sessionExpired: 0, maxDelaySeconds: 1, maxQueueSize: 3 },
+      merges: { running: 1, longestSeconds: 12, pendingMutations: 0 },
+      disks: { count: 2, totalBytes: 1_000, freeBytes: 400, lowestFreeRatio: 0.3 },
+      memory: { residentBytes: 600, totalBytes: 1_000 },
+      tables: [
+        { table: "stored_spans", activeParts: 40, maxPartsInPartition: 12, bytesOnDisk: 900 },
+        { table: "trace_summaries", activeParts: 8, maxPartsInPartition: 4, bytesOnDisk: 100 },
+      ],
+    }),
     listQueues: async () => [
       {
         name: "events",
@@ -168,6 +211,7 @@ export function staffAccessWorld({
             },
           ]
         : [],
+    ...activityPeers.auth(),
   });
 
   const summaries = [ACME, GLOBEX].map((organization) => ({
@@ -175,6 +219,15 @@ export function staffAccessWorld({
     createdAt: Temporal.Instant.from("2025-01-01T00:00:00Z"),
   }));
   const organizations = createApiFixture<OrganizationApi>({
+    findInviteFacts: async ({ organizationId }) => peopleInviteFacts({ organizationId }),
+    listMembers: async (input) => peopleMembers(input),
+    getInvitedMemberIds: async ({ organizationId }) => ({
+      memberUserIds: [],
+      invitedUserIds: organizationId === ACME.id ? ["user_acme_ben"] : [],
+    }),
+    organizationIdsForMember: async (input) => peopleOrganizationIds(input),
+    listAllIds: async () => ({ ids: [ACME.id, GLOBEX.id, "org_empty"], next: null }),
+    countMemberSeats: async ({ organizationId }) => peopleSeats({ organizationId }),
     findProvisioningSummary: async (id: string) =>
       summaries.find((summary) => summary.id === id) ?? null,
     listProvisioningSummaries: async () => summaries,
@@ -273,12 +326,17 @@ export function staffAccessWorld({
     config: { publicBaseUrl },
     dependencies: {
       ops,
+      langy: langyStandIn(state.platform),
+      monitors: platformPeers.monitors(),
+      dataRetention: platformPeers.dataRetention(),
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: async () => state.flag,
         findEnabledFlagsForOrganization: async () => ["release_trace_media_extraction"],
       }),
       auth,
       users: createApiFixture<UserApi>({
+        findSignInAccounts: async ({ email }) => peopleSignInAccounts({ email }),
+        getProfiles: async ({ userIds }) => peopleProfiles({ userIds }) as never,
         findById: async ({ id }) => {
           if (state.usersRefused) throw new Error("user store unavailable");
           return {
@@ -298,9 +356,11 @@ export function staffAccessWorld({
           sessions: since !== undefined && since > Date.parse("2026-10-20T00:00:00Z") ? 4 : 9,
           lastSessionAt: Date.parse("2026-11-01T08:00:00Z"),
         }),
+        ...activityPeers.codingAgents(state.activityAsks),
       }),
       gateway: createApiFixture<GatewayApi>({
         countUsage: async () => ({ requests: 120, spendUsd: 3.5 }),
+        ...activityPeers.gateway(state.activityAsks),
       }),
       traces: createApiFixture<TraceApi>({
         countUsage: async () => ({ traces: 42, spans: 300 }),
@@ -325,6 +385,7 @@ export function staffAccessWorld({
             : [],
       }),
       entitlements: createApiFixture<EntitlementApi>({
+        getActivePlan: async ({ organizationId }) => peoplePlan({ organizationId }) as never,
         getUsageLimits: async () => ({
           plan: "growth",
           limits: [
@@ -345,7 +406,10 @@ export function staffAccessWorld({
             errorsByCode: [{ code: "provider_rate_limited", count: 4 }],
             lastErrorAt: Date.parse("2026-11-02T08:00:00Z"),
           })),
+        ...platformPeers.evaluatorUsage(state.platform),
       }),
+      instantEvals: activityPeers.instantEvals(state.activityAsks),
+      scenarios: activityPeers.scenarios(state.activityAsks, [ACME.id]),
     },
     now: () => state.at,
   } as Parameters<typeof StaffAccessModule.create>[0]);
@@ -421,5 +485,215 @@ export function requestBody({
     codeChallenge: CHALLENGE,
     codeChallengeMethod: "S256" as const,
     machine: "olivia-macbook",
+  };
+}
+
+/** Langy as staff access sees it: one conversation in ACME's project with two turns. */
+export function langyStandIn(platform: PlatformPeerState = platformPeerState()) {
+  return createApiFixture<LangyApi>({
+    ...platformPeers.mirror(platform),
+    findTurnOutcomeCounts: async ({ projectIds }): Promise<LangyTurnOutcomeCount[]> =>
+      projectIds.includes(`${ACME.id}_project`)
+        ? [
+            {
+              day: "2026-11-01",
+              model: "openai/gpt-5.4-mini",
+              turnState: "failed",
+              failureCode: "langy_agent_errored",
+              toolErrorsByTool: { "langwatch.trace": 2 },
+              turns: 3,
+              users: 2,
+            },
+            {
+              day: "2026-11-01",
+              model: "openai/gpt-5.4-mini",
+              turnState: "completed",
+              failureCode: null,
+              toolErrorsByTool: {},
+              turns: 9,
+              users: 4,
+            },
+          ]
+        : [],
+    getTurnFacts: async ({ projectId, conversationId }) => {
+      if (projectId !== `${ACME.id}_project` || conversationId !== "conv_acme") {
+        throw new LangyConversationNotFoundError(conversationId);
+      }
+      return [
+        {
+          turnId: "turn_1",
+          state: "completed",
+          failureCode: null,
+          createdAt: Date.parse("2026-11-01T09:00:00Z"),
+          startedAt: Date.parse("2026-11-01T09:00:01Z"),
+          endedAt: Date.parse("2026-11-01T09:00:30Z"),
+          toolCalls: [
+            {
+              tool: "langwatch.dashboards",
+              status: "succeeded",
+              durationMs: 800,
+              waitKind: null,
+              targetKind: "dashboard",
+              targetId: "dash_open",
+            },
+          ],
+        },
+        {
+          turnId: "turn_2",
+          state: "failed",
+          failureCode: "langy_turn_timeout",
+          createdAt: Date.parse("2026-11-01T09:05:00Z"),
+          startedAt: Date.parse("2026-11-01T09:05:01Z"),
+          endedAt: null,
+          toolCalls: [
+            {
+              tool: "bash",
+              status: "failed",
+              durationMs: 120,
+              waitKind: "permission",
+              targetKind: null,
+              targetId: null,
+            },
+          ],
+        },
+      ];
+    },
+  });
+}
+
+/** ACME's invitations for the people functions: pending, expired and held for a checkout. */
+function peopleInviteFacts({ organizationId }: { organizationId: string }) {
+  if (organizationId !== ACME.id) return [];
+  const invite = ({
+    inviteId,
+    role = "MEMBER",
+    status,
+    viaCheckout = false,
+    teamIds = ["team_acme"],
+    createdAt,
+    expiresAt,
+  }: {
+    inviteId: string;
+    role?: "ADMIN" | "MEMBER";
+    status: "PENDING" | "EXPIRED" | "PAYMENT_PENDING";
+    viaCheckout?: boolean;
+    teamIds?: string[];
+    createdAt: string;
+    expiresAt: string | null;
+  }) => ({
+    inviteId,
+    role,
+    status,
+    billingOnly: false,
+    viaCheckout,
+    teamIds,
+    requestedByUserId: "user_acme_olivia",
+    acceptedByUserId: null,
+    createdAt: Date.parse(createdAt),
+    updatedAt: Date.parse(createdAt),
+    expiresAt: expiresAt === null ? null : Date.parse(expiresAt),
+  });
+  return [
+    invite({
+      inviteId: "invite_pending",
+      status: "PENDING",
+      createdAt: "2026-11-01T10:00:00Z",
+      expiresAt: "2026-11-03T10:00:00Z",
+    }),
+    invite({
+      inviteId: "invite_expired",
+      role: "ADMIN",
+      status: "EXPIRED",
+      teamIds: [],
+      createdAt: "2026-10-01T10:00:00Z",
+      expiresAt: "2026-10-03T10:00:00Z",
+    }),
+    invite({
+      inviteId: "invite_checkout",
+      status: "PAYMENT_PENDING",
+      viaCheckout: true,
+      createdAt: "2026-10-20T10:00:00Z",
+      expiresAt: null,
+    }),
+  ];
+}
+
+/** ACME's members, one switched off and one with a role the reads do not know, with names. */
+function peopleMembers({
+  organizationId,
+  offset = 0,
+  limit = 50,
+}: {
+  organizationId: string;
+  offset?: number;
+  limit?: number;
+}) {
+  const at = Temporal.Instant.from("2026-02-01T00:00:00Z");
+  const members =
+    organizationId === ACME.id
+      ? [
+          { userId: "user_acme_olivia", role: "ADMIN", disabledAt: null },
+          { userId: "user_acme_ben", role: "MEMBER", disabledAt: at },
+          { userId: "user_acme_lee", role: "OWNER", disabledAt: null },
+        ]
+      : [{ userId: "user_globex_kim", role: "ADMIN", disabledAt: null }];
+  const rows = members.map((member) => ({
+    ...member,
+    organizationId,
+    createdAt: at,
+    updatedAt: at,
+    user: { id: member.userId, name: "Olivia Acme", email: `${member.userId}@acme.test` },
+  }));
+  return { members: rows.slice(offset, offset + limit) as never, totalCount: rows.length };
+}
+
+function peopleOrganizationIds({ userId, activeOnly }: { userId: string; activeOnly?: boolean }) {
+  if (userId !== "user_acme_olivia") return [];
+  return activeOnly ? [ACME.id] : [GLOBEX.id, ACME.id];
+}
+
+/** ACME over both caps, Globex at its cap, and an organization with nobody in it. */
+function peopleSeats({ organizationId }: { organizationId: string }) {
+  const seats: Record<string, { fullMembers: number; liteMembers: number; developers: number }> = {
+    [ACME.id]: { fullMembers: 12, liteMembers: 3, developers: 4 },
+    [GLOBEX.id]: { fullMembers: 2, liteMembers: 0, developers: 0 },
+  };
+  return seats[organizationId] ?? { fullMembers: 0, liteMembers: 0, developers: 0 };
+}
+
+function peopleSignInAccounts({ email }: { email: string }) {
+  if (email !== "olivia@acme.test") return [];
+  return [
+    {
+      userId: "user_acme_olivia",
+      createdAt: Date.parse("2026-01-01T00:00:00Z"),
+      lastSignInAt: Date.parse("2026-11-01T07:00:00Z"),
+      methods: ["password" as const],
+      twoStepEnabled: false,
+      deactivated: false,
+    },
+  ];
+}
+
+function peopleProfiles({ userIds }: { userIds: readonly string[] }) {
+  return userIds.map((id) => ({
+    id,
+    name: "Olivia Acme",
+    email: `${id}@acme.test`,
+    lastLoginAt: id === "user_acme_olivia" ? new Date("2026-11-01T07:00:00Z") : null,
+    deactivatedAt: id === "user_acme_lee" ? new Date("2026-06-01T00:00:00Z") : null,
+  }));
+}
+
+/** ACME on a seat plan it went over; everybody else on Free with unlimited Lite seats. */
+function peoplePlan({ organizationId }: { organizationId: string }) {
+  if (organizationId !== ACME.id) {
+    return { type: "FREE", maxMembers: 2, maxMembersLite: Number.MAX_SAFE_INTEGER, overPlan: null };
+  }
+  return {
+    type: "GROWTH_SEAT_EUR_MONTHLY",
+    maxMembers: 10,
+    maxMembersLite: 2,
+    overPlan: { sinceMs: Date.parse("2026-10-15T00:00:00Z"), members: 12, maxMembers: 10 },
   };
 }

@@ -3,6 +3,7 @@
  * tests run the real graph against this instead of a database.
  */
 
+import type { InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
@@ -87,6 +88,42 @@ export class MemoryInstantEvalRunRepository implements InstantEvalRunRepository 
     };
   }
 
+  async findDailyRunCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<InstantEvalDailyRunCount[]> {
+    const groups = new Map<string, { row: InstantEvalDailyRunCount; codes: Map<string, number> }>();
+    for (const run of this.rows.values()) {
+      const at = run.createdAt.epochMilliseconds;
+      if (!input.projectIds.includes(run.projectId) || at < input.since || at >= input.until) {
+        continue;
+      }
+      const day = at - (at % DAY_MS);
+      const key = `${run.projectId}/${day}`;
+      const group = groups.get(key) ?? {
+        row: { ...emptyDay({ projectId: run.projectId, day }) },
+        codes: new Map<string, number>(),
+      };
+      const failed = run.status === "FAILED";
+      group.row = {
+        ...group.row,
+        runs: group.row.runs + 1,
+        judgedRows: group.row.judgedRows + run.progress,
+        largestRun: Math.max(group.row.largestRun, run.total ?? 0),
+        failedRuns: group.row.failedRuns + (failed ? 1 : 0),
+        priceUsd: group.row.priceUsd + run.priceUsd,
+        lastRunAt: Math.max(group.row.lastRunAt, at),
+      };
+      if (failed) group.codes.set(run.error ?? "", (group.codes.get(run.error ?? "") ?? 0) + 1);
+      groups.set(key, group);
+    }
+    return [...groups.values()].map(({ row, codes }) => ({
+      ...row,
+      failedByCode: [...codes.entries()].map(([code, count]) => ({ code, count })),
+    }));
+  }
+
   async write(row: InstantEvalRunRow): Promise<void> {
     this.rows.set(keyOf({ projectId: row.projectId, runId: row.id }), row);
   }
@@ -105,6 +142,28 @@ export class MemoryInstantEvalRunRepository implements InstantEvalRunRepository 
     const at = this.now();
     await this.write({ ...row, status: "FAILED", error: code, updatedAt: at, finishedAt: at });
   }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function emptyDay({
+  projectId,
+  day,
+}: {
+  projectId: string;
+  day: number;
+}): InstantEvalDailyRunCount {
+  return {
+    projectId,
+    day,
+    runs: 0,
+    judgedRows: 0,
+    largestRun: 0,
+    failedRuns: 0,
+    failedByCode: [],
+    priceUsd: 0,
+    lastRunAt: 0,
+  };
 }
 
 function keyOf({ projectId, runId }: { projectId: string; runId: string }): string {

@@ -22,6 +22,7 @@ import {
   type InstantEvalSampleWire,
   type InstantEvalRunProgress,
   type InstantEvalUsageCount,
+  type InstantEvalDailyRunCount,
   type InstantEvalRunWire,
   type InstantEvalServerConfig,
   instantEvalConfig,
@@ -767,6 +768,14 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     since?: number;
   }): Promise<InstantEvalUsageCount> {
     return this.reads.countUsage(input);
+  }
+
+  findDailyRunCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<InstantEvalDailyRunCount[]> {
+    return this.reads.findDailyRunCounts(input);
   }
 
   async findRunProgress(input: {

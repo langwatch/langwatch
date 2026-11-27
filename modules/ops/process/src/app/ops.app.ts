@@ -263,12 +263,17 @@ import {
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
+  type OpsServingProcess,
   type OpsFeatureFlagTarget,
   type OpsFindFeatureFlagTargetsInput,
   type OpsSearchFeatureFlagTargetsInput,
   tenantQueueCountInputSchema,
   type TenantQueueCount,
   type TenantQueueCountInput,
+  clickHouseQueryErrorsInputSchema,
+  type ClickHouseQueryErrorGroup,
+  type ClickHouseQueryErrorsInput,
+  type ClickHouseServerHealth,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -309,6 +314,7 @@ import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.
 import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
+import { ClickHouseServerReadService } from "#services/clickhouse-server-read.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
 import type { OpsChannels } from "../channels/ops.channels.ts";
@@ -745,6 +751,8 @@ type OpsRuntimeDependencies = Readonly<{
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
+  /** The shared ClickHouse's query log and health, for ops functions. */
+  clickhouseServer: ClickHouseServerReadService;
   /** The rules dialog's target search; absent where a composition built none. */
   featureFlagTargets: FeatureFlagTargetDirectoryService | undefined;
   /** Settings, Checkup and the usage report; absent where a composition built none. */
@@ -1018,6 +1026,10 @@ export class OpsModule implements OpsApi {
       }),
       upgradeDiagnostics,
       featureFlagTargets,
+      clickhouseServer: ClickHouseServerReadService.create({
+        repository: repositories.clickhouseServer,
+        cluster: setup.config.clickhouseCluster,
+      }),
     });
     return app;
   }
@@ -1040,6 +1052,7 @@ export class OpsModule implements OpsApi {
     upgradeAlerts?: UpgradeAlertsService;
     upgradeDiagnostics?: UpgradeDiagnosticsService;
     featureFlagTargets?: FeatureFlagTargetDirectoryService;
+    clickhouseServer?: ClickHouseServerReadService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -1097,6 +1110,9 @@ export class OpsModule implements OpsApi {
       upgradeAlerts: setup.upgradeAlerts,
       upgradeDiagnostics: setup.upgradeDiagnostics,
       featureFlagTargets: setup.featureFlagTargets,
+      clickhouseServer:
+        setup.clickhouseServer ??
+        ClickHouseServerReadService.create({ repository: repositories.clickhouseServer }),
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1476,6 +1492,16 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.ops.countQueueGroupsForTenants(
       tenantQueueCountInputSchema.parse(input),
     );
+  }
+  findClickHouseQueryErrors(
+    input: ClickHouseQueryErrorsInput,
+  ): Promise<ClickHouseQueryErrorGroup[]> {
+    return this.#dependencies.clickhouseServer.findQueryErrors(
+      clickHouseQueryErrorsInputSchema.parse(input),
+    );
+  }
+  getClickHouseHealth(): Promise<ClickHouseServerHealth> {
+    return this.#dependencies.clickhouseServer.getHealth();
   }
   pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void> {
     return this.#dependencies.ops.pauseQueuePipeline(input);
@@ -2159,6 +2185,10 @@ export class OpsModule implements OpsApi {
 
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]> {
     return this.#dependencies.upgrades.listTargets();
+  }
+
+  findServingProcesses(): Promise<OpsServingProcess[]> {
+    return this.#dependencies.upgrades.findServingProcesses();
   }
 
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {

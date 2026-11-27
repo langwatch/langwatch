@@ -649,6 +649,8 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#monitorTrend.findForProject(input);
   countEvaluatorOutcomes: EvaluationApiContract["countEvaluatorOutcomes"] = (input) =>
     this.#service.countEvaluatorOutcomes(input);
+  countEvaluatorUsageByType: EvaluationApiContract["countEvaluatorUsageByType"] = (input) =>
+    this.#service.countEvaluatorUsageByType(input);
 
   runEvaluator: EvaluationApiContract["runEvaluator"] = (input) =>
     this.#runner.runEvaluation(input);

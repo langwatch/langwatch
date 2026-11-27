@@ -8,6 +8,7 @@ import { privateTenantListing } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { ClickHouseClickHouseRoutesRepository } from "../clickhouse/clickhouse.clickhouse-routes.repository.ts";
+import { ClickHouseClickHouseServerRepository } from "../clickhouse/clickhouse.clickhouse-server.repository.ts";
 import { ClickHouseClickHouseHealthRepository } from "../clickhouse/clickhouse.datastore-health.repository.ts";
 import { ClickHouseStorageFootprintRepository } from "../clickhouse/clickhouse.storage-footprint.repository.ts";
 import { EventingPipelineDefinitionsRepository } from "../eventing/eventing.pipeline-definitions.repository.ts";
@@ -82,6 +83,7 @@ export const LiveOpsRepositories = {
       seatSharingChecks: RedisSeatSharingCheckRepository.create({ redis }),
       redisHealth: RedisRedisHealthRepository.create(redis),
       clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
+      clickhouseServer: ClickHouseClickHouseServerRepository.create({ clickhouse }),
       events: EventingClickHouseEventExplorer.create({ clickhouse }),
       storageFootprint: ClickHouseStorageFootprintRepository.create({ clickhouse }),
     };

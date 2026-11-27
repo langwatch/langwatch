@@ -25,6 +25,24 @@ import type {
   SimulationSetData,
 } from "./simulation.ts";
 
+/** Projects of one organization and a start-time window, epoch milliseconds. */
+export type SimulationRunCountsInput = {
+  projectIds: readonly string[];
+  since: number;
+  until: number;
+};
+
+/**
+ * One project's scenario runs started in a window, for staff investigation reads (ADR-202):
+ * counts only. `suites` counts the distinct scenario sets the runs belong to.
+ */
+export type SimulationProjectRunCount = {
+  projectId: string;
+  runs: number;
+  suites: number;
+  failedRuns: number;
+};
+
 export type SimulationProjectDateRangeInput = {
   projectId: string;
   startDate?: number;
@@ -169,6 +187,10 @@ export abstract class SimulationService {
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
   /** Lifetime runs across one organization's projects, in one read: they share one route. */
   abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
+  /** Runs started in `[since, until)` per project across one organization, in one read. */
+  abstract findRunCountsByProject(
+    input: SimulationRunCountsInput,
+  ): Promise<SimulationProjectRunCount[]>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;

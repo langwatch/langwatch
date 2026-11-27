@@ -93,6 +93,8 @@ export abstract class OrganizationInviteRepository {
     input: WriteInviteInput & { subscriptionId: string },
   ): Promise<OrganizationInvite>;
   abstract findListableInvites(input: { organizationId: string }): Promise<InviteWithRequester[]>;
+  /** Every invitation of the organization, whatever its status, newest first. */
+  abstract findAllInvites(input: { organizationId: string }): Promise<OrganizationInvite[]>;
   /** Answers how many rows moved; zero means the invite was not open. */
   abstract revokeOpenInvite(input: { inviteId: string; organizationId: string }): Promise<number>;
   /** Throws `InviteNotFoundError`. */

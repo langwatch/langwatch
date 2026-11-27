@@ -121,9 +121,9 @@ const STAFF_ACCESS_CORE_FUNCTIONS = {
       .strict(),
   }),
   "org.evaluator_errors": entry({
-    title: "Online evaluator runs and failures by error code",
+    title: "Online evaluator runs and failures by error code, who created it, and if it paused",
     scope: "org",
-    answers: "Which online evaluator fails, how often, and with which error codes.",
+    answers: "Which online evaluator fails, how often, with which codes, and whether it paused.",
     input: z.object({ ...rangeInput, ...pageInput }).strict(),
     output: staffAccessPageSchema(
       z
@@ -136,6 +136,10 @@ const STAFF_ACCESS_CORE_FUNCTIONS = {
           skipped: z.number().int(),
           errorsByCode: countsByCode,
           lastErrorAt: isoTime.nullable(),
+          createdByUserId: z.string().nullable(),
+          disabledAt: isoTime.nullable(),
+          /** `error_rate` when it paused itself, `manual` when someone turned it off. */
+          disabledReasonCode: z.enum(["error_rate", "manual"]).nullable(),
         })
         .strict(),
     ),

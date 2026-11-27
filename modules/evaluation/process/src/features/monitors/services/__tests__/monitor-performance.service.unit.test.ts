@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   MonitorPerformanceRepository,
   type EvaluatorOutcomeRow,
+  type EvaluatorTypeUsageRow,
   type MonitorPerformanceBucket,
 } from "../../../../repositories/monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "../monitor-performance.service.ts";
@@ -27,6 +28,10 @@ class InMemoryMonitorPerformanceRepository extends MonitorPerformanceRepository 
   }
 
   async findOutcomeRows(): Promise<EvaluatorOutcomeRow[]> {
+    return [];
+  }
+
+  async findTypeUsageRows(): Promise<EvaluatorTypeUsageRow[]> {
     return [];
   }
 }

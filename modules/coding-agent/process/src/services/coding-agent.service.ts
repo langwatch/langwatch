@@ -20,6 +20,7 @@ import {
   type CodingAgentTracePullRequestInput,
   type CodingAgentTracePullRequestLink,
   type CodingAgentUsageCount,
+  type CodingAgentDailySessionCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
@@ -88,6 +89,11 @@ export interface CodingAgentSessionService {
     projectIds: readonly string[];
     since?: number;
   }): Promise<CodingAgentUsageCount>;
+  findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]>;
 }
 
 /** The one public Coding Agent contract, composed from private role-specific collaborators. */
@@ -209,6 +215,14 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     since?: number;
   }): Promise<CodingAgentUsageCount> {
     return this.collaborators.sessionReads.countUsage(input);
+  }
+
+  findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]> {
+    return this.collaborators.sessionReads.findDailySessionCounts(input);
   }
 
   listForProject(

@@ -3,6 +3,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -31,6 +32,7 @@ type ReadsDeps = Readonly<{
   entitlements: Pick<EntitlementApi, "getUsageLimits">;
   traces: Pick<TraceApi, "countIngestionByProject" | "findTracePresence">;
   evaluations: Pick<EvaluationApi, "countEvaluatorOutcomes">;
+  monitors: Pick<MonitorApi, "getAllByIds">;
   apiKeys: Pick<ApiKeyApi, "findKeyFactsForOrganization">;
   ops: Pick<OpsApi, "countQueueGroupsForTenants">;
   auth: Pick<AuthApi, "findSignInFacts">;
@@ -263,7 +265,9 @@ export class StaffAccessFunctionReadsService {
       since: range.since.epochMilliseconds,
       until: range.until.epochMilliseconds,
     });
+    const monitors = await this.monitorsOf({ outcomes });
     const rows = outcomes.map((outcome) => ({
+      ...monitorStateOf(monitors.get(`${outcome.projectId}/${outcome.evaluatorId}`)),
       projectId: outcome.projectId,
       evaluatorId: outcome.evaluatorId,
       evaluatorType: outcome.evaluatorType,
@@ -281,6 +285,35 @@ export class StaffAccessFunctionReadsService {
       name: "org.evaluator_errors",
       ...pageInputOf(input),
     });
+  }
+
+  /** The monitors behind the outcomes, by project and id; a deleted one is absent. */
+  private async monitorsOf({
+    outcomes,
+  }: {
+    outcomes: readonly { projectId: string; evaluatorId: string }[];
+  }): Promise<Map<string, MonitorState>> {
+    const idsByProject = new Map<string, Set<string>>();
+    for (const outcome of outcomes) {
+      const ids = idsByProject.get(outcome.projectId) ?? new Set<string>();
+      ids.add(outcome.evaluatorId);
+      idsByProject.set(outcome.projectId, ids);
+    }
+    const found = await Promise.all(
+      [...idsByProject.entries()].map(([projectId, ids]) =>
+        this.deps.monitors.getAllByIds({ projectId, monitorIds: [...ids] }),
+      ),
+    );
+    return new Map(
+      found.flat().map((monitor) => [
+        `${monitor.projectId}/${monitor.id}`,
+        {
+          enabled: monitor.enabled,
+          createdById: monitor.createdById ?? null,
+          autoPausedAtMs: monitor.autoPausedAt ? monitor.autoPausedAt.getTime() : null,
+        },
+      ]),
+    );
   }
 
   private async usageLimits({
@@ -358,6 +391,28 @@ export class StaffAccessFunctionReadsService {
   private async projectIdsOf({ organizationId }: { organizationId: string }): Promise<string[]> {
     return this.deps.projects.listIdsByOrganization({ organizationId });
   }
+}
+
+type MonitorState = Readonly<{
+  enabled: boolean;
+  createdById: string | null;
+  autoPausedAtMs: number | null;
+}>;
+
+/** Who created the monitor, and when and why it stopped running: paused itself, or turned off. */
+function monitorStateOf(monitor: MonitorState | undefined): {
+  createdByUserId: string | null;
+  disabledAt: string | null;
+  disabledReasonCode: "error_rate" | "manual" | null;
+} {
+  if (!monitor) return { createdByUserId: null, disabledAt: null, disabledReasonCode: null };
+  const createdByUserId = monitor.createdById;
+  if (monitor.enabled) return { createdByUserId, disabledAt: null, disabledReasonCode: null };
+  if (monitor.autoPausedAtMs === null) {
+    return { createdByUserId, disabledAt: null, disabledReasonCode: "manual" };
+  }
+  const disabledAt = isoOfMs(monitor.autoPausedAtMs);
+  return { createdByUserId, disabledAt, disabledReasonCode: "error_rate" };
 }
 
 function isoOfMs(ms: number): string {

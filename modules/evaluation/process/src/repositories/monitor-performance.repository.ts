@@ -37,9 +37,27 @@ export type EvaluatorOutcomeRowQuery = {
   limit: number;
 };
 
+/** Every tenant's runs of one evaluator type; `errorsByCode` holds only codes that errored. */
+export type EvaluatorTypeUsageRow = {
+  evaluatorType: string;
+  projects: number;
+  runs: number;
+  errors: number;
+  skipped: number;
+  errorsByCode: Record<string, number>;
+};
+
+export type EvaluatorTypeUsageRowQuery = {
+  since: number;
+  until: number;
+  limit: number;
+};
+
 /** Private ClickHouse read model for monitor performance. */
 export abstract class MonitorPerformanceRepository {
   abstract findBuckets(input: MonitorPerformanceBucketQuery): Promise<MonitorPerformanceBucket[]>;
   /** Each run scheduled in `[since, until)` at its latest revision, per evaluator and code. */
   abstract findOutcomeRows(input: EvaluatorOutcomeRowQuery): Promise<EvaluatorOutcomeRow[]>;
+  /** Every tenant's runs scheduled in `[since, until)` at their latest revision, per type. */
+  abstract findTypeUsageRows(input: EvaluatorTypeUsageRowQuery): Promise<EvaluatorTypeUsageRow[]>;
 }

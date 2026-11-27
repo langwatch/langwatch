@@ -8,16 +8,22 @@ import {
   type PasskeyAssertionResponse,
 } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import { LangyApi } from "@langwatch/langy-contract";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   StaffAccessApi,
   staffAccessConfig,
@@ -102,6 +108,18 @@ export class StaffAccessModule implements StaffAccessApiContract {
     entitlements: EntitlementApi,
     /** Online evaluator runs and failures by error code. */
     evaluations: EvaluationApi,
+    /** Who created an online evaluator, and whether it paused itself or was turned off. */
+    monitors: MonitorApi,
+    /** Each project's retention days and its pending retention rewrites. */
+    dataRetention: DataRetentionApi,
+    /** Subscription facts, subscription counts and the Stripe price catalogue; Cloud only. */
+    billing: BillingApi,
+    /** Langy turn outcomes and one conversation's turn facts, without text. */
+    langy: LangyApi,
+    /** Instant Eval runs per day, for the activity functions. */
+    instantEvals: InstantEvalApi,
+    /** Scenario runs per project, for the activity functions. */
+    scenarios: ScenarioApi,
   };
 
   readonly #availability: StaffAccessAvailabilityService;
@@ -181,15 +199,41 @@ export class StaffAccessModule implements StaffAccessApiContract {
         entitlements: dependencies.entitlements,
         traces: dependencies.traces,
         evaluations: dependencies.evaluations,
+        monitors: dependencies.monitors,
         apiKeys: dependencies.apiKeys,
         ops: dependencies.ops,
         auth: dependencies.auth,
-        telemetry: StaffAccessTelemetryFunctionReadsService.create({}),
-        langy: StaffAccessLangyFunctionReadsService.create({}),
-        people: StaffAccessPeopleFunctionReadsService.create({}),
-        activity: StaffAccessActivityFunctionReadsService.create({}),
-        platform: StaffAccessPlatformFunctionReadsService.create({}),
-        billing: StaffAccessBillingFunctionReadsService.create({}),
+        telemetry: StaffAccessTelemetryFunctionReadsService.create({ ops: dependencies.ops }),
+        langy: StaffAccessLangyFunctionReadsService.create({
+          langy: dependencies.langy,
+          projects: dependencies.projects,
+        }),
+        people: StaffAccessPeopleFunctionReadsService.create({
+          organizations: dependencies.organizations,
+          users: dependencies.users,
+          entitlements: dependencies.entitlements,
+        }),
+        activity: StaffAccessActivityFunctionReadsService.create({
+          organizations: dependencies.organizations,
+          projects: dependencies.projects,
+          codingAgents: dependencies.codingAgents,
+          gateway: dependencies.gateway,
+          instantEvals: dependencies.instantEvals,
+          traces: dependencies.traces,
+          evaluations: dependencies.evaluations,
+          scenarios: dependencies.scenarios,
+          auth: dependencies.auth,
+          entitlements: dependencies.entitlements,
+        }),
+        platform: StaffAccessPlatformFunctionReadsService.create({
+          ops: dependencies.ops,
+          langy: dependencies.langy,
+          projects: dependencies.projects,
+          dataRetention: dependencies.dataRetention,
+          traces: dependencies.traces,
+          evaluations: dependencies.evaluations,
+        }),
+        billing: StaffAccessBillingFunctionReadsService.create({ billing: dependencies.billing }),
       }),
       now,
     });

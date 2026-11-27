@@ -73,6 +73,7 @@ type NotPostgres =
   | "processFleetReadings"
   | "redisHealth"
   | "clickhouseHealth"
+  | "clickhouseServer"
   | "events"
   | "storageFootprint";
 

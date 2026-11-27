@@ -4,6 +4,7 @@
  * @see packages/clickhouse-migrations/migrations/00098_create_instant_eval_runs.sql
  */
 
+import type { InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { InstantEvalStoredStatus } from "../rules/instant-eval-run-status.rules.ts";
@@ -84,4 +85,10 @@ export interface InstantEvalRunRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<{ runs: number; firstRunAt?: number }>;
+  /** Runs created in `[since, until)` per project and UTC day, at their latest version. */
+  findDailyRunCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<InstantEvalDailyRunCount[]>;
 }

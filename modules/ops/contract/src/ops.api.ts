@@ -40,6 +40,11 @@ import type {
   ExplicitCheckInput,
   ProjectCheckupReport,
 } from "./features/checkup/checkup.ts";
+import type {
+  ClickHouseQueryErrorGroup,
+  ClickHouseQueryErrorsInput,
+  ClickHouseServerHealth,
+} from "./features/clickhouse/ops-clickhouse-server.ts";
 import type { Anomaly, AnomalyKind } from "./features/dashboard/ops-anomaly.ts";
 import type {
   DashboardData,
@@ -62,6 +67,7 @@ import type {
   ReplayHistoryPageInput,
   ReplayStatus,
 } from "./features/event-log/ops-replay.ts";
+import type { OpsServingProcess } from "./features/migrations/ops-serving-roster.ts";
 import type {
   OpsMigrationCohortResult,
   OpsMigrationEnrollmentListing,
@@ -516,6 +522,12 @@ export interface OpsApi {
    * lettered (ADR-202 ops functions): counts and one time, never a key, payload or error text.
    */
   countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]>;
+  /** The shared ClickHouse's failed statements in a window, by shape, source and code (ADR-202). */
+  findClickHouseQueryErrors(
+    input: ClickHouseQueryErrorsInput,
+  ): Promise<ClickHouseQueryErrorGroup[]>;
+  /** The shared ClickHouse's replica, part, merge, disk and memory health (ADR-202). */
+  getClickHouseHealth(): Promise<ClickHouseServerHealth>;
   /** Whether this identity holds `ops:view` at the platform: the platform-operator grant. */
   isAdmin(identity: AdminIdentity): Promise<boolean>;
   assertDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
@@ -754,6 +766,8 @@ export interface OpsApi {
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
+  /** The processes serving now, by role, image and release; never a process id or host. */
+  findServingProcesses(): Promise<OpsServingProcess[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
   /** The step's redacted diagnostics; refuses with `upgrade_not_found` like `getUpgradeStep`. */

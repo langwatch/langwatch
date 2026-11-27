@@ -4,7 +4,7 @@ import type {
   PlanTypes as PrismaPlanTypes,
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from "@langwatch/prisma-client/generated";
-import { fromDate, nowInstant, toDate } from "@langwatch/time";
+import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import {
   BillingSubscriptionRepository,
@@ -114,6 +114,29 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     });
 
     return row ? subscriptionRecordOf(row) : null;
+  }
+
+  async findForOrganization(organizationId: string): Promise<BillingSubscriptionRecord[]> {
+    const rows = await this.prisma.subscription.findMany({
+      where: { organizationId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return rows.map(subscriptionRecordOf);
+  }
+
+  async findCreatedBetween({
+    since,
+    until,
+  }: {
+    since: Instant;
+    until: Instant;
+  }): Promise<BillingSubscriptionRecord[]> {
+    // An ops read across organizations: the range is capped at 31 days by its caller.
+    const rows = await this.prisma.subscription.findMany({
+      where: { createdAt: { gte: toDate(since), lt: toDate(until) } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return rows.map(subscriptionRecordOf);
   }
 
   async hasAnyForOrganization(organizationId: string): Promise<boolean> {

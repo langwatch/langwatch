@@ -19,6 +19,8 @@ export type EvaluationClickHouseQuery = {
   clickhouse_settings?: ClickHouseSettings;
   /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
   tenantIds?: readonly string[];
+  /** A statement over every tenant; the caller's comment says why (lint-checked). */
+  SKIP_TENANT_CHECK?: true;
 };
 
 export type EvaluationClickHouseClient = {
@@ -44,6 +46,7 @@ export class ClickHouseEvaluationSession implements EvaluationClickHouseClient {
     const request = {
       tenantId: this.tenantId,
       ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
+      ...(input.SKIP_TENANT_CHECK ? { SKIP_TENANT_CHECK: true as const } : {}),
       sql: input.query,
       params: input.query_params,
       ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),

@@ -95,6 +95,25 @@ export interface InstantEvalUsageCount {
   readonly firstRunAt?: number;
 }
 
+/**
+ * One project's Instant Eval runs created on one UTC day, for staff investigation reads
+ * (ADR-202): counts, codes and USD only. `day` and `lastRunAt` are epoch milliseconds.
+ */
+export interface InstantEvalDailyRunCount {
+  readonly projectId: string;
+  readonly day: number;
+  readonly runs: number;
+  /** Rows the runs judged. */
+  readonly judgedRows: number;
+  /** The most rows one run of the day set out to judge. */
+  readonly largestRun: number;
+  readonly failedRuns: number;
+  /** Failed runs by the code of the failure that ended them. */
+  readonly failedByCode: readonly { readonly code: string; readonly count: number }[];
+  readonly priceUsd: number;
+  readonly lastRunAt: number;
+}
+
 export interface InstantEvalApi {
   /** Whether this project may run Instant Evals at all. */
   isEnabled(input: { projectId: string }): Promise<boolean>;
@@ -226,6 +245,13 @@ export interface InstantEvalApi {
     projectIds: readonly string[];
     since?: number;
   }): Promise<InstantEvalUsageCount>;
+
+  /** Runs created in `[since, until)` per project and UTC day; epoch milliseconds. */
+  findDailyRunCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<InstantEvalDailyRunCount[]>;
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");

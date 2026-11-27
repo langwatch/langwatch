@@ -3,7 +3,11 @@
 import type { StripePriceDetail } from "@langwatch/enterprise-billing-contract";
 import type Stripe from "stripe";
 
-import { type StripePricePage, StripePricesChannel } from "../stripe-prices.channel.ts";
+import {
+  type StripePricePage,
+  StripePricesChannel,
+  type StripePriceTaxPage,
+} from "../stripe-prices.channel.ts";
 
 /** Stripe's prices over billing's one client, each with its product expanded. */
 export class HttpStripePricesChannel extends StripePricesChannel {
@@ -28,6 +32,32 @@ export class HttpStripePricesChannel extends StripePricesChannel {
       expand: ["data.product"],
     });
     return { prices: page.data.map(toPriceDetail), hasMore: page.has_more };
+  }
+
+  async listPriceTaxes({
+    limit,
+    startingAfter,
+  }: {
+    limit: number;
+    startingAfter?: string;
+  }): Promise<StripePriceTaxPage> {
+    const page = await this.stripe.prices.list({ limit, starting_after: startingAfter });
+    return {
+      prices: page.data.map((price) => {
+        const detail = toPriceDetail(price);
+        return {
+          id: detail.id,
+          active: detail.active,
+          livemode: detail.livemode,
+          currency: detail.currency,
+          unitAmount: detail.unitAmount,
+          recurring: detail.recurring,
+          lookupKey: detail.lookupKey,
+          taxBehavior: price.tax_behavior ?? null,
+        };
+      }),
+      hasMore: page.has_more,
+    };
   }
 }
 

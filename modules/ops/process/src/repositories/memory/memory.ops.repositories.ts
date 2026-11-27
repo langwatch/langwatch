@@ -22,6 +22,7 @@ import { MemoryAnomalyRateTrackerRepository } from "./memory.anomaly-rate-tracke
 import { MemoryAnomalyStateRepository } from "./memory.anomaly-state.repository.ts";
 import { MemoryBugReportRateLimitRepository } from "./memory.bug-report-rate-limit.repository.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
+import { MemoryClickHouseServerRepository } from "./memory.clickhouse-server.repository.ts";
 import { MemoryCloudLatestReleaseRepository } from "./memory.cloud-latest-release.repository.ts";
 import { MemoryCloudNoticeRepository } from "./memory.cloud-notice.repository.ts";
 import { MemoryCredentialsResealRepository } from "./memory.credentials-reseal.repository.ts";
@@ -198,6 +199,7 @@ export class MemoryOpsRepositories {
       seatSharingChecks: MemorySeatSharingCheckRepository.create({ store }),
       redisHealth: MemoryRedisHealthRepository.create(),
       clickhouseHealth: MemoryClickHouseHealthRepository.create(),
+      clickhouseServer: MemoryClickHouseServerRepository.create(),
       events: MemoryEventExplorerRepository.create({ store }),
       storageFootprint: MemoryStorageFootprintRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),

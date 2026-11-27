@@ -3,10 +3,28 @@
  * explicitly; message is always customer-safe.
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 import type { BilledSeatKind } from "./stripe-prices.ts";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
+
+/**
+ * Billing's ops reads run where billing bills: LangWatch Cloud, and for the price catalogue a
+ * configured payment provider. A self-hosted deployment answers this by name.
+ */
+export class BillingFactsUnavailableError extends HandledError {
+  declare readonly code: "billing_facts_unavailable";
+
+  constructor({ reason }: { reason: "not_cloud" | "no_payment_provider" }) {
+    super("billing_facts_unavailable", "Billing facts are only available on LangWatch Cloud", {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { reason },
+      ...remediation("billing_facts_unavailable"),
+    });
+    this.name = "BillingFactsUnavailableError";
+  }
+}
 
 /** Billing requires an email; 422 validates the account field, not auth. */
 export class UserEmailRequiredError extends HandledError {

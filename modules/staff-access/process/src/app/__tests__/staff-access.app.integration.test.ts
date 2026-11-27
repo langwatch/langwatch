@@ -1446,7 +1446,15 @@ function scenarios(backend: Backend): void {
           call("org.evaluator_errors", { since: "2026-10-30T00:00:00Z" }),
         ).resolves.toMatchObject({
           output: {
-            items: [{ evaluatorId: "monitor_1", errorsByCode: { provider_rate_limited: 4 } }],
+            items: [
+              {
+                evaluatorId: "monitor_1",
+                errorsByCode: { provider_rate_limited: 4 },
+                createdByUserId: "user_creator",
+                disabledAt: "2026-11-02T07:00:00.000Z",
+                disabledReasonCode: "error_rate",
+              },
+            ],
           },
         });
         await expect(call("queues.tenant")).resolves.toMatchObject({

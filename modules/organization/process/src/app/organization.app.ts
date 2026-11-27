@@ -33,6 +33,7 @@ import {
   type OrganizationOperatorSummary,
   type OrganizationIdPageInput,
   type OrganizationOpsSnapshot,
+  type OrganizationInviteFact,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
@@ -170,6 +171,7 @@ import { GroupIdentityService } from "../features/group/services/group-identity.
 import type { GroupIdentity } from "../features/group/services/group-identity.service.ts";
 import { OrganizationGroupScopeService } from "../features/group/services/organization-group-scope.service.ts";
 import { InviteCreationThrottleService } from "../features/invite/services/invite-creation-throttle.service.ts";
+import { OrganizationInviteFactsService } from "../features/invite/services/invite-facts.service.ts";
 import { InviteSeatCensusService } from "../features/invite/services/invite-seat-census.service.ts";
 import { InviteSendThrottleService } from "../features/invite/services/invite-send-throttle.service.ts";
 import { InviteService } from "../features/invite/services/invite.service.ts";
@@ -440,6 +442,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizations: setup.repositories.organization,
       membership,
     });
+    application.#inviteFacts = OrganizationInviteFactsService.create({
+      invites: setup.repositories.invite,
+    });
     application.#memberListing = OrganizationMemberListingService.create({
       organizations: setup.repositories.organization,
     });
@@ -663,6 +668,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #privateDataplanes!: PrivateDataplaneRecordService;
   #memberListing!: OrganizationMemberListingService;
   #operatorDirectory!: OrganizationOperatorDirectoryService;
+  #inviteFacts!: OrganizationInviteFactsService;
   #seatRequests!: SeatRequestService;
   #seatPeak!: SeatPeakService;
   #seatPeakCorrections!: SeatPeakCorrectionService;
@@ -1213,6 +1219,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       teamsCount: teams.pagination.total,
       projectIds: projectIds.toSorted(),
     };
+  }
+
+  findInviteFacts(input: Readonly<{ organizationId: string }>): Promise<OrganizationInviteFact[]> {
+    return this.#inviteFacts.findFacts(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {

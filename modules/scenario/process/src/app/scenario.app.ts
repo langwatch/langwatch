@@ -114,6 +114,8 @@ import {
   type SimulationRunRestResponse,
   type SimulationScenarioSetRunsInput,
   type ScenarioUsageCount,
+  type SimulationProjectRunCount,
+  type SimulationRunCountsInput,
   type SimulationService as SimulationServiceContract,
   type SimulationSetData,
   withActor,
@@ -1251,6 +1253,12 @@ export class ScenarioModule implements ScenarioApi {
     since?: number;
   }): Promise<ScenarioUsageCount> {
     return { runs: await this.#dependencies.simulations.countUsage(input) };
+  }
+
+  /** Staff investigation counts (ADR-202): ids and counts only. */
+  findRunCountsByProject(input: SimulationRunCountsInput): Promise<SimulationProjectRunCount[]> {
+    if (input.until <= input.since) return Promise.resolve([]);
+    return this.#dependencies.simulations.findRunCountsByProject(input);
   }
 }
 
