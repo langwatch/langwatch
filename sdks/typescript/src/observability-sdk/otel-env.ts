@@ -18,15 +18,17 @@ import { type Logger } from "../logger";
 const DEFAULT_RATIO = 1;
 const DEFAULT_SAMPLER = "parentbased_always_on";
 
-const SAMPLERS_BY_ENV_NAME: Record<string, (ratio: () => number) => Sampler> = {
-  always_on: () => new AlwaysOnSampler(),
-  always_off: () => new AlwaysOffSampler(),
-  traceidratio: (ratio) => new TraceIdRatioBasedSampler(ratio()),
-  parentbased_always_on: () => new ParentBasedSampler({ root: new AlwaysOnSampler() }),
-  parentbased_always_off: () => new ParentBasedSampler({ root: new AlwaysOffSampler() }),
-  parentbased_traceidratio: (ratio) =>
-    new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio()) }),
-};
+const SAMPLERS_BY_ENV_NAME = new Map<string, (ratio: () => number) => Sampler>([
+  ["always_on", () => new AlwaysOnSampler()],
+  ["always_off", () => new AlwaysOffSampler()],
+  ["traceidratio", (ratio) => new TraceIdRatioBasedSampler(ratio())],
+  ["parentbased_always_on", () => new ParentBasedSampler({ root: new AlwaysOnSampler() })],
+  ["parentbased_always_off", () => new ParentBasedSampler({ root: new AlwaysOffSampler() })],
+  [
+    "parentbased_traceidratio",
+    (ratio) => new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio()) }),
+  ],
+]);
 
 /** `undefined` when OTEL_TRACES_SAMPLER is unset, so the provider keeps its own default. */
 export function getSamplerFromEnv({ logger }: { logger: Logger }): Sampler | undefined {
@@ -34,7 +36,7 @@ export function getSamplerFromEnv({ logger }: { logger: Logger }): Sampler | und
   if (name == null) return void 0;
 
   const ratio = () => getSamplerRatioFromEnv(logger);
-  const build = SAMPLERS_BY_ENV_NAME[name];
+  const build = SAMPLERS_BY_ENV_NAME.get(name);
   if (build) return build(ratio);
 
   logger.warn(

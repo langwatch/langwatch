@@ -71,6 +71,16 @@ describe("getSamplerFromEnv()", () => {
       expect(sampler?.toString().startsWith("ParentBased{root=AlwaysOnSampler")).toBe(true);
       expect(logger.lines.some((line) => line.includes("jaeger_remote"))).toBe(true);
     });
+
+    it("treats an Object.prototype member name as unknown", () => {
+      vi.stubEnv("OTEL_TRACES_SAMPLER", "toString");
+      const logger = createRecordingLogger();
+
+      const sampler = getSamplerFromEnv({ logger });
+
+      expect(sampler?.toString().startsWith("ParentBased{root=AlwaysOnSampler")).toBe(true);
+      expect(logger.lines.some((line) => line.includes('"toString"'))).toBe(true);
+    });
   });
 });
 
