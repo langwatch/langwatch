@@ -97,6 +97,9 @@ The copy runs inside the request. A very large source organization can outrun
 the request timeout; a rerun continues where the ledger stopped, except for
 items reported `copy_interrupted` or incomplete, which need a look by hand: no
 operation clears a `copy_interrupted` reservation yet, and one would be its own
-ops function with its own approval. Workflows,
+ops function with its own approval. A transient failure (an owner timeout, a
+dropped connection) keeps its reservation on purpose: the owner may have
+committed the target before the failure reached the copy, and releasing it
+would let the rerun make a second target, which the ledger exists to prevent. Workflows,
 scenarios, agents, dashboards, triggers and ClickHouse data (traces, runs) are
 specified as `@unimplemented` and need their owners' APIs first.

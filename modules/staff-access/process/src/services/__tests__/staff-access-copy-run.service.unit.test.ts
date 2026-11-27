@@ -1,6 +1,6 @@
 import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { Temporal } from "@langwatch/time";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copyCatalog, type CopyCatalog } from "../../app/__tests__/support/copy-catalog.ts";
 import { MemoryStaffAccessCopyLedgerRepository } from "../../repositories/memory/memory.staff-access-copy-ledger.repository.ts";
@@ -103,5 +103,80 @@ describe("StaffAccessCopyRunService.execute", () => {
       outcome: "copied",
     });
     expect(catalog.data.datasets.filter((d) => d.projectId !== sourceProjectId)).toHaveLength(1);
+  });
+
+  const fullGrant = [
+    "project:create",
+    "evaluations:create",
+    "prompts:create",
+    "prompts:update",
+    "datasets:create",
+  ];
+  const executeAll = (current: StaffAccessCopyPlan) =>
+    run.execute({
+      plan: current,
+      requestId: "staffrequest_1",
+      source: ACME,
+      target: GLOBEX,
+      grant: fullGrant,
+      stillLive: async () => null,
+    });
+
+  /** @scenario "A copy of every project carries only live application projects" */
+  it("plans only the live application project when every project is copied", async () => {
+    Object.assign(catalog.addProject({ organizationId: ACME.id, name: "rollup" }), {
+      kind: "aggregate",
+    });
+    Object.assign(catalog.addProject({ organizationId: ACME.id, name: "olivia-sandbox" }), {
+      isPersonal: true,
+    });
+    Object.assign(catalog.addProject({ organizationId: ACME.id, name: "retired" }), {
+      archivedAt: AT,
+    });
+
+    const everything = await run.plan({ source: ACME, target: GLOBEX, projects: undefined });
+
+    expect(
+      everything.items.filter((item) => item.kind === "project").map((item) => item.name),
+    ).toEqual(["support-bot"]);
+  });
+
+  /** @scenario "A copied project joins the target's existing shared team" */
+  it("creates the project in the target's shared team without making a new one", async () => {
+    catalog.data.teams.push({ id: "team_globex_shared", organizationId: GLOBEX.id });
+    const create = vi.spyOn(catalog.projects, "createInOrganization");
+
+    await executeAll(plan);
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: GLOBEX.id, teamId: "team_globex_shared" }),
+    );
+    expect(create.mock.calls[0]?.[0]).not.toHaveProperty("newTeamName");
+  });
+
+  /** @scenario "A monitor whose evaluator was not copied is skipped" */
+  it("skips a monitor whose evaluator the copy did not make", async () => {
+    const studio = catalog.addEvaluator({
+      projectId: sourceProjectId,
+      name: "Studio judge",
+      type: "workflow",
+    });
+    catalog.addMonitor({
+      projectId: sourceProjectId,
+      name: "Judged replies",
+      evaluatorId: studio.id,
+    });
+
+    const { items } = await executeAll(
+      await run.plan({ source: ACME, target: GLOBEX, projects: [sourceProjectId] }),
+    );
+
+    expect(items.find((item) => item.kind === "monitor")).toMatchObject({
+      outcome: "skipped",
+      reason: "evaluator_not_copied",
+    });
+    expect(catalog.data.monitors.some((monitor) => monitor.projectId !== sourceProjectId)).toBe(
+      false,
+    );
   });
 });

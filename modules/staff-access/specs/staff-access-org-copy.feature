@@ -84,6 +84,24 @@ Feature: Copying an organization's setup into another organization
     And Globex holds one copy of the dataset
 
   @unit
+  Scenario: A copy of every project carries only live application projects
+    Given ACME holds an application project, an aggregate project, a personal project and an archived project
+    When a copy plans every project of ACME
+    Then only the application project is planned
+
+  @unit
+  Scenario: A copied project joins the target's existing shared team
+    Given Globex already has a shared team
+    When a copy makes a project in Globex
+    Then the project is created in that team and no new team is made
+
+  @unit
+  Scenario: A monitor whose evaluator was not copied is skipped
+    Given ACME has a monitor attached to an evaluator the copy skips
+    When the copy runs
+    Then the monitor is skipped with "evaluator_not_copied"
+
+  @unit
   Scenario: An owner's refusal by name releases the reservation so a rerun retries the item
     Given the dataset owner refuses a copy with a handled error below 500 before it makes anything
     When the copy runs and then runs again once the owner accepts
