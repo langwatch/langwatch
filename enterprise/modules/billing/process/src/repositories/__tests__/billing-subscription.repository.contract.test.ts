@@ -133,7 +133,6 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       await expect(
         repositories.webhookSubscriptions.activate({
           id: "sub-absent",
-          previousStatus: "PENDING",
         }),
       ).resolves.toEqual({ outcome: "missing_subscription" });
     });

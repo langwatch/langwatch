@@ -79,12 +79,10 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
 
       const result = await adapter.activate({
         id: "subscription-1",
-        previousStatus: "PENDING",
       });
 
       expect(activate).toHaveBeenCalledWith({
         id: "subscription-1",
-        previousStatus: "PENDING",
       });
       expect(result).toEqual({ outcome: "activated", subscription: WITH_ORGANIZATION });
     });
@@ -120,9 +118,9 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
         } as Partial<BillingSubscriptionRepository>),
       });
 
-      await expect(
-        adapter.activate({ id: "subscription-gone", previousStatus: "PENDING" }),
-      ).resolves.toEqual({ outcome: "missing_subscription" });
+      await expect(adapter.activate({ id: "subscription-gone" })).resolves.toEqual({
+        outcome: "missing_subscription",
+      });
     });
   });
 
@@ -131,13 +129,17 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
     it("rethrows, so the delivery is retried rather than acknowledged", async () => {
       const { adapter } = compose({
         repository: repositoryDouble({
-          activate: vi.fn(() => Promise.reject(new Error("connection refused"))),
+          activate: vi.fn(() =>
+            Promise.reject(
+              Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }),
+            ),
+          ),
         } as Partial<BillingSubscriptionRepository>),
       });
 
-      await expect(
-        adapter.activate({ id: "subscription-1", previousStatus: "PENDING" }),
-      ).rejects.toThrow("connection refused");
+      await expect(adapter.activate({ id: "subscription-1" })).rejects.toMatchObject({
+        code: "ECONNREFUSED",
+      });
     });
   });
 

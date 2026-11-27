@@ -262,3 +262,15 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given an organization on a tiered plan whose Growth seat subscription is awaiting payment
     When only the message that the Growth subscription became active arrives
     Then the old plan is cancelled once at Stripe and in our records
+
+  @unit @regression
+  Scenario: A Growth subscription started by the subscription-active message records when it started
+    Given an organization on a tiered plan whose Growth seat subscription is awaiting payment
+    When only the message that the Growth subscription became active arrives
+    Then the Growth subscription records when it started
+
+  @unit @regression
+  Scenario: A later activation keeps the start of a subscription already running
+    Given a Growth seat subscription that started earlier
+    When another subscription-active message and a renewal payment arrive
+    Then the Growth subscription keeps the start it recorded

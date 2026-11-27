@@ -478,4 +478,36 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     ]);
     expect(rowOf(upgrade, TIERED_ROW)?.status).toBe("CANCELLED");
   });
+
+  /** @scenario "A Growth subscription started by the subscription-active message records when it started" */
+  it("records the start of a Growth subscription the subscription-active message started", async () => {
+    const upgrade = harness({
+      growth: { stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+    });
+
+    await deliverTogether(upgrade, [subscriptionActive()]);
+
+    const growth = rowOf(upgrade, GROWTH_ROW);
+    expect(growth).toBeDefined();
+    expect(growth?.startDate).toBeInstanceOf(Temporal.Instant);
+  });
+
+  /** @scenario "A later activation keeps the start of a subscription already running" */
+  it("keeps the recorded start when a running subscription is activated again", async () => {
+    const started = Temporal.Instant.from("2026-09-15T08:01:06Z");
+    const running = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE, startDate: started },
+      tiered: null,
+      pricingModel: "SEAT_EVENT",
+    });
+
+    const [activation] = await deliverTogether(running, [subscriptionActive()]);
+    const [renewal] = await deliverTogether(running, [paymentSucceeded("in_renewal")]);
+
+    expect(activation?.status).toBe("ok");
+    expect(renewal?.status).toBe("ok");
+
+    expect(rowOf(running, GROWTH_ROW)?.startDate).toEqual(started);
+  });
 });

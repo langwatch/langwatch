@@ -44,10 +44,8 @@ export abstract class BillingWebhookSubscriptionRepository {
     stripeSubscriptionId: string;
   }): Promise<{ count: number }>;
 
-  abstract activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<ActivateSubscriptionResult>;
+  /** Activates it; a row not already active starts now, decided from the stored row. */
+  abstract activate(input: { id: string }): Promise<ActivateSubscriptionResult>;
 
   abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
 

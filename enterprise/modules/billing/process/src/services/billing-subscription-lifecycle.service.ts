@@ -379,7 +379,6 @@ export class BillingSubscriptionLifecycleService {
 
     const activationResult = await this.subscriptionRepository.activate({
       id: previousSubscription.id,
-      previousStatus: previousSubscription.status,
     });
 
     if (activationResult.outcome === "missing_subscription") {

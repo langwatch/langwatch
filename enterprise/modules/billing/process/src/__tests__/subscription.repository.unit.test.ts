@@ -79,4 +79,43 @@ describe("PrismaBillingSubscriptionRepository", () => {
       });
     });
   });
+
+  describe.each([
+    {
+      name: "activate()",
+      run: (repo: PrismaBillingSubscriptionRepository) => repo.activate({ id: "sub_1" }),
+    },
+    {
+      name: "updateQuantities()",
+      run: (repo: PrismaBillingSubscriptionRepository) =>
+        repo.updateQuantities({ id: "sub_1", maxMembers: 3, maxMessagesPerMonth: null }),
+    },
+  ])("when $name writes", ({ run }) => {
+    it("records the start only on a row not active yet, decided at the write", async () => {
+      const calls: string[] = [];
+      const updateMany = vi.fn(async (_args: unknown) => {
+        calls.push("updateMany");
+        return { count: 1 };
+      });
+      const write = vi.fn(async (_args: unknown) => {
+        calls.push("update");
+        return { id: "sub_1", createdAt: new Date(), organization: {} };
+      });
+
+      await run(
+        PrismaBillingSubscriptionRepository.create(
+          prismaDouble({ subscription: { update: write, updateMany } }),
+        ),
+      );
+
+      expect(calls).toEqual(["updateMany", "update"]);
+      const [stamp] = updateMany.mock.calls[0] ?? [];
+      expect(stamp).toMatchObject({
+        where: { id: "sub_1", status: { not: SubscriptionStatus.ACTIVE } },
+        data: { startDate: expect.any(Date) },
+      });
+      const [update] = write.mock.calls[0] ?? [];
+      expect((update as { data: Record<string, unknown> }).data).not.toHaveProperty("startDate");
+    });
+  });
 });

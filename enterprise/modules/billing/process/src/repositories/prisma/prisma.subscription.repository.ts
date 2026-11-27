@@ -178,24 +178,14 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     });
   }
 
-  async activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<BillingSubscriptionWithOrganization> {
-    const data: {
-      status: PrismaSubscriptionStatus;
-      startDate?: Date;
-      lastPaymentFailedDate: null;
-    } = {
-      status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
-      lastPaymentFailedDate: null,
-    };
-    if (input.previousStatus !== SubscriptionStatus.ACTIVE) {
-      data.startDate = toDate(nowInstant());
-    }
+  async activate(input: { id: string }): Promise<BillingSubscriptionWithOrganization> {
+    await this.startUnlessActive(input.id);
     const row = await this.prisma.subscription.update({
       where: { id: input.id },
-      data,
+      data: {
+        status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
+        lastPaymentFailedDate: null,
+      },
       include: { organization: true },
     });
 
@@ -276,6 +266,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization> {
+    await this.startUnlessActive(input.id);
     const row = await this.prisma.subscription.update({
       where: { id: input.id },
       data: {
@@ -291,5 +282,16 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     });
 
     return { ...subscriptionRecordOf(row), organization: row.organization };
+  }
+
+  /**
+   * Checked just before the write, so an activation that already finished keeps its start.
+   * Not atomic: Prisma's updateMany reads matching ids, then updates them by id alone.
+   */
+  private async startUnlessActive(id: string): Promise<void> {
+    await this.prisma.subscription.updateMany({
+      where: { id, status: { not: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus } },
+      data: { startDate: toDate(nowInstant()) },
+    });
   }
 }
