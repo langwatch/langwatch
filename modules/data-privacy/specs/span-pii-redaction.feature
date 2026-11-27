@@ -328,14 +328,16 @@ Feature: Redacting personal data out of a span at ingestion
     Then the model answers it and the plan is not read
 
   # On LangWatch Cloud a priced organization reaches the model only once an organization admin
-  # accepted its price (ADR-201 decision 15). Strict set any other way (before the model existed,
-  # through the API or project settings, by a rule saved with no price prompt) stays on Presidio,
-  # unbilled. The free list needs no acceptance, and self-hosted never reads either.
+  # accepted its price (ADR-201 decision 15). An organization on Strict without a recorded
+  # acceptance, including one that confirmed the price before this change, keeps rule-based
+  # detection (Presidio) at no charge until an organization admin accepts again, however Strict
+  # was set. The free list needs no acceptance, and self-hosted never reads either.
 
   @unit
   Scenario: A Strict organization that never accepted the price stays on Presidio, unbilled
     Given a LangWatch Cloud deployment that names the PII redaction model
-    And the organization is allowlisted for it, not on the free list, and no organization admin accepted its price
+    And the organization is allowlisted for it, not on the free list, with no recorded acceptance of its price
+    And a price it confirmed before this change left no acceptance on record
     When a strict batch is analysed
     Then Presidio answers it and the model is not called
     And the batch is counted with the reason not_accepted

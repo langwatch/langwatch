@@ -15,10 +15,11 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 added to the Stripe subscription, never from the month's first day (decision 15).
 
 **Revised 2026-11-26:** no organization is priced until an organization admin accepts the price
-(decision 15). An organization already on Strict when the flag goes on stays on Presidio, unbilled,
-until an admin switches it to the model; billing counts only spend from the acceptance on. The free
-list is now read when the batch is routed, and an unreadable one sends the batch to Presidio
-(decision 7, which recorded nothing and logged the full price before).
+(decision 15). An organization on Strict without a recorded acceptance, including one that confirmed
+the price before this change, keeps rule-based detection (Presidio) at no charge until an
+organization admin accepts again; billing counts only spend from the acceptance on. The free list is
+now read when the batch is routed, and an unreadable one sends the batch to Presidio (decision 7,
+which recorded nothing and logged the full price before).
 
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
@@ -134,22 +135,25 @@ list is now read when the batch is routed, and an unreadable one sends the batch
 
     **Only an organization whose admin accepted the price is priced.** On Cloud, a Strict batch of
     an organization with the flag reaches the model when the organization is on the free list
-    (unpriced) or an organization admin accepted the price (priced); otherwise it stays on
-    Presidio, counted and logged as `not_accepted`, and nothing is recorded. The acceptance is the
-    organization's own record (`Organization.piiRedactionModelAcceptedAt` and
+    (unpriced) or an organization admin accepted the price (priced); otherwise it stays on Presidio,
+    counted and logged as `not_accepted`, and nothing is recorded: an organization on Strict without
+    a recorded acceptance, including one that confirmed the price before this change, keeps
+    rule-based detection (Presidio) at no charge until an organization admin accepts again. The
+    acceptance is the organization's own record (`Organization.piiRedactionModelAcceptedAt` and
     `piiRedactionModelAcceptedByUserId`, as Instant Evals' consent), written by data-privacy's
     `acceptPiiRedactionModel` under `organization:manage` through `OrganizationApi`; the first
     acceptance is kept and the product never withdraws it. The settings page records it when an
-    admin confirms the price: picking Strict, switching a rule-based Strict to the model, or saving
-    a Strict rule. Routing reads it once a minute per organization, so an acceptance reaches the
-    model within a minute. Billing counts an organization's PII spend only from the moment of the
-    acceptance: none without one, none in a month that ended before it. A pending meter total (a
-    send cut off before Stripe confirmed it) is replayed under its own identifier by the next
-    report, without waiting for the price or the spend read, and kept as reported; when it is
-    above the spend from the acceptance on, the report after sends the negative difference, so the
-    month ends at the accepted spend. Neither the replay nor the correction is bounded in time: both
-    are the shared meter reporter's, with the two limits the trade-offs state. Self-hosted is
-    unchanged: the licence decides and no call is priced.
+    admin confirms the price: picking Strict, switching a rule-based Strict to the model (offered
+    wherever the page shows Strict, a team or project rule under an organization on Essential
+    included), or saving a Strict rule. Routing reads it once a minute per organization, so an
+    acceptance reaches the model within a minute. Billing counts an organization's PII spend only
+    from the moment of the acceptance: none without one, none in a month that ended before it. A
+    pending meter total (a send cut off before Stripe confirmed it) is replayed under its own
+    identifier by the next report, without waiting for the price or the spend read, and kept as
+    reported; when it is above the spend from the acceptance on, the report after sends the negative
+    difference, so the month ends at the accepted spend. Neither the replay nor the correction is
+    bounded in time: both are the shared meter reporter's, with the two limits the trade-offs state.
+    Self-hosted is unchanged: the licence decides and no call is priced.
 
 ## Rationale / Trade-offs
 
@@ -179,15 +183,17 @@ at the same rate per character: the customer on Strict pays for the model on the
 
 The model's routing reads the flag and the level, never the subscription. A Strict project of an
 organization with the flag is priced whatever its plan, and the meter holds the usage until the
-subscription carries the price (decision 10). What stops a customer who does not want to pay is
-the acceptance (decision 15): the settings page asks an admin before it turns Strict on at a
-price and keeps the level it had when it is cancelled; Essential never reaches the model or
-Presidio. An organization, team or project already on Strict (then Presidio) when the flag goes on
-stays there, unbilled, and the page shows it rule-based. The switch to the model sits on the
-organization card only, because one acceptance covers every Strict rule in the organization; a team
-or project rule on Strict moves once an organization admin accepts there. The cost: such
-an organization keeps the rule-based detection until an admin acts, and nothing but the page tells
-it (the owner, 2026-11-26: no prompt, no email). A team or project admin cannot accept for the
+subscription carries the price (decision 10). What stops a customer who does not want to pay is the
+acceptance (decision 15): the settings page asks an admin before it turns Strict on at a price and
+keeps the level it had when it is cancelled; Essential never reaches the model or Presidio. An
+organization, team or project on Strict without a recorded acceptance, including one that confirmed
+the price before this change, keeps rule-based detection (Presidio) at no charge until an
+organization admin accepts again, and the page shows it rule-based. The switch to the model sits on
+the organization card only, because one acceptance covers every Strict rule in the organization, and
+shows there whenever the page shows a Strict rule, the organization on Essential included; a team or
+project rule on Strict moves once an organization admin accepts there. The cost: such an
+organization keeps the rule-based detection until an admin acts, and nothing but the page tells it
+(the owner, 2026-11-26: no prompt, no email). A team or project admin cannot accept for the
 organization, so a Strict rule they save waits on an organization admin.
 
 Billing reads the acceptance from `Organization` through its own repository rather than asking

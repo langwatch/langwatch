@@ -230,10 +230,10 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And so does a member who cannot accept the price while no organization admin has accepted it
 
   # On LangWatch Cloud a priced organization reaches the model only once an organization admin
-  # accepted its price on this page (ADR-201 decision 15). Until then Strict runs the rule-based
-  # detector (Presidio) at no charge, however it was set. The snapshot the page reads says
-  # whether the organization accepted. A free organization and a self-hosted deployment need
-  # no acceptance and see the page as before.
+  # accepted its price on this page (ADR-201 decision 15). An organization on Strict without a
+  # recorded acceptance, including one that confirmed the price before this change, keeps
+  # rule-based detection (Presidio) at no charge until an organization admin accepts again. A
+  # free organization and a self-hosted deployment need no acceptance and see the page as before.
 
   @integration
   Scenario: An organization on Strict that never accepted the price sees it is rule-based, at no charge
