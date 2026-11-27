@@ -414,7 +414,8 @@ function StudioGuide(): JSX.Element | null {
           <Text as="p">
             Every email LangWatch sends, rendered with sample data. Pick an email on the left (some
             have more than one version), switch Desktop or Mobile and HTML or Text above the
-            preview, or open Gallery to see them all at once.{" "}
+            preview, or open Gallery to see them all at once. The left and right arrow keys step
+            through the emails and their versions.{" "}
             {isStaticStudio
               ? "This copy is read-only: run `pnpm --filter @langwatch/mail dev` to edit the sample data."
               : "Open Edit sample data under the preview to change what it shows."}
