@@ -23,6 +23,8 @@ import type {
 import { Context } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { recordAdmittedStaffSpend } from "../credential.ts";
+
 /** A context that answers only what the middleware installed. */
 const contextWith = (variables: Record<string, unknown>): Context => {
   const context = new Context(new Request("http://localhost/api/project"));
@@ -75,6 +77,50 @@ describe("reading the credential a project request arrived with", () => {
       );
 
       expect(principal).not.toHaveProperty("isLangySessionKey");
+    });
+  });
+});
+
+describe("reading the API key a request arrived with", () => {
+  const staffKey: RestKeyDoorPrincipal = {
+    kind: "apiKey",
+    apiKeyId: "key_staff",
+    userId: null,
+    organizationId: "organization-1",
+    isStaffAccessKey: true,
+  };
+
+  describe("given a staff key the gate admitted with spend approval", () => {
+    it("carries the approval on the key", () => {
+      const request = new Request("http://localhost/api/query");
+      recordKeyCredential(request, staffKey);
+      recordAdmittedStaffSpend({ request, spendApproved: true });
+
+      expect(keyCredentialOfRequest(request)).toMatchObject({ staffSpendApproved: true });
+    });
+  });
+
+  describe("given a staff key the gate admitted without spend approval", () => {
+    it("marks the key as not approved to spend", () => {
+      const request = new Request("http://localhost/api/query");
+      recordKeyCredential(request, staffKey);
+      recordAdmittedStaffSpend({ request, spendApproved: false });
+
+      expect(keyCredentialOfRequest(request)).toMatchObject({ staffSpendApproved: false });
+    });
+  });
+
+  describe("given an ordinary key", () => {
+    it("leaves the spend approval unset", () => {
+      const request = new Request("http://localhost/api/query");
+      recordKeyCredential(request, {
+        kind: "apiKey",
+        apiKeyId: "key_1",
+        userId: null,
+        organizationId: "organization-1",
+      });
+
+      expect(keyCredentialOfRequest(request)).not.toHaveProperty("staffSpendApproved");
     });
   });
 });

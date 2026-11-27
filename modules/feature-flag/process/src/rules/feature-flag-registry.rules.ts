@@ -32,3 +32,20 @@ export function tenantPolicyOf({
 
   return stored ? "enabled" : "disabled";
 }
+
+/** Whether the registry knows a key; any other lookup failure still throws. */
+export function isRegisteredFlag({
+  registry,
+  flagKey,
+}: {
+  registry: FeatureFlagRegistry;
+  flagKey: string;
+}): boolean {
+  try {
+    registry.getDefinition(flagKey);
+    return true;
+  } catch (error) {
+    if (error instanceof UnknownFeatureFlagError) return false;
+    throw error;
+  }
+}

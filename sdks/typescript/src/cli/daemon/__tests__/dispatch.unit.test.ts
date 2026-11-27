@@ -29,6 +29,7 @@ vi.mock("../eligibility", () => ({
   collectForwardedEnv: () => ({}),
   isAutoSpawnEnabled: () => false,
   isDaemonDisabledByConfig: () => false,
+  hasOpsSessionFile: () => false,
   resolveColorLevel: () => 0,
   stdinCarriesData: () => false,
 }));

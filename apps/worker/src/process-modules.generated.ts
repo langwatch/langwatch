@@ -59,6 +59,7 @@ import { secretProcessModule } from "@langwatch/secret-process";
 import { shareProcessModule } from "@langwatch/share-process";
 import { slackProcessModule } from "@langwatch/slack-process";
 import { ssoProcessModule } from "@langwatch/enterprise-sso-process";
+import { staffAccessProcessModule } from "@langwatch/staff-access-process";
 import { storedObjectProcessModule } from "@langwatch/stored-object-process";
 import { suiteProcessModule } from "@langwatch/suite-process";
 import { topicProcessModule } from "@langwatch/topic-process";
@@ -127,6 +128,7 @@ export const processModules = [
   shareProcessModule,
   slackProcessModule,
   ssoProcessModule,
+  staffAccessProcessModule,
   storedObjectProcessModule,
   suiteProcessModule,
   topicProcessModule,

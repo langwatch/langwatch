@@ -8,6 +8,7 @@ import {
   runsOutsideProject,
   setResolvedApiKey,
   setResolvedProjectId,
+  usesOpsSession,
 } from "@/internal/credentialContext";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
@@ -15,7 +16,8 @@ import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./governance/config";
 import { fetchPersonalProject, SessionApiError } from "./governance/session-api";
-import { maybePrintIdentityNotice } from "./identityNotice";
+import { maybePrintIdentityNotice, printOpsSessionNotice } from "./identityNotice";
+import { isSameOrigin, pickSessionProject, readOpsSession, removeOpsSession } from "./opsSession";
 import {
   type BoundKeySource,
   projectScopeErrorLines,
@@ -43,10 +45,10 @@ const loadEnvFileScoped = (): void => {
 export interface ResolvedCredentials {
   apiKey: string;
   /**
-   * Where the key came from: an explicit argument, the environment / caller's .env, or the stored
-   * device session's personal project.
+   * Where the key came from: an explicit argument, a live ops session file (ADR-202), the
+   * environment / caller's .env, or the stored device session's personal project.
    */
-  source: "flag" | "env" | "session";
+  source: "flag" | "ops-session" | "env" | "session";
   /** Control-plane endpoint the command targets (4-source resolver). */
   endpoint: string;
   /**
@@ -65,9 +67,9 @@ export interface ResolvedCredentials {
 export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
- * Resolves credentials in priority order: --api-key flag, env, then the
- * device session. Publishes into the request-scoped store, not
- * `process.env`, so concurrent daemon requests never cross identities.
+ * Resolves credentials in priority order: --api-key flag, then the ops session when the command
+ * asked for it (and nothing else), else env, then the device session. Publishes into the
+ * request-scoped store, not `process.env`, so concurrent daemon requests never cross identities.
  */
 export const resolveCredentials = async (
   opts: {
@@ -100,6 +102,11 @@ export const resolveCredentials = async (
     });
     return { apiKey: flagKey, source: "flag", endpoint, projectId };
   }
+
+  // The ops session acts on a customer organization, so only a command that asked for it (an
+  // `ops` command, or `--ops-session`) reads it; everything else resolves as if it did not exist.
+  if (usesOpsSession()) return resolveFromOpsSession({ project: opts.project, endpoint });
+  mentionUnusedOpsSession();
 
   // Trimmed for use, not just for the emptiness check: a `.env` written as
   // `LANGWATCH_API_KEY=sk-abc ` would otherwise ship `Bearer sk-abc ` and 401
@@ -280,6 +287,94 @@ async function resolveFromSession({
     });
   }
   return { apiKey: session.apiKey, source: "session", endpoint, projectId };
+}
+
+/**
+ * The ops session's key (ADR-202) for a command that asked for it, on `--project` or the session
+ * default (never `LANGWATCH_PROJECT_ID`). A session that cannot answer ends the command: no
+ * fallback to the caller's own credentials.
+ */
+function resolveFromOpsSession({
+  project,
+  endpoint,
+}: {
+  project?: string;
+  endpoint: string;
+}): ResolvedCredentials {
+  const state = readOpsSession();
+  if (state.kind === "none") return reportOpsSessionUnavailable("There is no ops session.");
+  if (state.kind === "invalid") {
+    return reportOpsSessionUnavailable(`The ops session file ${state.file} could not be read.`);
+  }
+  if (state.kind === "expired") {
+    removeOpsSession();
+    return reportOpsSessionUnavailable(
+      `Ops session ${state.session.requestId} expired at ${state.session.expiresAt}; ${state.file} removed.`,
+    );
+  }
+  const { session } = state;
+  if (!session.apiKey) {
+    return reportOpsSessionUnavailable(
+      `Ops session ${session.requestId} holds no API key (scopes: ${session.scopes.join(", ")}).`,
+    );
+  }
+  if (!isSameOrigin({ a: session.endpoint, b: endpoint })) {
+    return reportOpsSessionUnavailable(
+      `Ops session ${session.requestId} belongs to ${session.endpoint}; not sent to ${endpoint}.`,
+    );
+  }
+  const named = (project ?? requestedProject())?.trim();
+  const target = pickSessionProject({ session, selector: named });
+  if (named && !target) {
+    reportProjectScopeError(
+      new ProjectScopeError(
+        "project_not_accessible",
+        `Project "${named}" is not in the ops session ${session.requestId}.`,
+        named,
+        ["Run `langwatch ops access status` to see the projects it covers."],
+      ),
+    );
+  }
+  setResolvedApiKey(session.apiKey);
+  setResolvedProjectId(target?.id);
+  printOpsSessionNotice({
+    requestId: session.requestId,
+    organizationId: session.organizationId,
+    projectName: target?.name,
+    expiresAt: session.expiresAt,
+  });
+  return { apiKey: session.apiKey, source: "ops-session", endpoint, projectId: target?.id };
+}
+
+/** One stderr line when a live ops session sits unused, so its holder knows how to use it. */
+function mentionUnusedOpsSession(): void {
+  const state = readOpsSession();
+  if (state.kind !== "live" || !state.session.apiKey) return;
+  console.error(
+    chalk.gray(
+      `Ops session ${state.session.requestId} not used. Add --ops-session to run this command on it.`,
+    ),
+  );
+}
+
+/** Ends a command that asked for the ops session when the session cannot answer it. */
+function reportOpsSessionUnavailable(reason: string): never {
+  const message = `${reason} This command asked for the ops session and does not fall back to other credentials. Run \`langwatch ops access request\` for a new one, or drop --ops-session.`;
+  if (getOutputFormat() !== "text") {
+    console.log(
+      renderErrorAsJson({
+        code: "ops_session_unavailable",
+        kind: "ops_session_unavailable",
+        message,
+        httpStatus: 0,
+        meta: {},
+        isHandled: true,
+        retryable: false,
+      }),
+    );
+  }
+  console.error(chalk.red(`Error: ${message}`));
+  process.exit(1);
 }
 
 /** A project the command line or the environment asked this request to run against. */

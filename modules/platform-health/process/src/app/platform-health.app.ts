@@ -135,7 +135,8 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
         legacyKeyLogger,
         resolveCaller: async (input) => {
           const resolved = await dependencies.apiKeys.findResolvedToken(input);
-          if (!resolved) return null;
+          // A staff key answers only behind the staff gate, which these public probes skip.
+          if (!resolved || (resolved.type === "apiKey" && resolved.isStaffAccessKey)) return null;
           const isApiKey = resolved.type === "apiKey";
           const flags = { featureFlags: dependencies.featureFlags, project: resolved.project };
           const legacyKeyOutsideScope =

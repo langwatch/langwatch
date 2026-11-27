@@ -1,6 +1,7 @@
 export * from "./api-key.ts";
 export * from "./api-key.errors.ts";
 export * from "./api-key.list.ts";
+export * from "./api-key.facts.ts";
 export * from "./api-key.api.ts";
 export * from "./api-key.tokens.ts";
 export * from "./api-key.names.ts";
@@ -16,6 +17,7 @@ export * from "./api-key-trpc.schemas.ts";
 export * from "./api-key.device-label.ts";
 export * from "./api-key.session-ceiling.ts";
 export * from "./api-key.docs-session.ts";
+export * from "./api-key.staff-access.ts";
 export * from "./api-key.config.ts";
 export * from "./signing-key.ts";
 export * from "./signing-key.trpc.ts";

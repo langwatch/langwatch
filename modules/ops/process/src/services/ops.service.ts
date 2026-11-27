@@ -37,6 +37,7 @@ import {
   type OpsQueueReconcileOutcome,
   type QueueInfo,
   type QueueSummaryInfo,
+  type TenantQueueCount,
 } from "@langwatch/ops-contract";
 
 import type { OpsExplorers } from "../app/ops.app.ts";
@@ -248,6 +249,10 @@ export class OpsService {
 
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]> {
     return this.queues.getAllDlqGroups();
+  }
+
+  countQueueGroupsForTenants(input: { tenantIds: string[] }): Promise<TenantQueueCount[]> {
+    return this.queues.countTenantGroups(input);
   }
 
   unblockQueueGroup(input: {

@@ -472,7 +472,7 @@ func TestRelayReleasesTheBookingWhenTheDialFails(t *testing.T) {
 	require.Len(t, r.refusals, 1)
 	assert.True(t, herr.IsCode(r.refusals[0], domain.ErrProviderError))
 	assert.NotContains(t, r.refusals[0].Error(), providerKey)
-	assert.Zero(t, r.manager.Supervised())
+	assert.Eventually(t, func() bool { return r.manager.Supervised() == 0 }, 5*time.Second, 5*time.Millisecond, "an ended session leaves supervision")
 	assert.Empty(t, r.registry.snapshot())
 }
 
@@ -504,7 +504,7 @@ func TestRelayDrainClosesWithServiceRestart(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	require.NoError(t, r.manager.Stop(ctx))
-	assert.Zero(t, r.manager.Supervised())
+	assert.Eventually(t, func() bool { return r.manager.Supervised() == 0 }, 5*time.Second, 5*time.Millisecond, "an ended session leaves supervision")
 }
 
 // @scenario "A relayed Live socket reports cumulative seconds as deltas"

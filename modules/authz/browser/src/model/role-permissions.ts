@@ -121,6 +121,11 @@ const RESOURCE_COPY = {
     blurb: "The controls that run this installation.",
     area: "Platform operations",
   },
+  opsRead: {
+    label: "Staff agent reads",
+    blurb: "The cross-organization reads an approved staff agent may make.",
+    area: "Platform operations",
+  },
   auditLog: {
     label: "Audit log",
     blurb: "The record of what was done, and by whom.",

@@ -11,6 +11,7 @@ import { InMemoryProcessStore } from "@langwatch/eventing";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { InsightApi } from "@langwatch/insight-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -51,6 +52,7 @@ function buildInstanceAdmin(connectionDecides = true) {
       instanceAdmin: PrismaInstanceAdminRepository.create(refuseEveryQuery as never),
     },
     audit: new AuditStub(),
+    memberships: createApiFixture<OrganizationApi>(),
     sessions: createApiFixture<AuthApi>(),
     accounts: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
