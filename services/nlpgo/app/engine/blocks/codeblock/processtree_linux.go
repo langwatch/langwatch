@@ -46,7 +46,8 @@ const (
 // grandchild reparents to PID 1 and leaves the sweep with no way to tell it
 // apart from the rest of the container, so the orphan rule is only applied
 // when this is true. hideRefusal is the errno the platform (AWS Lambda's
-// seccomp answers EPERM) gave PR_SET_DUMPABLE, or 0 when it took.
+// seccomp answers EPERM) gave PR_SET_DUMPABLE, or 0 when it took; it is
+// reported, and detectExposure decides what it means.
 var (
 	hardeningOnce   sync.Once
 	subreaperActive bool
@@ -66,14 +67,13 @@ const teardownDeadline = 2 * time.Second
 // PR_SET_CHILD_SUBREAPER makes the engine the reaper for orphaned descendants,
 // which is what teardown is built on.
 //
-// In strict mode, PR_SET_DUMPABLE 0 takes the engine's own /proc files away
-// from every other process running as that same user, and a code block is one
-// of those. In visible-process mode (Lambda refused it) they stay readable:
-// the engine's own process environment is then readable by any code block that
-// looks — the whole pod environment this executor's allowlist exists to
-// withhold, including the database and ClickHouse credentials and the
-// instance's own LangWatch key — and the engine's memory and open descriptors
-// go with it. What stays readable is stat, status and cmdline, which is all
+// PR_SET_DUMPABLE 0 takes the engine's own /proc files away from every other
+// process running as that same user, and a code block is one of those. Left
+// readable, they hand any code block that looks the whole pod environment this
+// executor's allowlist exists to withhold (on AWS Lambda, the role's
+// credentials), and the engine's memory and descriptors with it. Lambda refuses
+// this prctl; there the execute-only binary has the kernel do the same at exec,
+// and detectExposure checks the outcome. What stays readable is stat, status and cmdline, which is all
 // teardown and the metrics this service exports read; the protected files
 // become root-owned, so the engine cannot read its own either, and nothing
 // here does (no os.Executable, no /proc/self reader, runtime metrics come from
@@ -85,9 +85,20 @@ func enableProcessHardening() {
 		_, _, errno := syscall.Syscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0)
 		subreaperActive = errno == 0
 		_, _, errno = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
-		// A refusal is recorded, not fatal; resolveHideMode turns it into a mode.
+		// A refusal is recorded, not fatal; detectExposure decides what it costs.
 		hideRefusal = errno
 	})
+}
+
+// confineRunGroup says whether the runner must keep user code in the run's
+// process group: whenever teardown could not otherwise find what a run leaves
+// behind. Without the subreaper flag (AWS Lambda refuses it) an orphan lands on
+// PID 1; from an execute-only interpreter its marks are unreadable, so beside an
+// older live run nothing claims it. Refusing setsid and setpgid leaves the group
+// as the whole run, and killing the group kills it.
+func confineRunGroup(python string) bool {
+	_, readable := interpreterReadable(python)
+	return !subreaperActive || !readable
 }
 
 // terminateRunTree kills every process the execution still owns and reaps the
@@ -379,9 +390,9 @@ func readProcEntry(pid int) (procEntry, bool) {
 // which survives the detach a process group does not — right up to an exec
 // with a scrubbed environment, which is what the orphan rule is for.
 //
-// In strict mode the interpreter is non-dumpable and refuses this read, so it
-// is named by pid and process group instead; so is a descendant that forked
-// without exec and kept that flag. In visible-process mode the read succeeds.
+// The interpreter is non-dumpable and refuses this read, so it is named by pid
+// and process group instead; so is a descendant that forked without exec and
+// kept that flag, or that exec'd the execute-only interpreter again.
 func hasRunToken(pid int, token string) bool {
 	raw, err := os.ReadFile(procPath(pid, "environ"))
 	if err != nil {

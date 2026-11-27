@@ -536,8 +536,11 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: The engine hides its process files, or says plainly that it cannot
 
-    # AWS Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). The mode is
-    # decided once at start-up; see _shared/contract.md §7.
+    # AWS Lambda's seccomp answers EPERM to prctl(PR_SET_DUMPABLE). There the
+    # image ships the engine, the adapter and python execute-only, and exec
+    # makes each non-dumpable instead. The engine checks the outcome once at
+    # start-up and no setting runs code blocks without it; see
+    # _shared/contract.md §7.
 
     @integration
     Scenario: a platform that lets the engine hide its process files runs code blocks in strict mode
@@ -547,40 +550,83 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the runner must hide itself or the run fails
 
     @integration
-    Scenario: a platform that refuses the hide step runs code blocks when visible-process is allowed
+    Scenario: a platform that refuses the hide step runs code blocks when the image ships the engine and python execute-only
       Given the platform refuses PR_SET_DUMPABLE
-      And visible-process mode is allowed on AWS Lambda
+      And the engine and the interpreter are files their user can execute but not read
       When a trivial code block runs
       Then it returns its value
-      And the runner continues past its refused hide step
+      And the runner finds itself hidden by exec and continues
 
     @integration
-    Scenario: a platform that refuses the hide step serves no code blocks unless visible-process is allowed
+    Scenario: a platform that refuses the hide step serves no code blocks when the engine's binary is readable
       Given the platform refuses PR_SET_DUMPABLE
-      And visible-process mode is not allowed
+      And the engine's binary is readable
       When a code block runs
-      Then the result carries an error that names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
+      Then the result carries an error saying the engine's process files are readable by user code
       And the other block types keep working
 
     @integration
-    Scenario: a platform that refuses the hide step with anything but EPERM serves no code blocks
-      Given the platform refuses PR_SET_DUMPABLE with EACCES
-      And visible-process mode is allowed on AWS Lambda
+    Scenario: a platform that refuses the hide step serves no code blocks when the interpreter is readable
+      Given the platform refuses PR_SET_DUMPABLE
+      And the engine is execute-only but the interpreter is readable
       When a code block runs
-      Then the result carries the disabled error and not a raw prctl error
-      And the runner still fails its hide step even in best-effort mode
+      Then the result carries an error saying the interpreter cannot hide a run
+      And the runner on its own still fails its hide step
 
     @integration
     Scenario: the engine reports its hide mode once at start-up
-      Given a platform that accepts, refuses with visible-process allowed, or refuses without it
+      Given a platform that accepts the hide step, or refuses it with an execute-only or a readable image
       When the code block executor is built
       Then exactly one nlpgo_code_block_hide_mode record carries the mode
-      And the record is at info when the mode is strict and at warn otherwise
+      And the record is at info when the mode is strict and at warn, naming what is exposed, otherwise
 
-    @unit
-    Scenario: the engine warns when the visible-process setting is ignored off Lambda
-      Given visible-process mode is allowed by the setting
-      And the process is not running on AWS Lambda
+  Rule: On AWS Lambda, user code cannot obtain the runner's cloud credentials
+
+    # Lambda puts the function role's credentials into the environment of the
+    # runtime (the engine) and of every extension (the web adapter), all
+    # running as the code block's own user with no namespace between them.
+
+    @integration
+    Scenario: on AWS Lambda, user code finds no cloud credential in its own environment
+      Given the engine runs on AWS Lambda with the role's credentials in its environment
+      When a code block lists its own environment
+      Then it finds no AWS_ variable and no credential value
+
+    @integration
+    Scenario: on AWS Lambda, user code cannot read the runner's process files
+      Given the engine runs on AWS Lambda from a readable binary
       When the code block executor is built
-      Then the setting is ignored and the hide step stays required
-      And one warning names NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS
+      Then code blocks refuse to run, so no code reads the engine's environment or memory
+
+    @integration
+    Scenario: on AWS Lambda, user code cannot read another process that holds the credentials
+      Given the engine and python are execute-only
+      And the web adapter runs beside the engine from a readable binary with the role's credentials
+      When the code block executor is built
+      Then code blocks refuse to run, naming the process and the variable it holds
+
+    # Lambda also refuses PR_SET_CHILD_SUBREAPER, so an orphan lands on PID 1
+    # and the sweep cannot claim one that scrubbed the run's marks; the run is
+    # kept in its process group instead.
+    @integration
+    Scenario: on AWS Lambda, nothing user code starts outlives its run
+      Given the platform refuses PR_SET_CHILD_SUBREAPER
+      When user code starts a process in a session of its own, or double forks one
+      Then the new session is refused
+      And the process is gone once the run returns
+      And a platform that also refuses the seccomp filter runs no user code at all
+
+    @integration
+    Scenario: a run from an execute-only interpreter leaves nothing behind while an older run is live
+      Given the interpreter is execute-only, so the marks teardown reads are closed
+      And an older run is still live
+      When user code starts a process that leaves the run's session
+      Then the run is kept in its process group
+      And the process is gone once the run returns, and the older run finishes untouched
+
+    @integration
+    Scenario: on AWS Lambda, the runner's loopback listener serves no credential and no debug route
+      Given the engine serves its routes on loopback
+      When a code block requests /env, /debug/pprof/, /metrics and every health and version route
+      Then no response carries a credential
+      And /env, /debug/pprof/ and /metrics are not served

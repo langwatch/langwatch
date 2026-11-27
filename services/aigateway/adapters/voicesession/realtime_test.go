@@ -311,7 +311,7 @@ func TestCallTheControlPlaneClosedIsEnded(t *testing.T) {
 // @scenario "A call whose server-side socket cannot be re-attached is ended"
 func TestRealtimeSidebandThatCannotReattachIsEnded(t *testing.T) {
 	t.Parallel()
-	r := newRig(t, func(o *Options) { o.Timing.ReattachWindow = 60 * time.Millisecond })
+	r := newRig(t, func(o *Options) { o.Timing.ReattachWindow = 500 * time.Millisecond }) // room for a second attach under -race
 	r.start(r.realtime())
 	conn := r.vendor.awaitAttach()
 	r.vendor.send(conn, responseDone("resp_1"))

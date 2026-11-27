@@ -21,7 +21,13 @@ func enableProcessHardening() {}
 // hideRefusal is always 0 off Linux: nothing is hidden there to refuse.
 const hideRefusal syscall.Errno = 0
 
+// detectExposure finds nothing off Linux: there is no /proc to read through.
+func detectExposure(string) string { return "" }
+
 func runStartMarker(int) uint64 { return 0 }
+
+// confineRunGroup is off: the runner has no seccomp to confine with here.
+func confineRunGroup(string) bool { return false }
 
 func terminateRunTree(scope runScope, _ *zap.Logger) {
 	if scope.pgid > 0 {

@@ -89,13 +89,20 @@ RUN set -eux; \
 # zoneinfo every service needs. The static Go binary is the only long-lived
 # process; nlpgo spawns python3 per code-block node and it exits. The nonroot
 # variant: the code-block sandbox isolates by file mode, which uid 0 bypasses.
-FROM gcr.io/distroless/python3-debian12:nonroot AS service
+FROM gcr.io/distroless/python3-debian12:nonroot AS python-runtime
+FROM python-runtime AS service
 # The nonroot base sets WORKDIR /home/nonroot, mode 0700 for uid 65532. Lambda
 # runs an image as its own user, which cannot enter it, so every start fails
 # with Runtime.InvalidEntrypoint. Start from / instead.
 WORKDIR /
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
-COPY --from=go-build /out/service /usr/local/bin/service
+# Execute-only, the engine and the interpreter both: a process that execs a
+# file its user cannot read is made non-dumpable by the kernel, so its /proc
+# files (environment, memory, descriptors) are closed to user code without the
+# prctl AWS Lambda refuses. The engine checks this at start-up and serves no
+# code blocks when it does not hold (specs/nlp-go/_shared/contract.md §7).
+COPY --from=go-build --chmod=0711 /out/service /usr/local/bin/service
+COPY --from=python-runtime --chmod=0711 /usr/bin/python3.11 /usr/bin/python3.11
 
 # Code-block sandbox: the interpreter and its curated libraries. PYTHONPATH is
 # only consulted when nlpgo spawns python3 for a code-block node.
@@ -110,16 +117,15 @@ ENTRYPOINT ["/usr/local/bin/service"]
 # nlpgo fronted by the AWS Lambda Web Adapter, so the function can stream
 # nlpgo's SSE flushes back through InvokeWithResponseStream. On Lambda the
 # image's USER does not decide who runs the code, so every file the function
-# needs must be readable by a non-root user.
+# needs must be readable by a non-root user, or for a binary executable by one.
 # https://docs.aws.amazon.com/lambda/latest/dg/images-create.html#images-reqs
 FROM service AS lambda
-COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
+# Execute-only for the same reason: the adapter runs as the function's user
+# with the role's credentials in its environment.
+COPY --from=lambda-adapter --chmod=0711 /lambda-adapter /opt/extensions/lambda-adapter
 # nlpgo binds $SERVER_ADDR and serves /go/* and /healthz. The adapter probes
 # its liveness and streams each SSE flush as its own response chunk.
 ENV SERVER_ADDR=:8080
-# Lambda's seccomp refuses PR_SET_DUMPABLE. Assumes one project per function and
-# one invocation per environment; not set for k8s/self-hosted.
-ENV NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS=true
 ENV AWS_LWA_READINESS_CHECK_PATH=/healthz
 ENV AWS_LWA_INVOKE_MODE=RESPONSE_STREAM
 # The model catalog (services/nlpgo/adapters/modelcatalog): it decides the name
