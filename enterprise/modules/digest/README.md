@@ -11,7 +11,7 @@ Weekly digest emails, on for every organization: folds each organization's week,
 | Classification | enterprise (`modules/catalogue.json`)                                                            |
 | Subjects       | digest                                                                                           |
 | Halves         | [contract](contract) · [process](process/README.md)                                              |
-| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:47` (7 operations) |
+| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:61` (9 operations) |
 | Installed by   | api, worker, tasks (process)                                                                     |
 
 ## What digest owns
@@ -25,7 +25,7 @@ Weekly digest emails, on for every organization: folds each organization's week,
 | Postgres table  | `DigestUserWeek`                | `process/src/repositories/prisma/prisma.digest-user-week.repository.ts:24`    |
 | Stores required |                                 | `process/src/channels/http/http.digest.channels.ts:10`                        |
 | Stores required | prisma, redis                   | `process/src/repositories/live/live.digest.repositories.ts:11`                |
-| Secrets         | `unsubscribe` (NEXTAUTH_SECRET) | `process/src/app/digest.app.ts:73`                                            |
+| Secrets         | `unsubscribe` (NEXTAUTH_SECRET) | `process/src/app/digest.app.ts:74`                                            |
 | Config          | `publicBaseUrl` (BASE_HOST)     | `contract/src/digest.config.ts:5`                                             |
 
 Anything else digest needs belongs to another module and is reached through its `*Api`.

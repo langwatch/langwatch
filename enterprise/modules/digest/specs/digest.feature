@@ -479,25 +479,25 @@ Feature: Weekly digest emails
   @unit
   Scenario: Someone who is not staff is answered not-found by the digest admin door
     Given a signed-in person who is not Cloud admin staff
-    When they arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call is refused with not_found and the digest is never reached
 
   @unit
   Scenario: A digest admin write needs ops:manage, not ops:view
     Given Cloud admin staff who hold ops:view but not ops:manage
-    When they arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call is refused with permission_denied and the digest is never reached
 
   @unit
   Scenario: Staff holding ops:manage reach the digest as themselves
     Given Cloud admin staff who hold ops:manage
-    When they arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call reaches the digest, naming them as the operator
 
   @unit
   Scenario: The digest asks ops to admit the operator behind every admin control
     Given Cloud admin staff the platform door admits, where ops's cloud-ops capability is off
-    When they arm the send or send a test
+    When they arm the send, send a test, or send themself their own or a person's digests
     Then each call is refused with not_found and nothing is armed or sent
 
   @unit
@@ -559,6 +559,90 @@ Feature: Weekly digest emails
     When an operator sends themself a test of a member's email
     And the test email's one-click unsubscribe is followed
     Then the operator is unsubscribed and the member is not
+
+  @integration
+  Scenario: An operator sends themself every digest they would get
+    Given an operator who is a member of two organizations, each with a busy week
+    When they send themself their digests
+    Then they receive one test per organization, picked as their own weekly email would be
+    And each subject names its organization and is marked [Test]
+    And the answer lists each organization by name with the template it was sent with
+    And no DigestSend row is written
+
+  @integration
+  Scenario: An organization with nothing to send is skipped and reported
+    Given an operator in two organizations, one of which has nothing to show them this week
+    When they send themself their digests
+    Then they receive the one with something to show
+    And the other is reported as skipped with nothing to send, not as an error
+
+  @integration
+  Scenario: An operator who opted out is sent none of their digests
+    Given an operator in two organizations who opted out of the digest
+    When they send themself their digests
+    Then no email is sent
+    And each organization is reported as skipped because they opted out
+
+  @integration
+  Scenario: One organization failing does not keep the operator's other digests from going
+    Given an operator in two organizations, one of whose weeks cannot be read
+    When they send themself their digests
+    Then they receive the other organization's test
+    And the unreadable one is reported as failed
+
+  @integration
+  Scenario: An operator's hidden system organization is not sent
+    Given an operator in two organizations, one of which is the install's hidden system organization
+    When they send themself their digests
+    Then only the other organization's test is sent and listed, as the weekly send would mail them
+
+  @integration
+  Scenario: Sending yourself your digests without an email address is refused
+    Given an operator whose account has no email address
+    When they send themself their digests
+    Then the call is refused with digest_operator_address_missing
+    And no email is sent
+
+  @integration
+  Scenario: Staff with ops:manage send themselves their digests from their settings
+    Given Cloud admin staff holding ops:manage on their Profile page
+    When they press "Send me my digests" under Email preferences
+    Then each of their organizations is listed with what was sent, or why nothing was
+    And someone without ops:manage sees no such button
+
+  @integration
+  Scenario: Staff send themselves a person's digests as that person would get them
+    Given a member in two organizations, each with a busy week, and an operator
+    When the operator sends themself the member's digests by the member's email, as they would get them
+    Then the operator receives one test per organization, picked as the member's weekly email would be
+    And the member is sent nothing
+    And the answer names the member and lists each organization with the template it was sent with
+
+  @unit @integration
+  Scenario: Staff force one digest for a person, past its threshold
+    Given a member whose busiest project had 40 traces this week, below the traces-week threshold
+    When the operator sends themself the member's digests with traces week forced
+    Then the operator receives the traces-week email for that week, though the weekly send would pick nothing
+
+  @unit @integration
+  Scenario: A forced digest with no data for the person is skipped, not sent
+    Given a member who is not an admin, and an admin, of an organization with a plan limit
+    When the operator forces plan usage for each in turn
+    Then the admin's test is sent with plan usage
+    And each of the member's organizations is reported as skipped with no data for this digest
+
+  @integration
+  Scenario: Sending a person's digests to an address no account has is refused
+    Given an address no account has
+    When an operator sends themself that person's digests
+    Then the call is refused with digest_person_not_found
+    And no email is sent
+
+  @integration
+  Scenario: Staff send themselves a person's digests from their settings
+    Given Cloud admin staff holding ops:manage on their Profile page
+    When they enter a person's email, choose a digest and press "Send test to me"
+    Then the person and each of their organizations are listed with what was sent, or why nothing was
 
   @integration @unimplemented
   Scenario: Metrics count sends, unique clickers and unsubscribes by template and week

@@ -52,6 +52,19 @@ export class DigestOperatorAddressMissingError extends HandledError {
   }
 }
 
+/** A test was asked for an address no account has; the address stays out of the error. */
+export class DigestPersonNotFoundError extends HandledError {
+  declare readonly code: "digest_person_not_found";
+
+  constructor() {
+    super("digest_person_not_found", "No account has this email address.", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "DigestPersonNotFoundError";
+  }
+}
+
 /** A test was asked for a member who opted out of the digest. */
 export class DigestMemberUnsubscribedError extends HandledError {
   declare readonly code: "digest_member_unsubscribed";

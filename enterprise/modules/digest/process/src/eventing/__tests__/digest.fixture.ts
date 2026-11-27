@@ -61,6 +61,7 @@ import { emptyProjectWeek, isoWeekOf } from "../../rules/digest-week.rules.ts";
 import { DigestCommandsService } from "../../services/digest-commands.service.ts";
 import { DigestSendService } from "../../services/digest-send.service.ts";
 import { DigestSourceService } from "../../services/digest-source.service.ts";
+import { DigestTestSendService } from "../../services/digest-test-send.service.ts";
 import { DigestTraceReadService } from "../../services/digest-trace-read.service.ts";
 import { DigestUnsubscribeService } from "../../services/digest-unsubscribe.service.ts";
 import { DigestUserErasureService } from "../../services/digest-user-erasure.service.ts";
@@ -141,6 +142,7 @@ type WorldMember = Readonly<{ userId: string; role: string; disabledAt: Instant 
 // The send and week services narrow OrganizationApi and EntitlementApi to the fields they read,
 // so the world's rows stay that narrow instead of padding every member and plan field.
 type SendDeps = Parameters<typeof DigestSendService.create>[0];
+type TestSendDeps = Parameters<typeof DigestTestSendService.create>[0];
 type WeekDeps = Parameters<typeof DigestWeekService.create>[0];
 
 /** What the test controls: who the organization's members are, and its projects. */
@@ -160,6 +162,8 @@ export function digestWorld() {
     failingOrganizations: new Set<string>(),
     /** Organizations the organization module has no name for. */
     unnamedOrganizations: new Set<string>(),
+    /** Organizations of the hidden system kind, which the organization module's lists leave out. */
+    systemOrganizations: new Set<string>(),
     /** People whose profile is deactivated. */
     deactivated: new Set<string>(),
     projects: [PROJECT],
@@ -230,13 +234,7 @@ export function installDigest(
   const memoryMail = MemoryDigestMailChannel.create();
   const mail = new FailsAfterAcceptingMailChannel(memoryMail);
   const now = () => Date.now() + world.clockOffsetMs;
-  const users = createApiFixture<Pick<UserApi, "findById">>(
-    {
-      findById: async ({ id }) =>
-        world.users.includes(id) ? userProfile(id, world.deactivated.has(id)) : null,
-    },
-    "UserApi",
-  );
+  const users = worldUsers({ world });
   const unsubscribes = DigestUnsubscribeService.create({
     secret,
     limits: repositories.callCounter,
@@ -286,31 +284,44 @@ export function installDigest(
       "EntitlementApi",
     ),
   });
+  const organizations = createApiFixture<SendDeps["organizations"] & TestSendDeps["organizations"]>(
+    {
+      listMembers: async ({ organizationId, offset = 0, limit = Number.POSITIVE_INFINITY }) => {
+        if (world.failingOrganizations.has(organizationId)) {
+          throw new Error(`${organizationId} cannot be read`);
+        }
+        const members = membersIn(organizationId);
+        return { members: members.slice(offset, offset + limit), totalCount: members.length };
+      },
+      getMember: async ({ organizationId, userId }) => {
+        const members = membersIn(organizationId);
+        const member = members.find((row) => row.userId === userId);
+        if (!member) throw new MemberNotFoundError(userId);
+        return member;
+      },
+      findProvisioningSummary: async (organizationId) =>
+        !world.unnamedOrganizations.has(organizationId) ? summaryOf(organizationId) : null,
+      listAllIds: async ({ after }: { after?: string } = {}) => pageOfIds({ world, after }),
+      organizationIdsForMember: async ({ userId }) =>
+        [ORGANIZATION, OTHER_ORGANIZATION].filter((organizationId) =>
+          membersIn(organizationId).some((row) => row.userId === userId && row.disabledAt === null),
+        ),
+      findForOperators: async ({ organizationIds }) =>
+        organizationIds
+          .filter((id) => !world.systemOrganizations.has(id))
+          .map((id) => ({
+            ...summaryOf(id),
+            memberCount: membersIn(id).length,
+            administratorEmails: [],
+          })),
+    },
+    "OrganizationApi",
+  );
   const sends = DigestSendService.create({
     audience: repositories.audience,
     sends: repositories.sends,
     weeks,
-    organizations: createApiFixture<SendDeps["organizations"]>(
-      {
-        listMembers: async ({ organizationId, offset = 0, limit = Number.POSITIVE_INFINITY }) => {
-          if (world.failingOrganizations.has(organizationId)) {
-            throw new Error(`${organizationId} cannot be read`);
-          }
-          const members = membersIn(organizationId);
-          return { members: members.slice(offset, offset + limit), totalCount: members.length };
-        },
-        getMember: async ({ organizationId, userId }) => {
-          const members = membersIn(organizationId);
-          const member = members.find((row) => row.userId === userId);
-          if (!member) throw new MemberNotFoundError(userId);
-          return member;
-        },
-        findProvisioningSummary: async (organizationId) =>
-          !world.unnamedOrganizations.has(organizationId) ? summaryOf(organizationId) : null,
-        listAllIds: async ({ after }: { after?: string } = {}) => pageOfIds({ world, after }),
-      },
-      "OrganizationApi",
-    ),
+    organizations,
     projects: createApiFixture<
       Pick<
         ProjectApi,
@@ -363,6 +374,7 @@ export function installDigest(
     },
     now,
   });
+  const tests = DigestTestSendService.create({ sends, users, organizations });
 
   const fold = eventing.register(
     buildDigestPipeline({
@@ -514,6 +526,11 @@ export function installDigest(
     /** An operator's test of a member's last week, as the app asks it once ops admitted them. */
     sendTest: (input: { organizationId: string; userId: string; operatorId: string }) =>
       sends.sendTest(input),
+    /** An operator's tests of their own week in every organization, once ops admitted them. */
+    sendMyTests: (input: { operatorId: string }) => tests.sendMyTests(input),
+    /** An operator's tests of another person's week, found by address, once ops admitted them. */
+    sendTestFor: (input: Parameters<DigestTestSendService["sendTestFor"]>[0]) =>
+      tests.sendTestFor(input),
     /** One organization's plan, as the outbox retries it after a failure. */
     planOrganization: (input: { organizationId: string; isoWeek?: string }) =>
       sends.planOrganization({ isoWeek: SENT_WEEK, ...input }),
@@ -647,6 +664,22 @@ function projectIdentity(id: string, ownerUserId: string | undefined, aggregate:
     ownerUserId: ownerUserId ?? null,
     kind: aggregate ? "aggregate" : "project",
   };
+}
+
+/** The user module over the world's people, found by id or by address. */
+function worldUsers({ world }: { world: ReturnType<typeof digestWorld> }) {
+  const profileOf = (id: string | undefined) =>
+    id !== undefined && world.users.includes(id)
+      ? userProfile(id, world.deactivated.has(id))
+      : null;
+  return createApiFixture<Pick<UserApi, "findById" | "findByEmail">>(
+    {
+      findById: async ({ id }) => profileOf(id),
+      findByEmail: async ({ email }) =>
+        profileOf(world.users.find((known) => emailOf(known) === email)),
+    },
+    "UserApi",
+  );
 }
 
 /** A person as the user module answers them: digest reads only the address. */

@@ -5023,6 +5023,10 @@ const presentations = {
     title: "Your account has no email address",
     describe: () => "Add an email address to your account, then send the test again.",
   },
+  digest_person_not_found: {
+    title: "No account with that email",
+    describe: () => "No LangWatch account uses that email address. Check it and try again.",
+  },
   digest_member_unsubscribed: {
     title: "Member opted out",
     describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",

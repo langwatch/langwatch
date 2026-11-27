@@ -6,6 +6,8 @@ import {
   DigestNothingToSendError,
   DigestOperatorAddressMissingError,
   DigestPublicBaseUrlMissingError,
+  type DigestTemplateId,
+  type DigestTestTemplate,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -41,7 +43,7 @@ import {
 } from "../rules/digest-mail.rules.ts";
 import {
   type DigestTemplatePick,
-  eligibleDigestTemplates,
+  pickDigestTemplatesToTry,
 } from "../rules/digest-template.rules.ts";
 import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
@@ -215,6 +217,7 @@ export class DigestSendService {
       week,
       member: { userId, admin: membership.admin },
       recipient: { userId, sendId: digestSendKey(sendKey) },
+      template: "auto",
     });
     if (!composed) return skip("no template has anything to show");
     // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
@@ -244,17 +247,19 @@ export class DigestSendService {
   /**
    * A member's last week in one organization, mailed to the operator alone, its signed unsubscribe
    * header naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
-   * arming, so a test can come first.
+   * arming, so a test can come first. A forced `template` is sent in place of the member's pick.
    */
   async sendTest({
     organizationId,
     userId,
     operatorId,
+    template = "auto",
   }: {
     organizationId: string;
     userId: string;
     operatorId: string;
-  }): Promise<void> {
+    template?: DigestTestTemplate;
+  }): Promise<DigestTemplateId> {
     const membership = await this.#membership({ organizationId, userId });
     if (membership.kind === "gone") throw new DigestMemberNotFoundError(userId);
     const member = { userId, admin: membership.admin };
@@ -270,6 +275,7 @@ export class DigestSendService {
       week,
       member,
       recipient: { userId: operatorId, sendId: `test:${isoWeek}` },
+      template,
     });
     if (!composed) throw new DigestNothingToSendError(userId);
     await this.deps.mail.send(
@@ -284,6 +290,7 @@ export class DigestSendService {
         renderer: this.deps.renderer,
       }),
     );
+    return composed.template.templateId;
   }
 
   /** An organization's active members, admins marked; names stay with the user module. */
@@ -369,15 +376,17 @@ export class DigestSendService {
     return identities.filter(({ id }) => decided.projects.get(id) === true).map(({ id }) => id);
   }
 
-  /** The member's pick and its props, with an unsubscribe signed for whoever receives it. */
+  /** The member's pick (or a forced template) with props; the unsubscribe is the recipient's. */
   async #compose({
     week,
     member,
     recipient,
+    template,
   }: {
     week: OrganizationWeek;
     member: Member;
     recipient: Readonly<{ userId: string; sendId: string }>;
+    template: DigestTestTemplate;
   }): Promise<Composed | null> {
     const baseUrl = this.#baseUrl();
     const organizationName =
@@ -389,7 +398,8 @@ export class DigestSendService {
     const preferencesUrl = `${baseUrl}${DIGEST_EMAIL_PREFERENCES_PATH}`;
     // The first eligible template whose props build: one that cannot (a name not found) must
     // not cost the member the email a lower-ranked template could send.
-    for (const pick of eligibleDigestTemplates(digestTemplateInput({ week, ...member }))) {
+    const input = digestTemplateInput({ week, ...member });
+    for (const pick of pickDigestTemplatesToTry({ template, input })) {
       const template = buildDigestTemplateProps({
         pick,
         week,
