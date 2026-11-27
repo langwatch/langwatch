@@ -21,6 +21,7 @@ import {
   ESSENTIAL_MISSES,
   type OrganizationPiiLevel,
   PII_REDACTION_MODEL_NAME,
+  type PiiRedactionModel,
   STRICT_ACCEPTANCE_NOTE,
   STRICT_BILLED_NOTE,
   STRICT_GAPS,
@@ -141,16 +142,12 @@ function SwitchToModelButton({ disabled, onSwitch }: { disabled: boolean; onSwit
  * while it is rule-based until an admin accepts the price, says so and offers the switch.
  */
 function LevelCards({
-  free,
-  licensed,
-  split,
+  model,
   ruleBased,
   isSaving,
   onSwitchToModel,
 }: {
-  free: boolean;
-  licensed: boolean;
-  split: boolean;
+  model: PiiRedactionModel;
   ruleBased: boolean;
   isSaving: boolean;
   onSwitchToModel?: (() => void) | undefined;
@@ -182,7 +179,7 @@ function LevelCards({
           </Badge>
         }
         subtitle={PII_REDACTION_MODEL_NAME}
-        price={<PiiRedactionModelPrice free={free} licensed={licensed} split={split} />}
+        price={<PiiRedactionModelPrice model={model} />}
         action={
           ruleBased && onSwitchToModel ? (
             <SwitchToModelButton disabled={isSaving} onSwitch={onSwitchToModel} />
@@ -245,9 +242,7 @@ export function OrganizationPiiLevelPicker({
   level,
   pendingLevel,
   otherLevelLabel,
-  free,
-  licensed = false,
-  split = false,
+  model,
   awaitingAcceptance = false,
   strictRuleShown = false,
   canWrite,
@@ -258,11 +253,8 @@ export function OrganizationPiiLevelPicker({
   level: OrganizationPiiLevel | null;
   pendingLevel: OrganizationPiiLevel | null;
   otherLevelLabel: string;
-  free: boolean;
-  /** Self-hosted: included with the Enterprise licence rather than for the organization. */
-  licensed?: boolean;
-  /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
-  split?: boolean;
+  /** Strict's model: its price in the subscription's currency, or why it is included. */
+  model: PiiRedactionModel;
   /** Strict is rule-based, at no charge, until an organization admin accepts the price. */
   awaitingAcceptance?: boolean;
   /** A team or project rule sets Strict, so Strict is in use with the organization on Essential. */
@@ -310,16 +302,14 @@ export function OrganizationPiiLevelPicker({
           }}
         >
           <LevelCards
-            free={free}
-            licensed={licensed}
-            split={split}
+            model={model}
             ruleBased={strictRuleBased}
             isSaving={isSaving}
             onSwitchToModel={onSwitchToModel}
           />
         </RadioCard.Root>
         {level && <LevelExample level={level} />}
-        {level === "strict" && !free && (
+        {level === "strict" && !model.free && (
           <Text fontSize="xs" color="fg.muted">
             {awaitingAcceptance ? STRICT_ACCEPTANCE_NOTE : STRICT_BILLED_NOTE}
           </Text>

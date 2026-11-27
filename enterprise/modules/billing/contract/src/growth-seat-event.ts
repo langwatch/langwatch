@@ -6,7 +6,12 @@ import { z } from "zod";
 import { InvalidSeatCountError } from "./billing.errors.ts";
 import { GROWTH_SEAT_PLAN_TYPES } from "./plan-types.ts";
 import type { Currency } from "./pricing.ts";
-import type { StripePriceMap, StripePriceName } from "./stripe-prices.ts";
+import type {
+  StripeEnvironment,
+  StripePriceMap,
+  StripePriceName,
+  StripePricesFile,
+} from "./stripe-prices.ts";
 
 /** Set of all GROWTH_SEAT price IDs resolved from the Stripe catalog. */
 const priceIds = (prices: StripePriceMap, names: readonly StripePriceName[]) =>
@@ -116,10 +121,25 @@ export const resolveGrowthEventsPriceId = ({
   return priceId;
 };
 
+/** Euros per dollar of usage on the dollar meters: the seat ratio, EUR 29 / USD 34 (ADR-201). */
+export const GROWTH_USAGE_EUR_PER_USD = 0.85;
+
+/** The Instant Evals price for each subscription currency; both price the one dollar meter. */
+export const GROWTH_INSTANT_EVAL_PRICE_NAMES = {
+  USD: "GROWTH_INSTANT_EVAL_USD",
+  EUR: "GROWTH_INSTANT_EVAL_EUR",
+} as const satisfies Record<Currency, StripePriceName>;
+
+/** The PII redaction price for each subscription currency; both price the one dollar meter. */
+export const GROWTH_PII_REDACTION_PRICE_NAMES = {
+  USD: "GROWTH_PII_REDACTION_USD",
+  EUR: "GROWTH_PII_REDACTION_EUR",
+} as const satisfies Record<Currency, StripePriceName>;
+
 /**
- * The Instant Evals price on a Growth subscription, when the mode has one.
- * Dollars only, and absent until the meter behind it is provisioned: failing a
- * checkout over another feature's meter would block every Growth signup.
+ * The Instant Evals price on a Growth subscription in its currency, when the mode has one.
+ * Absent until provisioned: failing a checkout over another feature's meter would block every
+ * Growth signup. The currency is the Stripe customer's, never the organization's own field.
  */
 export const pickGrowthInstantEvalPriceId = ({
   currency,
@@ -127,7 +147,7 @@ export const pickGrowthInstantEvalPriceId = ({
 }: {
   currency: Currency;
   prices: StripePriceMap;
-}): string | undefined => (currency === "USD" ? prices.GROWTH_INSTANT_EVAL_USD : undefined);
+}): string | undefined => prices[GROWTH_INSTANT_EVAL_PRICE_NAMES[currency]];
 
 /** Whether this deployment's Stripe mode has the Instant Evals price. */
 export const isGrowthInstantEvalPriceProvisioned = ({
@@ -164,9 +184,8 @@ export const retentionBillsStorage = (retentionDays: number | undefined): boolea
   retentionDays !== undefined && retentionDays > GROWTH_INCLUDED_RETENTION_DAYS;
 
 /**
- * The PII redaction price on a Growth subscription, when the mode has one.
- * Dollars only, since its meter counts dollars (ADR-201), and absent until
- * provisioned, so a checkout never fails over it.
+ * The PII redaction price on a Growth subscription in its currency, when the mode has one, and
+ * absent until provisioned, so a checkout never fails over it (ADR-201 decision 11).
  */
 export const pickGrowthPiiRedactionPriceId = ({
   currency,
@@ -174,7 +193,34 @@ export const pickGrowthPiiRedactionPriceId = ({
 }: {
   currency: Currency;
   prices: StripePriceMap;
-}): string | undefined => (currency === "USD" ? prices.GROWTH_PII_REDACTION_USD : undefined);
+}): string | undefined => prices[GROWTH_PII_REDACTION_PRICE_NAMES[currency]];
+
+/** Each usage price in euros beside the dollar price it follows at the fixed ratio. */
+const EURO_USAGE_PRICE_PAIRS = [GROWTH_INSTANT_EVAL_PRICE_NAMES, GROWTH_PII_REDACTION_PRICE_NAMES];
+
+/**
+ * Why the catalogue's mapped euro usage prices are wrong in this mode, or nothing: each must be a
+ * monthly euro price at the ratio times its dollar price, so an invoice never drifts from it.
+ */
+export const euroUsagePriceErrors = ({
+  file,
+  environment,
+}: {
+  file: StripePricesFile;
+  environment: StripeEnvironment;
+}): string[] =>
+  EURO_USAGE_PRICE_PAIRS.flatMap(({ USD, EUR }) => {
+    const euro = file.prices[file.mapping[EUR]?.[environment] ?? ""];
+    if (!euro) return [];
+    const dollar = file.prices[file.mapping[USD]?.[environment] ?? ""];
+    if (dollar?.unitAmount == null) return [`${EUR} has no dollar price ${USD} to follow`];
+    const expected = Math.round(dollar.unitAmount * GROWTH_USAGE_EUR_PER_USD);
+    const monthly = euro.recurring?.interval === "month" && euro.recurring.intervalCount === 1;
+    if (euro.currency === "eur" && euro.unitAmount === expected && monthly) return [];
+    return [
+      `${EUR} must be a monthly eur price of ${expected} cents (${GROWTH_USAGE_EUR_PER_USD} of ${USD}), found ${euro.currency} ${euro.unitAmount}`,
+    ];
+  });
 
 /**
  * Stripe checkout line items for Growth: a seat item (quantity = coreMembers), metered events,

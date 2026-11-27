@@ -24,5 +24,7 @@ export function usePiiRedactionModelOffer(): PiiRedactionModelOffer {
     modelFlag: flags.flag(FrontendFlags.release_pii_redaction_model_enabled),
     freeFlag: flags.flag(FrontendFlags.release_pii_redaction_model_free) === true,
     splitFlag: flags.flag(FrontendFlags.release_pii_redaction_model_split_enabled) === true,
+    currency: host.billingCurrency(),
+    readPrice: () => host.refreshBillingCurrency(),
   });
 }

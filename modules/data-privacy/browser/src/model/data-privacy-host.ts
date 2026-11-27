@@ -43,6 +43,12 @@ export type PrivacyFailureNotice = {
  */
 export type PrivacyLicence = "loading" | "enterprise" | "none" | "unknown";
 
+/** The currency the organization's subscription is billed in, which Strict's price is quoted in. */
+export type PrivacyBillingCurrency = "USD" | "EUR";
+
+/** The currency as the host reads it: "loading" on the first read, "unknown" when it failed. */
+export type PrivacyBillingCurrencyReading = PrivacyBillingCurrency | "loading" | "unknown";
+
 /** The one thing the screen is handed. */
 export abstract class DataPrivacyHostApi {
   /** The organization, team and project this page is about. */
@@ -60,11 +66,17 @@ export abstract class DataPrivacyHostApi {
 
   abstract failed(failure: PrivacyFailureNotice): void;
 
-  /** Self-hosted only; on LangWatch Cloud the plan is not read and this is "unknown". */
+  /** The licence the plan names, self-hosted only; on LangWatch Cloud this is "unknown". */
   abstract licence(): PrivacyLicence;
 
   /** Whether this reader may activate a licence, so the advert links there. */
   abstract mayManageLicence(): boolean;
+
+  /** Euros for a euro Growth plan, else dollars; "loading" first, "unknown" if the read failed. */
+  abstract billingCurrency(): PrivacyBillingCurrencyReading;
+
+  /** Reads the plan again, for a save waiting on the currency; settles when the read does. */
+  abstract refreshBillingCurrency(): Promise<void>;
 }
 
 const DataPrivacyHostContext = createContext<DataPrivacyHostApi | undefined>(void 0);
