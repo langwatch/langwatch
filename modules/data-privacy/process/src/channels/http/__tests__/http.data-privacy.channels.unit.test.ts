@@ -1,5 +1,7 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { DataPrivacyServerConfig } from "@langwatch/data-privacy-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { AwsPiiRedactionModelChannel } from "../../aws.pii-redaction-model.channel.ts";
@@ -20,6 +22,7 @@ function channelsFor(settings: Partial<DataPrivacyServerConfig>) {
       ...settings,
     },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    bound: { apiKeys: createApiFixture<ApiKeyApi>() },
   });
 }
 

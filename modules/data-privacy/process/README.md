@@ -152,11 +152,11 @@ Contract `../contract/src/data-privacy.trpc.ts:47`, router `src/transport/data-p
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:98
+type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:107
 
 // dataPrivacy.setForScope
 // Input: z.object({ ...dataPrivacyScopeTargetInputSchema.shape, config: dataPrivacyConfigSchema }) (inline, ../contract/src/data-privacy.trpc.ts:64)
-type Output = z.infer<typeof dataPrivacyPolicySchema>; // ../contract/src/data-privacy.ts:226
+type Output = z.infer<typeof dataPrivacyPolicySchema>; // ../contract/src/data-privacy.ts:242
 
 // dataPrivacy.removeForScope
 // Input: dataPrivacyScopeTargetInputSchema, ../contract/src/data-privacy.trpc.ts:45

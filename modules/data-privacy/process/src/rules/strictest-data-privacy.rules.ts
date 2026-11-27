@@ -154,18 +154,20 @@ const EVERYONE: ResolvedAudience = {
   viewers: false,
   projectOwner: false,
   groupIds: [],
+  apiKeyIds: [],
 };
 
 /**
- * Who is in every one of these audiences. `allMembers` is everyone with
- * project access, so it adds no constraint of its own: intersected with a
- * narrower audience it leaves that audience.
+ * Who is in every one of these audiences. `allMembers` adds no constraint of its own:
+ * intersected with a narrower audience it leaves that audience. A key is not a member,
+ * so keys are intersected across every audience, `allMembers` ones included.
  */
 function intersectAudiences(audiences: readonly ResolvedAudience[]): ResolvedAudience {
+  const apiKeyIds = intersection(audiences.map((audience) => audience.apiKeyIds));
   const narrowing = audiences.filter((audience) => !audience.allMembers);
   const [first, ...rest] = narrowing;
   // Every audience was everyone: keep one of them as it is.
-  if (first === undefined) return { ...EVERYONE, ...audiences[0] };
+  if (first === undefined) return { ...EVERYONE, ...audiences[0], apiKeyIds };
   return rest.reduce<ResolvedAudience>(
     (kept, audience) => ({
       admins: kept.admins && audience.admins,
@@ -174,8 +176,9 @@ function intersectAudiences(audiences: readonly ResolvedAudience[]): ResolvedAud
       viewers: kept.viewers && audience.viewers,
       projectOwner: kept.projectOwner && audience.projectOwner,
       groupIds: kept.groupIds.filter((id) => audience.groupIds.includes(id)),
+      apiKeyIds,
     }),
-    { ...first, groupIds: [...first.groupIds] },
+    { ...first, groupIds: [...first.groupIds], apiKeyIds },
   );
 }
 

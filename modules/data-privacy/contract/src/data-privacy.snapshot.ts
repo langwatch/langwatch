@@ -57,6 +57,15 @@ const dataPrivacyAudienceOptionsSchemaDefinition = z
      * organization without any sees the group control empty and disabled).
      */
     groups: z.array(namedScopeSchema),
+    /**
+     * ADR-208: the organization's live API keys a rule's audience may name, by the names their
+     * owners gave them. Empty for a caller who may edit no rule here.
+     */
+    apiKeys: z.array(namedScopeSchema),
+    /** Whether the caller may add a key a rule does not name yet: an organization admin. */
+    canAddApiKeys: z.boolean(),
+    /** Set when api-key could not list the keys: a key not in `apiKeys` may still be live. */
+    apiKeysUnavailable: z.literal(true).optional(),
   })
   .strict();
 export interface DataPrivacyAudienceOptionsSchema extends Named<

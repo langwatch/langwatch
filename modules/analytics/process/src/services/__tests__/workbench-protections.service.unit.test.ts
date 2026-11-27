@@ -49,6 +49,7 @@ function inputRestrictedTo(groupId: string): dataPrivacyContractModule.ResolvedD
     viewers: false,
     projectOwner: false,
     groupIds: [],
+    apiKeyIds: [],
   };
   return {
     ...PLATFORM_DEFAULT_DATA_PRIVACY,
@@ -71,6 +72,7 @@ function bothRestrictedToAdmins(): dataPrivacyContractModule.ResolvedDataPrivacy
       viewers: false,
       projectOwner: false,
       groupIds: [],
+      apiKeyIds: [],
     },
   };
   return {
@@ -710,6 +712,7 @@ describe("resolveApiKeyProtections", () => {
               viewers: false,
               projectOwner: false,
               groupIds: [],
+              apiKeyIds: [],
             },
           },
         },
@@ -721,6 +724,52 @@ describe("resolveApiKeyProtections", () => {
       });
 
       expect(resolved.canSeeCapturedInput).toBe(false);
+    });
+  });
+
+  describe("given a policy showing captured content to admins and one named api key", () => {
+    const namingKey1 = () =>
+      dataPrivacyResolving(async () => ({
+        ...PLATFORM_DEFAULT_DATA_PRIVACY,
+        categories: {
+          ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+          input: {
+            disposition: "restrict",
+            audience: { ...EMPTY_AUDIENCE, admins: true, apiKeyIds: ["key-1"] },
+          },
+          output: {
+            disposition: "restrict",
+            audience: { ...EMPTY_AUDIENCE, admins: true, apiKeyIds: ["key-1"] },
+          },
+        },
+      }));
+
+    /** @scenario "An api key the policy's audience names reads captured content" */
+    it("shows the named key the captured content", async () => {
+      const { authz } = authzAnswering(true);
+      const { dataPrivacy } = namingKey1();
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
+        projectId: "project-1",
+        credential: API_KEY_CREDENTIAL,
+      });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+    });
+
+    /** @scenario "An api key the policy's audience names reads captured content" */
+    it("keeps another key on the public cut", async () => {
+      const { authz } = authzAnswering(true);
+      const { dataPrivacy } = namingKey1();
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
+        projectId: "project-1",
+        credential: { ...API_KEY_CREDENTIAL, apiKeyId: "key-2" },
+      });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+      expect(resolved.canSeeCapturedOutput).toBe(false);
     });
   });
 

@@ -119,6 +119,7 @@ Reusable framework decisions live with their packages:
 | [205](./205-billing-only-is-a-flagged-membership.md)                                  | Billing only is a flagged Lite membership, not a new organization role                                                     | Proposed                  |
 | [206](./206-nx-remote-cache-in-s3.md)                                                 | Nx remote cache in S3, trusted by who wrote it                                                                             | Accepted                  |
 | [207](./207-a-long-strict-span-is-split-across-model-calls-by-the-caller.md)          | A long Strict span is split across PII redaction model calls by the caller                                                 | Accepted                  |
+| [208](./208-a-privacy-rule-may-name-api-keys.md)                                      | A privacy rule may name API keys among who sees its restricted content                                                     | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
