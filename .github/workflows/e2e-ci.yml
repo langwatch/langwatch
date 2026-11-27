@@ -235,7 +235,7 @@ jobs:
 
       - name: Wait for Postgres, Redis and ClickHouse
         timeout-minutes: 5
-        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 270s postgres redis clickhouse
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 240s postgres redis clickhouse
 
       # The api and the worker never migrate and refuse to serve until the
       # upgrade has run: the preparation script, `upgrade` then the
@@ -257,7 +257,7 @@ jobs:
 
       - name: Wait for OpenSearch and langevals
         timeout-minutes: 6
-        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 330s opensearch langevals
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 300s opensearch langevals
 
       - name: Run E2E tests
         env:

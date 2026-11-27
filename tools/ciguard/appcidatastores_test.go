@@ -65,6 +65,10 @@ func TestStepsAfterAFailureAndContainerWaitsHaveTheirOwnTimeLimit(t *testing.T) 
     steps:
       - name: Wait for Postgres
         run: go run ./cmd/waitcontainers postgres
+      - name: Wait for Redis, spaced
+        run: go  run   ./cmd/waitcontainers redis
+      - name: Mention the waiter
+        run: echo "Use go run ./cmd/waitcontainers for debugging"
       - name: Run the suites
         run: echo
       - name: Upload the report
@@ -84,6 +88,7 @@ func TestStepsAfterAFailureAndContainerWaitsHaveTheirOwnTimeLimit(t *testing.T) 
 
 	assert.ElementsMatch(t, []string{
 		`.github/workflows/langwatch-app-ci.yml job "suites": step "Wait for Postgres" needs its own timeout-minutes`,
+		`.github/workflows/langwatch-app-ci.yml job "suites": step "Wait for Redis, spaced" needs its own timeout-minutes`,
 		`.github/workflows/langwatch-app-ci.yml job "suites": step "Upload the report" needs its own timeout-minutes`,
 		`.github/workflows/langwatch-app-ci.yml job "suites": step "Notify on failure" needs its own timeout-minutes`,
 	}, problems)

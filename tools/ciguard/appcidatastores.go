@@ -20,6 +20,10 @@ var AppCIWorkflows = []string{
 // waitContainersCommand holds a step until the containers it names are healthy.
 const waitContainersCommand = "go run ./cmd/waitcontainers"
 
+// runsWaitContainers matches the command where a shell line or a chained command starts,
+// whatever its spacing, and not where it is only mentioned inside an argument.
+var runsWaitContainers = regexp.MustCompile(`(?m)(^|&&|\|\||;)\s*go\s+run\s+(\./)?cmd/waitcontainers\b`)
+
 // afterFailure matches an `if:` that runs a step once an earlier step failed or the job was cancelled.
 var afterFailure = regexp.MustCompile(`\b(always|failure)\(\)`)
 
@@ -69,7 +73,7 @@ func appCIJobProblems(path, name string, job ciscan.Job) []string {
 // timeout-minutes of its own, so a hang there holds the job until the job's own timeout.
 func unboundedStep(step *ciscan.Step) (string, bool) {
 	bounded := step.TimeoutMinutes != nil
-	needsBound := afterFailure.MatchString(step.If) || strings.Contains(step.Run, waitContainersCommand)
+	needsBound := afterFailure.MatchString(step.If) || runsWaitContainers.MatchString(step.Run)
 	if bounded || !needsBound {
 		return "", false
 	}
