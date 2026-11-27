@@ -1,15 +1,26 @@
 import copy
+import inspect
 import os
 from tempfile import mkdtemp
 from typing import Optional
+from urllib.parse import urlsplit
 import warnings
 
 import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
 import litellm
 import litellm.cost_calculator
+from litellm.llms.custom_httpx.aiohttp_transport import LiteLLMAiohttpTransport
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.egress import (
+    EgressDestinationRefusedError,
+    Fence,
+    egress_refusal,
+    fence_async_transport,
+    install_egress_fence,
+    server_egress_policy,
+)
 from langevals_core.model_capabilities import output_tokens_parameter
 from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
@@ -587,13 +598,17 @@ def _key_arguments(model: str) -> tuple:
     return ("api_key",)
 
 
+def _chosen_by_request(kwargs: dict, env: dict, argument: str) -> bool:
+    value = kwargs.get(argument)
+    supplied = {value for value in env.values() if isinstance(value, str)}
+    return isinstance(value, str) and value != "" and value in supplied
+
+
 def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
     """The server's own credentials only ever go to endpoints the server chose."""
-    supplied = {value for value in env.values() if isinstance(value, str)}
 
     def from_request(argument: str) -> bool:
-        value = kwargs.get(argument)
-        return isinstance(value, str) and value != "" and value in supplied
+        return _chosen_by_request(kwargs, env, argument)
 
     if not any(from_request(argument) for argument in ENDPOINT_ARGUMENTS):
         return
@@ -604,7 +619,57 @@ def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
     )
 
 
+def egress_fence(kwargs: dict, env: dict) -> Fence:
+    """The fence one call runs under; a request-chosen endpoint is judged up front.
+
+    A server-chosen endpoint is admitted by host. Every connection the call
+    makes, redirects included, is judged again by the transport."""
+    request_fence = Fence(policy=server_egress_policy())
+    admitted = set()
+    for argument in ENDPOINT_ARGUMENTS:
+        value = kwargs.get(argument)
+        if not isinstance(value, str) or value == "":
+            continue
+        if _chosen_by_request(kwargs, env, argument):
+            request_fence.judge_url(value)
+        else:
+            admitted.add(urlsplit(value).hostname or "")
+    return Fence(policy=request_fence.policy, admitted_hosts=frozenset(admitted - {""}))
+
+
+def fenced_lazy_stream(response, fence: Fence):
+    """A stream litellm opens on first read opens under the call's fence too."""
+    make_call = getattr(response, "make_call", None)
+    if make_call is None or getattr(response, "completion_stream", None) is not None:
+        return response
+    if inspect.iscoroutinefunction(make_call):
+
+        async def fenced_make_call(*args, **kwargs):
+            with fence.active():
+                return await make_call(*args, **kwargs)
+
+    else:
+
+        def fenced_make_call(*args, **kwargs):
+            with fence.active():
+                return make_call(*args, **kwargs)
+
+    response.make_call = fenced_make_call
+    return response
+
+
+def _raise_egress_refusal(exception: Exception) -> None:
+    """A refusal a client library wrapped as a connection error, raised as itself."""
+    refusal = egress_refusal(exception)
+    if refusal is not None and refusal is not exception:
+        raise EgressDestinationRefusedError(refusal.code, str(refusal)) from exception
+
+
 def patch_litellm_params(kwargs):
+    return _patch_litellm_params(kwargs)[0]
+
+
+def _patch_litellm_params(kwargs) -> tuple[dict, Fence]:
     kwargs["drop_params"] = True
     # Caching on disk is timing out for some reason, disable it
     kwargs["cache"] = {"no-cache": True, "no-store": True}
@@ -641,6 +706,8 @@ def patch_litellm_params(kwargs):
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
     refuse_request_endpoint_without_key(kwargs, request_env)
+    # Before the azure rewrite below, which moves api_base into a client object.
+    fence = egress_fence(kwargs, request_env)
 
     # Azure patches. Kept before the rewrite: a deployment name is arbitrary
     # ("prod-judge"), so after this block there is nothing left in the model
@@ -694,10 +761,14 @@ def patch_litellm_params(kwargs):
     # X_LITELLM_max_tokens, so this too waits until both have landed.
     kwargs = apply_output_tokens_parameter(kwargs, requested_model=requested_model)
 
-    return kwargs
+    return kwargs, fence
 
 
 def patch_litellm_embedding_params(kwargs):
+    return _patch_litellm_embedding_params(kwargs)[0]
+
+
+def _patch_litellm_embedding_params(kwargs) -> tuple[dict, Fence]:
     kwargs["drop_params"] = True
 
     request_env = current_request_env()
@@ -722,7 +793,7 @@ def patch_litellm_embedding_params(kwargs):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
     refuse_request_endpoint_without_key(kwargs, request_env)
 
-    return kwargs
+    return kwargs, egress_fence(kwargs, request_env)
 
 
 # The unpatched litellm entry points. Tests replace these to capture the
@@ -734,6 +805,8 @@ originals: dict = {}
 def patch_litellm():
     if originals:
         return
+    install_egress_fence()
+    fence_async_transport(LiteLLMAiohttpTransport)
     register_langwatch_model_pricing()
     originals["completion"] = litellm.completion
     originals["acompletion"] = litellm.acompletion
@@ -797,13 +870,15 @@ def patch_litellm():
 
     def patched_completion(*args, **kwargs):
         requested_model = kwargs.get("model")
-        kwargs = patch_litellm_params(kwargs)
+        kwargs, fence = _patch_litellm_params(kwargs)
         while True:
             try:
-                response = complete(args, kwargs)
+                with fence.active():
+                    response = complete(args, kwargs)
                 record_usage(requested_model, response)
-                return response
+                return fenced_lazy_stream(response, fence)
             except Exception as exception:
+                _raise_egress_refusal(exception)
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
                     conflict = tool_reasoning_conflict(kwargs, exception)
@@ -816,13 +891,15 @@ def patch_litellm():
 
     async def patched_acompletion(*args, **kwargs):
         requested_model = kwargs.get("model")
-        kwargs = patch_litellm_params(kwargs)
+        kwargs, fence = _patch_litellm_params(kwargs)
         while True:
             try:
-                response = await acomplete(args, kwargs)
+                with fence.active():
+                    response = await acomplete(args, kwargs)
                 record_usage(requested_model, response)
-                return response
+                return fenced_lazy_stream(response, fence)
             except Exception as exception:
+                _raise_egress_refusal(exception)
                 adjusted = adjusted_after_refusal(kwargs, exception)
                 if adjusted is None:
                     conflict = tool_reasoning_conflict(kwargs, exception)
@@ -835,8 +912,13 @@ def patch_litellm():
 
     def patched_embedding(*args, **kwargs):
         requested_model = kwargs.get("model")
-        kwargs = patch_litellm_embedding_params(kwargs)
-        response = originals["embedding"](*args, **kwargs)
+        kwargs, fence = _patch_litellm_embedding_params(kwargs)
+        try:
+            with fence.active():
+                response = originals["embedding"](*args, **kwargs)
+        except Exception as exception:
+            _raise_egress_refusal(exception)
+            raise
         record_usage(requested_model, response)
         return response
 

@@ -44,6 +44,24 @@ function excludedNames(findMany: ReturnType<typeof vi.fn>): string[] {
 }
 
 describe("PrismaApiKeyRepository", () => {
+  describe("when a key is looked up by its lookup id", () => {
+    it("asks only for an ownerless key or one whose owner is not deactivated", async () => {
+      const findFirst = vi.fn(async () => null);
+      const repository = PrismaApiKeyRepository.create({
+        prisma: prismaDouble({ apiKey: { findFirst } }),
+      });
+
+      await repository.findByLookupId({ lookupId: "lookup-1" });
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: {
+          lookupId: "lookup-1",
+          OR: [{ userId: null }, { user: { deactivatedAt: null } }],
+        },
+      });
+    });
+  });
+
   describe("when listing an organization's keys", () => {
     it("excludes every system-managed name the contract reserves", async () => {
       const { repository, findMany } = repositoryWithSpy();

@@ -14,8 +14,13 @@
 // are capped at that instant and an entry past it is refused with
 // virtual_key_expired without asking the control plane. Grace covers a control
 // plane we cannot reach, and a date it already told us needs no round trip.
-// Revoked and disabled keys keep the full window on purpose, since neither is
-// knowable in advance.
+// Revoked and disabled keys keep the full window when the control plane cannot
+// be reached, since neither is knowable in advance.
+//
+// Key re-check: while an org's change feed is silent, a cached key nothing
+// confirmed within KeyRecheckAfter (60s by default) is checked once more before
+// it serves, so a disable or revoke lands within about a minute whenever the
+// control plane answers. A check that cannot reach it serves on, as above.
 //
 // Last-known fallback: a change-feed eviction keeps the evicted entry aside,
 // and a cold refetch that fails for transport reasons serves it again for at
@@ -175,6 +180,8 @@ type Service struct {
 	denied          *lru.Cache[string, denial]
 	deniedKeys      *lru.Cache[[64]byte, string]
 	failClosedAfter time.Duration
+	// keyRecheckAfter is Options.KeyRecheckAfter, 0 when off.
+	keyRecheckAfter time.Duration
 	rechecks        denialRechecks
 	// denyMu orders denials against lifting them; deniedByVK lists the
 	// credentials each denied key carried, so a re-enable walks only those.
@@ -613,6 +620,12 @@ type Options struct {
 	// control-plane confirmation and its org's last change-feed poll are
 	// older than this. Zero (the default) keeps serving through an outage.
 	FailClosedAfter time.Duration
+	// KeyRecheckAfter bounds how long a cached key serves on its last
+	// confirmation while its org's change feed is silent: past it the key is
+	// checked with the control plane once more, a disabled or revoked key is
+	// refused, and a check that cannot reach the control plane serves on.
+	// 0 takes DefaultKeyRecheckAfter; negative turns it off.
+	KeyRecheckAfter time.Duration
 	// DenialRecheckInterval is how often a denied key may be re-checked
 	// against the control plane in the background. Default 30s.
 	DenialRecheckInterval time.Duration
@@ -641,6 +654,13 @@ func New(opts Options) (*Service, error) {
 	}
 	if opts.ConfigTTL < 0 {
 		opts.ConfigTTL = 0 // disabled
+	}
+
+	switch {
+	case opts.KeyRecheckAfter == 0:
+		opts.KeyRecheckAfter = DefaultKeyRecheckAfter
+	case opts.KeyRecheckAfter < 0:
+		opts.KeyRecheckAfter = 0 // off
 	}
 
 	if opts.DenialRecheckInterval <= 0 {
@@ -691,6 +711,7 @@ func New(opts Options) (*Service, error) {
 		denied:            denied,
 		deniedKeys:        deniedKeys,
 		failClosedAfter:   opts.FailClosedAfter,
+		keyRecheckAfter:   opts.KeyRecheckAfter,
 		rechecks:          denialRechecks{interval: opts.DenialRecheckInterval, state: recheckStates},
 		invalidations:     invalidations,
 		lastKnown:         lastKnown,
@@ -729,6 +750,17 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 		return nil, err
 	}
 	bundle, err := s.admit(ctx, h, answer)
+	if errors.Is(err, errKeyRecheckDue) {
+		var fresh bool
+		answer, fresh, err = s.recheckKey(ctx, presentedKey{key: key, h: h}, answer)
+		switch {
+		case err != nil:
+		case fresh:
+			bundle, err = s.admit(ctx, h, answer)
+		default:
+			bundle = answer.bundle
+		}
+	}
 	if errors.Is(err, domain.ErrAuthUpstream) {
 		if call := s.joinReconfirm(key, h); call != nil {
 			select {

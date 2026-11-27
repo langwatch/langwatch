@@ -566,7 +566,8 @@ func TestSafeDialer_FallsBackAcrossCheckedAddressesWithoutAnAllowlist(t *testing
 			return []net.IP{net.ParseIP("::1"), net.ParseIP("127.0.0.1")}, nil
 		},
 	})
-	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.example", port))
+	// A .localhost name: loopback is reached only through a loopback name.
+	conn, err := dial(context.Background(), "tcp", net.JoinHostPort("agent.localhost", port))
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 	assert.Equal(t, ln.Addr().String(), conn.RemoteAddr().String())
@@ -749,4 +750,92 @@ func TestExecute_ReachesALocalEndpointWhenPermitted(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "from the internal service", res.Output)
+}
+
+// The early check sees a public address and the connection sees loopback.
+// Local calls are allowed, so private addresses stay reachable, but loopback
+// is reached only through a loopback name or the allowlist.
+//
+// @scenario "A workflow HTTP call whose name resolves to loopback only at connect time is not reached"
+func TestExecute_DoesNotReachLoopbackWhenTheNameRebindsAfterTheCheck(t *testing.T) {
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+	_, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	lookups := 0
+	exec := httpblock.New(httpblock.Options{SSRF: httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(string) ([]net.IP, error) {
+			lookups++
+			if lookups == 1 {
+				return []net.IP{net.ParseIP("93.184.216.34")}, nil
+			}
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}})
+	_, err := exec.Execute(context.Background(), httpblock.Request{
+		URL: "http://rebind.example:" + port + "/", Method: "GET",
+	})
+
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+	assert.Zero(t, hits, "the loopback listener must never see the request")
+}
+
+// @scenario "Loopback is reached only through a loopback name or the allowlist"
+func TestSafeDialer_ReachesLoopbackOnlyThroughALoopbackNameOrTheAllowlist(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	loopback := func(string) ([]net.IP, error) { return []net.IP{net.ParseIP("127.0.0.1")}, nil }
+
+	for _, tc := range []struct {
+		name    string
+		opts    httpblock.SSRFOptions
+		host    string
+		allowed bool
+	}{
+		{"a public name, local calls allowed", httpblock.SSRFOptions{AllowLocal: true, Resolver: loopback}, "rebind.example", false},
+		{"localhost, local calls allowed", httpblock.SSRFOptions{AllowLocal: true, Resolver: loopback}, "localhost", true},
+		{"a .localhost name, local calls allowed", httpblock.SSRFOptions{AllowLocal: true, Resolver: loopback}, "agent.localhost", true},
+		{"the loopback literal, local calls allowed", httpblock.SSRFOptions{AllowLocal: true}, "127.0.0.1", true},
+		{"an allowlisted name", httpblock.SSRFOptions{AllowedHosts: []string{"rebind.example"}, Resolver: loopback}, "rebind.example", true},
+		{"the metadata literal, local calls allowed", httpblock.SSRFOptions{AllowLocal: true}, "169.254.169.254", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conn, err := httpblock.SafeDialer(tc.opts)(context.Background(), "tcp", net.JoinHostPort(tc.host, port))
+			if !tc.allowed {
+				require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+				return
+			}
+			require.NoError(t, err)
+			_ = conn.Close()
+		})
+	}
+}
+
+// @scenario "A workflow HTTP call never reaches a link-local address"
+func TestCheckURL_RefusesLinkLocalWhateverThePolicy(t *testing.T) {
+	linkLocal := func(string) ([]net.IP, error) { return []net.IP{net.ParseIP("169.254.1.1")}, nil }
+	for _, tc := range []struct {
+		name string
+		url  string
+		opts httpblock.SSRFOptions
+	}{
+		{"a link-local literal, local calls allowed", "http://169.254.1.1:9001/", httpblock.SSRFOptions{AllowLocal: true}},
+		{"a name resolving to link-local, local calls allowed", "http://runtime.example:9001/", httpblock.SSRFOptions{AllowLocal: true, Resolver: linkLocal}},
+		{"an allowlisted name resolving to link-local", "http://runtime.example:9001/", httpblock.SSRFOptions{AllowedHosts: []string{"runtime.example"}, Resolver: linkLocal}},
+		{"an IPv6 link-local literal, local calls allowed", "http://[fe80::1]:9001/", httpblock.SSRFOptions{AllowLocal: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.ErrorIs(t, httpblock.CheckURL(tc.url, tc.opts), httpblock.ErrSSRFBlocked)
+			host := strings.TrimSuffix(strings.TrimPrefix(tc.url, "http://"), "/")
+			_, err := httpblock.SafeDialer(tc.opts)(context.Background(), "tcp", host)
+			require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+		})
+	}
 }

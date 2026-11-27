@@ -218,14 +218,14 @@ type Response = unknown;
 
 |             |                                                      |
 | ----------- | ---------------------------------------------------- |
-| Declared at | `src/transport/stored-object-image-proxy.rest.ts:17` |
+| Declared at | `src/transport/stored-object-image-proxy.rest.ts:18` |
 | Base URL    | none: each route's path is its address               |
 | Addressing  | literal                                              |
-| Credential  | project                                              |
+| Credential  | browser                                              |
 
 #### `GET /api/image-proxy` · `proxyExternalImage`
 
-Public: an <img> fires with no credential; every address is fenced by the SSRF egress policy. Hidden from the OpenAPI document. Declared at `src/transport/stored-object-image-proxy.rest.ts:22`.
+Authenticated: the address names no project or organization, so a signed-in session is the whole gate; every address is still fenced by the SSRF egress policy. Hidden from the OpenAPI document. Declared at `src/transport/stored-object-image-proxy.rest.ts:24`.
 
 Answers at `/api/image-proxy`.
 
@@ -234,7 +234,7 @@ Answers at `/api/image-proxy`.
 interface Query {
   url?: string;
 }
-// Response: inline, src/transport/stored-object-image-proxy.rest.ts:30
+// Response: inline, src/transport/stored-object-image-proxy.rest.ts:33
 type Response = unknown;
 ```
 

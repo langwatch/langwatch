@@ -16,6 +16,9 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
     - TS: packages/ssrf/src/index.ts (scenario runner, webhooks)
     - Go: services/nlpgo/app/engine/blocks/httpblock/ssrf.go (workflow HTTP
       nodes, which is what an HTTP agent runs as, and remote attachments)
+    - Go: services/aigateway/adapters/egress (model provider calls from the
+      gateway and from the NLP service's in-process dispatcher)
+    - Both Go paths connect through pkg/ssrf/dial.go (PinnedDialer)
 
   # ============================================================================
   # Default behavior — toggle unset/false
@@ -277,6 +280,59 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       When the NLP service's HTTP block connects to that hostname
       Then it connects to the next checked address, never to one it did not check
       And each address gets an equal share of the time left, so one silent address cannot spend it all
+
+  Rule: Link-local addresses are never a destination
+    Link-local is where platform services answer (cloud metadata, the AWS
+    Lambda runtime API). The AI gateway already refuses it whatever the
+    policy; the NLP service's HTTP block does too, allowlist included.
+
+    @unit
+    Scenario: A workflow HTTP call never reaches a link-local address
+      Given BLOCK_LOCAL_HTTP_CALLS is "false", or ALLOWED_PROXY_HOSTS names the host
+      When a workflow HTTP call targets a link-local literal or a name resolving to one
+      Then the check and the connection both refuse it with an SSRF block error
+
+  Rule: Loopback is never reached by rebinding a name
+    The early check and the connection each resolve the name, so a name can
+    answer a public address to the check and 127.0.0.1 to the connection.
+    Every connection resolves once, judges each address and connects only to
+    one it judged. Local calls allowed still admit private addresses, but
+    loopback only through a loopback literal, localhost or a .localhost name,
+    or a host ALLOWED_PROXY_HOSTS names: a public name pointing at 127.0.0.1
+    reaches the service's own listeners, which no operator means to permit.
+
+    @unit
+    Scenario: Loopback is reached only through a loopback name or the allowlist
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      When a connection to "rebind.example" resolves to 127.0.0.1
+      Then it is refused
+      But a connection to 127.0.0.1, localhost, a .localhost name or an allowlisted host is made
+
+    @unit
+    Scenario: A provider endpoint that resolves to loopback only at connect time is not reached
+      Given a provider base URL whose name resolves to a public address for the endpoint check
+      And to 127.0.0.1 when the gateway connects
+      When a model call is dispatched through it
+      Then the call fails and the loopback listener never sees a request
+
+    @unit
+    Scenario: An allowlisted provider host on loopback is still reached
+      Given BLOCK_LOCAL_HTTP_CALLS is "true" and ALLOWED_PROXY_HOSTS names "localhost"
+      When a model call is dispatched to a provider on localhost
+      Then the provider receives it
+
+    @unit
+    Scenario: A provider endpoint that names loopback or metadata directly is refused
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      When a model call is dispatched to a provider at 127.0.0.1 or 169.254.169.254
+      Then the call is refused and nothing on loopback sees it
+
+    @unit
+    Scenario: A workflow HTTP call whose name resolves to loopback only at connect time is not reached
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      And a workflow HTTP call whose host resolves to a public address for the check and 127.0.0.1 for the connection
+      When the NLP service's HTTP block runs it
+      Then it fails with an SSRF block error and the loopback listener never sees it
 
   # ============================================================================
   # Migration — IS_SAAS no longer drives SSRF blocking

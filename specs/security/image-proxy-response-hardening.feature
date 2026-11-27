@@ -3,7 +3,7 @@ Feature: Relayed image bytes are inert on the product's own origin
   I want an image the product fetched on my behalf to be unable to run script
   So that a link to our own domain cannot take over my session
 
-  `GET /api/image-proxy?url=...` is a public, credential-less door: the URL is
+  `GET /api/image-proxy?url=...` serves only signed-in callers, but the URL is
   the caller's, and the bytes that come back are whatever the host at the other
   end chose to send. `image/svg+xml` passes any "is this an image" test and is
   also a document — a browser rendering one at the top level runs its `<script>`
@@ -15,7 +15,7 @@ Feature: Relayed image bytes are inert on the product's own origin
   own bucket. The proxy uses the same helper rather than a second answer to the
   same question: `packages/api/src/rest/media-response.ts`.
 
-  Implementation: apps/api/src/features/image-proxy/image-proxy-rest.ts
+  Implementation: modules/stored-object/process/src/services/image-proxy.service.ts
 
   Rule: Relayed bytes carry the stored-object hardening headers
 

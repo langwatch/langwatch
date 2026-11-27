@@ -16,6 +16,7 @@ import {
   type FunctionConfiguration,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 
 import {
   LAMBDA_INVOCATION_TIMEOUT_SECONDS,
@@ -307,8 +308,11 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
     deployed: FunctionConfiguration;
   }): Promise<FunctionConfiguration | null> {
     const desired = buildStudioLambdaEnvironment(this.options.config);
-    const deployedEnv = input.deployed.Environment?.Variables ?? {};
+    // User code reads this environment, so the engine hop's shared secret is dropped wherever set.
+    const { [NLP_INTERNAL_SECRET_ENV]: carriedSecret, ...deployedEnv } =
+      input.deployed.Environment?.Variables ?? {};
     const drifted =
+      carriedSecret !== undefined ||
       Object.entries(desired).some(([key, value]) => deployedEnv[key] !== value) ||
       input.deployed.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB ||
       input.deployed.Timeout !== LAMBDA_INVOCATION_TIMEOUT_SECONDS;

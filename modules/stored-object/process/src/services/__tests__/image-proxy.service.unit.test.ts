@@ -2,6 +2,7 @@
  * The proxy's media type is bare and its disposition filename is sanitised.
  * Covers @unit scenarios from specs/security/image-proxy-response-hardening.feature.
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -35,7 +36,7 @@ describe("ImageProxyService.proxy", () => {
 
         expect(response.status).toBe(200);
         expect(response.headers.get("content-type")).toBe("image/png");
-        expect(response.headers.get("cache-control")).toBe("public, max-age=31536000");
+        expect(response.headers.get("cache-control")).toBe("private, max-age=31536000");
         expect(response.headers.get("content-disposition")).toBe('inline; filename="logo.png"');
       });
     });
@@ -87,6 +88,42 @@ describe("ImageProxyService.proxy", () => {
         expect(response.status).toBe(413);
         expect(await response.json()).toEqual({ error: "Image is too large" });
         expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      });
+    });
+  });
+
+  describe("given a picture fetched from an outside host", () => {
+    const url = "https://pics.host.test/private/cat.png?token=abc";
+
+    describe("when the proxy relays it", () => {
+      /** @scenario "the image proxy records the host it fetched from, never the full address" */
+      it("logs the host alone", async () => {
+        const { logger, lines } = createTestLogger();
+
+        await ImageProxyService.create({
+          images: MemoryExternalImageChannel.create({ [url]: upstream("image/png") }),
+          logger,
+        }).proxy({ url });
+
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toMatchObject({ host: "pics.host.test", status: 200 });
+        expect(JSON.stringify(lines)).not.toMatch(/private|cat\.png|token/);
+      });
+    });
+
+    describe("when the proxy refuses it", () => {
+      /** @scenario "the image proxy records the host it fetched from, never the full address" */
+      it("logs the refusal with the host alone", async () => {
+        const { logger, lines } = createTestLogger();
+
+        await ImageProxyService.create({
+          images: MemoryExternalImageChannel.create(),
+          logger,
+        }).proxy({ url });
+
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toMatchObject({ host: "pics.host.test", status: 500 });
+        expect(JSON.stringify(lines)).not.toMatch(/private|cat\.png|token/);
       });
     });
   });

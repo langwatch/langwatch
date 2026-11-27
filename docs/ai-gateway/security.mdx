@@ -81,13 +81,13 @@ The receiver compares the signature in constant time before it checks the timest
 
 ## Egress controls
 
-A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Turn them on for any deployment that reaches the public internet.
+A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Every provider connection resolves the host once, checks each address and connects only to one it checked, so a name cannot pass the check on one address and connect to another. Turn them on for any deployment that reaches the public internet.
 
 | Variable                         | Effect                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may reach a private address while the guard is on, at the endpoint check and at dispatch. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 

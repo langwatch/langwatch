@@ -179,7 +179,7 @@ Rotations, revocations, budget edits, routing changes and cache-rule edits all t
 
 **Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
 
-**Fix:** restore the route to the control plane. `curl http://langwatch-gateway/debug/control-plane` inside the cluster prints the URL the pod resolved. A rolling restart clears every cache at once when you need the change now.
+**Fix:** restore the route to the control plane. The gateway row in **Settings > Checkup** compares the URL the running gateway resolved with this app, and `LW_GATEWAY_BASE_URL` in the gateway ConfigMap shows the configured one. A rolling restart clears every cache at once when you need the change now.
 
 ## Spend does not appear on the key
 

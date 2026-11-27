@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 
-import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
@@ -10,7 +9,6 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AuthApi,
   assertAuthServerConfig,
-  cliAccessTokenKey,
   authBrowserConfig,
   authServerConfig,
   AuthUnavailableError,
@@ -54,7 +52,6 @@ import {
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   type EmailIdentifierAdded,
   IdentityApi,
@@ -620,6 +617,7 @@ export class AuthModule implements AuthApiContract {
 
     const cliDeviceDirectory = CliDeviceDirectoryService.create({
       people: repositories.directory,
+      users: dependencies.users,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
     });
@@ -988,36 +986,10 @@ export class AuthModule implements AuthApiContract {
     return this.#sessions.resolveBrowserSession(input);
   }
 
-  async getCliAccessSession(input: {
+  getCliAccessSession(input: {
     authorization: string;
   }): Promise<CliAccessSession & Readonly<{ tokenKey: string }>> {
-    const token = CliDeviceSessionService.extractBearerCliAccessToken(input.authorization);
-    const record = await this.#cliSessions
-      .getAccessToken(input.authorization)
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "cli_session_record_not_found") {
-          throw new OrganizationInvalidCredentialsError();
-        }
-        throw error;
-      });
-    if (token === null) throw new OrganizationInvalidCredentialsError();
-
-    return {
-      userId: record.user_id,
-      organizationId: record.organization_id,
-      ...(record.project_id ? { projectId: record.project_id } : {}),
-      ...(record.project_locked ? { projectLocked: true } : {}),
-      tokenKey: cliAccessTokenKey(token),
-      ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
-      ...(record.client_info
-        ? {
-            clientInfo: {
-              deviceLabel: record.client_info.device_label,
-              hostname: record.client_info.hostname,
-            },
-          }
-        : {}),
-    };
+    return this.#cliDeviceFlow.getAccessSession(input);
   }
 
   /** The API door's reader for a project-bound bearer; auth's own, not an `AuthApi` operation. */

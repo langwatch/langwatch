@@ -136,18 +136,19 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     But a runtime host that is neither amazonaws.com nor on the allowlist is still refused
 
   @unit
-  Scenario Outline: A provider on a private address is dispatched to only with the private-network guard off
-    The allowlist does not lift the refusal at dispatch: every custom endpoint
-    shares one Bifrost provider, so it would lift it for every host.
+  Scenario Outline: A provider on a private address is dispatched to only when the egress policy admits its host
+    Every provider connection goes through the gateway's egress proxy, which
+    judges each host on its own, so the allowlist lifts the refusal for the
+    hosts it names and no other.
 
     Given BLOCK_LOCAL_HTTP_CALLS is <block> and ALLOWED_PROXY_HOSTS is <allowlist>
-    When the gateway configures a provider for dispatch
-    Then its connections to private addresses are <outcome>
+    When the gateway dispatches to "llm-proxy.internal" on a private address
+    Then the connection is <outcome>
 
     Examples:
       | block   | allowlist                 | outcome |
       | "false" | empty                     | allowed |
-      | "true"  | "llm-proxy.internal"      | refused |
+      | "true"  | "llm-proxy.internal"      | allowed |
       | "true"  | empty                     | refused |
 
   Scenario: An endpoint that fell out of recent use still works when dispatched to again

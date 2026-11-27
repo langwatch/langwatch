@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -34,6 +35,21 @@ func newCustomerEndpointPolicy(blockLocal, requireHTTPS bool, allowedHosts []str
 		requireHTTPS: requireHTTPS,
 		resolve:      defaultEndpointResolver,
 	}
+}
+
+// withLookup resolves through lookup for the endpoint check and the egress
+// dialer alike (tests).
+func (p customerEndpointPolicy) withLookup(lookup ssrf.Lookup) customerEndpointPolicy {
+	p.egress = p.egress.WithLookup(lookup)
+	p.resolve = func(ctx context.Context, host string) ([]net.IP, error) {
+		addrs, err := lookup(ctx, host)
+		ips := make([]net.IP, 0, len(addrs))
+		for _, addr := range addrs {
+			ips = append(ips, net.IP(addr.AsSlice()))
+		}
+		return ips, err
+	}
+	return p
 }
 
 func defaultEndpointResolver(ctx context.Context, host string) ([]net.IP, error) {
@@ -68,12 +84,11 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 		return fmt.Errorf("customer endpoint host is reserved for cloud metadata")
 	}
 
-	allowlisted := policy.egress.Allowlisted(host)
 	if policy.requireHTTPS && scheme != "https" {
 		return fmt.Errorf("customer endpoint must use https")
 	}
 	if parsed := net.ParseIP(host); parsed != nil {
-		return egress.AddressError(parsed, policy.egress.BlockLocal, allowlisted)
+		return policy.egress.AddressError(parsed, host)
 	}
 
 	addresses, err := policy.resolve(ctx, host)
@@ -84,7 +99,7 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 		return fmt.Errorf("customer endpoint host has no address records")
 	}
 	for _, address := range addresses {
-		if err := egress.AddressError(address, policy.egress.BlockLocal, allowlisted); err != nil {
+		if err := policy.egress.AddressError(address, host); err != nil {
 			return err
 		}
 	}

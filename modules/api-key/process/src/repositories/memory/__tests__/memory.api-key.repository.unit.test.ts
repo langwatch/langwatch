@@ -68,6 +68,14 @@ describe("given the memory API-key repository", () => {
       expect(await keys.findByLookupId({ lookupId: created.lookupId })).toBeNull();
     });
 
+    it("answers an ownerless key whatever happens to the people around it", async () => {
+      const { repository: keys, memory } = repository();
+      await keys.create(record({ userId: null, createdByUserId: "user_1", lookupId: "lookup_3" }));
+      memory.deactivateUser("user_1");
+
+      expect(await keys.findByLookupId({ lookupId: "lookup_3" })).not.toBeNull();
+    });
+
     it("answers the key of an active owner", async () => {
       const { repository: keys } = repository();
       await keys.create(record({ userId: "user_1", lookupId: "lookup_2" }));

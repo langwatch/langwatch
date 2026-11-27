@@ -24,7 +24,11 @@ import { CliDeviceApproveService } from "./cli-device-approve.service.ts";
 import type { CliDeviceDirectory } from "./cli-device-directory.service.ts";
 import { CliDeviceExchangeService } from "./cli-device-exchange.service.ts";
 import { CliDeviceKeysService } from "./cli-device-keys.service.ts";
-import { CliDeviceRotationService, type CliRotatedSession } from "./cli-device-rotation.service.ts";
+import {
+  CliDeviceRotationService,
+  type CliAccessSessionRead,
+  type CliRotatedSession,
+} from "./cli-device-rotation.service.ts";
 import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,
@@ -149,6 +153,10 @@ export class CliDeviceFlowService {
 
   getAccessProject(input: { authorization: string }): Promise<CliAccessProject> {
     return this.#rotation.getAccessProject(input);
+  }
+
+  getAccessSession(input: { authorization: string }): Promise<CliAccessSessionRead> {
+    return this.#rotation.getAccessSession(input);
   }
 
   lookupDeviceCode(input: CliDeviceCodeLookup): Promise<CliDeviceFlowAnswer> {

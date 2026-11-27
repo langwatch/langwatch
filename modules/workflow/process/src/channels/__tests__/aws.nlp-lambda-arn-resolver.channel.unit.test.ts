@@ -10,6 +10,7 @@ import {
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -186,6 +187,28 @@ describe("given a project whose studio engine needs a function", () => {
       ).Variables;
       expect(variables).toEqual({ ...desired, UNMANAGED: "keep-me" });
       expect(variables.CACHE_BUCKET).toBe("langwatch-nlp-cache");
+    });
+
+    it("drops the engine hop's shared secret a function carries out of band", async () => {
+      const carrying = deployed({
+        Environment: {
+          Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand", UNMANAGED: "keep-me" },
+        },
+      });
+      const { sent, subject } = resolver({
+        reads: [
+          { Configuration: carrying },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: carrying },
+          { Configuration: READY },
+        ],
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(updates(sent)).toHaveLength(1);
+      expect(
+        (updates(sent)[0]!.input.Environment as { Variables: Record<string, string> }).Variables,
+      ).toEqual({ ...desired, UNMANAGED: "keep-me" });
     });
 
     /** @scenario "A Lambda still on the old 1024 MB default is raised to 2048" */

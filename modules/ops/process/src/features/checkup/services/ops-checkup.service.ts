@@ -62,6 +62,8 @@ interface OpsCheckupDependencies {
     readonly cloudNotices: CloudNoticeRepository;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
+  /** Signs the gateway's `/internal/*` GETs; unset, the control-plane row reads not checked. */
+  readonly gatewayInternalSecret: string | undefined;
   /** The ops health the usage report carries; left out where the process composes none. */
   readonly opsHealth?: Pick<OpsHealthService, "read">;
 }
@@ -89,10 +91,12 @@ export class OpsCheckupService {
     gateway,
     probes,
     publicBaseUrl,
+    internalSecret,
   }: {
     gateway: OpsCheckupDependencies["peers"]["gateway"];
     probes: OpsCheckupDependencies["channels"]["probes"];
     publicBaseUrl: string | undefined;
+    internalSecret: string | undefined;
   }): ReturnType<CheckupFacts["gateway"]> {
     const { baseUrl, expectedControlPlaneUrl } = gateway.getDeploymentAddresses();
     return {
@@ -107,7 +111,7 @@ export class OpsCheckupService {
           throw new Error(`answered ${answer.status}`);
         }
       },
-      probeControlPlane: () => probeControlPlane({ probes, baseUrl }),
+      probeControlPlane: () => probeControlPlane({ probes, baseUrl, internalSecret }),
     };
   }
 
@@ -119,7 +123,7 @@ export class OpsCheckupService {
     repositories,
     channels,
     opsHealth,
-  }: OpsCheckupDependencies): UsageReportService {
+  }: Omit<OpsCheckupDependencies, "gatewayInternalSecret">): UsageReportService {
     const collection = UsageReportCollectionService.create({
       peers,
       opsHealth,
@@ -152,6 +156,7 @@ export class OpsCheckupService {
     peers,
     repositories,
     channels,
+    gatewayInternalSecret,
     opsHealth,
   }: OpsCheckupDependencies): OpsCheckupService {
     const usageReports = OpsCheckupService.usageReportsOf({
@@ -193,6 +198,7 @@ export class OpsCheckupService {
           gateway: peers.gateway,
           probes: channels.probes,
           publicBaseUrl: facts.publicBaseUrl,
+          internalSecret: gatewayInternalSecret,
         }),
       license: async () => licenseView(await peers.licensing.getLicenseStatus(organizationId)),
       connect: connectFact({ licensing: peers.licensing, organizationId }),

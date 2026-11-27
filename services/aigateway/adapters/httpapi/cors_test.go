@@ -239,7 +239,7 @@ func TestCORS_AnyOrigin(t *testing.T) {
 func TestCORS_OnlyOnPublicV1(t *testing.T) {
 	router := corsRouter(t, &corsWorld{}, "*")
 
-	for _, path := range []string{"/healthz", "/health", "/debug/control-plane"} {
+	for _, path := range []string{"/healthz", "/health", "/internal/control-plane"} {
 		t.Run(path, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			req.Header.Set("Origin", corsPageOrigin)

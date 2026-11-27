@@ -111,6 +111,15 @@ spec:
             - name: CPU_COUNT
               value: {{ include "langwatch.langevals.cpuCount" . | quote }}
             {{- end }}
+            {{- /* Outbound policy for evaluator model calls; extraEnvs may override it. */}}
+            {{- if not (has "BLOCK_LOCAL_HTTP_CALLS" $envNames) }}
+            - name: BLOCK_LOCAL_HTTP_CALLS
+              value: {{ ternary "true" "false" (ne (toString .Values.langevals.security.blockLocalHTTPCalls) "false") | quote }}
+            {{- end }}
+            {{- if and .Values.langevals.security.allowedProxyHosts (not (has "ALLOWED_PROXY_HOSTS" $envNames)) }}
+            - name: ALLOWED_PROXY_HOSTS
+              value: {{ join "," .Values.langevals.security.allowedProxyHosts | quote }}
+            {{- end }}
             {{- with .Values.langevals.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}

@@ -1,8 +1,13 @@
 /**
  * @vitest-environment node
- * `GET /api/image-proxy` pinned to main's statuses, bodies and cache header.
+ * `GET /api/image-proxy` pinned to main's statuses, bodies and cache header, for signed-in callers.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { SessionReader } from "@langwatch/api/hosting";
+import {
+  BrowserSessionIdentity,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -15,6 +20,7 @@ import { MemoryExternalImageChannel } from "../../channels/memory/memory.externa
 import { storedObjectImageProxyRest } from "../stored-object-image-proxy.rest.ts";
 
 const PNG = new Uint8Array([137, 80, 78, 71]);
+const SIGNED_IN = "session=signed-in";
 
 const answered = (over: Partial<ExternalImageResponse>): ExternalImageResponse => ({
   ok: true,
@@ -39,33 +45,60 @@ function proxy() {
     }),
   });
   const app = createStoredObjectTestApp({ images });
+  const door = BrowserSessionIdentity.create({
+    sessions: SessionReader.create({
+      verify: async (request: Request) =>
+        request.headers.get("cookie") === SIGNED_IN ? { userId: "user_1" } : null,
+    }),
+    authz: {
+      getDecision: async () => ({ permitted: false, organizationRole: null }),
+      getPlatformDecision: async () => ({ permitted: false }),
+    },
+    publicBaseUrl: void 0,
+  });
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
-    identity: {
-      authenticate: () => {
-        throw new Error("The image proxy asks no credential.");
-      },
-      identify: () => ({ actor: null, scope: null }),
-    },
+    identity: door,
+    doors: { browser: door },
   });
   const hono = runtime.mount(storedObjectImageProxyRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
   });
 
-  return (query: string) => hono.fetch(new Request(`http://api.test/api/image-proxy${query}`));
+  const ask = (query: string, cookie: string | null = SIGNED_IN) =>
+    hono.fetch(
+      new Request(`http://api.test/api/image-proxy${query}`, {
+        headers: cookie ? { cookie } : {},
+      }),
+    );
+
+  return Object.assign(ask, { images });
 }
 
 const at = (url: string) => `?url=${encodeURIComponent(url)}`;
 
 describe("GET /api/image-proxy", () => {
+  describe("given a caller who is not signed in", () => {
+    /** @scenario "the image proxy refuses a caller who is not signed in" */
+    it("answers 401 and fetches nothing", async () => {
+      const ask = proxy();
+
+      const response = await ask(at("https://pics.test/cat.png"), null);
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ code: "unauthorized" });
+      expect(ask.images.requested).toEqual([]);
+    });
+  });
+
   /** @scenario "the image proxy serves a picture with a year-long cache" */
   it("serves the picture with its media type, main's cache header and the read headers", async () => {
     const response = await proxy()(at("https://pics.test/cat.png"));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
-    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=31536000");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(PNG);
   });

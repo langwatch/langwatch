@@ -48,12 +48,12 @@ type RouterDeps struct {
 	TraceRegistry         *customertracebridge.Registry
 	DefaultExportEndpoint string
 	// OTTLServer handles /internal/validate-ottl and /internal/transform.
-	// Optional; when nil, the /internal/* routes are not mounted. The
-	// service runs without it for backwards-compat with old configs that
-	// don't expect ingestion-source OTTL traffic.
+	// Optional; when nil, those two routes are not mounted. The service
+	// runs without it for backwards-compat with old configs that don't
+	// expect ingestion-source OTTL traffic.
 	OTTLServer *ottlserver.Server
 	// InternalSecret is the HMAC shared secret protecting /internal/*.
-	// Required when OTTLServer is set.
+	// Empty refuses every /internal/* request (fail closed).
 	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
 	// config.DefaultMaxRequestBodyBytes (32 MiB), which fits a 1M-context
@@ -82,10 +82,9 @@ type RouterDeps struct {
 	CORSAllowedOrigins []string
 	// ControlPlaneBaseURL is the resolved control-plane target this
 	// gateway process ships spend, budget and auth traffic to. Surfaced
-	// read-only on GET /debug/control-plane so dev tooling can tell a
-	// stale or foreign gateway apart from this worktree's own before
-	// reusing an already-bound port (specs/setup/
-	// aigateway-control-plane-target.feature).
+	// read-only on the signed GET /internal/control-plane so the app's
+	// checkup can tell a gateway pointed at another install apart from
+	// its own (specs/setup/aigateway-control-plane-target.feature).
 	ControlPlaneBaseURL string
 	// WebhookRelay forwards a vendor post-call delivery to the control
 	// plane, which owns the per-tenant secret that verifies it. Optional;
@@ -153,13 +152,6 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Head("/health", statusRoute)
 
 	// /metrics is not served here: the scrape has its own listener (ADR-175).
-
-	// Unauthenticated and kept off the public ingress the same way as the
-	// probes above (the gateway Ingress in charts/langwatch/templates/ingress.yaml
-	// allowlists only /v1, /a2a and the exact /health path). Reveals nothing but
-	// a URL: dev tooling polls it to verify an already-running gateway
-	// before trusting it on a reused port.
-	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
 		// Opt-in, and first so a preflight never reaches auth and a refusal
@@ -260,19 +252,19 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1beta.HandleFunc("/*", geminiPassthroughHandler(deps))
 	})
 
-	// Internal control-plane channel — protected by a shared HMAC
-	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
-	// LangWatch governance ingestion pipeline to validate and execute
-	// OTTL statements over inbound OTLP payloads. See
-	// `enterprise/modules/governance/process/src/channels/http/http.ottl-transform.channel.ts`
-	// for the matching client.
-	if deps.OTTLServer != nil {
-		r.Route("/internal", func(in chi.Router) {
-			in.Use(InternalAuthMiddleware(deps.InternalSecret))
+	// Internal control-plane channel, protected by the shared HMAC secret
+	// (`LW_GATEWAY_INTERNAL_SECRET`). The OTTL routes serve the governance
+	// ingestion pipeline (client: enterprise/modules/governance/process/src/
+	// channels/http/http.ottl-transform.channel.ts); /control-plane serves the
+	// app's checkup and is on no unsigned route.
+	r.Route("/internal", func(in chi.Router) {
+		in.Use(InternalAuthMiddleware(deps.InternalSecret))
+		in.Get("/control-plane", controlPlaneTargetHandler(deps.ControlPlaneBaseURL))
+		if deps.OTTLServer != nil {
 			in.Post("/validate-ottl", deps.OTTLServer.HandleValidate)
 			in.Post("/transform", deps.OTTLServer.HandleTransform)
-		})
-	}
+		}
+	})
 
 	return r
 }

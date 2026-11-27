@@ -308,7 +308,8 @@ type served struct {
 
 // admit is the last check before a resolved bundle serves. It refuses a key the
 // change feed revoked after its confirmation began, and, when FailClosedAfter
-// is set, a key nothing confirmed recently while its org's feed is silent.
+// is set, a key nothing confirmed recently while its org's feed is silent. A
+// key past KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
 	if b.VirtualKeyID != "" {
@@ -318,14 +319,57 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 			}
 		}
 	}
-	if s.failClosedAfter > 0 && s.feedSilent(b.OrganizationID) &&
+	if s.failClosedAfter > 0 && s.feedSilentFor(b.OrganizationID, s.failClosedAfter) &&
 		time.Since(authStart) > s.failClosedAfter {
 		// Resolve counts this refusal once the key re-check has had its say.
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 			"message": "control plane unreachable and this gateway refuses keys it cannot re-check; retry shortly",
 		}).WithRetryable(true)
 	}
+	if s.keyRecheckAfter > 0 && time.Since(authStart) > s.keyRecheckAfter &&
+		s.feedSilentFor(b.OrganizationID, s.keyRecheckAfter) {
+		return b, errKeyRecheckDue
+	}
 	return b, nil
+}
+
+// presentedKey is a credential as presented and the hash it is cached under.
+type presentedKey struct {
+	key domain.PresentedKey
+	h   [64]byte
+}
+
+// errKeyRecheckDue is admit's answer for a key neither the control plane nor
+// its org's change feed vouched for within KeyRecheckAfter: Resolve checks it
+// once more before it serves (recheckKey).
+var errKeyRecheckDue = errors.New("key re-check due")
+
+// recheckKey checks a key the change feed has not vouched for lately. A
+// refusal stands. A check that cannot reach the control plane, or that runs
+// past keyRecheckWait, serves the cached answer; the check still evicts a key
+// it finds refused, so the next request is refused. fresh reports a new answer.
+func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (answer served, fresh bool, err error) {
+	call := s.joinReconfirm(k.key, k.h)
+	if call == nil {
+		return cached, false, nil
+	}
+	timer := time.NewTimer(keyRecheckWait)
+	defer timer.Stop()
+	select {
+	case <-call.done:
+	case <-timer.C:
+		return cached, false, nil
+	case <-ctx.Done():
+		return cached, false, nil
+	}
+	switch {
+	case call.err == nil:
+		return call.answer, true, nil
+	case classifyRefreshError(call.err) == classTransportFailure:
+		return cached, false, nil
+	default:
+		return served{}, false, call.err
+	}
 }
 
 // errPendingDenial is admit's answer when a pending denial voided the
@@ -363,6 +407,9 @@ func (s *Service) reaskVoided(ctx context.Context, key domain.PresentedKey, h [6
 		return nil, err
 	}
 	bundle, err := s.admit(ctx, h, answer)
+	if errors.Is(err, errKeyRecheckDue) {
+		err = nil // the answer is the re-check
+	}
 	if errors.Is(err, errPendingDenial) {
 		return nil, errReaskUnavailable(ctx, err)
 	}
@@ -508,19 +555,29 @@ func (s *Service) dropRejected(h [64]byte, err error) {
 	s.logger.Error("auth_cache_hard_evict", zap.String("reason", "reconfirm_rejection"), zap.Error(err))
 }
 
-// FailClosedReconfirmInterval bounds the re-checks fail closed makes per key.
+// FailClosedReconfirmInterval bounds the re-checks fail closed and the key
+// re-check make per key.
 const FailClosedReconfirmInterval = 5 * time.Second
 
-// feedSilent reports whether the org's change feed has gone without an answer
-// for longer than FailClosedAfter.
-func (s *Service) feedSilent(orgID string) bool {
+// DefaultKeyRecheckAfter is the KeyRecheckAfter used when none is set: a
+// disable or revoke the change feed could not carry lands within about this
+// long, as long as the control plane answers.
+const DefaultKeyRecheckAfter = 60 * time.Second
+
+// keyRecheckWait is how long a request waits on a key re-check before it
+// serves the cached key, so a slow control plane adds bounded latency.
+const keyRecheckWait = 2 * time.Second
+
+// feedSilentFor reports whether the org's change feed has gone without an
+// answer for longer than limit.
+func (s *Service) feedSilentFor(orgID string, limit time.Duration) bool {
 	v, ok := s.activeOrgs.Load(orgID)
 	if !ok {
 		return true
 	}
 	c, _ := v.(*orgCursor)
 	polled := c.polledAt.Load()
-	return polled == 0 || time.Duration(monoStamp(0)-polled) > s.failClosedAfter
+	return polled == 0 || time.Duration(monoStamp(0)-polled) > limit
 }
 
 // refusalIfDenied answers a credential the change feed denied, and that nothing

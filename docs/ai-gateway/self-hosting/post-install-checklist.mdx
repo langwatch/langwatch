@@ -50,14 +50,14 @@ Expected:
 
 A `503` with `"control_plane":"unreachable for Ns"` means one of two things: the gateway cannot reach `LW_GATEWAY_BASE_URL`, or `LW_GATEWAY_INTERNAL_SECRET` differs between the app and the gateway pods. The probe runs every 15 seconds and the verdict flips after 60 seconds without a success, so wait one minute after a fix before you read it again. The log line `statusprobe_control_plane_unreachable` on the gateway pod carries the underlying error.
 
-Confirm which control plane URL the pod resolved:
+Confirm which control plane URL the gateway is configured with:
 
 ```bash
-kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/debug/control-plane
+kubectl -n langwatch get configmap langwatch-gateway \
+  -o jsonpath='{.data.LW_GATEWAY_BASE_URL}'
 ```
 
-Expected: `{"control_plane_base_url":"http://langwatch-app:5560"}`.
+Expected: `http://langwatch-app:5560`. The gateway row in **Settings > Checkup** asks the running gateway the same question over the signed internal channel.
 
 ## 4. The public hostname serves TLS
 

@@ -52,6 +52,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     return this.database.apiKey.findFirst({
       where: {
         lookupId: input.lookupId,
+        // An ownerless (project or service) key belongs to no person, so only revocation ends it.
         OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
     });

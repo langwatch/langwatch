@@ -1,3 +1,5 @@
+import { createHash, createHmac } from "node:crypto";
+
 /**
  * The checkup's facts, each answered by the module that owns it.
  * Spec: specs/self-hosting/checkup/checkup.feature
@@ -92,6 +94,7 @@ let mintedKeys: MintRunKeyInput[];
 let checkupProjectIds: string[];
 let createdKeys: CreateApiKeyInput[];
 let gatewayAddresses: GatewayDeploymentAddresses;
+let gatewayInternalSecret: string | undefined;
 let upgrade: ReturnType<typeof ledgerOf>;
 
 function checkup() {
@@ -177,6 +180,7 @@ function service() {
       usageReport: MemoryUsageReportChannel.create(),
       probes,
     },
+    gatewayInternalSecret,
   });
 }
 
@@ -203,6 +207,7 @@ beforeEach(() => {
     publicUrl: void 0,
     expectedControlPlaneUrl: "https://langwatch.acme.test",
   };
+  gatewayInternalSecret = "gateway-internal-test-secret";
   upgrade = ledgerOf([]);
 });
 
@@ -374,7 +379,7 @@ describe("OpsCheckupService", () => {
 
     it("refuses a gateway that reports another install as its control plane", async () => {
       gatewayAddresses = { ...gatewayAddresses, baseUrl: "http://gateway:5563" };
-      probes.answers.set("http://gateway:5563/debug/control-plane", {
+      probes.answers.set("http://gateway:5563/internal/control-plane", {
         status: 200,
         body: { control_plane_base_url: "https://someone-else.test" },
       });
@@ -384,6 +389,39 @@ describe("OpsCheckupService", () => {
       expect(rows.find((row) => row.id === "gateway_control_plane")?.verdict).toMatchObject({
         outcome: "refused",
         code: "checkup_gateway_control_plane_mismatch",
+      });
+    });
+
+    it("signs the control-plane GET with the gateway's internal secret", async () => {
+      gatewayAddresses = { ...gatewayAddresses, baseUrl: "http://gateway:5563" };
+
+      await checkup().explicit({ checks: ["gateway_control_plane"] });
+
+      const sent = probes.gets.find(
+        ({ url }) => url === "http://gateway:5563/internal/control-plane",
+      );
+      const timestamp = sent?.headers["X-LangWatch-Gateway-Timestamp"] ?? "";
+      const emptyBodyHash = createHash("sha256").update("").digest("hex");
+      expect(sent?.headers["X-LangWatch-Gateway-Signature"]).toBe(
+        createHmac("sha256", "gateway-internal-test-secret")
+          .update(`GET\n/internal/control-plane\n${timestamp}\n${emptyBodyHash}`)
+          .digest("hex"),
+      );
+      expect(Math.abs(Number(timestamp) - Date.now() / 1000)).toBeLessThan(300);
+    });
+
+    describe("when this app holds no gateway internal secret", () => {
+      it("leaves the control-plane row unchecked and asks the gateway nothing", async () => {
+        gatewayAddresses = { ...gatewayAddresses, baseUrl: "http://gateway:5563" };
+        gatewayInternalSecret = undefined;
+
+        const { rows } = await checkup().explicit({ checks: ["gateway_control_plane"] });
+
+        expect(rows.find((row) => row.id === "gateway_control_plane")?.verdict).toMatchObject({
+          outcome: "unchecked",
+          detail: expect.stringContaining("LW_GATEWAY_INTERNAL_SECRET"),
+        });
+        expect(probes.asked).not.toContain("http://gateway:5563/internal/control-plane");
       });
     });
   });

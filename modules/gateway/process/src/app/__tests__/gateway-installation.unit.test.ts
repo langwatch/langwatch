@@ -13,6 +13,7 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
+import { gatewayInternalSignatureHeaders } from "@langwatch/process/gateway-internal-signature";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -29,10 +30,6 @@ import type { GatewayGuardrailCheckRow } from "../../repositories/gateway-guardr
 import type { OpenAdmission } from "../../repositories/gateway-open-admissions.repository.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-} from "../../rules/gateway-internal-identity.rules.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import { signedGatewayRequest } from "../../transport/__tests__/support/gateway-internal-rest.harness.ts";
 import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
@@ -254,18 +251,15 @@ function installedApp(state: InstalledGateway): GatewayModule {
 }
 
 function signedHealthRequest(): Request {
-  const timestamp = String(Math.floor(Date.now() / 1000));
   const path = "/api/internal/gateway/health";
-  const signature = computeGatewaySignature(
-    INTERNAL_SECRET,
-    buildGatewayCanonicalString({ method: "GET", path, timestamp, body: "" }),
-  );
 
   return new Request(`http://api.test${path}`, {
-    headers: {
-      "X-LangWatch-Gateway-Signature": signature,
-      "X-LangWatch-Gateway-Timestamp": timestamp,
-    },
+    headers: gatewayInternalSignatureHeaders({
+      secret: INTERNAL_SECRET,
+      method: "GET",
+      path,
+      nowMs: Date.now(),
+    }),
   });
 }
 

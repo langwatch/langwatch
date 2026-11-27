@@ -3,6 +3,7 @@ import {
   sanitizeFilenameSegment,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "@langwatch/api/rest";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { isReadbackSafe, type ImageProxyRequest } from "@langwatch/stored-object-contract";
 
 import {
@@ -10,8 +11,11 @@ import {
   ExternalImageTooLargeError,
 } from "../channels/external-image.channel.ts";
 
-/** Pictures are immutable at their address, so the browser may keep one for a year. */
-const IMAGE_CACHE_CONTROL = "public, max-age=31536000";
+/**
+ * Pictures are immutable at their address, so the browser may keep one for a year; private, so no
+ * shared cache hands a signed-in caller's picture to anyone else.
+ */
+const IMAGE_CACHE_CONTROL = "private, max-age=31536000";
 
 /** Every answer carries stored-object's read headers, so relayed bytes cannot run as a page. */
 const relayed = (
@@ -36,19 +40,42 @@ const proxiedFilename = (requestedUrl: string): string => {
   return sanitizeFilenameSegment(segments[segments.length - 1] ?? "") || "image";
 };
 
+/** The host a requested address names, or `none`; the path and query may carry a secret. */
+const loggedHostOf = (requestedUrl: string | undefined): string =>
+  requestedUrl && URL.canParse(requestedUrl) ? new URL(requestedUrl).hostname : "none";
+
 /** `GET /api/image-proxy`, answering each outcome with main's status and body. */
 export class ImageProxyService {
   readonly #images: ExternalImageChannel;
+  readonly #logger: Pick<Logger, "info" | "warn">;
 
-  private constructor(images: ExternalImageChannel) {
+  private constructor(images: ExternalImageChannel, logger: Pick<Logger, "info" | "warn">) {
     this.#images = images;
+    this.#logger = logger;
   }
 
-  static create(options: { images: ExternalImageChannel }): ImageProxyService {
-    return new ImageProxyService(options.images);
+  static create({
+    images,
+    logger = createLogger("langwatch:stored-object:image-proxy"),
+  }: {
+    images: ExternalImageChannel;
+    logger?: Pick<Logger, "info" | "warn">;
+  }): ImageProxyService {
+    return new ImageProxyService(images, logger);
   }
 
+  /** One log line per request, naming only the host the picture was asked of. */
   async proxy({ url }: ImageProxyRequest): Promise<Response> {
+    const answer = await this.#answer(url);
+    const host = loggedHostOf(url);
+    if (answer.ok)
+      this.#logger.info({ host, status: answer.status }, "Image proxy relayed a picture");
+    else this.#logger.warn({ host, status: answer.status }, "Image proxy refused a picture");
+
+    return answer;
+  }
+
+  async #answer(url: string | undefined): Promise<Response> {
     if (!url) return refusal(400, "Missing url");
 
     try {

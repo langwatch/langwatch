@@ -191,9 +191,8 @@ if [ "${LANGWATCH_SKIP_AIGATEWAY:-}" != "1" ]; then
     # A reused gateway ships ITS OWN spend, budget and auth traffic to whatever
     # control plane it was started with, which is not necessarily this
     # worktree's. Nothing about a proxying, 200-returning gateway reveals that.
-    # The check that used to ask it directly (GET /debug/control-plane) went
-    # with the platform application and has no home yet, so this is a bare
-    # warning until it does.
+    # The gateway reports its target only on the signed /internal/control-plane
+    # route, and nothing here signs requests yet, so this is a bare warning.
     echo "  ✓ aigateway: already running on :$GATEWAY_PORT, reusing"
     echo "  ! aigateway: that process may point at ANOTHER worktree's control plane; this one is ${LW_GATEWAY_BASE_URL}"
   else

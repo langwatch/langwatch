@@ -1440,6 +1440,17 @@ langevals:
     requests: { cpu: 1000m, memory: 6Gi }
     limits: { cpu: 2000m, memory: 8Gi }
 
+  # Outbound policy for the model calls LLM evaluators make to a caller-supplied
+  # base URL, the same policy and variable names the NLP service and the gateway
+  # read. On by default: an evaluator only needs public model providers, and a
+  # model server on your own network is reached by naming it in
+  # allowedProxyHosts. Cloud metadata is refused either way.
+  ## @param langevals.security.blockLocalHTTPCalls [default: true] Refuse evaluator model calls to private, loopback and link-local addresses.
+  ## @param langevals.security.allowedProxyHosts [array, default: []] Hostnames evaluators may reach even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.
+  security:
+    blockLocalHTTPCalls: true
+    allowedProxyHosts: []
+
   # =============================================================================
   # Kubernetes Pass-Through Configuration
   # =============================================================================

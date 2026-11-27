@@ -5,6 +5,7 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -66,6 +67,20 @@ describe("given a deployment that fronts the studio engine with a Lambda fleet",
         CACHE_BUCKET: "langwatch-nlp-cache",
         NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "600",
       });
+    });
+  });
+
+  describe("when the environment is built", () => {
+    it("never names the engine hop's shared secret", () => {
+      const config = buildStudioLambdaConfig({
+        fields: FIELDS,
+        langwatchEndpoint: "https://app.langwatch.test",
+        codeBlockTimeoutRawValue: undefined,
+        stagingThresholdBytesRawValue: undefined,
+        stagingTtlSecondsRawValue: undefined,
+      });
+
+      expect(buildStudioLambdaEnvironment(config)).not.toHaveProperty(NLP_INTERNAL_SECRET_ENV);
     });
   });
 

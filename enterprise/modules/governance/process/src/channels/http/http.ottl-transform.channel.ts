@@ -32,7 +32,7 @@
  * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
  */
 
-import { createHash, createHmac } from "crypto";
+import { gatewayInternalSignatureHeaders } from "@langwatch/process/gateway-internal-signature";
 
 import {
   GovernanceOttlGateway,
@@ -68,36 +68,6 @@ interface RawTransformResponse {
     col?: number;
     message?: string;
   }[];
-}
-
-/**
- * Compose the canonical signing string used by the gateway-internal
- * channel:
- *   METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
- *
- * Mirrors `buildGatewayCanonicalString` in
- * `src/server/routes/gateway-internal.ts`. Imported via duplication
- * rather than cross-package import — that file lives under `src/` and
- * pulls in Hono context types we don't want in this lightweight EE
- * service module.
- */
-function canonical({
-  method,
-  path,
-  timestamp,
-  body,
-}: {
-  method: string;
-  path: string;
-  timestamp: string;
-  body: string;
-}): string {
-  const bodyHash = createHash("sha256").update(body).digest("hex");
-  return `${method}\n${path}\n${timestamp}\n${bodyHash}`;
-}
-
-function sign(secret: string, canonicalString: string): string {
-  return createHmac("sha256", secret).update(canonicalString).digest("hex");
 }
 
 function normaliseErrors(raw: RawValidateResponse | RawTransformResponse): OttlValidationError[] {
@@ -211,18 +181,18 @@ export class HttpOttlTransformChannel extends GovernanceOttlGateway {
         "LW_GATEWAY_INTERNAL_URL (or legacy LW_GATEWAY_BASE_URL) and LW_GATEWAY_INTERNAL_SECRET must both be set for OTTL endpoints",
       );
     }
-    const timestamp = Math.floor(this.now() / 1_000).toString();
     const bodyJson = JSON.stringify(body);
-    const signature = sign(
-      this.secret,
-      canonical({ method: "POST", path, timestamp, body: bodyJson }),
-    );
     return this.request(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-LangWatch-Gateway-Signature": signature,
-        "X-LangWatch-Gateway-Timestamp": timestamp,
+        ...gatewayInternalSignatureHeaders({
+          secret: this.secret,
+          method: "POST",
+          path,
+          body: bodyJson,
+          nowMs: this.now(),
+        }),
         "X-LangWatch-Gateway-Node": "control-plane",
       },
       body: bodyJson,

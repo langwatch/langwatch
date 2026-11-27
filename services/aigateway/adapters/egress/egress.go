@@ -1,7 +1,8 @@
 // Package egress is the gateway's one rule for calling a customer-configured
 // host: which resolved addresses it may reach (BLOCK_LOCAL_HTTP_CALLS and
-// ALLOWED_PROXY_HOSTS over pkg/ssrf) and the dialer that checks every address
-// immediately before it connects. Provider endpoints and A2A targets share it.
+// ALLOWED_PROXY_HOSTS over pkg/ssrf), the dialer that resolves once and
+// connects only to an address it checked, and the CONNECT proxy that gives
+// Bifrost's provider clients that same dialer. Provider and A2A calls share it.
 package egress
 
 import (
@@ -10,7 +11,6 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/ssrf"
@@ -31,6 +31,7 @@ func (blockedError) Is(target error) bool { return target == ErrBlocked }
 type Policy struct {
 	BlockLocal bool
 	allowed    map[string]struct{}
+	lookup     ssrf.Lookup
 }
 
 // NewPolicy builds a policy from BLOCK_LOCAL_HTTP_CALLS and ALLOWED_PROXY_HOSTS.
@@ -44,6 +45,12 @@ func NewPolicy(blockLocal bool, allowedHosts []string) Policy {
 	return policy
 }
 
+// WithLookup replaces the system resolver the dialer uses (tests).
+func (p Policy) WithLookup(lookup ssrf.Lookup) Policy {
+	p.lookup = lookup
+	return p
+}
+
 // NormalizeHost is the spelling hosts are compared in.
 func NormalizeHost(host string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
@@ -55,73 +62,99 @@ func (p Policy) Allowlisted(host string) bool {
 	return ok
 }
 
-// AddressError maps a literal or resolved address onto pkg/ssrf. Cloud
-// metadata, unspecified and link-local addresses are refused even when
-// allowlisted: none is ever a legitimate customer endpoint. Every other
-// non-public address is refused only when blockLocal and not allowlisted.
-func AddressError(ip net.IP, blockLocal, allowlisted bool) error {
+// AddressError judges one literal or resolved address for host, the name
+// (or literal) the URL gives. Only that host is matched against the
+// allowlist, never the address it resolves to: listing an IP must not admit
+// every name that points at it.
+func (p Policy) AddressError(ip net.IP, host string) error {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		return blockedError("customer endpoint resolves to an unparseable address")
 	}
+	return p.addrError(addr, NormalizeHost(host))
+}
+
+// addrError maps an address onto pkg/ssrf. Cloud metadata, unspecified and
+// link-local addresses are refused even when allowlisted. Other non-public
+// addresses are refused when BlockLocal and not allowlisted. Loopback needs
+// more: a loopback name or the allowlist, else a public name rebound to
+// 127.0.0.1 reaches this pod's own listeners with local calls allowed.
+func (p Policy) addrError(addr netip.Addr, host string) error {
 	addr = addr.Unmap()
+	allowlisted := host != "" && p.Allowlisted(host)
 	switch ssrf.Classify(addr) {
 	case ssrf.CategoryGlobal:
 		return nil
 	case ssrf.CategoryMetadata:
 		return blockedError("customer endpoint resolves to a reserved address")
 	case ssrf.CategorySpecial:
-		if addr.IsUnspecified() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() {
-			return blockedError("customer endpoint resolves to a reserved address")
-		}
-		if blockLocal && !allowlisted {
-			return blockedError("customer endpoint resolves to a non-public address")
-		}
+		return p.specialAddrError(addr, host, allowlisted)
 	}
 	return nil
 }
 
-// CheckDial applies the policy to the resolved "ip:port" a dialer is about to
-// connect to. Only the host the URL names (dialHost, a name or a literal IP)
-// is matched against the allowlist, never the address a name resolves to:
-// listing an IP must not admit every name that points at it.
+// specialAddrError judges a non-public address that is not cloud metadata.
+func (p Policy) specialAddrError(addr netip.Addr, host string, allowlisted bool) error {
+	switch {
+	case addr.IsUnspecified() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast():
+		return blockedError("customer endpoint resolves to a reserved address")
+	case allowlisted:
+		return nil
+	case p.BlockLocal:
+		return blockedError("customer endpoint resolves to a non-public address")
+	case addr.IsLoopback() && !ssrf.NamesLoopback(host):
+		return blockedError("customer endpoint resolves to loopback through a name that is not a loopback name")
+	}
+	return nil
+}
+
+// CheckDial applies the policy to the resolved "ip:port" a dial connects to.
+// dialHost is the name or literal the URL gives; empty means the URL gave
+// the address itself.
 func (p Policy) CheckDial(address, dialHost string) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return blockedError("customer endpoint address is not host:port")
 	}
-	ip := net.ParseIP(host)
-	if ip == nil {
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
 		return blockedError("customer endpoint did not resolve to an IP address")
 	}
-	return AddressError(ip, p.BlockLocal, dialHost != "" && p.Allowlisted(dialHost))
+	if dialHost == "" {
+		dialHost = host
+	}
+	return p.addrError(addr, NormalizeHost(dialHost))
 }
 
-// Dialer re-checks every resolved address against the policy immediately
-// before connecting, so DNS rebinding cannot slip past an earlier check.
-type Dialer struct{ dialer *net.Dialer }
+// check judges every address one dial resolved.
+func (p Policy) check(host string, addrs []netip.Addr) error {
+	if len(addrs) == 0 {
+		return blockedError("customer endpoint host has no address records")
+	}
+	host = NormalizeHost(strings.Trim(host, "[]"))
+	for _, addr := range addrs {
+		if err := p.addrError(addr, host); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-// dialHostKey carries the host a dial was asked for (before resolution) to
-// the pre-connect check, so an allowlisted name keeps its exemption there.
-type dialHostKey struct{}
+// Dialer resolves each dial once, judges every address against the policy,
+// and connects only to an address it judged (ssrf.PinnedDialer).
+type Dialer struct{ pinned ssrf.PinnedDialer }
 
-// Dialer builds the pre-connect checking dialer for this policy.
+// Dialer builds the pinned, policy-checking dialer for this policy.
 func (p Policy) Dialer(timeout time.Duration) Dialer {
-	return Dialer{dialer: &net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(ctx context.Context, _, address string, _ syscall.RawConn) error {
-			dialHost, _ := ctx.Value(dialHostKey{}).(string)
-			return p.CheckDial(address, dialHost)
-		},
+	return Dialer{pinned: ssrf.PinnedDialer{
+		Dialer: &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second},
+		Lookup: p.lookup,
+		Check:  p.check,
 	}}
 }
 
-// DialContext dials address, refusing it when the policy does not allow the
+// DialContext dials address, refusing it when the policy does not allow an
 // address it resolves to.
 func (d Dialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	if host, _, err := net.SplitHostPort(address); err == nil {
-		ctx = context.WithValue(ctx, dialHostKey{}, NormalizeHost(host))
-	}
-	return d.dialer.DialContext(ctx, network, address)
+	return d.pinned.DialContext(ctx, network, address)
 }

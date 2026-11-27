@@ -3,8 +3,9 @@
  * then the spend the gateway would have drained for each model call, signed as the gateway.
  * The Go gateway stamps spend with the time it serves a call, so history cannot go through it.
  */
-import { createHash, createHmac } from "node:crypto";
+import { createHash } from "node:crypto";
 
+import { gatewayInternalSignatureHeaders } from "@langwatch/process/gateway-internal-signature";
 import { nowInstant } from "@langwatch/time";
 
 import type { DemoHttp } from "./dashboards-demo-http.ts";
@@ -148,29 +149,14 @@ export async function sendSpend({
         method: "POST",
         path: SPEND_PATH,
         body,
-        headers: signatureHeaders({ secret, path: SPEND_PATH, body }),
+        headers: gatewayInternalSignatureHeaders({
+          secret,
+          method: "POST",
+          path: SPEND_PATH,
+          body,
+          nowMs: nowInstant().epochMilliseconds,
+        }),
       });
     },
   });
-}
-
-/** The gateway's request signature: HMAC over method, path, unix seconds and the body hash. */
-function signatureHeaders({
-  secret,
-  path,
-  body,
-}: {
-  secret: string;
-  path: string;
-  body: string;
-}): Record<string, string> {
-  const timestamp = String(Math.floor(nowInstant().epochMilliseconds / 1000));
-  const bodyHash = createHash("sha256").update(body).digest("hex");
-  const signature = createHmac("sha256", secret)
-    .update(`POST\n${path}\n${timestamp}\n${bodyHash}`)
-    .digest("hex");
-  return {
-    "X-LangWatch-Gateway-Signature": signature,
-    "X-LangWatch-Gateway-Timestamp": timestamp,
-  };
 }

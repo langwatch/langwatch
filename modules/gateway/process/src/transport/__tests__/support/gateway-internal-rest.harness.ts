@@ -5,15 +5,12 @@
  */
 import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { gatewayInternalSignatureHeaders } from "@langwatch/process/gateway-internal-signature";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-} from "../../../rules/gateway-internal-identity.rules.ts";
 import { GatewayInternalDoorService } from "../../../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../../../services/gateway-internal-identity.service.ts";
 import {
@@ -108,22 +105,22 @@ export function signedGatewayRequest(input: {
 }): Request {
   const secret = input.secret ?? GATEWAY_INTERNAL_TEST_SECRET;
   const body = input.body === undefined ? "" : JSON.stringify(input.body);
-  const timestamp = String(Math.floor(Date.now() / 1000));
   const url = new URL(`http://api.test${input.path}`);
-  const signature = computeGatewaySignature(
+  // The signature covers the PATH only: the query string is not signed, as the data plane does.
+  const signature = gatewayInternalSignatureHeaders({
     secret,
-    // The canonical string covers the PATH only — the query string is not
-    // signed, which is what the data plane does and what the verifier reads.
-    buildGatewayCanonicalString({ method: input.method, path: url.pathname, timestamp, body }),
-  );
+    method: input.method,
+    path: url.pathname,
+    body,
+    nowMs: Date.now(),
+  });
 
   return new Request(url, {
     method: input.method,
     ...(input.body === undefined ? {} : { body }),
     headers: {
       "Content-Type": "application/json",
-      "X-LangWatch-Gateway-Signature": signature,
-      "X-LangWatch-Gateway-Timestamp": timestamp,
+      ...signature,
       ...input.headers,
     },
   });

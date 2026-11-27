@@ -85,8 +85,6 @@ export class HttpWorkflowChannels {
       };
     }
 
-    // The engine hop's shared credential (ADR-132); the process holds the same handle.
-    const internalSecret = await secrets.into(nlpInternalSecret, (secret) => secret);
     const cacheKeySalt = await secrets.into(s3KeySaltSecret, (salt) => salt);
     if (named.data) {
       const fields = named.data;
@@ -138,7 +136,6 @@ export class HttpWorkflowChannels {
           configFingerprint: studioLambdaConfigFingerprint(lambdaConfig),
           stagingThresholdBytes: lambdaConfig.stagingThresholdBytes,
           stagingTtlSeconds: lambdaConfig.stagingTtlSeconds,
-          internalSecret,
           cacheKeySalt,
           close: () => {
             lambda.destroy();
@@ -161,6 +158,10 @@ export class HttpWorkflowChannels {
         },
       };
     }
+
+    // The single shared service's credential (ADR-132), read only here: a per-project function
+    // never receives it, since user code there can read its invokes.
+    const internalSecret = await secrets.into(nlpInternalSecret, (secret) => secret);
 
     return {
       spend: bound.spend,
