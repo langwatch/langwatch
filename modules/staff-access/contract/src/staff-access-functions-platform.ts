@@ -20,7 +20,7 @@ export const STAFF_ACCESS_PLATFORM_FUNCTIONS = {
     title: "The release each service runs, the upgrade step counts and allowlisted settings",
     scope: "platform",
     answers: "Whether a change is live, which release each role serves, and a few non-secret ids.",
-    input: z.object({}).strict(),
+    input: z.object({ ...pageInput }).strict(),
     output: z
       .object({
         installedRelease: z.string().nullable(),

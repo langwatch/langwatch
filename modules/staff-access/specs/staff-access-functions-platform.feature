@@ -34,6 +34,13 @@ Feature: Platform ops functions
     Then the setting "langy.mirror_project_id" reads as not set, with no value
 
   @unit
+  Scenario: releases.state reads its service rows on, page by page
+    Given a redeemed "ops:read" session naming "releases.state"
+    And more serving roles than one page holds
+    When the agent calls "releases.state" with a limit, then with the cursor it answered
+    Then the second call answers the service rows the first one left out
+
+  @unit
   Scenario: A service role or image tag that is not a plain word reads as other
     Given a roster row whose role or image tag holds spaces or slashes
     When the release state folds it

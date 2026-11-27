@@ -52,6 +52,24 @@ describe("the platform ops function reads", () => {
     expect(answered.items[0]?.tenantScanComplete).toBe(true);
   });
 
+  describe("when the serving roles take more than one page", () => {
+    /** @scenario "releases.state reads its service rows on, page by page" */
+    it("answers the rest of the service rows from the cursor", async () => {
+      const reads = readsOver({});
+      const call = (input: { limit?: number; cursor?: string }) =>
+        reads["releases.state"]({ input, organizationId: "", at: AT });
+
+      const whole = await call({});
+      const first = await call({ limit: 1 });
+      const rest = await call({ limit: 50, cursor: first.services.nextCursor ?? "" });
+
+      expect(whole.services.total).toBeGreaterThan(1);
+      expect(first.services).toMatchObject({ truncated: true, total: whole.services.total });
+      expect([...first.services.items, ...rest.services.items]).toEqual(whole.services.items);
+      expect(rest.services.truncated).toBe(false);
+    });
+  });
+
   describe("when a step parked more tenants than one read scans", () => {
     it("marks the count incomplete", async () => {
       const reads = readsOver({ parkedTenants: 10_001 });

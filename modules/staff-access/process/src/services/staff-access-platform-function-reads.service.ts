@@ -54,7 +54,7 @@ export class StaffAccessPlatformFunctionReadsService {
 
   private constructor(private readonly deps: PlatformReadsDeps) {
     this.reads = {
-      "releases.state": () => this.releasesState(),
+      "releases.state": (call) => this.releasesState(call),
       "upgrade.step_failures": (call) => this.stepFailures(call),
       "org.retention": (call) => this.retention(call),
       "evaluators.platform_usage": (call) => this.evaluatorUsage(call),
@@ -65,7 +65,11 @@ export class StaffAccessPlatformFunctionReadsService {
     return new StaffAccessPlatformFunctionReadsService(deps);
   }
 
-  private async releasesState(): Promise<StaffAccessFunctionOutput<"releases.state">> {
+  private async releasesState({
+    input,
+  }: {
+    input: StaffAccessFunctionInput<"releases.state">;
+  }): Promise<StaffAccessFunctionOutput<"releases.state">> {
     const [status, processes] = await Promise.all([
       this.deps.ops.getUpgradeStatus(),
       this.deps.ops.findServingProcesses(),
@@ -87,6 +91,7 @@ export class StaffAccessPlatformFunctionReadsService {
         rows: servicesOf(processes),
         keyOf: (row) => `${row.role}/${row.release ?? ""}/${row.imageTag}`,
         name: "releases.state.services",
+        ...pageInputOf(input),
       }),
       settings: pageOf({
         rows: [
