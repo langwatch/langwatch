@@ -4,11 +4,12 @@ import math
 from typing import Optional
 import litellm
 from litellm.cost_calculator import completion_cost
+from litellm.exceptions import UnsupportedParamsError
 import numpy as np
 import os
 import json
 from random import random
-from typing import Iterable, TypeVar, Optional
+from typing import Any, Iterable, TypeVar, Optional
 
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
@@ -39,6 +40,27 @@ def cost_of(response) -> float:
     except Exception as e:
         logger.warning("Could not price the naming call, counting it as zero", error=str(e))
         return 0.0
+
+
+def _naming_temperature(litellm_params: dict[str, str]) -> float:
+    """gpt-5-family models reject temperature=0; every other model stays deterministic."""
+    model = str(litellm_params.get("model", ""))
+    return 1.0 if "gpt-5" in model else 0.0
+
+
+def _completion_for_naming(
+    litellm_params: dict[str, str], **kwargs: Any
+) -> Any:
+    """Retry once without temperature when another reasoning model refuses it."""
+    try:
+        return litellm.completion(
+            temperature=_naming_temperature(litellm_params), **kwargs
+        )
+    except UnsupportedParamsError as e:
+        message = str(e).lower()
+        if "temperature" not in message or "reasoning" not in message:
+            raise
+        return litellm.completion(**kwargs)
 
 
 @retry(retry=_retry_unless_refused, wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
@@ -98,8 +120,8 @@ def generate_topic_names(
     tool_choice = {"type": "function", "function": {"name": "topicNames"}}
 
     try:
-        response = litellm.completion(
-            temperature=0.0,
+        response = _completion_for_naming(
+            litellm_params,
             messages=messages,
             tools=tools,
             tool_choice=tool_choice,
@@ -315,8 +337,8 @@ def improve_name_between_two_topics(
     )
 
     try:
-        response = litellm.completion(
-            temperature=0.0,
+        response = _completion_for_naming(
+            litellm_params,
             messages=[
                 {
                     "role": "system",
