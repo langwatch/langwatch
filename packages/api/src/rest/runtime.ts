@@ -4,6 +4,7 @@ import {
   type Authorization,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
+  BlankScopeIdError,
   internalActor,
   type PlatformTierPermission,
 } from "@langwatch/authorization";
@@ -2346,7 +2347,17 @@ function headerScopeInput(
   if (typeof headers !== "object" || headers === null)
     throw new Error(`REST ${route.operation} header schema returned no object`);
 
-  return { [target.param]: Reflect.get(headers, target.header) };
+  return callerScopeInput(target.param, target.header, Reflect.get(headers, target.header));
+}
+
+/**
+ * A scope the caller's own header or body left out is theirs to fix, a 400 as
+ * for a blank id; only a path parameter the route never parsed is a wiring fault.
+ */
+function callerScopeInput(param: string, field: string, value: unknown): Record<string, unknown> {
+  if (typeof value !== "string") throw new BlankScopeIdError({ field });
+
+  return { [param]: value };
 }
 
 /** The fields the route's permission target reads its scope from, wherever it is located. */
@@ -2378,7 +2389,7 @@ function bodyScopeInput(
       ? Reflect.get(body, target.field ?? target.param)
       : void 0;
 
-  return { [target.param]: value };
+  return callerScopeInput(target.param, target.field ?? target.param, value);
 }
 
 /** The route's input, with the scope its path spells under another name read as the tier's own. */
