@@ -27,6 +27,9 @@ func TestClassifyUpstream(t *testing.T) {
 		{"upstream 429", &domain.UpstreamError{StatusCode: 429}, 429, "rate_limited"},
 		{"upstream 500", &domain.UpstreamError{StatusCode: 500}, 500, "provider_error"},
 		{"upstream 400", &domain.UpstreamError{StatusCode: 400}, 400, "bad_request"},
+		{"upstream 401", &domain.UpstreamError{StatusCode: 401}, 401, "unauthorized"},
+		{"upstream 403", &domain.UpstreamError{StatusCode: 403}, 403, "forbidden"},
+		{"upstream 499", &domain.UpstreamError{StatusCode: 499}, 499, "client_closed_request"},
 		{"upstream 404", &domain.UpstreamError{StatusCode: 404}, 404, "not_found"},
 		{"non-upstream error", assert.AnError, 502, "provider_error"},
 	}
