@@ -14,6 +14,7 @@ import { MemoryBillingCheckpointRepository } from "../../repositories/memory/mem
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import type { PriceLine } from "../../rules/price-line.rules.ts";
 import type { BillableEventsTotalResult } from "../../rules/billing-month.rules.ts";
+import { PiiRedactionSpendQueryService } from "../../services/pii-redaction-spend-query.service.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -1797,6 +1798,46 @@ describe("ReportUsageForMonthCommand: the PII redaction price", () => {
         eventName: "langwatch_pii_redaction_usd",
         identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:5000",
       });
+    });
+  });
+
+  describe("given an organization that accepted the price on the 10th, read through the real spend query", () => {
+    /** @scenario "An organization that accepted the price is billed only from the moment it accepted" */
+    it("reports only the spend recorded from the moment of acceptance", async () => {
+      const acceptedAtMs = Date.UTC(2026, 1, 10, 9);
+      // 0.30 USD before the acceptance and 0.20 USD after it, in nano-USD.
+      const ledger = [
+        { atMs: Date.UTC(2026, 1, 5), nanoUsd: 300_000_000 },
+        { atMs: Date.UTC(2026, 1, 20), nanoUsd: 200_000_000 },
+      ];
+      const spendQuery = PiiRedactionSpendQueryService.create({
+        isSpendSourceAvailable: () => true,
+        listProjectIds: async () => ["project-1"],
+        findPiiRedactionModelAcceptedAtMs: async () => acceptedAtMs,
+        sumSpendNanoUsdByRequestType: async ({ fromMs = 0, toMs = Infinity }) =>
+          ledger
+            .filter((row) => row.atMs >= fromMs && row.atMs < toMs)
+            .reduce((sum, row) => sum + row.nanoUsd, 0),
+      });
+      const checkpoints = MemoryBillingCheckpointRepository.create(MemoryBillingStore.create());
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockQueryPiiRedactionSpendTotal.mockImplementation((input) =>
+        spendQuery.queryPiiRedactionSpendTotal(input),
+      );
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+      await handler.handle(makeCommand());
+
+      const sent = mockReportUsageDelta.mock.calls
+        .flatMap(([input]) => input.events)
+        .filter((event) => event.eventName === "langwatch_pii_redaction_usd");
+      expect(sent).toEqual([
+        expect.objectContaining({
+          identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:2000",
+          value: 0.2,
+        }),
+      ]);
     });
   });
 
