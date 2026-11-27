@@ -434,6 +434,7 @@ const FRAME_RUNTIME = String.raw`function (config) {
     if (pressedAt - pending.shownAt < config.confirmDelayMs) return;
     var request = pending.request;
     dismissConfirm(null);
+    answer(request.id, { kind: "confirmed" });
     send(request);
   });
   confirmCancel.addEventListener("click", function () { dismissConfirm("declined"); });

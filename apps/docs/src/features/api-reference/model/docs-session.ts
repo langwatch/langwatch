@@ -34,6 +34,8 @@ const frameMessageSchema = z.discriminatedUnion("kind", [
     project: z.nullable(z.string()),
   }),
   z.object({ ...envelope, kind: z.literal("height"), height: z.number().check(z.nonnegative()) }),
+  /* The reader pressed Send on the frame's confirmation; the request is on its way. */
+  z.object({ ...envelope, kind: z.literal("confirmed"), id: z.string() }),
   z.object({
     ...envelope,
     kind: z.literal("response"),

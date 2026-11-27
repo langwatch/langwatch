@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { z } from "zod/mini";
 
-import { generateExample, liveRequest } from "../model/codegen.ts";
+import { generateExample, liveRequest, type RequestState } from "../model/codegen.ts";
 import { frameRequest, sessionCovers, type FrameFailure } from "../model/docs-session.ts";
 import { operationSchema } from "../model/operation-schema.ts";
 import type { Operation } from "../model/operation.ts";
@@ -12,6 +12,7 @@ import type { Outcome } from "../model/playground-outcome.ts";
 import { validateRequest } from "../model/request-validation.ts";
 import type * as BodyForm from "./body-form.ts";
 import { frameConnection, sendThroughFrame, type FrameAnswer } from "./docs-session.ts";
+import { FRAME_ROOM_SELECTOR } from "./frame-placement.ts";
 import { editManualKey, fieldValue, setFormOpen, showErrors, syncBody } from "./playground-dom.ts";
 import type * as RequestValues from "./request-values.ts";
 import { ResponseView } from "./response-view.tsx";
@@ -126,6 +127,61 @@ async function sendDirect({
   }
 }
 
+/** Sends a checked request, through the frame when signed in, reporting each step it reaches. */
+async function dispatch({
+  operation,
+  state,
+  key,
+  viaFrame,
+  abort,
+  report,
+}: {
+  operation: Operation;
+  state: RequestState;
+  key: string;
+  viaFrame: boolean;
+  abort: AbortController;
+  report: (outcome: Outcome) => void;
+}) {
+  if (!viaFrame) {
+    report({ kind: "sending" });
+    const answer = await sendDirect({
+      operation,
+      request: liveRequest({ operation, state, key }),
+      abort,
+    });
+    if (answer) report(answer);
+    return;
+  }
+  const request = frameRequest({ operation, state });
+  /* The frame asks the reader to confirm a write in its own box, up by the key. */
+  report({ kind: request.method === "GET" ? "sending" : "confirming" });
+  const answer = await sendThroughFrame({
+    request,
+    signal: abort.signal,
+    onConfirmed: () => report({ kind: "sending" }),
+  });
+  report(frameOutcome({ answer }));
+}
+
+function scrollBehavior(): ScrollBehavior {
+  return matchMedia("(prefers-reduced-motion: no-preference)").matches ? "smooth" : "instant";
+}
+
+/** Brings the session frame's confirmation into view; the frame is laid over this room. */
+function showConfirmation() {
+  document
+    .querySelector(FRAME_ROOM_SELECTOR)
+    ?.scrollIntoView({ block: "center", behavior: scrollBehavior() });
+}
+
+/** Brings the live response into view: its top once there is something to read. */
+function showResponse({ start }: { start: boolean }) {
+  document
+    .querySelector("[data-docs-runtime]")
+    ?.scrollIntoView({ block: start ? "start" : "nearest", behavior: scrollBehavior() });
+}
+
 function PlaygroundRuntime({ operation }: { operation: Operation }) {
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const tools = useRequestTools();
@@ -161,39 +217,35 @@ function PlaygroundRuntime({ operation }: { operation: Operation }) {
     });
     showErrors({ errors });
     if (Object.keys(errors).length) return;
-    setOutcome({ kind: "sending" });
-    if (viaFrame) {
-      const answer = await sendThroughFrame({
-        request: frameRequest({ operation, state }),
-        signal: abort.signal,
-      });
-      if (pending.current === abort) setOutcome(frameOutcome({ answer }));
-      return;
-    }
-    const answer = await sendDirect({
+    await dispatch({
       operation,
-      request: liveRequest({ operation, state, key }),
+      state,
+      key,
+      viaFrame,
       abort,
+      report: (next) => {
+        if (pending.current === abort) setOutcome(next);
+      },
     });
-    if (pending.current === abort && answer) setOutcome(answer);
   };
   useEffect(() => {
     const button = document.getElementById("pg-send");
-    if (button instanceof HTMLButtonElement) button.disabled = outcome.kind === "sending";
+    if (button instanceof HTMLButtonElement)
+      button.disabled = outcome.kind === "sending" || outcome.kind === "confirming";
   }, [outcome.kind]);
   useEffect(() => {
     return bindRequestForm({ operation, onSend: send });
   });
+  /* Follow the request: to the frame's confirmation, then back to the response under Send. */
   useEffect(() => {
     if (outcome.kind === "idle") return;
-    const smooth = matchMedia("(prefers-reduced-motion: no-preference)").matches;
-    document
-      .querySelector("[data-docs-runtime]")
-      ?.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "instant" });
+    if (outcome.kind === "confirming") showConfirmation();
+    else showResponse({ start: outcome.kind !== "sending" });
   }, [outcome.kind]);
   return (
     <ResponseView
       outcome={outcome}
+      showConfirmation={showConfirmation}
       retry={() => void send()}
       cancel={() => pending.current?.abort("cancel")}
       curl={
@@ -217,6 +269,7 @@ function activate() {
       .parse(JSON.parse(document.getElementById("docs-page-data")?.textContent ?? "{}"));
     const container = document.createElement("div");
     container.dataset.docsRuntime = "";
+    container.style.scrollMarginTop = "calc(var(--docs-header-h, 64px) + 1rem)";
     const slot =
       document.querySelector("[data-docs-response-slot]") ??
       document.querySelector("[data-docs-playground]");

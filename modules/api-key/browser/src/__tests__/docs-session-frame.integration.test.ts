@@ -347,7 +347,9 @@ describe("the docs session frame", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 60));
       press(byId("confirm-send"));
-      await vi.waitFor(() => expect(answers("w1")).toHaveLength(1));
+      await vi.waitFor(() => expect(answers("w1")).toHaveLength(2));
+      expect(answers("w1")[0]).toMatchObject({ kind: "confirmed", id: "w1" });
+      expect(answers("w1")[1]).toMatchObject({ kind: "response", id: "w1" });
       expect(sent[0]!.init).toMatchObject({ method: "POST", body: '{"name":"x"}' });
       expect(byId("confirm").hidden).toBe(true);
     });
@@ -405,7 +407,7 @@ describe("the docs session frame", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 60));
       press(byId("confirm-send"));
-      await vi.waitFor(() => expect(answers("w5")).toHaveLength(1));
+      await vi.waitFor(() => expect(answers("w5")).toHaveLength(2));
     });
 
     /** @scenario "A request that changes data waits for the reader inside the frame" */
