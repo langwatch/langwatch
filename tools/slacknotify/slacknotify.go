@@ -21,7 +21,7 @@ type Run struct {
 	Repository string // owner/name
 	Workflow   string // workflow file name, e.g. langwatch-app-ci.yml
 	RunID      int64
-	Job        string // the job's display name
+	Job        string // the job's display name; a matrix job's name also covers its " (i/n)" legs
 	SHA        string
 	Subject    string // the commit's first line
 	Author     string
@@ -41,7 +41,7 @@ type Result struct {
 	Reason string
 }
 
-// Notify posts unless the same job was red in the last finished main run that ran it.
+// Notify posts unless the same job, or any leg of it, was red in the last finished main run that ran it.
 // A failed lookup posts anyway: a duplicate alert beats a silent red main.
 func (n Notifier) Notify(ctx context.Context, run Run) (Result, error) {
 	if n.Webhook == "" {
@@ -106,18 +106,33 @@ func verdict(job, conclusion string, id int64) (bool, string) {
 }
 
 // jobConclusion is run.Job's conclusion in the given run, and whether it ran there.
+// A matrix job is red when any of its legs is.
 func (n Notifier) jobConclusion(ctx context.Context, run Run, id int64) (string, bool, error) {
 	var jobs jobsPage
 	if err := n.get(ctx, fmt.Sprintf("/repos/%s/actions/runs/%d/jobs?filter=latest&per_page=100", run.Repository, id), &jobs); err != nil {
 		return "", false, err
 	}
+	conclusion, ran := "", false
 	for _, j := range jobs.Jobs {
-		if j.Name == run.Job {
-			return j.Conclusion, true, nil
+		if !IsLegOf(j.Name, run.Job) {
+			continue
+		}
+		if !ran || j.Conclusion == "failure" || j.Conclusion == "cancelled" {
+			conclusion = j.Conclusion
+		}
+		ran = true
+		if conclusion == "failure" || conclusion == "cancelled" {
+			break
 		}
 	}
 
-	return "", false, nil
+	return conclusion, ran, nil
+}
+
+// IsLegOf reports whether a job named name is job itself or one leg of it,
+// "package-suites (3/8)" for "package-suites".
+func IsLegOf(name, job string) bool {
+	return name == job || strings.HasPrefix(name, job+" (")
 }
 
 func (n Notifier) get(ctx context.Context, path string, into any) error {

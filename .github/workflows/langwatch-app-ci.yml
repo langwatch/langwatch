@@ -43,9 +43,9 @@ env:
 concurrency:
   # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
   group: langwatch-app-ci-${{ github.event_name }}-${{ github.ref }}
-  # A newer commit supersedes an older run, except a push to main: there
-  # package-suites runs as one long job (see `suites-one-job`), so a run finishes
-  # and the newest commit waits behind it. Guarded by tools/ciguard/mainsuites.go.
+  # A newer commit supersedes an older run, except a push to main: a main run
+  # finishes, so every red commit is reported, and the newest commit waits behind
+  # it. Guarded by tools/ciguard/mainsuites.go.
   cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -59,9 +59,6 @@ jobs:
       # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
       # runs the full suite, so nothing lands without it.
       heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
-      # A push to main runs package-suites as one job: nobody waits on it, and one
-      # setup instead of eight saves about a fifth of its Actions minutes (#9146).
-      suites-one-job: ${{ github.event_name == 'push' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -977,7 +974,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     name: package-suites (${{ matrix.shard }}/${{ strategy.job-total }})
     #
     # It DOES have services. This job absorbed the datastore lane at the
@@ -986,7 +983,7 @@ jobs:
     # package suites, which this job already discovers. Standing the datastores
     # up here is what keeps their integration halves running for real instead
     # of self-skipping into a green job.
-    timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}
+    timeout-minutes: 45
 
     services:
       redis:
@@ -1113,27 +1110,25 @@ jobs:
         run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
       # The suites' own Nx cache, apart from the build cache so it holds only test
-      # results and stays small. Per shard: a re-push to the same change splits alike.
-      # Main's one job saves under `all`, which a shard falls back to.
+      # results and stays small. Per shard: a re-push to the same change splits alike,
+      # and a pull request's shard falls back to main's shard of the same number.
       - name: Restore the package suite results
         if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
-            ${{ runner.os }}-nx-suites-all-
+            ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
 
       - name: Restore the package suite results, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
-            ${{ runner.os }}-nx-suites-all-
+            ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -1151,7 +1146,7 @@ jobs:
       # hash is over the blob ids of the lockfile, every package.json and tsconfig,
       # and packages/vitest-config: the shared config is loaded from the package, so
       # vitest does not count its source (plugin options, React compiler) as a config file.
-      # Main's one job saves under `all`, which a shard falls back to: entries are keyed by content.
+      # A pull request's shard falls back to main's shard of the same number: entries are keyed by content.
       - name: Hash what a cached transform depends on besides its source
         id: transform-inputs
         run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
@@ -1161,20 +1156,18 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
-            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
 
       - name: Restore the vitest transforms, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
-            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -1253,7 +1246,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job "package-suites (1/1)"
+        run: go run ./cmd/slacknotify -job "package-suites"
 
   build:
     needs: changes
