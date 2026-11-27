@@ -11,7 +11,7 @@ Weekly digest emails, on for every organization: folds each organization's week,
 | Classification | enterprise (`modules/catalogue.json`)                                                            |
 | Subjects       | digest                                                                                           |
 | Halves         | [contract](contract) · [process](process/README.md)                                              |
-| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:61` (9 operations) |
+| Api token      | `DigestApi` = `moduleApi<DigestApi>()("digest")`, `contract/src/digest.api.ts:62` (9 operations) |
 | Installed by   | api, worker, tasks (process)                                                                     |
 
 ## What digest owns
