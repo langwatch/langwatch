@@ -281,6 +281,12 @@ function PrivacyRuleDrawerMount({
     scopes: PrivacyScopeEntry[];
     config: DataPrivacyConfig;
   } | null>(null);
+  // A waiting save belongs to its drawer: closing the drawer, by any route, drops it unsaved.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) setPending(null);
+  }
   // The price of Strict and a key reading restricted content each ask first (ADR-208).
   const stepFor = (config: DataPrivacyConfig) =>
     ruleSaveStep({ offer: piiRedactionModelOffer, before: editingRule?.config, after: config });

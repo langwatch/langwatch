@@ -408,11 +408,15 @@ describe("given the Data Privacy page", () => {
       await screen.findByRole("dialog", { name: "Turn on Strict?" });
 
       navigate({});
-      await waitFor(() => expect(document.body.textContent).not.toContain("hasn't loaded yet"));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Turn on Strict?", hidden: true })).toBeNull(),
+      );
       setFlag({ name: "release_pii_redaction_model_enabled", on: false });
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(api.setForScope).not.toHaveBeenCalled();
+      // A save that still fired would land within the wait: none may arrive.
+      await expect(
+        waitFor(() => expect(api.setForScope).toHaveBeenCalled(), { timeout: 500 }),
+      ).rejects.toThrow();
     });
   });
 });
