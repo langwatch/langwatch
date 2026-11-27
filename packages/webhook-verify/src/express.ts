@@ -26,8 +26,8 @@ export function langwatchWebhook(options: WebhookMiddlewareOptions) {
     response: ExpressLikeResponse,
     next: (error?: unknown) => void,
   ): Promise<void> => {
-    const rawBody = request.body;
-    if (!(rawBody instanceof Uint8Array) && typeof rawBody !== "string") {
+    const body = request.body;
+    if (!(body instanceof Uint8Array) && typeof body !== "string") {
       next(new TypeError("langwatchWebhook needs the raw body: mount express.raw() before it"));
       return;
     }
@@ -35,7 +35,7 @@ export function langwatchWebhook(options: WebhookMiddlewareOptions) {
     try {
       await verifyWebhookSignature({
         ...options,
-        body: rawBody,
+        body,
         header: request.header(WEBHOOK_SIGNATURE_HEADER),
       });
     } catch (error) {
