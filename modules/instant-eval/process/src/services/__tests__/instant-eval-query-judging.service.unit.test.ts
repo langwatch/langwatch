@@ -113,6 +113,7 @@ function harness({
   holdPricing = INSTANT_EVAL_PRICING,
   gatewayRefusal,
   isSearchRouted = false,
+  isOwnDecisionModel = false,
 }: {
   judge?: ScriptedJudge;
   spentNanoUsd?: number;
@@ -126,6 +127,8 @@ function harness({
   gatewayRefusal?: Error;
   /** Whether the project's search router flag is on. */
   isSearchRouted?: boolean;
+  /** Whether the project judges on its own decision model rather than LangWatch's. */
+  isOwnDecisionModel?: boolean;
 } = {}) {
   const events: string[] = [];
   const gatewayAsked: { projectId: string; inFlightUsd?: number }[] = [];
@@ -185,6 +188,7 @@ function harness({
     holdPricing: async () => holdPricing,
     queryTokenBudget,
     searchRouting: { isRouted: async () => isSearchRouted },
+    ownModels: { isOwnDecisionModel: async () => isOwnDecisionModel },
     now: () => AT,
   });
 
@@ -713,6 +717,26 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         costNanoUsd: 14_000,
         routedInputTokens: 2 * TOKENS_PER_TEXT,
       });
+    });
+
+    /** @scenario "A project on its own decision model is not held at the routed ceiling" */
+    it("sends no route for a project on its own decision model, so a free organization under 0.78 USD left still runs", async () => {
+      // 0.50 USD of the 1 USD free budget is left: the 0.2184 hold fits, the 0.78 ceiling does not.
+      const { service, judge, events } = harness({
+        isSearchRouted: true,
+        isOwnDecisionModel: true,
+        spentNanoUsd: 0.5 * NANO,
+      });
+
+      const judged = await service.judgeQuery(query);
+
+      expect(judged.rows).toEqual([{ annoyed: 0.9 }, { annoyed: 0.9 }]);
+      for (const request of judge.requests) {
+        expect(request).not.toHaveProperty("route");
+        expect(request).not.toHaveProperty("costCeiling");
+      }
+      const hold = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 4_000_000 }) });
+      expect(events[0]).toBe(`reserve ${hold} with 0 judged`);
     });
 
     /** @scenario "With the search router flag on a judged query is routed under its cost ceiling" */

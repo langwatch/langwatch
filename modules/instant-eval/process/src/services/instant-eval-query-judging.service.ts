@@ -28,6 +28,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 
 import { instantEvalRunQuestions } from "../rules/instant-eval-run-questions.rules.ts";
 import { instantEvalQueryReservationId } from "../rules/instant-eval-spend-outcome.rules.ts";
+import type { InstantEvalDecisionModelJudgeService } from "./instant-eval-decision-model-judge.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
 import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
 import type {
@@ -58,6 +59,7 @@ export class InstantEvalQueryJudgingService {
       holdPricing: () => Promise<InstantEvalPricing>;
       queryTokenBudget: number;
       searchRouting: Pick<InstantEvalSearchRoutingService, "isRouted">;
+      ownModels: Pick<InstantEvalDecisionModelJudgeService, "isOwnDecisionModel">;
       now: () => Instant;
     },
   ) {}
@@ -70,6 +72,7 @@ export class InstantEvalQueryJudgingService {
     holdPricing,
     queryTokenBudget,
     searchRouting,
+    ownModels,
     now = nowInstant,
   }: {
     rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
@@ -82,6 +85,8 @@ export class InstantEvalQueryJudgingService {
     queryTokenBudget: number;
     /** Whether a project's queries send the search route, behind its own flag. */
     searchRouting: Pick<InstantEvalSearchRoutingService, "isRouted">;
+    /** Whether a project judges on its own decision model, which never sends the route. */
+    ownModels: Pick<InstantEvalDecisionModelJudgeService, "isOwnDecisionModel">;
     now?: () => Instant;
   }): InstantEvalQueryJudgingService {
     return new InstantEvalQueryJudgingService({
@@ -92,6 +97,7 @@ export class InstantEvalQueryJudgingService {
       holdPricing,
       queryTokenBudget,
       searchRouting,
+      ownModels,
       now,
     });
   }
@@ -137,9 +143,13 @@ export class InstantEvalQueryJudgingService {
     }
   }
 
-  /** Routed behind the project's own flag, under a fresh ceiling for this query alone. */
+  /**
+   * Routed behind the project's own flag, under a fresh ceiling for this query alone. A project on
+   * its own decision model is never routed (ADR-190 decision 13), so it is not held at the ceiling.
+   */
   async #routingOf({ projectId }: { projectId: string }): Promise<InstantEvalQueryRouting> {
     if (!(await this.options.searchRouting.isRouted({ projectId }))) return { isRouted: false };
+    if (await this.options.ownModels.isOwnDecisionModel({ projectId })) return { isRouted: false };
     const ceilingNanoUsd = instantEvalRoutedQueryCeilingNanoUsd({
       queryTokenBudget: this.options.queryTokenBudget,
     });

@@ -367,6 +367,15 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And a project on its own decision model, or an install judging through Connect, sends neither
     And the module reads the real search router flag, so the flag alone turns routing on or off
 
+  @unit @regression
+  Scenario: A project on its own decision model is not held at the routed ceiling
+    Given the search router flag is on for the project's organization
+    And the project judges on its own decision model
+    When a statement with an eval function is executed
+    Then every classifier request carries no route and no cost ceiling
+    And the query is held at the query token budget priced at the judge's hold rate, not the ceiling
+    And a free organization with less than the ceiling but more than that hold left still runs it
+
   @unit
   Scenario: A routed query's ceiling holds sends up to the ceiling and no further
     Given a routed query's cost ceiling

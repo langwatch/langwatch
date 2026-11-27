@@ -336,6 +336,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         flags: setup.dependencies.featureFlags,
         projects,
       }),
+      ownModels: judge,
     });
 
     const classifications = InstantEvalClassifyService.create({ judge });
