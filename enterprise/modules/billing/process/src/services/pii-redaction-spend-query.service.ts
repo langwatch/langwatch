@@ -9,7 +9,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { BillableEventsTotalResult } from "../rules/billing-month.rules.ts";
 import {
-  billingMonthWindowMs,
+  instantEvalWindowMs,
   nanoUsdToInstantEvalMeterUnits,
 } from "../rules/instant-eval-meter.rules.ts";
 
@@ -37,13 +37,18 @@ export class PiiRedactionSpendQueryService {
     return new PiiRedactionSpendQueryService(peers);
   }
 
-  /** `unavailable` where there is no ledger: "not now", never a zero to checkpoint against. */
+  /**
+   * `unavailable` where there is no ledger: "not now", never a zero to checkpoint against.
+   * The month starts no earlier than `usageBilledSinceMs`, the price line's (ADR-174 decision 26).
+   */
   async queryPiiRedactionSpendTotal({
     organizationId,
     billingMonth,
+    usageBilledSinceMs,
   }: {
     organizationId: string;
     billingMonth: string;
+    usageBilledSinceMs: number | null;
   }): Promise<BillableEventsTotalResult> {
     if (!this.peers.isSpendSourceAvailable()) {
       logger.warn({ organizationId }, "no spend ledger, skipping the PII redaction spend query");
@@ -54,7 +59,7 @@ export class PiiRedactionSpendQueryService {
     const nanoUsd = await this.peers.sumSpendNanoUsdByRequestType({
       tenantIds: await this.peers.listProjectIds({ organizationId }),
       requestType: PII_REDACTION_REQUEST_TYPE,
-      ...billingMonthWindowMs(billingMonth),
+      ...instantEvalWindowMs({ billingMonth, usageBilledSinceMs }),
     });
 
     return { outcome: "counted", total: nanoUsdToInstantEvalMeterUnits(nanoUsd) };

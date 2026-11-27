@@ -139,7 +139,7 @@ describe("seatEventSubscription", () => {
       id,
       status: "active",
       canceledAt,
-      items: [{ id: "si_seat", priceId, unitAmount, interval, quantity }],
+      items: [{ id: "si_seat", priceId, unitAmount, interval, quantity, createdAt: 1_700_000_000 }],
     });
 
   describe("previewProration()", () => {
@@ -722,6 +722,7 @@ describe("seatEventSubscription", () => {
             items: [
               {
                 id: "si_events",
+                createdAt: 1_700_000_000,
                 priceId: "price_events_usd_monthly",
                 unitAmount: null,
                 interval: null,
@@ -926,6 +927,7 @@ describe("seatEventSubscription", () => {
             items: [
               {
                 id: "si_events",
+                createdAt: 1_700_000_000,
                 priceId: "price_events_usd_monthly",
                 unitAmount: null,
                 interval: null,

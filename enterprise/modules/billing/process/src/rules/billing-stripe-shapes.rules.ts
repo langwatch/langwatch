@@ -30,6 +30,8 @@ export type BillingSubscriptionItem = Readonly<{
   lookupKey?: string | null;
   /** The catalogue name in the price's `langwatch_key` metadata, which stays on the old price. */
   langwatchKey?: string | null;
+  /** When the line was added to its subscription, in epoch seconds; Stripe always sends it. */
+  createdAt: number;
 }>;
 
 /** The accrued amount at which the provider invoices mid-cycle, and whether that moves the anchor. */
@@ -43,6 +45,8 @@ export type BillingSubscription = Readonly<{
   status: BillingSubscriptionStatus;
   /** Set once a cancellation was asked for, even one scheduled for the period end. */
   canceledAt: number | null;
+  /** When the subscription ended, in epoch seconds; absent while it runs or where not read. */
+  endedAt?: number | null;
   billingThreshold: BillingThreshold | null;
   items: readonly BillingSubscriptionItem[];
   /** End of the period already invoiced, in epoch seconds. */

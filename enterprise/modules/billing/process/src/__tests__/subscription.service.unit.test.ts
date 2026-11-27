@@ -73,7 +73,12 @@ const providerSubscription = ({
   status,
   canceledAt: null,
   billingThreshold: null,
-  items: items.map((item) => ({ ...item, unitAmount: null, interval: null })),
+  items: items.map((item) => ({
+    ...item,
+    unitAmount: null,
+    interval: null,
+    createdAt: 1_700_000_000,
+  })),
 });
 
 /** Throws by name until a test configures it, so an unexercised lookup fails loudly. */
