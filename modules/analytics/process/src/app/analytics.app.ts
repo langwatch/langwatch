@@ -136,11 +136,11 @@ import {
 import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import {
   derivedRestrictedUser,
+  LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
   type LwqlCredentials,
   resolveLwqlCredentials,
 } from "../rules/lwql-default-credentials.rules.ts";
 import {
-  LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
   type LwqlPrivateReaderOf,
   parsePrivateReaderPasswords,
   privateReaderLookupOf,
@@ -533,7 +533,7 @@ function lwqlPrivateReaders(secrets: ScopedSecrets): Promise<LwqlPrivateReaderOf
               organizationId,
               ...(fallback.kind === "refused" ? { variable: fallback.variable } : {}),
             },
-            "LangWatchQL has no private reader for this organisation: its reader password variable is blank or names it twice, or neither it nor a key pepper is set; its queries are refused",
+            "LangWatchQL has no private reader for this organisation: its reader password variable is blank, shorter than 32 characters, shared with another organisation or names it twice, or neither it nor a key pepper is set; its queries are refused",
           );
         },
       }),

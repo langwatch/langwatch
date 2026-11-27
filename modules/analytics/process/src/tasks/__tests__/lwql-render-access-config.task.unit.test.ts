@@ -414,7 +414,7 @@ describe("renderLwqlAccessConfig", () => {
 
   describe("when the private target is given its reader password's hash", () => {
     const ORGANIZATION_ID = "org-hash-test";
-    const OWN_PASSWORD = "fake-own-reader-password";
+    const OWN_PASSWORD = "fake-own-reader-password-0123456789";
     const HASH = createHash("sha256").update(OWN_PASSWORD).digest("hex");
     const HASH_ENV: Record<string, string | undefined> = {
       LWQL_RENDER_PRIVATE_ORGANIZATION_ID: ORGANIZATION_ID,
@@ -443,7 +443,8 @@ describe("renderLwqlAccessConfig", () => {
       const contents = await renderedUsersFile({
         ...HASH_ENV,
         API_KEY_PEPPER: "fake-test-pepper",
-        [`LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`]: "fake-other-password",
+        [`LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`]:
+          "fake-other-reader-password-0123456789",
       });
 
       expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
@@ -472,6 +473,19 @@ describe("renderLwqlAccessConfig", () => {
 
       expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
       expect(contents).not.toContain(OWN_PASSWORD);
+    });
+
+    /** @scenario "The upgrade and render tasks read private reader passwords through the secrets chain" */
+    it("writes the sha256 of an own password only the secrets chain holds", async () => {
+      const { LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256, ...env } = HASH_ENV;
+      void LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256;
+      const lookupFamily = async (prefix: string) =>
+        new Map([[`${prefix}label__${ORGANIZATION_ID}`, OWN_PASSWORD]]);
+
+      await writeLwqlAccessConfig({ outDir, source: env, lookupFamily });
+      const contents = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+
+      expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
     });
 
     /** @scenario "The private render refuses a malformed password hash" */
@@ -511,7 +525,9 @@ describe("renderLwqlAccessConfig", () => {
       const source = { ...env, API_KEY_PEPPER: "fake-test-pepper", [variable]: " " };
 
       await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
-        new RegExp(`${variable} is blank or names an organisation another variable names too`),
+        new RegExp(
+          `${variable} is blank, shorter than 32 characters, shared with another organisation or names an organisation another variable names too`,
+        ),
       );
       expect(await readdir(outDir, { recursive: true })).toEqual([]);
     });

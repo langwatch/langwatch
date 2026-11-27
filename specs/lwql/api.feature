@@ -837,6 +837,26 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And no password derived from the key pepper stands in for it
 
   @unit
+  Scenario: A short or shared private reader password is refused, never derived
+    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> holds fewer than 32 characters once trimmed, or the same value as another organization's
+    When its reader password is read
+    Then each such organization is refused as a blank one is, naming its variable
+    And no password derived from the key pepper stands in for it
+
+  @unit
+  Scenario: A private reader password variable naming no organization is ignored
+    Given a LWQL_PRIVATE_READER_PASSWORD__ variable with no organization id after its last "__", or one starting with "_"
+    When the reader passwords are read
+    Then it gives no organization a password and refuses none
+
+  @unit
+  Scenario: The upgrade and render tasks read private reader passwords through the secrets chain
+    Given LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is held by a source the secrets chain reads, such as the workspace .env file, and not by the task's environment
+    When the upgrade provisions that organization's server, or the render task renders its reader
+    Then the reader uses that password, as the api's does
+    And a blank value the task's environment carries is still refused
+
+  @unit
   Scenario: Each private ClickHouse is provisioned with its own derived reader
     Given a deployment with a private ClickHouse route for an organization
     When the upgrade provisions LangWatchQL

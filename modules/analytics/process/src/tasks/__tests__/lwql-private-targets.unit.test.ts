@@ -107,7 +107,8 @@ const SHARED_PLAN: LwqlConvergencePlan = {
 };
 
 /** The fake own reader password a run gives each organisation unless told otherwise. */
-const ownPasswordOf = (organizationId: string) => `fake-own-password-${organizationId}`;
+const ownPasswordOf = (organizationId: string) =>
+  `fake-own-reader-password-0123456789-${organizationId}`;
 
 function run({
   endpoints,

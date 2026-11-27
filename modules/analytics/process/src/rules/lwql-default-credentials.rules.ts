@@ -24,6 +24,12 @@ export const LWQL_CREDENTIAL_SECRETS = [
   ...KEY_PEPPER_SOURCES,
 ] as const;
 
+/** `LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId>`, split as the route family is. */
+export const LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX = "LWQL_PRIVATE_READER_PASSWORD__";
+
+/** The secret families a runner overlays as it does each single secret, every name under one. */
+const LWQL_CREDENTIAL_SECRET_FAMILIES = [LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX] as const;
+
 export interface LwqlCredentialInputs {
   readonly clickHousePassword: string | undefined;
   readonly postgresReaderPassword: string | undefined;
@@ -216,19 +222,30 @@ export function classifyLwqlSetupFailure({
 /** Reads one secret through the runner's chain: the sources the api and worker boot with. */
 export type LwqlSecretLookup = (id: string) => Promise<string | undefined>;
 
-/** The environment with each credential secret the chain answers laid over it. */
+/** Reads every name under one prefix through the runner's chain, as the api's families do. */
+export type LwqlSecretFamilyLookup = (prefix: string) => Promise<ReadonlyMap<string, string>>;
+
+/** The environment with each credential secret, and each family's names, the chain answers. */
 export async function withChainedSecrets({
   environment,
   lookup,
+  lookupFamily,
 }: {
   environment: Record<string, string | undefined>;
   lookup: LwqlSecretLookup | undefined;
+  lookupFamily?: LwqlSecretFamilyLookup | undefined;
 }): Promise<Record<string, string | undefined>> {
-  if (!lookup) return environment;
   const resolved = { ...environment };
-  for (const id of LWQL_CREDENTIAL_SECRETS) {
-    const value = await lookup(id);
-    if (value !== undefined) resolved[id] = value;
+  if (lookup) {
+    for (const id of LWQL_CREDENTIAL_SECRETS) {
+      const value = await lookup(id);
+      if (value !== undefined) resolved[id] = value;
+    }
+  }
+  if (lookupFamily) {
+    for (const prefix of LWQL_CREDENTIAL_SECRET_FAMILIES) {
+      for (const [name, value] of await lookupFamily(prefix)) resolved[name] = value;
+    }
   }
   return resolved;
 }

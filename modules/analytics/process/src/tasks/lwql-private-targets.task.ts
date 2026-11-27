@@ -387,7 +387,7 @@ function warnReaderFallback({
     case "refused":
       logger.warn(
         { organizationId, variable: resolved.variable },
-        "LangWatchQL private provisioning refused an organisation whose reader password variable is blank or names it twice; it stays refused and nothing is derived in its place",
+        "LangWatchQL private provisioning refused an organisation whose reader password variable is blank, shorter than 32 characters, shared with another organisation or names it twice; it stays refused and nothing is derived in its place",
       );
       return;
     case "absent":

@@ -22,6 +22,7 @@ import {
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   findKeyPeppers,
+  type LwqlSecretFamilyLookup,
   type LwqlSecretLookup,
   withChainedSecrets,
 } from "../rules/lwql-default-credentials.rules.ts";
@@ -136,7 +137,7 @@ function privateReaderPasswordSha256Of({
       return sha256Hex(resolved.reader.password);
     case "refused":
       throw new Error(
-        `lwql-render-access-config: ${resolved.variable} is blank or names an organisation another variable names too`,
+        `lwql-render-access-config: ${resolved.variable} is blank, shorter than 32 characters, shared with another organisation or names an organisation another variable names too`,
       );
     case "absent":
       throw new Error(
@@ -225,16 +226,18 @@ export async function writeLwqlAccessConfig({
   outDir,
   source: environment,
   lookup,
+  lookupFamily,
 }: {
   outDir: string;
   source: Record<string, string | undefined>;
   lookup?: LwqlSecretLookup;
+  lookupFamily?: LwqlSecretFamilyLookup;
 }): Promise<{
   files: RenderedConfigFile[];
   secretLength: number;
   privateReader?: LwqlRenderedPrivateReader;
 }> {
-  const source = await withChainedSecrets({ environment, lookup });
+  const source = await withChainedSecrets({ environment, lookup, lookupFamily });
   const { definition, files, privateReader } = renderedFilesOf(source);
   for (const file of files) {
     const absolute = join(outDir, file.relativePath);
@@ -257,6 +260,7 @@ export class LwqlRenderAccessConfigTask extends Task {
   private constructor(
     private readonly source: Record<string, string | undefined>,
     private readonly lookup: LwqlSecretLookup | undefined,
+    private readonly lookupFamily: LwqlSecretFamilyLookup | undefined,
   ) {
     super();
   }
@@ -264,13 +268,16 @@ export class LwqlRenderAccessConfigTask extends Task {
   static create({
     source,
     lookup,
+    lookupFamily,
   }: {
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
     /** The runner's secrets chain, so the reader derives from the pepper the upgrade reads. */
     lookup?: LwqlSecretLookup;
+    /** The same chain's families, so a private reader's own password is the api's. */
+    lookupFamily?: LwqlSecretFamilyLookup;
   }): LwqlRenderAccessConfigTask {
-    return new LwqlRenderAccessConfigTask(source, lookup);
+    return new LwqlRenderAccessConfigTask(source, lookup, lookupFamily);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -282,6 +289,7 @@ export class LwqlRenderAccessConfigTask extends Task {
       outDir,
       source: this.source,
       lookup: this.lookup,
+      lookupFamily: this.lookupFamily,
     });
     logger.info(
       { files: files.map((file) => file.relativePath), secretLength, ...privateReader },

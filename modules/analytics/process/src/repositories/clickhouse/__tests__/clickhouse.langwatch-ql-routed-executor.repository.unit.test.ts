@@ -486,7 +486,7 @@ describe("given a deployment with no key pepper to derive a private reader from"
 });
 
 describe("given an organization with its own reader password and no key pepper", () => {
-  const OWN_PASSWORD = "fake-own-reader-password";
+  const OWN_PASSWORD = "fake-own-reader-password-0123456789";
   const lookup = () =>
     privateReaderLookupOf({
       passwords: parsePrivateReaderPasswords({

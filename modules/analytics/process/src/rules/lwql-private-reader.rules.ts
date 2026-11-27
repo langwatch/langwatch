@@ -6,7 +6,12 @@
  */
 import { createHash } from "node:crypto";
 
-import { derive } from "./lwql-default-credentials.rules.ts";
+import { privateRouteNameOf } from "@langwatch/process-stores";
+
+import {
+  derive,
+  LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
+} from "./lwql-default-credentials.rules.ts";
 
 /** What a private reader's password is derived under; changing it rotates every reader. */
 const PRIVATE_READER_LABEL = "langwatch:lwql:private-reader-password:v1";
@@ -14,8 +19,8 @@ const PRIVATE_READER_LABEL = "langwatch:lwql:private-reader-password:v1";
 /** Hex characters of the organisation id's digest in the login name: 48 bits, lower-case. */
 const NAME_DIGEST_LENGTH = 12;
 
-/** `LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId>`, split as the route family is. */
-export const LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX = "LWQL_PRIVATE_READER_PASSWORD__";
+/** A password shorter than this, once trimmed, is refused: too guessable for a reader's login. */
+export const LWQL_PRIVATE_READER_PASSWORD_MIN_LENGTH = 32;
 
 /** A private reader's login and settings profile, which never depend on its password. */
 export interface LwqlPrivateReaderName {
@@ -64,39 +69,75 @@ export function privateReaderOf(
 /** Each organisation's own reader password, and the variable refused for one, by name only. */
 export interface LwqlPrivateReaderPasswords {
   readonly passwords: ReadonlyMap<string, string>;
-  /** A variable that is blank, or the second naming its organisation: never a fallback. */
+  /** Blank, short, shared with another organisation, or the second naming one: never a fallback. */
   readonly refused: ReadonlyMap<string, string>;
 }
 
-/** The organisation a variable names: after the last `__`, as the `CLICKHOUSE_URL__` family. */
-function organizationIdOf(variable: string): string {
-  const suffix = variable.slice(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX.length);
-  const separator = suffix.lastIndexOf("__");
-  return separator >= 0 ? suffix.slice(separator + 2) : suffix;
+interface ReaderPasswordEntry {
+  readonly organizationId: string;
+  readonly variable: string;
+  readonly value: string;
+}
+
+/** The family's entries naming an organisation; an id starting `_` is a mistyped separator. */
+function readerPasswordEntriesOf(
+  source: Readonly<Record<string, string | undefined>>,
+): ReaderPasswordEntry[] {
+  return Object.entries(source).flatMap(([variable, value]) => {
+    if (!variable.startsWith(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX) || value === undefined) {
+      return [];
+    }
+    const { organizationId } = privateRouteNameOf({
+      prefix: LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX,
+      variable,
+    });
+    if (organizationId === "" || organizationId.startsWith("_")) return [];
+    return [{ organizationId, variable, value }];
+  });
+}
+
+/** A value two organisations share is one secret for two servers: every holder is refused. */
+function refuseShared({
+  accepted,
+  refused,
+}: {
+  accepted: Map<string, ReaderPasswordEntry>;
+  refused: Map<string, string>;
+}): void {
+  const holders = new Map<string, ReaderPasswordEntry[]>();
+  for (const entry of accepted.values()) {
+    holders.set(entry.value, [...(holders.get(entry.value) ?? []), entry]);
+  }
+  for (const shared of holders.values()) {
+    if (shared.length < 2) continue;
+    for (const { organizationId, variable } of shared) {
+      accepted.delete(organizationId);
+      refused.set(organizationId, variable);
+    }
+  }
 }
 
 /** Pure and total: the label is for humans; the organisation follows the last `__`. */
 export function parsePrivateReaderPasswords(
   source: Readonly<Record<string, string | undefined>>,
 ): LwqlPrivateReaderPasswords {
-  const passwords = new Map<string, string>();
+  const accepted = new Map<string, ReaderPasswordEntry>();
   const refused = new Map<string, string>();
-  const named = new Set<string>();
-  for (const [variable, value] of Object.entries(source)) {
-    if (!variable.startsWith(LWQL_PRIVATE_READER_PASSWORD_ENV_PREFIX) || value === undefined) {
-      continue;
-    }
-    const organizationId = organizationIdOf(variable);
-    if (organizationId === "") continue;
-    // Blank, or a second one for the organisation: using either would be a guess, so refuse.
-    if (named.has(organizationId) || value.trim() === "") {
-      passwords.delete(organizationId);
+  for (const entry of readerPasswordEntriesOf(source)) {
+    const { organizationId, variable, value } = entry;
+    // Short, or a second one for the organisation: using either would be a guess, so refuse.
+    const doubled = accepted.has(organizationId) || refused.has(organizationId);
+    if (doubled || value.trim().length < LWQL_PRIVATE_READER_PASSWORD_MIN_LENGTH) {
+      accepted.delete(organizationId);
       refused.set(organizationId, variable);
     } else {
-      passwords.set(organizationId, value);
+      accepted.set(organizationId, entry);
     }
-    named.add(organizationId);
   }
+  refuseShared({ accepted, refused });
+  const passwords = new Map(
+    [...accepted].map(([organizationId, { value }]) => [organizationId, value]),
+  );
   return { passwords, refused };
 }
 

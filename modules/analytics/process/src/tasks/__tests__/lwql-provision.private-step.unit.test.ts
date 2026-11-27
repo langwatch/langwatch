@@ -19,8 +19,9 @@ import {
   LwqlProvisionTask,
 } from "../lwql-provision.task.ts";
 
-const { events, logCalls, routeConfig } = vi.hoisted(() => ({
+const { events, logCalls, readerPasswordsSeen, routeConfig } = vi.hoisted(() => ({
   events: [] as string[],
+  readerPasswordsSeen: [] as { passwords: ReadonlyMap<string, string> }[],
   logCalls: [] as { level: string; fields: unknown; message: unknown }[],
   routeConfig: {
     endpoints: [] as { organizationId: string; url: string }[],
@@ -57,8 +58,15 @@ vi.mock("@langwatch/clickhouse-migrations", async (importActual) => {
 });
 vi.mock("../lwql-private-targets.task.ts", async (importActual) => ({
   ...(await importActual<object>()),
-  provisionLwqlPrivateTargets: async ({ endpoints }: { endpoints: readonly unknown[] }) => {
+  provisionLwqlPrivateTargets: async ({
+    endpoints,
+    readerPasswords,
+  }: {
+    endpoints: readonly unknown[];
+    readerPasswords: { passwords: ReadonlyMap<string, string> };
+  }) => {
     events.push(`private:${endpoints.length}`);
+    readerPasswordsSeen.push(readerPasswords);
   },
 }));
 
@@ -98,6 +106,7 @@ function emptyServer() {
 
 beforeEach(() => {
   events.length = 0;
+  readerPasswordsSeen.length = 0;
   logCalls.length = 0;
   routeConfig.endpoints = [];
   routeConfig.malformed = false;
@@ -147,6 +156,24 @@ describe("given two organisations on private ClickHouse servers", () => {
         (call) => call.level === "warn" && String(call.message).includes("shared converge"),
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe("given a reader password only the secrets chain holds", () => {
+  /** @scenario "The upgrade and render tasks read private reader passwords through the secrets chain" */
+  it("hands the private step the chain's password over the task environment's", async () => {
+    routeConfig.endpoints = [{ organizationId: "org-a", url: "https://a.invalid/a_db" }];
+    const { database } = recordingDatabase();
+    const chained = "fake-chained-reader-password-0123456789";
+    const lookupFamily = vi.fn(async (prefix: string) => new Map([[`${prefix}a__org-a`, chained]]));
+
+    await LwqlProvisionTask.create({ database: () => database, source: SOURCE, lookupFamily }).run({
+      args: [],
+      signal: new AbortController().signal,
+    });
+
+    expect(lookupFamily).toHaveBeenCalledWith("LWQL_PRIVATE_READER_PASSWORD__");
+    expect(readerPasswordsSeen.at(-1)?.passwords.get("org-a")).toBe(chained);
   });
 });
 

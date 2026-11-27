@@ -10,5 +10,6 @@ export async function lwqlRenderAccessConfig({
   await LwqlRenderAccessConfigTask.create({
     source: environment,
     lookup: (id) => chain.fetch(id),
+    lookupFamily: (prefix) => chain.fetchFamily(prefix),
   }).run({ args: [], signal });
 }
