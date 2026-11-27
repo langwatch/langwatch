@@ -186,7 +186,7 @@ describe("the weekly digest send", () => {
         expect(mail.oneClickUnsubscribeUrl).toMatch(
           new RegExp(`^${BASE_URL}/api/digest/unsubscribe\\?token=.+`),
         );
-        expect(mail.props.unsubscribeUrl).toBe(`${BASE_URL}/settings/profile#email-preferences`);
+        expect(mail.props.preferencesUrl).toBe(`${BASE_URL}/settings/profile#email-preferences`);
         expect(mail.email.unsubscribe).toEqual({ url: mail.oneClickUnsubscribeUrl });
       }
     });
@@ -420,7 +420,7 @@ describe("the weekly digest send", () => {
       expect(mail?.templateId).toBe("digest-coding-agent-week");
       expect(mail?.props).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: `${BASE_URL}/settings/profile#email-preferences`,
+        preferencesUrl: `${BASE_URL}/settings/profile#email-preferences`,
         sessions: 5,
         tokens: 1_200,
         costUsd: 2.5,

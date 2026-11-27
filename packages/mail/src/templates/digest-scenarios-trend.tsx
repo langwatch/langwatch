@@ -49,7 +49,7 @@ export const DigestScenariosTrend = (props: DigestScenariosTrendProps) => {
       }}
       whatsNew={props.whatsNew}
       reason={`You are a member of ${projectName}.`}
-      unsubscribeUrl={props.unsubscribeUrl}
+      preferencesUrl={props.preferencesUrl}
     >
       <DetailTable
         rows={[
@@ -72,7 +72,7 @@ export const DigestScenariosTrend = (props: DigestScenariosTrendProps) => {
 };
 
 const links = {
-  unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+  preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
   scenariosUrl: "https://app.langwatch.ai/api/digest/c/tk_scena9Bx2",
 } as const;
 

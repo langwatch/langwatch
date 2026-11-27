@@ -59,7 +59,7 @@ export type OrganizationWeek = Readonly<{
 }>;
 
 /** What every template's props open with. */
-type CommonProps = Readonly<{ weekLabel: string; unsubscribeUrl: string }>;
+type CommonProps = Readonly<{ weekLabel: string; preferencesUrl: string }>;
 
 const TOP_ROWS = 3;
 
@@ -166,7 +166,7 @@ export function buildDigestTemplateProps({
   userId,
   names,
   baseUrl,
-  unsubscribeUrl,
+  preferencesUrl,
   now,
 }: {
   pick: DigestTemplatePick;
@@ -175,10 +175,10 @@ export function buildDigestTemplateProps({
   names: DigestNames;
   baseUrl: string;
   /** The page behind the email's own unsubscribe link. */
-  unsubscribeUrl: string;
+  preferencesUrl: string;
   now: number;
 }): DigestTemplateProps | undefined {
-  const common = { weekLabel: weekLabel(week.isoWeek), unsubscribeUrl };
+  const common = { weekLabel: weekLabel(week.isoWeek), preferencesUrl };
   switch (pick.template) {
     case "digest-plan-pressure": {
       const props = buildPlanPressureProps({ week, names, baseUrl, now, common });

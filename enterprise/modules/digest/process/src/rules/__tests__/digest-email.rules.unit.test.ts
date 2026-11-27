@@ -91,7 +91,7 @@ function propsFor({
     userId: "u",
     names,
     baseUrl: BASE,
-    unsubscribeUrl: UNSUBSCRIBE,
+    preferencesUrl: UNSUBSCRIBE,
     now: NOW,
   });
   return { pick, props: built?.props };
@@ -153,7 +153,7 @@ describe("buildDigestTemplateProps()", () => {
       expect(pick.template).toBe("digest-traces-week");
       expect(parsedBy({ templateId: pick.template, props })).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: UNSUBSCRIBE,
+        preferencesUrl: UNSUBSCRIBE,
         projectName: "Support bot",
         traces: 1_200,
         changePercent: 20,
@@ -241,7 +241,7 @@ describe("buildDigestTemplateProps()", () => {
       expect(pick.template).toBe("digest-coding-agent-week");
       expect(parsedBy({ templateId: pick.template, props })).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: UNSUBSCRIBE,
+        preferencesUrl: UNSUBSCRIBE,
         sessions: 5,
         tokens: 1_200,
         costUsd: 1.25,
@@ -260,7 +260,7 @@ describe("buildDigestTemplateProps()", () => {
 
       expect(parsedBy({ templateId: pick.template, props })).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: UNSUBSCRIBE,
+        preferencesUrl: UNSUBSCRIBE,
         sessions: 5,
         tokens: 0,
         costUsd: 0,

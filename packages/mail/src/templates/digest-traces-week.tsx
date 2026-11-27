@@ -56,7 +56,7 @@ export const DigestTracesWeek = (props: DigestTracesWeekProps) => {
       hero={{ value: formatCount(traces), caption: changeCaption(props.changePercent) }}
       whatsNew={props.whatsNew}
       reason={`You are a member of ${projectName}.`}
-      unsubscribeUrl={props.unsubscribeUrl}
+      preferencesUrl={props.preferencesUrl}
     >
       <DetailTable
         rows={[
@@ -94,7 +94,7 @@ export const DigestTracesWeek = (props: DigestTracesWeekProps) => {
 };
 
 const links = {
-  unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+  preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
   tracesUrl: "https://app.langwatch.ai/api/digest/c/tk_trace1Jd5",
 } as const;
 

@@ -15,7 +15,7 @@ const ONE_CLICK = "https://app.example.test/api/digest/unsubscribe?token=signed"
 /** Props the plan-pressure template's schema accepts. */
 const PLAN_PRESSURE: DigestPlanPressureProps = {
   weekLabel: "Nov 9 to 15",
-  unsubscribeUrl: ONE_CLICK,
+  preferencesUrl: ONE_CLICK,
   organizationName: "Acme",
   usagePercentage: 90,
   used: 900,
@@ -89,11 +89,11 @@ describe("renderDigestMail", () => {
 
   describe("when the template's schema refuses the props", () => {
     it("rejects before anything is sent", async () => {
-      const props = { ...PLAN_PRESSURE, unsubscribeUrl: "not a url" };
+      const props = { ...PLAN_PRESSURE, preferencesUrl: "not a url" };
 
       // The template's schema names the field it refused.
       await expect(renderDigestMail({ mail: mail({ props }), renderer })).rejects.toThrow(
-        /"unsubscribeUrl"/,
+        /"preferencesUrl"/,
       );
     });
   });

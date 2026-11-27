@@ -396,7 +396,7 @@ export class DigestSendService {
         userId: member.userId,
         names: await this.#names({ week, pick, organizationName }),
         baseUrl,
-        unsubscribeUrl: preferencesUrl,
+        preferencesUrl,
         now: this.deps.now(),
       });
       if (template) return { template, oneClick: oneClickUrl, organizationName };
