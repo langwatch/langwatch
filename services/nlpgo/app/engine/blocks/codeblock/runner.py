@@ -103,32 +103,40 @@ Wire shape (result file):
 
 from __future__ import annotations
 
-import errno
 import os
 import sys
 
 # FIRST, before the payload is asked for: make this process's /proc files
-# unreadable to other executions running as the same user. A failure ends
-# the run, except on AWS Lambda, where seccomp refuses it with EPERM and the
-# engine sets NLPGO_CODE_BLOCK_HIDE=best-effort. Rationale:
-# specs/nlp-go/_shared/contract.md §7.
+# unreadable to other executions running as the same user. AWS Lambda's
+# seccomp refuses the prctl; there the image ships the interpreter
+# execute-only, and exec has already done it. Either way the outcome is
+# checked, and a process still readable ends the run.
+# Rationale: specs/nlp-go/_shared/contract.md §7.
+_PR_GET_DUMPABLE = 3
 _PR_SET_DUMPABLE = 4
+_SUID_DUMP_USER = 1
+
+
+def _hidden(libc) -> bool:
+    dumpable = libc.prctl(_PR_GET_DUMPABLE, 0, 0, 0, 0)
+    if dumpable >= 0:
+        return dumpable != _SUID_DUMP_USER
+    # The kernel hands a non-dumpable process's files to root.
+    return os.stat("/proc/self/environ").st_uid != os.geteuid()
 
 
 def _hide_from_other_executions() -> None:
-    # Popped so user code does not inherit the switch.
-    best_effort = os.environ.pop("NLPGO_CODE_BLOCK_HIDE", "") == "best-effort"
     if not sys.platform.startswith("linux"):
         return
 
     import ctypes
 
     libc = ctypes.CDLL(None, use_errno=True)
+    err = 0
     if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
         err = ctypes.get_errno()
-        # Best effort covers only the refusal the engine detected (EPERM).
-        if not (best_effort and err == errno.EPERM):
-            raise OSError(err, "prctl(PR_SET_DUMPABLE) failed")
+    if not _hidden(libc):
+        raise OSError(err, "prctl(PR_SET_DUMPABLE) failed and this process is still readable")
 
 
 _hide_from_other_executions()
@@ -202,6 +210,60 @@ def format_user_traceback() -> str:
 
 _PAYLOAD_TIMEOUT_S = 30
 
+# (audit arch, setsid, setpgid) per machine, for the filter below.
+_GROUP_SYSCALLS = {
+    "x86_64": (0xC000003E, 112, 109),
+    "aarch64": (0xC00000B7, 157, 154),
+}
+
+
+def confine_process_group() -> None:
+    """Refuse setsid and setpgid to this process and everything it starts.
+
+    nlpgo asks for this where it cannot adopt orphans (AWS Lambda refuses
+    PR_SET_CHILD_SUBREAPER): a process that left the run's process group
+    there would outlive the run. With both calls refused the group is the
+    whole run, and nlpgo kills the group when the run ends. A seccomp filter
+    cannot be removed, so user code that runs after this cannot undo it.
+    """
+    import ctypes
+    import platform
+
+    numbers = _GROUP_SYSCALLS.get(platform.machine())
+    if numbers is None:
+        raise OSError(0, f"no process-group filter for {platform.machine()}")
+    arch, setsid, setpgid = numbers
+
+    ld_abs, jeq, jge, ret = 0x20, 0x15, 0x35, 0x06
+    allow, refuse = 0x7FFF0000, 0x00050000 | 1  # SECCOMP_RET_ERRNO | EPERM
+    program = [
+        (ld_abs, 0, 0, 4),           # 0 arch
+        (jeq, 1, 0, arch),           # 1 native -> 3
+        (ret, 0, 0, refuse),         # 2 any other ABI is refused outright
+        (ld_abs, 0, 0, 0),           # 3 syscall number
+        (jge, 3, 0, 0x40000000),     # 4 x32 numbers -> 8 refuse
+        (jeq, 2, 0, setsid),         # 5 -> 8 refuse
+        (jeq, 1, 0, setpgid),        # 6 -> 8 refuse
+        (ret, 0, 0, allow),          # 7
+        (ret, 0, 0, refuse),         # 8
+    ]
+
+    class SockFilter(ctypes.Structure):
+        _fields_ = [("code", ctypes.c_ushort), ("jt", ctypes.c_ubyte),
+                    ("jf", ctypes.c_ubyte), ("k", ctypes.c_uint)]
+
+    class SockFprog(ctypes.Structure):
+        _fields_ = [("len", ctypes.c_ushort), ("filter", ctypes.POINTER(SockFilter))]
+
+    filters = (SockFilter * len(program))(*[SockFilter(*row) for row in program])
+    fprog = SockFprog(len(program), filters)
+    libc = ctypes.CDLL(None, use_errno=True)
+    pr_set_no_new_privs, pr_set_seccomp, seccomp_mode_filter = 38, 22, 2
+    if libc.prctl(pr_set_no_new_privs, 1, 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "prctl(PR_SET_NO_NEW_PRIVS) failed")
+    if libc.prctl(pr_set_seccomp, seccomp_mode_filter, ctypes.byref(fprog), 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "prctl(PR_SET_SECCOMP) failed")
+
 
 def read_payload() -> str:
     """Ask nlpgo for this run's payload, now that this process is hidden.
@@ -264,6 +326,15 @@ def main() -> int:
     # the initial environment another execution can read out of /proc.
     for name, value in (payload.get("env") or {}).items():
         os.environ[str(name)] = str(value)
+
+    # Before any user code: a run that cannot be kept in its process group
+    # where nlpgo asked for it does not run at all.
+    if payload.get("confine_process_group"):
+        try:
+            confine_process_group()
+        except OSError as e:
+            sys.stderr.write(f"runner: cannot keep this run in its process group: {e}\n")
+            return 1
 
     stub_source = payload.get("dspy_stub")
     if not stub_source:

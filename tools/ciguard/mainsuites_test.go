@@ -66,8 +66,8 @@ func TestMainSplitsThePackageSuitesLikeAPullRequest(t *testing.T) {
 			"shard: ${{ fromJSON(needs.changes.outputs.shards) }}",
 		},
 		"a longer timeout on main": {
-			"timeout-minutes: 45\n\n    services:",
-			"timeout-minutes: ${{ github.ref == 'refs/heads/main' && 120 || 45 }}\n\n    services:",
+			"timeout-minutes: 45\n\n    steps:",
+			"timeout-minutes: ${{ github.ref == 'refs/heads/main' && 120 || 45 }}\n\n    steps:",
 		},
 		"a fixed shard total": {
 			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}",

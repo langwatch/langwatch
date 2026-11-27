@@ -263,6 +263,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/ciguard",
   // The review job's wait for the other checks (specs/ci/pr-review-bot.feature).
   "tools/waitforchecks",
+  // The wait for CI's background datastore containers (specs/ci/app-ci-datastores.feature).
+  "tools/waitcontainers",
   "tools/deployimpact",
   "tools/operatornotes",
   "tools/cachesweep",

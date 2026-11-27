@@ -23,7 +23,24 @@ type runScope struct {
 	pgid  int
 	token string
 	dir   string
+	// strays: teardown also claims what PID 1 adopted; see runTeardown.
+	strays bool
 }
+
+// runTeardown is how runs are kept from outliving themselves, decided once in
+// New from what the platform allows (see runTeardownFor).
+type runTeardown string
+
+const (
+	// teardownGroup: the run's process group, and the orphans the engine adopts.
+	teardownGroup runTeardown = "group"
+	// teardownConfined: the runner also refuses setsid and setpgid to user code.
+	teardownConfined runTeardown = "confined"
+	// teardownStrays: the platform refuses that filter (AWS Lambda refuses
+	// PR_SET_NO_NEW_PRIVS), so teardown also claims the orphans PID 1 adopted
+	// after the engine started that no running execution can account for.
+	teardownStrays runTeardown = "strays"
+)
 
 // liveRun is one running execution as the rest of the package needs it: when
 // its interpreter started, which dates the processes it leaves behind, and the
