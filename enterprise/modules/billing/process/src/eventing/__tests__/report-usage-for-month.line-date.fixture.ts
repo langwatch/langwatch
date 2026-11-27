@@ -140,12 +140,12 @@ export function billing({
     isInstantEvalMeterProvisioned: () => true,
     queryPiiRedactionSpendTotal: (input) => piiRedaction.queryPiiRedactionSpendTotal(input),
     isPiiRedactionMeterProvisioned: () => true,
-    subscriptionPriceLine: async ({ price, billingMonth }) =>
+    subscriptionPriceLine: async ({ prices, billingMonth }) =>
       stripe === undefined
-        ? (lines[price] ?? NO_LINE)
+        ? (prices.map((price) => lines[price]).find((line) => line !== undefined) ?? NO_LINE)
         : priceLineOf({
             subscriptions: stripe,
-            prices: [{ priceName: price, priceId: PRICE_IDS[price] }],
+            prices: prices.map((priceName) => ({ priceName, priceId: PRICE_IDS[priceName] })),
             billingMonth,
           }),
     selfDispatch: async () => {},
