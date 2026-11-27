@@ -20,6 +20,7 @@ import {
   type OrganizationPiiLevel,
   otherPiiLevelLabel,
   showsStrictRule,
+  SWITCH_TO_MODEL_CONFIRMATION,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
@@ -137,9 +138,8 @@ export function OrganizationPiiLevelSection({
   const ownRule = organizationRule({ rules: snapshot.rules, organizationId });
   const confirmationFor = (level: OrganizationPiiLevel) =>
     levelChangeConfirmation({ from: storedPii.level, to: level, free, acceptance });
-  const confirmation = asking
-    ? confirmationFor(asking.kind === "switch" ? "strict" : asking.level)
-    : null;
+  const levelConfirmation = asking?.kind === "level" ? confirmationFor(asking.level) : null;
+  const confirmation = asking?.kind === "switch" ? SWITCH_TO_MODEL_CONFIRMATION : levelConfirmation;
 
   const save = async (level: OrganizationPiiLevel) => {
     optimistic.show({ organizationId, level, over: stored });

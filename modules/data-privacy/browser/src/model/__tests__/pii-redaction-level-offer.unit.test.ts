@@ -23,6 +23,7 @@ import {
   ruleSaveConfirmation,
   strictFallbackNote,
   STRICT_RULE_BASED_NOTES,
+  SWITCH_TO_MODEL_CONFIRMATION,
   withOrganizationPiiLevel,
 } from "../pii-redaction-level-offer.ts";
 
@@ -242,6 +243,18 @@ describe("given the organization's resolved PII level", () => {
   });
 });
 
+describe("given the switch to the model, which records the acceptance and saves no level", () => {
+  /** @scenario Accepting the price from the picker switches the organization to the model */
+  it("names the model's price alone, says it covers every Strict rule and keeps the level", () => {
+    expect(SWITCH_TO_MODEL_CONFIRMATION).toEqual({
+      title: "Switch to the PII Redaction Model?",
+      description:
+        "$0.50 per 1M characters excl. VAT, pay as you go. This covers every Strict rule in your organization: each one moves to the model and is billed. Your organization's level does not change.",
+      confirmLabel: "Accept and switch",
+    });
+  });
+});
+
 describe("given a change of the organization's level", () => {
   describe("when Essential turns into Strict for a paying organization", () => {
     it("asks with the model and its price", () => {
@@ -262,7 +275,7 @@ describe("given a change of the organization's level", () => {
   });
 
   describe("when the prompt records the organization's acceptance", () => {
-    /** @scenario Accepting the price from the picker switches the organization to the model */
+    /** @scenario Picking Strict through the price prompt records the acceptance first */
     it("says the acceptance covers every Strict rule in the organization", () => {
       const asking = levelChangeConfirmation({
         from: "essential",

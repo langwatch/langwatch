@@ -253,10 +253,10 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Given release_pii_redaction_model_enabled is on for "acme"
     And the organization's PII level resolves to Strict and no organization admin accepted the price
     When an admin presses "Switch to the PII Redaction Model"
-    Then a confirmation names the LangWatch PII Redaction Model and its price
-    And it says the acceptance covers every Strict rule in the organization
-    And nothing is accepted until the admin confirms
-    When the admin confirms
+    Then a confirmation titled "Switch to the PII Redaction Model?" names the model's price as the Strict card shows it
+    And it says the acceptance covers every Strict rule in the organization and the organization's level does not change
+    And nothing is accepted until the admin presses "Accept and switch"
+    When the admin presses "Accept and switch"
     Then the organization's acceptance of the price is recorded
     And the page says Strict is billed from the next trace
 
@@ -267,8 +267,9 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And no organization admin accepted the model's price
     When an admin opens the Data Privacy page for project "web-app"
     Then Strict reads "Currently on rule-based (Presidio), no charge" and offers "Switch to the PII Redaction Model"
-    When the admin presses it and confirms the price
+    When the admin presses it and then "Accept and switch" in the "Switch to the PII Redaction Model?" prompt
     Then the organization's acceptance of the price is recorded and the organization stays on Essential
+    And an organization on custom PII settings is asked the same, with no word on its settings, and keeps them
 
   @integration
   Scenario: Picking Strict through the price prompt records the acceptance first

@@ -175,6 +175,13 @@ type LevelChangeConfirmation = {
 const ACCEPTANCE_COVERS =
   "This covers every Strict rule in your organization: each one moves to the model and is billed. ";
 
+/** The switch records the acceptance and saves no level, so it names the price alone. */
+export const SWITCH_TO_MODEL_CONFIRMATION: LevelChangeConfirmation = {
+  title: "Switch to the PII Redaction Model?",
+  description: `${PII_REDACTION_MODEL_PRICE} ${PII_REDACTION_MODEL_PRICE_UNIT}. ${ACCEPTANCE_COVERS}Your organization's level does not change.`,
+  confirmLabel: "Accept and switch",
+};
+
 export function levelChangeConfirmation({
   from,
   to,

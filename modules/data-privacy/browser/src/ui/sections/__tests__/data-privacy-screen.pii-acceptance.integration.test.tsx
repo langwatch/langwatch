@@ -48,6 +48,18 @@ const legacyStrict = (options: { canWriteOrganization?: boolean } = {}) =>
 const switchButton = () =>
   screen.getByRole("button", { name: "Switch to the PII Redaction Model" });
 
+const SWITCH_PROMPT = "Switch to the PII Redaction Model?";
+const SWITCH_COPY =
+  "$0.50 per 1M characters excl. VAT, pay as you go. This covers every Strict rule in your organization: each one moves to the model and is billed. Your organization's level does not change.";
+
+/** Presses the switch prompt's own confirmation. */
+const confirmSwitch = async () =>
+  userEvent.setup().click(
+    within(await screen.findByRole("dialog", { name: SWITCH_PROMPT })).getByRole("button", {
+      name: "Accept and switch",
+    }),
+  );
+
 /** An acceptance still on its way, settled by the test. */
 function acceptanceOnItsWay() {
   const settle = { resolve: () => {}, reject: (_error: Error) => {} };
@@ -107,13 +119,11 @@ describe("given a Cloud organization on the model flag whose price no admin acce
 
       await user.click(switchButton());
 
-      const dialog = await screen.findByRole("dialog", { name: "Turn on Strict?" });
-      expect(dialog.textContent).toContain(
-        "Strict uses the LangWatch PII Redaction Model at $0.50 per 1M characters excl. VAT, pay as you go. This covers every Strict rule in your organization: each one moves to the model and is billed. Turn it on?",
-      );
+      const dialog = await screen.findByRole("dialog", { name: SWITCH_PROMPT });
+      expect(dialog.textContent).toContain(SWITCH_COPY);
       expect(api.acceptPiiRedactionModel).not.toHaveBeenCalled();
 
-      await user.click(within(dialog).getByRole("button", { name: "Turn on Strict" }));
+      await user.click(within(dialog).getByRole("button", { name: "Accept and switch" }));
 
       await waitFor(() =>
         expect(api.acceptPiiRedactionModel).toHaveBeenCalledWith({ organizationId: "org-1" }),
@@ -152,13 +162,42 @@ describe("given a Cloud organization on the model flag whose price no admin acce
         within(picker()).getByText("Currently on rule-based (Presidio), no charge"),
       ).toBeInTheDocument();
       await userEvent.setup().click(switchButton());
-      await confirmStrict();
+      expect(await screen.findByRole("dialog", { name: SWITCH_PROMPT })).toHaveTextContent(
+        SWITCH_COPY,
+      );
+      await confirmSwitch();
 
       await waitFor(() =>
         expect(api.acceptPiiRedactionModel).toHaveBeenCalledWith({ organizationId: "org-1" }),
       );
       expect(api.setForScope).not.toHaveBeenCalled();
       expect(pickedLevel()).toBe("Essential");
+    });
+  });
+
+  describe("when the organization keeps custom PII settings and a project rule sets Strict", () => {
+    /** @scenario An admin accepts the price for a project's Strict rule while the organization is on Essential */
+    it("asks to switch without a word on the custom settings, and replaces nothing", async () => {
+      api.snapshot = snapshotWith({
+        level: "custom",
+        entities: ["EMAIL_ADDRESS"],
+        rules: [
+          organizationRuleWith({ pii: { level: "custom", entities: ["EMAIL_ADDRESS"] } }),
+          projectRuleWith({ pii: { level: "strict" } }),
+        ],
+        accepted: false,
+      });
+      page({ flagOn: true });
+
+      await userEvent.setup().click(switchButton());
+      const dialog = await screen.findByRole("dialog", { name: SWITCH_PROMPT });
+      expect(dialog.textContent).not.toContain("custom PII settings");
+      await confirmSwitch();
+
+      await waitFor(() =>
+        expect(api.acceptPiiRedactionModel).toHaveBeenCalledWith({ organizationId: "org-1" }),
+      );
+      expect(api.setForScope).not.toHaveBeenCalled();
     });
   });
 
@@ -219,7 +258,7 @@ describe("given a Cloud organization on the model flag whose price no admin acce
       page({ flagOn: true });
 
       await userEvent.setup().click(switchButton());
-      await confirmStrict();
+      await confirmSwitch();
       await waitFor(() => expect(api.acceptPiiRedactionModel).toHaveBeenCalled());
 
       expect(switchButton()).toBeDisabled();
@@ -355,7 +394,7 @@ describe("given a Cloud organization on the model flag whose price no admin acce
       const { rerender } = page({ flagOn: true });
 
       await userEvent.setup().click(switchButton());
-      await confirmStrict();
+      await confirmSwitch();
       expect(await screen.findByText(BILLED)).toBeInTheDocument();
 
       api.snapshot = snapshotWith({ level: "strict", accepted: false, organizationId: "org-2" });
