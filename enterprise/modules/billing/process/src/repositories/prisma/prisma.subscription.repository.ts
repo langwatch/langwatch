@@ -275,16 +275,20 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
-    previousStatus: string;
   }): Promise<BillingSubscriptionWithOrganization> {
+    // The stored status decides, at the write: a parallel activation that won keeps its start.
+    await this.prisma.subscription.updateMany({
+      where: {
+        id: input.id,
+        status: { not: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus },
+      },
+      data: { startDate: toDate(nowInstant()) },
+    });
     const row = await this.prisma.subscription.update({
       where: { id: input.id },
       data: {
         status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
         lastPaymentFailedDate: null,
-        ...(input.previousStatus === SubscriptionStatus.ACTIVE
-          ? {}
-          : { startDate: toDate(nowInstant()) }),
         maxMembers: input.maxMembers,
         ...(input.maxMembersDeveloper === undefined
           ? {}

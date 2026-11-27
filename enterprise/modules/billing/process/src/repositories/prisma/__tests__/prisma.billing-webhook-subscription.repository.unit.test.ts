@@ -100,14 +100,12 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
         id: "subscription-1",
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
-        previousStatus: "ACTIVE",
       });
 
       expect(updateQuantities).toHaveBeenCalledWith({
         id: "subscription-1",
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
-        previousStatus: "ACTIVE",
       });
       expect(result).toEqual({ outcome: "updated", subscription: WITH_ORGANIZATION });
     });

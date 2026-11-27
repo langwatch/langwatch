@@ -97,7 +97,6 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
-    previousStatus: string;
   }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>> {
     const updated = await this.orNull("updateQuantities", () =>
       this.subscriptions.updateQuantities(input),

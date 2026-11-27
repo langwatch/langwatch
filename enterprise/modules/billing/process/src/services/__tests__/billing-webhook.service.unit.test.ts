@@ -1401,7 +1401,6 @@ describe("EEWebhookService", () => {
           id: "sub_db_1",
           maxMembers: 5,
           maxMessagesPerMonth: 30_000,
-          previousStatus: SubscriptionStatus.ACTIVE,
         });
       });
 

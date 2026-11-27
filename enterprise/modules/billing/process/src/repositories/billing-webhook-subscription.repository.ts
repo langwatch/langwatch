@@ -66,7 +66,5 @@ export abstract class BillingWebhookSubscriptionRepository {
     /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
-    /** The status before this update: one not already active starts now, as in `activate`. */
-    previousStatus: string;
   }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>>;
 }

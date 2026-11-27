@@ -105,7 +105,6 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
-    previousStatus: string;
   }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>> {
     if (!this.present(input.id)) return { outcome: "missing_subscription" };
     const updated = await this.subscriptions.updateQuantities(input);

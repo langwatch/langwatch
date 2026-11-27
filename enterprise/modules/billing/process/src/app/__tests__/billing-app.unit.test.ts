@@ -542,7 +542,6 @@ describe("the seat price BillingModule quotes", () => {
         id: row.id,
         maxMembers: 5,
         maxMessagesPerMonth: null,
-        previousStatus: "ACTIVE",
       });
       await paymentRecovery.open({
         subscriptionId: row.id,

@@ -81,28 +81,34 @@ describe("PrismaBillingSubscriptionRepository", () => {
   });
 
   describe("updateQuantities()", () => {
-    const quantities = { id: "sub_1", maxMembers: 3, maxMessagesPerMonth: null };
-    const dataOf = async (previousStatus: string) => {
-      const write = vi.fn(async (_args: unknown) => ({
-        id: "sub_1",
-        createdAt: new Date(),
-        organization: {},
-      }));
+    it("records the start only on a row not active yet, decided at the write", async () => {
+      const calls: string[] = [];
+      const updateMany = vi.fn(async (_args: unknown) => {
+        calls.push("updateMany");
+        return { count: 1 };
+      });
+      const write = vi.fn(async (_args: unknown) => {
+        calls.push("update");
+        return { id: "sub_1", createdAt: new Date(), organization: {} };
+      });
       const quantitiesRepo = PrismaBillingSubscriptionRepository.create(
-        prismaDouble({ subscription: { update: write } }),
+        prismaDouble({ subscription: { update: write, updateMany } }),
       );
-      await quantitiesRepo.updateQuantities({ ...quantities, previousStatus });
-      expect(write).toHaveBeenCalledTimes(1);
-      const [call] = write.mock.calls[0] ?? [];
-      return (call as { data: Record<string, unknown> }).data;
-    };
 
-    it("records the start when the subscription was not active yet", async () => {
-      expect((await dataOf(SubscriptionStatus.PENDING)).startDate).toBeInstanceOf(Date);
-    });
+      await quantitiesRepo.updateQuantities({
+        id: "sub_1",
+        maxMembers: 3,
+        maxMessagesPerMonth: null,
+      });
 
-    it("leaves the start alone when the subscription was already active", async () => {
-      expect(await dataOf(SubscriptionStatus.ACTIVE)).not.toHaveProperty("startDate");
+      expect(calls).toEqual(["updateMany", "update"]);
+      const [stamp] = updateMany.mock.calls[0] ?? [];
+      expect(stamp).toMatchObject({
+        where: { id: "sub_1", status: { not: SubscriptionStatus.ACTIVE } },
+        data: { startDate: expect.any(Date) },
+      });
+      const [update] = write.mock.calls[0] ?? [];
+      expect((update as { data: Record<string, unknown> }).data).not.toHaveProperty("startDate");
     });
   });
 });

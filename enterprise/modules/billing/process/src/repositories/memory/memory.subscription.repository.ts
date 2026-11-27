@@ -127,7 +127,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       ...subscription,
       status: ACTIVE,
       lastPaymentFailedDate: null,
-      startDate: input.previousStatus === ACTIVE ? subscription.startDate : nowInstant(),
+      startDate: subscription.status === ACTIVE ? subscription.startDate : nowInstant(),
     }));
 
     return this.withOrganization(activated);
@@ -180,13 +180,12 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
-    previousStatus: string;
   }): Promise<BillingSubscriptionWithOrganization> {
     const updated = this.update(input.id, (subscription) => ({
       ...subscription,
       status: ACTIVE,
       lastPaymentFailedDate: null,
-      startDate: input.previousStatus === ACTIVE ? subscription.startDate : nowInstant(),
+      startDate: subscription.status === ACTIVE ? subscription.startDate : nowInstant(),
       maxMembers: input.maxMembers,
       maxMembersDeveloper: input.maxMembersDeveloper ?? subscription.maxMembersDeveloper,
       maxMessagesPerMonth: input.maxMessagesPerMonth,

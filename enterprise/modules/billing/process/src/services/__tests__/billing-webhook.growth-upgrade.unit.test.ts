@@ -488,7 +488,9 @@ describe("given a tiered organization upgrading to Growth seats", () => {
 
     await deliverTogether(upgrade, [subscriptionActive()]);
 
-    expect(rowOf(upgrade, GROWTH_ROW)?.startDate).not.toBeNull();
+    const growth = rowOf(upgrade, GROWTH_ROW);
+    expect(growth).toBeDefined();
+    expect(growth?.startDate).toBeInstanceOf(Temporal.Instant);
   });
 
   /** @scenario "A later subscription-active message keeps the start of a subscription already running" */
