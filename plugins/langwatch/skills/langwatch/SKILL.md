@@ -23,7 +23,7 @@ credentials.
 
 ## Find a trace
 
-Search the last 24 hours by default. Widen with `--start-date` / `--end-date`.
+Search the last 7 days by default. Widen with `--start-date` / `--end-date`.
 
 ```bash
 langwatch trace search -q "checkout agent" --limit 10 -o json

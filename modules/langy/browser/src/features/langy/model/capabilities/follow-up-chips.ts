@@ -97,10 +97,10 @@ export function deriveFollowUpChips({
   for (const suggestion of suggestions) {
     const build = DESTINATION_BY_FEATURE[suggestion.featureId];
     // `search` was read off a settled `langwatch trace search` call above, so an
-    // absent window here is the CLI's own last-24h default rather than an
+    // absent window here is the CLI's own 7-day default rather than an
     // unknown one — the alert must match the traces the card just showed.
     const carriedHref = build
-      ? build({ projectSlug, search, unstatedWindow: "cli-last-24h" })
+      ? build({ projectSlug, search, unstatedWindow: "cli-default" })
       : null;
     if (carriedHref) {
       chips.push({

@@ -1,7 +1,7 @@
 /**
  * Preserve a Langy trace search when crossing from the CLI grammar into the Explorer's
  * liqe URL fragment. Free text is quoted so field-like text remains free text. Named
- * windows stay absolute; the unnamed CLI default stays a rolling day.
+ * windows stay absolute; the unnamed CLI default stays a rolling week.
  */
 
 // The Explorer's own value-quoting rule. Imported rather than reimplemented so
@@ -32,10 +32,11 @@ export interface TraceSearchQuery {
 const TRACE_EXPLORER_LENS = "all-traces";
 
 /**
- * The window `trace search` covers when the agent named none — the CLI's own
- * `oneDayAgo` default (`cli/commands/traces/search.ts`).
+ * The CLI's `DEFAULT_LOOKBACK` (`sdks/typescript/src/cli/utils/timeWindow.ts`)
+ * as the Explorer preset of the same length. Copied, not imported: this module
+ * does not depend on the SDK, so the two change together by hand.
  */
-const CLI_DEFAULT_WINDOW_PRESET = "24h";
+const CLI_DEFAULT_WINDOW_PRESET = "7d";
 
 /**
  * Recover the search the agent actually ran.
@@ -152,7 +153,7 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
  * What an ABSENT window means for a given caller — which is not the same question for
  * every caller, and answering it wrong invents a filter.
  */
-export type UnstatedWindow = "cli-last-24h" | "unknown";
+export type UnstatedWindow = "cli-default" | "unknown";
 
 /**
  * The Explorer's fragment for this search: the default lens, plus whatever survived of
@@ -172,10 +173,10 @@ function explorerFragment(
   } else if (
     search.startDate === undefined &&
     search.endDate === undefined &&
-    unstatedWindow === "cli-last-24h"
+    unstatedWindow === "cli-default"
   ) {
     // NEITHER bound named AND the caller vouches for the CLI's own default: the
-    // search covered the last day and we can say so exactly — see
+    // search covered the last week and we can say so exactly — see
     // CLI_DEFAULT_WINDOW_PRESET. Saying nothing here is not neutral; it hands
     // the user the Explorer's 30d default instead. Only the CLI's own search
     // carries that guarantee, which is why the caller has to state it.

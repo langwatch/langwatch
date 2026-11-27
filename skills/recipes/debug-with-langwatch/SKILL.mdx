@@ -35,7 +35,7 @@ langwatch trace search --errors-only -q "timeout" --start-date 2026-01-01 -o jso
 ```
 
 - `--errors-only` is how you find failures. An error is recorded on the span, not in the trace's searchable text, so `-q "error"` finds nothing and reads like a clean project.
-- `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
+- `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 7 days).
 - `-q` does a text search over one phrase: the error message, a user id, a thread id. AND, OR and NOT are matched as words, not as operators.
 - The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
 
@@ -82,7 +82,7 @@ langwatch analytics query -m trace-count -a sum --group-by metadata.model -o jso
 
 1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
 2. Apply the fix (prompt, code, or configuration).
-3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
+3. Note the start time first (`date +%s000` prints epoch ms). Generate fresh traffic, then re-run Step 1 with `--start-date <that time>`. Confirm the new run produced a trace (search without `--errors-only`), then check no errored ones appear. Without `--start-date`, the old errors in the last 7 days still show.
 4. If the failure was a regression, add a scenario so it stays fixed. The `scenarios` skill covers this.
 
 ## Discovery

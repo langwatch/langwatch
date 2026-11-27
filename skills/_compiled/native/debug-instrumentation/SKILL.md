@@ -20,7 +20,7 @@ langwatch trace search --limit 25 --start-date "$(( ($(date +%s) - 7*24*3600) * 
 ```
 
 (Widen or narrow the window as needed. `--start-date` accepts an ISO string or
-epoch milliseconds, and defaults to the last 24 hours. The epoch form above is
+epoch milliseconds, and defaults to the last 7 days. The epoch form above is
 used because `date -d '7 days ago'` is GNU-only and fails on macOS.)
 
 For each trace, ask:

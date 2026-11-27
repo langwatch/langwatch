@@ -21,12 +21,12 @@ const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({
 });
 
 // No `--start-date`/`--end-date` in the fixture's command, so the search
-// covered the CLI's own default last-24h window — carried here as a rolling
-// `preset=24h` rather than silently dropped (see traceExplorerLink.ts).
+// covered the CLI's own default 7-day window — carried here as a rolling
+// `preset=7d` rather than silently dropped (see traceExplorerLink.ts).
 const CARRIED_ALERT = {
   id: "traces:triggers",
   label: "Alert me on this",
-  href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22&preset=24h",
+  href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22&preset=7d",
   carried: true,
 };
 
@@ -144,7 +144,7 @@ describe("deriveFollowUpChips", () => {
         expect(chips).toContainEqual({
           id: "traces:triggers",
           label: "Alert me on this",
-          href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22refund+policy%22#all-traces?q=%22refund+policy%22&preset=24h",
+          href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22refund+policy%22#all-traces?q=%22refund+policy%22&preset=7d",
           carried: true,
         });
       });

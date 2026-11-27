@@ -5,19 +5,23 @@ import { describe, expect, it } from "vitest";
 
 import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
-// Backs specs/langy/langy-dogfood-scenarios.feature: the tracing skill is what
-// tells Langy how to prove the instrumentation works. A filmed run asked the
-// trace search seven times inside a few seconds, saw nothing, and reported its
-// own verification as inconclusive, because the skill said to check and said
-// nothing about the ingestion the check waits on.
+// Backs specs/langy/langy-dogfood-scenarios.feature: the tracing skill and the
+// debug-with-langwatch recipe tell Langy how to prove a change worked. A filmed
+// run asked the trace search seven times in a few seconds, saw nothing, and
+// called its own verification inconclusive: the skill said nothing about the
+// ingestion the check waits on, nor the window that ties a trace to the run.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
 
-function tracingSkill(): string {
-  const skill = listNativeSkills(skillsRoot).find((s) => s.slug === "tracing");
-  expect(skill, "tracing is a shipped native skill").toBeTruthy();
+function nativeSkill(slug: string): string {
+  const skill = listNativeSkills(skillsRoot).find((s) => s.slug === slug);
+  expect(skill, `${slug} is a shipped native skill`).toBeTruthy();
   return renderSkill(skill!);
+}
+
+function tracingSkill(): string {
+  return nativeSkill("tracing");
 }
 
 describe("given the tracing skill", () => {
@@ -56,6 +60,10 @@ describe("given the tracing skill", () => {
       );
       expect(rendered).toContain("No variant before it");
       expect(rendered).toContain("Always `-c`, never `python -` with a heredoc");
+      expect(rendered).toContain("The one change it takes is the loader");
+      expect(rendered).toContain(
+        "put the project's own loader in place of the dotenv call, or nothing when the environment comes from the shell",
+      );
       expect(rendered).toContain(
         "```bash\nuv run python -c \"from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))\"\n```",
       );
@@ -108,6 +116,40 @@ describe("given the tracing skill", () => {
     it("says not to report the change as verified when the wait runs out", () => {
       const rendered = tracingSkill();
       expect(rendered).toContain("do not report the change as verified");
+    });
+
+    /** @scenario "The tracing skill waits for the trace instead of asking again at once" */
+    it("ties the search to the time noted at the start of the run", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain("--start-date <the time you noted>");
+      expect(rendered).toContain("A trace from before the run is not this run's");
+    });
+  });
+});
+
+describe("given the debug-with-langwatch recipe", () => {
+  describe("when its re-check after the fix is read", () => {
+    /** @scenario "The debug recipe ties its re-check to the time the fix's run started" */
+    it("notes the start time in epoch ms before generating fresh traffic", () => {
+      const rendered = nativeSkill("debug-with-langwatch");
+      expect(rendered).toContain("Note the start time first (`date +%s000` prints epoch ms)");
+    });
+
+    /** @scenario "The debug recipe ties its re-check to the time the fix's run started" */
+    it("re-runs the search from that time, so the old errors are not taken for this run's", () => {
+      const rendered = nativeSkill("debug-with-langwatch");
+      expect(rendered).toContain("re-run Step 1 with `--start-date <that time>`");
+      expect(rendered).toContain(
+        "Without `--start-date`, the old errors in the last 7 days still show",
+      );
+    });
+
+    /** @scenario "The debug recipe ties its re-check to the time the fix's run started" */
+    it("confirms the new run produced a trace before reading no errors as fixed", () => {
+      const rendered = nativeSkill("debug-with-langwatch");
+      expect(rendered).toContain(
+        "Confirm the new run produced a trace (search without `--errors-only`), then check no errored ones appear",
+      );
     });
   });
 });

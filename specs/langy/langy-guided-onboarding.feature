@@ -582,7 +582,7 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then the manifest of a pip project is requirements.txt, or the requirements file the folder uses
       And a pip install writes no manifest, so Langy writes the langwatch line into that file itself
-      And the version comes from python -m pip show langwatch, run with the interpreter the install worked with
+      And the version comes from <interpreter> -m pip show langwatch, with the interpreter of the rung that worked
       And the line is pinned the way the file pins its other packages, and unpinned when the file pins none of them
       And the commit stages that manifest
 
@@ -716,7 +716,7 @@ Feature: Langy guides the first setup after sign-up
       And a folder where git could not be run keeps the unknown lines
 
     # A run ended on "this folder does not have the pip package manager
-    # available" after one `pip install` answered 127: pip3, python -m pip and
+    # available" after one `pip install` answered 127: python3 -m pip, python -m pip and
     # uv were never tried.
     # A film ran python3 -m pip first in a folder whose venv uv had made,
     # where pip is not installed, and reached uv add only on the second try.
@@ -726,12 +726,14 @@ Feature: Langy guides the first setup after sign-up
       Then the install ladder starts with the manager the workspace facts name
       And uv is that manager when the facts name it, the folder has a uv.lock, or the virtual environment was made by uv
       And the interpreter's pip spellings come only after the named manager and the folder's own interpreter
+      And bare pip and pip3 are not rungs: facts that name pip mean the interpreter's -m pip
       And the tracing skill says the same
+      And the tracing skill's rungs after the named manager are .venv/bin/python -m pip, then python3 -m pip and python -m pip, with no bare pip or pip3 rung
 
     @unit
     Scenario: A missing pip climbs the install ladder before it asks
       When the compiled guided-onboarding skill is read
-      Then the Python install is a ladder from uv to the folder's interpreter to pip, pip3, python3 -m pip and python -m pip
+      Then the Python install is a ladder from uv to .venv/bin/python -m pip, python3 -m pip and python -m pip
       And a command not found moves to the next rung without a retry
       And only when every rung is missing does the question offer "Install uv for me" or "I'll set up Python myself"
 
@@ -746,6 +748,7 @@ Feature: Langy guides the first setup after sign-up
       And a JavaScript install is checked with a require
       And uv run is the runner only in a uv project, and elsewhere Python runs through the interpreter the ladder worked with
       And pip install --upgrade never runs against an interpreter the SDK does not support
+      And the Python check of the install runs through the interpreter of the rung of the install ladder that worked
       And the tracing skill says the same
 
     @unit
@@ -926,20 +929,20 @@ Feature: Langy guides the first setup after sign-up
     @e2e
     Scenario: A command not found moves the install ladder to the next rung
       Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
-      And a terminal whose PATH has no pip, while pip3 and python3 -m pip work
+      And a terminal whose PATH has no python3, so python3 -m pip is a rung that fails, while python -m pip works
       When Langy runs the llmops path
-      Then Langy tries pip at most once and installs through the next spelling on the ladder
+      Then Langy tries python3 -m pip at most once and installs through python -m pip, the next rung on the ladder
       And the manifest names langwatch and the interpreter can import it
       And the question offering to install uv is never asked
       And nothing Langy says calls the folder unmanaged
 
     @e2e
-    Scenario: Every missing rung is tried once, and the ladder still installs
-      Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
-      And a terminal where uv, pip and pip3 each answer command not found and exit 127
+    Scenario: Only the last rung is left, and the ladder still installs through it
+      Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment, so the facts name pip
+      And a terminal where python3, uv, pip and pip3 each answer command not found and exit 127, while python -m pip works
       When Langy runs the llmops path
-      Then each missing spelling is tried at most once and never asked again
-      And the install goes through the interpreter's own -m pip
+      Then Langy tries python3 -m pip at most once and installs through python -m pip, the last rung on the ladder
+      And uv, pip and pip3, which are not rungs for this folder, are never tried as an install
       And the manifest names langwatch and the interpreter can import it
       And the question offering to install uv is never asked
 

@@ -329,9 +329,9 @@ describe("buildTraceExplorerHref", () => {
         expect(params.get("to")).toBeNull();
       });
 
-      it("does not claim the 24h default either, which would NARROW the link", () => {
+      it("does not claim the 7d default either, which would NARROW the link", () => {
         // The CLI defaults the two ends independently, so `--start-date` with
-        // no end is [thatStart, now] — not the 24h window. Stamping 24h on a
+        // no end is [thatStart, now] — not the 7d window. Stamping 7d on a
         // start three months back would cut the link to a fraction of what the
         // agent searched, hiding rows the user came to find. Carrying no window
         // is the safe direction: the Explorer's own default is a superset.
@@ -360,8 +360,8 @@ describe("buildTraceExplorerHref", () => {
     });
 
     describe("when the agent named no window at all", () => {
-      // The CLI itself defaults to the last 24h rather than searching all
-      // time (`cli/commands/traces/search.ts`), so a search that named no
+      // The CLI itself defaults to the last 7 days rather than searching all
+      // time (`DEFAULT_LOOKBACK` in `cli/utils/timeWindow.ts`), so a search that named no
       // window still covered one. This is the fix for the bug where the link
       // instead fell through to the Explorer's own 30d default — a search's
       // card would say "4 traces, no errors" while the Explorer, having
@@ -372,11 +372,11 @@ describe("buildTraceExplorerHref", () => {
           buildTraceExplorerHref({
             projectSlug: "acme",
             search: { query: "x" },
-            unstatedWindow: "cli-last-24h",
+            unstatedWindow: "cli-default",
           })!,
         );
 
-        expect(params.get("preset")).toBe("24h");
+        expect(params.get("preset")).toBe("7d");
         expect(params.get("from")).toBeNull();
         expect(params.get("to")).toBeNull();
       });
@@ -385,10 +385,10 @@ describe("buildTraceExplorerHref", () => {
         const href = buildTraceExplorerHref({
           projectSlug: "acme",
           search: {},
-          unstatedWindow: "cli-last-24h",
+          unstatedWindow: "cli-default",
         })!;
 
-        expect(fragmentParams(href).get("preset")).toBe("24h");
+        expect(fragmentParams(href).get("preset")).toBe("7d");
         expect(fragmentParams(href).get("q")).toBeNull();
       });
     });
@@ -396,9 +396,9 @@ describe("buildTraceExplorerHref", () => {
     describe("when the caller cannot vouch for what an absent window means", () => {
       // `buildTraceExplorerHref` is also the seam for ADR-060 derived-card
       // `explore` hints, which the model authors with no dates and no claim
-      // about when the underlying data is from. Stamping the CLI's 24h default
+      // about when the underlying data is from. Stamping the CLI's 7d default
       // on those invents a filter: a card summarising last quarter would link
-      // to a one-day window and show an empty page.
+      // to a one-week window and show an empty page.
       it("asserts no window at all rather than inventing the CLI's default", () => {
         const params = fragmentParams(
           buildTraceExplorerHref({
@@ -498,7 +498,7 @@ describe("buildAutomationHref", () => {
           buildAutomationHref({
             projectSlug: "acme",
             search,
-            unstatedWindow: "cli-last-24h",
+            unstatedWindow: "cli-default",
           })!,
         );
 
@@ -511,7 +511,7 @@ describe("buildAutomationHref", () => {
           buildAutomationHref({
             projectSlug: "acme",
             search,
-            unstatedWindow: "cli-last-24h",
+            unstatedWindow: "cli-default",
           })!,
         );
 
@@ -541,7 +541,7 @@ describe("buildAutomationHref", () => {
         const href = buildAutomationHref({
           projectSlug: "acme",
           search,
-          unstatedWindow: "cli-last-24h",
+          unstatedWindow: "cli-default",
         })!;
 
         expect(href.startsWith("/acme/traces?")).toBe(true);

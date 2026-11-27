@@ -633,7 +633,7 @@ describe("the guided-onboarding skill", () => {
       expect(install).toBeGreaterThan(branch);
       expect(tracingItem).toBeGreaterThan(install);
       const how = rendered.indexOf(
-        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager. For Python the install is a ladder, not one command, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it); otherwise the folder's own interpreter, `.venv/bin/python -m pip install langwatch` when `.venv` exists; and only after those the interpreter's pip, `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`, stopping at the first that works. The interpreter's pip never runs before the named manager or the folder's own interpreter.",
+        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager. For Python the install is a ladder, not one command, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it); otherwise the folder's own interpreter, `.venv/bin/python -m pip install langwatch` when `.venv` exists; and only after those the interpreter's pip, `python3 -m pip install langwatch`, `python -m pip install langwatch`, stopping at the first that works. The interpreter's pip never runs before the named manager or the folder's own interpreter.",
       );
       const tracingStep = rendered.indexOf("2. `tracing` for the detected framework.");
       expect(how).toBeGreaterThan(-1);
@@ -647,7 +647,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A pip project's manifest gets the package line" */
     it("writes the langwatch line into the requirements file itself, since a pip install writes no manifest", () => {
       expect(rendered).toContain(
-        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `python -m pip show langwatch` through the interpreter the install worked with, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and unpinned when the file pins none of them.",
+        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `<interpreter> -m pip show langwatch`, with the interpreter of the rung that worked, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and unpinned when the file pins none of them.",
       );
       // The commit stages that manifest, whatever the file is called.
       expect(rendered).toContain(
@@ -1084,10 +1084,30 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "The interpreter's pip never runs before the named manager or the folder's own interpreter.",
       );
+      expect(rendered).toContain(
+        "Bare `pip` and `pip3` are not rungs: when the workspace facts name pip as the package manager, that is the interpreter's pip, `.venv/bin/python -m pip` when `.venv` exists, else `python3 -m pip` then `python -m pip`.",
+      );
       const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
         "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line",
       );
+      expect(tracing).toContain(
+        "Bare `pip` and `pip3` are not rungs: when the workspace facts name pip as the package manager, that is the interpreter's `-m pip`, the rungs above.",
+      );
+      const ladderStart = tracing.indexOf("The rungs after it, in order:\n\n");
+      expect(ladderStart).toBeGreaterThan(-1);
+      const rungs = tracing.slice(ladderStart).split("\n\n")[1]!.split("\n");
+      expect(rungs).toEqual([
+        "- Otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists.",
+        "- Only then `python3 -m pip install langwatch`, `python -m pip install langwatch`.",
+      ]);
+      // Anywhere in either skill, not just the list: a bare rung could be
+      // added in prose. `pip install langwatch --upgrade` is a different
+      // string, so it does not trip this.
+      for (const skill of [rendered, tracing]) {
+        expect(skill).not.toContain("`pip install langwatch`");
+        expect(skill).not.toContain("`pip3 install langwatch`");
+      }
     });
 
     /** @scenario "A missing pip climbs the install ladder before it asks" */
@@ -1136,12 +1156,16 @@ describe("the guided-onboarding skill", () => {
         'Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require(\'langwatch\')"` for TypeScript.',
       );
       expect(tracing).toContain("`pip install langwatch --upgrade` cannot help there.");
+      expect(tracing).toContain("through the interpreter of the rung that worked");
+      expect(tracing).toContain("`.venv/bin/python -c` after `.venv/bin/python -m pip`");
+      expect(tracing).toContain("`python3 -c` after `python3 -m pip`");
+      expect(tracing).toContain("`<interpreter> -m pip show langwatch`");
     });
 
     /** @scenario "An installed SDK without the tracing API is an interpreter question, not a stop" */
     it("asks about the interpreter when the installed SDK has no tracing API", () => {
       expect(rendered).toContain(
-        'When the check fails, or the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
+        'When the check fails, or the version the show command reads (`<interpreter> -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
       );
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));

@@ -364,23 +364,29 @@ Each file's header links here rather than repeating its narrative.
   answers. The run screenshots the panel with the card open.
 - **llmops-pip-missing**: the shared folder's `requirements.txt` names `pip`
   as the package manager, and the install ladder's first rung,
-  `pip install langwatch`, is not on the terminal's PATH — it answers
-  "pip: command not found" and exits 127, while `pip3` and `python3 -m pip`
-  work. A command not found is a missing spelling, never a missing
-  capability, so the ladder is expected to move to the next rung instead of
+  `python3 -m pip install langwatch`, is not on the terminal's PATH —
+  `python3` answers "command not found" and exits 127, while `python -m pip`
+  works. Bare `pip` and `pip3` are spellings that are not rungs. A
+  command not found is a missing spelling, never a missing capability, so the
+  ladder is expected to move to the next rung instead of
   retrying the one that is gone or telling the developer their folder has no
   package manager. Layer 2 comes before the judge: what the manifest names
   afterwards, whether the interpreter can import the package, how many
-  `pip install` attempts Langy made, and that the "no pip or uv" unlock card
+  `python3 -m pip install` attempts Langy made, and that the "no pip or uv" unlock card
   never came up, since only one rung was missing.
-- **llmops-pip-gone**: every rung above `python3 -m pip` is gone — `uv`,
-  `pip` and `pip3` each answer "command not found" and exit 127, and the
-  folder has no lock file and no virtual environment, so the ladder's only
-  working rung is the interpreter's own `-m pip`. The ladder walks down to a
-  rung that works instead of retrying one that is gone, and the folder is
-  never called unmanaged while an interpreter on PATH can still install into
-  it. Each shim writes the call it refused to a log, so the run can say
-  which rungs Langy actually reached for rather than infer it from what
+- **llmops-pip-gone**: every Python install spelling but `python` is gone —
+  `python3`, `uv`, `pip` and `pip3` each answer "command not found" and exit
+  127, and the folder has no lock file and no virtual environment, so the
+  facts name `pip` and the ladder is `python3 -m pip` then `python -m pip`.
+  Where llmops-pip-missing takes away one rung and leaves the off-ladder
+  spellings alone, this one leaves only the last rung: `python3` is the rung
+  that fails, and `uv`, `pip` and `pip3`, which are not rungs here, are gone
+  too, so no shortcut off the ladder can install. Layer 2 checks that
+  `python3 -m pip` was tried at most once, that `uv`, `pip` and `pip3` were
+  never tried as an install, and that `python -m pip` installed. The folder
+  is never called unmanaged while `python` can still install into it. Each
+  shim writes the call it refused to a log, so the run can say which
+  spellings Langy actually reached for rather than infer it from what
   survived.
 - **pip-index.ts**: reads `pip index versions <package>` so the pip-missing
   and pip-gone scenarios can ask what the index actually offers this

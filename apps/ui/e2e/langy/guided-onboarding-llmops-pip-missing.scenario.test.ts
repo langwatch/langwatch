@@ -45,11 +45,19 @@ const model = guidedHarnessModel();
 const LONG_RUN_TIMEOUT_MS = 2_700_000;
 
 /**
- * What the missing spelling answers. Both halves matter: the text is what a
- * shell prints for a command it cannot find, and 127 is the exit code the
- * ladder reads.
+ * The first prescribed rung for this folder, and the spelling this terminal
+ * lacks: the next rung, `python -m pip`, is the one that works.
  */
-const PIP_NOT_FOUND = 'echo "pip: command not found" >&2\nexit 127';
+const MISSING = "python3";
+
+/**
+ * What the missing spelling answers. Both halves matter: the text is what a
+ * shell prints for a command it cannot find, naming the command it refused,
+ * and 127 is the exit code the ladder reads.
+ */
+function notFoundShim(name: string): string {
+  return `echo "${name}: command not found" >&2\nexit 127`;
+}
 
 let org: GuidedOrganization;
 let folder: FixtureFolder;
@@ -57,7 +65,7 @@ let python: PythonEnv;
 let terminal: CliTerminal | undefined;
 let watcher: ConversationWatcher | undefined;
 
-describe("Langy installs the package when pip is not on PATH", () => {
+describe("Langy installs the package when python3 is not on PATH", () => {
   beforeAll(async () => {
     assertToolsPresent();
     org = await seedGuidedOrganization({
@@ -81,10 +89,10 @@ describe("Langy installs the package when pip is not on PATH", () => {
     await teardown({ terminal, watcher, repo: folder });
   });
 
-  describe("when the folder's own package manager spelling is gone", () => {
+  describe("when the first prescribed rung is gone", () => {
     /** @scenario A command not found moves the install ladder to the next rung */
     it(
-      "tries the next spelling instead of retrying pip or calling the folder unmanaged",
+      "climbs to the next rung instead of retrying python3 or calling the folder unmanaged",
       async () => {
         const langy = makeLangyAdapter();
         watcher = watchLangyConversation({
@@ -109,9 +117,9 @@ describe("Langy installs the package when pip is not on PATH", () => {
 
         const result = await runScenarioAndLog({
           config: {
-            name: "guided onboarding: the llmops path when pip is not on PATH",
+            name: "guided onboarding: the llmops path when python3 is not on PATH",
             description:
-              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal\'s PATH has no `pip`: that spelling answers "pip: command not found" and exits 127, while `pip3` and `python3 -m pip` work. Langy must install the LangWatch package anyway, through the next spelling on the ladder.',
+              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal\'s PATH has no `python3`: it answers "command not found" and exits 127, so `python3 -m pip` is a rung that fails, while `python -m pip` works. Langy must install the LangWatch package anyway, through the next rung on the ladder.',
             agents: [
               langy,
               scenario.userSimulatorAgent({ model }),
@@ -120,7 +128,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
                 criteria: [
                   "After a command answers that it is not found, Langy tries a different spelling of the same tool before it reports anything to the developer. Retrying the spelling that was not found, or stopping at it, fails this criterion.",
                   "Langy installs the LangWatch package into the project and says so. A reply that leaves the package uninstalled fails this criterion.",
-                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. Only the spelling `pip` was absent.",
+                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. Only the `python3` spelling was absent.",
                   "Langy does not ask the developer to run the install by hand while the folder is connected; it does the work itself.",
                   ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
@@ -146,7 +154,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
                   repo: folder,
                   label: "guided-pip-missing",
                   clearOpenRequests: false,
-                  shims: { pip: PIP_NOT_FOUND },
+                  shims: { [MISSING]: notFoundShim(MISSING) },
                   pathDirs: [python.binDir],
                 });
                 await terminal.approve();
@@ -180,19 +188,14 @@ describe("Langy installs the package when pip is not on PATH", () => {
         console.log(terminalSection(terminal!));
 
         // The rung that is gone was tried once at most, and the ladder moved
-        // on rather than retrying a spelling that is not there. Only the bare
-        // spelling counts: `python3 -m pip install` is a later rung that
-        // happens to carry the same word.
-        const pipAttempts = commands.filter(
-          (command) =>
-            /(?:^|[\s;&|])pip\s+install\b/.test(command) && !/-m\s+pip\s+install\b/.test(command),
+        // on to `python -m pip` rather than retrying a spelling that is not there.
+        const missingAttempts = commands.filter((command) =>
+          /(?:^|[\s;&|])python3\s+-m\s+pip\s+install\b/.test(command),
         );
-        console.log("[layer2] pip attempts:", pipAttempts.join(" | "));
-        expect(pipAttempts.length).toBeLessThanOrEqual(1);
+        console.log("[layer2] python3 attempts:", missingAttempts.join(" | "));
+        expect(missingAttempts.length).toBeLessThanOrEqual(1);
         expect(
-          commands.some((command) =>
-            /(pip3\s+install|python3?\s+-m\s+pip\s+install|uv\s+add)/.test(command),
-          ),
+          commands.some((command) => /(?:^|[\s;&|])python\s+-m\s+pip\s+install\b/.test(command)),
         ).toBe(true);
 
         // Item 1 is done: the manifest names the package and the interpreter

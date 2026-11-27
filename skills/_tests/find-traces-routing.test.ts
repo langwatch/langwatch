@@ -46,6 +46,15 @@ describe("the find-traces skill", () => {
       expect(secondary).toContain("langwatch trace search");
       expect(secondary).toContain("View in Trace Explorer");
     });
+
+    /** @scenario "The skill states the primary and the secondary way of working" */
+    it("answers the secondary way outside a Langy worker, where there is no page to drive", () => {
+      const section = sectionOf(renderedSkill(), "Primary and secondary way of working");
+      const outside = section.slice(section.indexOf("Outside a Langy worker"));
+      expect(outside).toContain("ui call needs LANGY_CONVERSATION_ID");
+      expect(outside).toContain("answer every ask the secondary way");
+      expect(outside).toContain("give the user the filter to paste");
+    });
   });
 
   describe("given its section on defaults", () => {
@@ -67,6 +76,15 @@ describe("the find-traces skill", () => {
       for (const command of commands) {
         expect(command).not.toContain("--origin");
       }
+    });
+  });
+
+  describe("given its common mistakes", () => {
+    /** @scenario "The skill takes the window and the filter from the page" */
+    it("warns against the 7 day CLI default when the user looks at a longer window", () => {
+      const section = sectionOf(renderedSkill(), "Common mistakes");
+      expect(section).toContain("Using the 7 day CLI default while the user looks at 30 days");
+      expect(section).toContain("Pass the page's window.");
     });
   });
 

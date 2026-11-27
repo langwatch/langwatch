@@ -184,12 +184,14 @@ Feature: Langy drives and reads the Trace Explorer
       Given the find-traces skill
       Then it says to open the Explorer and drive explorer.setTimeRange and explorer.setFilter when finding traces is the ask
       And it says to stay on the page and answer with cards and a link when traces are a means to another task
+      And it says to answer the secondary way, with the filter to paste, outside a Langy worker where there is no page to drive
 
     @unit
     Scenario: The skill takes the window and the filter from the page
       Given the find-traces skill
       Then it says to search with the page's from, to and filter
       And it does not tell Langy to add an application origin
+      And it warns against the 7 day CLI default when the user looks at a longer window
 
     # The Explorer leaves Langy's own traces out server side, so a search that
     # names no origin counts what the Explorer counts. Naming `application`

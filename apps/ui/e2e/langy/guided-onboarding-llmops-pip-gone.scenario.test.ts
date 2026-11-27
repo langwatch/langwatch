@@ -1,5 +1,5 @@
 /**
- * The llmops path when every rung above `python3 -m pip` is gone.
+ * The llmops path when every Python install spelling but `python` is gone.
  * See README.md "Scenario notes" (llmops-pip-gone).
  */
 
@@ -44,8 +44,19 @@ const model = guidedHarnessModel();
 /** The budget of a run that installs an SDK, edits code and starts the agent. */
 const LONG_RUN_TIMEOUT_MS = 2_700_000;
 
-/** The spellings this terminal will not have. */
-const GONE = ["uv", "pip", "pip3"] as const;
+/**
+ * The one rung of this folder's ladder the terminal lacks. The facts name
+ * pip, so the ladder is `python3 -m pip` then `python -m pip`; only the last
+ * is left.
+ */
+const GONE_RUNG = "python3";
+
+/**
+ * Spellings that are not rungs for this folder: the facts name pip, which is
+ * the interpreter's `-m pip`, and nothing names uv. Gone too, so no shortcut
+ * off the ladder can install, and asserted never tried.
+ */
+const NOT_RUNGS = ["uv", "pip", "pip3"] as const;
 
 /**
  * What a gone spelling answers: the line a shell prints for a command it
@@ -92,10 +103,10 @@ describe("Langy walks the install ladder down to a rung that works", () => {
     await teardown({ terminal, watcher, repo: folder });
   });
 
-  describe("when uv, pip and pip3 are all missing from the terminal", () => {
-    /** @scenario Every missing rung is tried once, and the ladder still installs */
+  describe("when python3, uv, pip and pip3 are all missing from the terminal", () => {
+    /** @scenario Only the last rung is left, and the ladder still installs through it */
     it(
-      "installs through the interpreter without retrying a spelling that is gone",
+      "installs through python -m pip without retrying python3 or reaching for a spelling that is not a rung",
       async () => {
         const langy = makeLangyAdapter();
         watcher = watchLangyConversation({
@@ -120,9 +131,9 @@ describe("Langy walks the install ladder down to a rung that works", () => {
 
         const result = await runScenarioAndLog({
           config: {
-            name: "guided onboarding: the llmops path with uv, pip and pip3 all gone",
+            name: "guided onboarding: the llmops path with python3, uv, pip and pip3 all gone",
             description:
-              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal has no `uv`, no `pip` and no `pip3`: each answers "command not found" and exits 127. The interpreter on PATH works and can install through `-m pip`. Langy must install the LangWatch package through it.',
+              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal has no `python3`, no `uv`, no `pip` and no `pip3`: each answers "command not found" and exits 127, so `python3 -m pip` is a rung that fails. `python` on PATH works and can install through `-m pip`. Langy must install the LangWatch package through it, the last rung on the ladder.',
             agents: [
               langy,
               scenario.userSimulatorAgent({ model }),
@@ -131,7 +142,7 @@ describe("Langy walks the install ladder down to a rung that works", () => {
                 criteria: [
                   "After a command answers that it is not found, Langy tries a different spelling of the same tool before it reports anything to the developer. Retrying the spelling that was not found, or stopping at it, fails this criterion.",
                   "Langy installs the LangWatch package into the project and says so. A reply that leaves the package uninstalled fails this criterion.",
-                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. The interpreter on PATH could install the whole time.",
+                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. `python -m pip` could install the whole time.",
                   "Langy does not ask the developer to run the install by hand while the folder is connected; it does the work itself.",
                   ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
@@ -158,7 +169,10 @@ describe("Langy walks the install ladder down to a rung that works", () => {
                   label: "guided-pip-gone",
                   clearOpenRequests: false,
                   shims: Object.fromEntries(
-                    GONE.map((name) => [name, goneShim({ name, log: shimLog })]),
+                    [GONE_RUNG, ...NOT_RUNGS].map((name) => [
+                      name,
+                      goneShim({ name, log: shimLog }),
+                    ]),
                   ),
                   pathDirs: [python.binDir],
                 });
@@ -192,28 +206,34 @@ describe("Langy walks the install ladder down to a rung that works", () => {
         console.log("[layer2] commands:", commands.join(" | "));
         console.log(terminalSection(terminal!));
 
-        // Which rungs Langy actually reached for, from the shims themselves.
+        // Which spellings Langy actually reached for, from the shims themselves.
         const refused = existsSync(shimLog)
           ? readFileSync(shimLog, "utf8").split("\n").filter(Boolean)
           : [];
-        console.log("[layer2] rungs refused:", refused.join(" | "));
+        console.log("[layer2] spellings refused:", refused.join(" | "));
 
-        // A spelling that answered 127 was not asked again. The count is per
-        // spelling, so an install tried through one of them stays one attempt
-        // whatever the ladder did with the others.
-        for (const name of GONE) {
-          const attempts = refused.filter((call) =>
-            new RegExp(`^${name} (install|add)\\b`).test(call),
+        // The gone rung answered 127 and was not asked again.
+        const rungAttempts = refused.filter((call) =>
+          new RegExp(`^${GONE_RUNG} -m pip install\\b`).test(call),
+        );
+        console.log(`[layer2] ${GONE_RUNG} attempts:`, rungAttempts.length);
+        expect(rungAttempts.length).toBeLessThanOrEqual(1);
+
+        // A spelling that is not a rung is never an install attempt, the
+        // facts' pip included: it means the interpreter's `-m pip`.
+        for (const name of NOT_RUNGS) {
+          const attempts = refused.filter(
+            (call) => call.startsWith(`${name} `) && /\b(install|add)\b/.test(call),
           );
           console.log(`[layer2] ${name} attempts:`, attempts.length);
-          expect(attempts.length).toBeLessThanOrEqual(1);
+          expect(attempts).toEqual([]);
         }
 
-        // Item 1 is done through the rung that was there: the manifest names
-        // the package and the interpreter the terminal used can import it.
-        expect(commands.some((command) => /python3?\s+-m\s+pip\s+install/.test(command))).toBe(
-          true,
-        );
+        // Item 1 is done through the last rung: the manifest names the
+        // package and the interpreter the terminal used can import it.
+        expect(
+          commands.some((command) => /(?:^|[\s;&|])python\s+-m\s+pip\s+install\b/.test(command)),
+        ).toBe(true);
         const manifest = folder.read("requirements.txt");
         console.log("[layer2] requirements.txt:", JSON.stringify(manifest));
         expect(manifest).toMatch(/langwatch/i);
