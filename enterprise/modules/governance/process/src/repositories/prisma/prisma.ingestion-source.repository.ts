@@ -91,7 +91,10 @@ function toIngestionSource({
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type IngestionSourceDatabase = Pick<PrismaClient, "ingestionSource" | "$transaction">;
+type IngestionSourceDatabase = Pick<
+  PrismaClient,
+  "ingestionSource" | "$transaction" | "$executeRaw"
+>;
 
 /**
  * Sources as Postgres holds them. `parserConfig.credentials` is sealed on every write and opened
@@ -205,18 +208,31 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     { id, status }: ReceivingIngestionSource,
     at: Instant,
   ): Promise<{ wentLive: boolean }> {
-    const data = { lastEventAt: toDate(at), status: "active" };
+    // As SQL: Prisma's updateMany reads the matching ids, then updates by id alone, so a racing
+    // stamp or a disable between the two passed the status check. One statement re-checks the
+    // committed status under the row lock.
+    const lastEventAt = toDate(at);
     if (ingestionSourceAwaitsFirstEvent(status)) {
-      const first = await this.database.ingestionSource.updateMany({
-        where: { id, status: "awaiting_first_event" },
-        data,
-      });
-      if (first.count === 1) return { wentLive: true };
+      const first = await this.database.$executeRaw`
+        ${skipTenantCheck({
+          // An ingestion source is addressed by its own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        UPDATE "IngestionSource"
+           SET "lastEventAt" = ${lastEventAt}, "status" = 'active', "updatedAt" = now()
+         WHERE "id" = ${id} AND "status" = 'awaiting_first_event'
+      `;
+      if (first === 1) return { wentLive: true };
     }
-    await this.database.ingestionSource.updateMany({
-      where: { id, status: { in: [...INGESTION_SOURCE_LIVE_STATUSES] } },
-      data,
-    });
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // An ingestion source is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "IngestionSource"
+         SET "lastEventAt" = ${lastEventAt}, "status" = 'active', "updatedAt" = now()
+       WHERE "id" = ${id} AND "status" = ANY(${[...INGESTION_SOURCE_LIVE_STATUSES]})
+    `;
     return { wentLive: false };
   }
 

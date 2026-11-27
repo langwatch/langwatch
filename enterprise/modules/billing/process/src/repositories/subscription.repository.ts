@@ -33,6 +33,13 @@ type BillingOrganizationRecord = {
   stripeCustomerId: string | null;
 };
 
+/** A tiered subscription a Growth seat subscription replaces; ours may already say cancelled. */
+export type SupersededSubscription = {
+  id: string;
+  stripeSubscriptionId: string;
+  cancelledInRecords: boolean;
+};
+
 export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
   organization: BillingOrganizationRecord;
 };
@@ -67,10 +74,11 @@ export abstract class BillingSubscriptionRepository {
   abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
   abstract cancel(input: { id: string }): Promise<void>;
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
-  abstract migrateToSeatEvent(input: {
+  /** Every tiered subscription with a Stripe id that a Growth seat one replaces, cancelled too. */
+  abstract findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]>;
+  }): Promise<SupersededSubscription[]>;
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

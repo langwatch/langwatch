@@ -31,6 +31,7 @@ import { BestEffortService } from "./best-effort.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { OverPlanService } from "./over-plan.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { TieredPlanRetirementService } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 
@@ -76,6 +77,7 @@ export class BillingSubscriptionLifecycleService {
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
   private readonly overPlan: BillingSubscriptionLifecycleOptions["overPlan"];
   private readonly bestEffort = BestEffortService.create();
+  private readonly retirement: TieredPlanRetirementService;
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
@@ -86,6 +88,12 @@ export class BillingSubscriptionLifecycleService {
     this.host = options.host;
     this.announcer = options.announcer;
     this.overPlan = options.overPlan;
+    this.retirement = TieredPlanRetirementService.create({
+      subscriptions: options.subscriptionRepository,
+      organizations: options.organizationRepository,
+      stripeSubscriptions: options.stripeSubscriptions,
+      ...(options.announcer ? { announcer: options.announcer } : {}),
+    });
   }
 
   async handleSubscriptionDeleted({
@@ -238,11 +246,12 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = quantitiesResult.subscription;
 
     await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
-    if (!shouldNotify) {
-      return;
+    if (shouldNotify) {
+      await this.announceSubscriptionStarted(updatedSubscription);
     }
-
-    await this.announceSubscriptionStarted(updatedSubscription);
+    if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
+      await this.retirement.retire({ seat: updatedSubscription });
+    }
   }
 
   /**
@@ -377,15 +386,15 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
     const updatedSubscription = activationResult.subscription;
+    const firstActivation = previousSubscription.status !== SubscriptionStatus.ACTIVE;
 
-    if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
+    if (firstActivation) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
-
-      if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        await this.migrateToSeatEventPlan(updatedSubscription);
-      }
-
       await this.announceSubscriptionStarted(updatedSubscription);
+    }
+    // Every paid Growth invoice checks, so the order Stripe's messages arrive in cannot skip it.
+    if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
+      await this.retirement.retire({ seat: updatedSubscription });
     }
   }
 
@@ -431,39 +440,6 @@ export class BillingSubscriptionLifecycleService {
       );
 
       return false;
-    }
-  }
-
-  /** Retires the plans this seat-event subscription supersedes, once the records agree. */
-  private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
-    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
-    await this.announcer?.pricingModelChanged({
-      organizationId: updated.organizationId,
-      pricingModel: "SEAT_EVENT",
-    });
-    const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
-      organizationId: updated.organizationId,
-      excludeSubscriptionId: updated.id,
-    });
-
-    // Cancel in Stripe after the records are consistent, outside the transaction.
-    for (const oldSub of oldSubscriptions) {
-      if (!oldSub.stripeSubscriptionId) {
-        continue;
-      }
-
-      try {
-        await this.stripeSubscriptions.cancelSubscription({
-          subscriptionId: oldSub.stripeSubscriptionId,
-          prorate: true,
-        });
-      } catch (err) {
-        logger.error(
-          { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-          "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
-            "upgrade. Manual intervention required.",
-        );
-      }
     }
   }
 

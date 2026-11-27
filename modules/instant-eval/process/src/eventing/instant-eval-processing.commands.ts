@@ -13,6 +13,7 @@ import {
   instantEvalCancelRequestedEventDataSchema,
   instantEvalFinishedEventDataSchema,
   instantEvalLatePageBilledEventDataSchema,
+  instantEvalPageFailedEventDataSchema,
   instantEvalPageJudgedEventDataSchema,
   instantEvalPlannedEventDataSchema,
   instantEvalRequestedEventDataSchema,
@@ -144,7 +145,24 @@ const RecordInstantEvalLatePageBilledCommand = defineCommand({
   makeJobId: (data) => runKey({ ...data, phase: `late-page-${data.page}` }),
 });
 
-/** The six, named as the pipeline registers them and the app sends them. */
+/** One per page: a redelivered failure collapses, and the run's process finishes it once. */
+const RecordInstantEvalPageFailedCommand = defineCommand({
+  commandType: INSTANT_EVAL_COMMAND_TYPES.RECORD_PAGE_FAILED,
+  eventType: INSTANT_EVAL_EVENT_TYPES.PAGE_FAILED,
+  eventVersion: INSTANT_EVAL_EVENT_VERSIONS.PAGE_FAILED,
+  aggregateType: INSTANT_EVAL_AGGREGATE_TYPE,
+  schema: instantEvalPageFailedEventDataSchema,
+  aggregateId: (data) => data.runId,
+  groupKey: groupByTenant,
+  idempotencyKey: (data) => runKey({ ...data, phase: `page-failed-${data.page}` }),
+  spanAttributes: (data) => ({
+    "payload.page": data.page,
+    "payload.error_code": data.errorCode,
+  }),
+  makeJobId: (data) => runKey({ ...data, phase: `page-failed-${data.page}` }),
+});
+
+/** The seven, named as the pipeline registers them and the app sends them. */
 export class InstantEvalProcessingCommandsAdapter {
   readonly requestRun = RequestInstantEvalRunCommand;
   readonly recordPlanned = RecordInstantEvalPlannedCommand;
@@ -152,6 +170,7 @@ export class InstantEvalProcessingCommandsAdapter {
   readonly requestCancel = RequestInstantEvalCancelCommand;
   readonly recordFinished = RecordInstantEvalFinishedCommand;
   readonly recordLatePageBilled = RecordInstantEvalLatePageBilledCommand;
+  readonly recordPageFailed = RecordInstantEvalPageFailedCommand;
 
   private constructor() {}
 

@@ -11,6 +11,9 @@ one), and the free list stays with no end date (decisions 12 to 14).
 **Revised 2026-11-25:** a span of 8,001 to 32,000 characters is split across model calls by the
 caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 
+**Revised 2026-11-26:** usage is billed only from the moment the PII redaction price line was
+added to the Stripe subscription, never from the month's first day (decision 15).
+
 > One line: every strict batch the PII redaction model answers is priced in data-privacy at a
 > published rate per character and recorded as a priced fact; gateway writes it to
 > `gateway_spend` as request type `pii_redaction`; billing reports the month's dollars on a
@@ -96,7 +99,8 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
     none: the meter counts dollars. The price is $1.00 per meter unit (one dollar redacted),
     monthly, mapped in test mode only until live is provisioned.
 12. **No free monthly amount.** Every character the model is sent is priced from the first one
-    of the month; the meter reports the month's whole total, nothing taken off. The characters
+    of the month, or of its price line when that was added later (decision 15); the meter reports
+    that whole total, nothing taken off. The characters
     are counted as sent, after the in-process standard detection has masked what it finds (a
     phone number is counted as its marker), so the customer pays for the text the model read. The
     length caps (8,000 characters for one call, 32,000 for a split span, ADR-207) are measured on
@@ -108,6 +112,16 @@ caller (ADR-207) and stays one priced batch: decisions 2, 6 and 12 say how.
 14. **The free list has no end date.** Organizations on `release_pii_redaction_model_free` stay
     free for as long as LangWatch keeps them on it. Ending it is an operator change to the flag,
     not a deploy; calls recorded while it was on stay at zero (decision 7).
+15. **Usage is billed only from the moment the price line was added (revised 2026-11-26).** All
+    charges start from the day the line is added to the subscription (Sergio, 2026-11-26). The
+    month the meter reports starts at the latest of the month's start, the growth-seat
+    subscription's start and the creation of the `GROWTH_PII_REDACTION_USD` line, read off the
+    same subscriptions list decision 10 already makes. The first report after the line is added
+    carries only usage since then, never the month from its first day, and a month the line
+    narrows never reports below what it already sent. Usage while no line existed on any
+    subscription is never billed, and a line with no creation time is refused as a failed read.
+    The rule, its replacement handling and its trade-offs are ADR-174 decision 26, shared by
+    both usage meters.
 
 ## Rationale / Trade-offs
 

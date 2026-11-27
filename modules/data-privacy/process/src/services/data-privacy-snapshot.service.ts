@@ -88,13 +88,13 @@ export class DataPrivacySnapshotService {
       this.permissions.canManageOrganization({ userId, organizationId }),
     ]);
 
-    const [teamManage, projectUpdate] = await Promise.all([
+    const [teamManage, projectManage] = await Promise.all([
       this.permissions.canManageTeams({
         userId,
         organizationId,
         teamIds: directory.teams.map((team) => team.id),
       }),
-      this.permissions.canUpdateProjects({
+      this.permissions.canManageProjects({
         userId,
         organizationId,
         projectIds: directory.projects.map((candidate) => candidate.id),
@@ -106,7 +106,7 @@ export class DataPrivacySnapshotService {
       organizationName,
       canManageOrganization,
       teamManage,
-      projectUpdate,
+      projectManage,
     });
     const allRows = this.parseRows(rows);
     const baselines = this.baselineCascades({
@@ -127,7 +127,7 @@ export class DataPrivacySnapshotService {
         organizationName,
         canManageOrganization,
         teamManage,
-        projectUpdate,
+        projectManage,
       }),
       audienceOptions: { groups: [...directory.groups] },
     };
@@ -139,9 +139,9 @@ export class DataPrivacySnapshotService {
     organizationName: string | null;
     canManageOrganization: boolean;
     teamManage: ReadonlyMap<string, boolean>;
-    projectUpdate: ReadonlyMap<string, boolean>;
+    projectManage: ReadonlyMap<string, boolean>;
   }): ScopeLens {
-    const { directory, organizationName, canManageOrganization, teamManage, projectUpdate } = input;
+    const { directory, organizationName, canManageOrganization, teamManage, projectManage } = input;
     const departmentName = new Map(directory.departments.map((row) => [row.id, row.name]));
     const teamName = new Map(directory.teams.map((row) => [row.id, row.name]));
     const projectName = new Map(directory.projects.map((row) => [row.id, row.name]));
@@ -156,7 +156,7 @@ export class DataPrivacySnapshotService {
           return teamManage.get(scopeId) === true;
         }
 
-        return projectUpdate.get(scopeId) === true;
+        return projectManage.get(scopeId) === true;
       },
       nameOf: (scopeType, scopeId) => {
         if (scopeType === "ORGANIZATION") {
@@ -248,7 +248,7 @@ export class DataPrivacySnapshotService {
     organizationName: string | null;
     canManageOrganization: boolean;
     teamManage: ReadonlyMap<string, boolean>;
-    projectUpdate: ReadonlyMap<string, boolean>;
+    projectManage: ReadonlyMap<string, boolean>;
   }): DataPrivacyScopeAvailable {
     const { directory, organizationId, organizationName, canManageOrganization } = input;
 
@@ -266,7 +266,7 @@ export class DataPrivacySnapshotService {
         .filter((team) => input.teamManage.get(team.id) === true)
         .map(({ id, name }) => ({ id, name })),
       projects: directory.projects
-        .filter((candidate) => input.projectUpdate.get(candidate.id) === true)
+        .filter((candidate) => input.projectManage.get(candidate.id) === true)
         .map(({ id, name, teamId }) => ({ id, name, teamId })),
     };
   }
@@ -281,7 +281,7 @@ export class DataPrivacySnapshotService {
     effective: DataPrivacySnapshot["effective"];
     project: { name: string; teamId: string | null } | null;
   }): Promise<DataPrivacySnapshot> {
-    const writable = await this.permissions.canUpdateProjects({
+    const writable = await this.permissions.canManageProjects({
       userId: input.userId,
       organizationId: null,
       projectIds: [input.projectId],

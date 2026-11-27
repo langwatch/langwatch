@@ -62,12 +62,14 @@ import {
 import {
   classifyLwqlSetupFailure,
   findKeyPeppers,
-  LWQL_CREDENTIAL_SECRETS,
+  type LwqlSecretLookup,
   resolveLwqlSource,
+  withChainedSecrets,
 } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 import {
+  assertRenderedPrivateServer,
   type LwqlPrivateEndpoint,
   provisionLwqlPrivateTargets,
 } from "./lwql-private-targets.task.ts";
@@ -901,26 +903,6 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
   }
 }
 
-/** Reads one secret through the runner's chain: the sources the api and worker boot with. */
-export type LwqlSecretLookup = (id: string) => Promise<string | undefined>;
-
-/** The environment with each credential secret the chain answers laid over it. */
-async function withChainedSecrets({
-  environment,
-  lookup,
-}: {
-  environment: Record<string, string | undefined>;
-  lookup: LwqlSecretLookup | undefined;
-}): Promise<Record<string, string | undefined>> {
-  if (!lookup) return environment;
-  const resolved = { ...environment };
-  for (const id of LWQL_CREDENTIAL_SECRETS) {
-    const value = await lookup(id);
-    if (value !== undefined) resolved[id] = value;
-  }
-  return resolved;
-}
-
 /** The private routes, or none: a malformed route variable warns and never fails the upgrade. */
 function privateEndpointsOf({
   source,
@@ -998,7 +980,7 @@ async function runLwqlProvisioningTask({
 /**
  * One private server's ClickHouse half, after the shared converge and under its lock, so two
  * replicas never interleave; no PostgreSQL work. Config's `lwql_postgres` holds the login, and
- * a server without it stays refused.
+ * a server without it stays refused. The access model follows the shared run's mode (ADR-200).
  */
 export async function convergeLwqlPrivateClickHouse({
   database,
@@ -1035,10 +1017,16 @@ export async function convergeLwqlPrivateRepository({
   }
   const configStoreEntities = await repository.inventoryConfigStore({ names });
   const includeAppFunctions = await appFunctionsProvisionable(repository);
-  await clusterGuard.assertSafe({
-    query: (sql) => repository.queryRows(sql),
-    source: plan.settings,
-  });
+  // Rendered: the reader comes from the server's users.d, so no access entity is written here.
+  const mode = selfProvisioning.accessModelMode({ source: plan.settings });
+  if (mode === "sql") {
+    await clusterGuard.assertSafe({
+      query: (sql) => repository.queryRows(sql),
+      source: plan.settings,
+    });
+  } else {
+    await assertRenderedPrivateServer({ repository, names });
+  }
   const statements = selfProvisioning.clickHouseStatements({
     names,
     restrictedPassword: request.connection.password,
@@ -1047,6 +1035,7 @@ export async function convergeLwqlPrivateRepository({
     // The scoped copies are the only relation the per-customer login reads.
     schema: LWQL_SCOPED_SCHEMA,
     includeAppFunctions,
+    mode,
     externalCollection: LWQL_RENDERED_NAMED_COLLECTION,
     postgresKeyMap: true,
   });
