@@ -3,6 +3,7 @@
   "defaultBase": "origin/main",
   "defaultProject": "workspace",
   "namedInputs": {
+    "tsconfigReads": [],
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json",
       "{workspaceRoot}/tsconfig.shared.json",
@@ -303,6 +304,7 @@
       "inputs": [
         "default",
         "^production",
+        "tsconfigReads",
         "lintGlobals",
         "npmDeps",
         {

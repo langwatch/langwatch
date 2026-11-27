@@ -51,6 +51,7 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     Given a project whose tsconfig extends a config outside the project
     And a dependency that publishes no declarations, so tsc reads its sources
     Then the extended config is part of the project's typecheck hash
+    And so is every file its configs map in from outside the project through paths, include or files, for typecheck and lint:types alike
     And so are the production files of that dependency, and of such dependencies further down
     But a dependency's devDependencies are not
 
@@ -76,7 +77,8 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     And every TypeScript project's lint:types is cached on its own files and its dependencies' sources, whatever the --base value
     And the lint runner and its executor are lint globals, so a change to either relints every project
     And the projects Nx did not replay are linted in one oxlint run, each failing only on findings in its own files
-    And an oxlint process that could not run fails every project in the run
+    And an oxlint process that could not run fails every project in the run, printing its output once
+    And after a failed typecheck the type-aware lint still reports but caches nothing
     And the plain lint does not wait for typecheck
 
   Scenario: A nightly run checks the cache keys against an uncached run for a month

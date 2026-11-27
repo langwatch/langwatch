@@ -66,6 +66,28 @@ export const inheritedConfigs = (root, configs, dir) => {
     .toSorted((a, b) => a.localeCompare(b));
 };
 
+// Files a project's own or inherited configs reach outside the project through `paths`,
+// `include` or `files` (apps/ui maps better-auth/react to packages/browser-types).
+export const readsOutside = (root, dir) => {
+  const own = referenced(root, dir, new Set(), (file) => file.startsWith(`${dir}/`));
+  const found = new Set();
+  for (const file of [...own, ...inheritedConfigs(root, own, dir)]) {
+    const config = readConfig(root, file);
+    const entries = [
+      ...Object.values(config.compilerOptions?.paths ?? {}).flat(),
+      ...(config.include ?? []),
+      ...(config.files ?? []),
+    ];
+    for (const entry of entries.filter((e) => typeof e === "string" && !e.includes("${"))) {
+      const path = normalize(join(dirname(file), entry));
+      if (path.startsWith(`${dir}/`) || path.startsWith("..")) continue;
+      if (path.split("/").includes("node_modules")) continue;
+      found.add(`{workspaceRoot}/${path}`);
+    }
+  }
+  return [...found].toSorted((a, b) => a.localeCompare(b));
+};
+
 // Build info a config writes outside its dist (apps/docs keeps it in .tsbuild).
 export const buildInfoOutsideDist = (root, configs) =>
   [...configs].flatMap((file) => {
@@ -140,6 +162,7 @@ export function typecheckTarget(root, dir, dirsByName = new Map()) {
       "npmDeps",
       { externalDependencies: ["typescript"] },
       ...inheritedConfigs(root, own, dir).map((file) => `{workspaceRoot}/${file}`),
+      "tsconfigReads",
       { dependentTasksOutputFiles: "**/*.{ts,tsx,mts,cts,json}", transitive: true },
       ...(sourceOnly.length > 0 ? [{ input: "production", projects: sourceOnly }] : []),
     ],
@@ -157,7 +180,9 @@ export const createNodes = [
     const dirsByName = new Map(dirs.map((dir) => [manifestOf(workspaceRoot, dir).name, dir]));
     return dirs.map((dir) => {
       const targets = { typecheck: typecheckTarget(workspaceRoot, dir, dirsByName) };
-      return [join(dir, "package.json"), { projects: { [dir]: { targets } } }];
+      // A named input, so lint:types (nx.json) hashes the same files.
+      const namedInputs = { tsconfigReads: readsOutside(workspaceRoot, dir) };
+      return [join(dir, "package.json"), { projects: { [dir]: { targets, namedInputs } } }];
     });
   },
 ];

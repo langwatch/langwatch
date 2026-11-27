@@ -510,7 +510,11 @@ every dependant's hash unchanged. Two inputs cover what tsc reads outside that: 
 configs a project's own configs extend from outside it (`tsconfig.emit.json`,
 `tsconfig.base.json`), and the `production` files of every dependency with no
 declaration build (no `tsconfig.build.json`, `types` not built), which tsc reads from
-source. That walk follows a dependency's runtime dependencies only. Outputs are the
+source. That walk follows a dependency's runtime dependencies only. A file a project's
+configs map in from outside it through `paths`, `include` or `files` (apps/ui reads
+`packages/browser-types`) is the project's `tsconfigReads` named input, which `lint:types`
+hashes too. After a failed typecheck `pnpm lint:types` lints with `--skip-nx-cache`, since
+missing declarations could otherwise cache a pass. Outputs are the
 declaration globs of the 2026-09-30 amendment per project, plus build info outside dist
 (apps/docs `.tsbuild`).
 

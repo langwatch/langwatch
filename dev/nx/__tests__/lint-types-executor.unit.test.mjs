@@ -66,5 +66,7 @@ void describe("lint:types batch report", () => {
     const err = "oxlint -c .oxlintrc.types.jsonc exited 2:\nthread panicked\n";
     const results = taskResults({ tasks, roots, status: 1, out: "", err });
     assert.ok(Object.values(results).every((result) => !result.success));
+    assert.match(results["time:lint:types"].terminalOutput, /thread panicked/);
+    assert.doesNotMatch(results["process:lint:types"].terminalOutput, /thread panicked/);
   });
 });

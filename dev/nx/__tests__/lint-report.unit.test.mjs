@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseReport, routeFlags, widenedScope } from "../lint.mjs";
+import { lintTypesArgs, parseReport, routeFlags, widenedScope } from "../lint.mjs";
 
 void describe("parseReport", () => {
   /** @scenario "A lint run whose every path is ignored has no problems" */
@@ -32,6 +32,13 @@ void describe("widenedScope", () => {
   /** @scenario "A type-aware scope past half the projects lints every project" */
   void it("keeps a scope of half the projects or fewer", () => {
     assert.deepEqual(widenedScope({ roots, reached: ["a", "c"] }), ["a", "c"]);
+  });
+});
+void describe("lintTypesArgs", () => {
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("lints without the cache after a failed typecheck, so nothing it writes is cached", () => {
+    assert.deepEqual(lintTypesArgs({ typecheck: 0 }), ["run-many", "-t", "lint:types"]);
+    assert.ok(lintTypesArgs({ typecheck: 1 }).includes("--skip-nx-cache"));
   });
 });
 void describe("routeFlags", () => {

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
+import { isCI } from "nx/src/utils/is-ci.js";
+
 // The `lint:types` executor. Nx batches every project it did not replay into one
 // `dev/nx/lint.mjs --resolved --types` run, so a miss of many projects builds their
 // programs once, as the tree run did, and each project still caches its own result.
@@ -44,6 +46,10 @@ export function splitReport({ out, roots }) {
 
 const countOf = (lines) => lines.filter((line) => DIAGNOSTIC.test(line)).length;
 
+// A run that failed as a whole prints once, on the first task; the rest point at it.
+const failedReport = ({ first, err, out, owner }) =>
+  first ? `${err}${out}` : `The batched type-aware lint failed; its output is on ${owner}.\n`;
+
 /** One result per task; a failed process, or a report the projects do not add up to, fails all. */
 export function taskResults({ tasks, roots, status, out, err }) {
   const byRoot = splitReport({ out, roots });
@@ -57,7 +63,7 @@ export function taskResults({ tasks, roots, status, out, err }) {
       const lines = byRoot.get(roots[i]);
       const problems = countOf(lines);
       const report = failed
-        ? `${err}${out}`
+        ? failedReport({ first: i === 0, err, out, owner: tasks[0].id })
         : `${lines.map((line) => `${line}\n`).join("")}${problems} problem(s)\n`;
       return [task.id, { success: !failed && problems === 0, terminalOutput: report }];
     }),
@@ -69,8 +75,8 @@ export async function batch(taskGraph, _inputs, _overrides, context) {
   const { projects } = context.projectsConfigurations;
   const roots = tasks.map((task) => projects[task.target.project].root);
   const run = await lint({ workspaceRoot: context.root, roots });
-  process.stderr.write(run.err);
-  process.stdout.write(run.out);
+  // In CI Nx prints each task's terminalOutput; locally it prints none for a batch.
+  if (!isCI()) process.stdout.write(`${run.err}${run.out}`);
 
   return taskResults({ tasks, roots, ...run });
 }

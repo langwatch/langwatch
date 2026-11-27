@@ -186,10 +186,18 @@ const nx = (args) => process.exit(nxStatus(args));
  */
 function lintProjects() {
   const typecheck = nxStatus(["run-many", "-t", "typecheck"]);
-  const lint = nxStatus(["run-many", "-t", "lint:types"]);
+  const lint = nxStatus(lintTypesArgs({ typecheck }));
 
   process.exit(typecheck || lint);
 }
+
+/** After a failed typecheck some declarations are missing: lint still reports, never caches. */
+export const lintTypesArgs = ({ typecheck }) => [
+  "run-many",
+  "-t",
+  "lint:types",
+  ...(typecheck === 0 ? [] : ["--skip-nx-cache"]),
+];
 
 /** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
 function lintThroughNx({ paths }) {

@@ -4,7 +4,7 @@ import { dirname, join, matchesGlob } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { sourceOnlyDependencies, typecheckTarget } from "../typecheck-plugin.mjs";
+import { readsOutside, sourceOnlyDependencies, typecheckTarget } from "../typecheck-plugin.mjs";
 import { createNodes } from "../workspace-plugin.mjs";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -60,6 +60,17 @@ void describe("per-project typecheck", () => {
     assert.ok(time.outputs.includes("{workspaceRoot}/packages/time/dist/**/*.d.ts"));
     assert.ok(time.outputs.every((output) => !output.endsWith("/dist")));
     assert.ok(time.outputs.includes("{workspaceRoot}/packages/time/dist/**/*.tsbuildinfo"));
+  });
+
+  /** @scenario "A typecheck hashes the configs it extends and the sources of dependencies with no declarations" */
+  void it("hashes files its configs map in from outside the project, for typecheck and lint:types", () => {
+    const reads = readsOutside(workspaceRoot, "apps/ui");
+    assert.ok(reads.includes("{workspaceRoot}/packages/browser-types/better-auth-react.d.ts"));
+    assert.deepEqual(readsOutside(workspaceRoot, "packages/time"), []);
+    assert.ok(time.inputs.includes("tsconfigReads"));
+    const nx = JSON.parse(readFileSync(join(workspaceRoot, "nx.json"), "utf8"));
+    assert.ok(nx.targetDefaults["lint:types"].inputs.includes("tsconfigReads"));
+    assert.deepEqual(nx.namedInputs.tsconfigReads, []);
   });
 
   /** @scenario "A typecheck hashes the configs it extends and the sources of dependencies with no declarations" */
@@ -119,7 +130,7 @@ void describe("nightly uncached checks", () => {
     assert.match(job, /NX_SKIP_NX_CACHE: "true"/);
     assert.doesNotMatch(job, /uses: .*nx-remote-cache/);
     assert.match(job, /pnpm typecheck --skip-nx-cache/);
-    assert.match(job, /pnpm lint:types/);
+    assert.match(job, /nx run-many -t lint:types/);
     assert.match(job, /github\.ref_name == github\.event\.repository\.default_branch/);
     assert.match(job, /UNCACHED_CHECKS_END: "2026-12-28"/);
     assert.match(job, /::warning::/);

@@ -152,8 +152,9 @@ jobs:
       - name: Oxlint, whole tree
         run: pnpm lint > hygiene/lint.txt 2>&1 || tail -n 3 hygiene/lint.txt
 
+      # The typecheck above wrote the declarations, so only the lint:types targets run.
       - name: Oxlint type-aware, every project
-        run: pnpm lint:types > hygiene/lint-types.txt 2>&1 || tail -n 3 hygiene/lint-types.txt
+        run: FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm exec nx run-many -t lint:types --outputStyle=static > hygiene/lint-types.txt 2>&1 || tail -n 3 hygiene/lint-types.txt
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -653,9 +654,10 @@ jobs:
         if: steps.window.outputs.open == 'true'
         run: pnpm typecheck --skip-nx-cache
 
+      # After the typecheck above, so only the lint:types targets run.
       - name: Oxlint type-aware, every project, uncached
         if: steps.window.outputs.open == 'true'
-        run: pnpm lint:types
+        run: FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm exec nx run-many -t lint:types --outputStyle=static
 
   # ---------------------------------------------------------------------------
 
