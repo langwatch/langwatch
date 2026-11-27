@@ -13,6 +13,7 @@ Feature: The docs jobs install Playwright Chromium through a stale or syncing ap
     When an install attempt starts
     Then it runs apt-get update under a timeout
     And it then runs the Playwright install with --with-deps under a timeout
+    And that install timeout is at least the 10 minutes the ffmpeg install in docs-media-encoders gets
 
   @unit
   Scenario: A failed index refresh still runs the install

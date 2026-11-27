@@ -30,6 +30,6 @@ runs:
         install() {
           sudo timeout 90 apt-get -o Acquire::Retries=3 update \
             || echo "::warning::apt-get update failed, installing from the current index"
-          timeout 300 pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+          timeout 600 pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
         }
         install || { echo "::warning::Playwright install failed, retrying once in 30s"; sleep 30; install; }

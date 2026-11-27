@@ -22,7 +22,7 @@ const goodPlaywrightAction = `runs:
         install() {
           sudo timeout 90 apt-get -o Acquire::Retries=3 update \
             || echo "::warning::apt-get update failed"
-          timeout 300 pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+          timeout 600 pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
         }
         install || { echo "::warning::retrying"; sleep 30; install; }
 `
@@ -31,10 +31,10 @@ const goodPlaywrightWorkflow = `on: push
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: ./.github/actions/playwright-chromium
-        timeout-minutes: 14
+        timeout-minutes: 24
 `
 
 func playwrightProblems(t *testing.T, action, workflow string) []string {
@@ -65,12 +65,14 @@ func TestPlaywrightAttemptRefreshesAndInstallsUnderTimeouts(t *testing.T) {
 	assert.Empty(t, playwrightProblems(t, goodPlaywrightAction, goodPlaywrightWorkflow))
 
 	noRefreshTimeout := strings.Replace(goodPlaywrightAction, "sudo timeout 90 apt-get", "sudo apt-get", 1)
-	noInstallTimeout := strings.Replace(goodPlaywrightAction, "timeout 300 pnpm", "pnpm", 1)
+	noInstallTimeout := strings.Replace(goodPlaywrightAction, "timeout 600 pnpm", "pnpm", 1)
+	shortInstall := strings.Replace(goodPlaywrightAction, "timeout 600 pnpm", "timeout 300 pnpm", 1)
 	noStep := strings.Replace(goodPlaywrightAction, "id: playwright-install", "id: other", 1)
 
 	assert.Contains(t, strings.Join(playwrightProblems(t, noRefreshTimeout, goodPlaywrightWorkflow), "\n"), "apt index")
 	assert.Contains(t, strings.Join(playwrightProblems(t, noInstallTimeout, goodPlaywrightWorkflow), "\n"), "under a timeout")
 	assert.Contains(t, strings.Join(playwrightProblems(t, noStep, goodPlaywrightWorkflow), "\n"), "missing")
+	assert.Contains(t, strings.Join(playwrightProblems(t, shortInstall, goodPlaywrightWorkflow), "\n"), "slow mirror")
 }
 
 // @scenario "A failed index refresh still runs the install"
@@ -94,9 +96,9 @@ func TestPlaywrightFailedInstallRetriesOnce(t *testing.T) {
 
 // @scenario "Every use bounds the install inside its job's budget"
 func TestPlaywrightUseBoundsInsideItsJob(t *testing.T) {
-	noStepTimeout := strings.Replace(goodPlaywrightWorkflow, "        timeout-minutes: 14\n", "", 1)
-	tooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 14", "timeout-minutes: 10", 1)
-	jobTooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 25", "timeout-minutes: 14", 1)
+	noStepTimeout := strings.Replace(goodPlaywrightWorkflow, "        timeout-minutes: 24\n", "", 1)
+	tooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 24", "timeout-minutes: 20", 1)
+	jobTooShort := strings.Replace(goodPlaywrightWorkflow, "timeout-minutes: 35", "timeout-minutes: 24", 1)
 
 	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, noStepTimeout), "\n"), "no numeric timeout-minutes")
 	assert.Contains(t, strings.Join(playwrightProblems(t, goodPlaywrightAction, tooShort), "\n"), "cannot cover")

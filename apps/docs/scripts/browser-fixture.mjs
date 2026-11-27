@@ -4,6 +4,22 @@ import { chromium } from "playwright";
 
 import { startPreview } from "../src/site/preview-server.ts";
 
+// A copy lands asynchronously, and waitForFunction resolves at once on a returned promise,
+// so poll the clipboard from the test until accept passes or 30s go by; returns the last read.
+export async function readClipboardUntil(page, accept) {
+  let text = "";
+  for (const deadline = Date.now() + 30_000; Date.now() < deadline;) {
+    text = await page.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+    if (accept(text)) break;
+    await page.waitForTimeout(100);
+  }
+  return text;
+}
+
+export async function clipboardEquals(page, expected) {
+  assert.equal(await readClipboardUntil(page, (text) => text === expected), expected);
+}
+
 export async function withPreviewBrowser({ outDir, run }) {
   const server = await startPreview({ outDir, port: 0 });
   let browser;

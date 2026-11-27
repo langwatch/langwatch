@@ -19,6 +19,8 @@ const (
 	playwrightAction      = ".github/actions/playwright-chromium/action.yml"
 	playwrightActionUse   = "./.github/actions/playwright-chromium"
 	playwrightInstallStep = "playwright-install"
+	// playwrightMinInstallSeconds matches the ffmpeg install bound in docs-media-encoders.
+	playwrightMinInstallSeconds = 600
 )
 
 var (
@@ -94,6 +96,9 @@ func playwrightInstallProblems(run string) (playwrightBudget, []string) {
 	retry := playwrightRetry.FindStringSubmatch(run)
 	if retry == nil {
 		problems = append(problems, "a failed playwright install is not retried once after a pause (install || { ...; sleep N; install; })")
+	}
+	if len(inst) > 1 && atoi(inst[1]) < playwrightMinInstallSeconds {
+		problems = append(problems, fmt.Sprintf("playwright install's %ss bound is below the %ds a slow mirror needs", inst[1], playwrightMinInstallSeconds))
 	}
 	if len(problems) > 0 {
 		return playwrightBudget{}, problems

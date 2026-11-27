@@ -45,7 +45,7 @@ jobs:
         with:
           save: "false"
       - uses: ./.github/actions/playwright-chromium
-        timeout-minutes: 14
+        timeout-minutes: 24
       - name: Build the documentation under /docs
         env:
           # Signs the star count read, which GitHub refuses from shared runner addresses.
@@ -65,7 +65,7 @@ jobs:
   lighthouse:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -84,7 +84,7 @@ jobs:
           name: docs-site-lighthouse-all-build
           path: apps/docs/dist
       - uses: ./.github/actions/playwright-chromium
-        timeout-minutes: 14
+        timeout-minutes: 24
       - name: Lighthouse on this shard's pages
         run: >-
           pnpm --filter @langwatch/docs-site audit:site

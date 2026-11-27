@@ -97,6 +97,8 @@ describe("the dashboard tRPC declarations", () => {
         ["star", "mutation", "analytics:view"],
         ["unstar", "mutation", "analytics:view"],
         ["reorderStars", "mutation", "analytics:view"],
+        ["sidebarOrder", "query", "organization:view"],
+        ["reorderSidebar", "mutation", "organization:view"],
       ]);
     });
 
