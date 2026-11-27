@@ -39,6 +39,7 @@ app:
   - ".github/actions/nx-remote-cache/**"
   - ".github/actions/prepare-generated-files/**"
   - ".github/actions/setup-pnpm-node/**"
+  - ".github/actions/wait-for-containers/**"
   - "specs/**"
   - "charts/langwatch/tests/**"
   - "charts/gateway/tests/**"
@@ -68,6 +69,7 @@ e2e:
   - "package.json"
   - ".npmrc"
   - ".github/workflows/e2e-ci.yml"
+  - ".github/actions/wait-for-containers/**"
   - ".github/workflows/pr.yml"
   - ".github/pr-filters.yml"
 nlp:

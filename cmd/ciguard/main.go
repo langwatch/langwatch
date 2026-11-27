@@ -58,10 +58,11 @@ func main() {
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
 		{name: "main-suites", run: ciguard.MainSuites},
 		{name: "upgradelab-trigger", run: ciguard.UpgradelabTrigger},
+		{name: "app-ci-datastores", run: ciguard.AppCIDatastores},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature and specs/ci/package-suites-transform-cache.feature, and specs/ci/path-filters.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature and specs/ci/package-suites-transform-cache.feature, specs/ci/path-filters.feature and specs/ci/app-ci-datastores.feature")
 		os.Exit(1)
 	}
 }

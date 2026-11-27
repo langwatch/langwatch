@@ -59,6 +59,7 @@ jobs:
               - 'package.json'
               - '.npmrc'
               - '.github/workflows/e2e-ci.yml'
+              - '.github/actions/wait-for-containers/**'
 
   e2e:
     needs: changes
@@ -120,83 +121,39 @@ jobs:
       BASE_URL: "http://localhost:5570"
       CI: "true"
 
-    services:
-      postgres:
-        image: postgres:16
-        ports:
-          - 5433:5432
-        env:
-          POSTGRES_DB: testdb
-          POSTGRES_USER: prisma
-          POSTGRES_PASSWORD: prisma
-        options: >-
-          --health-cmd "pg_isready -U prisma"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:alpine
-        ports:
-          - 6380:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      clickhouse:
-        image: clickhouse/clickhouse-server:26.8.36.3
-        ports:
-          - 8123:8123
-        env:
-          CLICKHOUSE_DB: default
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ci_password
-        options: >-
-          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      opensearch:
-        image: langwatch/opensearch-lite:latest
-        ports:
-          - 9201:9200
-        env:
-          discovery.type: single-node
-          DISABLE_SECURITY_PLUGIN: "true"
-          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
-          cluster.routing.allocation.disk.threshold_enabled: "false"
-          bootstrap.memory_lock: "false"
-          node.store.allow_mmap: "false"
-        options: >-
-          --health-cmd "curl -s http://localhost:9200 || exit 1"
-          --health-interval 30s
-          --health-timeout 30s
-          --health-retries 3
-
-      # No nlpgo runs in this job: only `pnpm dev` starts one, and the api and
-      # worker below are started directly. LANGWATCH_NLP_SERVICE therefore names
-      # a port nothing listens on, so a scenario run is only queued, never
-      # executed; the scenario specs assert the queued run or the missing-provider
-      # notice. A suite that needs a run to finish starts nlpgo the way
-      # sdk-javascript-ci.yml does (go build ./cmd/service, then `nlpgo`).
-
-      langevals:
-        image: langwatch/langevals:latest
-        ports:
-          - 5564:5562
-        env:
-          DISABLE_EVALUATORS_PRELOAD: "true"
-        options: >-
-          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5562/healthcheck')\" || exit 1"
-          --health-interval 15s
-          --health-timeout 10s
-          --health-retries 12
-          --health-start-period 30s
-
     steps:
+      # Plain containers started in the background, not a `services:` block: the
+      # image pulls overlap the checkout and install, and the wait steps hold the
+      # first step that reads each (specs/ci/app-ci-datastores.feature). No nlpgo
+      # runs here, so a scenario run is only queued; the scenario specs assert that.
+      - name: Start the datastores and langevals in the background
+        timeout-minutes: 1
+        run: |
+          {
+            docker run -d --name postgres -p 5433:5432 \
+              -e POSTGRES_DB=testdb -e POSTGRES_USER=prisma -e POSTGRES_PASSWORD=prisma \
+              --health-cmd "pg_isready -U prisma" --health-interval 2s --health-timeout 5s --health-retries 60 \
+              postgres:16 &
+            docker run -d --name redis -p 6380:6379 \
+              --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 60 \
+              redis:alpine &
+            docker run -d --name clickhouse -p 8123:8123 \
+              -e CLICKHOUSE_DB=default -e CLICKHOUSE_USER=default -e CLICKHOUSE_PASSWORD=ci_password \
+              --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1" \
+              --health-interval 2s --health-timeout 5s --health-retries 60 \
+              clickhouse/clickhouse-server:26.8.36.3 &
+            docker run -d --name opensearch -p 9201:9200 \
+              -e discovery.type=single-node -e DISABLE_SECURITY_PLUGIN=true -e "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m" \
+              -e cluster.routing.allocation.disk.threshold_enabled=false -e bootstrap.memory_lock=false -e node.store.allow_mmap=false \
+              --health-cmd "curl -s http://localhost:9200 || exit 1" --health-interval 5s --health-timeout 30s --health-retries 60 \
+              langwatch/opensearch-lite:latest &
+            docker run -d --name langevals -p 5564:5562 -e DISABLE_EVALUATORS_PRELOAD=true \
+              --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5562/healthcheck')\" || exit 1" \
+              --health-interval 5s --health-timeout 10s --health-retries 60 --health-start-period 30s \
+              langwatch/langevals:latest &
+            wait
+          } > "$RUNNER_TEMP/datastores.log" 2>&1 < /dev/null &
+
       - name: Generate a throwaway CREDENTIALS_SECRET
         # The api refuses to boot without a 32-byte hex encryption key. Generated
         # per run: a committed hex literal reads as a leaked key to the scanner.
@@ -274,6 +231,13 @@ jobs:
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
+      - name: Wait for Postgres, Redis and ClickHouse
+        timeout-minutes: 3
+        uses: ./.github/actions/wait-for-containers
+        with:
+          names: postgres redis clickhouse
+          start-log: ${{ runner.temp }}/datastores.log
+
       # The api and the worker never migrate and refuse to serve until the
       # upgrade has run: the preparation script, `upgrade` then the
       # system-migrations pass (specs/upgrade/entry-points.feature).
@@ -291,6 +255,14 @@ jobs:
 
       - name: Unit-test the e2e guard
         run: pnpm --filter langwatch-e2e-tests test:unit
+
+      - name: Wait for OpenSearch and langevals
+        timeout-minutes: 4
+        uses: ./.github/actions/wait-for-containers
+        with:
+          names: opensearch langevals
+          start-log: ${{ runner.temp }}/datastores.log
+          seconds: "210"
 
       - name: Run E2E tests
         env:
@@ -321,6 +293,8 @@ jobs:
 
       - name: Upload test results
         if: always()
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
@@ -329,6 +303,8 @@ jobs:
 
       - name: Upload test artifacts
         if: failure()
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
@@ -337,12 +313,16 @@ jobs:
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
