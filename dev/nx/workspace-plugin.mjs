@@ -1,20 +1,31 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 
+import { parseJson } from "nx/src/devkit-exports.js";
+
 // Project `workspace` (at dev/nx: no project owns the root) holds the repo-wide builds:
 // `build:types` (`tsc -b` over every module contract's build config, declarations into the dist of
 // every project those reference) plus `lint:rules` and `test:scripts`, which run the Makefile
 // recipes as `lint:go` does. Keyed on nx.json, which every workspace has. ADR-150 records why.
 const contracts = "modules/*/contract/tsconfig.build.json";
 
+// tsconfig files are JSONC: comments and trailing commas are allowed.
+const readConfig = (root, file) => parseJson(readFileSync(join(root, file), "utf8"));
+
 // Declarations only: a project whose own `build` emits its published `.d.ts`
-// (ksuid) keeps those, and this target owns just its maps and build info.
+// (ksuid) keeps those, and this target owns just its maps and build info, plus the
+// `.d.ts` its declaration config writes to a dist subdirectory (mail: dist/typecheck).
 const declarationOutputs = (root, dir) => {
   const manifest = join(root, dir, "package.json");
   const ownBuild =
     existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).scripts?.build;
+  const buildConfig = join(dir, "tsconfig.build.json");
+  const outDir = existsSync(join(root, buildConfig))
+    ? normalize(readConfig(root, buildConfig).compilerOptions?.outDir ?? "dist")
+    : "dist";
+  const own = outDir.startsWith("dist/") ? [`${outDir}/**/*.d.ts`] : [];
   const globs = ["dist/**/*.d.ts.map", "dist/**/*.tsbuildinfo"];
-  return (ownBuild ? globs : ["dist/**/*.d.ts", ...globs]).map(
+  return (ownBuild ? [...own, ...globs] : ["dist/**/*.d.ts", ...globs]).map(
     (g) => `{workspaceRoot}/${dir}/${g}`,
   );
 };
@@ -24,7 +35,7 @@ const referenced = (root, reference, seen) => {
   const file = reference.endsWith(".json") ? reference : join(reference, "tsconfig.json");
   if (seen.has(file)) return seen;
   seen.add(file);
-  const config = JSON.parse(readFileSync(join(root, file), "utf8").replace(/^\s*\/\/.*$/gm, ""));
+  const config = readConfig(root, file);
   for (const { path } of config.references ?? [])
     referenced(root, normalize(join(dirname(file), path)), seen);
   return seen;
@@ -33,7 +44,7 @@ const referenced = (root, reference, seen) => {
 // Build info a config writes outside its dist (apps/docs keeps it in .tsbuild).
 const buildInfoOutsideDist = (root, configs) =>
   [...configs].flatMap((file) => {
-    const config = JSON.parse(readFileSync(join(root, file), "utf8").replace(/^\s*\/\/.*$/gm, ""));
+    const config = readConfig(root, file);
     const info = config.compilerOptions?.tsBuildInfoFile;
     const path = info && normalize(join(dirname(file), info));
     return path && !path.split("/").includes("dist") ? [`{workspaceRoot}/${path}`] : [];

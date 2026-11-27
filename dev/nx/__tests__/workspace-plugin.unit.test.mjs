@@ -32,6 +32,7 @@ void describe("workspace targets", () => {
     assert.ok(outputs.includes("{workspaceRoot}/packages/time/dist/**/*.d.ts"));
     assert.ok(outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.tsbuildinfo"));
     assert.ok(!outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.d.ts"));
+    assert.ok(outputs.includes("{workspaceRoot}/packages/mail/dist/typecheck/**/*.d.ts"));
     assert.ok(outputs.every((output) => !output.endsWith("/dist")));
   });
 });
