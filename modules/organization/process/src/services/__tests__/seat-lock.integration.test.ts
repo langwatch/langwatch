@@ -255,7 +255,7 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
           findAdministrators: async () => [],
         },
         seats,
-        notices: createApiFixture<OrganizationAccessNoticeService>({}),
+        notices: createApiFixture<OrganizationAccessNoticeService>({ mailAnswer: async () => {} }),
         peers: createApiFixture<SeatRequestPeers>({}),
         isSaas: true,
         now: () => Date.now(),
