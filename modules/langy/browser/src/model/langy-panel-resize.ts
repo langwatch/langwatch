@@ -1,8 +1,6 @@
 import {
-  FLOATING_PANEL_INSET,
   FLOATING_PANEL_MIN_WIDTH,
   FLOATING_PANEL_VIEWPORT_GUTTER,
-  LANGY_PAGE_RESERVE_PX,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
 } from "./langy-panel-layout.ts";
@@ -28,43 +26,24 @@ const LIMITS = {
   sidebar: { min: SIDEBAR_MIN_WIDTH },
 } as const;
 
-function widestFor({
-  placement,
-  viewportWidth,
-  besideDrawer,
-  fitsViewport,
-}: {
-  placement: LangyResizablePlacement;
-  viewportWidth: number;
-  besideDrawer: boolean;
-  fitsViewport: number;
-}): number {
-  if (placement === "sidebar") return viewportWidth - LANGY_PAGE_RESERVE_PX;
-  if (besideDrawer) return viewportWidth - FLOATING_PANEL_INSET - LANGY_PAGE_RESERVE_PX;
-  return fitsViewport;
-}
-
 /**
- * Width bounds with no fixed pixel cap: the page keeps LANGY_PAGE_RESERVE_PX beside a dock, or
- * beside a dodged drawer (the card sits FLOATING_PANEL_INSET in); a card with no drawer stops
- * at the edge gutter. An unmeasured viewport (<= 0) caps at the default.
+ * The widest the panel may be (whatever the window can show, less its edge gutter), the
+ * narrowest that keeps the composer usable, and the default, all for one viewport. A viewport
+ * not yet measured (<= 0) caps at the default so the bound stays finite.
  */
 export function resolvePanelWidthBounds({
   placement,
   viewportWidth,
-  besideDrawer = false,
 }: {
   placement: LangyResizablePlacement;
   viewportWidth: number;
-  besideDrawer?: boolean;
 }): LangyPanelWidthBounds {
   const measured = viewportWidth > 0;
   const fitsViewport = measured ? viewportWidth - FLOATING_PANEL_VIEWPORT_GUTTER : Infinity;
   const min = Math.min(LIMITS[placement].min, fitsViewport);
-  const widest = widestFor({ placement, viewportWidth, besideDrawer, fitsViewport });
   const preferred =
     placement === "floating" ? resolveFloatingPanelWidth(viewportWidth) : SIDEBAR_PANEL_WIDTH;
-  const max = Math.floor(Math.max(min, measured ? widest : preferred));
+  const max = Math.floor(Math.max(min, measured ? fitsViewport : preferred));
   return { min, max, default: Math.round(Math.min(max, Math.max(min, preferred))) };
 }
 
@@ -74,14 +53,12 @@ export function clampPanelWidth({
   placement,
   viewportWidth,
   width,
-  besideDrawer,
 }: {
   placement: LangyResizablePlacement;
   viewportWidth: number;
   width: number;
-  besideDrawer?: boolean;
 }): number {
-  const { min, max } = resolvePanelWidthBounds({ placement, viewportWidth, besideDrawer });
+  const { min, max } = resolvePanelWidthBounds({ placement, viewportWidth });
   return Math.min(max, Math.max(min, Math.round(width)));
 }
 
@@ -90,17 +67,13 @@ export function resolvePanelWidth({
   placement,
   viewportWidth,
   stored,
-  besideDrawer,
 }: {
   placement: LangyResizablePlacement;
   viewportWidth: number;
   stored: number | undefined;
-  besideDrawer?: boolean;
 }): number {
-  if (stored === undefined) {
-    return resolvePanelWidthBounds({ placement, viewportWidth, besideDrawer }).default;
-  }
-  return clampPanelWidth({ placement, viewportWidth, width: stored, besideDrawer });
+  if (stored === undefined) return resolvePanelWidthBounds({ placement, viewportWidth }).default;
+  return clampPanelWidth({ placement, viewportWidth, width: stored });
 }
 
 /** Whatever the storage held, reduced to the widths that are usable numbers. */

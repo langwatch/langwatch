@@ -33,18 +33,15 @@ export function useViewportWidth(): number {
 function useResolvedPanelWidth({
   placement,
   viewportWidth,
-  besideDrawer,
 }: {
   placement: LangyResizablePlacement;
   viewportWidth: number;
-  besideDrawer?: boolean;
 }): number {
   const stored = useLangyStore((s) => s.panelWidths);
   return resolvePanelWidth({
     placement,
     viewportWidth,
     stored: stored[placement],
-    besideDrawer,
   });
 }
 
@@ -72,12 +69,7 @@ export function useLangyPanelPlacement() {
     immediate: reduceMotion,
   });
   const viewportWidth = useViewportWidth();
-  const floatingDodgesDrawer = isOpen && drawerEdgeHeld && floating;
-  const floatingPanelWidth = useResolvedPanelWidth({
-    placement: "floating",
-    viewportWidth,
-    besideDrawer: floatingDodgesDrawer,
-  });
+  const floatingPanelWidth = useResolvedPanelWidth({ placement: "floating", viewportWidth });
   const dockWidthPx = useResolvedPanelWidth({ placement: "sidebar", viewportWidth });
   const isDrawerCompanion = isOpen && drawerShowing && !floating;
   const resolvedWidthPx = floating ? floatingPanelWidth : dockWidthPx;
@@ -87,7 +79,7 @@ export function useLangyPanelPlacement() {
     reduceMotion,
     drawerEdgeHeld,
     isDrawerCompanion,
-    floatingDodgesDrawer,
+    floatingDodgesDrawer: isOpen && drawerEdgeHeld && floating,
     viewportWidth,
     floatingPanelWidth,
     /** The width the panel renders at; the drawer companion keeps the default dock width. */

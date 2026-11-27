@@ -19,41 +19,11 @@ describe("resolvePanelWidthBounds", () => {
   });
 
   /** @scenario "The width stays within a usable range" */
-  it("bounds the sidebar so the page keeps its room, defaulting to the dock width", () => {
+  it("bounds the sidebar to the width the window can show, defaulting to the dock width", () => {
     expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 1_000 })).toEqual({
       min: 320,
-      max: 520,
+      max: 976,
       default: 392,
-    });
-  });
-
-  /** @scenario "The docked panel leaves the page room" */
-  it("keeps 480px for the page beside the dock", () => {
-    expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 1_440 })).toMatchObject({
-      min: 320,
-      max: 960,
-    });
-  });
-
-  /** @scenario "The docked panel leaves the page room" */
-  it("keeps 480px for the page beside a drawer the floating card dodges", () => {
-    expect(
-      resolvePanelWidthBounds({ placement: "floating", viewportWidth: 1_440, besideDrawer: true }),
-    ).toMatchObject({ min: 340, max: 948 });
-  });
-
-  /** @scenario "The width stays within a usable range" */
-  it("lets a floating card with no drawer reach the window's edge gutter", () => {
-    expect(resolvePanelWidthBounds({ placement: "floating", viewportWidth: 1_440 }).max).toBe(
-      1_416,
-    );
-  });
-
-  /** @scenario "The width stays within a usable range" */
-  it("never lets the maximum fall below the minimum on a narrow window", () => {
-    expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 700 })).toMatchObject({
-      min: 320,
-      max: 320,
     });
   });
 
@@ -93,19 +63,6 @@ describe("clampPanelWidth", () => {
     expect(clampPanelWidth({ ...base, width: 100 })).toBe(340);
     expect(clampPanelWidth({ ...base, width: 5_000 })).toBe(1_416);
     expect(clampPanelWidth({ ...base, width: 500.4 })).toBe(500);
-  });
-
-  /** @scenario "The docked panel leaves the page room" */
-  it("stops the dock where the page would keep less than 480px", () => {
-    expect(clampPanelWidth({ placement: "sidebar", viewportWidth: 1_440, width: 5_000 })).toBe(960);
-    expect(
-      clampPanelWidth({
-        placement: "floating",
-        viewportWidth: 1_440,
-        width: 5_000,
-        besideDrawer: true,
-      }),
-    ).toBe(948);
   });
 });
 

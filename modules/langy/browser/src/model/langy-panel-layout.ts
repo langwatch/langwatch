@@ -54,12 +54,6 @@ export const FLOATING_PANEL_MIN_WIDTH = 340;
 /** Symmetric viewport breathing room when even the minimum cannot fit. */
 export const FLOATING_PANEL_VIEWPORT_GUTTER = 24;
 
-/**
- * The room the page always keeps beside a docked Langy, or beside a drawer the floating card
- * dodges.
- */
-export const LANGY_PAGE_RESERVE_PX = 480;
-
 export const FLOATING_PANEL_VIEWPORT_SHARE = 0.74;
 
 /** The floating card's default width in pixels for a viewport. */
