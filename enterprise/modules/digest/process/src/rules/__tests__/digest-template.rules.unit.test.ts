@@ -362,6 +362,25 @@ describe("pickDigestTemplatesToTry()", () => {
     });
   });
 
+  describe("when a forced scenario trend's rate equals its baseline's", () => {
+    /** @scenario "A forced digest with no data for the person is skipped, not sent" */
+    it("tries nothing, at the same rate or with no failures either week", () => {
+      const toTry = (project: NonNullable<InputOverrides["project"]>) =>
+        pickDigestTemplatesToTry({ template: "digest-scenarios-trend", input: input({ project }) });
+
+      expect(
+        toTry({ scenarioRuns: 20, scenarioFailures: 2, baselineWeeks: NO_BASELINE_FAILURES }),
+      ).toEqual([]);
+      expect(
+        toTry({
+          scenarioRuns: 20,
+          scenarioFailures: 0,
+          baselineWeeks: [{ runs: 10, failures: 0 }],
+        }),
+      ).toEqual([]);
+    });
+  });
+
   describe("when a forced template has no data for the person", () => {
     /** @scenario "A forced digest with no data for the person is skipped, not sent" */
     it("tries nothing", () => {

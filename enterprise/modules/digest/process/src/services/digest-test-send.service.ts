@@ -72,7 +72,8 @@ export class DigestTestSendService {
     const person = await this.deps.users.findByEmail({ email });
     if (!person) throw new DigestPersonNotFoundError();
     return {
-      person: { name: person.name, email },
+      // The matched account's own address, so a match that differs from what was typed shows.
+      person: { name: person.name, email: person.email ?? email },
       organizations: await this.#testsOf({ userId: person.id, operatorId, template }),
     };
   }

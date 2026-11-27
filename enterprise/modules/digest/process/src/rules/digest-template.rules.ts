@@ -105,8 +105,8 @@ const ready = (pick: DigestTemplatePick): ForcedDigestTemplate => ({ kind: "read
 
 /**
  * Plan pressure needs an admin and a plan limit; a scenario trend runs this week and in the four
- * before (its direction whichever way the rate moved); coding-agent week a session; traces week
- * a trace on the project the email is about.
+ * before, and a rate that moved (either way, however little); coding-agent week a session;
+ * traces week a trace on the project the email is about.
  */
 function forceDigestTemplate({
   template,
@@ -137,10 +137,12 @@ function scenarioDirectionOf({
   const baselineRuns = sum(project.baselineWeeks.map((week) => week.runs));
   const baselineFailures = sum(project.baselineWeeks.map((week) => week.failures));
   if (project.scenarioRuns === 0 || baselineRuns === 0) return NO_DATA;
-  const worse = project.scenarioFailures * baselineRuns > baselineFailures * project.scenarioRuns;
+  // Cross-multiplied so the rates compare exactly; an unchanged rate has no trend to show.
+  const moved = project.scenarioFailures * baselineRuns - baselineFailures * project.scenarioRuns;
+  if (moved === 0) return NO_DATA;
   return ready({
     template: "digest-scenarios-trend",
-    direction: worse ? "more_failing" : "getting_better",
+    direction: moved > 0 ? "more_failing" : "getting_better",
   });
 }
 
