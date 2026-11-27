@@ -67,8 +67,13 @@ export function typecheckTarget(root, dir) {
   const manifest = manifestOf(root, dir);
   const scripts = manifest.scripts ?? {};
   const own = referenced(root, dir, new Set(), (file) => file.startsWith(`${dir}/`));
-  // A package whose published types are its build's output (the SDK, ksuid) builds first.
+  // A package whose published types are its build's output (the SDK, ksuid) builds first,
+  // and every `.d.ts` in its dist is a typecheck output too: dependants hash what is on
+  // disk after the typecheck, whichever of the two wrote it, so a run and a replay agree.
   const typesFromBuild = scripts.build !== undefined && typeof manifest.types === "string";
+  const declarations = ["dist/**/*.d.ts", "dist/**/*.d.ts.map", "dist/**/*.tsbuildinfo"].map(
+    (glob) => `{workspaceRoot}/${dir}/${glob}`,
+  );
   return {
     cache: true,
     dependsOn: [
@@ -83,7 +88,7 @@ export function typecheckTarget(root, dir) {
       { externalDependencies: ["typescript"] },
       { dependentTasksOutputFiles: "**/*.{ts,tsx,mts,cts,json}", transitive: true },
     ],
-    outputs: [...declarationOutputs(root, dir), ...buildInfoOutsideDist(root, own)],
+    outputs: [...declarations, ...buildInfoOutsideDist(root, own)],
     syncGenerators: ["@nx/js:typescript-sync"],
   };
 }

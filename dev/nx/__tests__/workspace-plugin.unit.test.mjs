@@ -59,11 +59,7 @@ void describe("per-project typecheck", () => {
   void it("declares the declarations it writes as globs, never a dist directory", () => {
     assert.ok(time.outputs.includes("{workspaceRoot}/packages/time/dist/**/*.d.ts"));
     assert.ok(time.outputs.every((output) => !output.endsWith("/dist")));
-    const ksuid = typecheckTarget(workspaceRoot, "packages/ksuid");
-    assert.ok(ksuid.outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.tsbuildinfo"));
-    assert.ok(!ksuid.outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.d.ts"));
-    const mail = typecheckTarget(workspaceRoot, "packages/mail");
-    assert.ok(mail.outputs.includes("{workspaceRoot}/packages/mail/dist/typecheck/**/*.d.ts"));
+    assert.ok(time.outputs.includes("{workspaceRoot}/packages/time/dist/**/*.tsbuildinfo"));
   });
 
   /** @scenario "Generated sources and built declarations exist before a project's typecheck" */
@@ -72,6 +68,10 @@ void describe("per-project typecheck", () => {
     assert.ok(prisma.dependsOn.includes("prisma:generate"));
     assert.ok(typecheckTarget(workspaceRoot, "sdks/typescript").dependsOn.includes("build"));
     assert.ok(!time.dependsOn.includes("build"));
+    // ksuid's build and its tsc both write dist/*.d.ts; typecheck runs last and owns them.
+    const ksuid = typecheckTarget(workspaceRoot, "packages/ksuid");
+    assert.ok(ksuid.dependsOn.includes("build"));
+    assert.ok(ksuid.outputs.includes("{workspaceRoot}/packages/ksuid/dist/**/*.d.ts"));
   });
 
   /** @scenario "Build info written outside dist is a typecheck output" */
