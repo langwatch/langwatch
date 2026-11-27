@@ -64,12 +64,13 @@ export const InspectView = ({
   const [rendered, setRendered] = useState<Rendered | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("html");
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
 
   const template = templates.find((entry) => entry.id === selected?.id) ?? null;
   const fixtureIndex =
     template?.fixtures.findIndex((fixture) => fixture.name === selected?.fixture) ?? -1;
 
-  useArrowKeyStepping({ templates, selected, onSelect });
+  useArrowKeyStepping({ templates, selected, onSelect, frame });
 
   useEffect(() => {
     if (!selected || currentProps === null) return;
@@ -133,7 +134,7 @@ export const InspectView = ({
             <div className="mailroom-stage">
               {tab === "html" ? (
                 <div className="mailroom-frame" style={{ width: WIDTHS[width] }}>
-                  <iframe title="Rendered email" srcDoc={frameHtml} />
+                  <iframe ref={setFrame} title="Rendered email" srcDoc={frameHtml} />
                 </div>
               ) : (
                 <div className="mailroom-text" style={{ width: WIDTHS[width] }}>
@@ -172,7 +173,10 @@ function useArrowKeyStepping({
   templates,
   selected,
   onSelect,
-}: Pick<InspectViewProps, "templates" | "selected" | "onSelect">): void {
+  frame,
+}: Pick<InspectViewProps, "templates" | "selected" | "onSelect"> & {
+  frame: HTMLIFrameElement | null;
+}): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = ARROW_DIRECTION[event.key];
@@ -183,8 +187,27 @@ function useArrowKeyStepping({
       onSelect(next.id, next.fixture);
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [templates, selected, onSelect]);
+    // A click in the rendered email focuses its frame, whose keys never reach this window;
+    // every srcdoc load is a new window, so the listener moves on each load.
+    let frameWindow: Window | null = null;
+    const bindFrame = () => {
+      frameWindow?.removeEventListener("keydown", onKeyDown);
+      frameWindow = null;
+      try {
+        frame?.contentWindow?.addEventListener("keydown", onKeyDown);
+        frameWindow = frame?.contentWindow ?? null;
+      } catch {
+        // A cross-origin frame refuses listeners; its keys stay its own.
+      }
+    };
+    bindFrame();
+    frame?.addEventListener("load", bindFrame);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      frame?.removeEventListener("load", bindFrame);
+      frameWindow?.removeEventListener("keydown", onKeyDown);
+    };
+  }, [templates, selected, onSelect, frame]);
 }
 
 /** The live props form, or under the built studio the fixture's props, read-only. */
