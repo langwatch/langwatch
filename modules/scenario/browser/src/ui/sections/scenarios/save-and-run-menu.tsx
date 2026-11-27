@@ -11,7 +11,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";
-import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Play, Plug, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { useAgents } from "../../../behavior/agents/use-agents.ts";
@@ -283,6 +283,13 @@ export function SaveAndRunMenu({
   );
 }
 
+/** The kind of an agent row: code, Scenario Connector, or an endpoint. */
+function AgentKindMark({ type }: { type: ScenarioAgent["type"] }) {
+  if (type === "code") return <Code size={14} color="var(--chakra-colors-fg-muted)" />;
+  if (type === "connector") return <Plug size={14} color="var(--chakra-colors-fg-muted)" />;
+  return <Globe size={14} color="var(--chakra-colors-fg-muted)" />;
+}
+
 /**
  * One agent of the menu. A development agent of another person is drawn disabled and
  * says why on hover: the menu saves and runs in one click, and a run against it would
@@ -315,11 +322,7 @@ function AgentRow({
       aria-disabled={!agent.isRunnable}
       data-testid={`save-and-run-agent-${agent.id}`}
     >
-      {agent.type === "code" ? (
-        <Code size={14} color="var(--chakra-colors-fg-muted)" />
-      ) : (
-        <Globe size={14} color="var(--chakra-colors-fg-muted)" />
-      )}
+      <AgentKindMark type={agent.type} />
       <Text fontSize="sm" flex={1}>
         {agent.label}
       </Text>

@@ -277,9 +277,10 @@ Feature: Scenario run hooks: setup and teardown
 
     @unit
     Scenario: A teardown that did not happen by accident reads "Teardown not run"
-      Given a run whose agent went offline before teardown
+      Given a run whose agent went offline before teardown, after a setup that succeeded
       Then the run shows "Teardown not run"
       And it does not show "Teardown skipped"
+      And the run shows "Test data may be left behind."
 
   Rule: Recording
 
@@ -487,6 +488,41 @@ Feature: Scenario run hooks: setup and teardown
       Then setup records "failed" with the refusal
       And teardown records "not_run"
       And the code runner is not called
+
+    @integration
+    Scenario: A refused connector run shows only the refusal as a failure
+      Given a connector run refused before any block ran, so setup failed and teardown did not run
+      Then the run shows "Setup failed" with the refusal
+      And teardown's reason reads as a note, not as an error
+      And the run does not show "Test data may be left behind."
+
+    # suiteTargetTypeSchema has no connector type, so a run plan or suite cannot target one yet.
+    @integration
+    Scenario: A connector agent is offered as a scenario run target
+      Given a connector agent
+      When the person opens the target picker of a scenario
+      Then the connector agent is listed with its connector mark
+      And choosing it makes it the scenario's run target
+
+    @integration
+    Scenario: A run plan draws a connector agent disabled and says why
+      Given a connector agent
+      When the Agent testing run dialog lists the agents to run against
+      Then the connector agent is drawn disabled
+      And on hover it reads "Suites cannot target a Scenario Connector yet"
+
+    @unit
+    Scenario: A run plan never opens on a connector remembered from a scenario run
+      Given a scenario last run against a connector agent from its editor
+      When the scenario is run from Agent testing
+      Then the run dialog opens with no agent chosen
+
+    @integration
+    Scenario: Running again from a connector run offers the connector
+      Given a finished run on a connector agent and no target remembered for the scenario
+      When the person presses "Run again" on the run
+      Then the run modal opens on that connector agent
+      And running it goes against the connector agent
 
     @unit
     Scenario: A connector agent whose fixtures dataset was deleted fails setup before any block runs

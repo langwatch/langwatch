@@ -18,6 +18,7 @@ const AGENT_ICONS = {
   workflow: Workflow,
   connected: Plug,
   voice: Mic,
+  connector: Plug,
 } as const;
 
 /**
@@ -32,7 +33,7 @@ const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
 export type RunDialogAgent = {
   id: string;
   name: string;
-  type: "http" | "code" | "workflow" | "connected" | "voice";
+  type: "http" | "code" | "workflow" | "connected" | "voice" | "connector";
   config?: unknown;
   /** The name with the environment of a connected agent, when it has one. */
   label?: string;
@@ -42,12 +43,14 @@ export type RunDialogAgent = {
   status?: "online" | "offline";
   /** The owner of a personal development agent. */
   owner?: { userId: string; name: string | null } | null;
-  /** False for a development agent of another person and for an offline agent. */
+  /** False for another person's development agent, an offline agent and a connector. */
   isRunnable?: boolean;
   /** True when a development agent belongs to another person. */
   isTeammateOwned?: boolean;
   /** True when a connected agent has no process holding it. */
   isOffline?: boolean;
+  /** True for a Scenario Connector, which a run plan cannot target yet. */
+  isRefusedBySuite?: boolean;
   /** The parameters a connected agent declares. */
   parameters?: ScenarioParameterDefinition[];
 };

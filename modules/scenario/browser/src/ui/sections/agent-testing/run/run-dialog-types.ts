@@ -11,10 +11,11 @@ import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { RunScope } from "./run-configuration.ts";
 
 /**
- * One target the run goes against: the agent, and in a comparison the
- * overrides that target alone runs with.
+ * One target the run goes against: the agent, and in a comparison the overrides that target alone
+ * runs with. The dialog queues a run plan, so its targets are the kinds a suite can target.
  */
-export type RunTarget = NonNullable<TargetValue> & {
+export type RunTarget = Omit<NonNullable<TargetValue>, "type"> & {
+  type: SuiteTarget["type"];
   runParameters?: RunParameterValues;
 };
 

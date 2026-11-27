@@ -37,8 +37,9 @@ export function canRunAgain({ scenarioRun }: { scenarioRun: RunAgainSource }): b
 }
 
 /**
- * The run dialog subject for running one scenario again, preselecting the
- * target the run used and falling back to the one last chosen for the scenario.
+ * The run dialog subject for running one scenario again: the run's target, else the last one
+ * chosen. The dialog queues a run plan, which cannot target a connector, so a connector run falls
+ * back too; the run detail drawer is where it runs again.
  */
 export function runAgainSubjectOf({
   scenarioRun,

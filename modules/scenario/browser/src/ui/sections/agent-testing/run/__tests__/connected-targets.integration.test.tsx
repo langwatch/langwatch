@@ -1,8 +1,9 @@
 /**
  * Connected agents in the run dialog: presence mark, environment label,
- * disabled cards (another's dev agent, an unheld one), and the plan warning.
+ * disabled cards (another's dev agent, an unheld one, a connector), and the plan warning.
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
+ * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -13,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   OFFLINE_AGENT_SELECT_COPY,
+  SUITE_CONNECTOR_SELECT_COPY,
   scenarioAgentsOf,
 } from "../../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { OfflineTargetsNotice } from "../offline-targets-notice.tsx";
@@ -216,6 +218,52 @@ describe("connected agents in the run dialog", () => {
       );
 
       expect(screen.queryByTestId("run-dialog-offline-targets")).toBeNull();
+    });
+  });
+
+  describe("given a Scenario Connector agent", () => {
+    /** @scenario "A run plan draws a connector agent disabled and says why" */
+    it("draws it disabled and says a suite cannot target it on hover", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      const agents = scenarioAgentsOf({
+        agents: [
+          connectedRow({ id: "agent_on" }),
+          {
+            id: "agent_connector",
+            name: "Shop connector",
+            type: "connector",
+            updatedAt: Temporal.Instant.from("2026-08-30T10:00:00Z"),
+          },
+        ],
+        searchValue: "",
+        viewerUserId: VIEWER,
+        forSuite: true,
+      });
+      renderWithDesignSystem(
+        <TargetSection
+          mode="agents"
+          agents={agents}
+          prompts={[]}
+          target={null}
+          onSelect={onSelect}
+          onRemovePromptPicker={vi.fn()}
+          onSetupAgent={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("run-dialog-agent-agent_on")).toHaveAttribute(
+        "aria-disabled",
+        "false",
+      );
+      const connector = screen.getByTestId("run-dialog-agent-agent_connector");
+      expect(connector).toHaveAttribute("aria-disabled", "true");
+      // Hover first: a click closes the tooltip, and the pointer is then already over the card.
+      await user.hover(connector);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(SUITE_CONNECTOR_SELECT_COPY);
+
+      await user.click(connector);
+      expect(onSelect).not.toHaveBeenCalled();
     });
   });
 });

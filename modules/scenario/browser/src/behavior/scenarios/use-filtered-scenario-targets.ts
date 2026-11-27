@@ -19,6 +19,9 @@ import type { TargetValue } from "../../model/scenario-target.ts";
 export const OFFLINE_AGENT_SELECT_COPY =
   "This agent is offline. Start the process that runs it to be able to select it.";
 
+/** Why a run plan or suite draws a Scenario Connector agent disabled. */
+export const SUITE_CONNECTOR_SELECT_COPY = "Suites cannot target a Scenario Connector yet";
+
 /** Agent types that can be used as scenario targets */
 const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
   "http",
@@ -26,6 +29,7 @@ const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
   "workflow",
   "connected",
   "voice",
+  "connector",
 ]);
 
 /** What the picker reads off an agent row. */
@@ -43,7 +47,7 @@ export type AgentLike = {
   owner?: { userId: string; name: string | null } | null;
 };
 
-export type ScenarioAgentType = "http" | "code" | "workflow" | "connected" | "voice";
+export type ScenarioAgentType = "http" | "code" | "workflow" | "connected" | "voice" | "connector";
 
 /** One agent as the picker offers it. */
 export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
@@ -54,7 +58,9 @@ export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
   isTeammateOwned: boolean;
   /** True when a connected agent has no process holding it. */
   isOffline: boolean;
-  /** False for a development agent of another person and for an offline agent. */
+  /** True when the picker feeds a suite run and the agent is a Scenario Connector. */
+  isRefusedBySuite: boolean;
+  /** False for another person's development agent, an offline agent and one a suite refuses. */
   isRunnable: boolean;
 };
 
@@ -95,15 +101,21 @@ function targetUpdatedAtMs(value: AgentLike["updatedAt"]): number {
   return typeof value === "string" ? toEpochMs(value) : value.epochMilliseconds;
 }
 
-/** The agents of the project as targets, newest first, filtered by the search. */
+/**
+ * The agents of the project as targets, newest first, filtered by the search.
+ * `forSuite` is set where the run goes out as a run plan or suite, which cannot
+ * target a Scenario Connector yet (suiteTargetTypeSchema), so one is drawn disabled.
+ */
 export function scenarioAgentsOf<T extends AgentLike>({
   agents,
   searchValue,
   viewerUserId,
+  forSuite = false,
 }: {
   agents: T[] | undefined;
   searchValue: string;
   viewerUserId?: string | null;
+  forSuite?: boolean;
 }): ScenarioAgent<T>[] {
   const scenarioAgents = (agents ?? [])
     .filter((agent): agent is T & { type: ScenarioAgentType } =>
@@ -112,12 +124,14 @@ export function scenarioAgentsOf<T extends AgentLike>({
     .map((agent): ScenarioAgent<T> => {
       const teammates = isTeammateOwned({ agent, viewerUserId });
       const offline = isOfflineAgent(agent);
+      const refusedBySuite = forSuite && agent.type === "connector";
       return {
         ...agent,
         label: agentTargetLabel(agent),
         isTeammateOwned: teammates,
         isOffline: offline,
-        isRunnable: !teammates && !offline,
+        isRefusedBySuite: refusedBySuite,
+        isRunnable: !teammates && !offline && !refusedBySuite,
       };
     });
   const sorted = [...scenarioAgents].toSorted(
@@ -133,15 +147,26 @@ export function useFilteredAgents<T extends AgentLike>({
   agents,
   searchValue,
   viewerUserId,
+  forSuite = false,
 }: {
   agents: T[] | undefined;
   searchValue: string;
   viewerUserId?: string | null;
+  /** Set where the run goes out as a run plan or suite; see {@link scenarioAgentsOf}. */
+  forSuite?: boolean;
 }): ScenarioAgent<T>[] {
   return useMemo(
-    () => scenarioAgentsOf({ agents, searchValue, viewerUserId }),
-    [agents, searchValue, viewerUserId],
+    () => scenarioAgentsOf({ agents, searchValue, viewerUserId, forSuite }),
+    [agents, searchValue, viewerUserId, forSuite],
   );
+}
+
+/**
+ * The target a run plan or suite may open on. A Scenario Connector pick, remembered
+ * from a single scenario run, is dropped: a suite cannot target one yet.
+ */
+export function suiteTargetOf(target: TargetValue): TargetValue {
+  return target?.type === "connector" ? null : target;
 }
 
 /** Type guard: is this target value an agent rather than a prompt? */
@@ -152,15 +177,17 @@ export function isAgentTarget(
 }
 
 /**
- * Why an agent cannot be picked as a run target. A development agent of
- * another person can never be run by the reader, so that reason comes
- * first even when the agent is offline too.
+ * Why an agent cannot be picked as a run target. A suite's refusal of a
+ * connector comes first; then a development agent of another person, which
+ * the reader can never run, even when it is offline too.
  */
 export function notRunnableCopy(agent: {
   isTeammateOwned?: boolean;
   owner?: { name: string | null } | null;
   isOffline?: boolean;
+  isRefusedBySuite?: boolean;
 }): string {
+  if (agent.isRefusedBySuite) return SUITE_CONNECTOR_SELECT_COPY;
   if (agent.isOffline && !agent.isTeammateOwned) {
     return OFFLINE_AGENT_SELECT_COPY;
   }

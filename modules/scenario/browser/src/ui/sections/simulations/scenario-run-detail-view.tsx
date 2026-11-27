@@ -296,7 +296,13 @@ export function RunDetailView({
           </RunDetailSection>
         )}
 
-        {hooks.teardown && <TeardownBand result={hooks.teardown} onOpenTrace={openHookTrace} />}
+        {hooks.teardown && (
+          <TeardownBand
+            result={hooks.teardown}
+            setupStatus={hooks.setup?.status}
+            onOpenTrace={openHookTrace}
+          />
+        )}
 
         <RunDetailSection
           value="results"
@@ -367,7 +373,7 @@ export function RunDetailDialogs({ detail }: { detail: ScenarioRunDetail }) {
     runModalOpen,
     setRunModalOpen,
     handleRunAgain,
-    persistedTarget,
+    runAgainTarget,
     isRunning,
     scenarioEditorOpen,
     setScenarioEditorOpen,
@@ -375,11 +381,13 @@ export function RunDetailDialogs({ detail }: { detail: ScenarioRunDetail }) {
   } = detail;
   return (
     <>
+      {/* Keyed so the pick follows the run's target once the stream has read it. */}
       <RunScenarioModal
+        key={runAgainTarget ? `${runAgainTarget.type}:${runAgainTarget.id}` : "none"}
         open={runModalOpen}
         onClose={() => setRunModalOpen(false)}
         onRun={handleRunAgain}
-        initialTarget={persistedTarget}
+        initialTarget={runAgainTarget}
         isLoading={isRunning}
       />
 

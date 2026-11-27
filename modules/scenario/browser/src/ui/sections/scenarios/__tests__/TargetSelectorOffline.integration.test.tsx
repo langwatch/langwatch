@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  * Marks a presence-less connected agent unpickable, with why on hover; an
- * HTTP agent, having no such presence, stays pickable.
+ * HTTP agent, having no such presence, stays pickable, as does a connector.
+ * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, waitFor } from "@testing-library/react";
@@ -30,6 +31,12 @@ const mockAgents = [
     name: "Support phone",
     type: "voice",
     updatedAt: new Date("2025-01-03"),
+  },
+  {
+    id: "agent-connector",
+    name: "Shop connector",
+    type: "connector",
+    updatedAt: new Date("2025-01-04"),
   },
 ];
 
@@ -101,6 +108,28 @@ describe("given a voice target is selected", () => {
 
       const trigger = screen.getByTestId("target-selector-trigger");
       expect(trigger).toHaveTextContent("Support phone");
+    });
+  });
+});
+
+describe("given a Scenario Connector agent", () => {
+  afterEach(cleanup);
+
+  describe("when the list is open", () => {
+    /** @scenario "A connector agent is offered as a scenario run target" */
+    it("lists it with the connector mark and picks it as the target", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn<(value: TargetValue) => void>();
+      renderWithDesignSystem(<TargetSelector value={null} onChange={onChange} />);
+
+      await user.click(screen.getByTestId("target-selector-trigger"));
+      const connector = await screen.findByTestId("target-option-agent-connector");
+
+      expect(connector).toHaveTextContent("Shop connector");
+      expect(connector).toHaveAttribute("aria-disabled", "false");
+      expect(connector.querySelector(".lucide-plug")).not.toBeNull();
+      await user.click(connector);
+      expect(onChange).toHaveBeenCalledWith({ type: "connector", id: "agent-connector" });
     });
   });
 });

@@ -10,13 +10,21 @@ import type {
   ScenarioRunHooks,
   SimulationRunMetadata,
 } from "@langwatch/scenario-contract";
-import { cleanup, screen, within } from "@testing-library/react";
+import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+type ModalTarget = { type: string; id: string } | null;
+type RunModalProps = {
+  open: boolean;
+  initialTarget?: ModalTarget;
+  onRun: (target: ModalTarget, shouldRemember: boolean) => void;
+};
 
 const mocks = vi.hoisted(() => ({
   runState: null as ScenarioRunData | null,
   runScenario: vi.fn(),
+  runModalProps: null as RunModalProps | null,
 }));
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
@@ -35,7 +43,12 @@ vi.mock("@langwatch/scenario-client", () => ({
     },
   },
 }));
-vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({ RunScenarioModal: () => null }));
+vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({
+  RunScenarioModal: (props: RunModalProps) => {
+    mocks.runModalProps = props;
+    return null;
+  },
+}));
 vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({ ScenarioFormDrawer: () => null }));
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
@@ -126,6 +139,7 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
   afterEach(() => {
     cleanup();
     mocks.runState = null;
+    mocks.runModalProps = null;
     vi.clearAllMocks();
   });
 
@@ -265,6 +279,43 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
 
       expect(screen.getByText("Teardown not run")).toBeInTheDocument();
       expect(screen.queryByText("Teardown skipped")).toBeNull();
+      expect(screen.getByTestId("hook-band-teardown")).toHaveTextContent(
+        "Test data may be left behind.",
+      );
+    });
+  });
+
+  describe("given a connector run refused before any block ran", () => {
+    /** @scenario "A refused connector run shows only the refusal as a failure" */
+    it("reads Setup failed with the refusal, and teardown's reason as a note with no warning", () => {
+      mocks.runState = buildRunState({
+        status: ScenarioRunStatus.ERROR,
+        results: null,
+        targetType: "connector",
+        hooks: {
+          setup: {
+            status: "failed",
+            durationMs: 0,
+            error: "Connector steps are not released for this project yet.",
+          },
+          teardown: {
+            status: "not_run",
+            durationMs: 0,
+            error: "The connector was refused before any block ran, so teardown did not run.",
+          },
+        },
+      });
+
+      renderDrawer();
+
+      expect(screen.getByText("Setup failed")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("hook-band-setup")).getByTestId("hook-error"),
+      ).toHaveTextContent("Connector steps are not released for this project yet.");
+      const teardown = screen.getByTestId("hook-band-teardown");
+      expect(teardown).toHaveTextContent("The connector was refused before any block ran");
+      expect(within(teardown).queryByTestId("hook-error")).toBeNull();
+      expect(teardown).not.toHaveTextContent("Test data may be left behind.");
     });
   });
 
@@ -323,7 +374,7 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
 
   describe("given a run on a connector agent with a teardown", () => {
     /** @scenario 'A connector run offers no "Rerun and keep data"' */
-    it("offers no keep-data rerun, as it has no target to rerun against", async () => {
+    it("offers no keep-data rerun, though the run can be run again", async () => {
       const user = userEvent.setup();
       mocks.runState = buildRunState({
         targetType: "connector",
@@ -332,9 +383,32 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
 
       renderDrawer();
 
+      expect(screen.getByRole("button", { name: "Run again" })).toBeInTheDocument();
       const more = screen.queryByRole("button", { name: "More actions" });
       if (more) await user.click(more);
       expect(screen.queryByText("Rerun and keep data")).toBeNull();
+    });
+  });
+
+  describe("given a finished connector run and no target remembered for the scenario", () => {
+    /** @scenario "Running again from a connector run offers the connector" */
+    it("opens the run modal on the connector and runs against it", async () => {
+      const user = userEvent.setup();
+      mocks.runState = buildRunState({ targetType: "connector" });
+      mocks.runScenario.mockResolvedValue(undefined);
+
+      renderDrawer();
+      await user.click(screen.getByRole("button", { name: "Run again" }));
+
+      const connector = { type: "connector", id: "agent_shop" };
+      expect(mocks.runModalProps).toMatchObject({ open: true, initialTarget: connector });
+      await act(async () => {
+        mocks.runModalProps?.onRun(connector, false);
+      });
+      expect(mocks.runScenario).toHaveBeenCalledWith({
+        scenarioId: "scenario_1",
+        target: connector,
+      });
     });
   });
 

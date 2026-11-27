@@ -1,6 +1,12 @@
+/**
+ * @see modules/scenario/specs/scenario-run-hooks.feature
+ */
 import { describe, expect, it } from "vitest";
 
-import { scenarioAgentsOf } from "../behavior/scenarios/use-filtered-scenario-targets.ts";
+import {
+  scenarioAgentsOf,
+  suiteTargetOf,
+} from "../behavior/scenarios/use-filtered-scenario-targets.ts";
 
 describe("scenarioAgentsOf", () => {
   it("keeps supported target types, orders newest first, and narrows by name", () => {
@@ -35,5 +41,20 @@ describe("scenarioAgentsOf", () => {
       "http",
       "workflow",
     ]);
+  });
+});
+
+describe("suiteTargetOf", () => {
+  /** @scenario "A run plan never opens on a connector remembered from a scenario run" */
+  it("drops a remembered connector pick, so the run dialog opens with no agent chosen", () => {
+    expect(suiteTargetOf({ type: "connector", id: "agent_connector" })).toBeNull();
+  });
+
+  it("keeps any other pick", () => {
+    expect(suiteTargetOf({ type: "http", id: "agent_http" })).toEqual({
+      type: "http",
+      id: "agent_http",
+    });
+    expect(suiteTargetOf(null)).toBeNull();
   });
 });
