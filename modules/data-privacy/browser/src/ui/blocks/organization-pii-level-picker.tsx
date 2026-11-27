@@ -249,6 +249,7 @@ export function OrganizationPiiLevelPicker({
   licensed = false,
   split = false,
   awaitingAcceptance = false,
+  strictRuleShown = false,
   canWrite,
   isSaving,
   onPick,
@@ -264,6 +265,8 @@ export function OrganizationPiiLevelPicker({
   split?: boolean;
   /** Strict is rule-based, at no charge, until an organization admin accepts the price. */
   awaitingAcceptance?: boolean;
+  /** A team or project rule sets Strict, so Strict is in use with the organization on Essential. */
+  strictRuleShown?: boolean;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
@@ -271,6 +274,8 @@ export function OrganizationPiiLevelPicker({
   onSwitchToModel?: (() => void) | undefined;
 }) {
   const ruleBased = level === "strict" && awaitingAcceptance;
+  // Any Strict the page shows offers the switch: an admin has no other place to accept it.
+  const strictRuleBased = awaitingAcceptance && (level === "strict" || strictRuleShown);
   const currentLabel = level
     ? `${LEVEL_LABELS[level]}${ruleBased ? " (rule-based)" : ""}`
     : otherLevelLabel;
@@ -308,7 +313,7 @@ export function OrganizationPiiLevelPicker({
             free={free}
             licensed={licensed}
             split={split}
-            ruleBased={ruleBased}
+            ruleBased={strictRuleBased}
             isSaving={isSaving}
             onSwitchToModel={onSwitchToModel}
           />

@@ -248,6 +248,11 @@ export function otherPiiLevelLabel({
   return level === "strict" ? "Strict" : "Essential";
 }
 
+/** Whether a rule the page shows sets Strict, which also waits on the acceptance. */
+export function showsStrictRule({ rules }: { rules: readonly DataPrivacyRule[] }): boolean {
+  return rules.some((rule) => rule.config.pii?.level === "strict");
+}
+
 /** The organization's own rule, if it has one. */
 export function organizationRule({
   rules,

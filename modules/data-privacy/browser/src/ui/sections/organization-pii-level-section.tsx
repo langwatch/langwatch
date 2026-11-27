@@ -19,6 +19,7 @@ import {
   organizationRule,
   type OrganizationPiiLevel,
   otherPiiLevelLabel,
+  showsStrictRule,
   withOrganizationPiiLevel,
 } from "../../model/pii-redaction-level-offer.ts";
 import { OrganizationPiiLevelPicker } from "../blocks/organization-pii-level-picker.tsx";
@@ -170,6 +171,7 @@ export function OrganizationPiiLevelSection({
         licensed={licensed}
         split={split}
         awaitingAcceptance={awaitsAcceptance(acceptance)}
+        strictRuleShown={showsStrictRule({ rules: snapshot.rules })}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending || acceptanceInFlight.inFlight}
         onPick={(level) =>

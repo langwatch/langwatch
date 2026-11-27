@@ -261,6 +261,16 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And the page says Strict is billed from the next trace
 
   @integration
+  Scenario: An admin accepts the price for a project's Strict rule while the organization is on Essential
+    Given release_pii_redaction_model_enabled is on for "acme"
+    And the organization's PII level resolves to Essential and a project rule sets Strict
+    And no organization admin accepted the model's price
+    When an admin opens the Data Privacy page for project "web-app"
+    Then Strict reads "Currently on rule-based (Presidio), no charge" and offers "Switch to the PII Redaction Model"
+    When the admin presses it and confirms the price
+    Then the organization's acceptance of the price is recorded and the organization stays on Essential
+
+  @integration
   Scenario: Picking Strict through the price prompt records the acceptance first
     Given release_pii_redaction_model_enabled is on for "acme"
     And the organization's PII level resolves to Essential and no organization admin accepted the price

@@ -138,6 +138,30 @@ describe("given a Cloud organization on the model flag whose price no admin acce
     });
   });
 
+  describe("when the organization is on Essential and a project rule sets Strict", () => {
+    /** @scenario An admin accepts the price for a project's Strict rule while the organization is on Essential */
+    it("offers the switch, records the acceptance and leaves the organization on Essential", async () => {
+      api.snapshot = snapshotWith({
+        rules: [projectRuleWith({ pii: { level: "strict" } })],
+        accepted: false,
+      });
+      page({ flagOn: true });
+
+      expect(screen.getByText("Organization on Essential")).toBeInTheDocument();
+      expect(
+        within(picker()).getByText("Currently on rule-based (Presidio), no charge"),
+      ).toBeInTheDocument();
+      await userEvent.setup().click(switchButton());
+      await confirmStrict();
+
+      await waitFor(() =>
+        expect(api.acceptPiiRedactionModel).toHaveBeenCalledWith({ organizationId: "org-1" }),
+      );
+      expect(api.setForScope).not.toHaveBeenCalled();
+      expect(pickedLevel()).toBe("Essential");
+    });
+  });
+
   describe("when an admin picks Strict over Essential and confirms the price", () => {
     /** @scenario Picking Strict through the price prompt records the acceptance first */
     it("records the acceptance, then saves the organization rule at strict", async () => {
