@@ -1,3 +1,5 @@
+import { pickNewestChatModel } from "@langwatch/model-provider-contract";
+
 /**
  * Which model the composer's picker should hold, from `reachable` — the project's models,
  * narrowed to providers connected at the project, team, or organization and the key's allowlist —
@@ -34,13 +36,27 @@ export function resolveComposerModel({
       ? resolvedDefault
       : null;
   if (current) {
-    if (!reachable.includes(current)) return servedDefault ?? reachable[0]!;
+    if (!reachable.includes(current)) return servedDefault ?? fallbackModel(reachable);
     // A seed taken while the default was out of reach (the menu answered first, or narrowed
     // later) gives way to the default once the project serves it.
     return seedFollowsDefault && servedDefault && servedDefault !== current ? servedDefault : null;
   }
   if (!resolvedDefaultSettled) return null;
-  return servedDefault ?? reachable[0]!;
+  return servedDefault ?? fallbackModel(reachable);
+}
+
+/**
+ * The menu's first provider keeps the turn, but on the newest model it lists: a provider's
+ * saved order puts whatever was added first on top, which may be a model it has since retired.
+ */
+function fallbackModel(reachable: readonly string[]): string {
+  const provider = providerOf(reachable[0]!);
+  const ofProvider = reachable.filter((model) => providerOf(model) === provider);
+  return pickNewestChatModel({ models: ofProvider }) ?? reachable[0]!;
+}
+
+function providerOf(model: string): string {
+  return model.split("/")[0] ?? model;
 }
 
 /**

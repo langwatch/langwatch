@@ -4,6 +4,8 @@
  * by the latest-alias resolver and every "recommended model" surface.
  */
 
+import { normalizeBedrockModelId } from "../model-cost.ts";
+
 /** Newest-first sort key. `rank` breaks ties inside one generation. */
 export interface ModelSortKey {
   major: number;
@@ -128,4 +130,30 @@ export function deriveChatModelRank({
   const rank = grammar[variant][parsed.tier];
   if (rank === undefined) return null;
   return { major: parsed.major, minor: parsed.minor, rank };
+}
+
+const VARIANTS_BEST_FIRST: readonly ModelVariant[] = ["main", "fast"];
+
+/** A served id as the grammar reads it: Bedrock's envelope and a trailing release date gone. */
+function rankableModelId(model: string): string {
+  const unwrapped = /^bedrock\//i.test(model) ? normalizeBedrockModelId(model) : model;
+  return unwrapped.replace(/-\d{8}$/, "");
+}
+
+/**
+ * The model a fallback should land on: the newest main-tier one in `models`, else the newest
+ * fast-tier one, else the first. A provider's own list order says nothing about which is current.
+ */
+export function pickNewestChatModel({ models }: { models: readonly string[] }): string | null {
+  const ranked = models.flatMap((model) => {
+    const id = rankableModelId(model);
+    const provider = id.split("/")[0] ?? id;
+    for (const [variantOrder, variant] of VARIANTS_BEST_FIRST.entries()) {
+      const key = deriveChatModelRank({ id, provider, variant });
+      if (key) return [{ model, variantOrder, key }];
+    }
+    return [];
+  });
+  ranked.sort((a, b) => a.variantOrder - b.variantOrder || compareModelSortKeys(a.key, b.key));
+  return ranked[0]?.model ?? models[0] ?? null;
 }

@@ -103,11 +103,13 @@ Feature: Langy runs on the model the project chose
   # name a provider nobody connected here. Seeding it put a model in the pill
   # that the pill's own menu never offered, and every send died at the gateway
   # with "no provider connected". The seed reads the same list the menu does.
+  # Within the first provider it takes the newest model, not the first saved:
+  # a provider's oldest entry may be one its vendor has since retired.
   @unit
   Scenario: A default naming a provider nobody connected never reaches the composer
     Given the resolved Langy default names a provider this project cannot reach
     When the composer seeds its model
-    Then it holds the first model the project's providers serve
+    Then it holds the newest model the first of the project's providers serves
     And a model the project can serve is seeded unchanged
 
   @unit
