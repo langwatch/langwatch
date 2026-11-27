@@ -33,6 +33,18 @@ function isSchemaBehind(message: string): boolean {
   return message.toLowerCase().includes("does not exist") && SCHEMA_BEHIND_SUBJECT.test(message);
 }
 
+const LOST_SERIALIZABLE_RACE = /\bP2034\b|write conflict or a deadlock|could not serialize access/i;
+
+/** A lost SERIALIZABLE race: its caller retries it, or reports the failure that is final. */
+function isLostSerializableRace(message: string): boolean {
+  return LOST_SERIALIZABLE_RACE.test(message);
+}
+
+/** An error event the process expects and handles, so it lands at warn rather than paging. */
+function isExpectedError(message: string): boolean {
+  return isSchemaBehind(message) || isLostSerializableRace(message);
+}
+
 /** A query event carries `query` where a log event carries `message`. */
 function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
   return "query" in event ? event.query : event.message;
@@ -50,7 +62,7 @@ export function forwardPrismaEvent({
 }): void {
   const message = prismaEventMessage(event);
   const loggerLevel =
-    level === "error" && isSchemaBehind(message) ? "warn" : prismaLoggerLevel(level);
+    level === "error" && isExpectedError(message) ? "warn" : prismaLoggerLevel(level);
   logger[loggerLevel](
     { target: event.target, message, timestamp: event.timestamp },
     PRISMA_EVENT_MESSAGE[level],
