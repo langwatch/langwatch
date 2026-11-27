@@ -20,6 +20,7 @@ const written = await captureScreens({
   baseUrl,
   outDir,
   views: [
+    { name: "digests", path: "/", prepare: framesReady },
     { name: "inspect", path: "/?view=inspect", prepare: framesReady },
     {
       name: "inspect-text",
@@ -37,12 +38,6 @@ const written = await captureScreens({
         await framesReady({ page });
         await page.keyboard.press("Tab");
       },
-    },
-    { name: "gallery", path: "/?view=gallery", prepare: framesReady },
-    {
-      name: "gallery-compact",
-      path: "/?view=gallery&density=compact&fixtures=all&width=mobile",
-      prepare: framesReady,
     },
   ],
 });

@@ -1,34 +1,30 @@
-import type { Density } from "./gallery-view.tsx";
 import type { PreviewScheme, WIDTHS } from "./studio-shared.ts";
 
-export type View = "inspect" | "gallery" | "review";
+/** "review" is the Weekly digests tab, "inspect" All other emails. */
+export type View = "review" | "inspect";
 
 export interface UrlState {
   view: View;
   templateId: string | null;
   fixtureName: string | null;
   width: keyof typeof WIDTHS;
-  density: Density;
   theme: PreviewScheme;
-  everyFixture: boolean;
 }
 
 const PROPS_KEY = "props";
 
 /** What the address bar shows when nothing in it says otherwise. */
 export const DEFAULT_URL_STATE: UrlState = {
-  view: "inspect",
+  view: "review",
   templateId: null,
   fixtureName: null,
   width: "desktop",
-  density: "comfortable",
   theme: "system",
-  everyFixture: false,
 };
 
-const VIEWS: readonly View[] = ["inspect", "gallery", "review"];
-
-const parseView = (value: string | null): View => VIEWS.find((view) => view === value) ?? "inspect";
+/** The removed Gallery tab's links open All other emails; anything else opens the digests. */
+const parseView = (value: string | null): View =>
+  value === "inspect" || value === "gallery" ? "inspect" : "review";
 
 export const parseUrlState = (search: string): UrlState => {
   const params = new URLSearchParams(search);
@@ -38,9 +34,7 @@ export const parseUrlState = (search: string): UrlState => {
     templateId: params.get("template"),
     fixtureName: params.get("fixture"),
     width: params.get("width") === "mobile" ? "mobile" : "desktop",
-    density: params.get("density") === "compact" ? "compact" : "comfortable",
     theme: theme === "light" || theme === "dark" ? theme : "system",
-    everyFixture: params.get("fixtures") === "all",
   };
 };
 
@@ -50,9 +44,7 @@ export const buildSearch = (state: UrlState): string => {
   if (state.templateId) params.set("template", state.templateId);
   if (state.fixtureName) params.set("fixture", state.fixtureName);
   params.set("width", state.width);
-  params.set("density", state.density);
   params.set("theme", state.theme);
-  if (state.everyFixture) params.set("fixtures", "all");
   return `?${params.toString()}`;
 };
 

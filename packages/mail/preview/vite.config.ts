@@ -7,7 +7,6 @@ import { createServer, defineConfig, type Plugin, type ViteDevServer } from "vit
 
 import type * as indexModule from "../src/templates/index.ts";
 import { buildDigestReview } from "./digest-review.ts";
-import { buildGalleryEntries } from "./gallery-render.ts";
 import { STATIC_STUDIO_META } from "./studio-endpoints.ts";
 import { serveAssetsLocally, STUDIO_ASSETS } from "./studio-shared.ts";
 
@@ -55,23 +54,6 @@ const templateRenderer = (): Plugin => {
             respondJson(response, 200, await registry.renderMailTemplate(template, props));
           })
           .catch((error: unknown) => respondJson(response, 422, { error: describe(error) }));
-      });
-
-      // The gallery: every fixture rendered in one round trip, so the grid view
-      // never re-renders per card the way the single-template view does.
-      server.middlewares.use("/__gallery", (request, response) => {
-        const query = new URL(request.url ?? "", "http://studio").searchParams;
-        const everyFixture = query.get("fixtures") === "all";
-        void load(server)
-          .then(async (registry) => {
-            const entries = await buildGalleryEntries(
-              registry.mailTemplates,
-              registry.renderMailTemplate,
-              { everyFixture },
-            );
-            respondJson(response, 200, entries);
-          })
-          .catch((error: unknown) => respondJson(response, 500, { error: describe(error) }));
       });
 
       server.middlewares.use("/__digest-review", (_request, response) => {
@@ -178,15 +160,6 @@ const staticRenders = (): Plugin => ({
       const registry = await load(server);
       const { mailTemplates, renderMailTemplate } = registry;
       emit("__templates.json", JSON.stringify(templateSummaries(registry)));
-      for (const [fileName, everyFixture] of [
-        ["__gallery.json", false],
-        ["__gallery-all.json", true],
-      ] as const) {
-        const entries = await buildGalleryEntries(mailTemplates, renderMailTemplate, {
-          everyFixture,
-        });
-        emit(fileName, JSON.stringify(entries));
-      }
       const review = await buildDigestReview({
         templates: mailTemplates,
         render: renderMailTemplate,

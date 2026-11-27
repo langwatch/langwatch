@@ -6,12 +6,8 @@ export interface TemplateGroup<T> {
 
 interface GroupRule {
   heading: string;
-  ids?: readonly string[];
-  prefix?: string;
+  ids: readonly string[];
 }
-
-/** The weekly digests' heading, where the list offers Digest review. */
-export const DIGEST_HEADING = "Weekly digest";
 
 const GROUP_RULES: readonly GroupRule[] = [
   {
@@ -54,10 +50,12 @@ const GROUP_RULES: readonly GroupRule[] = [
     ],
   },
   { heading: "Alerts", ids: ["upgrade-alert", "monitor-auto-paused", "trigger-digest"] },
-  { heading: DIGEST_HEADING, prefix: "digest-" },
 ];
 
 export const OTHER_HEADING = "Other";
+
+/** Weekly digests have their own tab; trigger-digest is an automation alert, not one of them. */
+export const isWeeklyDigest = (id: string): boolean => id.startsWith("digest-");
 
 /** The templates whose name holds the query, ignoring case; an empty query keeps them all. */
 export const filterTemplates = <T extends { title: string }>({
@@ -72,8 +70,7 @@ export const filterTemplates = <T extends { title: string }>({
 };
 
 const headingFor = (id: string): string =>
-  GROUP_RULES.find((rule) => rule.ids?.includes(id) || (rule.prefix && id.startsWith(rule.prefix)))
-    ?.heading ?? OTHER_HEADING;
+  GROUP_RULES.find((rule) => rule.ids.includes(id))?.heading ?? OTHER_HEADING;
 
 /** The message list's headings in a fixed order; empty ones are left out, unknown ids go last. */
 export const groupTemplates = <T extends { id: string }>({

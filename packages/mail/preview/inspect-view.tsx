@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
 
 import { PropsForm } from "./props-form.tsx";
 import { documentUrl as documentUrlOf, fetchRender, isStaticStudio } from "./studio-endpoints.ts";
-import { DIGEST_HEADING, filterTemplates, groupTemplates, stepSelection } from "./studio-groups.ts";
+import { filterTemplates, groupTemplates, stepSelection } from "./studio-groups.ts";
 import {
   prepareMailDocument,
   renderResponseSchema,
@@ -46,7 +46,6 @@ export interface InspectViewProps {
   currentProps: unknown;
   onPropsChange: (next: unknown) => void;
   onSelect: (templateId: string, fixtureName: string) => void;
-  onReviewDigests: () => void;
   previewDark: boolean;
   width: keyof typeof WIDTHS;
   onWidthChange: (next: keyof typeof WIDTHS) => void;
@@ -59,7 +58,6 @@ export const InspectView = ({
   currentProps,
   onPropsChange,
   onSelect,
-  onReviewDigests,
   previewDark,
   width,
   onWidthChange,
@@ -138,12 +136,7 @@ export const InspectView = ({
               {visible.length === 0 ? (
                 <Text tone="secondary">No email matches that name.</Text>
               ) : (
-                <MessageList
-                  templates={visible}
-                  selected={selected}
-                  onSelect={onSelect}
-                  onReviewDigests={onReviewDigests}
-                />
+                <MessageList templates={visible} selected={selected} onSelect={onSelect} />
               )}
             </ScrollArea>
           </Stack>
@@ -265,18 +258,12 @@ function MessageList({
   templates,
   selected,
   onSelect,
-  onReviewDigests,
-}: Pick<InspectViewProps, "templates" | "selected" | "onSelect" | "onReviewDigests">): JSX.Element {
+}: Pick<InspectViewProps, "templates" | "selected" | "onSelect">): JSX.Element {
   return (
     <Stack gap={4}>
       {groupTemplates({ templates }).map((group) => (
         <section key={group.heading} className="mailroom-group">
           <h2 className="mailroom-group-heading">{group.heading}</h2>
-          {group.heading === DIGEST_HEADING && (
-            <Button size="sm" variant="secondary" onClick={onReviewDigests}>
-              Review digests as they send
-            </Button>
-          )}
           <ul className="mailroom-group-list">
             {group.templates.map((entry) => (
               <MessageRow key={entry.id} entry={entry} selected={selected} onSelect={onSelect} />
@@ -311,7 +298,7 @@ function MessageRow({
         {entry.title}
       </button>
       {isCurrent && entry.fixtures.length > 1 && (
-        <Inline gap={1} wrap>
+        <Inline gap={1} wrap className="mailroom-variants">
           {entry.fixtures.map((fixture) => (
             <Button
               key={fixture.name}

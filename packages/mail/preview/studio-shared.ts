@@ -12,7 +12,8 @@ export type TemplateSummary = z.infer<typeof templateSummarySchema>;
 const renderedSchema = z.object({ subject: z.string(), html: z.string(), text: z.string() });
 export type Rendered = z.infer<typeof renderedSchema>;
 
-const galleryEntrySchema = z.object({
+/** One fixture of a template, rendered: what a review card shows. */
+const renderedFixtureSchema = z.object({
   template: z.string(),
   title: z.string(),
   fixture: z.string(),
@@ -20,17 +21,16 @@ const galleryEntrySchema = z.object({
   html: z.string(),
   text: z.string(),
 });
-export type GalleryEntry = z.infer<typeof galleryEntrySchema>;
+export type RenderedFixture = z.infer<typeof renderedFixtureSchema>;
 
 /** Every studio endpoint answers its body or `{ error }`; Zod says which. */
 const failureSchema = z.object({ error: z.string() });
 export const templatesResponseSchema = z.union([failureSchema, z.array(templateSummarySchema)]);
 export const renderResponseSchema = z.union([failureSchema, renderedSchema]);
-export const galleryResponseSchema = z.union([failureSchema, z.array(galleryEntrySchema)]);
 
 const digestReviewVersionSchema = z.object({
   label: z.string(),
-  cards: z.array(galleryEntrySchema),
+  cards: z.array(renderedFixtureSchema),
 });
 export type DigestReviewVersion = z.infer<typeof digestReviewVersionSchema>;
 
@@ -112,6 +112,6 @@ export const serveAssetsLocally = (html: string): string =>
     html,
   );
 
-/** The one place an iframe document is prepared, for Inspect, the gallery and digest review. */
+/** The one place an iframe document is prepared, for both tabs. */
 export const prepareMailDocument = (html: string, dark: boolean): string =>
   centerDocument(serveAssetsLocally(dark ? promoteDarkRules(html) : html));

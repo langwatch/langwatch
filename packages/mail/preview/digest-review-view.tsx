@@ -1,7 +1,7 @@
 import { Badge, Callout, Page, Stack, Text } from "@langwatch/design-system-internal";
 import { useEffect, useState, type JSX, type ReactNode } from "react";
 
-import { GalleryCard } from "./gallery-view.tsx";
+import { MailCard } from "./mail-card.tsx";
 import { digestReviewUrl } from "./studio-endpoints.ts";
 import {
   digestReviewResponseSchema,
@@ -22,7 +22,7 @@ export const DigestReviewView = ({ nav, previewDark }: DigestReviewViewProps): J
     <Page
       nav={nav}
       width="full"
-      title="Digest review"
+      title="Weekly digests"
       subtitle="Each person gets at most one a week per organisation: the first below they qualify for. No activity, no email."
     >
       <Stack gap={6}>
@@ -100,12 +100,7 @@ function ReviewVersion({
             <Text as="p">
               <strong>Subject:</strong> {card.subject}
             </Text>
-            <GalleryCard
-              entry={card}
-              viewportWidth={WIDTHS.desktop}
-              density="comfortable"
-              previewDark={previewDark}
-            />
+            <MailCard entry={card} viewportWidth={WIDTHS.desktop} previewDark={previewDark} />
           </Stack>
         ))}
       </div>

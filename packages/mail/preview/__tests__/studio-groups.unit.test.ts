@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { filterTemplates, groupTemplates, OTHER_HEADING, stepSelection } from "../studio-groups.ts";
+import {
+  filterTemplates,
+  groupTemplates,
+  isWeeklyDigest,
+  OTHER_HEADING,
+  stepSelection,
+} from "../studio-groups.ts";
 
 const headingsOf = (ids: string[]) =>
   groupTemplates({ templates: ids.map((id) => ({ id })) }).map((group) => ({
@@ -13,20 +19,12 @@ describe("groupTemplates", () => {
     /** @scenario "The studio lists every message under a plain heading" */
     it("lists them under the fixed headings in heading order, keeping registry order within each", () => {
       expect(
-        headingsOf(["digest-whats-new", "usage-limit", "reset-password", "invite", "license"]),
+        headingsOf(["upgrade-alert", "usage-limit", "reset-password", "invite", "license"]),
       ).toEqual([
         { heading: "Account and sign-in", ids: ["reset-password"] },
         { heading: "Organisation and team", ids: ["invite"] },
         { heading: "Billing and usage", ids: ["usage-limit", "license"] },
-        { heading: "Weekly digest", ids: ["digest-whats-new"] },
-      ]);
-    });
-  });
-
-  describe("given a new digest the map does not name", () => {
-    it("files it under Weekly digest by its prefix", () => {
-      expect(headingsOf(["digest-brand-new"])).toEqual([
-        { heading: "Weekly digest", ids: ["digest-brand-new"] },
+        { heading: "Alerts", ids: ["upgrade-alert"] },
       ]);
     });
   });
@@ -57,9 +55,9 @@ describe("groupTemplates", () => {
 });
 
 describe("stepSelection", () => {
-  // Registry order differs from list order: the digest is listed last, the invite first.
+  // Registry order differs from list order: the alert is listed last, the invite first.
   const templates = [
-    { id: "digest-whats-new", fixtures: [{ name: "default" }] },
+    { id: "upgrade-alert", fixtures: [{ name: "default" }] },
     { id: "payment-recovery", fixtures: [{ name: "payment failed" }, { name: "reminder" }] },
     { id: "invite", fixtures: [{ name: "default" }] },
   ];
@@ -86,7 +84,7 @@ describe("stepSelection", () => {
           selected: { id: "payment-recovery", fixture: "reminder" },
           direction: 1,
         }),
-      ).toEqual({ id: "digest-whats-new", fixture: "default" });
+      ).toEqual({ id: "upgrade-alert", fixture: "default" });
     });
   });
 
@@ -95,7 +93,7 @@ describe("stepSelection", () => {
       expect(
         stepSelection({
           templates,
-          selected: { id: "digest-whats-new", fixture: "default" },
+          selected: { id: "upgrade-alert", fixture: "default" },
           direction: -1,
         }),
       ).toEqual({ id: "payment-recovery", fixture: "reminder" });
@@ -108,7 +106,7 @@ describe("stepSelection", () => {
       expect(
         stepSelection({
           templates,
-          selected: { id: "digest-whats-new", fixture: "default" },
+          selected: { id: "upgrade-alert", fixture: "default" },
           direction: 1,
         }),
       ).toEqual({ id: "invite", fixture: "default" });
@@ -117,7 +115,7 @@ describe("stepSelection", () => {
     it("wraps from the first stop to the last", () => {
       expect(
         stepSelection({ templates, selected: { id: "invite", fixture: "default" }, direction: -1 }),
-      ).toEqual({ id: "digest-whats-new", fixture: "default" });
+      ).toEqual({ id: "upgrade-alert", fixture: "default" });
     });
   });
 
@@ -161,5 +159,21 @@ describe("filterTemplates", () => {
 
   it("returns none when no name matches", () => {
     expect(filterTemplates({ templates, query: "invoice" })).toEqual([]);
+  });
+});
+
+describe("isWeeklyDigest", () => {
+  /** @scenario "The weekly digests sit only on their own tab" */
+  it("picks out the weekly digests, which have their own tab", () => {
+    expect(isWeeklyDigest("digest-plan-pressure")).toBe(true);
+    expect(isWeeklyDigest("digest-whats-new")).toBe(true);
+  });
+
+  /** @scenario "The weekly digests sit only on their own tab" */
+  it("keeps the automation trigger email with all other emails", () => {
+    expect(isWeeklyDigest("trigger-digest")).toBe(false);
+    expect(headingsOf(["trigger-digest"])).toEqual([
+      { heading: "Alerts", ids: ["trigger-digest"] },
+    ]);
   });
 });
