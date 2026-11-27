@@ -63,7 +63,7 @@ calls and 88 s, longer than the 60 s drain timeout.
    keyspace walk this decision allows. Deploy-time projection replay steps declare it in `after`.
 7. **No keyspace walks on live paths.** The lint rule `no-redis-keyspace-scan` refuses every walk
    spelling outside an allowlist of budgeted, operator-paced sweeps, each with its reason: `scan`
-   and `scanBuffer` (with options, from cursor `"0"`, or on a Redis-named client), the stream and
+   and `scanBuffer` (with options, or on a Redis-named client), the stream and
    iterator forms, `keys`, a raw `call("SCAN"|"KEYS")`, and `SCAN`/`KEYS` inside a Lua source string
    (see Gates).
 

@@ -117,6 +117,7 @@ describe("given a Redis client used on a live path", () => {
           "recognizer.scan(text);",
           "adapter.scan(prefix);",
           "adapter.scan('prefix');",
+          "recognizer.scan(0);",
           "Object.keys(row);",
           "map.keys();",
         ].join("\n"),

@@ -5,15 +5,19 @@ import { QueueTenantClaimsFillService } from "../queue-tenant-claims-fill.servic
 /** A keyspace walk of fixed slices: each cursor leads to the next, "0" ends it. */
 function walkOver(slices: Record<string, { cursor: string; listed: number }>) {
   const asked: { cursor: string; maxScanCalls: number }[] = [];
+  const steps: string[] = [];
   const repository = {
     async fillTenantClaims(params: { cursor: string; maxScanCalls: number }) {
       asked.push(params);
+      steps.push(`slice ${params.cursor}`);
       const slice = slices[params.cursor];
       if (!slice) throw new Error(`no slice after cursor ${params.cursor}`);
       return slice;
     },
   };
-  return { service: QueueTenantClaimsFillService.create({ repository }), asked };
+  const pause = async ({ ms }: { ms: number; signal: AbortSignal }) =>
+    void steps.push(`pause ${ms}`);
+  return { service: QueueTenantClaimsFillService.create({ repository, pause }), asked, steps };
 }
 
 describe("given the backfill step saved a cursor partway through the walk", () => {
@@ -40,6 +44,23 @@ describe("given the backfill step saved a cursor partway through the walk", () =
       { cursor: "0", listed: 5 },
     ]);
     expect(outcome).toEqual({ listed: 5, finished: true });
+  });
+
+  /** @scenario "The claimed-groups backfill rests between slices so live traffic keeps Redis" */
+  it("pauses between slices, never before the first or after the last", async () => {
+    const { service, steps } = walkOver({
+      "0": { cursor: "7", listed: 1 },
+      "7": { cursor: "9", listed: 1 },
+      "9": { cursor: "0", listed: 1 },
+    });
+
+    await service.fill({
+      resumeCursor: "0",
+      signal: new AbortController().signal,
+      onSlice: async () => undefined,
+    });
+
+    expect(steps).toEqual(["slice 0", "pause 1000", "slice 7", "pause 1000", "slice 9"]);
   });
 
   /** @scenario "The claimed-groups backfill resumes from its saved cursor and stops on its signal" */

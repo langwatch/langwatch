@@ -28,7 +28,6 @@ function isLivePath(file) {
 const SCAN_METHODS = new Set(["scan", "scanBuffer"]);
 const WALK_METHODS = new Set(["scanStream", "scanBufferStream", "scanIterator"]);
 const REDIS_RECEIVER = /redis|conn|client|cluster|node/i;
-const CURSOR_START = new Set(["0", 0]);
 const GLOB = /[*?[]/;
 const LUA_WALK = /redis\.p?call\s*\(\s*["'](SCAN|KEYS)["']/i;
 const RAW_COMMAND_METHODS = new Set(["call", "callBuffer"]);
@@ -83,9 +82,7 @@ function walksKeyspace({ method, callee, args }) {
   }
   const fromRedis = REDIS_RECEIVER.test(receiverName(callee));
   if (SCAN_METHODS.has(method)) {
-    const first = args[0];
-    const startsAtCursor = first?.type === "Literal" && CURSOR_START.has(first.value);
-    return args.some(isScanOption) || startsAtCursor || (fromRedis && args.length > 0);
+    return args.some(isScanOption) || (fromRedis && args.length > 0);
   }
   if (method === "keys" && args.length > 0) {
     const pattern = staticString(args[0]);

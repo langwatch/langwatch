@@ -165,3 +165,10 @@ Feature: Projection replay from the operator console
     Then it walks on from that cursor in slices, saving each slice's cursor and count
     And it reports finished when the walk returns to cursor "0"
     And when its signal is aborted it stops before the next slice and reports not finished
+
+  @unit
+  Scenario: The claimed-groups backfill rests between slices so live traffic keeps Redis
+    Given the backfill walks the keyspace in three slices
+    When it runs
+    Then it pauses between each pair of slices
+    And it pauses neither before the first slice nor after the last
