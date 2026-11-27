@@ -30,7 +30,7 @@ func translatedRequest(t *testing.T, provider bfschemas.ModelProvider, body stri
 	bfCtx := bfschemasNewCtx()
 	bfReq, err := buildMessagesResponsesRequest(bfCtx, messagesRequest(body), provider, bedrockSonnet)
 	require.NoError(t, err)
-	require.NoError(t, prepareBedrockConverseBody(bfCtx, bfReq, []byte(body)))
+	require.NoError(t, prepareBedrockConverseBody(bfCtx, bfReq, bedrockBodySource{anthropicBody: []byte(body)}))
 	return bfCtx, bfReq
 }
 
@@ -88,7 +88,7 @@ func TestCarryBedrockCacheTTL_LeavesOtherRequestsAlone(t *testing.T) {
 		bfCtx := bfschemasNewCtx()
 		bfReq, err := buildMessagesResponsesRequest(bfCtx, messagesRequest(hourCacheBody), bfschemas.Bedrock, "eu.amazon.nova-lite-v1:0")
 		require.NoError(t, err)
-		require.NoError(t, prepareBedrockConverseBody(bfCtx, bfReq, []byte(hourCacheBody)))
+		require.NoError(t, prepareBedrockConverseBody(bfCtx, bfReq, bedrockBodySource{anthropicBody: []byte(hourCacheBody)}))
 		assert.False(t, usesRawBody(bfCtx))
 	})
 

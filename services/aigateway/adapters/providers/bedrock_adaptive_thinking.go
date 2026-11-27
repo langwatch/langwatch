@@ -9,6 +9,8 @@ import (
 	bfbedrock "github.com/maximhq/bifrost/core/providers/bedrock"
 	bfutils "github.com/maximhq/bifrost/core/providers/utils"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // claudeGenerationPattern captures the major version of a Claude model id in
@@ -45,59 +47,56 @@ func bifrostMissesAdaptiveThinking(model string) bool {
 	return claudeTakesAdaptiveThinking(model) && !bfanthropic.SupportsAdaptiveThinking(model)
 }
 
-// thinkingIntent is what the caller asked of the model's thinking.
+// thinkingIntent is what the caller asked of the model's thinking. model is
+// the id Bifrost dispatches, after the credential's deployment map.
 type thinkingIntent struct {
 	model   string
 	effort  string
+	budget  *int
 	display *string
 }
 
-// keepBedrockThinkingAdaptive turns the budget thinking block Bifrost wrote
-// for a model it does not know as adaptive back into adaptive thinking, with
-// the effort in output_config. A caller's budget becomes the effort it maps
-// to. Reports whether the fields changed.
-func keepBedrockThinkingAdaptive(converse *bfbedrock.BedrockConverseRequest, intent thinkingIntent) bool {
-	if converse == nil || converse.AdditionalModelRequestFields == nil || !bifrostMissesAdaptiveThinking(intent.model) {
+// needsPinning reports whether Bifrost's conversion would downgrade this
+// request's thinking.
+func (i thinkingIntent) needsPinning() bool {
+	if !bifrostMissesAdaptiveThinking(i.model) {
 		return false
 	}
-	fields := converse.AdditionalModelRequestFields
-	raw, ok := fields.Get("thinking")
-	if !ok {
-		return false
-	}
-	thinking, ok := raw.(map[string]any)
-	if !ok || thinking["type"] != "enabled" {
-		return false
-	}
-	effort := intent.effort
-	if effort == "" || effort == "none" {
-		effort = effortFromThinkingBudget(thinking["budget_tokens"], converse.InferenceConfig)
-	}
-	adaptive := map[string]any{"type": "adaptive", "display": "summarized"}
-	if intent.display != nil && *intent.display != "" {
-		adaptive["display"] = *intent.display
-	}
-	fields.Set("thinking", adaptive)
-	setOrderedOutputConfig(fields, "effort", bfanthropic.MapBifrostEffortToAnthropic(effort))
-	return true
+	return (i.effort != "" && i.effort != "none") || (i.budget != nil && *i.budget != 0)
 }
 
-// effortFromThinkingBudget maps a budget_tokens value onto the effort bucket
-// it stands for against the request's output cap.
-func effortFromThinkingBudget(budget any, cfg *bfbedrock.BedrockInferenceConfig) string {
-	tokens, ok := bfschemas.SafeExtractInt(budget)
-	if !ok {
+// adaptiveEffort is the effort the request asked for: its own, or the bucket
+// its budget maps to against the output cap.
+func (i thinkingIntent) adaptiveEffort(cfg *bfbedrock.BedrockInferenceConfig) string {
+	if i.effort != "" && i.effort != "none" {
+		return i.effort
+	}
+	if i.budget == nil {
 		return "high"
+	}
+	if *i.budget < 0 {
+		return "low"
 	}
 	maxTokens := bedrockDefaultCompletionMaxTokens
 	if cfg != nil && cfg.MaxTokens != nil {
 		maxTokens = *cfg.MaxTokens
 	}
-	effort := bfutils.GetReasoningEffortFromBudgetTokens(tokens, anthropicMinimumThinkingBudget, maxTokens)
-	if effort == "none" {
-		return "high"
+	return bfutils.GetReasoningEffortFromBudgetTokens(*i.budget, anthropicMinimumThinkingBudget, maxTokens)
+}
+
+// applyAdaptiveThinking writes adaptive thinking, with the effort in
+// output_config, over whatever thinking block the conversion wrote.
+func applyAdaptiveThinking(converse *bfbedrock.BedrockConverseRequest, intent thinkingIntent) {
+	if converse.AdditionalModelRequestFields == nil {
+		converse.AdditionalModelRequestFields = bfschemas.NewOrderedMap()
 	}
-	return effort
+	adaptive := map[string]any{"type": "adaptive", "display": "summarized"}
+	if intent.display != nil && *intent.display != "" {
+		adaptive["display"] = *intent.display
+	}
+	converse.AdditionalModelRequestFields.Set("thinking", adaptive)
+	setOrderedOutputConfig(converse.AdditionalModelRequestFields, "effort",
+		bfanthropic.MapBifrostEffortToAnthropic(intent.adaptiveEffort(converse.InferenceConfig)))
 }
 
 // setOrderedOutputConfig sets one key of output_config, keeping the keys
@@ -120,71 +119,76 @@ func setOrderedOutputConfig(fields *bfschemas.OrderedMap, key string, value any)
 	fields.Set("output_config", current)
 }
 
-// responsesThinkingDisplay maps a Responses reasoning summary onto the
-// thinking display Bifrost's adaptive branch would pick.
-func responsesThinkingDisplay(reasoning *bfschemas.ResponsesParametersReasoning) *string {
-	if reasoning == nil || reasoning.Summary == nil {
-		return nil
-	}
-	if *reasoning.Summary == "none" {
-		return bfschemas.Ptr("omitted")
-	}
-	return bfschemas.Ptr("summarized")
-}
-
-// responsesReasoningEffort returns the request's reasoning effort, "" when unset.
-func responsesReasoningEffort(bfReq *bfschemas.BifrostResponsesRequest) string {
-	if bfReq.Params == nil || bfReq.Params.Reasoning == nil || bfReq.Params.Reasoning.Effort == nil {
-		return ""
-	}
-	return *bfReq.Params.Reasoning.Effort
-}
-
-// keepResponsesThinkingAdaptive applies keepBedrockThinkingAdaptive to a
-// Converse body converted from a Responses request.
-func keepResponsesThinkingAdaptive(converse *bfbedrock.BedrockConverseRequest, bfReq *bfschemas.BifrostResponsesRequest) bool {
-	var reasoning *bfschemas.ResponsesParametersReasoning
-	if bfReq.Params != nil {
-		reasoning = bfReq.Params.Reasoning
-	}
-	return keepBedrockThinkingAdaptive(converse, thinkingIntent{
-		model:   bfReq.Model,
-		effort:  responsesReasoningEffort(bfReq),
-		display: responsesThinkingDisplay(reasoning),
-	})
-}
-
-// responsesRequestReasons reports whether a Responses request asks for
-// reasoning at all.
-func responsesRequestReasons(bfReq *bfschemas.BifrostResponsesRequest) bool {
+// responsesThinkingIntent reads the thinking a Responses request asks for.
+func responsesThinkingIntent(bfReq *bfschemas.BifrostResponsesRequest, model string) thinkingIntent {
+	intent := thinkingIntent{model: model}
 	if bfReq.Params == nil || bfReq.Params.Reasoning == nil {
-		return false
+		return intent
 	}
-	r := bfReq.Params.Reasoning
-	return r.MaxTokens != nil || (r.Effort != nil && *r.Effort != "" && *r.Effort != "none")
+	reasoning := bfReq.Params.Reasoning
+	if reasoning.Effort != nil {
+		intent.effort = *reasoning.Effort
+	}
+	intent.budget = reasoning.MaxTokens
+	if reasoning.Summary != nil {
+		display := "summarized"
+		if *reasoning.Summary == "none" {
+			display = "omitted"
+		}
+		intent.display = &display
+	}
+	return intent
+}
+
+// convertResponsesForBedrock runs the vendored Converse conversion against
+// the model Bifrost dispatches. When that conversion would downgrade adaptive
+// thinking, it runs without the reasoning (whose budget arithmetic can refuse
+// small output caps) and adaptive thinking is written from the request
+// instead.
+func convertResponsesForBedrock(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostResponsesRequest, model string) (*bfbedrock.BedrockConverseRequest, error) {
+	intent := responsesThinkingIntent(bfReq, model)
+	conv := *bfReq
+	conv.Model = model
+	pin := intent.needsPinning()
+	if pin {
+		params := *bfReq.Params
+		params.Reasoning = nil
+		conv.Params = &params
+	}
+	converse, err := bfbedrock.ToBedrockResponsesRequest(bfCtx, &conv)
+	if err != nil {
+		return nil, err
+	}
+	if pin {
+		applyAdaptiveThinking(converse, intent)
+	}
+	return converse, nil
 }
 
 // pinBedrockAdaptiveThinkingChat converts a public-Bedrock chat request here
 // and sends it raw when Bifrost would downgrade its adaptive thinking.
-func pinBedrockAdaptiveThinkingChat(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostChatRequest) error {
-	if bfReq == nil || bfReq.Provider != bfschemas.Bedrock || !bifrostMissesAdaptiveThinking(bfReq.Model) {
-		return nil
-	}
-	if bfReq.Params == nil || bfReq.Params.Reasoning == nil {
+func pinBedrockAdaptiveThinkingChat(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostChatRequest, cred domain.Credential) error {
+	if bfReq == nil || bfReq.Provider != bfschemas.Bedrock || bfReq.Params == nil || bfReq.Params.Reasoning == nil {
 		return nil
 	}
 	reasoning := bfReq.Params.Reasoning
-	converse, err := bfbedrock.ToBedrockChatCompletionRequest(bfCtx, bfReq)
+	intent := thinkingIntent{model: bedrockModelID(bfReq.Model, cred), budget: reasoning.MaxTokens, display: reasoning.Display}
+	if reasoning.Effort != nil {
+		intent.effort = *reasoning.Effort
+	}
+	if !intent.needsPinning() {
+		return nil
+	}
+	conv := *bfReq
+	conv.Model = intent.model
+	params := *bfReq.Params
+	params.Reasoning = nil
+	conv.Params = &params
+	converse, err := bfbedrock.ToBedrockChatCompletionRequest(bfCtx, &conv)
 	if err != nil {
 		return fmt.Errorf("convert request for bedrock: %w", err)
 	}
-	effort := ""
-	if reasoning.Effort != nil {
-		effort = *reasoning.Effort
-	}
-	if !keepBedrockThinkingAdaptive(converse, thinkingIntent{model: bfReq.Model, effort: effort, display: reasoning.Display}) {
-		return nil
-	}
+	applyAdaptiveThinking(converse, intent)
 	body, err := marshalConverseBody(bfCtx, converse)
 	if err != nil {
 		return err

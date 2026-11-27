@@ -140,11 +140,10 @@ func converseInputFromResponsesRequest(
 	// conversion pass that could only add a redundant failure mode.
 	slim := *bfReq
 	slim.Input = nil
-	vendored, err := bfbedrock.ToBedrockResponsesRequest(bfCtx, &slim)
+	vendored, err := convertResponsesForBedrock(bfCtx, &slim, bedrockModelID(model, cred))
 	if err != nil {
 		return nil, err
 	}
-	keepResponsesThinkingAdaptive(vendored, &slim)
 
 	input := &bedrockruntime.ConverseInput{
 		ModelId:         aws.String(bedrockModelID(model, cred)),

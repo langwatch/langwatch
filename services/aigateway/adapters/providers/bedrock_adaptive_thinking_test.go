@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,10 +39,15 @@ func claudeCodeFixture(t *testing.T, name string) string {
 // set one, else Bifrost's own conversion.
 func publicBedrockConverse(t *testing.T, body, model string) (gjson.Result, bool) {
 	t.Helper()
+	return publicBedrockConverseWith(t, body, model, domain.Credential{})
+}
+
+func publicBedrockConverseWith(t *testing.T, body, model string, cred domain.Credential) (gjson.Result, bool) {
+	t.Helper()
 	bfCtx := bfschemasNewCtx()
 	bfReq, err := buildMessagesResponsesRequest(bfCtx, messagesRequest(body), bfschemas.Bedrock, model)
 	require.NoError(t, err)
-	require.NoError(t, prepareBedrockConverseBody(bfCtx, bfReq, []byte(body)))
+	require.NoError(t, prepareBedrockConverseBody(bfCtx, bfReq, bedrockBodySource{anthropicBody: []byte(body), cred: cred}))
 	if usesRawBody(bfCtx) {
 		return gjson.ParseBytes(bfReq.RawRequestBody), true
 	}
@@ -135,7 +141,7 @@ func publicBedrockChatConverse(t *testing.T, body, model string) (gjson.Result, 
 	bfReq, dispatchCtx, err := buildChatRequest(context.Background(), req, bfschemas.Bedrock, model)
 	require.NoError(t, err)
 	bfCtx := bfschemas.NewBifrostContext(dispatchCtx, time.Time{})
-	require.NoError(t, pinBedrockAdaptiveThinkingChat(bfCtx, bfReq))
+	require.NoError(t, pinBedrockAdaptiveThinkingChat(bfCtx, bfReq, domain.Credential{}))
 	if !usesRawBody(bfCtx) {
 		return gjson.Result{}, false
 	}
@@ -188,6 +194,67 @@ func TestBedrockAdaptiveThinking_ChatOnThePrivateEndpoint(t *testing.T) {
 		assert.False(t, fields.Get("thinking.budget_tokens").Exists())
 		assert.Equal(t, "high", fields.Get("output_config.effort").String())
 	})
+}
+
+// aliasedOpus55 maps a deployment alias onto Opus 5.5, the way a customer's
+// deployment map names its inference profiles.
+var aliasedOpus55 = domain.Credential{
+	ProviderID:    domain.ProviderBedrock,
+	DeploymentMap: map[string]string{"reasoning-prod": bedrockOpus55},
+}
+
+// @scenario "Adaptive thinking stays adaptive for Claude 5 models on Bedrock"
+func TestBedrockAdaptiveThinking_FollowsTheDeploymentMap(t *testing.T) {
+	t.Run("messages", func(t *testing.T) {
+		converse, raw := publicBedrockConverseWith(t, claudeCodeFixture(t, "claude_code_adaptive_opus_5_5.json"), "reasoning-prod", aliasedOpus55)
+		require.True(t, raw)
+		fields := converse.Get("additionalModelRequestFields")
+		assert.Equal(t, "adaptive", fields.Get("thinking.type").String(), "%s", fields.Raw)
+		assert.Equal(t, "high", fields.Get("output_config.effort").String())
+	})
+	t.Run("chat", func(t *testing.T) {
+		req := &domain.Request{Type: domain.RequestTypeChat, Model: bedrockOpus55,
+			Body: []byte(`{"model":"m","max_tokens":8000,"reasoning_effort":"high","messages":[{"role":"user","content":"think"}]}`)}
+		bfReq, dispatchCtx, err := buildChatRequest(context.Background(), req, bfschemas.Bedrock, bedrockOpus55)
+		require.NoError(t, err)
+		bfReq.Model = "reasoning-prod"
+		bfCtx := bfschemas.NewBifrostContext(dispatchCtx, time.Time{})
+		require.NoError(t, pinBedrockAdaptiveThinkingChat(bfCtx, bfReq, aliasedOpus55))
+		require.True(t, usesRawBody(bfCtx))
+		converse := gjson.ParseBytes(bfReq.RawRequestBody)
+		fields := converse.Get("additionalModelRequestFields")
+		assert.Equal(t, "adaptive", fields.Get("thinking.type").String(), "%s", fields.Raw)
+		assert.Equal(t, "high", fields.Get("output_config.effort").String())
+	})
+}
+
+// @scenario "Adaptive thinking stays adaptive for Claude 5 models on Bedrock"
+func TestBedrockAdaptiveThinking_KeepsASmallOutputCap(t *testing.T) {
+	t.Run("messages", func(t *testing.T) {
+		body := strings.Replace(claudeCodeFixture(t, "claude_code_adaptive_opus_5_5.json"), `"max_tokens": 32000`, `"max_tokens": 512`, 1)
+		converse, raw := publicBedrockConverse(t, body, bedrockOpus55)
+		require.True(t, raw)
+		assert.Equal(t, int64(512), converse.Get("inferenceConfig.maxTokens").Int())
+		assert.Equal(t, "adaptive", converse.Get("additionalModelRequestFields.thinking.type").String())
+	})
+	t.Run("chat", func(t *testing.T) {
+		converse, raw := publicBedrockChatConverse(t,
+			`{"model":"m","max_tokens":512,"reasoning_effort":"high","messages":[{"role":"user","content":"think"}]}`, bedrockOpus55)
+		require.True(t, raw)
+		assert.Equal(t, int64(512), converse.Get("inferenceConfig.maxTokens").Int())
+		assert.Equal(t, "adaptive", converse.Get("additionalModelRequestFields.thinking.type").String())
+	})
+}
+
+// @scenario "Claude models Bifrost already maps keep the vendored thinking conversion"
+func TestBedrockAdaptiveThinking_HourCacheOnOpus47KeepsItsThinking(t *testing.T) {
+	body := strings.Replace(hourCacheBody, `"max_tokens": 10,`, `"max_tokens": 4000, "thinking": {"type": "adaptive"}, "output_config": {"effort": "high"},`, 1)
+	converse, raw := publicBedrockConverse(t, body, bedrockOpus47)
+	require.True(t, raw, "the hour-long cache marker still needs the raw body")
+	fields := converse.Get("additionalModelRequestFields")
+	assert.Equal(t, "adaptive", fields.Get("thinking.type").String(), "%s", fields.Raw)
+	assert.Equal(t, "high", fields.Get("output_config.effort").String())
+	assert.Equal(t, "1h", converse.Get("system.1.cachePoint.ttl").String())
 }
 
 func TestClaudeTakesAdaptiveThinking(t *testing.T) {

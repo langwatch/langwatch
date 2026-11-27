@@ -364,7 +364,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	stampParamsDropped(ctx, paramsDroppedFrom(dispatchCtx))
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
-	if err := pinBedrockAdaptiveThinkingChat(bfCtx, bfReq); err != nil {
+	if err := pinBedrockAdaptiveThinkingChat(bfCtx, bfReq, cred); err != nil {
 		return nil, classifyRequestBuildError(ctx, err)
 	}
 
@@ -762,7 +762,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	stampParamsDropped(ctx, dropped)
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
-	if err := pinBedrockAdaptiveThinkingChat(bfCtx, bfReq); err != nil {
+	if err := pinBedrockAdaptiveThinkingChat(bfCtx, bfReq, cred); err != nil {
 		return nil, classifyRequestBuildError(ctx, err)
 	}
 

@@ -5,10 +5,11 @@ import (
 	"regexp"
 	"strconv"
 
-	bfbedrock "github.com/maximhq/bifrost/core/providers/bedrock"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const hourCacheTTL = "1h"
@@ -17,26 +18,31 @@ const hourCacheTTL = "1h"
 // claude-sonnet-4-20250514 has no minor.
 var claudeVersionPattern = regexp.MustCompile(`claude-(?:opus|sonnet|haiku)-(\d+)(?:-(\d)(?:\D|$))?`)
 
+// bedrockBodySource is what a translated Bedrock request came from: the
+// client's Anthropic body and the credential whose deployment map names the
+// model Bifrost dispatches.
+type bedrockBodySource struct {
+	anthropicBody []byte
+	cred          domain.Credential
+}
+
 // prepareBedrockConverseBody converts a public-Bedrock Responses request here
 // and sends it raw when Bifrost v1.5.17's own conversion would lose part of
 // it: an hour-long cache_control TTL (BedrockCachePoint has no ttl until v1.14)
 // or the adaptive thinking of a Claude model it does not know takes adaptive
 // thinking. Other requests stay on Bifrost's conversion.
-func prepareBedrockConverseBody(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostResponsesRequest, anthropicBody []byte) error {
+func prepareBedrockConverseBody(bfCtx *bfschemas.BifrostContext, bfReq *bfschemas.BifrostResponsesRequest, src bedrockBodySource) error {
 	if bfReq.Provider != bfschemas.Bedrock {
 		return nil
 	}
-	hourMarkers := hourCacheMarkersFor(bfReq.Model, anthropicBody)
-	pinThinking := bifrostMissesAdaptiveThinking(bfReq.Model) && responsesRequestReasons(bfReq)
-	if hourMarkers == 0 && !pinThinking {
+	model := bedrockModelID(bfReq.Model, src.cred)
+	hourMarkers := hourCacheMarkersFor(model, src.anthropicBody)
+	if hourMarkers == 0 && !responsesThinkingIntent(bfReq, model).needsPinning() {
 		return nil
 	}
-	converse, err := bfbedrock.ToBedrockResponsesRequest(bfCtx, bfReq)
+	converse, err := convertResponsesForBedrock(bfCtx, bfReq, model)
 	if err != nil {
 		return fmt.Errorf("convert request for bedrock: %w", err)
-	}
-	if !keepResponsesThinkingAdaptive(converse, bfReq) && hourMarkers == 0 {
-		return nil
 	}
 	body, err := marshalConverseBody(bfCtx, converse)
 	if err != nil {
