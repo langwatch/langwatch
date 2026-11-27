@@ -65,3 +65,31 @@ func KeyRejected(status int, body []byte) bool {
 	}
 	return gjson.GetBytes(body, "error.code").String() == "invalid_api_key"
 }
+
+// retiredModelPhrases are how providers say a model id is past its end of life
+// (Bedrock: "This model version has reached the end of its life").
+var retiredModelPhrases = []string{"end of its life", "end of life", "end-of-life", "decommissioned", "retired"}
+
+// retiredModelMessagePaths cover the gateway's envelope and the providers' own
+// bodies, Bedrock's native `message` and the AWS SDK's `Message` included.
+var retiredModelMessagePaths = []string{"error.message", "error.error.message", "message", "Message"}
+
+// ModelRetired reports whether the provider refused the call because the model
+// itself was retired: a terminal 4xx that another model fixes, never a retry.
+func ModelRetired(status int, body []byte) bool {
+	if status >= http.StatusInternalServerError {
+		return false
+	}
+	if gjson.GetBytes(body, "error.code").String() == "model_decommissioned" {
+		return true
+	}
+	for _, path := range retiredModelMessagePaths {
+		message := strings.ToLower(gjson.GetBytes(body, path).String())
+		for _, phrase := range retiredModelPhrases {
+			if strings.Contains(message, phrase) {
+				return true
+			}
+		}
+	}
+	return false
+}

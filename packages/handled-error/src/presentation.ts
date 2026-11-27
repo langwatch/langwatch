@@ -424,7 +424,15 @@ export const PROVIDER_MODEL_MISSING_REASONS: ReadonlySet<string> = new Set([
   "model_not_found",
   "not_found_error",
   "ResourceNotFoundException",
+  // A model the provider retired is one it no longer serves to anyone.
+  "llm_provider_model_retired",
 ]);
+
+const RETIRED_MODEL_DESCRIPTION =
+  "The model provider has retired this model and no longer serves it. Pick another model.";
+
+/** The proxy's name for a model the provider retired (llmproxy.go ErrProviderModelRetired). */
+const PROVIDER_MODEL_RETIRED_REASONS: ReadonlySet<string> = new Set(["llm_provider_model_retired"]);
 
 /*
  * The proxy's status fallback plus the providers' own body codes: OpenAI and
@@ -6713,6 +6721,9 @@ const presentations = {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "This provider account is out of credit";
       }
+      if (hasReasonCode(error.reasons, PROVIDER_MODEL_RETIRED_REASONS)) {
+        return "The model provider retired this model";
+      }
       return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
         ? "This provider rejected the API key"
         : undefined;
@@ -6723,6 +6734,9 @@ const presentations = {
       }
       if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
         return "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_MODEL_RETIRED_REASONS)) {
+        return RETIRED_MODEL_DESCRIPTION;
       }
       if (hasReasonCode(error.reasons, PROVIDER_MODEL_MISSING_REASONS)) {
         return "The model provider does not serve this model to this key. Check the model name, or pick a different model.";
@@ -6745,6 +6759,10 @@ const presentations = {
     title: "This provider account is out of credit",
     describe: () =>
       "The model provider took the key and refused to generate: the account behind it has no credit left. Top it up with the provider, or pick a model from a different provider.",
+  },
+  llm_provider_model_retired: {
+    title: "The model provider retired this model",
+    describe: () => RETIRED_MODEL_DESCRIPTION,
   },
   llm_provider_key_rejected: {
     title: "This provider rejected the API key",

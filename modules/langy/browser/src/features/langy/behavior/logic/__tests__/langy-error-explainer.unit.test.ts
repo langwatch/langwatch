@@ -300,6 +300,34 @@ describe("explainLangyError", () => {
         });
       });
 
+      it("says a model Bedrock retired was retired, with another model as the way out", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 404, provider: "bedrock", body_kind: "json" },
+                reasons: [
+                  { kind: "provider_error" },
+                  { kind: "upstream_not_found" },
+                  { kind: "llm_provider_model_retired" },
+                ],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.title).toBe("The model provider retired this model");
+        expect(presentation.description).toBe(
+          "The model provider has retired this model and no longer serves it. Pick another model.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
       /** @scenario Any failure filed under the proxy's upstream code reads as the provider's */
       it("reads an unclassified provider code under the proxy's upstream code as the provider card", () => {
         const presentation = explainLangyError(

@@ -649,6 +649,24 @@ describe("explainHandledError", () => {
       );
     });
 
+    it("says a model the provider retired was retired, not that the key lacks it", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [
+            reason("provider_error"),
+            reason("upstream_not_found"),
+            reason("llm_provider_model_retired"),
+          ],
+        }),
+      );
+
+      expect(title).toBe("The model provider retired this model");
+      expect(description).toBe(
+        "The model provider has retired this model and no longer serves it. Pick another model.",
+      );
+    });
+
     /** @scenario "A provider rate limit gets its own remediation copy" */
     it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
       const { description } = explainHandledError(

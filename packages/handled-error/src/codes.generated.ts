@@ -301,6 +301,14 @@ export const goErrorCodes = {
    */
   llm_provider_key_rejected: { service: "langyagent" },
   /**
+   * ErrProviderModelRetired — marks a model the provider retired (Bedrock's
+   * 404 "reached the end of its life"): another model fixes it, a retry never
+   * does.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_model_retired: { service: "langyagent" },
+  /**
    * ErrProviderOutOfCredit — marks a provider account with no credit or quota
    * left.
    *
