@@ -476,7 +476,7 @@ replay a run whose inputs Nx has seen.
 `workspace:typecheck` (and `typecheck:src`) is `cache: true`. Its inputs are every
 file tsc can read (`*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}` outside `.claude` and
 `.nx`), the lockfile, and the sources of the files its dependencies generate (the
-Prisma schema, `skills/`, `LANGWATCH_SKILLS_RENDER`). It never hashes dist contents
+Prisma schema, `skills/`, the SDK's `copy-types.sh`, `LANGWATCH_SKILLS_RENDER`). It never hashes dist contents
 (`dependentTasksOutputFiles`): CI restores an older dist snapshot before the
 typecheck, so a hash over dist differs on every run and never hits.
 Its outputs are the declarations, maps and build info of every project the root

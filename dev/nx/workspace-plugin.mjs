@@ -117,6 +117,7 @@ export const createNodes = [
           "!{workspaceRoot}/.claude/**/*",
           "!{workspaceRoot}/.nx/**/*",
           "{workspaceRoot}/**/*.prisma",
+          "{workspaceRoot}/sdks/typescript/copy-types.sh",
           "{workspaceRoot}/skills/**/*",
           "{workspaceRoot}/pnpm-lock.yaml",
           { env: "LANGWATCH_SKILLS_RENDER" },

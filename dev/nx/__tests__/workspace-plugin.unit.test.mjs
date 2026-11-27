@@ -23,6 +23,7 @@ void describe("workspace targets", () => {
     const { inputs, dependsOn } = targets.typecheck;
     assert.ok(inputs.includes("{workspaceRoot}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}"));
     assert.ok(inputs.includes("{workspaceRoot}/**/*.prisma"));
+    assert.ok(inputs.includes("{workspaceRoot}/sdks/typescript/copy-types.sh"));
     assert.ok(inputs.every((input) => input.dependentTasksOutputFiles === undefined));
     assert.ok(dependsOn.includes("@langwatch/prisma-client:prisma:generate"));
   });
