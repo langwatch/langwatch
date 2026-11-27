@@ -29,6 +29,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.reject(new Error("Not used by Workflow tests."));
   }
 
+  getGatewayKeysEpoch(): string {
+    throw new Error("Not used by Workflow tests.");
+  }
+
   constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
   listForProjectWithServedModels(): Promise<[]> {

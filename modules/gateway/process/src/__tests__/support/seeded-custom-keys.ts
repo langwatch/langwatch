@@ -18,5 +18,6 @@ export function seededCustomKeys(prisma: PrismaClient): GatewayCustomKeys {
         typeof stored === "object" && stored !== null && !Array.isArray(stored) ? stored : {};
       return { id: row.id, provider: row.provider, organizationId: row.organizationId, customKeys };
     },
+    getGatewayKeysEpoch: () => "",
   };
 }

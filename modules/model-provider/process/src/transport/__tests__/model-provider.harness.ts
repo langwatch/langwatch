@@ -181,6 +181,7 @@ function forwarded(app: ModelProviderModule): ModelProviderApi {
     findEnabledProviderKeysInScopes: (...args) => app.findEnabledProviderKeysInScopes(...args),
     getCustomKeys: (...args) => app.getCustomKeys(...args),
     getGatewayCustomKeys: (...args) => app.getGatewayCustomKeys(...args),
+    getGatewayKeysEpoch: (...args) => app.getGatewayKeysEpoch(...args),
     platformProviderChain: (...args) => app.platformProviderChain(...args),
     listForProject: (...args) => app.listForProject(...args),
     findAllAccessibleForProject: (...args) => app.findAllAccessibleForProject(...args),

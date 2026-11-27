@@ -121,6 +121,16 @@ Feature: Managed model providers
       And only a minted managed session names a runtime endpoint
 
     @unit
+    Scenario: The gateway re-reads a managed row's keys before its session expires
+      Given an organization whose Bedrock is managed through a private endpoint
+      When 45 minutes pass, inside the one-hour session a role hop mints
+      Then the gateway's config version for its keys moves
+      And the gateway fetches a fresh bundle with a newly minted session instead of confirming the old one
+
+    # The role hop deadline lives in the credentials channel, so it bounds every
+    # caller: the gateway's bundle and the LiteLLM parameters path alike. That is
+    # deliberate: a hop that takes over 1.5s is broken for either caller.
+    @unit
     Scenario: A stalled role hop gives up inside the gateway's config fetch
       Given assuming the proxy role does not answer
       When the managed Bedrock credentials are minted

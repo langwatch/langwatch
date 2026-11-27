@@ -844,6 +844,10 @@ export class ModelProviderModule implements ModelProviderApi {
     return this.#modelProviders.getGatewayCustomKeys(input);
   }
 
+  getGatewayKeysEpoch(input: { organizationId: string }): string {
+    return this.#modelProviders.getGatewayKeysEpoch(input);
+  }
+
   async platformProviderChain(): Promise<PlatformProviderEntry[]> {
     return this.#dataPrivacy
       .intoGoogleApplicationCredentials((credential) =>

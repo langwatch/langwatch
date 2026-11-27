@@ -49,6 +49,7 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
+import { nowEpochMs } from "@langwatch/time";
 
 import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
@@ -103,6 +104,9 @@ interface ModelProviderServiceOptions {
 }
 
 const logger = createLogger("langwatch:model-provider:gateway-keys");
+
+/** Shorter than the one-hour session a role hop mints, so the gateway re-reads keys in time. */
+const MANAGED_SESSION_RENEWAL_MS = 45 * 60 * 1000;
 
 /** A managed Bedrock session in the row's own field names, its private endpoint included. */
 function managedBedrockKeys(session: ManagedBedrockCredentials): Record<string, string> {
@@ -292,6 +296,14 @@ export class ModelProviderService {
     }
     if (!row.customKeys) throw new ModelProviderCustomKeysMissingError();
     return { ...owner, customKeys: storedGatewayKeys(row.customKeys) };
+  }
+
+  getGatewayKeysEpoch(input: { organizationId: string }): string {
+    const managed = this.options.catalog.isManagedProvider({
+      organizationId: input.organizationId,
+      provider: "bedrock",
+    });
+    return managed ? `managed-${Math.floor(nowEpochMs() / MANAGED_SESSION_RENEWAL_MS)}` : "";
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {

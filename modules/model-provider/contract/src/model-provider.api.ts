@@ -396,6 +396,11 @@ export interface ModelProviderApi {
    * organization the customer role's session and private endpoint (as the runtime endpoint key).
    */
   getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+  /**
+   * Names the window the organization's minted managed sessions belong to, so the gateway's
+   * config version moves before a session expires. Empty for an organization with none.
+   */
+  getGatewayKeysEpoch(input: { organizationId: string }): string;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

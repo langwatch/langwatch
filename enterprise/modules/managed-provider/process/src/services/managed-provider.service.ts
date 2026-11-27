@@ -7,6 +7,16 @@ import {
 import type { ManagedProviderCredentialVendor } from "../channels/managed-provider-credentials.channel.ts";
 import type { ManagedProviderConfiguration } from "./managed-provider-configuration.service.ts";
 
+/** Asked to mint for an organization with no managed Bedrock deployment: a caller bug. */
+export class ManagedBedrockNotConfiguredError extends Error {
+  readonly code = "managed_bedrock_not_configured";
+
+  constructor() {
+    super("This organization has no managed Bedrock deployment.");
+    this.name = "ManagedBedrockNotConfiguredError";
+  }
+}
+
 export class ManagedProviderService implements ManagedProviderApi {
   private constructor(
     private readonly configuration: ManagedProviderConfiguration,
@@ -63,7 +73,7 @@ export class ManagedProviderService implements ManagedProviderApi {
   }): Promise<ManagedBedrockCredentials> {
     const deployment = this.configuration.getBedrockDeployment(organizationId);
     if (deployment.kind === "unmanaged") {
-      throw new Error("This organization has no managed Bedrock deployment.");
+      throw new ManagedBedrockNotConfiguredError();
     }
 
     const { config } = deployment;

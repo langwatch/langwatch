@@ -155,9 +155,11 @@ describe("ManagedProviderService", () => {
         credentials,
       });
 
-      await expect(service.getBedrockCredentials({ organizationId: "org_2" })).rejects.toThrow(
-        "no managed Bedrock deployment",
-      );
+      await expect(
+        service.getBedrockCredentials({ organizationId: "org_2" }),
+      ).rejects.toMatchObject({
+        code: "managed_bedrock_not_configured",
+      });
       expect(credentials.configs).toEqual([]);
     });
   });

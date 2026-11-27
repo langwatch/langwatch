@@ -98,14 +98,14 @@ const platformProviders = createApiFixture<ModelProviderApi>({
   platformProviderChain: async () => [],
 });
 
-/** The bundle the gateway builds for a Langy key over the customer's managed Bedrock row. */
-async function bundleForManagedBedrock() {
+/** The materialiser for a Langy key over the customer's managed Bedrock row. */
+function managedBedrockMaterialiser({ keysEpoch }: { keysEpoch: () => string }) {
   const projects = createApiFixture<ProjectApi>({
     listNamesByIds: async () => [],
     findTraceDestination: async () => null,
   });
   const repository = new CustomerOrganizationScopes();
-  const materialiser = GatewayConfigMaterialiserService.create({
+  return GatewayConfigMaterialiserService.create({
     scopeResolution: GatewayScopeResolutionService.create({
       repository,
       platformProviders,
@@ -128,11 +128,15 @@ async function bundleForManagedBedrock() {
           AWS_BEDROCK_RUNTIME_ENDPOINT: PRIVATE_ENDPOINT,
         },
       }),
+      getGatewayKeysEpoch: keysEpoch,
     }),
     assembly: GatewayConfigAssemblyService.create({ repository, platformProviders, projects }),
   });
+}
 
-  return materialiser.materialise(langyKey);
+/** The bundle the gateway builds for a Langy key over the customer's managed Bedrock row. */
+function bundleForManagedBedrock() {
+  return managedBedrockMaterialiser({ keysEpoch: () => "managed-1" }).materialise(langyKey);
 }
 
 describe("the configuration the gateway builds over a managed Bedrock row", () => {
@@ -149,5 +153,21 @@ describe("the configuration the gateway builds over a managed Bedrock row", () =
       bedrock_runtime_endpoint: PRIVATE_ENDPOINT,
     });
     expect(slot?.base_url).toBeUndefined();
+  });
+});
+
+describe("the config version the gateway confirms for a managed Bedrock key", () => {
+  /** @scenario "The gateway re-reads a managed row's keys before its session expires" */
+  it("moves when the managed session window moves, so a 304 never confirms an old session", async () => {
+    let epoch = "managed-1";
+    const materialiser = managedBedrockMaterialiser({ keysEpoch: () => epoch });
+
+    const first = await materialiser.versionToken(langyKey);
+    const sameWindow = await materialiser.versionToken(langyKey);
+    epoch = "managed-2";
+    const nextWindow = await materialiser.versionToken(langyKey);
+
+    expect(sameWindow).toBe(first);
+    expect(nextWindow).not.toBe(first);
   });
 });
