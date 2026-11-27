@@ -119,7 +119,7 @@ catalog:
   dotenv: ^17.4.2
   esbuild: ^0.28.2
   fast-deep-equal: ^3.1.3
-  hono: 4.13.18
+  hono: 4.13.23
   hono-openapi: ^1.3.1
   hyparquet: 1.32.0
   hyparquet-compressors: ^1.1.3
@@ -251,6 +251,9 @@ minimumReleaseAgeExclude:
   - es-toolkit@1.51.0
   - '@earendil-works/pi-coding-agent@0.84.2'
   - '@earendil-works/pi-ai@0.84.2'
+  # hono 4.13.23 fixes GHSA-656w-x92q-369m, GHSA-mhwf-w6q6-q58w, GHSA-586x-c76g-h528;
+  # published 2026-11-26. Remove after 2026-12-03, once it clears the 7-day gate.
+  - hono@4.13.23
 
 allowBuilds:
   '@prisma/client': true
@@ -327,7 +330,7 @@ overrides:
   follow-redirects@<1.16.2: '>=1.16.2 <2'
   form-data@<4.0.6: '>=4.0.6'
   glob: ^11.1.0
-  hono@<4.13.16: '>=4.13.16 <4.13.19'
+  hono@<4.13.23: '>=4.13.23 <4.13.24'
   ip-address@<10.7.1: '>=10.7.1 <11'
   js-yaml@>=3.0.0 <3.15.2: '>=3.15.2 <4'
   js-yaml@>=4.0.0 <4.3.2: '>=4.3.2 <5'
