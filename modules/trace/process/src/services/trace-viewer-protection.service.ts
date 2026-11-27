@@ -260,7 +260,7 @@ export class TraceViewerProtectionService {
         (await this.options.projects.findWithTeam(projectId))?.ownerUserId,
       onLookupFailure: (error) =>
         this.logger.error(
-          { projectId: input.projectId, error },
+          { projectIds: input.projectIds, error },
           "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
         ),
     });
