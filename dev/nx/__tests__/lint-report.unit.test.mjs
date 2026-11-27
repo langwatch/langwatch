@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseReport, widenedScope } from "../lint.mjs";
+import { parseReport, routeFlags, widenedScope } from "../lint.mjs";
 
 void describe("parseReport", () => {
   /** @scenario "A lint run whose every path is ignored has no problems" */
@@ -32,5 +32,32 @@ void describe("widenedScope", () => {
   /** @scenario "A type-aware scope past half the projects lints every project" */
   void it("keeps a scope of half the projects or fewer", () => {
     assert.deepEqual(widenedScope({ roots, reached: ["a", "c"] }), ["a", "c"]);
+  });
+});
+void describe("routeFlags", () => {
+  /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
+  void it("lints a --changed run directly, never through Nx", () => {
+    assert.deepEqual(routeFlags(["--changed"]), { route: "direct", types: false });
+    assert.deepEqual(routeFlags(["--changed", "--types"]), { route: "direct", types: true });
+  });
+
+  /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
+  void it("sends a full or --base run through Nx", () => {
+    assert.deepEqual(routeFlags([]), { route: "nx", types: false, base: undefined });
+    assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {
+      route: "nx",
+      types: true,
+      base: "abc123",
+    });
+  });
+
+  /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
+  void it("lints the paths Nx hands back, dropping flags and the --base value", () => {
+    const flags = ["--resolved", "--types", "--base", "abc123", "apps/api", "packages/time"];
+    assert.deepEqual(routeFlags(flags), {
+      route: "resolved",
+      types: true,
+      paths: ["apps/api", "packages/time"],
+    });
   });
 });

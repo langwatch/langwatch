@@ -415,9 +415,10 @@ jobs:
   # parity, OpenAPI clients, typecheck and the CI self-test. Each check is its
   # own step and every step runs even when an earlier one failed, so one run
   # reports every failure. They run in sequence, not in parallel: the
-  # type-aware lint reads the packages' dist declarations, which typecheck
-  # (tsc -b) writes, so typecheck runs after lint, as when they were separate
-  # jobs. The CI self-test runs last: it stages a failing test in apps/api.
+  # type-aware lint reads the packages' dist declarations, so its Nx target runs
+  # workspace:typecheck (tsc -b) first, after the dist snapshot is restored; the
+  # typecheck step then replays that run. The CI self-test runs last: it stages
+  # a failing test in apps/api.
   checks:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' || needs.changes.outputs.feature-parity == 'true'
@@ -693,62 +694,6 @@ jobs:
           BASE: ${{ steps.lint-scope.outputs.base }}
         run: pnpm lint ${BASE:+--base "$BASE"}
 
-      # Type-aware rules over the affected projects in one process (shared parse;
-      # ADR-150), beside the native and plugin processes its directive check needs.
-      - name: Oxlint type-aware, affected projects (blocking)
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        env:
-          BASE: ${{ steps.lint-scope.outputs.base }}
-        run: pnpm lint:types ${BASE:+--base "$BASE"}
-
-      # The SDK clients and the docs site copy against the OpenAPI document the
-      # routes generate: regenerate them with `make sync-all-openapi` and fail
-      # when any committed file changes. The fix is to run the same target
-      # locally and commit the result.
-      - name: Set up Go for the SDK client
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: sdks/go/client/go.mod
-          cache: true
-          cache-dependency-path: sdks/go/client/go.sum
-
-      # The default cache glob is **/uv.lock, which walks the installed
-      # node_modules tree; name the workspace lockfile instead.
-      - name: Set up uv
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          cache-dependency-glob: uv.lock
-
-      - name: Regenerate the clients and the docs copy
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        run: make sync-all-openapi
-
-      - name: Check the committed clients match the routes
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        run: |
-          STALE=0
-          if ! git diff --exit-code --stat; then
-            STALE=1
-          fi
-          UNTRACKED=$(git ls-files --others --exclude-standard \
-            sdks/typescript/src/internal/generated/openapi \
-            sdks/python/src/langwatch/generated \
-            sdks/go/client/internal/openapi \
-            docs/api-reference)
-          if [ -n "$UNTRACKED" ]; then
-            echo "These generated files are not committed:"
-            echo "$UNTRACKED"
-            STALE=1
-          fi
-          if [ "$STALE" = "1" ]; then
-            echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
-            exit 1
-          fi
-
       # Each package writes its own .tsbuildinfo beside its output, to
       # dist/tsconfig.<stem>.tsbuildinfo, per the repo rule that every package
       # tsconfig sets `incremental` and its own tsBuildInfoFile -- never under
@@ -813,6 +758,64 @@ jobs:
           fi
           mkdir -p "$(dirname "$manifest")"
           cp "$current" "$manifest"
+
+      # Type-aware rules over the affected projects in one process (shared parse;
+      # ADR-150), beside the native and plugin processes its directive check needs.
+      # Its Nx target depends on workspace:typecheck, so the declarations it reads are
+      # built from the hashed sources first (or replayed); the typecheck step replays it.
+      - name: Oxlint type-aware, affected projects (blocking)
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        env:
+          BASE: ${{ steps.lint-scope.outputs.base }}
+        run: pnpm lint:types ${BASE:+--base "$BASE"}
+
+      # The SDK clients and the docs site copy against the OpenAPI document the
+      # routes generate: regenerate them with `make sync-all-openapi` and fail
+      # when any committed file changes. The fix is to run the same target
+      # locally and commit the result.
+      - name: Set up Go for the SDK client
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: sdks/go/client/go.mod
+          cache: true
+          cache-dependency-path: sdks/go/client/go.sum
+
+      # The default cache glob is **/uv.lock, which walks the installed
+      # node_modules tree; name the workspace lockfile instead.
+      - name: Set up uv
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          cache-dependency-glob: uv.lock
+
+      - name: Regenerate the clients and the docs copy
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: make sync-all-openapi
+
+      - name: Check the committed clients match the routes
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
+        run: |
+          STALE=0
+          if ! git diff --exit-code --stat; then
+            STALE=1
+          fi
+          UNTRACKED=$(git ls-files --others --exclude-standard \
+            sdks/typescript/src/internal/generated/openapi \
+            sdks/python/src/langwatch/generated \
+            sdks/go/client/internal/openapi \
+            docs/api-reference)
+          if [ -n "$UNTRACKED" ]; then
+            echo "These generated files are not committed:"
+            echo "$UNTRACKED"
+            STALE=1
+          fi
+          if [ "$STALE" = "1" ]; then
+            echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
+            exit 1
+          fi
 
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.

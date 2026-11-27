@@ -141,6 +141,8 @@ export const createNodes = [
       };
       // `pnpm lint` and `pnpm lint:types` over a resolved scope (dev/nx/lint.mjs passes it
       // as arguments, which Nx hashes); the plugin rules read files beyond the linted ones.
+      // The type-aware run reads the packages' dist declarations, so it runs after
+      // `typecheck`, which derives them from the same hashed sources.
       const lintTree = {
         executor: "nx:run-commands",
         options: { cwd: "{workspaceRoot}", command: "node dev/nx/lint.mjs" },
@@ -149,9 +151,11 @@ export const createNodes = [
         outputs: [],
         dependsOn: typecheck.dependsOn,
       };
+      const lintTreeTypes = { ...lintTree, dependsOn: [...typecheck.dependsOn, "typecheck"] };
       const targets = {
         typecheck,
         "lint:tree": lintTree,
+        "lint:tree:types": lintTreeTypes,
         "typecheck:src": sourceTypecheck,
         "build:types": target,
         "lint:rules": make("lint-rules-run", "uvx --version", everything),

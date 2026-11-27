@@ -167,7 +167,8 @@ function print(diagnostic) {
 
 /** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
 function lintThroughNx({ types, paths }) {
-  const args = ["exec", "nx", "run", "workspace:lint:tree", "--outputStyle=static", "--"];
+  const target = types ? "workspace:lint:tree:types" : "workspace:lint:tree";
+  const args = ["exec", "nx", "run", target, "--outputStyle=static", "--"];
   const scoped = [...args, "--resolved", ...(types ? ["--types"] : []), ...paths];
   const env = { ...process.env, FORCE_COLOR: "0", NX_LOAD_DOT_ENV_FILES: "false" };
   const run = spawnSync("pnpm", scoped, { cwd: root, stdio: "inherit", env });
@@ -175,20 +176,34 @@ function lintThroughNx({ types, paths }) {
   process.exit(run.status ?? 1);
 }
 
-/** The scopes this process lints itself; a run Nx should cache is handed to it instead. */
-function ownScopes(flags) {
+/**
+ * What a run does with its flags: lint the paths Nx handed back (`resolved`), lint the
+ * working tree's changes itself (`direct`), or resolve a scope and lint it through Nx.
+ */
+export function routeFlags(flags) {
   const baseFlag = flags.indexOf("--base");
   const types = flags.includes("--types");
   const base = baseFlag === -1 ? undefined : flags[baseFlag + 1];
   if (flags.includes("--resolved")) {
     const paths = flags.filter((flag, i) => !flag.startsWith("--") && flags[i - 1] !== "--base");
-    return [{ paths, ignores: [] }];
+    return { route: "resolved", types, paths };
   }
-  const files = flags.includes("--changed") ? changedFiles(mergeBase()) : undefined;
-  if (files?.length === 0) process.exit(0);
-  const resolved = scopes({ types, files, base });
-  if (files !== undefined) return resolved;
-  const paths = resolved.flatMap((scope) => scope.paths);
+  if (flags.includes("--changed")) return { route: "direct", types };
+
+  return { route: "nx", types, base };
+}
+
+/** The scopes this process lints itself; a run Nx should cache is handed to it instead. */
+function ownScopes(flags) {
+  const decision = routeFlags(flags);
+  const { types } = decision;
+  if (decision.route === "resolved") return [{ paths: decision.paths, ignores: [] }];
+  if (decision.route === "direct") {
+    const files = changedFiles(mergeBase());
+    if (files.length === 0) process.exit(0);
+    return scopes({ types, files, base: undefined });
+  }
+  const paths = scopes({ types, files: undefined, base: decision.base }).flatMap((s) => s.paths);
   if (paths.length === 0) process.exit(0);
 
   return lintThroughNx({ types, paths });

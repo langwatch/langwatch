@@ -36,4 +36,17 @@ void describe("workspace targets", () => {
     assert.ok(outputs.includes("{workspaceRoot}/packages/mail/dist/typecheck/**/*.d.ts"));
     assert.ok(outputs.every((output) => !output.endsWith("/dist")));
   });
+
+  /** @scenario "Type-aware lint reads declarations typecheck built from hashed sources" */
+  void it("runs the type-aware lint after typecheck and the plain lint without it", () => {
+    assert.ok(targets["lint:tree:types"].dependsOn.includes("typecheck"));
+    assert.ok(!targets["lint:tree"].dependsOn.includes("typecheck"));
+    assert.equal(targets["lint:tree:types"].cache, true);
+  });
+
+  /** @scenario "Build info written outside dist is a typecheck output" */
+  void it("declares build info a config writes outside its dist", () => {
+    const { outputs } = targets.typecheck;
+    assert.ok(outputs.includes("{workspaceRoot}/apps/docs/.tsbuild/tsconfig.tsbuildinfo"));
+  });
 });
