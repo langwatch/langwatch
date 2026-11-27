@@ -7,6 +7,7 @@ import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
   BillingSubscriptionRepository,
+  type LiveUnlinkedSubscription,
 } from "../subscription.repository.ts";
 import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory.billing.store.ts";
 
@@ -181,7 +182,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     pendingId,
   }: {
     pendingId: string;
-  }): Promise<BillingSubscriptionRecord[]> {
+  }): Promise<LiveUnlinkedSubscription[]> {
     const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
     if (!pending) return [];
     return this.store.subscriptions
@@ -192,7 +193,11 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
           subscription.status === ACTIVE &&
           subscription.stripeSubscriptionId === null,
       )
-      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
+      .map((subscription) => ({
+        ...subscription,
+        customLimits: this.store.customLimitSubscriptions.has(subscription.id),
+      }));
   }
 
   async findLiveLinkedBeside({

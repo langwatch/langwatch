@@ -3,6 +3,7 @@
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionWithOrganization,
+  LiveUnlinkedSubscription,
 } from "./subscription.repository.ts";
 
 export type SubscriptionWithOrg = BillingSubscriptionWithOrganization;
@@ -62,7 +63,7 @@ export abstract class BillingWebhookSubscriptionRepository {
 
   abstract findLiveUnlinkedBeside(input: {
     pendingId: string;
-  }): Promise<BillingSubscriptionRecord[]>;
+  }): Promise<LiveUnlinkedSubscription[]>;
 
   abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
 

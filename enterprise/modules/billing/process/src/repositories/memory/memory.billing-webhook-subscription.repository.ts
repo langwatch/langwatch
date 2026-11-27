@@ -10,6 +10,7 @@ import {
 import type {
   BillingSubscriptionRepository,
   BillingSubscriptionRecord,
+  LiveUnlinkedSubscription,
 } from "../subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
@@ -99,7 +100,7 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
-  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]> {
+  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<LiveUnlinkedSubscription[]> {
     return this.subscriptions.findLiveUnlinkedBeside(input);
   }
 

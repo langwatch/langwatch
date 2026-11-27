@@ -653,6 +653,13 @@ Feature: Seat requests when an organization is over its seat limit
       Then it refuses with validation_error and nothing is approved
 
     @unit
+    Scenario: Completing an approval settles only the payment that approval recorded
+      Given an approval is waiting on its Stripe page
+      When an administrator completes it with a payment reference naming another invoice
+      Then only the payment the approval recorded is settled
+      And a completion for an opening no approval waits on settles nothing and refuses with validation_error
+
+    @unit
     Scenario: Approve with a seat where the organization does not pay per seat in Stripe buys nothing
       Given the organization is on the free plan with every full seat in use
       When an administrator approves with a seat

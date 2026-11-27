@@ -17,6 +17,7 @@ import { MemoryOrganizationRepository } from "./memory.organization.repository.t
 import { MemoryPendingSeatRoleChangeRepository } from "./memory.pending-seat-role-change.repository.ts";
 import { MemoryPersonalTeamScopeRepository } from "./memory.personal-team-scope.repository.ts";
 import { MemoryScopeGraphRepository } from "./memory.scope-graph.repository.ts";
+import { MemorySeatApprovalPaymentRepository } from "./memory.seat-approval-payment.repository.ts";
 import { MemorySeatHoldRepository } from "./memory.seat-hold.repository.ts";
 import { MemorySeatRequestRepository } from "./memory.seat-request.repository.ts";
 import { MemorySignUpPolicyRepository } from "./memory.sign-up-policy.repository.ts";
@@ -49,6 +50,7 @@ export function memoryOrganizationRepositories({
     signUpPolicy: MemorySignUpPolicyRepository.create({ memory }),
     inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
     pendingSeatRoleChanges: MemoryPendingSeatRoleChangeRepository.create(),
+    seatApprovalPayments: MemorySeatApprovalPaymentRepository.create(),
     invite: MemoryOrganizationInviteRepository.create({ memory }),
     seats: MemoryOrganizationSeatRepository.create({ memory }),
     departures: MemoryOrganizationDeparturesRepository.create({ memory }),

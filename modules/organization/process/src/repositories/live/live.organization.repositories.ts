@@ -9,6 +9,7 @@ import type { OrganizationRepositories } from "../organization.repositories.ts";
 import { PostgresOrganizationRepositories } from "../prisma/prisma.organization.repositories.ts";
 import { RedisOrganizationInviteRateLimitRepository } from "../redis/redis.organization-invite-rate-limit.repository.ts";
 import { RedisPendingSeatRoleChangeRepository } from "../redis/redis.pending-seat-role-change.repository.ts";
+import { RedisSeatApprovalPaymentRepository } from "../redis/redis.seat-approval-payment.repository.ts";
 
 /**
  * Organization's live stores: Postgres rows sealed by the cipher; the invite counter in Redis; the
@@ -45,6 +46,7 @@ export class LiveOrganizationRepositories {
       ...PostgresOrganizationRepositories.create({ prisma, encryption }),
       inviteRateLimit: RedisOrganizationInviteRateLimitRepository.create(redis),
       pendingSeatRoleChanges: RedisPendingSeatRoleChangeRepository.create(redis),
+      seatApprovalPayments: RedisSeatApprovalPaymentRepository.create(redis),
       privateClickHouseRoutes: ClickHousePrivateClickHouseRoutesRepository.create({ clickhouse }),
       privateS3Accounts: ObjectStoragePrivateS3AccountsRepository.create({ objectStorage }),
       departures: EventingOrganizationDeparturesRepository.create({ eventReadSeat }),

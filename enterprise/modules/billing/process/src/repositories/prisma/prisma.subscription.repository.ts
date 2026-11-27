@@ -6,10 +6,12 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import { hasCustomLimits } from "../../rules/seat-checkout-guard.rules.ts";
 import {
   BillingSubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
+  type LiveUnlinkedSubscription,
 } from "../subscription.repository.ts";
 
 const NUMERIC_OVERRIDE_FIELDS = [
@@ -271,7 +273,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     pendingId,
   }: {
     pendingId: string;
-  }): Promise<BillingSubscriptionRecord[]> {
+  }): Promise<LiveUnlinkedSubscription[]> {
     const pending = await this.prisma.subscription.findUnique({
       where: { id: pendingId },
       select: { organizationId: true },
@@ -286,7 +288,10 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
-    return rows.map(subscriptionRecordOf);
+    return rows.map((row) => ({
+      ...subscriptionRecordOf(row),
+      customLimits: hasCustomLimits(row),
+    }));
   }
 
   async findLiveLinkedBeside({

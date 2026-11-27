@@ -102,6 +102,27 @@ describe.skipIf(!DB_URL)("duplicate active subscriptions on Postgres", () => {
     expect(await statusOf(pending)).toBe("CANCELLED");
   });
 
+  /** @scenario "A paid checkout is never moved onto an operator's custom-limit plan" */
+  it("reads the operator's unlinked row with a limit beyond seats as a custom deal", async () => {
+    const organizationId = await organization("custom_live");
+    const live = await row(organizationId, "custom_live", { status: "ACTIVE", maxProjects: 50 });
+    const plain = await row(organizationId, "plain_live", { status: "ACTIVE" });
+    const pending = await row(organizationId, "custom_checkout", { status: "PENDING" });
+
+    const found = await subscriptions.findLiveUnlinkedBeside({ pendingId: pending });
+
+    expect(
+      found
+        .map(({ id, customLimits }) => ({ id, customLimits }))
+        .toSorted((a, b) => a.id.localeCompare(b.id)),
+    ).toEqual(
+      [
+        { id: live, customLimits: true },
+        { id: plain, customLimits: false },
+      ].toSorted((a, b) => a.id.localeCompare(b.id)),
+    );
+  });
+
   /** @scenario "A paid checkout links the only subscription an operator added" */
   it("links the operator's only row when the checkout a seat change opened is paid", async () => {
     const organizationId = await organization("ops_only");

@@ -672,6 +672,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
           }),
         settleSeatPayment: (input) => dependencies.billing.settleSeatPayment(input),
       },
+      payments: setup.repositories.seatApprovalPayments,
       isSaas: setup.config.isSaas,
       now,
       newId: () => generate("seatrequest").toString(),

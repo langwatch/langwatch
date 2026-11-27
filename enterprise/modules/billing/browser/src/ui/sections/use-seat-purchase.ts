@@ -85,7 +85,7 @@ async function sendInvites({
  * Asks the server whether these addresses can be invited before a seat is bought for them: an
  * address that already belongs to a member is refused here, so nothing is charged for it.
  */
-export async function invitesAccepted({
+async function invitesAccepted({
   host,
   checkInvites,
   organizationId,
@@ -141,7 +141,7 @@ async function changeDeveloperSeats({
  * The invitations are asked first, then the full seats, then Developer seats, then the invites
  * are sent; stops at the first refusal, so a refused invitation buys no seat.
  */
-export async function commitChange({
+async function commitChange({
   host,
   change,
   check,

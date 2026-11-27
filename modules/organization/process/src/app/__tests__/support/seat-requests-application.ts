@@ -3,7 +3,7 @@
  * organization (Ada admin, Bill member and Billing) every seat request suite starts from.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { BillingApi, SeatPayment } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationUserRole, type OrganizationCaller } from "@langwatch/organization-contract";
@@ -67,6 +67,8 @@ export type SeatBilling = {
   /** How the Stripe page stands when the approval is completed. */
   payment: "paid" | "open" | "failed";
   purchases: number;
+  /** Every payment billing was asked to settle, in order. */
+  settled: SeatPayment[];
   /** Runs while a purchase is under way, before billing answers. */
   duringPurchase?: () => Promise<void>;
   /** Runs while billing reads whether the seat payment landed, before it answers. */
@@ -92,7 +94,12 @@ export async function application(
   const salesNotices: SalesNotice[] = [];
   /** Whether billing's sales notice goes out; a test may bring it back up. */
   const sales = { down: options.salesDown ?? false };
-  const seatBilling: SeatBilling = { purchase: "added", payment: "paid", purchases: 0 };
+  const seatBilling: SeatBilling = {
+    purchase: "added",
+    payment: "paid",
+    purchases: 0,
+    settled: [],
+  };
   const addSeat = () => {
     state.plan = { ...state.plan, maxMembers: state.plan.maxMembers + 1 };
   };
@@ -133,7 +140,8 @@ export async function application(
             url: "https://invoice.stripe.example/in_seat",
           };
         },
-        settleSeatPayment: async () => {
+        settleSeatPayment: async ({ payment }) => {
+          seatBilling.settled.push(payment);
           const during = seatBilling.duringSettle;
           seatBilling.duringSettle = undefined;
           await during?.();

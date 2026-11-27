@@ -30,6 +30,7 @@ export const PostgresOrganizationRepositories = {
     OrganizationRepositories,
     | "inviteRateLimit"
     | "pendingSeatRoleChanges"
+    | "seatApprovalPayments"
     | "privateClickHouseRoutes"
     | "privateS3Accounts"
     | "departures"

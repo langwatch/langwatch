@@ -130,7 +130,7 @@ describe("given an open seat request", () => {
       renderTable({ approvalPath: stripeSeats });
 
       const approve = screen.getByRole("button", { name: "Approve and add a seat" });
-      expect(approve.getAttribute("title")).toMatch(/29/);
+      expect(approve.getAttribute("title")).toContain("€29 to your subscription");
     });
   });
 });

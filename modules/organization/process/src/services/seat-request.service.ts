@@ -3,7 +3,6 @@ import {
   type SeatPayment,
   type SeatPaymentStatus,
   type SeatPurchase,
-  seatPaymentSchema,
 } from "@langwatch/enterprise-billing-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { SignInIdpKind } from "@langwatch/identity-contract";
@@ -24,6 +23,7 @@ import {
 } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
+import type { SeatApprovalPaymentRepository } from "../repositories/seat-approval-payment.repository.ts";
 import type {
   SeatRequestRepository,
   SeatRequestRow,
@@ -109,6 +109,8 @@ type Dependencies = Readonly<{
   seats: Pick<OrganizationSeatLicense, "checkLimit">;
   notices: OrganizationAccessNoticeService;
   peers: SeatRequestPeers;
+  /** The payment each approval with a seat waits on; a completion settles only that one. */
+  payments: SeatApprovalPaymentRepository;
   isSaas: boolean;
   now: () => number;
   newId: () => string;
@@ -311,10 +313,12 @@ export class SeatRequestService {
       const { purchase } = bought;
       const refused = HandledError.isHandled(error) && error.code === "member_seat_limit_reached";
       if (refused && purchase?.status === "payment_required") {
+        const opening = { organizationId, seatRequestId: input.seatRequestId, openedAt };
+        await this.dependencies.payments.save({ ...opening, payment: purchase.payment });
         return {
           status: "payment_required",
           url: purchase.url,
-          paymentRef: JSON.stringify({ payment: purchase.payment, openedAt }),
+          paymentRef: JSON.stringify({ openedAt }),
         };
       }
       throw error;
@@ -329,10 +333,17 @@ export class SeatRequestService {
     by: OrganizationPlanUser;
   }): Promise<SeatApprovalCompletion> {
     const { organizationId, seatRequestId, by } = input;
-    const { payment, openedAt } = parsePaymentRef(input.paymentRef);
+    const { openedAt } = parsePaymentRef(input.paymentRef);
     const request = await this.dependencies.requests.getOpen({ organizationId, id: seatRequestId });
     // A payment opened before a decline and a new ask never approves the new opening.
     if (request.openedAt !== openedAt) throw new SeatRequestNotFoundError(seatRequestId);
+    // Only the payment this opening's approval kept is settled, whatever the reference names.
+    const [payment] = await this.dependencies.payments.find({
+      organizationId,
+      seatRequestId,
+      openedAt,
+    });
+    if (!payment) throw new ValidationError(UNKNOWN_PAYMENT_REF);
     const { status } = await this.dependencies.peers.settleSeatPayment({ organizationId, payment });
     if (status === "open") return { status: "waiting" };
     if (status === "failed") return { status: "failed" };
@@ -461,19 +472,17 @@ const ACCESS_STATUS: Record<SeatRequestRow["status"], MyAccessRequest["status"]>
   DECLINED: "declined",
 };
 
-/** The payment reference `approveWithSeat` handed out, read back; anything else is refused. */
-function parsePaymentRef(paymentRef: string): { payment: SeatPayment; openedAt: number } {
-  let candidate: { payment?: unknown; openedAt?: unknown } | null;
+const UNKNOWN_PAYMENT_REF = "The seat payment reference is not one this approval handed out";
+
+/** The opening the reference `approveWithSeat` handed out names; anything else is refused. */
+function parsePaymentRef(paymentRef: string): { openedAt: number } {
+  let candidate: { openedAt?: unknown } | null;
   try {
     candidate = JSON.parse(paymentRef);
   } catch {
-    throw new ValidationError("The seat payment reference is not one this approval handed out");
+    throw new ValidationError(UNKNOWN_PAYMENT_REF);
   }
   const openedAt = candidate?.openedAt;
-  if (typeof openedAt !== "number") {
-    throw new ValidationError("The seat payment reference is not one this approval handed out");
-  }
-  const parsed = seatPaymentSchema.safeParse(candidate?.payment);
-  if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
-  return { payment: parsed.data, openedAt };
+  if (typeof openedAt !== "number") throw new ValidationError(UNKNOWN_PAYMENT_REF);
+  return { openedAt };
 }

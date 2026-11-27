@@ -222,6 +222,37 @@ describe("given an operator activated an older PENDING Growth row in Ops", () =>
   });
 });
 
+describe("given an operator's active Growth row with a limit beyond seats", () => {
+  describe("when a seat checkout opened before the limit was set is paid", () => {
+    /** @scenario "A paid checkout is never moved onto an operator's custom-limit plan" */
+    it("leaves the operator's row as it was and does not adopt the checkout", async () => {
+      const { store, seats, announcer, complete } = world();
+      store.subscriptions.push(growthRow({ status: SubscriptionStatus.ACTIVE }));
+      const { subscriptionId: pendingId } = await seats.createSeatEventCheckout({
+        organizationId: ORG,
+        customerId: "cus_acme",
+        baseUrl: "https://app.test",
+        currency: "EUR",
+        billingInterval: "monthly",
+        membersToAdd: 5,
+      });
+      store.customLimitSubscriptions.add("sub_db_ops");
+
+      await complete(pendingId);
+
+      expect(store.subscriptions.find((row) => row.id === "sub_db_ops")).toMatchObject({
+        status: SubscriptionStatus.ACTIVE,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        stripeSubscriptionId: null,
+        maxMembers: 3,
+      });
+      expect(announcer.audited).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "subscription.adoptCheckout" }),
+      );
+    });
+  });
+});
+
 describe("given an operator activated the checkout's own PENDING Growth row in Ops", () => {
   describe("when the checkout completion arrives", () => {
     /** @scenario "A paid checkout on the row an operator activated starts the plan" */

@@ -369,6 +369,14 @@ Feature: Enterprise billing compatibility
       And the organization holds exactly one active subscription
       And the invitations held against the checkout's row are opened
 
+    @unit @integration
+    Scenario: A paid checkout is never moved onto an operator's custom-limit plan
+      Given an operator's active row with no Stripe subscription carries a limit beyond seats
+      And a seat checkout opened before that limit was set is paid
+      When the checkout completion arrives
+      Then the operator's row keeps its plan, seats and limits
+      And the move onto it is neither made nor audited, and ops are told to settle the two rows
+
     @integration
     Scenario: A paid checkout links the only subscription an operator added
       Given an operator added the organization's only subscription in Ops, with no Stripe subscription

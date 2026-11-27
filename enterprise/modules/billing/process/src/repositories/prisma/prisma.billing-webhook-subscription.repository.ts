@@ -14,6 +14,7 @@ import {
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
+  LiveUnlinkedSubscription,
 } from "../subscription.repository.ts";
 
 const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
@@ -95,7 +96,7 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
-  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]> {
+  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<LiveUnlinkedSubscription[]> {
     return this.subscriptions.findLiveUnlinkedBeside(input);
   }
 

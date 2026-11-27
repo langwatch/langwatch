@@ -27,6 +27,12 @@ export type BillingSubscriptionRecord = {
   overPlanEndedAt?: Instant | null;
 };
 
+/** An operator's live row with no provider link, and whether it is a custom deal (isCustomDeal). */
+export type LiveUnlinkedSubscription = BillingSubscriptionRecord & {
+  /** An operator set a limit beyond seats on it. */
+  customLimits: boolean;
+};
+
 type BillingOrganizationRecord = {
   id: string;
   name: string;
@@ -67,7 +73,7 @@ export abstract class BillingSubscriptionRepository {
   /** The ACTIVE rows with no provider link in the checkout row's organization, the row excluded. */
   abstract findLiveUnlinkedBeside(input: {
     pendingId: string;
-  }): Promise<BillingSubscriptionRecord[]>;
+  }): Promise<LiveUnlinkedSubscription[]>;
   /** The checkout row's organization's other ACTIVE non-tiered rows linked to Stripe. */
   abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
   /**

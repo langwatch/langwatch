@@ -10,6 +10,30 @@ export function blocksSeatCheckout(
   return active.some((row) => row.stripeSubscriptionId !== null && !isTieredPlan(row.plan));
 }
 
+/** The limits only an operator sets; any of them on a row makes it a custom deal. */
+export const CUSTOM_LIMIT_COLUMNS = [
+  "maxProjects",
+  "maxWorkflows",
+  "maxTeams",
+  "maxPrompts",
+  "maxEvaluators",
+  "maxScenarios",
+  "maxAgents",
+  "maxExperiments",
+  "maxOnlineEvaluations",
+  "maxDatasets",
+  "maxDashboards",
+  "maxCustomGraphs",
+  "maxAutomations",
+] as const;
+
+/** Whether any operator-only limit is set on the row. */
+export function hasCustomLimits(
+  row: Record<(typeof CUSTOM_LIMIT_COLUMNS)[number], number | null>,
+): boolean {
+  return CUSTOM_LIMIT_COLUMNS.some((column) => row[column] !== null);
+}
+
 /**
  * A plan set up by hand: ENTERPRISE, or any row an operator gave limits beyond seats. Billing never
  * checks one out, adopts it or closes it on its own; its seats change through support.

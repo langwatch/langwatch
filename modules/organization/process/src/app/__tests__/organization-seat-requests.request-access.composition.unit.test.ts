@@ -473,6 +473,46 @@ describe("given an organization paying per seat in Stripe with every full seat i
     });
   });
 
+  describe("when the payment reference names another open invoice of the organization", () => {
+    const OTHER_INVOICE = { kind: "invoice", invoiceId: "in_other", seats: 9 } as const;
+
+    /** @scenario "Completing an approval settles only the payment that approval recorded" */
+    it("settles only the invoice the approval recorded, never the one the reference names", async () => {
+      const { app, seatRequestId, seatBilling } = await lenaAsking();
+      seatBilling.purchase = "payment_required";
+      seatBilling.payment = "failed";
+      const waiting = await app.approveSeatRequestWithSeat({ ...scope, seatRequestId }, ADA);
+      if (waiting.status !== "payment_required") throw new Error("expected a Stripe page");
+      const { openedAt } = JSON.parse(waiting.paymentRef) as { openedAt: number };
+      const forged = JSON.stringify({ payment: OTHER_INVOICE, openedAt });
+
+      const done = await app.completeSeatApproval(
+        { ...scope, seatRequestId, paymentRef: forged },
+        ADA,
+      );
+
+      expect(done).toEqual({ status: "failed" });
+      expect(
+        seatBilling.settled.map((payment) => payment.kind === "invoice" && payment.invoiceId),
+      ).toEqual(["in_seat"]);
+    });
+
+    /** @scenario "Completing an approval settles only the payment that approval recorded" */
+    it("refuses with validation_error and settles nothing when no approval waits on the opening", async () => {
+      const { app, seatRequestId, seatBilling, seatRequests, openRequests } = await lenaAsking();
+      const { openedAt } = await seatRequests.getOpen({ ...scope, id: seatRequestId });
+      const forged = JSON.stringify({ payment: OTHER_INVOICE, openedAt });
+
+      const refusal = await app
+        .completeSeatApproval({ ...scope, seatRequestId, paymentRef: forged }, ADA)
+        .catch((error: unknown) => error);
+
+      expect(codeOf(refusal)).toBe("validation_error");
+      expect(seatBilling.settled).toEqual([]);
+      expect(await openRequests()).toHaveLength(1);
+    });
+  });
+
   describe("when the organization is on the free plan instead", () => {
     /** @scenario "Approve with a seat where the organization does not pay per seat in Stripe buys nothing" */
     it("refuses with member_seat_limit_reached and buys nothing", async () => {

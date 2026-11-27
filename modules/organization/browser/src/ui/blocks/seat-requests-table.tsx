@@ -1,5 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { formatPrice } from "@langwatch/enterprise-billing-contract";
 import type { SeatApprovalPath, SeatRequest } from "@langwatch/organization-contract";
 import { readableDate } from "@langwatch/time";
 
@@ -37,13 +38,14 @@ function approveLabel({
   return {
     label: "Approve and add a seat",
     title: price
-      ? `Adds one full seat at ${formatPrice(price)} to your subscription, then approves.`
+      ? `Adds one full seat at ${seatPriceLabel(price)} to your subscription, then approves.`
       : "Adds one full seat to your subscription, then approves.",
   };
 }
 
-function formatPrice({ amount, currency }: { amount: number; currency: "USD" | "EUR" }): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+/** The seat price as every other price in the product reads. */
+function seatPriceLabel({ amount, currency }: { amount: number; currency: "USD" | "EUR" }): string {
+  return formatPrice({ cents: Math.round(amount * 100), currency });
 }
 
 /** The one action that gives a seat when Approve cannot, worded for how the organization pays. */

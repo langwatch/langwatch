@@ -49,7 +49,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
         seatsKept,
         seatsKeptUntil,
         plan,
-        customLimits: false,
+        customLimits: this.store.customLimitSubscriptions.has(id),
       }));
   }
 
@@ -64,7 +64,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
         id,
         plan,
         stripeSubscriptionId,
-        customLimits: false,
+        customLimits: this.store.customLimitSubscriptions.has(id),
       }));
   }
 

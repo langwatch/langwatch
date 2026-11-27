@@ -6,6 +6,7 @@ import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
+import { CUSTOM_LIMIT_COLUMNS, hasCustomLimits } from "../../rules/seat-checkout-guard.rules.ts";
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
@@ -38,30 +39,9 @@ const NO_SEAT_LINE_WRITE = {
   seatLineWriteFlaggedAt: null,
 };
 
-/** The limits only an operator sets; any of them on a row makes it a custom deal. */
-const CUSTOM_LIMIT_COLUMNS = [
-  "maxProjects",
-  "maxWorkflows",
-  "maxTeams",
-  "maxPrompts",
-  "maxEvaluators",
-  "maxScenarios",
-  "maxAgents",
-  "maxExperiments",
-  "maxOnlineEvaluations",
-  "maxDatasets",
-  "maxDashboards",
-  "maxCustomGraphs",
-  "maxAutomations",
-] as const;
 const CUSTOM_LIMIT_SELECT = Object.fromEntries(
   CUSTOM_LIMIT_COLUMNS.map((column) => [column, true]),
 ) as Record<(typeof CUSTOM_LIMIT_COLUMNS)[number], true>;
-
-/** Whether any operator-only limit is set on the row. */
-function hasCustomLimits(row: Record<(typeof CUSTOM_LIMIT_COLUMNS)[number], number | null>) {
-  return CUSTOM_LIMIT_COLUMNS.some((column) => row[column] !== null);
-}
 
 /** Only what this repository touches. */
 type SeatEventSubscriptionDatabase = Pick<PrismaClient, "subscription">;
