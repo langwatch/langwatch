@@ -344,6 +344,19 @@ const getProjectTopicClusteringModelProvider = async (
   return { model: topicClusteringModel, modelProvider };
 };
 
+/** A disabled embeddings provider skips the run, as a disabled clustering provider does. */
+const getProjectEmbeddingsModel = async (deps: TopicClusteringRunnerDeps, projectId: string) => {
+  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  if (!embeddingsModel.modelProvider.enabled) {
+    logger.info(
+      { model: embeddingsModel.model },
+      "topic clustering embeddings provider is not enabled, skipping topic clustering",
+    );
+    return;
+  }
+  return embeddingsModel;
+};
+
 const batchClusterTraces = async ({
   deps,
   projectId,
@@ -363,7 +376,10 @@ const batchClusterTraces = async ({
   if (!topicModel) {
     return { kind: "not_configured" };
   }
-  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  const embeddingsModel = await getProjectEmbeddingsModel(deps, projectId);
+  if (!embeddingsModel) {
+    return { kind: "not_configured" };
+  }
   const fetched = await requestClustering(deps, {
     projectId,
     mode: "batch",
@@ -442,7 +458,10 @@ const incrementalClustering = async ({
   if (!topicModel) {
     return { kind: "not_configured" };
   }
-  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  const embeddingsModel = await getProjectEmbeddingsModel(deps, projectId);
+  if (!embeddingsModel) {
+    return { kind: "not_configured" };
+  }
   const fetched = await requestClustering(deps, {
     projectId,
     mode: "incremental",
@@ -663,6 +682,7 @@ const CLUSTERING_CODE_OF_LANGEVALS_FAILURE: Partial<
 > = {
   model_not_configured: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
   model_provider_auth_failed: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
+  model_provider_key_missing: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_KEY_MISSING,
   model_provider_rate_limited: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
 };
 

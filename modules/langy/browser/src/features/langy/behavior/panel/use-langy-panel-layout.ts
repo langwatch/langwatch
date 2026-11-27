@@ -9,13 +9,17 @@ import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import {
   LANGY_DODGE_STAGGER_MS,
   langyRestingFloorPx,
-  resolveFloatingPanelWidth,
+  SIDEBAR_PANEL_WIDTH,
 } from "../../../../model/langy-panel-layout.ts";
+import {
+  type LangyResizablePlacement,
+  resolvePanelWidth,
+} from "../../../../model/langy-panel-resize.ts";
 import { type LangyPeekPhase, resolvePeekTranslate } from "../../../../model/langy-peek-dock.ts";
 
 /** The viewport's width, kept current across resizes. */
-function useViewportWidth(): number {
-  const [width, setWidth] = useState(0);
+export function useViewportWidth(): number {
+  const [width, setWidth] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
   useEffect(() => {
     const measure = () => setWidth(window.innerWidth);
     measure();
@@ -25,10 +29,32 @@ function useViewportWidth(): number {
   return width;
 }
 
+/** A layout's width: the user's dragged choice re-clamped to this viewport, else its default. */
+function useResolvedPanelWidth({
+  placement,
+  viewportWidth,
+}: {
+  placement: LangyResizablePlacement;
+  viewportWidth: number;
+}): number {
+  const stored = useLangyStore((s) => s.panelWidths);
+  return resolvePanelWidth({
+    placement,
+    viewportWidth,
+    stored: stored[placement],
+  });
+}
+
+/** The docked panel's width, for whatever reserves room beside it. */
+export function useLangyDockWidthPx(): number {
+  const viewportWidth = useViewportWidth();
+  return useResolvedPanelWidth({ placement: "sidebar", viewportWidth });
+}
+
 /**
  * Where the panel sits: docked or floating, riding beside an open drawer (docked becomes the
  * drawer's companion, floating dodges to the left on a lingering release), and the floating
- * card's width. Spec: specs/langy/langy-panel-layout.feature
+ * card's and the dock's width (the user drags both). Spec: specs/langy/langy-panel-layout.feature
  */
 export function useLangyPanelPlacement() {
   const isOpen = useLangyStore((s) => s.isOpen);
@@ -43,14 +69,21 @@ export function useLangyPanelPlacement() {
     immediate: reduceMotion,
   });
   const viewportWidth = useViewportWidth();
+  const floatingPanelWidth = useResolvedPanelWidth({ placement: "floating", viewportWidth });
+  const dockWidthPx = useResolvedPanelWidth({ placement: "sidebar", viewportWidth });
+  const isDrawerCompanion = isOpen && drawerShowing && !floating;
+  const resolvedWidthPx = floating ? floatingPanelWidth : dockWidthPx;
   return {
     panelMode,
     floating,
     reduceMotion,
     drawerEdgeHeld,
-    isDrawerCompanion: isOpen && drawerShowing && !floating,
+    isDrawerCompanion,
     floatingDodgesDrawer: isOpen && drawerEdgeHeld && floating,
-    floatingPanelWidth: resolveFloatingPanelWidth(viewportWidth),
+    viewportWidth,
+    floatingPanelWidth,
+    /** The width the panel renders at; the drawer companion keeps the default dock width. */
+    panelWidthPx: isDrawerCompanion ? SIDEBAR_PANEL_WIDTH : resolvedWidthPx,
   };
 }
 
@@ -64,11 +97,13 @@ export function useLangyPanelPeek({
   floating,
   reduceMotion,
   drawerEdgeHeld,
+  floatingWidthPx,
 }: {
   peekEnabled: boolean;
   floating: boolean;
   reduceMotion: boolean;
   drawerEdgeHeld: boolean;
+  floatingWidthPx: number;
 }) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const panelMode = useLangyStore((s) => s.panelMode);
@@ -79,6 +114,7 @@ export function useLangyPanelPeek({
     mode: panelMode,
     // The proximity zone follows the floating panel's dodge.
     dodgeLeft: drawerEdgeHeld && floating,
+    floatingWidthPx,
   });
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);

@@ -59,6 +59,10 @@ export NODE_ENV="${NODE_ENV:-development}"
 # written, and nothing at all in production.
 "$HERE/ensure-langy-dev-env.sh"
 
+# The Nx remote cache needs a GitHub login: with none, one line says how to
+# turn it on. It never prompts or waits; with no login the cache is off.
+node "$REPO_ROOT/dev/nx/remote-cache/setup.mjs" || true
+
 # The port each lane binds, exported so the lane actually gets it. The Node
 # lanes load the workspace env files with `--env-file-if-exists`, which never
 # overwrites a variable already set, so an exported value beats the committed
