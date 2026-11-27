@@ -43,14 +43,12 @@ export type RunDialogAgent = {
   status?: "online" | "offline";
   /** The owner of a personal development agent. */
   owner?: { userId: string; name: string | null } | null;
-  /** False for another person's development agent, an offline agent and a connector. */
+  /** False for a development agent of another person and for an offline agent. */
   isRunnable?: boolean;
   /** True when a development agent belongs to another person. */
   isTeammateOwned?: boolean;
   /** True when a connected agent has no process holding it. */
   isOffline?: boolean;
-  /** True for a Scenario Connector, which a run plan cannot target yet. */
-  isRefusedBySuite?: boolean;
   /** The parameters a connected agent declares. */
   parameters?: ScenarioParameterDefinition[];
 };

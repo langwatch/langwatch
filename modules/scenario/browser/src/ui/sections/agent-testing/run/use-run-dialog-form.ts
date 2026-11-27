@@ -13,10 +13,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useSession } from "../../../../behavior/auth-session.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
-import {
-  suiteTargetOf,
-  useFilteredAgents,
-} from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
+import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
 import {
   unionParameterDefinitions,
@@ -165,7 +162,7 @@ function useParameterFieldsState(remembered: ReturnType<typeof rememberedParamet
 
 /** The fields of the dialog, opened on the values of the subject it is mounted for. */
 function useRunDialogFields(subject: RunDialogSubject | null) {
-  const initialTarget = suiteTargetOf(subject?.initialTarget ?? null);
+  const initialTarget = subject?.initialTarget ?? null;
   const remembered = rememberedParameters(subject);
   const [target, setTarget] = useState<TargetValue>(initialTarget);
   const [mode, setMode] = useState<RunDialogMode>(
@@ -217,12 +214,10 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
   const isDialogOpen = !!project && !!subject;
 
   const { data: agents } = useAgents({ projectId, enabled: isDialogOpen });
-  // Every entry point of this dialog queues through suites.runPlan.
   const scenarioAgents = useFilteredAgents({
     agents,
     searchValue: "",
     viewerUserId,
-    forSuite: true,
   });
   const { data: prompts } = useAllPromptsForProject();
   const { data: allScenarios } = useScenarios({
@@ -891,25 +886,16 @@ function runTargetsOf({
   definitions: readonly DeclaredParameter[];
 }): RunTarget[] {
   if (compareRows.length > 0) {
-    return compareRows
-      .map((row) => {
-        const runParameters = compareRowParameters({
-          row,
-          defaults,
-          definitions,
-        });
-        return { ...row.target, ...(runParameters ? { runParameters } : {}) };
-      })
-      .filter(isSuiteKind);
+    return compareRows.map((row) => {
+      const runParameters = compareRowParameters({
+        row,
+        defaults,
+        definitions,
+      });
+      return { ...row.target, ...(runParameters ? { runParameters } : {}) };
+    });
   }
-  return target && isSuiteKind(target) ? [target] : [];
-}
-
-/** The dialog queues a run plan, so a connector (never pickable here) is dropped, not sent. */
-function isSuiteKind<T extends { type: NonNullable<TargetValue>["type"] }>(
-  target: T,
-): target is T & { type: RunTarget["type"] } {
-  return target.type !== "connector";
+  return target ? [target] : [];
 }
 
 /**

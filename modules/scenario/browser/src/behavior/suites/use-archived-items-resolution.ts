@@ -2,6 +2,7 @@
  * Resolves human-readable names for archived scenarios and targets.
  */
 
+import type { SuiteTargetType } from "@langwatch/suite-contract";
 import { useMemo } from "react";
 
 import { api } from "../scenario-api.ts";
@@ -11,7 +12,7 @@ interface ArchivedScenarioRef {
 }
 
 interface ArchivedTargetRef {
-  type: "http" | "prompt" | "code" | "workflow" | "connected" | "voice";
+  type: SuiteTargetType;
   referenceId: string;
 }
 

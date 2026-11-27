@@ -34522,6 +34522,7 @@ func (e ListRunPlans200JSONResponseBodyTargetsScenarioMappings1Type) Valid() boo
 const (
 	ListRunPlans200JSONResponseBodyTargetsTypeCode      ListRunPlans200JSONResponseBodyTargetsType = "code"
 	ListRunPlans200JSONResponseBodyTargetsTypeConnected ListRunPlans200JSONResponseBodyTargetsType = "connected"
+	ListRunPlans200JSONResponseBodyTargetsTypeConnector ListRunPlans200JSONResponseBodyTargetsType = "connector"
 	ListRunPlans200JSONResponseBodyTargetsTypeHttp      ListRunPlans200JSONResponseBodyTargetsType = "http"
 	ListRunPlans200JSONResponseBodyTargetsTypePrompt    ListRunPlans200JSONResponseBodyTargetsType = "prompt"
 	ListRunPlans200JSONResponseBodyTargetsTypeVoice     ListRunPlans200JSONResponseBodyTargetsType = "voice"
@@ -34534,6 +34535,8 @@ func (e ListRunPlans200JSONResponseBodyTargetsType) Valid() bool {
 	case ListRunPlans200JSONResponseBodyTargetsTypeCode:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case ListRunPlans200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -34693,6 +34696,7 @@ func (e RunRunPlanJSONBodyConfigTargetsScenarioMappings1Type) Valid() bool {
 const (
 	RunRunPlanJSONBodyConfigTargetsTypeCode      RunRunPlanJSONBodyConfigTargetsType = "code"
 	RunRunPlanJSONBodyConfigTargetsTypeConnected RunRunPlanJSONBodyConfigTargetsType = "connected"
+	RunRunPlanJSONBodyConfigTargetsTypeConnector RunRunPlanJSONBodyConfigTargetsType = "connector"
 	RunRunPlanJSONBodyConfigTargetsTypeHttp      RunRunPlanJSONBodyConfigTargetsType = "http"
 	RunRunPlanJSONBodyConfigTargetsTypePrompt    RunRunPlanJSONBodyConfigTargetsType = "prompt"
 	RunRunPlanJSONBodyConfigTargetsTypeVoice     RunRunPlanJSONBodyConfigTargetsType = "voice"
@@ -34705,6 +34709,8 @@ func (e RunRunPlanJSONBodyConfigTargetsType) Valid() bool {
 	case RunRunPlanJSONBodyConfigTargetsTypeCode:
 		return true
 	case RunRunPlanJSONBodyConfigTargetsTypeConnected:
+		return true
+	case RunRunPlanJSONBodyConfigTargetsTypeConnector:
 		return true
 	case RunRunPlanJSONBodyConfigTargetsTypeHttp:
 		return true
@@ -34753,6 +34759,7 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetScenarioMappings1Type) Valid() b
 const (
 	RunRunPlan200JSONResponseBodyItemsTargetTypeCode      RunRunPlan200JSONResponseBodyItemsTargetType = "code"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeConnected RunRunPlan200JSONResponseBodyItemsTargetType = "connected"
+	RunRunPlan200JSONResponseBodyItemsTargetTypeConnector RunRunPlan200JSONResponseBodyItemsTargetType = "connector"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RunRunPlan200JSONResponseBodyItemsTargetType = "voice"
@@ -34765,6 +34772,8 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case RunRunPlan200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -34939,6 +34948,7 @@ func (e GetRunPlan200JSONResponseBodyTargetsScenarioMappings1Type) Valid() bool 
 const (
 	GetRunPlan200JSONResponseBodyTargetsTypeCode      GetRunPlan200JSONResponseBodyTargetsType = "code"
 	GetRunPlan200JSONResponseBodyTargetsTypeConnected GetRunPlan200JSONResponseBodyTargetsType = "connected"
+	GetRunPlan200JSONResponseBodyTargetsTypeConnector GetRunPlan200JSONResponseBodyTargetsType = "connector"
 	GetRunPlan200JSONResponseBodyTargetsTypeHttp      GetRunPlan200JSONResponseBodyTargetsType = "http"
 	GetRunPlan200JSONResponseBodyTargetsTypePrompt    GetRunPlan200JSONResponseBodyTargetsType = "prompt"
 	GetRunPlan200JSONResponseBodyTargetsTypeVoice     GetRunPlan200JSONResponseBodyTargetsType = "voice"
@@ -34951,6 +34961,8 @@ func (e GetRunPlan200JSONResponseBodyTargetsType) Valid() bool {
 	case GetRunPlan200JSONResponseBodyTargetsTypeCode:
 		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case GetRunPlan200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -34999,6 +35011,7 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetScenarioMappings1Type) Valid()
 const (
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeCode      RerunRunPlan200JSONResponseBodyItemsTargetType = "code"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeConnected RerunRunPlan200JSONResponseBodyItemsTargetType = "connected"
+	RerunRunPlan200JSONResponseBodyItemsTargetTypeConnector RerunRunPlan200JSONResponseBodyItemsTargetType = "connector"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RerunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RerunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RerunRunPlan200JSONResponseBodyItemsTargetType = "voice"
@@ -35011,6 +35024,8 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case RerunRunPlan200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -37411,6 +37426,7 @@ func (e GetApiSuites200JSONResponseBodyTargetsScenarioMappings1Type) Valid() boo
 const (
 	GetApiSuites200JSONResponseBodyTargetsTypeCode      GetApiSuites200JSONResponseBodyTargetsType = "code"
 	GetApiSuites200JSONResponseBodyTargetsTypeConnected GetApiSuites200JSONResponseBodyTargetsType = "connected"
+	GetApiSuites200JSONResponseBodyTargetsTypeConnector GetApiSuites200JSONResponseBodyTargetsType = "connector"
 	GetApiSuites200JSONResponseBodyTargetsTypeHttp      GetApiSuites200JSONResponseBodyTargetsType = "http"
 	GetApiSuites200JSONResponseBodyTargetsTypePrompt    GetApiSuites200JSONResponseBodyTargetsType = "prompt"
 	GetApiSuites200JSONResponseBodyTargetsTypeVoice     GetApiSuites200JSONResponseBodyTargetsType = "voice"
@@ -37423,6 +37439,8 @@ func (e GetApiSuites200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuites200JSONResponseBodyTargetsTypeCode:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case GetApiSuites200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37549,6 +37567,7 @@ func (e PostApiSuitesJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	PostApiSuitesJSONBodyTargetsTypeCode      PostApiSuitesJSONBodyTargetsType = "code"
 	PostApiSuitesJSONBodyTargetsTypeConnected PostApiSuitesJSONBodyTargetsType = "connected"
+	PostApiSuitesJSONBodyTargetsTypeConnector PostApiSuitesJSONBodyTargetsType = "connector"
 	PostApiSuitesJSONBodyTargetsTypeHttp      PostApiSuitesJSONBodyTargetsType = "http"
 	PostApiSuitesJSONBodyTargetsTypePrompt    PostApiSuitesJSONBodyTargetsType = "prompt"
 	PostApiSuitesJSONBodyTargetsTypeVoice     PostApiSuitesJSONBodyTargetsType = "voice"
@@ -37561,6 +37580,8 @@ func (e PostApiSuitesJSONBodyTargetsType) Valid() bool {
 	case PostApiSuitesJSONBodyTargetsTypeCode:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypeConnected:
+		return true
+	case PostApiSuitesJSONBodyTargetsTypeConnector:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypeHttp:
 		return true
@@ -37687,6 +37708,7 @@ func (e PostApiSuites201JSONResponseBodyTargetsScenarioMappings1Type) Valid() bo
 const (
 	PostApiSuites201JSONResponseBodyTargetsTypeCode      PostApiSuites201JSONResponseBodyTargetsType = "code"
 	PostApiSuites201JSONResponseBodyTargetsTypeConnected PostApiSuites201JSONResponseBodyTargetsType = "connected"
+	PostApiSuites201JSONResponseBodyTargetsTypeConnector PostApiSuites201JSONResponseBodyTargetsType = "connector"
 	PostApiSuites201JSONResponseBodyTargetsTypeHttp      PostApiSuites201JSONResponseBodyTargetsType = "http"
 	PostApiSuites201JSONResponseBodyTargetsTypePrompt    PostApiSuites201JSONResponseBodyTargetsType = "prompt"
 	PostApiSuites201JSONResponseBodyTargetsTypeVoice     PostApiSuites201JSONResponseBodyTargetsType = "voice"
@@ -37699,6 +37721,8 @@ func (e PostApiSuites201JSONResponseBodyTargetsType) Valid() bool {
 	case PostApiSuites201JSONResponseBodyTargetsTypeCode:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypeConnected:
+		return true
+	case PostApiSuites201JSONResponseBodyTargetsTypeConnector:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37825,6 +37849,7 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsScenarioMappings1Type) Valid()
 const (
 	GetApiSuitesById200JSONResponseBodyTargetsTypeCode      GetApiSuitesById200JSONResponseBodyTargetsType = "code"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeConnected GetApiSuitesById200JSONResponseBodyTargetsType = "connected"
+	GetApiSuitesById200JSONResponseBodyTargetsTypeConnector GetApiSuitesById200JSONResponseBodyTargetsType = "connector"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeHttp      GetApiSuitesById200JSONResponseBodyTargetsType = "http"
 	GetApiSuitesById200JSONResponseBodyTargetsTypePrompt    GetApiSuitesById200JSONResponseBodyTargetsType = "prompt"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeVoice     GetApiSuitesById200JSONResponseBodyTargetsType = "voice"
@@ -37837,6 +37862,8 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeCode:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case GetApiSuitesById200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37945,6 +37972,7 @@ func (e PatchApiSuitesByIdJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	PatchApiSuitesByIdJSONBodyTargetsTypeCode      PatchApiSuitesByIdJSONBodyTargetsType = "code"
 	PatchApiSuitesByIdJSONBodyTargetsTypeConnected PatchApiSuitesByIdJSONBodyTargetsType = "connected"
+	PatchApiSuitesByIdJSONBodyTargetsTypeConnector PatchApiSuitesByIdJSONBodyTargetsType = "connector"
 	PatchApiSuitesByIdJSONBodyTargetsTypeHttp      PatchApiSuitesByIdJSONBodyTargetsType = "http"
 	PatchApiSuitesByIdJSONBodyTargetsTypePrompt    PatchApiSuitesByIdJSONBodyTargetsType = "prompt"
 	PatchApiSuitesByIdJSONBodyTargetsTypeVoice     PatchApiSuitesByIdJSONBodyTargetsType = "voice"
@@ -37957,6 +37985,8 @@ func (e PatchApiSuitesByIdJSONBodyTargetsType) Valid() bool {
 	case PatchApiSuitesByIdJSONBodyTargetsTypeCode:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypeConnected:
+		return true
+	case PatchApiSuitesByIdJSONBodyTargetsTypeConnector:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypeHttp:
 		return true
@@ -38083,6 +38113,7 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsScenarioMappings1Type) Valid
 const (
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeCode      PatchApiSuitesById200JSONResponseBodyTargetsType = "code"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeConnected PatchApiSuitesById200JSONResponseBodyTargetsType = "connected"
+	PatchApiSuitesById200JSONResponseBodyTargetsTypeConnector PatchApiSuitesById200JSONResponseBodyTargetsType = "connector"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp      PatchApiSuitesById200JSONResponseBodyTargetsType = "http"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypePrompt    PatchApiSuitesById200JSONResponseBodyTargetsType = "prompt"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeVoice     PatchApiSuitesById200JSONResponseBodyTargetsType = "voice"
@@ -38095,6 +38126,8 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeCode:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case PatchApiSuitesById200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -38221,6 +38254,7 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsScenarioMappings1Typ
 const (
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeCode      PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "code"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnected PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "connected"
+	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnector PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "connector"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeHttp      PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "http"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypePrompt    PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "prompt"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeVoice     PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "voice"
@@ -38233,6 +38267,8 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType) Valid() bool {
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeCode:
 		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnected:
+		return true
+	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnector:
 		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -38281,6 +38317,7 @@ func (e PostApiSuitesByIdRunJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	PostApiSuitesByIdRunJSONBodyTargetsTypeCode      PostApiSuitesByIdRunJSONBodyTargetsType = "code"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeConnected PostApiSuitesByIdRunJSONBodyTargetsType = "connected"
+	PostApiSuitesByIdRunJSONBodyTargetsTypeConnector PostApiSuitesByIdRunJSONBodyTargetsType = "connector"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeHttp      PostApiSuitesByIdRunJSONBodyTargetsType = "http"
 	PostApiSuitesByIdRunJSONBodyTargetsTypePrompt    PostApiSuitesByIdRunJSONBodyTargetsType = "prompt"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeVoice     PostApiSuitesByIdRunJSONBodyTargetsType = "voice"
@@ -38293,6 +38330,8 @@ func (e PostApiSuitesByIdRunJSONBodyTargetsType) Valid() bool {
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeCode:
 		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeConnected:
+		return true
+	case PostApiSuitesByIdRunJSONBodyTargetsTypeConnector:
 		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeHttp:
 		return true
@@ -38341,6 +38380,7 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetScenarioMappings1Type)
 const (
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeCode      PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "code"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnected PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "connected"
+	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnector PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "connector"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp      PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "http"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypePrompt    PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "prompt"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeVoice     PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "voice"
@@ -38353,6 +38393,8 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType) Valid() bool {
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -38929,6 +38971,7 @@ func (e RunTestSuiteJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	RunTestSuiteJSONBodyTargetsTypeCode      RunTestSuiteJSONBodyTargetsType = "code"
 	RunTestSuiteJSONBodyTargetsTypeConnected RunTestSuiteJSONBodyTargetsType = "connected"
+	RunTestSuiteJSONBodyTargetsTypeConnector RunTestSuiteJSONBodyTargetsType = "connector"
 	RunTestSuiteJSONBodyTargetsTypeHttp      RunTestSuiteJSONBodyTargetsType = "http"
 	RunTestSuiteJSONBodyTargetsTypePrompt    RunTestSuiteJSONBodyTargetsType = "prompt"
 	RunTestSuiteJSONBodyTargetsTypeVoice     RunTestSuiteJSONBodyTargetsType = "voice"
@@ -38941,6 +38984,8 @@ func (e RunTestSuiteJSONBodyTargetsType) Valid() bool {
 	case RunTestSuiteJSONBodyTargetsTypeCode:
 		return true
 	case RunTestSuiteJSONBodyTargetsTypeConnected:
+		return true
+	case RunTestSuiteJSONBodyTargetsTypeConnector:
 		return true
 	case RunTestSuiteJSONBodyTargetsTypeHttp:
 		return true
@@ -38989,6 +39034,7 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetScenarioMappings1Type) Valid()
 const (
 	RunTestSuite200JSONResponseBodyItemsTargetTypeCode      RunTestSuite200JSONResponseBodyItemsTargetType = "code"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeConnected RunTestSuite200JSONResponseBodyItemsTargetType = "connected"
+	RunTestSuite200JSONResponseBodyItemsTargetTypeConnector RunTestSuite200JSONResponseBodyItemsTargetType = "connector"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeHttp      RunTestSuite200JSONResponseBodyItemsTargetType = "http"
 	RunTestSuite200JSONResponseBodyItemsTargetTypePrompt    RunTestSuite200JSONResponseBodyItemsTargetType = "prompt"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeVoice     RunTestSuite200JSONResponseBodyItemsTargetType = "voice"
@@ -39001,6 +39047,8 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case RunTestSuite200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeHttp:
 		return true

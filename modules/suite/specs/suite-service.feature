@@ -101,6 +101,14 @@ Feature: Suite service
     Then the run's reserved namespace records the target key and the target's overrides
     And it records the models the plan was configured with
 
+  # ADR-194: the scenario run reads the connector's blocks and refuses it while
+  # the release is off, so the suite resolves it like any other agent.
+  @unit
+  Scenario: A suite accepts a connector agent as a target
+    Given a run plan target of type connector naming a connector agent the project holds
+    When the suite resolves the run's target references
+    Then the target parses, counts as an agent target and is active
+
   @unit
   Scenario: The list surface renders a deep link when a public base URL is configured
     Given a deployment that configured a public base URL

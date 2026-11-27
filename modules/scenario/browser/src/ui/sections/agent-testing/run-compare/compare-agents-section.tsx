@@ -212,7 +212,7 @@ function CompareTargetRow({
             data-testid={`run-dialog-compare-agent-${index}`}
           >
             {agents.map((agent) => (
-              <option key={agent.id} value={agent.id} disabled={agent.isRefusedBySuite === true}>
+              <option key={agent.id} value={agent.id}>
                 {agentOptionLabel(agent)}
               </option>
             ))}

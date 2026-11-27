@@ -496,7 +496,6 @@ Feature: Scenario run hooks: setup and teardown
       And teardown's reason reads as a note, not as an error
       And the run does not show "Test data may be left behind."
 
-    # suiteTargetTypeSchema has no connector type, so a run plan or suite cannot target one yet.
     @integration
     Scenario: A connector agent is offered as a scenario run target
       Given a connector agent
@@ -504,18 +503,13 @@ Feature: Scenario run hooks: setup and teardown
       Then the connector agent is listed with its connector mark
       And choosing it makes it the scenario's run target
 
+    # A suite target may be a connector, so Save & Run and every Agent testing Run reach one.
     @integration
-    Scenario: A run plan draws a connector agent disabled and says why
+    Scenario: A run plan can target a connector agent
       Given a connector agent
       When the Agent testing run dialog lists the agents to run against
-      Then the connector agent is drawn disabled
-      And on hover it reads "Suites cannot target a Scenario Connector yet"
-
-    @unit
-    Scenario: A run plan never opens on a connector remembered from a scenario run
-      Given a scenario last run against a connector agent from its editor
-      When the scenario is run from Agent testing
-      Then the run dialog opens with no agent chosen
+      Then the connector agent is offered enabled
+      And running against it queues a run plan whose target is type "connector"
 
     @integration
     Scenario: Running again from a connector run offers the connector

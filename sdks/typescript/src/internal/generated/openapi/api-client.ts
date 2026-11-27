@@ -14164,7 +14164,7 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -14267,7 +14267,7 @@ export interface operations {
                         /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -14365,7 +14365,7 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {
@@ -14449,7 +14449,7 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -14630,7 +14630,7 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {
@@ -15260,7 +15260,7 @@ export interface operations {
                     /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
                     targets: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15334,7 +15334,7 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {
@@ -15431,7 +15431,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15499,7 +15499,7 @@ export interface operations {
                     };
                     targets?: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15560,7 +15560,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15635,7 +15635,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15747,7 +15747,7 @@ export interface operations {
                     scenarioIds?: string[];
                     targets?: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15806,7 +15806,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15893,7 +15893,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15953,7 +15953,7 @@ export interface operations {
                     /** @description The prompts, agents or workflows the run goes against. Read only when the id names a test suite, which stores no target of its own; a run plan already holds its own and refuses these. */
                     targets?: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -16012,7 +16012,7 @@ export interface operations {
                             scenarioId: string;
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {

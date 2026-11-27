@@ -31,6 +31,8 @@ export function isAgentTarget(target: SuiteTarget): boolean {
     // from the agent row, the same way the other four resolve an endpoint.
     // Main's `SCENARIO_AGENT_TYPES` counts it among the agent types.
     case "voice":
+    // A connector target names an Agent row whose blocks the scenario run reads (ADR-194).
+    case "connector":
       return true;
     case "prompt":
       return false;

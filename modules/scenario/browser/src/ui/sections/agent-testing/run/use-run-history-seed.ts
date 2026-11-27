@@ -5,7 +5,6 @@
 
 import { useEffect, useRef } from "react";
 
-import { suiteTargetOf } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { applyConfigurationTo } from "./apply-configuration.ts";
 import type { RunConfigurationEntry } from "./run-configuration.ts";
@@ -24,7 +23,7 @@ function isUntouched({
   planFields: RunPlanFields;
 }): boolean {
   return (
-    isSameTarget(fields.target, suiteTargetOf(subject.initialTarget)) &&
+    isSameTarget(fields.target, subject.initialTarget) &&
     !fields.showParams &&
     !fields.showNote &&
     !planFields.showCompare &&
