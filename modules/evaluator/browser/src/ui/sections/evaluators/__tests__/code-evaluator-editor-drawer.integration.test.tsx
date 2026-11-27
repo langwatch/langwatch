@@ -138,6 +138,13 @@ describe("CodeEvaluatorEditorDrawer", () => {
         // is pressed, then names the requirement and puts the cursor on the name.
         expect(screen.getByTestId("save-code-evaluator")).toBeEnabled();
         expect(screen.queryByTestId("code-evaluator-disabled-reason")).not.toBeInTheDocument();
+        // Let the drawer settle its initial focus first,
+        // or it can take the cursor back after the click.
+        await waitFor(() =>
+          expect(screen.getByRole("dialog")).toContainElement(
+            document.activeElement as HTMLElement,
+          ),
+        );
 
         fireEvent.click(screen.getByTestId("save-code-evaluator"));
 
