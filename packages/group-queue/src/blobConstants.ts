@@ -24,10 +24,9 @@ export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
 
 /**
  * Grace period after lease retirement before blob expires (non-eager reclaim, so
- * bytes stay readable if retaken). Redis holds every finished payload this long, so
- * it sets memory: one hour filled production Redis on 2026-11-27.
+ * bytes stay readable if retaken). Redis holds every finished payload this long.
  */
-export const BLOB_RELEASE_GRACE_TTL_SECONDS = 15 * 60;
+export const BLOB_RELEASE_GRACE_TTL_SECONDS = 60 * 60;
 
 /**
  * Safety margin proving unreferenced blobs are safe to reclaim (distinguishes
@@ -36,16 +35,16 @@ export const BLOB_RELEASE_GRACE_TTL_SECONDS = 15 * 60;
 export const BLOB_RECLAIM_SAFETY_MARGIN_SECONDS = 10 * 60;
 
 /**
- * TTL at or below which the reclaim runner may destroy an unleased blob.
- * Derived so the margin above is the single number to reason about.
+ * TTL at or below which the reclaim runner may destroy an unleased blob. Fixed, not
+ * derived from the grace: a pod on an older grace must never read a newer, shorter
+ * grace as nearly spent while a deploy rolls out.
  */
-export const BLOB_RECLAIM_TTL_THRESHOLD_SECONDS =
-  BLOB_RELEASE_GRACE_TTL_SECONDS - BLOB_RECLAIM_SAFETY_MARGIN_SECONDS;
+export const BLOB_RECLAIM_TTL_THRESHOLD_SECONDS = 5 * 60;
 
 /**
  * How often the reclaim runner sweeps the blob keyspace. Sized against the
  * grace window, not traffic: an unreferenced blob is graced and gone within
- * it, ~15 minutes, not the 4-day backstop.
+ * it, not the 4-day backstop.
  */
 export const BLOB_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
