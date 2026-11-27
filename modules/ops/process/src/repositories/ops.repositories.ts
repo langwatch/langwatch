@@ -9,8 +9,8 @@ import type { SystemMigrationStateReader } from "../rules/system-migration-suppo
 import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRateLimitRepository, BugReportRepository } from "./bug-report.repository.ts";
-import type { ClickHouseServerRepository } from "./clickhouse.server.repository.ts";
 import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
+import type { ClickHouseServerRepository } from "./clickhouse.server.repository.ts";
 import type { CloudLatestReleaseRepository } from "./cloud-latest-release.repository.ts";
 import type { CloudNoticeRepository } from "./cloud-notice.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";

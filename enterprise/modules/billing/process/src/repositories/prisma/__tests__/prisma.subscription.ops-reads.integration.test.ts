@@ -15,9 +15,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaBillingSubscriptionRepository } from "../prisma.subscription.repository.ts";
 
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const namespace = `ops-reads-${randomUUID().slice(0, 8)}`;
 
-describe("given two organizations with subscriptions across two months", () => {
+describe.skipIf(!DB_URL)("given two organizations with subscriptions across two months", () => {
   let prisma: PrismaClient;
   let repository: PrismaBillingSubscriptionRepository;
   const organizationIds: string[] = [];
@@ -25,7 +26,7 @@ describe("given two organizations with subscriptions across two months", () => {
 
   beforeAll(async () => {
     prisma = new PrismaClient({
-      adapter: PrismaDriverAdapterService.create().create(process.env.DATABASE_URL ?? "").adapter,
+      adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
     });
     repository = PrismaBillingSubscriptionRepository.create(prisma);
     for (const name of ["acme", "globex"]) {

@@ -11,7 +11,7 @@ Instant evaluations: the opt-in, the estimate, and running or cancelling an inst
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | instant-eval                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                      |
-| Api token      | `InstantEvalApi` = `moduleApi<InstantEvalApi>()("instant-eval")`, `contract/src/instant-eval.api.ts:231` (18 operations) |
+| Api token      | `InstantEvalApi` = `moduleApi<InstantEvalApi>()("instant-eval")`, `contract/src/instant-eval.api.ts:257` (19 operations) |
 | Other token    | `InstantEvalBrowserApi`, `process/src/transport/instant-eval.trpc.ts:48`                                                 |
 | Installed by   | api, worker, tasks (process)                                                                                             |
 
@@ -20,7 +20,7 @@ Instant evaluations: the opt-in, the estimate, and running or cancelling an inst
 | Kind                      | Name                                                                                                                                                                               | Declared at                                                                               |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | ClickHouse table (writes) | `instant_eval_judgments`                                                                                                                                                           | `process/src/repositories/clickhouse/clickhouse.instant-eval-judgments.repository.ts:103` |
-| ClickHouse table (writes) | `instant_eval_runs`                                                                                                                                                                | `process/src/repositories/clickhouse/clickhouse.instant-eval-run.repository.ts:188`       |
+| ClickHouse table (writes) | `instant_eval_runs`                                                                                                                                                                | `process/src/repositories/clickhouse/clickhouse.instant-eval-run.repository.ts:241`       |
 | Stores required           |                                                                                                                                                                                    | `process/src/channels/instant-eval.channels.ts:22`                                        |
 | Stores required           | clickhouse, redis                                                                                                                                                                  | `process/src/repositories/live/live.instant-eval.repositories.ts:14`                      |
 | Config                    | `classifier` (INSTANT_EVAL_CLASSIFIER), `isBounded` (INSTANT_EVAL_BOUNDED), `queryTokenBudget` (INSTANT_EVAL_QUERY_TOKEN_BUDGET), `isSaas` (IS_SAAS), `nodeEnvironment` (NODE_ENV) | `contract/src/instant-eval.config.ts:10`                                                  |
@@ -42,6 +42,6 @@ Anything else instant-eval needs belongs to another module and is reached throug
 
 ## Who depends on instant-eval
 
-[connect](../../enterprise/modules/connect/README.md), [ops](../ops/README.md) (as a peer).
+[connect](../../enterprise/modules/connect/README.md), [ops](../ops/README.md), [staff-access](../staff-access/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -17,7 +17,6 @@ import type {
   SimulationLastUpdatedInput,
   SimulationLastResultSummariesInput,
   SimulationProjectDateRangeInput,
-  SimulationProjectIdsInput,
   SimulationProjectRunCount,
   SimulationRunCountsInput,
   SimulationScenarioRunInput,

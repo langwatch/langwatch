@@ -29,22 +29,28 @@ Anything else staff-access needs belongs to another module and is reached throug
 
 ## Peers (static dependencies)
 
-| Name            | Token                 | Module                                    |
-| --------------- | --------------------- | ----------------------------------------- |
-| `apiKeys`       | `ApiKeyApi`           | [api-key](../api-key/README.md)           |
-| `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)       |
-| `auth`          | `AuthApi`             | [auth](../auth/README.md)                 |
-| `codingAgents`  | `CodingAgentApi`      | [coding-agent](../coding-agent/README.md) |
-| `entitlements`  | `EntitlementApi`      | [entitlement](../entitlement/README.md)   |
-| `evaluations`   | `EvaluationApi`       | [evaluation](../evaluation/README.md)     |
-| `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md) |
-| `gateway`       | `GatewayApi`          | [gateway](../gateway/README.md)           |
-| `notifications` | `NotificationService` | [notification](../notification/README.md) |
-| `ops`           | `OpsApi`              | [ops](../ops/README.md)                   |
-| `organizations` | `OrganizationApi`     | [organization](../organization/README.md) |
-| `projects`      | `ProjectApi`          | [project](../project/README.md)           |
-| `traces`        | `TraceApi`            | [trace](../trace/README.md)               |
-| `users`         | `UserApi`             | [user](../user/README.md)                 |
+| Name            | Token                 | Module                                                |
+| --------------- | --------------------- | ----------------------------------------------------- |
+| `apiKeys`       | `ApiKeyApi`           | [api-key](../api-key/README.md)                       |
+| `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)                   |
+| `auth`          | `AuthApi`             | [auth](../auth/README.md)                             |
+| `billing`       | `BillingApi`          | [billing](../../enterprise/modules/billing/README.md) |
+| `codingAgents`  | `CodingAgentApi`      | [coding-agent](../coding-agent/README.md)             |
+| `dataRetention` | `DataRetentionApi`    | [data-retention](../data-retention/README.md)         |
+| `entitlements`  | `EntitlementApi`      | [entitlement](../entitlement/README.md)               |
+| `evaluations`   | `EvaluationApi`       | [evaluation](../evaluation/README.md)                 |
+| `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md)             |
+| `gateway`       | `GatewayApi`          | [gateway](../gateway/README.md)                       |
+| `instantEvals`  | `InstantEvalApi`      | [instant-eval](../instant-eval/README.md)             |
+| `langy`         | `LangyApi`            | [langy](../langy/README.md)                           |
+| `monitors`      | `MonitorApi`          | [monitor](../monitor/README.md)                       |
+| `notifications` | `NotificationService` | [notification](../notification/README.md)             |
+| `ops`           | `OpsApi`              | [ops](../ops/README.md)                               |
+| `organizations` | `OrganizationApi`     | [organization](../organization/README.md)             |
+| `projects`      | `ProjectApi`          | [project](../project/README.md)                       |
+| `scenarios`     | `ScenarioApi`         | [scenario](../scenario/README.md)                     |
+| `traces`        | `TraceApi`            | [trace](../trace/README.md)                           |
+| `users`         | `UserApi`             | [user](../user/README.md)                             |
 
 ## Who depends on staff-access
 

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:55`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:60`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -120,6 +120,14 @@ Online evaluator runs scheduled in `[since, until)` per project: counts and code
 
 ```typescript
 countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]>;
+```
+
+#### `countEvaluatorUsageByType`
+
+Every tenant's runs in `[since, until)` per evaluator type, busiest first (ADR-202).
+
+```typescript
+countEvaluatorUsageByType(input: EvaluatorTypeUsageQuery): Promise<EvaluatorTypeUsage[]>;
 ```
 
 #### `runEvaluator`

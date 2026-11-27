@@ -30,9 +30,6 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../topic/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -42,9 +39,6 @@
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
-      "path": "../../rum/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
@@ -52,9 +46,6 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../platform-health/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
@@ -102,9 +93,6 @@
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
@@ -130,9 +118,6 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:447`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:453`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -348,6 +348,22 @@ Per queue, how many groups of these tenants wait, are blocked, active, parked or
 
 ```typescript
 countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]>;
+```
+
+#### `findClickHouseQueryErrors`
+
+The shared ClickHouse's failed statements in a window, by shape, source and code (ADR-202).
+
+```typescript
+findClickHouseQueryErrors(input: ClickHouseQueryErrorsInput): Promise<ClickHouseQueryErrorGroup[]>;
+```
+
+#### `getClickHouseHealth`
+
+The shared ClickHouse's replica, part, merge, disk and memory health (ADR-202).
+
+```typescript
+getClickHouseHealth(): Promise<ClickHouseServerHealth>;
 ```
 
 #### `isAdmin`
@@ -954,6 +970,14 @@ getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
 
 ```typescript
 listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
+```
+
+#### `findServingProcesses`
+
+The processes serving now, by role, image and release; never a process id or host.
+
+```typescript
+findServingProcesses(): Promise<OpsServingProcess[]>;
 ```
 
 #### `retryUpgradeStep`
@@ -2713,11 +2737,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                 | Environment variable                    | Declared at                        |
 | ------ | ------------------------------------ | --------------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:845`           |
-| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:846`           |
-| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:848`           |
-| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:849`           |
-| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:850`           |
+| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:853`           |
+| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:854`           |
+| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:856`           |
+| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:857`           |
+| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:858`           |
 | config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:32` |
 | config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:34` |
 | config | `clickhouseOpsPasswordFile`          | `CLICKHOUSE_OPS_PASSWORD_FILE`          | `../contract/src/ops.config.ts:36` |

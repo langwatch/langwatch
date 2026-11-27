@@ -11,7 +11,7 @@ import type { StripePriceDetail } from "@langwatch/enterprise-billing-contract";
 export type StripePricePage = Readonly<{ prices: StripePriceDetail[]; hasMore: boolean }>;
 
 /** A price as an ops read sees it: its catalogue facts and how Stripe treats its tax. */
-export type StripePriceTaxListing = Readonly<{
+type StripePriceTaxListing = Readonly<{
   id: string;
   active: boolean;
   livemode: boolean;
