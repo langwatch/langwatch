@@ -5,6 +5,7 @@
  */
 import { ClientAddress } from "@langwatch/api/policy";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { STAFF_ACCESS_OPS_TOKEN_PREFIX } from "@langwatch/staff-access-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -17,6 +18,7 @@ import {
   VERIFIER,
 } from "../../app/__tests__/support/staff-access-world.ts";
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
+import { parseToken } from "../../rules/staff-access.rules.ts";
 import { staffAccessRest } from "../staff-access.rest.ts";
 
 function mount() {
@@ -144,7 +146,6 @@ describe("given the staff access REST family", () => {
       };
       const sourceToken = await side(ACME, GLOBEX, "copy:source");
       const targetToken = await side(GLOBEX, ACME, "copy:target");
-      const secretOf = (token: string) => token.split("_").at(-1) ?? token;
 
       const dryRun = await send({
         method: "POST",
@@ -174,7 +175,13 @@ describe("given the staff access REST family", () => {
         ),
       );
       const written = JSON.stringify([dryRun, malformed, unknown, trail, w.state.audit]);
-      expect(written).not.toContain(secretOf(sourceToken));
+      const secret = parseToken({
+        token: sourceToken,
+        prefix: STAFF_ACCESS_OPS_TOKEN_PREFIX,
+      })?.secret;
+      expect(secret?.length).toBeGreaterThanOrEqual(20);
+      expect(written).not.toContain(sourceToken);
+      expect(written).not.toContain(secret);
     });
   });
 
