@@ -9,10 +9,12 @@ export function useLangyPeekProximity({
   enabled,
   mode,
   dodgeLeft,
+  floatingWidthPx,
 }: {
   enabled: boolean;
   mode: "floating" | "sidebar";
   dodgeLeft: boolean;
+  floatingWidthPx: number;
 }): boolean {
   const [near, setNear] = useState(false);
 
@@ -36,6 +38,7 @@ export function useLangyPeekProximity({
           mode,
           dodgeLeft,
           wasNear,
+          floatingWidthPx,
         }),
       );
     };
@@ -61,7 +64,7 @@ export function useLangyPeekProximity({
       window.removeEventListener("blur", onLeave);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [enabled, mode, dodgeLeft]);
+  }, [enabled, mode, dodgeLeft, floatingWidthPx]);
 
   return near;
 }

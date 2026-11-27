@@ -93,6 +93,16 @@ Feature: Uploads through LangWatch when browsers cannot reach the bucket
       And an answer the door writes itself, such as liveness or readiness, closes a connection whose body is still arriving
       And a request that declared no body keeps its connection for reuse
 
+    @unit
+    Scenario: A body over the cap is answered 413, never a reset
+      Given a door in front of the api's listener
+      And a client that writes its whole request body before it reads the answer
+      When the api refuses the body as over the cap before reading it
+      Then the client reads the 413 and the connection closes
+      And the door reads and drops the rest of the body without passing it to the api
+      And it closes once the body ends, after 5 s with no byte, after 30 s or after 1 GiB, whichever comes first
+      And a 408 closes at once, since the slow body is what it refused
+
   Rule: Uploads nobody confirmed are cleaned up
 
     @unit

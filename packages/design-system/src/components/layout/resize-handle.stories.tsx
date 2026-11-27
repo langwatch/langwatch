@@ -6,14 +6,21 @@ import { ResizeHandle } from "./resize-handle.tsx";
 
 const DEFAULT_WIDTH = 212;
 
-function ResizableColumn() {
+function ResizableColumn({ edge = "right" }: { edge?: "left" | "right" }) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   return (
-    <Box display="flex" height="240px" borderWidth="1px" borderRadius="md">
+    <Box
+      display="flex"
+      flexDirection={edge === "left" ? "row-reverse" : "row"}
+      height="240px"
+      borderWidth="1px"
+      borderRadius="md"
+    >
       <Box position="relative" width={`${width}px`} flexShrink={0} padding={3} bg="bg.muted">
         <Text truncate>Analytics: LLM Metrics and costs per customer</Text>
         <ResizeHandle
           label="Resize sidebar"
+          edge={edge}
           value={width}
           min={DEFAULT_WIDTH}
           max={480}
@@ -51,3 +58,5 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const LeftEdge: Story = { render: () => <ResizableColumn edge="left" /> };

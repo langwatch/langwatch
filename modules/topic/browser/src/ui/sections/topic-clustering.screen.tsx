@@ -64,6 +64,11 @@ const CLUSTERING_FAILURE_GUIDANCE: Partial<
     description:
       "Check the API key for your topic clustering model in Settings → Model Providers, then run topic clustering again.",
   },
+  model_provider_key_missing: {
+    title: "Your model provider has no API key",
+    description:
+      "Add the API key for your topic clustering or embeddings model in Settings → Model Providers, then run topic clustering again.",
+  },
   model_provider_quota: {
     title: "Your model provider refused the request",
     description:

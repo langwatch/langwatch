@@ -4,6 +4,7 @@
  */
 import type { ModelProviderApi, ModelProviderExecution } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderTopicClusteringModelsService } from "../topic-clustering-models.service.ts";
@@ -68,19 +69,28 @@ describe("topic clustering's models, read through the model provider", () => {
     });
   });
 
-  describe("when the embeddings model names a provider that is missing or disabled", () => {
+  describe("when the embeddings model names a provider that is missing", () => {
     /** @scenario "Topic clustering names the provider it cannot use rather than inventing a model" */
-    it.each([
-      ["missing", {}, "Embeddings model provider openai not found"],
-      [
-        "disabled",
-        { openai: execution({ enabled: false }) },
-        "Embeddings model provider openai is not enabled",
-      ],
-    ])("refuses naming the provider when it is %s", async (_state, providers, message) => {
-      const { models } = modelsOver({ providers });
+    it("refuses naming the provider", async () => {
+      const { models } = modelsOver({ providers: {} });
 
-      await expect(models.resolveEmbeddingsModel(PROJECT)).rejects.toThrow(message);
+      const refusal = models.resolveEmbeddingsModel(PROJECT);
+
+      await expect(refusal).rejects.toMatchObject({
+        code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      });
+    });
+  });
+
+  describe("when the embeddings model names a disabled provider", () => {
+    /** @scenario "A disabled embeddings provider skips the run like a disabled clustering provider" */
+    it("returns the provider so the run can see it is disabled", async () => {
+      const { models } = modelsOver({ providers: { openai: execution({ enabled: false }) } });
+
+      await expect(models.resolveEmbeddingsModel(PROJECT)).resolves.toMatchObject({
+        model: "openai/text-embedding-3-small",
+        modelProvider: { enabled: false },
+      });
     });
   });
 });

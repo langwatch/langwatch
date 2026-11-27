@@ -83,7 +83,8 @@
     "./dev/nx/helm-plugin.mjs",
     "./dev/nx/workspace-plugin.mjs",
     "./dev/nx/test-reads-plugin.mjs",
-    "./dev/nx/haven-plugin.mjs"
+    "./dev/nx/haven-plugin.mjs",
+    "./dev/nx/remote-cache-plugin.mjs"
   ],
   "targetDefaults": {
     "build": [

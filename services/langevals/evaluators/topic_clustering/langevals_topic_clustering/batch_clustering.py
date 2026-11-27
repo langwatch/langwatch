@@ -22,7 +22,10 @@ from langevals_topic_clustering.types import (
     TraceWithEmbeddings,
 )
 from scipy.cluster.hierarchy import linkage, fcluster
-from langevals_topic_clustering.failures import configured_model, failure_answer
+from langevals_topic_clustering.failures import (
+    configured_model,
+    failure_answer,
+)
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.batch")
