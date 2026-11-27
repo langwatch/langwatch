@@ -10,9 +10,12 @@ Feature: Profile - who I am here, and where I am signed in
   # holds everything about CHANGING how you prove who you are; this page reads
   # it back and changes only the two things nowhere else changes.
   #
-  # FOUR BANDS, each a narrower kind of "you" than the one above:
+  # FIVE BANDS, each a narrower kind of "you" than the one above, the last
+  # being the mail that reaches you:
   #
   #   your details ──► sign-in methods ──► where you are signed in ──► your keys
+  #                                                                      │
+  #                                                          email preferences
   #
   # ONE MUTATION SURFACE PER SUBJECT. The name and the photo are set here
   # because nowhere else sets them. Addresses, passkeys and passwords are
@@ -258,6 +261,16 @@ Feature: Profile - who I am here, and where I am signed in
       Given the read of my keys fails
       When I open my profile
       Then I am told what could not be read, in words, with a trace to quote
+
+  # ── Email preferences ──────────────────────────────────────────────────
+
+  Rule: the mail I get is chosen last, below my keys
+
+    @integration
+    Scenario: The profile shows my email preferences after my keys
+      When I open my profile
+      Then I see an Email preferences band
+      And it comes after my keys
 
   Rule: the page keeps the settings look
 
