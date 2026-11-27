@@ -9,6 +9,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type {
   OrganizationApi,
@@ -49,6 +50,8 @@ import {
 import { hasPassed, parseToken, secretMatches } from "../rules/staff-access.rules.ts";
 import { StaffAccessCopyRunService } from "./staff-access-copy-run.service.ts";
 
+const logger = createLogger("langwatch:staff-access:copy");
+const STOP_AUDIT_ATTEMPTS = 3;
 const COPY_OPERATION = "staffAccess.copyOrganization";
 const COPY_PATH = "/api/staff-access/ops/copies";
 
@@ -67,7 +70,7 @@ type CopyDeps = Readonly<{
   organizations: Pick<OrganizationApi, "findProvisioningSummary" | "listTeams">;
   projects: Pick<ProjectApi, "listByOrganization" | "findById" | "createInOrganization">;
   evaluators: Pick<EvaluatorApi, "getAll" | "create">;
-  monitors: Pick<MonitorApi, "list" | "create" | "toggle">;
+  monitors: Pick<MonitorApi, "list" | "create">;
   prompts: Pick<PromptApi, "getAllPrompts" | "getAllVersions" | "createPrompt" | "updatePrompt">;
   datasets: Pick<DatasetApi, "findDatasetSummaries" | "copyDataset">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -149,7 +152,7 @@ export class StaffAccessCopyService {
           items,
           action: AUDIT_ACTION.stopped,
           stoppedBecause,
-        }).catch(() => undefined);
+        });
       }
       await finish(200, null);
       return {
@@ -296,38 +299,58 @@ export class StaffAccessCopyService {
       items,
       outcome: action === AUDIT_ACTION.stopped ? "copied" : "planned",
     });
+    const sides = [
+      [source, "source"],
+      [target, "target"],
+    ] as const;
+    const recordSide = async ([side, role]: (typeof sides)[number]): Promise<void> => {
+      await this.deps.auditLog.record({
+        organizationId: side.organization.id,
+        userId: side.row.ownerUserId,
+        actorUserId: side.row.ownerUserId,
+        action,
+        targetKind: "staffAccess",
+        targetId: side.row.id,
+        ...(bearer.ipAddress ? { ipAddress: bearer.ipAddress } : {}),
+        ...(bearer.userAgent ? { userAgent: bearer.userAgent } : {}),
+        metadata: {
+          principal: STAFF_ACCESS_PRINCIPAL,
+          approvedBy: { id: side.row.ownerUserId },
+          reason: side.row.reason,
+          role,
+          sourceOrganizationId: source.organization.id,
+          targetOrganizationId: target.organization.id,
+          sourceApproval: source.row.id,
+          targetApproval: target.row.id,
+          counts: plan.counts,
+          items: plan.names,
+          monitorsCreatedPaused: true,
+          ...(stoppedBecause ? { stoppedBecause } : {}),
+        },
+      });
+    };
+    if (action === AUDIT_ACTION.stopped) {
+      for (const entry of sides) await this.recordStopped({ write: () => recordSide(entry) });
+      return;
+    }
     try {
-      for (const [side, role] of [
-        [source, "source"],
-        [target, "target"],
-      ] as const) {
-        await this.deps.auditLog.record({
-          organizationId: side.organization.id,
-          userId: side.row.ownerUserId,
-          actorUserId: side.row.ownerUserId,
-          action,
-          targetKind: "staffAccess",
-          targetId: side.row.id,
-          ...(bearer.ipAddress ? { ipAddress: bearer.ipAddress } : {}),
-          ...(bearer.userAgent ? { userAgent: bearer.userAgent } : {}),
-          metadata: {
-            principal: STAFF_ACCESS_PRINCIPAL,
-            approvedBy: { id: side.row.ownerUserId },
-            reason: side.row.reason,
-            role,
-            sourceOrganizationId: source.organization.id,
-            targetOrganizationId: target.organization.id,
-            sourceApproval: source.row.id,
-            targetApproval: target.row.id,
-            counts: plan.counts,
-            items: plan.names,
-            monitorsCreatedPaused: true,
-            ...(stoppedBecause ? { stoppedBecause } : {}),
-          },
-        });
-      }
+      for (const entry of sides) await recordSide(entry);
     } catch {
       throw new StaffAccessAuditUnavailableError();
+    }
+  }
+
+  /** A stop row is written on its own for each side, retried, and logged if it never lands. */
+  private async recordStopped({ write }: { write: () => Promise<void> }): Promise<void> {
+    for (let attempt = 1; attempt <= STOP_AUDIT_ATTEMPTS; attempt++) {
+      try {
+        await write();
+        return;
+      } catch (error) {
+        if (attempt === STOP_AUDIT_ATTEMPTS) {
+          logger.error({ error }, "a staff access copy stop row was not written");
+        }
+      }
     }
   }
 }

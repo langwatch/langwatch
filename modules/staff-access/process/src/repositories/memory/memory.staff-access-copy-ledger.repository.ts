@@ -4,7 +4,7 @@ import type {
 } from "../staff-access.repository.ts";
 
 export class MemoryStaffAccessCopyLedgerRepository implements StaffAccessCopyLedgerRepository {
-  readonly #rows: StaffAccessCopyLedgerRow[] = [];
+  #rows: StaffAccessCopyLedgerRow[] = [];
 
   static create(): MemoryStaffAccessCopyLedgerRepository {
     return new MemoryStaffAccessCopyLedgerRepository();
@@ -24,7 +24,7 @@ export class MemoryStaffAccessCopyLedgerRepository implements StaffAccessCopyLed
     );
   }
 
-  async record(row: StaffAccessCopyLedgerRow): Promise<boolean> {
+  async reserve(row: StaffAccessCopyLedgerRow): Promise<boolean> {
     const taken = this.#rows.some(
       (existing) =>
         existing.targetOrganizationId === row.targetOrganizationId &&
@@ -34,5 +34,23 @@ export class MemoryStaffAccessCopyLedgerRepository implements StaffAccessCopyLed
     if (taken) return false;
     this.#rows.push(row);
     return true;
+  }
+
+  async complete({
+    id,
+    targetId,
+    targetProjectId,
+  }: {
+    id: string;
+    targetId: string;
+    targetProjectId: string;
+  }): Promise<void> {
+    this.#rows = this.#rows.map((row) =>
+      row.id === id ? { ...row, targetId, targetProjectId } : row,
+    );
+  }
+
+  async release({ id }: { id: string }): Promise<void> {
+    this.#rows = this.#rows.filter((row) => row.id !== id || row.targetId !== null);
   }
 }

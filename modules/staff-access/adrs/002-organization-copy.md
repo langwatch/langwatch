@@ -51,8 +51,11 @@ The copy is an ops operation of the `staff-access` module:
 - **A revoke stops a running copy.** Before each item the run rereads both
   approvals. Once either is revoked, lapsed or ended, nothing more is made,
   the remaining items are reported `stopped`, the report says why, and both
-  audit logs get a `staffAccess.orgCopyStopped` row with what was made.
-- **An allowlist.** A copy carries projects, evaluators, monitors (paused),
+  audit logs get a `staffAccess.orgCopyStopped` row with what was made. Each
+  side's stop row is written on its own and retried, so one failed write never
+  costs the other organization its row.
+- **An allowlist.** A copy carries projects, evaluators, monitors (created
+  paused, in the same write),
   prompts with every version, and ready datasets. It never carries secrets,
   API keys, model providers, members, roles, SSO, billing, licence or usage.
   A kind not on the list is not read at all.
@@ -63,8 +66,14 @@ The copy is an ops operation of the `staff-access` module:
   the source organization.
 - **Idempotent by a ledger.** `StaffAccessCopyLedger` records each source item
   and the target item made from it, unique on target organization, kind and
-  source id. A rerun reports earlier items as `already_copied` and makes only
-  new ones. A dry run plans and creates nothing.
+  source id. The row is reserved before the owner creates the target and
+  completed with its id after, so a source item never gets two targets: a
+  concurrent run loses the reservation and makes nothing, a make that fails
+  releases it, and a reservation left unfinished by a crash or a failed write
+  is reported `copy_interrupted` on every rerun instead of made again. A prompt
+  whose later version the owner refuses keeps its row and is reported
+  `prompt_versions_incomplete`. A rerun reports earlier items as
+  `already_copied` and makes only new ones. A dry run plans and creates nothing.
 
 ## Consequences
 

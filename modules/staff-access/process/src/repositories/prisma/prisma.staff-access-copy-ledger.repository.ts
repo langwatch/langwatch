@@ -1,4 +1,4 @@
-/** The Postgres backend of the organization copy ledger: rows are only ever added and read. */
+/** The Postgres copy ledger: a row is reserved, then completed with its target. */
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient, StaffAccessCopyLedger } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate } from "@langwatch/time";
@@ -39,11 +39,30 @@ export class PrismaStaffAccessCopyLedgerRepository
     }));
   }
 
-  async record(row: StaffAccessCopyLedgerRow): Promise<boolean> {
+  async reserve(row: StaffAccessCopyLedgerRow): Promise<boolean> {
     const { count } = await this.database.staffAccessCopyLedger.createMany({
       data: [{ ...row, createdAt: toDate(row.createdAt) }],
       skipDuplicates: true,
     });
     return count === 1;
+  }
+
+  async complete({
+    id,
+    targetId,
+    targetProjectId,
+  }: {
+    id: string;
+    targetId: string;
+    targetProjectId: string;
+  }): Promise<void> {
+    await this.database.staffAccessCopyLedger.updateMany({
+      where: { id },
+      data: { targetId, targetProjectId },
+    });
+  }
+
+  async release({ id }: { id: string }): Promise<void> {
+    await this.database.staffAccessCopyLedger.deleteMany({ where: { id, targetId: null } });
   }
 }

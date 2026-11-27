@@ -159,6 +159,9 @@ export const opsCopyCommand = async ({
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+  if (projects !== undefined && named.length === 0) {
+    throw validationError("--projects names no project; leave it out to copy every project.");
+  }
 
   const requesterKey = requireRequesterKey();
   const endpoint = getEndpoint();

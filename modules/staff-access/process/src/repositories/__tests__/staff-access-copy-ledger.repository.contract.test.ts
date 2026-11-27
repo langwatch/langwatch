@@ -40,16 +40,16 @@ function row(overrides: Partial<StaffAccessCopyLedgerRow>): StaffAccessCopyLedge
 
 function contract(name: string, repository: () => StaffAccessCopyLedgerRepository): void {
   describe(`given the ${name} copy ledger`, () => {
-    it("records a copy once per target organization, kind and source", async () => {
+    it("reserves a copy once per target organization, kind and source", async () => {
       const ledger = repository();
       const first = row({});
 
-      await expect(ledger.record(first)).resolves.toBe(true);
-      await expect(ledger.record({ ...first, id: `staffcopy_${randomUUID()}` })).resolves.toBe(
+      await expect(ledger.reserve(first)).resolves.toBe(true);
+      await expect(ledger.reserve({ ...first, id: `staffcopy_${randomUUID()}` })).resolves.toBe(
         false,
       );
       await expect(
-        ledger.record({
+        ledger.reserve({
           ...first,
           id: `staffcopy_${randomUUID()}`,
           targetOrganizationId: `org_other_${randomUUID()}`,
@@ -57,12 +57,34 @@ function contract(name: string, repository: () => StaffAccessCopyLedgerRepositor
       ).resolves.toBe(true);
     });
 
+    it("completes a reservation with its target and releases only an unfinished one", async () => {
+      const ledger = repository();
+      const sourceOrganizationId = `org_source_${randomUUID()}`;
+      const pair = { sourceOrganizationId, targetOrganizationId: "org_target" };
+      const done = row({ sourceOrganizationId, targetId: null, targetProjectId: null });
+      const dropped = row({ sourceOrganizationId, targetId: null, targetProjectId: null });
+      await ledger.reserve(done);
+      await ledger.reserve(dropped);
+
+      await ledger.complete({
+        id: done.id,
+        targetId: "prompt_made",
+        targetProjectId: "project_made",
+      });
+      await ledger.release({ id: done.id });
+      await ledger.release({ id: dropped.id });
+
+      expect(await ledger.findForPair(pair)).toEqual([
+        { ...done, targetId: "prompt_made", targetProjectId: "project_made" },
+      ]);
+    });
+
     it("answers only the rows of one source and target pair", async () => {
       const ledger = repository();
       const sourceOrganizationId = `org_source_${randomUUID()}`;
       const mine = row({ sourceOrganizationId });
-      await ledger.record(mine);
-      await ledger.record(row({ sourceOrganizationId: `org_elsewhere_${randomUUID()}` }));
+      await ledger.reserve(mine);
+      await ledger.reserve(row({ sourceOrganizationId: `org_elsewhere_${randomUUID()}` }));
 
       const found = await ledger.findForPair({
         sourceOrganizationId,

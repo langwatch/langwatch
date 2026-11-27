@@ -2,6 +2,7 @@ import type { DatasetApi, DatasetSummary } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
 import type {
   OrganizationApi,
   OrganizationProvisioningSummary,
@@ -26,6 +27,12 @@ import {
   type CopyWork as Work,
 } from "./staff-access-copy-make.service.ts";
 
+const logger = createLogger("langwatch:staff-access:copy");
+
+/** A ledger row reserved by a run that never named its target: its outcome is unknown. */
+const INTERRUPTED: Placed = { targetId: "", targetProjectId: "" };
+const INTERRUPTED_REASON = "copy_interrupted";
+
 const PAGE = 100;
 const DATASET_PAGE = 1000;
 /** A bound on paging; no organization or project comes near it. */
@@ -36,7 +43,7 @@ type RunDeps = Readonly<{
   organizations: Pick<OrganizationApi, "listTeams">;
   projects: Pick<ProjectApi, "listByOrganization" | "findById" | "createInOrganization">;
   evaluators: Pick<EvaluatorApi, "getAll" | "create">;
-  monitors: Pick<MonitorApi, "list" | "create" | "toggle">;
+  monitors: Pick<MonitorApi, "list" | "create">;
   prompts: Pick<PromptApi, "getAllPrompts" | "getAllVersions" | "createPrompt" | "updatePrompt">;
   datasets: Pick<DatasetApi, "findDatasetSummaries" | "copyDataset">;
   now: () => Instant;
@@ -84,12 +91,16 @@ export class StaffAccessCopyRunService {
       sourceOrganizationId: source.id,
       targetOrganizationId: target.id,
     });
-    const placed = new Map<string, Placed>(
-      ledger.map((row) => [
-        keyOf(row.kind as StaffAccessCopyKind, row.sourceId),
-        { targetId: row.targetId, targetProjectId: row.targetProjectId },
-      ]),
-    );
+    const placed = new Map<string, Placed>();
+    for (const row of ledger) {
+      const key = keyOf(row.kind as StaffAccessCopyKind, row.sourceId);
+      placed.set(
+        key,
+        row.targetId === null || row.targetProjectId === null
+          ? INTERRUPTED
+          : { targetId: row.targetId, targetProjectId: row.targetProjectId },
+      );
+    }
     const { selected, unknown } = selectProjects({
       projects: await this.copyableProjects({ organizationId: source.id }),
       named,
@@ -104,7 +115,8 @@ export class StaffAccessCopyRunService {
     for (const project of selected) {
       steps.push(...(await this.planProject({ project, source, placed })));
     }
-    return { items: steps.map((step) => step.item), steps, placed };
+    const finished = new Map([...placed].filter(([, where]) => where !== INTERRUPTED));
+    return { items: steps.map((step) => step.item), steps, placed: finished };
   }
 
   /**
@@ -163,36 +175,59 @@ export class StaffAccessCopyRunService {
     if (!withinGrant({ kind: step.item.kind, grant: run.grant })) {
       return { ...step.item, outcome: "skipped", reason: "outside_copy_grant" };
     }
+    const reservation = {
+      id: generate("staffcopy").toString(),
+      requestId: run.requestId,
+      sourceOrganizationId: run.source.id,
+      targetOrganizationId: run.target.id,
+      kind: step.item.kind,
+      sourceId: step.item.sourceId,
+      targetId: null,
+      sourceProjectId: step.item.sourceProjectId,
+      targetProjectId: null,
+      createdAt: this.deps.now(),
+    };
     try {
-      const made = await this.#make.make({
+      if (!(await this.deps.ledger.reserve(reservation))) {
+        return { ...step.item, outcome: "skipped", reason: "copied_by_a_concurrent_run" };
+      }
+    } catch (error) {
+      return { ...step.item, outcome: "failed", reason: failureReason(error) };
+    }
+    let made: Awaited<ReturnType<StaffAccessCopyMakeService["make"]>>;
+    try {
+      made = await this.#make.make({
         work: step.work,
         sourceProjectId: step.item.sourceProjectId,
         targetProjectId,
         run,
       });
-      if ("skipped" in made) return { ...step.item, outcome: "skipped", reason: made.skipped };
-      const recorded = await this.deps.ledger.record({
-        id: generate("staffcopy").toString(),
-        requestId: run.requestId,
-        sourceOrganizationId: run.source.id,
-        targetOrganizationId: run.target.id,
-        kind: step.item.kind,
-        sourceId: step.item.sourceId,
-        targetId: made.targetId,
-        sourceProjectId: step.item.sourceProjectId,
-        targetProjectId: made.targetProjectId,
-        createdAt: this.deps.now(),
-      });
-      run.placed.set(keyOf(step.item.kind, step.item.sourceId), made);
-      return {
-        ...step.item,
-        outcome: recorded ? "copied" : "failed",
-        targetId: made.targetId,
-        targetProjectId: made.targetProjectId,
-        reason: recorded ? null : "copied_by_a_concurrent_run",
-      };
     } catch (error) {
+      await this.releaseQuietly({ id: reservation.id });
       return { ...step.item, outcome: "failed", reason: failureReason(error) };
+    }
+    if ("skipped" in made) {
+      await this.releaseQuietly({ id: reservation.id });
+      return { ...step.item, outcome: "skipped", reason: made.skipped };
+    }
+    const placedItem = { targetId: made.targetId, targetProjectId: made.targetProjectId };
+    run.placed.set(keyOf(step.item.kind, step.item.sourceId), placedItem);
+    const copied = { ...step.item, ...placedItem };
+    try {
+      await this.deps.ledger.complete({ id: reservation.id, ...placedItem });
+    } catch (error) {
+      return { ...copied, outcome: "failed", reason: failureReason(error) };
+    }
+    if (made.incomplete) return { ...copied, outcome: "failed", reason: made.incomplete };
+    return { ...copied, outcome: "copied", reason: null };
+  }
+
+  /** A reservation whose make failed holds nothing; a failed release leaves it interrupted. */
+  private async releaseQuietly({ id }: { id: string }): Promise<void> {
+    try {
+      await this.deps.ledger.release({ id });
+    } catch (error) {
+      logger.warn({ error, ledgerId: id }, "a copy reservation was not released");
     }
   }
 
@@ -229,6 +264,10 @@ export class StaffAccessCopyRunService {
   }): Promise<Step[]> {
     const at = { sourceProjectId: project.id };
     const earlier = placed.get(keyOf("project", project.id));
+    if (earlier === INTERRUPTED) {
+      const base = { kind: "project" as const, name: project.name, sourceId: project.id, ...at };
+      return [{ item: copyItem(base, "skipped", { reason: INTERRUPTED_REASON }), work: null }];
+    }
     const projectStep: Step = {
       item: earlier
         ? copyItem(
@@ -280,6 +319,9 @@ export class StaffAccessCopyRunService {
     const step = (work: Work, name: string, skipped?: string): Step => {
       const base = { kind: work.kind, name, sourceId: work.source.id, ...at };
       const done = placed.get(keyOf(work.kind, work.source.id));
+      if (done === INTERRUPTED) {
+        return { item: copyItem(base, "skipped", { reason: INTERRUPTED_REASON }), work: null };
+      }
       if (done) return { item: copyItem(base, "already_copied", done), work };
       if (skipped) return { item: copyItem(base, "skipped", { reason: skipped }), work: null };
       return { item: copyItem(base, "planned"), work };

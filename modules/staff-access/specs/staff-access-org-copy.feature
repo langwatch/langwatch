@@ -166,6 +166,12 @@ Feature: Copying an organization's setup into another organization
     And it sends the copy with the target's ops token and the source's ops token in the body
     And it ends both sessions afterwards
 
+  @integration
+  Scenario: The CLI refuses a project list that names no project
+    When the agent runs "langwatch ops copy --from acme --to globex --projects ' , '"
+    Then it fails before asking any approval
+    And it says to leave --projects out to copy every project
+
   @unimplemented
   Scenario: Scenarios and test suites are copied
     When the agent copies ACME into Globex

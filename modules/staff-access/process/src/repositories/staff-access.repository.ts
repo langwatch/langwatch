@@ -93,9 +93,10 @@ export type StaffAccessCopyLedgerRow = Readonly<{
   targetOrganizationId: string;
   kind: string;
   sourceId: string;
-  targetId: string;
+  /** Null while the copy of this source is reserved and its target is not made yet. */
+  targetId: string | null;
   sourceProjectId: string;
-  targetProjectId: string;
+  targetProjectId: string | null;
   createdAt: Instant;
 }>;
 
@@ -204,6 +205,10 @@ export interface StaffAccessCopyLedgerRepository {
     sourceOrganizationId: string;
     targetOrganizationId: string;
   }): Promise<StaffAccessCopyLedgerRow[]>;
-  /** Records one copied object; false when the target already holds a copy of that source. */
-  record(row: StaffAccessCopyLedgerRow): Promise<boolean>;
+  /** Reserves one source before its target is made; false when another copy holds it. */
+  reserve(row: StaffAccessCopyLedgerRow): Promise<boolean>;
+  /** Names the target a reservation made. */
+  complete(input: { id: string; targetId: string; targetProjectId: string }): Promise<void>;
+  /** Drops a reservation that made nothing; a completed row is never removed. */
+  release(input: { id: string }): Promise<void>;
 }

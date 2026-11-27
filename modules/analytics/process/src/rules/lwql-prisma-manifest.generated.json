@@ -31888,8 +31888,8 @@
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isOptional": false,
-          "documentation": ""
+          "isOptional": true,
+          "documentation": "Null while the source is reserved and its target is not made yet."
         },
         {
           "name": "sourceProjectId",
@@ -31906,7 +31906,7 @@
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isOptional": false,
+          "isOptional": true,
           "documentation": ""
         },
         {

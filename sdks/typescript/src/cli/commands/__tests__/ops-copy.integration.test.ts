@@ -189,4 +189,22 @@ describe("langwatch ops copy", () => {
     expect(result.stdout).not.toContain(OPS_TOKENS.req_source);
     expect(fs.readdirSync(stateDir)).toEqual([]);
   }, 30_000);
+
+  /** @scenario "The CLI refuses a project list that names no project" */
+  it("refuses an empty --projects before asking any approval", async () => {
+    const result = await run([
+      "ops",
+      "copy",
+      "--from",
+      "acme",
+      "--to",
+      "globex",
+      "--projects",
+      " , ",
+    ]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("leave it out to copy every project");
+    expect(requests).toEqual([]);
+  }, 30_000);
 });

@@ -1,4 +1,5 @@
--- The organization copy ledger (staff-access module ADR-002).
+-- The organization copy ledger (staff-access module ADR-002). A row is reserved before its
+-- target is made, so the target columns stay null until the copy names them.
 CREATE TABLE IF NOT EXISTS "StaffAccessCopyLedger" (
     "id" TEXT NOT NULL,
     "requestId" TEXT NOT NULL,
@@ -6,9 +7,9 @@ CREATE TABLE IF NOT EXISTS "StaffAccessCopyLedger" (
     "targetOrganizationId" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
     "sourceId" TEXT NOT NULL,
-    "targetId" TEXT NOT NULL,
+    "targetId" TEXT,
     "sourceProjectId" TEXT NOT NULL,
-    "targetProjectId" TEXT NOT NULL,
+    "targetProjectId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "StaffAccessCopyLedger_pkey" PRIMARY KEY ("id")
 );

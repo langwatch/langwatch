@@ -279,20 +279,14 @@ export function copyCatalog() {
     list: async ({ projectId }) =>
       data.monitors.filter((monitor) => monitor.projectId === projectId),
     create: async (input) => {
-      const monitor = {
-        ...addMonitor({
-          projectId: input.projectId,
-          name: input.name,
-          evaluatorId: input.evaluatorId ?? null,
-        }),
-      };
+      const made = addMonitor({
+        projectId: input.projectId,
+        name: input.name,
+        evaluatorId: input.evaluatorId ?? null,
+      });
+      const monitor = { ...made, enabled: input.enabled ?? true };
+      data.monitors[data.monitors.indexOf(made)] = monitor;
       return monitor;
-    },
-    toggle: async ({ id, enabled }) => {
-      const index = data.monitors.findIndex((monitor) => monitor.id === id);
-      const found = data.monitors[index];
-      if (found) data.monitors[index] = { ...found, enabled };
-      return { success: true };
     },
   });
 

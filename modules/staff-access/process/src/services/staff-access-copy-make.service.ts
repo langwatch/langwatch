@@ -25,7 +25,7 @@ type MakeDeps = Readonly<{
   organizations: Pick<OrganizationApi, "listTeams">;
   projects: Pick<ProjectApi, "createInOrganization">;
   evaluators: Pick<EvaluatorApi, "create">;
-  monitors: Pick<MonitorApi, "create" | "toggle">;
+  monitors: Pick<MonitorApi, "create">;
   prompts: Pick<PromptApi, "getAllVersions" | "createPrompt" | "updatePrompt">;
   datasets: Pick<DatasetApi, "copyDataset">;
 }>;
@@ -39,6 +39,8 @@ export type CopyWork =
   | { kind: "dataset"; source: DatasetSummary };
 
 export type CopyPlaced = Readonly<{ targetId: string; targetProjectId: string }>;
+/** A made target; `incomplete` names what the owner refused after the target existed. */
+export type CopyMade = CopyPlaced & Readonly<{ incomplete?: string }>;
 type Organization = OrganizationProvisioningSummary;
 type Teams = { teamId: string | undefined; looked: boolean };
 
@@ -74,7 +76,7 @@ export class StaffAccessCopyMakeService {
     sourceProjectId: string;
     targetProjectId: string | null;
     run: CopyRun;
-  }): Promise<CopyPlaced | { skipped: string }> {
+  }): Promise<CopyMade | { skipped: string }> {
     if (work.kind === "project") {
       const created = await this.deps.projects.createInOrganization({
         organizationId: run.target.id,
@@ -93,15 +95,18 @@ export class StaffAccessCopyMakeService {
         return into(await this.copyEvaluator({ evaluator: work.source, projectId }));
       case "monitor":
         return this.copyMonitor({ monitor: work.source, projectId, placed: run.placed });
-      case "prompt":
-        return into(
-          await this.copyPrompt({
-            prompt: work.source,
-            source: run.source,
-            target: run.target,
-            projectId,
-          }),
-        );
+      case "prompt": {
+        const copied = await this.copyPrompt({
+          prompt: work.source,
+          source: run.source,
+          target: run.target,
+          projectId,
+        });
+        return {
+          ...into(copied.id),
+          ...(copied.incomplete ? { incomplete: copied.incomplete } : {}),
+        };
+      }
       case "dataset": {
         const copied = await this.deps.datasets.copyDataset({
           sourceDatasetId: work.source.id,
@@ -154,19 +159,20 @@ export class StaffAccessCopyMakeService {
         parameters: monitor.parameters,
         ...(monitor.mappings ? { mappings: monitor.mappings } : {}),
         sample: monitor.sample,
+        enabled: false,
         executionMode: monitor.executionMode,
         ...(evaluatorId ? { evaluatorId } : {}),
         level: monitor.level === "thread" ? "thread" : "trace",
         threadIdleTimeout: monitor.threadIdleTimeout,
       }),
     );
-    if (created.enabled) {
-      await this.deps.monitors.toggle({ id: created.id, projectId, enabled: false });
-    }
     return { targetId: created.id, targetProjectId: projectId };
   }
 
-  /** Every version, oldest first, as new versions of one new prompt. */
+  /**
+   * Every version, oldest first, as new versions of one new prompt. Once the prompt exists a
+   * refused version is reported, not thrown, so the ledger records the prompt it made.
+   */
   private async copyPrompt({
     prompt,
     source,
@@ -177,7 +183,7 @@ export class StaffAccessCopyMakeService {
     source: Organization;
     target: Organization;
     projectId: string;
-  }): Promise<string> {
+  }): Promise<{ id: string; incomplete?: string }> {
     const versions = (
       await this.deps.prompts.getAllVersions({
         idOrHandle: prompt.id,
@@ -194,17 +200,21 @@ export class StaffAccessCopyMakeService {
       commitMessage: first?.commitMessage ?? null,
       ...promptFields(first as VersionedPrompt),
     });
-    for (const version of later) {
-      await this.deps.prompts.updatePrompt({
-        idOrHandle: created.id,
-        projectId,
-        data: {
-          commitMessage: version.commitMessage || `Version ${version.version}`,
-          ...promptFields(version),
-        },
-      });
+    try {
+      for (const version of later) {
+        await this.deps.prompts.updatePrompt({
+          idOrHandle: created.id,
+          projectId,
+          data: {
+            commitMessage: version.commitMessage || `Version ${version.version}`,
+            ...promptFields(version),
+          },
+        });
+      }
+    } catch {
+      return { id: created.id, incomplete: "prompt_versions_incomplete" };
     }
-    return created.id;
+    return { id: created.id };
   }
 
   /** The target organization's first shared team, or a new team named after it. */

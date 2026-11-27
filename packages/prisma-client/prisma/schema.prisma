@@ -8442,9 +8442,10 @@ model StaffAccessCopyLedger {
   targetOrganizationId String
   kind                 String
   sourceId             String
-  targetId             String
+  /// Null while the source is reserved and its target is not made yet.
+  targetId             String?
   sourceProjectId      String
-  targetProjectId      String
+  targetProjectId      String?
   createdAt            DateTime @default(now())
 
   @@unique([targetOrganizationId, kind, sourceId])
