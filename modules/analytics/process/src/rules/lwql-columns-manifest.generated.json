@@ -348,6 +348,46 @@
           "name": "AiUnits",
           "type": "Float64",
           "comment": ""
+        },
+        {
+          "name": "AccountId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "AccountName",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "AccountSource",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "AccountUsagePercent",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "AccountUsageWindow",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "AccountUsageResetsAt",
+          "type": "Nullable(DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "AccountUsageReadAt",
+          "type": "Nullable(DateTime64(3))",
+          "comment": ""
+        },
+        {
+          "name": "AccountLimitedUntil",
+          "type": "Nullable(DateTime64(3))",
+          "comment": ""
         }
       ]
     },

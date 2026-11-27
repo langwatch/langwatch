@@ -29240,6 +29240,16 @@ Every run recorded from then on adds its traces, tokens and cost to that one ses
 
 If the managed settings file already sets `OTEL_RESOURCE_ATTRIBUTES`, it wins over the shell export, so add `langwatch.session.id` to the value in the managed settings file instead.
 
+## Name the account an agent runs on
+
+A harness that runs agents on several subscription logins can say which login each session used, so you can chart usage per account. Add the account attributes to the same resource attributes:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="${OTEL_RESOURCE_ATTRIBUTES:+$OTEL_RESOURCE_ATTRIBUTES,}langwatch.account.id=4f1c9e2a7b6d4c3e8a1f0b2c3d4e5f60,langwatch.account.name=Work%20Max,langwatch.account.source=pool"
+```
+
+Percent-encode spaces and commas in values, as `OTEL_RESOURCE_ATTRIBUTES` requires. To show how much of its limit an account used, stamp the provider's own figure on each record as `langwatch.account.usage.percent`, with `langwatch.account.usage.window`, `langwatch.account.usage.resets_at` and `langwatch.account.usage.read_at`, and `langwatch.account.limited_until` while it is out of usage. The full list is on [Usage](/coding-agents/usage-analytics#subscription-accounts).
+
 ## See your machines
 
 Every CLI sign-in, CI runners included, appears under **Devices** on [/coding-agents/configure](https://app.langwatch.ai/coding-agents/configure), where you revoke one machine or all of them. An organization can cap how long a device session lives before it must sign in again; see the session policy on the [governance dashboard](/ai-governance/governance-dashboard).
@@ -30922,6 +30932,48 @@ Usage rolls up everything your sessions spent. Read your own numbers at [/coding
 The personal page opens on this month: what you spent, how many requests you made, and the model you used most, with spend over time and a breakdown by tool underneath.
 
 The **coding-agent usage** card summarizes the last 30 days across your assistants: cost, tokens, active time, and how many sessions you ran. Sessions that reported only metrics still count, so the card is complete even for tools set up with usage-only telemetry.
+
+## Subscription accounts
+
+If your agents run on subscription logins, such as a few Claude Max accounts shared by many agents, LangWatch records which account each model call and rate limit ran on. You chart them yourself in a [dashboard](/features/dashboards) widget or [query them](/features/querying-your-data) with LangWatchQL.
+
+Claude Code sends its account id (`user.account_uuid`) and Codex sends its own (`user.account_id`), so their accounts are recorded without setup. A launcher that runs agents on several logins can name each one, and report its usage, with these attributes, on each record or once in `OTEL_RESOURCE_ATTRIBUTES`:
+
+| Attribute | Value |
+| --- | --- |
+| `langwatch.account.id` | An opaque id for the account. Never an email address. |
+| `langwatch.account.name` | A label for the account, such as `Work Max`. |
+| `langwatch.account.source` | `personal`, `pool` or `computer`. |
+| `langwatch.account.usage.percent` | The provider's usage figure, 0 to 100. |
+| `langwatch.account.usage.window` | The window it is for, such as `five_hour` or `seven_day`. |
+| `langwatch.account.usage.resets_at` | When that window resets, ISO 8601. |
+| `langwatch.account.usage.read_at` | When the figure was read, ISO 8601. |
+| `langwatch.account.limited_until` | While the account is out of usage, when it can run again, ISO 8601. |
+
+A value on the record wins over the same attribute on the resource. The percent is the figure the provider reported. Providers publish no token allowance for these plans, so LangWatch never estimates a percent from tokens.
+
+### Chart your accounts
+
+The `coding_session_events` view carries the account as `AccountId`, `AccountName`, `AccountSource`, `AccountUsagePercent`, `AccountUsageWindow`, `AccountUsageResetsAt`, `AccountUsageReadAt` and `AccountLimitedUntil`. They are set on `model_call` and `rate_limit` rows only. Other rows, and calls that named no account, have an empty `AccountId`.
+
+This widget query sums each account's tokens over the dashboard's period and keeps its newest name and usage figure:
+
+```sql
+SELECT
+  AccountId,
+  argMaxIf(AccountName, TimeUnixMs, AccountName != '') AS AccountName,
+  sumIf(InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens, EventKind = 'model_call') AS Tokens,
+  countIf(EventKind = 'rate_limit') AS RateLimits,
+  argMaxIf(AccountUsagePercent, TimeUnixMs, AccountUsagePercent IS NOT NULL) AS UsagePercent
+FROM coding_session_events
+WHERE TimeUnixMs >= {dashboard_context_period_start:DateTime}
+  AND TimeUnixMs < {dashboard_context_period_end:DateTime}
+  AND AccountId != ''
+GROUP BY AccountId
+ORDER BY AccountName
+```
+
+For a burndown per day, add `toDate(TimeUnixMs) AS Day` to the select and to `GROUP BY`. From the command line, run the same statement with `langwatch query` and `subtractDays(now(), 7)` in place of the period placeholders.
 
 ## Query it from the command line
 
