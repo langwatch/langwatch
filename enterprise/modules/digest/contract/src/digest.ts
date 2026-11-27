@@ -52,6 +52,46 @@ export const digestSendTestInputSchema: DigestSendTestInputSchema =
   digestSendTestInputSchemaDefinition;
 export type DigestSendTestInput = z.infer<typeof digestSendTestInputSchema>;
 
+/** Why an organization's test was not sent: nothing went, and nothing is wrong. */
+export const DIGEST_MY_TEST_SKIP_REASONS = [
+  "nothing_to_send",
+  "opted_out",
+  "not_a_member",
+] as const;
+
+/**
+ * One organization's outcome when an operator sends themself every digest they would get: sent
+ * with its template, skipped for a reason, or failed (logged; the rest still went).
+ */
+const digestMyTestSchemaDefinition = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("sent"),
+    organizationId: z.string(),
+    organizationName: z.string(),
+    templateId: digestTemplateIdSchema,
+  }),
+  z.object({
+    outcome: z.literal("skipped"),
+    organizationId: z.string(),
+    organizationName: z.string(),
+    reason: z.enum(DIGEST_MY_TEST_SKIP_REASONS),
+  }),
+  z.object({
+    outcome: z.literal("failed"),
+    organizationId: z.string(),
+    organizationName: z.string(),
+  }),
+]);
+export interface DigestMyTestSchema extends Named<typeof digestMyTestSchemaDefinition> {}
+export const digestMyTestSchema: DigestMyTestSchema = digestMyTestSchemaDefinition;
+export type DigestMyTest = z.infer<typeof digestMyTestSchema>;
+
+/** Every organization the operator is an active member of, one outcome each, by name. */
+const digestMyTestsSchemaDefinition = z.object({ organizations: z.array(digestMyTestSchema) });
+export interface DigestMyTestsSchema extends Named<typeof digestMyTestsSchemaDefinition> {}
+export const digestMyTestsSchema: DigestMyTestsSchema = digestMyTestsSchemaDefinition;
+export type DigestMyTests = z.infer<typeof digestMyTestsSchema>;
+
 const digestAcknowledgedSchemaDefinition = z.object({ ok: z.literal(true) });
 export interface DigestAcknowledgedSchema extends Named<
   typeof digestAcknowledgedSchemaDefinition

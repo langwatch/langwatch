@@ -189,12 +189,16 @@ export class DigestModule implements DigestApiContract {
     return this.#settings.setArmed({ armed });
   };
 
-  sendTest: DigestApiContract["sendTest"] = async ({ operator, organizationId, userId }) =>
-    this.#sends.sendTest({
+  sendTest: DigestApiContract["sendTest"] = async ({ operator, organizationId, userId }) => {
+    await this.#sends.sendTest({
       organizationId,
       userId,
       operatorId: await this.#operators.admitManager(operator),
     });
+  };
+
+  sendMyTests: DigestApiContract["sendMyTests"] = async ({ operator }) =>
+    this.#sends.sendMyTests({ operatorId: await this.#operators.admitManager(operator) });
 
   getPreference: DigestApiContract["getPreference"] = (input) => this.#settings.preference(input);
 

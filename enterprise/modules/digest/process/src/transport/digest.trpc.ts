@@ -35,6 +35,11 @@ export const digestTrpcTransport: TrpcRouterDeclaration<DigestApi, typeof digest
       return { ok: true as const };
     })
 
+    .procedure("sendMyTests")
+    .withMiddlewareContext(operatorContext)
+    .withPermission("ops:manage", STAFF)
+    .handle(({ app }, operator) => app.sendMyTests({ operator }))
+
     .procedure("getMyPreference")
     .noPermission({ reason: OWN_PREFERENCE })
     // Read-only under impersonation: the person's own choice, shown, never changed.

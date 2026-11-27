@@ -1,8 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The weekly digest switch on the Profile page: on, off and on again, and a failed save.
- * Spec: enterprise/modules/digest/specs/digest.feature
+ * The weekly digest switch on the Profile page (on, off, on again, a failed save) and the
+ * staff-only "Send me my digests" button with its per-organization results. Spec: digest.feature
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
@@ -21,6 +20,8 @@ const stored = vi.hoisted(() => {
     failReadBack: false,
     failFirstRead: false,
     saves: [] as boolean[],
+    failSendMyTests: false,
+    sendMyTestsCalls: 0,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -34,7 +35,23 @@ const stored = vi.hoisted(() => {
 });
 
 vi.mock("../../../behavior/personal-workspace-api.ts", async () => {
-  const { useSyncExternalStore } = await import("react");
+  const { useState, useSyncExternalStore } = await import("react");
+  const myTests = {
+    organizations: [
+      {
+        outcome: "sent",
+        organizationId: "org-acme",
+        organizationName: "Acme",
+        templateId: "digest-traces-week",
+      },
+      {
+        outcome: "skipped",
+        organizationId: "org-quiet",
+        organizationName: "Quiet Co",
+        reason: "nothing_to_send",
+      },
+    ],
+  };
   const api = {
     useUtils: () => ({
       digest: {
@@ -76,6 +93,21 @@ vi.mock("../../../behavior/personal-workspace-api.ts", async () => {
           },
         }),
       },
+      sendMyTests: {
+        useMutation: () => {
+          const [data, setData] = useState<typeof myTests | undefined>(undefined);
+          return {
+            isPending: false,
+            data,
+            mutateAsync: async () => {
+              stored.sendMyTestsCalls += 1;
+              if (stored.failSendMyTests) throw new Error("mailer down");
+              setData(myTests);
+              return myTests;
+            },
+          };
+        },
+      },
     },
   };
   return { personalWorkspaceApi: api, api };
@@ -87,6 +119,8 @@ beforeEach(() => {
   stored.failReadBack = false;
   stored.failFirstRead = false;
   stored.saves = [];
+  stored.failSendMyTests = false;
+  stored.sendMyTestsCalls = 0;
 });
 
 afterEach(() => cleanup());
@@ -169,6 +203,55 @@ describe("given the email preferences band on the Profile page", () => {
       await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
       await waitFor(() => expect(isOn()).toBe(true));
+    });
+  });
+});
+
+describe("given the email preferences band and the staff send of one's own digests", () => {
+  describe("when the reader is staff holding ops:manage and presses the button", () => {
+    /** @scenario "Staff with ops:manage send themselves their digests from their settings" */
+    it("sends once and lists each organization with what was sent, or why nothing was", async () => {
+      renderWithPersonalWorkspaceHost(<EmailPreferencesSection />, {
+        host: fakePersonalWorkspaceHost({ permissions: ["ops:manage"] }),
+      });
+
+      await userEvent.click(screen.getByTestId("send-my-digests-button"));
+
+      const results = await screen.findByTestId("send-my-digests-results");
+      expect(results.textContent).toContain("Acme");
+      expect(results.textContent).toContain("Sent: Traces week");
+      expect(results.textContent).toContain("Quiet Co");
+      expect(results.textContent).toContain("Skipped: nothing to show you this week");
+      expect(stored.sendMyTestsCalls).toBe(1);
+    });
+  });
+
+  describe("when the send fails", () => {
+    /** @scenario "Staff with ops:manage send themselves their digests from their settings" */
+    it("says so and lists nothing", async () => {
+      stored.failSendMyTests = true;
+      const host = fakePersonalWorkspaceHost({ permissions: ["ops:manage"] });
+      renderWithPersonalWorkspaceHost(<EmailPreferencesSection />, { host });
+
+      await userEvent.click(screen.getByTestId("send-my-digests-button"));
+
+      await waitFor(() =>
+        expect(host.recording.failures).toContainEqual(
+          expect.objectContaining({ fallbackTitle: "Couldn't send your digests" }),
+        ),
+      );
+      expect(screen.queryByTestId("send-my-digests-results")).toBeNull();
+    });
+  });
+
+  describe("when the reader does not hold ops:manage", () => {
+    /** @scenario "Staff with ops:manage send themselves their digests from their settings" */
+    it("shows no such button", () => {
+      renderWithPersonalWorkspaceHost(<EmailPreferencesSection />, {
+        host: fakePersonalWorkspaceHost({ permissions: ["ops:view"] }),
+      });
+
+      expect(screen.queryByTestId("send-my-digests-button")).toBeNull();
     });
   });
 });

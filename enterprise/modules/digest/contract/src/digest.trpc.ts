@@ -7,6 +7,7 @@ import { defineTrpcContract } from "@langwatch/module";
 
 import {
   digestAcknowledgedSchema,
+  digestMyTestsSchema,
   digestNoInputSchema,
   digestPreferenceSchema,
   digestSendTestInputSchema,
@@ -22,6 +23,10 @@ export const digestTrpc = defineTrpcContract("digest")
   .mutation("sendTest")
   .withInput(digestSendTestInputSchema)
   .withOutput(digestAcknowledgedSchema)
+
+  .mutation("sendMyTests")
+  .withInput(digestNoInputSchema)
+  .withOutput(digestMyTestsSchema)
 
   .query("getMyPreference")
   .withInput(digestNoInputSchema)

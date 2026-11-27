@@ -103,6 +103,10 @@ function recordingDigest(reached: string[]) {
       sendTest: async ({ operator }) => {
         reached.push(`sendTest:${operator?.id}`);
       },
+      sendMyTests: async ({ operator }) => {
+        reached.push(`sendMyTests:${operator?.id}`);
+        return { organizations: [] };
+      },
       getPreference: async ({ userId }) => {
         reached.push(`getPreference:${userId}`);
         return { subscribed: true };
@@ -167,6 +171,7 @@ describe("the digest's operator controls at the platform door", () => {
       const refusals = await Promise.all([
         stranger.setArmed(ARM).catch((error: unknown) => error),
         stranger.sendTest(TEST_SEND).catch((error: unknown) => error),
+        stranger.sendMyTests({}).catch((error: unknown) => error),
       ]);
       const anonymous = await digest(null)
         .setArmed(ARM)
@@ -189,6 +194,7 @@ describe("the digest's operator controls at the platform door", () => {
       const refusals = await Promise.all([
         viewer.setArmed(ARM).catch((error: unknown) => error),
         viewer.sendTest(TEST_SEND).catch((error: unknown) => error),
+        viewer.sendMyTests({}).catch((error: unknown) => error),
       ]);
 
       expect(refusals.map(codeOf)).toEqual(
@@ -206,8 +212,13 @@ describe("the digest's operator controls at the platform door", () => {
 
       await expect(staff.setArmed(ARM)).resolves.toEqual(SETTINGS);
       await expect(staff.sendTest(TEST_SEND)).resolves.toEqual({ ok: true });
+      await expect(staff.sendMyTests({})).resolves.toEqual({ organizations: [] });
 
-      expect(reached).toEqual(["setArmed:user-staff", "sendTest:user-staff"]);
+      expect(reached).toEqual([
+        "setArmed:user-staff",
+        "sendTest:user-staff",
+        "sendMyTests:user-staff",
+      ]);
     });
   });
 
@@ -220,12 +231,13 @@ describe("the digest's operator controls at the platform door", () => {
       const refusals = [
         await staff.setArmed(ARM).catch((error: unknown) => error),
         await staff.sendTest(TEST_SEND).catch((error: unknown) => error),
+        await staff.sendMyTests({}).catch((error: unknown) => error),
       ];
 
       expect(refusals.map(codeOf)).toEqual(
         refusals.map(() => ({ trpc: "NOT_FOUND", code: "not_found" })),
       );
-      expect(askedOps).toEqual(["user-staff", "user-staff"]);
+      expect(askedOps).toEqual(["user-staff", "user-staff", "user-staff"]);
       expect((await repositories.audience.getSettings()).armed).toBe(false);
       expect(mail.sent).toEqual([]);
     });

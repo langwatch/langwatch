@@ -3,9 +3,12 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestMemberNotFoundError,
   DigestMemberUnsubscribedError,
+  type DigestMyTest,
+  type DigestMyTests,
   DigestNothingToSendError,
   DigestOperatorAddressMissingError,
   DigestPublicBaseUrlMissingError,
+  type DigestTemplateId,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -43,6 +46,7 @@ import {
   type DigestTemplatePick,
   eligibleDigestTemplates,
 } from "../rules/digest-template.rules.ts";
+import { classifyDigestTestRefusal } from "../rules/digest-test.rules.ts";
 import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
@@ -81,6 +85,10 @@ type Deps = Readonly<{
     findProvisioningSummary: OrganizationApi["findProvisioningSummary"];
     /** Organization ids a page at a time, the install's hidden system one left out. */
     listAllIds: OrganizationApi["listAllIds"];
+    /** The organizations a person is an active member of, for the operator's own tests. */
+    organizationIdsForMember: OrganizationApi["organizationIdsForMember"];
+    /** Those organizations' names, the install's hidden system one left out as `listAllIds` does. */
+    findForOperators: OrganizationApi["findForOperators"];
   }>;
   /** A project's name, and each project's team, which is what its access is decided on. */
   projects: Pick<
@@ -254,7 +262,7 @@ export class DigestSendService {
     organizationId: string;
     userId: string;
     operatorId: string;
-  }): Promise<void> {
+  }): Promise<DigestTemplateId> {
     const membership = await this.#membership({ organizationId, userId });
     if (membership.kind === "gone") throw new DigestMemberNotFoundError(userId);
     const member = { userId, admin: membership.admin };
@@ -284,6 +292,52 @@ export class DigestSendService {
         renderer: this.deps.renderer,
       }),
     );
+    return composed.template.templateId;
+  }
+
+  /**
+   * The operator's own week in every organization the weekly send would mail them for (active
+   * memberships, the system organization left out), as tests, by name. A refusal that means nothing would go out is a skip; any
+   * other is logged and reported, and the rest still go. No address fails the whole call.
+   */
+  async sendMyTests({ operatorId }: { operatorId: string }): Promise<DigestMyTests> {
+    const operator = await this.deps.users.findById({ id: operatorId });
+    if (!operator?.email) throw new DigestOperatorAddressMissingError();
+    const organizationIds = await this.deps.organizations.organizationIdsForMember({
+      userId: operatorId,
+    });
+    if (organizationIds.length === 0) return { organizations: [] };
+    const named = await this.deps.organizations.findForOperators({ organizationIds });
+    const organizations: DigestMyTest[] = [];
+    for (const { id, name } of named.toSorted((a, b) => a.name.localeCompare(b.name))) {
+      organizations.push(
+        await this.#myTest({ organizationId: id, organizationName: name, operatorId }),
+      );
+    }
+    return { organizations };
+  }
+
+  async #myTest({
+    organizationId,
+    organizationName,
+    operatorId,
+  }: {
+    organizationId: string;
+    organizationName: string;
+    operatorId: string;
+  }): Promise<DigestMyTest> {
+    const about = { organizationId, organizationName };
+    try {
+      const templateId = await this.sendTest({ organizationId, userId: operatorId, operatorId });
+      return { outcome: "sent", ...about, templateId };
+    } catch (error) {
+      const reason = classifyDigestTestRefusal(error);
+      if (reason) return { outcome: "skipped", ...about, reason };
+      // No public base URL fails every organization alike, before any mail: the call fails.
+      if (error instanceof DigestPublicBaseUrlMissingError) throw error;
+      logger.error({ error, organizationId, operatorId }, "the digest could not send a test");
+      return { outcome: "failed", ...about };
+    }
   }
 
   /** An organization's active members, admins marked; names stay with the user module. */

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The weekly digest, sent to every organization's members. The operator controls admit Cloud admin staff through `OpsApi.admitCloudAdmin`, so they answer not_found where cloud ops is off (§3.5); the token operations serve the public unsubscribe address, whose signed token is the authorization.
 
-Peers call these through the token, declared at `../contract/src/digest.api.ts:20`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/digest.api.ts:21`; nothing else in this package is public.
 
 #### `setArmed`
 
@@ -28,6 +28,14 @@ Mails the member's week to the operator alone; no send is recorded.
 
 ```typescript
 sendTest(input: DigestSendTestInput & Operated): Promise<void>;
+```
+
+#### `sendMyTests`
+
+Mails the operator, as a test, their own week in every organization they are an active member of; an organization with nothing to send is skipped and reported, not refused.
+
+```typescript
+sendMyTests(input: Operated): Promise<DigestMyTests>;
 ```
 
 #### `getPreference`
@@ -90,7 +98,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-// Query: digestTokenQuerySchema, ../contract/src/digest.ts:65
+// Query: digestTokenQuerySchema, ../contract/src/digest.ts:105
 interface Query {
   token: string;
 }
@@ -107,7 +115,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:65
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:105
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:76
 type Response = unknown;
 ```
@@ -121,7 +129,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:65
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:105
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:94
 type Response = unknown;
 ```
@@ -130,12 +138,13 @@ type Response = unknown;
 
 ### `digest`
 
-Contract `../contract/src/digest.trpc.ts:17`, router `src/transport/digest.trpc.ts:24`.
+Contract `../contract/src/digest.trpc.ts:18`, router `src/transport/digest.trpc.ts:24`.
 
 | Procedure                | Kind     | Gate                                                                                  | Input                       | Output                     |
 | ------------------------ | -------- | ------------------------------------------------------------------------------------- | --------------------------- | -------------------------- |
 | `digest.setArmed`        | mutation | Platform permission `ops:manage`                                                      | `digestSetArmedInputSchema` | `digestSettingsSchema`     |
 | `digest.sendTest`        | mutation | Platform permission `ops:manage`                                                      | `digestSendTestInputSchema` | `digestAcknowledgedSchema` |
+| `digest.sendMyTests`     | mutation | Platform permission `ops:manage`                                                      | `digestNoInputSchema`       | `digestMyTestsSchema`      |
 | `digest.getMyPreference` | query    | No permission: operates on the session user's own opt-out, so no tenant scope applies | `digestNoInputSchema`       | `digestPreferenceSchema`   |
 | `digest.setMyPreference` | mutation | No permission: operates on the session user's own opt-out, so no tenant scope applies | `digestPreferenceSchema`    | `digestPreferenceSchema`   |
 
@@ -156,14 +165,18 @@ interface Input {
   organizationId: string;
   userId: string;
 }
-// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:60
+// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:100
 interface Output {
   ok: true;
 }
 
-// digest.getMyPreference
+// digest.sendMyTests
 // Input: digestNoInputSchema, ../contract/src/digest.ts:35
 type Input = Record<string, unknown>;
+type Output = z.infer<typeof digestMyTestsSchema>; // ../contract/src/digest.ts:92
+
+// digest.getMyPreference
+type Input = z.infer<typeof digestNoInputSchema>; // ../contract/src/digest.ts:35
 // Output: digestPreferenceSchema, ../contract/src/digest.ts:40
 interface Output {
   subscribed: boolean;

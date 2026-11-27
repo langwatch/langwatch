@@ -160,6 +160,8 @@ export function digestWorld() {
     failingOrganizations: new Set<string>(),
     /** Organizations the organization module has no name for. */
     unnamedOrganizations: new Set<string>(),
+    /** Organizations of the hidden system kind, which the organization module's lists leave out. */
+    systemOrganizations: new Set<string>(),
     /** People whose profile is deactivated. */
     deactivated: new Set<string>(),
     projects: [PROJECT],
@@ -308,6 +310,20 @@ export function installDigest(
         findProvisioningSummary: async (organizationId) =>
           !world.unnamedOrganizations.has(organizationId) ? summaryOf(organizationId) : null,
         listAllIds: async ({ after }: { after?: string } = {}) => pageOfIds({ world, after }),
+        organizationIdsForMember: async ({ userId }) =>
+          [ORGANIZATION, OTHER_ORGANIZATION].filter((organizationId) =>
+            membersIn(organizationId).some(
+              (row) => row.userId === userId && row.disabledAt === null,
+            ),
+          ),
+        findForOperators: async ({ organizationIds }) =>
+          organizationIds
+            .filter((id) => !world.systemOrganizations.has(id))
+            .map((id) => ({
+              ...summaryOf(id),
+              memberCount: membersIn(id).length,
+              administratorEmails: [],
+            })),
       },
       "OrganizationApi",
     ),
@@ -514,6 +530,8 @@ export function installDigest(
     /** An operator's test of a member's last week, as the app asks it once ops admitted them. */
     sendTest: (input: { organizationId: string; userId: string; operatorId: string }) =>
       sends.sendTest(input),
+    /** An operator's tests of their own week in every organization, once ops admitted them. */
+    sendMyTests: (input: { operatorId: string }) => sends.sendMyTests(input),
     /** One organization's plan, as the outbox retries it after a failure. */
     planOrganization: (input: { organizationId: string; isoWeek?: string }) =>
       sends.planOrganization({ isoWeek: SENT_WEEK, ...input }),

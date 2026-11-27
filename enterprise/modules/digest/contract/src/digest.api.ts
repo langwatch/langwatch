@@ -3,6 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import type { OpsOperator } from "@langwatch/ops-contract";
 
 import type {
+  DigestMyTests,
   DigestSendTestInput,
   DigestSetArmedInput,
   DigestPreference,
@@ -21,6 +22,11 @@ export interface DigestApi {
   setArmed(input: DigestSetArmedInput & Operated): Promise<DigestSettings>;
   /** Mails the member's week to the operator alone; no send is recorded. */
   sendTest(input: DigestSendTestInput & Operated): Promise<void>;
+  /**
+   * Mails the operator, as a test, their own week in every organization they are an active
+   * member of; an organization with nothing to send is skipped and reported, not refused.
+   */
+  sendMyTests(input: Operated): Promise<DigestMyTests>;
 
   /** The signed-in person's own choice; the caller names themselves, never anyone else. */
   getPreference(input: Readonly<{ userId: string }>): Promise<DigestPreference>;
