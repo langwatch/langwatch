@@ -478,4 +478,30 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     ]);
     expect(rowOf(upgrade, TIERED_ROW)?.status).toBe("CANCELLED");
   });
+
+  /** @scenario "A Growth subscription started by the subscription-active message records when it started" */
+  it("records the start of a Growth subscription the subscription-active message started", async () => {
+    const upgrade = harness({
+      growth: { stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+    });
+
+    await deliverTogether(upgrade, [subscriptionActive()]);
+
+    expect(rowOf(upgrade, GROWTH_ROW)?.startDate).not.toBeNull();
+  });
+
+  /** @scenario "A later subscription-active message keeps the start of a subscription already running" */
+  it("keeps the recorded start when a running subscription is reported active again", async () => {
+    const started = Temporal.Instant.from("2026-09-15T08:01:06Z");
+    const running = harness({
+      growth: { status: "ACTIVE", stripeSubscriptionId: GROWTH_STRIPE, startDate: started },
+      tiered: null,
+      pricingModel: "SEAT_EVENT",
+    });
+
+    await deliverTogether(running, [subscriptionActive()]);
+
+    expect(rowOf(running, GROWTH_ROW)?.startDate).toEqual(started);
+  });
 });

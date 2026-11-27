@@ -79,4 +79,30 @@ describe("PrismaBillingSubscriptionRepository", () => {
       });
     });
   });
+
+  describe("updateQuantities()", () => {
+    const quantities = { id: "sub_1", maxMembers: 3, maxMessagesPerMonth: null };
+    const dataOf = async (previousStatus: string) => {
+      const write = vi.fn(async (_args: unknown) => ({
+        id: "sub_1",
+        createdAt: new Date(),
+        organization: {},
+      }));
+      const quantitiesRepo = PrismaBillingSubscriptionRepository.create(
+        prismaDouble({ subscription: { update: write } }),
+      );
+      await quantitiesRepo.updateQuantities({ ...quantities, previousStatus });
+      expect(write).toHaveBeenCalledTimes(1);
+      const [call] = write.mock.calls[0] ?? [];
+      return (call as { data: Record<string, unknown> }).data;
+    };
+
+    it("records the start when the subscription was not active yet", async () => {
+      expect((await dataOf(SubscriptionStatus.PENDING)).startDate).toBeInstanceOf(Date);
+    });
+
+    it("leaves the start alone when the subscription was already active", async () => {
+      expect(await dataOf(SubscriptionStatus.ACTIVE)).not.toHaveProperty("startDate");
+    });
+  });
 });

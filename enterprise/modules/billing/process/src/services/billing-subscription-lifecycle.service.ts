@@ -239,6 +239,7 @@ export class BillingSubscriptionLifecycleService {
       id: existing.id,
       ...planQuantities({ members: usersQuantity, messagesPerMonth: tracesQuantity }),
       ...(developerQuantity === undefined ? {} : { maxMembersDeveloper: developerQuantity }),
+      previousStatus: existing.status,
     });
     if (quantitiesResult.outcome === "missing_subscription") {
       return;

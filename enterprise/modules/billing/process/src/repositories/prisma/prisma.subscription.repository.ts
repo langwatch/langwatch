@@ -275,12 +275,16 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
     maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
+    previousStatus: string;
   }): Promise<BillingSubscriptionWithOrganization> {
     const row = await this.prisma.subscription.update({
       where: { id: input.id },
       data: {
         status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
         lastPaymentFailedDate: null,
+        ...(input.previousStatus === SubscriptionStatus.ACTIVE
+          ? {}
+          : { startDate: toDate(nowInstant()) }),
         maxMembers: input.maxMembers,
         ...(input.maxMembersDeveloper === undefined
           ? {}
