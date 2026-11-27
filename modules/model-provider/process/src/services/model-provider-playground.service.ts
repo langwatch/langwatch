@@ -1,9 +1,10 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import type {
-  ModelProviderApi,
-  ModelProviderPlaygroundCompletion,
-  ModelProviderPlaygroundRequest,
-  ModelProviderPlaygroundStatus,
+import {
+  expandLatestAlias,
+  type ModelProviderApi,
+  type ModelProviderPlaygroundCompletion,
+  type ModelProviderPlaygroundRequest,
+  type ModelProviderPlaygroundStatus,
 } from "@langwatch/model-provider-contract";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import {
@@ -84,7 +85,10 @@ export class ModelProviderPlaygroundService {
     });
 
     try {
-      const model = vercelProvider(input.model);
+      // Chat completions, not the SDK's default Responses API: the proxy's
+      // Responses lane forwards the body as it came, so only an OpenAI-wire
+      // provider could read it. A latest alias goes out as the model it names.
+      const model = vercelProvider.chat(expandLatestAlias(input.model));
       const result = streamText({
         model: this.#metering
           ? this.#metering.metered(model, {

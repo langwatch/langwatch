@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,4 +45,21 @@ func TestWriteHandlerErrorLogsWithFaultAttribution(t *testing.T) {
 		// The herr response still reaches the client.
 		assert.GreaterOrEqual(t, w.Code, http.StatusBadRequest)
 	}
+}
+
+// @scenario "A failed request logs the errors it wraps"
+func TestWriteHandlerErrorLogsWrappedReasons(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	ctx := clog.Set(context.Background(), zap.New(core))
+	w := httptest.NewRecorder()
+	cause := errors.New("upstream error (status 400): messages: Field required")
+
+	writeHandlerError(ctx, w, herr.New(ctx, domain.ErrGatewayUnavailable,
+		herr.M{"reason": "dispatcher_stream_error"}, cause))
+
+	entries := logs.FilterMessage("request_failed").All()
+	require.Len(t, entries, 1)
+	assert.Equal(t, []any{cause.Error()}, entries[0].ContextMap()["reasons"])
+	// The operator reads the cause; the client still does not.
+	assert.NotContains(t, w.Body.String(), "Field required")
 }

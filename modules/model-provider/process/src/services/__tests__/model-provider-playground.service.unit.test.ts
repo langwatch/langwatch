@@ -1,7 +1,7 @@
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi, ModelProviderExecution } from "@langwatch/model-provider-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ModelProviderPlaygroundService } from "../model-provider-playground.service.ts";
 
@@ -43,12 +43,40 @@ const PROJECT: Project = {
   lastCodingAgentPullRequestAt: null,
 };
 
+const OPENAI: ModelProviderExecution = {
+  id: "provider-openai",
+  organizationId: "organization-1",
+  provider: "openai",
+  name: "OpenAI",
+  enabled: true,
+  routingHandle: null,
+  scopes: [],
+  customKeys: null,
+  customModels: [],
+  customEmbeddingsModels: [],
+  extraHeaders: [],
+  rateLimitRpm: null,
+  rateLimitTpm: null,
+  rateLimitRpd: null,
+  fallbackPriorityGlobal: null,
+  providerConfig: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  models: null,
+  embeddingsModels: null,
+  isSystem: false,
+  embeddingsUnsupported: false,
+};
+
 function service(
   getExecutionProviders: ModelProviderApi["getExecutionProviders"],
   kind = "application",
 ) {
   return ModelProviderPlaygroundService.create({
-    modelProviders: createApiFixture<ModelProviderApi>({ getExecutionProviders }),
+    modelProviders: createApiFixture<ModelProviderApi>({
+      getExecutionProviders,
+      prepareExecution: async () => ({ api_key: "test-key" }),
+    }),
     projects: createApiFixture<ProjectApi>({
       findById: async () => ({ ...PROJECT, kind }),
     }),
@@ -65,6 +93,33 @@ describe("ModelProviderPlaygroundService", () => {
     expect(new TextDecoder().decode((await result.body[Symbol.asyncIterator]().next()).value)).toBe(
       JSON.stringify({ error: "Provider not configured: openai" }),
     );
+  });
+
+  describe("when a completion streams", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("asks the proxy for chat completions with the model a latest alias names", async () => {
+      const sent: { url: string; model: string }[] = [];
+      vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+        sent.push({ url, model: (JSON.parse(init.body as string) as { model: string }).model });
+        return new Response("data: [DONE]\n\n", {
+          headers: { "content-type": "text/event-stream" },
+        });
+      });
+
+      const result = await service(async () => ({ openai: OPENAI })).execute({
+        ...request,
+        model: "openai/latest-mini",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of result.body) chunks.push(chunk);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.url).toBe("http://nlp.test/go/proxy/v1/chat/completions");
+      expect(sent[0]?.model).toMatch(/^openai\//);
+      expect(sent[0]?.model).not.toContain("latest");
+    });
   });
 
   describe("when the project is an aggregate", () => {
