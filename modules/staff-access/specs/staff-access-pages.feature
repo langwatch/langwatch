@@ -76,6 +76,12 @@ Feature: Ops agent access pages
     Then she sees the organization name and id, each scope with its plain line, the machine, the request IP and a countdown
     And the reason shows exactly as typed, with no markup rendered
 
+  @unit
+  Scenario: The approval countdown reads in hours and minutes
+    Given a pending request with 1 hour 59 minutes 44 seconds left
+    Then the approval page reads "In 1 h 59 min unless you decide first"
+    And under an hour it reads minutes and seconds, under a minute seconds
+
   @integration
   Scenario: A request the operator may not open reads as not found
     Given the request belongs to another operator's agent

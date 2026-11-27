@@ -57,12 +57,14 @@ export const staffAccessFetch = async <T>({
   bearer,
   body,
   endpoint = getEndpoint(),
+  signal,
 }: {
   method: "GET" | "POST";
   path: string;
   bearer: string;
   body?: unknown;
   endpoint?: string;
+  signal?: AbortSignal;
 }): Promise<T> => {
   const url = `${endpoint.replace(/\/+$/, "")}${path}`;
   const response = await langwatchFetch(url, {
@@ -73,6 +75,7 @@ export const staffAccessFetch = async <T>({
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    ...(signal === undefined ? {} : { signal }),
   });
   const raw = await response.text();
   let parsed: unknown = raw;

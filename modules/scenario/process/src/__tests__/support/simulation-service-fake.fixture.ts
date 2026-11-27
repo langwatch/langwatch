@@ -24,6 +24,7 @@ const servedReads = {
   countRunsForExport: "countRunsForExport",
   countUsage: "countUsage",
   countOrganizationRuns: "countOrganizationRuns",
+  findRunCountsByProject: "findRunCountsByProject",
   listRunsForExport: "listRunsForExport",
 } as const satisfies Record<keyof SimulationRepository, keyof SimulationService>;
 

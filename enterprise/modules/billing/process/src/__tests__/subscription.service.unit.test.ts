@@ -92,6 +92,8 @@ const createMockRepository = (): {
 } => ({
   findActive: unconfigured("findActive"),
   findLastNonCancelled: unconfigured("findLastNonCancelled"),
+  findForOrganization: unconfigured("findForOrganization"),
+  findCreatedBetween: unconfigured("findCreatedBetween"),
   hasAnyForOrganization: unconfigured("hasAnyForOrganization"),
   createPending: unconfigured("createPending"),
   updateStatus: unconfigured("updateStatus"),

@@ -59,7 +59,7 @@ import type {
   UpdateOrganizationTeamWithMembersInput,
 } from "./features/team/team.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
-import type { OrganizationOpsSnapshot } from "./organization-ops.ts";
+import type { OrganizationInviteFact, OrganizationOpsSnapshot } from "./organization-ops.ts";
 import type {
   PendingInvitationForCaller,
   PendingInvitationsByEmail,
@@ -990,6 +990,11 @@ export interface OrganizationApi {
    * slug or address (ADR-202, ops functions). Throws `OrganizationNotFoundError`.
    */
   getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
+  /**
+   * Every invitation of one organization, whatever its status, newest first, as ids, flags and
+   * times: never an address, a code or a link (ADR-202, ops functions). Empty when none.
+   */
+  findInviteFacts(input: Readonly<{ organizationId: string }>): Promise<OrganizationInviteFact[]>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

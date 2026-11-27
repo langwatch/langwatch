@@ -90,6 +90,8 @@ export type {
 export * from "./features/dashboard/ops-dashboard.ts";
 export * from "./features/queue/ops-queue.ts";
 export * from "./features/queue/ops-tenant-queue.ts";
+export * from "./features/migrations/ops-serving-roster.ts";
+export * from "./features/clickhouse/ops-clickhouse-server.ts";
 export * from "./features/event-log/ops-replay.ts";
 export * from "./features/process/ops-process.ts";
 export * from "./features/dashboard/ops-latency.ts";

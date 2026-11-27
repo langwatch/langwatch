@@ -1,4 +1,5 @@
 import type {
+  OpsServingProcess,
   OpsUpgradeAttentionNotice,
   OpsUpgradeDeprecation,
   OpsUpgradeIdInput,
@@ -20,6 +21,7 @@ import type {
   SelfHostedNotice,
 } from "@langwatch/ops-contract";
 import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
+import { SERVING_ROSTER_TIMING } from "@langwatch/upgrade/gate";
 import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
   UpgradeImageVersion,
@@ -309,6 +311,22 @@ export class OpsUpgradeService {
     return (await this.ledger.findTargets()).map((summary) =>
       targetSummaryOf({ summary, routes: this.routes }),
     );
+  }
+
+  /** The roster's live processes, oldest first; the process id and host stay in the ledger. */
+  async findServingProcesses(): Promise<OpsServingProcess[]> {
+    const roster = await this.ledger.findLiveRoster({
+      staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs,
+    });
+    return roster
+      .map((entry) => ({
+        role: entry.role,
+        image: entry.image,
+        release: entry.release,
+        startedAt: entry.startedAt.getTime(),
+        lastSeenAt: entry.heartbeatAt.getTime(),
+      }))
+      .toSorted((left, right) => left.startedAt - right.startedAt);
   }
 
   /** Reopens a failed step for the worker's next sweep, its checkpoint kept (D6). */

@@ -134,6 +134,14 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
     return this.#tenantRuns(tenantId);
   }
 
+  /** Every stored run with its project, for the memory twin of a platform-wide count. */
+  findEveryRun(): { tenantId: string; run: EvaluationRunData }[] {
+    return [...this.#runs.entries()].map(([key, run]) => ({
+      tenantId: key.slice(0, key.indexOf("\u0000")),
+      run,
+    }));
+  }
+
   #tenantRuns(tenantId: string): EvaluationRunData[] {
     return [...this.#runs.entries()]
       .filter(([key]) => key.startsWith(`${tenantId}\u0000`))

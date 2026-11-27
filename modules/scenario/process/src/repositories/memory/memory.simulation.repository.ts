@@ -14,6 +14,8 @@ import {
   type SimulationLastResultSummary,
   type SimulationRunData,
   type SimulationSetData,
+  type SimulationProjectRunCount,
+  type SimulationRunCountsInput,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -102,6 +104,12 @@ function byCreatedAt(left: FoldedRun, right: FoldedRun): number {
     compareText(left.scenarioRunId, right.scenarioRunId)
   );
 }
+
+/** The statuses the staff run counts call failed, as the ClickHouse read counts them. */
+const COUNTED_FAILED_STATUSES = new Set<string>([
+  SimulationRunStatus.FAILED,
+  SimulationRunStatus.ERROR,
+]);
 
 function isVisible(run: FoldedRun): boolean {
   return run.state.ArchivedAt == null;
@@ -909,6 +917,27 @@ export class MemorySimulationRepository extends SimulationRepository {
 
   async countOrganizationRuns({ projectIds }: { projectIds: readonly string[] }): Promise<number> {
     return this.runsOf([...new Set(projectIds)]).filter(isVisible).length;
+  }
+
+  async findRunCountsByProject({
+    projectIds,
+    since,
+    until,
+  }: SimulationRunCountsInput): Promise<SimulationProjectRunCount[]> {
+    return [...new Set(projectIds)].flatMap((projectId) => {
+      const runs = this.runsOf([projectId]).filter(
+        (run) => isVisible(run) && run.startedAt >= since && run.startedAt < until,
+      );
+      if (runs.length === 0) return [];
+      return [
+        {
+          projectId,
+          runs: runs.length,
+          suites: new Set(runs.map((run) => run.state.ScenarioSetId || DEFAULT_SET_ID)).size,
+          failedRuns: runs.filter((run) => COUNTED_FAILED_STATUSES.has(run.state.Status)).length,
+        },
+      ];
+    });
   }
 
   async listRunsForExport({

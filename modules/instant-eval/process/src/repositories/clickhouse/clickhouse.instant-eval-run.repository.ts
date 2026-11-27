@@ -1,3 +1,4 @@
+import type { InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -18,6 +19,18 @@ import {
 import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-session.store.ts";
 
 const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
+const dailyRowsSchema = z.array(
+  z.object({
+    DayMs: z.string(),
+    Status: z.string(),
+    ErrorCode: z.string(),
+    Runs: z.string(),
+    Judged: z.string(),
+    Largest: z.string(),
+    PriceUsd: z.string(),
+    LastMs: z.string(),
+  }),
+);
 
 export class ClickHouseInstantEvalRunRepository implements InstantEvalRunRepository {
   private constructor(
@@ -183,6 +196,46 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
     };
   }
 
+  /** Per project, FINAL for each run's latest counters; folded per day, failures by code. */
+  async findDailyRunCounts({
+    projectIds,
+    since,
+    until,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<InstantEvalDailyRunCount[]> {
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const client = await this.resolveClient(tenantId);
+        const result = await client.query({
+          query: `
+            SELECT toString(toUnixTimestamp(toStartOfDay(CreatedAt, 'UTC')) * 1000) AS DayMs,
+                   Status,
+                   ifNull(Error, '') AS ErrorCode,
+                   toString(count()) AS Runs,
+                   toString(sum(Progress)) AS Judged,
+                   toString(max(ifNull(Total, 0))) AS Largest,
+                   toString(sum(PriceUsd)) AS PriceUsd,
+                   toString(toUnixTimestamp64Milli(max(CreatedAt))) AS LastMs
+            FROM ${INSTANT_EVAL_RUNS_TABLE} FINAL
+            WHERE TenantId = {tenantId:String}
+              AND CreatedAt >= fromUnixTimestamp64Milli({since:Int64})
+              AND CreatedAt < fromUnixTimestamp64Milli({until:Int64})
+            GROUP BY DayMs, Status, ErrorCode`,
+          query_params: { tenantId, since, until },
+          format: "JSONEachRow",
+        });
+        return foldDailyRows({
+          projectId: tenantId,
+          rows: dailyRowsSchema.parse(await result.json()),
+        });
+      }),
+    );
+    return perProject.flat();
+  }
+
   async write(row: InstantEvalRunRow): Promise<void> {
     const client = await this.resolveClient(row.projectId);
     await client.insert({
@@ -192,4 +245,38 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
       clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
   }
+}
+
+type DailyRow = z.infer<typeof dailyRowsSchema>[number];
+
+/** One project's grouped rows folded to one count per day, failures keyed by their code. */
+function foldDailyRows({
+  projectId,
+  rows,
+}: {
+  projectId: string;
+  rows: DailyRow[];
+}): InstantEvalDailyRunCount[] {
+  const days = new Map<number, InstantEvalDailyRunCount>();
+  for (const row of rows) {
+    const day = Number(row.DayMs);
+    const runs = Number.parseInt(row.Runs, 10);
+    const failed = row.Status === "FAILED";
+    const known = days.get(day);
+    days.set(day, {
+      projectId,
+      day,
+      runs: (known?.runs ?? 0) + runs,
+      judgedRows: (known?.judgedRows ?? 0) + Number.parseInt(row.Judged, 10),
+      largestRun: Math.max(known?.largestRun ?? 0, Number.parseInt(row.Largest, 10)),
+      failedRuns: (known?.failedRuns ?? 0) + (failed ? runs : 0),
+      failedByCode: [
+        ...(known?.failedByCode ?? []),
+        ...(failed ? [{ code: row.ErrorCode, count: runs }] : []),
+      ],
+      priceUsd: (known?.priceUsd ?? 0) + Number(row.PriceUsd),
+      lastRunAt: Math.max(known?.lastRunAt ?? 0, Number(row.LastMs)),
+    });
+  }
+  return [...days.values()];
 }

@@ -15,7 +15,10 @@ import {
 } from "../clickhouse.simulation-session.store.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
-const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
+const configuredClickHouseUrl =
+  process.env.TEST_CLICKHOUSE_URL ??
+  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
+  process.env.CI_CLICKHOUSE_URL;
 export const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
 if (databaseUrl && !process.env.TEST_CLICKHOUSE_URL) {
   databaseUrl.pathname = "/test_langwatch";

@@ -26,6 +26,10 @@ import {
   staffAccessFetch,
   waitForDecision,
 } from "./_shared";
+import { type ListedFunction, suggestOpsCall } from "./call-hint";
+
+/** How long the optional first-call hint may wait for the function listing. */
+const SUGGESTION_TIMEOUT_MS = 3_000;
 
 interface CreatedRequest {
   requestId: string;
@@ -74,6 +78,48 @@ const sessionTable = (summary: ReturnType<typeof describeSession>): void => {
     ["Expires", new Date(summary.expiresAt).toLocaleString()],
     ["Session file", summary.sessionFile],
   ]);
+};
+
+/** What a redeemed session prints: the command to start with, then the session. */
+const printRedeemed = ({
+  summary,
+  suggestedCall,
+}: {
+  summary: ReturnType<typeof describeSession>;
+  suggestedCall: string | null;
+}): void => {
+  if (summary.hasApiKey) {
+    console.log(
+      chalk.green("Access granted. Run a normal command on it with --ops-session, e.g.:"),
+    );
+    console.log(chalk.cyan("  langwatch trace search --ops-session"));
+  } else if (suggestedCall) {
+    console.log(chalk.green("Access granted. Call an approved function, e.g.:"));
+    console.log(chalk.cyan(`  ${suggestedCall}`));
+  } else {
+    console.log(
+      chalk.green("Access granted. Each function's input: langwatch ops functions -o json"),
+    );
+  }
+  sessionTable(summary);
+};
+
+/** A first `ops call` line built from the server's input schemas; null when it can't be read. */
+const suggestFirstCall = async ({ session }: { session: OpsSession }): Promise<string | null> => {
+  const approved = session.functions ?? [];
+  if (!session.opsToken || approved.length === 0) return null;
+  try {
+    const page = await staffAccessFetch<{ items: ListedFunction[] }>({
+      method: "GET",
+      path: "/api/staff-access/functions",
+      bearer: session.opsToken,
+      endpoint: session.endpoint,
+      signal: AbortSignal.timeout(SUGGESTION_TIMEOUT_MS),
+    });
+    return suggestOpsCall({ approved, listing: page.items, now: new Date() }) ?? null;
+  } catch {
+    return null;
+  }
 };
 
 /** Redeems an approved request and writes the session file. */
@@ -127,21 +173,10 @@ const redeemInto = async ({
   const file = saveOpsSession(session);
   forgetPendingRequest({ requestId });
   const summary = describeSession({ session, file });
+  const suggestedCall = session.apiKey ? null : await suggestFirstCall({ session });
   return {
-    data: { status: "redeemed", ...summary },
-    table: () => {
-      if (summary.hasApiKey) {
-        console.log(
-          chalk.green("Access granted. Run a normal command on it with --ops-session, e.g.:"),
-        );
-        console.log(chalk.cyan("  langwatch trace search --ops-session"));
-      } else {
-        console.log(chalk.green("Access granted. Call an approved function, e.g.:"));
-        const first = summary.functions[0] ?? "<name>";
-        console.log(chalk.cyan(`  langwatch ops call ${first} --input '{}'`));
-      }
-      sessionTable(summary);
-    },
+    data: { status: "redeemed", ...summary, suggestedCall },
+    table: () => printRedeemed({ summary, suggestedCall }),
   };
 };
 

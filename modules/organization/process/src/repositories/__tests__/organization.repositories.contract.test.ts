@@ -4,11 +4,12 @@ import {
   TeamNotFoundError,
   TeamSlugConflictError,
   GroupNotFoundError,
+  OrganizationUserRole,
   type OrganizationIntent,
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 /** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MemoryOrganizationDatabase } from "../memory/memory.organization.database.ts";
 import { organizationRepositories } from "../organization-repositories.registry.ts";
@@ -406,6 +407,101 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         name: "Acme Corp",
         billingCustomerId: "cus_123",
       });
+    });
+  });
+
+  describe("when every invitation of an organization is read", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function inviteAt({
+      organizationId,
+      label,
+      at,
+    }: {
+      organizationId: string;
+      label: string;
+      at: string;
+    }): Promise<string> {
+      vi.setSystemTime(new Date(at));
+      const created = await repositories.invite.createPendingInvite({
+        email: `${label}@acme.test`,
+        inviteCode: `code-${label}`,
+        expiration: null,
+        organizationId,
+        teamIds: "",
+        role: OrganizationUserRole.MEMBER,
+      });
+      return created.id;
+    }
+
+    it("answers every status of this organization only, newest first", async () => {
+      const accepted = await inviteAt({
+        organizationId: ORGANIZATION_ID,
+        label: "accepted",
+        at: "2026-11-01T00:00:00Z",
+      });
+      await repositories.invite.claimInviteForAcceptance({
+        inviteId: accepted,
+        organizationId: ORGANIZATION_ID,
+        inviteCode: "code-accepted",
+        acceptedByUserId: USER_ID,
+        acceptedViaIdentifierId: null,
+      });
+      vi.setSystemTime(new Date("2026-11-02T00:00:00Z"));
+      const checkout = await repositories.invite.createPaymentPendingInvite({
+        email: "checkout@acme.test",
+        inviteCode: "code-checkout",
+        expiration: null,
+        organizationId: ORGANIZATION_ID,
+        teamIds: "",
+        role: OrganizationUserRole.MEMBER,
+        subscriptionId: "sub-1",
+      });
+      const revoked = await inviteAt({
+        organizationId: ORGANIZATION_ID,
+        label: "revoked",
+        at: "2026-11-03T00:00:00Z",
+      });
+      await repositories.invite.revokeOpenInvite({
+        inviteId: revoked,
+        organizationId: ORGANIZATION_ID,
+      });
+      await inviteAt({
+        organizationId: ORGANIZATION_ID_2,
+        label: "elsewhere",
+        at: "2026-11-04T00:00:00Z",
+      });
+
+      const found = await repositories.invite.findAllInvites({ organizationId: ORGANIZATION_ID });
+
+      expect(found.map(({ id, status }) => [id, status])).toEqual([
+        [revoked, "REVOKED"],
+        [checkout.id, "PAYMENT_PENDING"],
+        [accepted, "ACCEPTED"],
+      ]);
+      expect(found.map(({ createdAt }) => createdAt.toString())).toEqual([
+        "2026-11-03T00:00:00Z",
+        "2026-11-02T00:00:00Z",
+        "2026-11-01T00:00:00Z",
+      ]);
+    });
+
+    it("answers an empty list for an organization with none", async () => {
+      await inviteAt({
+        organizationId: ORGANIZATION_ID_2,
+        label: "other",
+        at: "2026-11-04T00:00:00Z",
+      });
+
+      await expect(
+        repositories.invite.findAllInvites({ organizationId: ORGANIZATION_ID }),
+      ).resolves.toEqual([]);
     });
   });
 });

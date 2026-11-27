@@ -3,6 +3,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -12,11 +13,24 @@ import {
   type StaffAccessFunctionName,
   type StaffAccessFunctionOutput,
 } from "@langwatch/staff-access-contract";
-import { type Instant, Temporal } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { pageOf, rangeOf } from "../rules/staff-access-function.rules.ts";
+import {
+  pageOf,
+  rangeOf,
+  isoOfMs,
+  pageInputOf,
+  type StaffAccessFunctionRun,
+  type StaffAccessFunctionRuns,
+} from "../rules/staff-access-function.rules.ts";
 import { isoText } from "../rules/staff-access.rules.ts";
+import type { StaffAccessActivityFunctionReadsService } from "./staff-access-activity-function-reads.service.ts";
+import type { StaffAccessBillingFunctionReadsService } from "./staff-access-billing-function-reads.service.ts";
+import type { StaffAccessLangyFunctionReadsService } from "./staff-access-langy-function-reads.service.ts";
+import type { StaffAccessPeopleFunctionReadsService } from "./staff-access-people-function-reads.service.ts";
+import type { StaffAccessPlatformFunctionReadsService } from "./staff-access-platform-function-reads.service.ts";
+import type { StaffAccessTelemetryFunctionReadsService } from "./staff-access-telemetry-function-reads.service.ts";
 
 type ReadsDeps = Readonly<{
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "getOpsSnapshot">;
@@ -25,23 +39,26 @@ type ReadsDeps = Readonly<{
   entitlements: Pick<EntitlementApi, "getUsageLimits">;
   traces: Pick<TraceApi, "countIngestionByProject" | "findTracePresence">;
   evaluations: Pick<EvaluationApi, "countEvaluatorOutcomes">;
+  monitors: Pick<MonitorApi, "getAllByIds">;
   apiKeys: Pick<ApiKeyApi, "findKeyFactsForOrganization">;
   ops: Pick<OpsApi, "countQueueGroupsForTenants">;
   auth: Pick<AuthApi, "findSignInFacts">;
+  telemetry: Pick<StaffAccessTelemetryFunctionReadsService, "reads">;
+  langy: Pick<StaffAccessLangyFunctionReadsService, "reads">;
+  people: Pick<StaffAccessPeopleFunctionReadsService, "reads">;
+  activity: Pick<StaffAccessActivityFunctionReadsService, "reads">;
+  platform: Pick<StaffAccessPlatformFunctionReadsService, "reads">;
+  billing: Pick<StaffAccessBillingFunctionReadsService, "reads">;
 }>;
 
-type Run<Name extends StaffAccessFunctionName> = (input: {
-  input: StaffAccessFunctionInput<Name>;
-  organizationId: string;
-  at: Instant;
-}) => Promise<StaffAccessFunctionOutput<Name>>;
+type Run<Name extends StaffAccessFunctionName> = StaffAccessFunctionRun<Name>;
 
 /**
  * Each ops function's read, through the owning module's `*Api` (ARCHITECTURE.md §3): staff
  * access reads no other module's tables. An `org` function reads only the approved organization.
  */
 export class StaffAccessFunctionReadsService {
-  private readonly reads: { [Name in StaffAccessFunctionName]: Run<Name> };
+  private readonly reads: StaffAccessFunctionRuns<StaffAccessFunctionName>;
 
   private constructor(private readonly deps: ReadsDeps) {
     this.reads = {
@@ -54,6 +71,12 @@ export class StaffAccessFunctionReadsService {
       "org.usage_limits": (call) => this.usageLimits(call),
       "org.api_keys": (call) => this.apiKeys(call),
       "queues.tenant": (call) => this.tenantQueues(call),
+      ...deps.telemetry.reads,
+      ...deps.langy.reads,
+      ...deps.people.reads,
+      ...deps.activity.reads,
+      ...deps.platform.reads,
+      ...deps.billing.reads,
     };
   }
 
@@ -240,7 +263,9 @@ export class StaffAccessFunctionReadsService {
       since: range.since.epochMilliseconds,
       until: range.until.epochMilliseconds,
     });
+    const monitors = await this.monitorsOf({ outcomes });
     const rows = outcomes.map((outcome) => ({
+      ...monitorStateOf(monitors.get(`${outcome.projectId}/${outcome.evaluatorId}`)),
       projectId: outcome.projectId,
       evaluatorId: outcome.evaluatorId,
       evaluatorType: outcome.evaluatorType,
@@ -258,6 +283,35 @@ export class StaffAccessFunctionReadsService {
       name: "org.evaluator_errors",
       ...pageInputOf(input),
     });
+  }
+
+  /** The monitors behind the outcomes, by project and id; a deleted one is absent. */
+  private async monitorsOf({
+    outcomes,
+  }: {
+    outcomes: readonly { projectId: string; evaluatorId: string }[];
+  }): Promise<Map<string, MonitorState>> {
+    const idsByProject = new Map<string, Set<string>>();
+    for (const outcome of outcomes) {
+      const ids = idsByProject.get(outcome.projectId) ?? new Set<string>();
+      ids.add(outcome.evaluatorId);
+      idsByProject.set(outcome.projectId, ids);
+    }
+    const found = await Promise.all(
+      [...idsByProject.entries()].map(([projectId, ids]) =>
+        this.deps.monitors.getAllByIds({ projectId, monitorIds: [...ids] }),
+      ),
+    );
+    return new Map(
+      found.flat().map((monitor) => [
+        `${monitor.projectId}/${monitor.id}`,
+        {
+          enabled: monitor.enabled,
+          createdById: monitor.createdById ?? null,
+          autoPausedAtMs: monitor.autoPausedAt ? monitor.autoPausedAt.getTime() : null,
+        },
+      ]),
+    );
   }
 
   private async usageLimits({
@@ -337,16 +391,24 @@ export class StaffAccessFunctionReadsService {
   }
 }
 
-function isoOfMs(ms: number): string {
-  return isoText(Temporal.Instant.fromEpochMilliseconds(ms));
-}
+type MonitorState = Readonly<{
+  enabled: boolean;
+  createdById: string | null;
+  autoPausedAtMs: number | null;
+}>;
 
-function pageInputOf(input: { limit?: number; cursor?: string }): {
-  limit?: number;
-  cursor?: string;
+/** Who created the monitor, and when and why it stopped running: paused itself, or turned off. */
+function monitorStateOf(monitor: MonitorState | undefined): {
+  createdByUserId: string | null;
+  disabledAt: string | null;
+  disabledReasonCode: "error_rate" | "manual" | null;
 } {
-  return {
-    ...(input.limit === undefined ? {} : { limit: input.limit }),
-    ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-  };
+  if (!monitor) return { createdByUserId: null, disabledAt: null, disabledReasonCode: null };
+  const createdByUserId = monitor.createdById;
+  if (monitor.enabled) return { createdByUserId, disabledAt: null, disabledReasonCode: null };
+  if (monitor.autoPausedAtMs === null) {
+    return { createdByUserId, disabledAt: null, disabledReasonCode: "manual" };
+  }
+  const disabledAt = isoOfMs(monitor.autoPausedAtMs);
+  return { createdByUserId, disabledAt, disabledReasonCode: "error_rate" };
 }

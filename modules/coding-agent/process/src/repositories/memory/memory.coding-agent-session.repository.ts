@@ -1,6 +1,7 @@
 import { AccessNotGrantedError, type Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
+  CodingAgentDailySessionCount,
   CodingAgentSessionBranchRecord,
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
@@ -10,6 +11,8 @@ import {
   type OtherSessionKind,
 } from "../coding-agent-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The session aggregate, held in the process rather than in ClickHouse. */
 export class MemoryCodingAgentSessionRepository extends CodingAgentSessionRepository {
@@ -183,6 +186,36 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
       sessions: new Set(counted.map((row) => row.sessionId)).size,
       ...(rows.length === 0 ? {} : { firstSessionAt: first, lastSessionAt: last }),
     };
+  }
+
+  async findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]> {
+    const groups = new Map<
+      string,
+      { row: CodingAgentDailySessionCount; sessions: Set<string>; users: Set<string> }
+    >();
+    for (const row of this.rows()) {
+      if (!input.projectIds.includes(row.tenantId)) continue;
+      if (row.startedAtMs < input.since || row.startedAtMs >= input.until) continue;
+      const day = row.startedAtMs - (row.startedAtMs % DAY_MS);
+      const key = `${row.tenantId}/${day}/${row.agent}`;
+      const group = groups.get(key) ?? {
+        row: { projectId: row.tenantId, day, agent: row.agent, sessions: 0, users: 0 },
+        sessions: new Set<string>(),
+        users: new Set<string>(),
+      };
+      group.sessions.add(row.sessionId);
+      if (row.userId !== "") group.users.add(row.userId);
+      groups.set(key, group);
+    }
+    return [...groups.values()].map(({ row, sessions, users }) => ({
+      ...row,
+      sessions: sessions.size,
+      users: users.size,
+    }));
   }
 
   private rows(): CodingAgentSession[] {

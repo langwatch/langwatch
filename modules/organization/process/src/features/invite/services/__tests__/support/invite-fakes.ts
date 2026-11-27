@@ -525,6 +525,7 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   >("findPersonalTeamsInScopes");
   findListableInvites =
     unsupported<OrganizationInviteRepository["findListableInvites"]>("findListableInvites");
+  findAllInvites = unsupported<OrganizationInviteRepository["findAllInvites"]>("findAllInvites");
   revokeOpenInvite =
     unsupported<OrganizationInviteRepository["revokeOpenInvite"]>("revokeOpenInvite");
   async getInviteWithOrganization({

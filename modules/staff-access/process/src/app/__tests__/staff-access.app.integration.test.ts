@@ -33,19 +33,10 @@ import {
   requestBody,
   staffAccessWorld,
   VERIFIER,
+  codeOf,
 } from "./support/staff-access-world.ts";
 
 type Backend = Readonly<{ name: string; repositories: () => StaffAccessRepositories }>;
-
-/** The code a promise rejects with, for asserting on codes rather than prose. */
-async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-    return undefined;
-  } catch (error) {
-    return (error as { code?: string }).code;
-  }
-}
 
 function requestFrom({ bearer, ip = AGENT_IP }: { bearer: string; ip?: string }): Request {
   const request = new Request("https://app.langwatch.test/api/staff-access/requests", {
@@ -1447,7 +1438,15 @@ function scenarios(backend: Backend): void {
           call("org.evaluator_errors", { since: "2026-10-30T00:00:00Z" }),
         ).resolves.toMatchObject({
           output: {
-            items: [{ evaluatorId: "monitor_1", errorsByCode: { provider_rate_limited: 4 } }],
+            items: [
+              {
+                evaluatorId: "monitor_1",
+                errorsByCode: { provider_rate_limited: 4 },
+                createdByUserId: "user_creator",
+                disabledAt: "2026-11-02T07:00:00.000Z",
+                disabledReasonCode: "error_rate",
+              },
+            ],
           },
         });
         await expect(call("queues.tenant")).resolves.toMatchObject({

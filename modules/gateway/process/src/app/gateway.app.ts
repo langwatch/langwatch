@@ -113,6 +113,7 @@ import {
   type GatewaySpendEventEnvelope,
   gatewaySpendEventEnvelopeSchema,
   type GatewayUsageCount,
+  type GatewayDailyKeySpend,
   gatewayBrowserConfig,
   gatewayConfig,
   type GatewayDeploymentAddresses,
@@ -1917,6 +1918,15 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     since?: number;
   }): Promise<GatewayUsageCount> {
     return this.getSpendEvents().countUsage(input);
+  }
+
+  /** Staff investigation counts (ADR-202); refused where no spend ledger is composed. */
+  findDailyKeySpend(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<GatewayDailyKeySpend[]> {
+    return this.getSpendEvents().findDailyKeySpend(input);
   }
 
   getBudgetSpend(): GatewayBudgetSpendRepository {

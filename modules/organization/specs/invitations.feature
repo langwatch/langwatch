@@ -192,3 +192,26 @@ Feature: Invitation acceptance and role recomputation
     When an administrator invites "sam" from the members screen
     Then a pending invitation is created for "sam" and its mail is sent
     And the held payment-pending invitation is gone
+
+  # organization.app.ts findInviteFacts, prisma.organization-invite.repository.ts findAllInvites:
+  # the read the staff ops function org.invites stands on (ADR-202).
+  @integration
+  Scenario: Every invitation of an organization reads newest first with the status a person sees
+    Given an organization holding invitations that are pending, expired, revoked, accepted and held for a checkout
+    And another organization holding a pending invitation
+    When the organization's invitations are read for a staff investigation
+    Then each of its invitations is answered once, newest first, and none of the other organization's
+    And an expired pending invitation reads as expired and a held one as payment pending
+    And each carries its teams as a list, its role, its inviter and who accepted it
+
+  @integration
+  Scenario: An organization's invitations read for staff carry no address, code or link
+    Given an organization holding invitations
+    When the organization's invitations are read for a staff investigation
+    Then no email address, invite code or link is in the answer
+
+  @integration
+  Scenario: An organization with no invitations reads as an empty list
+    Given an organization with no invitations
+    When the organization's invitations are read for a staff investigation
+    Then the answer is an empty list

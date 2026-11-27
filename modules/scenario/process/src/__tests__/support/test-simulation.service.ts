@@ -126,6 +126,10 @@ export class TestSimulationService extends SimulationService {
     return 0;
   }
 
+  async findRunCountsByProject(): Promise<[]> {
+    return [];
+  }
+
   async listRunsForExport(): Promise<{
     runs: SimulationExportRun[];
     nextCursor?: string;

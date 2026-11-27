@@ -19,6 +19,8 @@ import {
   type SimulationRunData,
   type SimulationSetData,
   type SimulationExportRun,
+  type SimulationProjectRunCount,
+  type SimulationRunCountsInput,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -1514,6 +1516,65 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     });
     const [row] = await result.json<{ Total: string }>();
     return Number(row?.Total ?? "0");
+  }
+
+  /**
+   * One read for the whole organization, routed by its first project like countOrganizationRuns,
+   * latest version per run, one row per project with runs in the window.
+   */
+  async findRunCountsByProject({
+    projectIds,
+    since,
+    until,
+  }: SimulationRunCountsInput): Promise<SimulationProjectRunCount[]> {
+    const tenantIds = [...new Set(projectIds)];
+    const [routingTenant] = tenantIds;
+    if (routingTenant === undefined) return [];
+    const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
+    const windowOf = (alias: string) =>
+      `${alias}StartedAt >= fromUnixTimestamp64Milli(toInt64({since:String}))
+         AND ${alias}StartedAt < fromUnixTimestamp64Milli(toInt64({until:String}))`;
+    const client = await this.getClient(routingTenant);
+    const result = await client.query({
+      query: `SELECT t.TenantId AS ProjectId,
+              toString(count()) AS Runs,
+              toString(uniqExact(if(t.ScenarioSetId = '', {defaultSetId:String}, t.ScenarioSetId))) AS Suites,
+              toString(countIf(t.Status IN ('FAILED', 'ERROR'))) AS Failed
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId IN (${placeholders})
+         AND ${windowOf("t.")}
+         AND t.ArchivedAt IS NULL
+         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+           FROM ${TABLE_NAME}
+           WHERE TenantId IN (${placeholders})
+             AND ${windowOf("")}
+           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
+       GROUP BY t.TenantId`,
+      query_params: {
+        ...Object.fromEntries(tenantIds.map((id, i) => [`tenant${i}`, id])),
+        since: String(since),
+        until: String(until),
+        defaultSetId: DEFAULT_SET_ID,
+      },
+      format: "JSONEachRow",
+      tenantIds,
+    });
+    const rows = await result.json<{
+      ProjectId: string;
+      Runs: string;
+      Suites: string;
+      Failed: string;
+    }>();
+    return rows
+      .map((row) => ({
+        projectId: row.ProjectId,
+        runs: Number(row.Runs),
+        suites: Number(row.Suites),
+        failedRuns: Number(row.Failed),
+      }))
+      .filter((count) => count.runs > 0);
   }
 
   /**

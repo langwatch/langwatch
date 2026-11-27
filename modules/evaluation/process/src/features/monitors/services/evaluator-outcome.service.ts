@@ -1,8 +1,12 @@
 /** Staff investigation counts of online evaluator runs; ids, counts, codes and times only. */
 import {
+  EVALUATOR_TYPE_USAGE_MAX_TYPES,
   evaluatorOutcomeCountQuerySchema,
+  evaluatorTypeUsageQuerySchema,
   type EvaluatorOutcomeCount,
   type EvaluatorOutcomeCountQuery,
+  type EvaluatorTypeUsage,
+  type EvaluatorTypeUsageQuery,
 } from "@langwatch/evaluation-contract";
 
 import type {
@@ -38,6 +42,27 @@ export class EvaluatorOutcomeService {
       counts.push(...foldOutcomeRows({ projectId, rows }));
     }
     return counts;
+  }
+
+  /** One read over every tenant; each type's error codes busiest first. */
+  async countEvaluatorUsageByType(input: EvaluatorTypeUsageQuery): Promise<EvaluatorTypeUsage[]> {
+    const query = evaluatorTypeUsageQuerySchema.parse(input);
+    if (query.until <= query.since) return [];
+    const rows = await this.repository.findTypeUsageRows({
+      since: query.since,
+      until: query.until,
+      limit: EVALUATOR_TYPE_USAGE_MAX_TYPES,
+    });
+    return rows.map((row) => ({
+      evaluatorType: row.evaluatorType,
+      projects: row.projects,
+      runs: row.runs,
+      errors: row.errors,
+      skipped: row.skipped,
+      errorsByCode: Object.entries(row.errorsByCode)
+        .map(([code, count]) => ({ code, count }))
+        .toSorted((left, right) => right.count - left.count || left.code.localeCompare(right.code)),
+    }));
   }
 }
 

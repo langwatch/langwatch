@@ -30,6 +30,8 @@ import type {
   SimulationRecordRedTeamReport,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
+  SimulationProjectRunCount,
+  SimulationRunCountsInput,
   SimulationExternalSetCountInput,
   SimulationExternalSetSummary,
   SimulationAllSuitesRunData,
@@ -149,6 +151,10 @@ export class SimulationService extends SimulationServiceContract {
 
   countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number> {
     return this.repository.countOrganizationRuns(input);
+  }
+
+  findRunCountsByProject(input: SimulationRunCountsInput): Promise<SimulationProjectRunCount[]> {
+    return this.repository.findRunCountsByProject(input);
   }
 
   listRunsForExport(

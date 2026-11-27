@@ -11,7 +11,7 @@ Evaluations: running evaluators against traces, the evaluation runs that record 
 | Classification | core (`modules/catalogue.json`)                                                                                    |
 | Subjects       | evaluation                                                                                                         |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                |
-| Api token      | `EvaluationApi` = `moduleApi<EvaluationApi>()("evaluation")`, `contract/src/evaluation.api.ts:121` (28 operations) |
+| Api token      | `EvaluationApi` = `moduleApi<EvaluationApi>()("evaluation")`, `contract/src/evaluation.api.ts:128` (29 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                       |
 
 ## What evaluation owns

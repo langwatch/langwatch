@@ -10,6 +10,7 @@ import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./ano
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRateLimitRepository, BugReportRepository } from "./bug-report.repository.ts";
 import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
+import type { ClickHouseServerRepository } from "./clickhouse.server.repository.ts";
 import type { CloudLatestReleaseRepository } from "./cloud-latest-release.repository.ts";
 import type { CloudNoticeRepository } from "./cloud-notice.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
@@ -101,6 +102,8 @@ export interface OpsRepositories {
   readonly seatSharingChecks: SeatSharingCheckRepository;
   readonly redisHealth: RedisHealthRepository;
   readonly clickhouseHealth: ClickHouseHealthRepository;
+  /** The shared ClickHouse's query log and health, for ops functions (ADR-202). */
+  readonly clickhouseServer: ClickHouseServerRepository;
   readonly events: EventExplorerRepository;
   readonly storageFootprint: StorageFootprintRepository;
   readonly upgradeLedger: UpgradeLedgerRepository;

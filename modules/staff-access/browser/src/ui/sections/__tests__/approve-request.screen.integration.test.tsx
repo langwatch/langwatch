@@ -54,7 +54,7 @@ describe("given a pending request", () => {
       expect(screen.getByText("olivia-mbp")).toBeInTheDocument();
       expect(screen.getByText("203.0.113.7")).toBeInTheDocument();
       expect(screen.getByTestId("staff-access-approval-countdown")).toHaveTextContent(
-        /In \d+:\d\d/,
+        /In \d+ (h|min|s)\b.* unless you decide first/,
       );
 
       const reason = screen.getByTestId("staff-access-reason");

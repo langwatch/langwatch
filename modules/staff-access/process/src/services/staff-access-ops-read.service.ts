@@ -21,10 +21,8 @@ import { type Instant, Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { StaffAccessEventRepository } from "../repositories/staff-access.repository.ts";
-import { pageOf } from "../rules/staff-access-function.rules.ts";
+import { DAY_MS, pageOf } from "../rules/staff-access-function.rules.ts";
 import { isoText, STAFF_ACCESS_USAGE_CLASSIFICATION } from "../rules/staff-access.rules.ts";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 type OpsReadDeps = Readonly<{
   events: StaffAccessEventRepository;

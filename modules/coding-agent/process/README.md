@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`CodingAgentApi`)
 
-Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:65`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/coding-agent.api.ts:77`; nothing else in this package is public.
 
 #### `findBySessionId`
 
@@ -152,6 +152,14 @@ The usage report's figures (ADR-156, section 10).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<CodingAgentUsageCount>;
+```
+
+#### `findDailySessionCounts`
+
+Sessions started in `[since, until)` per project, UTC day and agent; epoch milliseconds.
+
+```typescript
+findDailySessionCounts(input: { projectIds: readonly string[]; since: number; until: number; }): Promise<CodingAgentDailySessionCount[]>;
 ```
 
 ## REST transport
@@ -381,8 +389,8 @@ Declared at `src/eventing/coding-agent-project-milestones.pipeline.ts:18`. Event
 
 | Kind   | Leaf                    | Environment variable               | Declared at                                |
 | ------ | ----------------------- | ---------------------------------- | ------------------------------------------ |
-| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:158`          |
-| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:159`          |
+| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:159`          |
+| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:160`          |
 | config | `foldCacheTtlSeconds`   | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/coding-agent.config.ts:4` |
 
 <!-- readme:generated:end -->

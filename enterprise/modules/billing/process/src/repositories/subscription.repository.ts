@@ -47,6 +47,13 @@ export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
 export abstract class BillingSubscriptionRepository {
   abstract findActive(organizationId: string): Promise<BillingSubscriptionRecord | null>;
   abstract findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
+  /** Every subscription row of the organization, cancelled ones included, newest first. */
+  abstract findForOrganization(organizationId: string): Promise<BillingSubscriptionRecord[]>;
+  /** Every subscription row created in `[since, until)`, across organizations. */
+  abstract findCreatedBetween(input: {
+    since: Instant;
+    until: Instant;
+  }): Promise<BillingSubscriptionRecord[]>;
   /** Whether the organization holds any subscription row, cancelled ones included. */
   abstract hasAnyForOrganization(organizationId: string): Promise<boolean>;
   abstract createPending(input: {

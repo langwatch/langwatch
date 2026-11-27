@@ -13,6 +13,8 @@ type SimulationEventingClickHouseClient = {
     clickhouse_settings?: ClickHouseSettings;
     /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
     idBound?: IdBoundOptions;
+    /** For a statement spanning several tenants: the declared set its `TenantId IN` binds. */
+    tenantIds?: readonly string[];
   }): Promise<{ json<Row>(): Promise<Row[]> }>;
   insert(input: {
     table: string;
@@ -48,6 +50,7 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
       params: input.query_params,
       ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),
       ...(input.idBound === undefined ? {} : { idBound: input.idBound }),
+      ...(input.tenantIds === undefined ? {} : { tenantIds: input.tenantIds }),
     };
 
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };

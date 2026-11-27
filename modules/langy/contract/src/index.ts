@@ -1,6 +1,7 @@
 export * from "./constants.ts";
 export * from "./json.ts";
 export * from "./langy-call-stopped.ts";
+export * from "./langy-mirror-settings.ts";
 export * from "./event-sourcing/contracts/langy.events.ts";
 export * from "./event-sourcing/contracts/cursor.ts";
 export * from "./event-sourcing/contracts/turn-wire.ts";

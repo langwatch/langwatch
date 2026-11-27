@@ -526,3 +526,10 @@ Feature: Ops shows an installation's release upgrades, read-only
   Scenario: The upgrade notice shows nothing while it loads
     Given the upgrade attention notice has not answered yet
     Then Home shows no card and no error
+
+  @unit
+  Scenario: The serving processes are read by role, image and release only
+    Given the roster holds a live api process and a live worker process
+    When ops reads the serving processes
+    Then each carries its role, image, release, start time and last heartbeat, oldest first
+    And no process id or host

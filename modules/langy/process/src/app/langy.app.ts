@@ -29,6 +29,7 @@ import {
   type LangyAttachmentUpload,
   type LangyAttachmentUploadInput,
   type LangyConversationDetail,
+  type LangyMirrorSettings,
   type LangyConversationEventPage,
   type LangyConversationListPage,
   type LangyControlFramesInput,
@@ -67,6 +68,8 @@ import {
   renderLangyTurnContext,
   type LangyServerConfig,
   type LangyUsageCount,
+  type LangyTurnFacts,
+  type LangyTurnOutcomeCounts,
   type LangyRelayConnection,
   type LocalControlConnectionOpened,
   type LocalControlKeyHolder,
@@ -199,6 +202,8 @@ const relayLogger = createLogger("langwatch:langy:relay");
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
   langy: LangyService;
+  /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
+  mirrorProjectId: string | undefined;
   internalDoor: RestIdentity;
   /** The gate every Langy key's delete passes: a click on its card, or a refusal. */
   deleteConfirmations: LangyDeleteConfirmationService;
@@ -491,6 +496,7 @@ export class LangyModule implements LangyApiContract {
     });
     return new LangyModule({
       langy,
+      mirrorProjectId: setup.config.mirrorProjectId?.trim() || undefined,
       uiActionDoor,
       internalDoor: door,
       deleteConfirmations,
@@ -912,6 +918,18 @@ export class LangyModule implements LangyApiContract {
     return this.dependencies.langy.countUsage(input);
   }
 
+  findTurnOutcomeCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<LangyTurnOutcomeCounts> {
+    return this.dependencies.langy.findTurnOutcomeCounts(input);
+  }
+
+  getTurnFacts(input: { projectId: string; conversationId: string }): Promise<LangyTurnFacts[]> {
+    return this.dependencies.langy.getTurnFacts(input);
+  }
+
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }> {
     return this.#setupSkills.getPrompt(input);
   }
@@ -1245,5 +1263,9 @@ export class LangyModule implements LangyApiContract {
     input: LangyPanelCall<typeof langyEgressSetInputSchema>,
   ): Promise<z.infer<typeof langyEgressStateSchema>> {
     return this.dependencies.panelEgress.setEgressState(input);
+  }
+
+  getMirrorSettings(): LangyMirrorSettings {
+    return { projectId: this.dependencies.mirrorProjectId ?? null };
   }
 }

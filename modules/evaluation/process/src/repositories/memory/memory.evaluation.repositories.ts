@@ -8,6 +8,8 @@ import {
   MonitorPerformanceRepository,
   type EvaluatorOutcomeRow,
   type EvaluatorOutcomeRowQuery,
+  type EvaluatorTypeUsageRow,
+  type EvaluatorTypeUsageRowQuery,
   type MonitorPerformanceBucket,
 } from "../monitor-performance.repository.ts";
 import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-storage/object-storage.evaluation-langevals-staging.repository.ts";
@@ -61,6 +63,36 @@ class MemoryMonitorPerformanceRepository extends MonitorPerformanceRepository {
       rows.set(key, row);
     }
     return [...rows.values()].slice(0, input.limit);
+  }
+
+  async findTypeUsageRows(input: EvaluatorTypeUsageRowQuery): Promise<EvaluatorTypeUsageRow[]> {
+    const rows = new Map<string, EvaluatorTypeUsageRow & { tenants: Set<string> }>();
+    for (const { tenantId, run } of this.runs.findEveryRun()) {
+      const scheduledAt = run.scheduledAt ?? run.createdAt;
+      if (scheduledAt < input.since || scheduledAt >= input.until) continue;
+      const row = rows.get(run.evaluatorType) ?? {
+        evaluatorType: run.evaluatorType,
+        projects: 0,
+        runs: 0,
+        errors: 0,
+        skipped: 0,
+        errorsByCode: {},
+        tenants: new Set<string>(),
+      };
+      row.tenants.add(tenantId);
+      row.runs += 1;
+      if (run.status === "skipped") row.skipped += 1;
+      if (run.status === "error") {
+        row.errors += 1;
+        const code = evaluatorErrorCodeOf(run.error);
+        row.errorsByCode[code] = (row.errorsByCode[code] ?? 0) + 1;
+      }
+      rows.set(run.evaluatorType, row);
+    }
+    return [...rows.values()]
+      .map(({ tenants, ...row }) => ({ ...row, projects: tenants.size }))
+      .toSorted((a, b) => b.runs - a.runs || (a.evaluatorType < b.evaluatorType ? -1 : 1))
+      .slice(0, input.limit);
   }
 }
 

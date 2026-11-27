@@ -4,6 +4,11 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  BillingStripePriceFact,
+  BillingSubscriptionCount,
+  OrganizationBillingFacts,
+} from "./billing-ops-facts.ts";
+import type {
   BillingPricingModel,
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
@@ -113,6 +118,24 @@ export interface BillingApi {
    * GB-month. Answers what it did; an organization with no Growth seat subscription is skipped.
    */
   recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome>;
+  /**
+   * One organization's subscription facts for an ops read: ids, codes, counts and times.
+   * @throws {BillingFactsUnavailableError} off LangWatch Cloud
+   */
+  getOrganizationBillingFacts(input: { organizationId: string }): Promise<OrganizationBillingFacts>;
+  /**
+   * Subscriptions created in `[since, until)` (epoch ms), counted per plan and state.
+   * @throws {BillingFactsUnavailableError} off LangWatch Cloud
+   */
+  findSubscriptionCounts(input: {
+    since: number;
+    until: number;
+  }): Promise<BillingSubscriptionCount[]>;
+  /**
+   * Every price in the Stripe account, with its tax behaviour; read through billing's channel.
+   * @throws {BillingFactsUnavailableError} off LangWatch Cloud or with no payment provider
+   */
+  findStripePriceFacts(): Promise<BillingStripePriceFact[]>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

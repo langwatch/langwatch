@@ -1,6 +1,12 @@
-import { LangyConversationNotFoundError, type LangyUsageCount } from "@langwatch/langy-contract";
+import {
+  LangyConversationNotFoundError,
+  langyTurnToolCallSchema,
+  type LangyUsageCount,
+} from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
+import type { LangyTurnFactRow, LangyTurnOutcomeRow } from "../../rules/langy-turn-facts.rules.ts";
 import { LangyConversationRepository } from "../langy-conversation-projection.repository.ts";
 import type {
   LangyConversationListCursor,
@@ -10,6 +16,34 @@ import type {
 import type { LangyDatabase } from "./langy-database.mapper.ts";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
+
+const toolCallsSchema = z.array(langyTurnToolCallSchema);
+const failedToolCallsSchema = z.array(
+  z.object({ toolName: z.string(), command: z.string().optional() }),
+);
+
+type TurnOutcomeSqlRow = {
+  status: string;
+  error: string | null;
+  createdAt: number;
+  userId: string | null;
+  lastModel: string | null;
+  failedToolCalls: unknown;
+};
+const TURN_FACT_COLUMNS = {
+  projectId: true,
+  ConversationId: true,
+  TurnId: true,
+  Status: true,
+  Error: true,
+  CreatedAt: true,
+  StartedAt: true,
+  EndedAt: true,
+  ToolCalls: true,
+} as const;
+type TurnFactColumns = Prisma.LangyConversationTurnProjectionGetPayload<{
+  select: typeof TURN_FACT_COLUMNS;
+}>;
 
 function toRow(row: Row): LangyConversationRow {
   return {
@@ -97,6 +131,115 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
       activeUsers: owners.length,
       ...(first ? { firstTurnAt: Number(first.CreatedAt) } : {}),
     };
+  }
+
+  /** One statement: the owner join and the failed-call cut run in Postgres, not the call bodies. */
+  async findTurnOutcomeRows({
+    projectIds,
+    since,
+    until,
+    limit,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+    limit: number;
+  }): Promise<{ rows: LangyTurnOutcomeRow[]; truncated: boolean }> {
+    const found = await this.prisma.$queryRaw<TurnOutcomeSqlRow[]>`
+      SELECT t."status", t."error", t."createdAt", c."userId", c."lastModel",
+        COALESCE((
+          SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+            'toolName', call->'toolName', 'command', call->'command')))
+          FROM jsonb_array_elements(
+            CASE WHEN jsonb_typeof(t."toolCalls") = 'array' THEN t."toolCalls" ELSE '[]'::jsonb END
+          ) AS call
+          WHERE call->>'status' = 'failed'
+        ), '[]'::jsonb) AS "failedToolCalls"
+      FROM "LangyConversationTurnProjection" t
+      LEFT JOIN "LangyConversationProjection" c
+        ON c."projectId" = t."projectId" AND c."conversationId" = t."conversationId"
+      WHERE t."projectId" = ANY(${[...projectIds]})
+        AND t."createdAt" >= ${since} AND t."createdAt" < ${until}
+      ORDER BY t."createdAt", t."turnId"
+      LIMIT ${limit + 1}
+    `;
+    return {
+      rows: found.slice(0, limit).map((row) => ({
+        status: row.status,
+        error: row.error,
+        createdAt: Number(row.createdAt),
+        userId: row.userId,
+        model: row.lastModel,
+        failedToolCalls: failedToolCallsSchema.safeParse(row.failedToolCalls).data ?? [],
+      })),
+      truncated: found.length > limit,
+    };
+  }
+
+  async findConversationTurnFactRows({
+    projectId,
+    conversationId: ConversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LangyTurnFactRow[]> {
+    const turns = await this.prisma.langyConversationTurnProjection.findMany({
+      where: { projectId, ConversationId },
+      select: TURN_FACT_COLUMNS,
+      orderBy: [{ CreatedAt: "asc" }, { TurnId: "asc" }],
+    });
+    return this.withOwners({ turns, projectIds: [projectId] });
+  }
+
+  async conversationExists({
+    projectId,
+    conversationId: ConversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.langyConversationProjection.findFirst({
+      where: { projectId, ConversationId },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
+  /** Joins each turn to its conversation's owner and latest model, read in one query. */
+  private async withOwners({
+    turns,
+    projectIds,
+  }: {
+    turns: TurnFactColumns[];
+    projectIds: readonly string[];
+  }): Promise<LangyTurnFactRow[]> {
+    if (turns.length === 0) return [];
+    const conversations = await this.prisma.langyConversationProjection.findMany({
+      where: {
+        projectId: { in: [...projectIds] },
+        ConversationId: { in: [...new Set(turns.map((turn) => turn.ConversationId))] },
+      },
+      select: { projectId: true, ConversationId: true, UserId: true, LastModel: true },
+    });
+    const owners = new Map(
+      conversations.map((row) => [`${row.projectId}:${row.ConversationId}`, row] as const),
+    );
+    return turns.map((turn) => {
+      const owner = owners.get(`${turn.projectId}:${turn.ConversationId}`);
+      return {
+        projectId: turn.projectId,
+        conversationId: turn.ConversationId,
+        turnId: turn.TurnId,
+        status: turn.Status,
+        error: turn.Error,
+        createdAt: Number(turn.CreatedAt),
+        startedAt: turn.StartedAt === null ? null : Number(turn.StartedAt),
+        endedAt: turn.EndedAt === null ? null : Number(turn.EndedAt),
+        userId: owner?.UserId ?? null,
+        model: owner?.LastModel ?? null,
+        toolCalls: toolCallsSchema.safeParse(turn.ToolCalls).data ?? [],
+      };
+    });
   }
 
   async getVisibleById({

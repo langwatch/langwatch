@@ -213,6 +213,10 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
   countUsage(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "count the spend ledger"));
   }
+
+  findDailyKeySpend(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "count the spend ledger"));
+  }
 }
 
 /** The gateway-spend pipeline for a process that only sends commands. */

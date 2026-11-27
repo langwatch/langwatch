@@ -270,4 +270,89 @@ describe.each(backends)("given the $name coding-agent repositories", ({ create }
       ]);
     });
   });
+  describe("when sessions are counted per day", () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const day = Date.UTC(2026, 10, 20);
+    const since = day - 7 * DAY_MS;
+    const until = day + DAY_MS;
+    const fold = (
+      repositories: ReturnType<typeof create>,
+      overrides: Parameters<typeof session>[0],
+    ) => repositories.sessions.upsert(session(overrides), 30, []);
+    const daily = (repositories: ReturnType<typeof create>, projectIds = ["project-1"]) =>
+      repositories.sessions.findDailySessionCounts({ projectIds, since, until });
+
+    it("counts a refolded session once, on the day of its latest start", async () => {
+      const repositories = create();
+      await fold(repositories, { sessionId: "a", startedAtMs: day + 3_600_000 });
+      await fold(repositories, { sessionId: "a", startedAtMs: day + 3_600_000 });
+      await fold(repositories, { sessionId: "moved", startedAtMs: day - 1_800_000 });
+      await fold(repositories, { sessionId: "moved", startedAtMs: day + 1_800_000 });
+      await fold(repositories, { sessionId: "old", startedAtMs: day - 20 * DAY_MS });
+
+      await expect(daily(repositories)).resolves.toEqual([
+        { projectId: "project-1", day, agent: "claude_code", sessions: 2, users: 1 },
+      ]);
+    });
+
+    it("counts a session starting at since and leaves one starting at until out", async () => {
+      const repositories = create();
+      await fold(repositories, { sessionId: "at-since", startedAtMs: since });
+      await fold(repositories, { sessionId: "at-until", startedAtMs: until });
+
+      await expect(daily(repositories)).resolves.toEqual([
+        { projectId: "project-1", day: since, agent: "claude_code", sessions: 1, users: 1 },
+      ]);
+    });
+
+    it("splits by UTC day and agent and counts each distinct non-empty user", async () => {
+      const repositories = create();
+      await fold(repositories, { sessionId: "s1", startedAtMs: day, userId: "user-1" });
+      await fold(repositories, { sessionId: "s2", startedAtMs: day + 1, userId: "user-2" });
+      await fold(repositories, { sessionId: "s3", startedAtMs: day + 2, userId: "user-2" });
+      await fold(repositories, { sessionId: "s4", startedAtMs: day + 3, userId: "" });
+      await fold(repositories, { sessionId: "s5", startedAtMs: day - 1, userId: "user-1" });
+      await fold(repositories, {
+        sessionId: "s6",
+        startedAtMs: day + 4,
+        userId: "user-3",
+        agent: "codex",
+      });
+
+      const counts = await daily(repositories);
+
+      expect(counts.toSorted((a, b) => a.day - b.day || a.agent.localeCompare(b.agent))).toEqual([
+        { projectId: "project-1", day: day - DAY_MS, agent: "claude_code", sessions: 1, users: 1 },
+        { projectId: "project-1", day, agent: "claude_code", sessions: 4, users: 2 },
+        { projectId: "project-1", day, agent: "codex", sessions: 1, users: 1 },
+      ]);
+    });
+
+    it("counts a helper-thread session like any other", async () => {
+      const repositories = create();
+      await fold(repositories, { sessionId: "helper", startedAtMs: day, auxiliary: true });
+
+      await expect(daily(repositories)).resolves.toEqual([
+        { projectId: "project-1", day, agent: "claude_code", sessions: 1, users: 1 },
+      ]);
+    });
+
+    it("keeps each asked project apart and leaves an unasked project out", async () => {
+      const repositories = create();
+      await fold(repositories, { tenantId: "project-1", sessionId: "s1", startedAtMs: day });
+      await fold(repositories, { tenantId: "project-2", sessionId: "s1", startedAtMs: day });
+      await fold(repositories, { tenantId: "project-3", sessionId: "s1", startedAtMs: day });
+
+      const counts = await daily(repositories, ["project-1", "project-2", "project-1"]);
+
+      expect(counts.toSorted((a, b) => a.projectId.localeCompare(b.projectId))).toEqual([
+        { projectId: "project-1", day, agent: "claude_code", sessions: 1, users: 1 },
+        { projectId: "project-2", day, agent: "claude_code", sessions: 1, users: 1 },
+      ]);
+    });
+
+    it("answers no days when the window holds no session", async () => {
+      await expect(daily(create())).resolves.toEqual([]);
+    });
+  });
 });

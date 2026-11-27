@@ -121,6 +121,24 @@
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../instant-eval/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     }
   ]
 }

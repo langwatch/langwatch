@@ -37,6 +37,9 @@ import {
   type RetentionStorageReport,
   type SubscriptionPlanInput,
   type BillingPricingModel,
+  type BillingStripePriceFact,
+  type BillingSubscriptionCount,
+  type OrganizationBillingFacts,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type {
@@ -86,6 +89,7 @@ import {
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import type { LicensePurchaseHandler } from "../services/billing-license-webhook.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
+import { BillingOpsFactsService } from "../services/billing-ops-facts.service.ts";
 import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
@@ -203,6 +207,28 @@ type ConnectedBilling = Readonly<{
   seats: ConnectedSeatChangeService;
   tick: ConnectedBillingTickService;
 }>;
+
+/** Billing's ops reads; the price catalogue only where the deployment holds a Stripe key. */
+function composeOpsFacts({
+  isSaas,
+  repositories,
+  pricing,
+  stripe,
+}: {
+  isSaas: boolean;
+  repositories: Pick<BillingRepositories, "subscriptions" | "overPlan">;
+  pricing: OrganizationPricingService;
+  stripe: BillingStripe | undefined;
+}): BillingOpsFactsService {
+  return BillingOpsFactsService.create({
+    isSaas,
+    subscriptions: repositories.subscriptions,
+    overPlan: repositories.overPlan,
+    pricing,
+    ...(stripe ? { prices: stripe.channels.prices } : {}),
+    stripeErrors: StripeErrorTranslatorService.create(),
+  });
+}
 
 export class BillingModule
   implements BillingApi, BillingStripeWebhookApi, BillingCurrencyApi, BillingSubscriptionApi
@@ -457,6 +483,7 @@ export class BillingModule
           ...(lifecycle ? { facts: lifecycle } : {}),
         })
       : void 0;
+    const pricing = OrganizationPricingService.create(repositories.organizationPricing);
     const gate = {
       authorization: peers.authorization,
       overview,
@@ -464,7 +491,8 @@ export class BillingModule
       overPlan,
       isSaas,
       resourceLimitAlerts,
-      pricing: OrganizationPricingService.create(repositories.organizationPricing),
+      pricing,
+      opsFacts: composeOpsFacts({ isSaas, repositories, pricing, stripe }),
       reporting: BillingModule.#composeReporting({
         repositories,
         peers,
@@ -887,8 +915,10 @@ export class BillingModule
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
   readonly #paymentRecovery: PaymentRecoveryService | undefined;
   readonly #overPlan: OverPlanService | undefined;
+  readonly #opsFacts: BillingOpsFactsService;
 
   private constructor({
+    opsFacts,
     paymentRecovery,
     overPlan,
     stripeWebhook,
@@ -903,6 +933,8 @@ export class BillingModule
     resourceLimitAlerts,
     lifecycle,
   }: {
+    /** The ops reads of subscriptions and prices; each refuses off LangWatch Cloud. */
+    opsFacts: BillingOpsFactsService;
     paymentRecovery: PaymentRecoveryService | undefined;
     /** The over-plan state; absent off LangWatch Cloud, where no plan carries it. */
     overPlan: OverPlanService | undefined;
@@ -931,6 +963,30 @@ export class BillingModule
     this.#lifecycle = lifecycle;
     this.#paymentRecovery = paymentRecovery;
     this.#overPlan = overPlan;
+    this.#opsFacts = opsFacts;
+  }
+
+  getOrganizationBillingFacts(input: {
+    organizationId: string;
+  }): Promise<OrganizationBillingFacts> {
+    return this.#opsFacts.getOrganizationBillingFacts(input);
+  }
+
+  findSubscriptionCounts({
+    since,
+    until,
+  }: {
+    since: number;
+    until: number;
+  }): Promise<BillingSubscriptionCount[]> {
+    return this.#opsFacts.findSubscriptionCounts({
+      since: Temporal.Instant.fromEpochMilliseconds(since),
+      until: Temporal.Instant.fromEpochMilliseconds(until),
+    });
+  }
+
+  findStripePriceFacts(): Promise<BillingStripePriceFact[]> {
+    return this.#opsFacts.findStripePriceFacts();
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {

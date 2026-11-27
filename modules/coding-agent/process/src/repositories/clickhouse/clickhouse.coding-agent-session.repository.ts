@@ -13,6 +13,7 @@ import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
   CodingAgentSessionContextUsage,
+  CodingAgentDailySessionCount,
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
@@ -1278,6 +1279,67 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       ...(lasts.length === 0 ? {} : { lastSessionAt: Math.max(...lasts) }),
     };
   }
+
+  /**
+   * Per project, each session at its latest version, then dated by that version's `StartedAt`:
+   * a refold counts once, even one that moved `StartedAt` across midnight or out of the window.
+   */
+  async findDailySessionCounts({
+    projectIds,
+    since,
+    until,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]> {
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const dedup = await this.spanBound({
+          read: "daily_count",
+          tenants: { tenantId },
+          overlapping: { fromMs: since, toMs: until },
+          whenNotReady: "unbounded",
+        });
+        if (dedup === null) return [];
+        const rows = dailyRowsSchema.parse(
+          (
+            await this.clickhouse.query<unknown>({
+              tenantId,
+              table: TABLE_NAME,
+              kind: "read",
+              sql: `
+                SELECT toString(toUnixTimestamp(toStartOfDay(StartedAt, 'UTC')) * 1000) AS DayMs,
+                       Agent,
+                       toString(uniqExact(SessionId)) AS Sessions,
+                       toString(uniqExactIf(UserId, UserId != '')) AS Users
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND StartedAt >= fromUnixTimestamp64Milli({since:Int64})
+                  AND StartedAt < fromUnixTimestamp64Milli({until:Int64})
+                  AND (TenantId, SessionId, UpdatedAt) IN (
+                    SELECT TenantId, SessionId, max(UpdatedAt)
+                    FROM ${TABLE_NAME}
+                    WHERE TenantId = {tenantId:String}
+                      ${dedup.sql}
+                    GROUP BY TenantId, SessionId
+                  )
+                GROUP BY DayMs, Agent`,
+              params: { tenantId, since, until, ...dedup.params },
+            })
+          ).rows,
+        );
+        return rows.map((row) => ({
+          projectId: tenantId,
+          day: Number(row.DayMs),
+          agent: row.Agent,
+          sessions: Number.parseInt(row.Sessions, 10),
+          users: Number.parseInt(row.Users, 10),
+        }));
+      }),
+    );
+    return perProject.flat();
+  }
 }
 
 /** `StartedAt` inside an index span, widened a day each side as an `{{idBound}}` read widens. */
@@ -1291,6 +1353,9 @@ function startedAtWithin(span: SessionSpan): TimeBound {
 
 const usageRowsSchema = z.array(
   z.object({ Total: z.string(), FirstMs: z.string(), LastMs: z.string() }),
+);
+const dailyRowsSchema = z.array(
+  z.object({ DayMs: z.string(), Agent: z.string(), Sessions: z.string(), Users: z.string() }),
 );
 
 const asNumberArray = (value: unknown): number[] =>

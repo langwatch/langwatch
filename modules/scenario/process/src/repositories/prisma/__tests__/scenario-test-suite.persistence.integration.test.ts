@@ -105,6 +105,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     countRunsForExport: async () => 0,
     countUsage: async () => 0,
     countOrganizationRuns: async () => 0,
+    findRunCountsByProject: async () => [],
     listRunsForExport: async () => ({ runs: [], hasMore: false }),
     queueRun: async () => {},
     startRun: async () => {},

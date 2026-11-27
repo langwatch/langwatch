@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { generate } from "@langwatch/ksuid";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import {
   type BillingSubscriptionRecord,
@@ -52,6 +52,28 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       (subscription) =>
         subscription.organizationId === organizationId && subscription.status !== CANCELLED,
     );
+  }
+
+  async findForOrganization(organizationId: string): Promise<BillingSubscriptionRecord[]> {
+    return this.store.subscriptions
+      .filter((subscription) => subscription.organizationId === organizationId)
+      .toSorted(newestFirst);
+  }
+
+  async findCreatedBetween({
+    since,
+    until,
+  }: {
+    since: Instant;
+    until: Instant;
+  }): Promise<BillingSubscriptionRecord[]> {
+    return this.store.subscriptions
+      .filter(
+        ({ createdAt }) =>
+          createdAt.epochMilliseconds >= since.epochMilliseconds &&
+          createdAt.epochMilliseconds < until.epochMilliseconds,
+      )
+      .toSorted((left, right) => newestFirst(right, left));
   }
 
   async hasAnyForOrganization(organizationId: string): Promise<boolean> {
@@ -196,12 +218,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
   private newestOf(
     matches: (subscription: BillingSubscriptionRecord) => boolean,
   ): BillingSubscriptionRecord | null {
-    const found = this.store.subscriptions.filter(matches);
-    found.sort((left, right) => {
-      const byCreated = right.createdAt.epochMilliseconds - left.createdAt.epochMilliseconds;
-      return byCreated === 0 ? right.id.localeCompare(left.id) : byCreated;
-    });
-    return found[0] ?? null;
+    return this.store.subscriptions.filter(matches).toSorted(newestFirst)[0] ?? null;
   }
 
   private update(
@@ -227,6 +244,12 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
 
     return { ...subscription, organization: organizationRecordOf(organization) };
   }
+}
+
+/** Newest created first, id breaking ties, as the Prisma twin orders. */
+function newestFirst(left: BillingSubscriptionRecord, right: BillingSubscriptionRecord): number {
+  const byCreated = right.createdAt.epochMilliseconds - left.createdAt.epochMilliseconds;
+  return byCreated === 0 ? right.id.localeCompare(left.id) : byCreated;
 }
 
 /** The three organization facts a subscription answer carries. */

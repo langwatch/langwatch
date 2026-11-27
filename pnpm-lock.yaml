@@ -15478,9 +15478,15 @@ importers:
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -15502,9 +15508,15 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
@@ -15535,6 +15547,9 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/staff-access-contract':
         specifier: workspace:*
         version: link:../contract
@@ -15554,6 +15569,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

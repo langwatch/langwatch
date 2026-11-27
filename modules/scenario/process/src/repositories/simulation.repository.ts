@@ -17,6 +17,8 @@ import type {
   SimulationLastUpdatedInput,
   SimulationLastResultSummariesInput,
   SimulationProjectDateRangeInput,
+  SimulationProjectRunCount,
+  SimulationRunCountsInput,
   SimulationScenarioRunInput,
   SimulationScenarioSetInput,
   SimulationScenarioSetRunsInput,
@@ -75,6 +77,9 @@ export abstract class SimulationRepository {
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
   abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
+  abstract findRunCountsByProject(
+    input: SimulationRunCountsInput,
+  ): Promise<SimulationProjectRunCount[]>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
@@ -142,6 +147,9 @@ export class NullSimulationRepository extends SimulationRepository {
   }
   async countOrganizationRuns(): Promise<number> {
     return 0;
+  }
+  async findRunCountsByProject(): Promise<SimulationProjectRunCount[]> {
+    return [];
   }
   async listRunsForExport(): Promise<{
     runs: SimulationExportRun[];

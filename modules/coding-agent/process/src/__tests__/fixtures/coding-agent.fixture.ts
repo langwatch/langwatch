@@ -484,6 +484,10 @@ export class TestSessions extends CodingAgentSessionRepository {
   async countUsage(): Promise<{ sessions: number }> {
     return { sessions: this.rows.length };
   }
+
+  async findDailySessionCounts(): Promise<[]> {
+    return [];
+  }
 }
 
 /** The stored-trace lookup, unconfigured: a test that reaches it configures it. */

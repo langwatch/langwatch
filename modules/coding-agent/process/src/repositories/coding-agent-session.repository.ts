@@ -1,6 +1,7 @@
 import type { Authorization } from "@langwatch/authorization";
 import type {
   CodingAgentSession,
+  CodingAgentDailySessionCount,
   CodingAgentSessionBranchRecord,
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
@@ -20,7 +21,8 @@ export type SessionIdIndexRead =
   | "recent_list"
   | "recent_list_fenced"
   | "branch_list"
-  | "usage_count";
+  | "usage_count"
+  | "daily_count";
 
 /** Observes the bounded session-list storage read without coupling the feature to app metrics. */
 export interface CodingAgentReadMetrics {
@@ -127,4 +129,11 @@ export abstract class CodingAgentSessionRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<CodingAgentUsageCount>;
+
+  /** Sessions started in `[since, until)` per project, UTC day and agent; a refold counts once. */
+  abstract findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]>;
 }

@@ -1182,6 +1182,14 @@ One organization for a staff investigation: ids, counts and its creation time, n
 getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
 ```
 
+#### `findInviteFacts`
+
+Every invitation of one organization, whatever its status, newest first, as ids, flags and times: never an address, a code or a link (ADR-202, ops functions). Empty when none.
+
+```typescript
+findInviteFacts(input: Readonly<{ organizationId: string }>): Promise<OrganizationInviteFact[]>;
+```
+
 ## REST transport
 
 ### `groupsRest`
@@ -2611,7 +2619,7 @@ Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSc
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:342`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:344`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

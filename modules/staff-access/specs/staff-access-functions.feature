@@ -147,6 +147,7 @@ Feature: Ops functions
     Given ACME's online evaluator ran and failed over the last days
     When the agent calls "org.evaluator_errors" for the last 7 days
     Then each evaluator carries its run count, its error count by code and its last error time
+    And its creator's user id, and when and why it was paused when it is off
     And no error message
 
   @integration

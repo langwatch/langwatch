@@ -3522,6 +3522,14 @@ const presentations = {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
   },
+  billing_facts_unavailable: {
+    // An ops read of billing on a deployment that runs no subscriptions or holds no Stripe key.
+    title: "Billing facts are not available here",
+    describe: (error) =>
+      strEq(error, "reason", "no_payment_provider")
+        ? "This deployment has no payment provider configured, so it has no Stripe prices to read."
+        : "This deployment does not bill through LangWatch Cloud, so it holds no subscriptions or prices to read.",
+  },
   billing_only_keeps_billing: {
     // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
     title: "A Billing-only member always pays",
@@ -3540,6 +3548,12 @@ const presentations = {
     // "check their input" would send them hunting for a field that isn't wrong.
     title: "This plan isn't ready to buy yet",
     describe: () => "We've been notified. Contact support if you need it sooner.",
+  },
+  billing_price_catalogue_too_large: {
+    // fault: platform. An ops read of the price catalogue; answering part of it would mislead.
+    title: "The price catalogue is too large to read",
+    describe: () =>
+      "The Stripe account holds more prices than this read covers, so it answers none rather than part of them.",
   },
   billing_currency_unsupported: {
     // Account state, not an outage, and not fixable from the UI: the account is

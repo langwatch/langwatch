@@ -1,6 +1,12 @@
 import { type StateProjectionStore, type TenantId } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
-import type { LangyConversationTurnData, LangyUsageCount } from "@langwatch/langy-contract";
+import {
+  LangyConversationNotFoundError,
+  type LangyConversationTurnData,
+  type LangyTurnFacts,
+  type LangyTurnOutcomeCounts,
+  type LangyUsageCount,
+} from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
@@ -11,6 +17,7 @@ import {
   type LangyMessageRepository,
   NullLangyMessageRepository,
 } from "../../../repositories/langy-message.repository.ts";
+import { countTurnOutcomes, turnFactsOf } from "../../../rules/langy-turn-facts.rules.ts";
 import { LangyFinalPartsService } from "../../../services/langy-final-parts.service.ts";
 import type { LangyTurnOrderReader } from "../../turn/services/langy-turn-order.service.ts";
 import { LangyConversationLifecycleService } from "./langy-conversation-lifecycle.service.ts";
@@ -36,6 +43,9 @@ export interface LangyConversationRuntime {
   generateId(resource: keyof typeof LANGY_ID_RESOURCES): string;
   createTurnId(): string;
 }
+
+/** The most turns one outcome read folds: a window past it answers floors, marked truncated. */
+const TURN_OUTCOME_SCAN_LIMIT = 50_000;
 
 const defaultRuntime: LangyConversationRuntime = {
   now: () => nowInstant().epochMilliseconds,
@@ -153,6 +163,32 @@ export class LangyConversationService {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
     return this.repository.countUsage(input);
+  }
+
+  async findTurnOutcomeCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<LangyTurnOutcomeCounts> {
+    if (input.projectIds.length === 0) return { counts: [], truncated: false };
+    const { rows, truncated } = await this.repository.findTurnOutcomeRows({
+      ...input,
+      limit: TURN_OUTCOME_SCAN_LIMIT,
+    });
+    return { counts: countTurnOutcomes(rows), truncated };
+  }
+
+  /** @throws {LangyConversationNotFoundError} when the project holds no such conversation */
+  async getTurnFacts(input: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LangyTurnFacts[]> {
+    const [exists, rows] = await Promise.all([
+      this.repository.conversationExists(input),
+      this.repository.findConversationTurnFactRows(input),
+    ]);
+    if (!exists) throw new LangyConversationNotFoundError(input.conversationId);
+    return rows.map(turnFactsOf);
   }
 
   getPage(

@@ -40,6 +40,8 @@ import type {
   SimulationLastResultSummariesInput,
   SimulationLastUpdatedInput,
   SimulationProjectDateRangeInput,
+  SimulationProjectRunCount,
+  SimulationRunCountsInput,
   SimulationScenarioRunInput,
   SimulationUpdateWatchInput,
   SimulationScenarioSetRunsInput,
@@ -468,6 +470,8 @@ export interface ScenarioApi {
   }): Promise<SimulationBatchSummary | null>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<ScenarioUsageCount>;
+  /** Runs started in `[since, until)` per project of one organization; counts only. */
+  findRunCountsByProject(input: SimulationRunCountsInput): Promise<SimulationProjectRunCount[]>;
 }
 
 export const ScenarioApi = moduleApi<ScenarioApi>()("scenario");

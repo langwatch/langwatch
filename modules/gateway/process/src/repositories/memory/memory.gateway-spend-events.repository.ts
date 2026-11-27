@@ -4,6 +4,7 @@ import {
   SPEND_STATUS_IN_FLIGHT,
   type GatewaySpendDay,
   type GatewayUsageCount,
+  type GatewayDailyKeySpend,
   type SpendBucket,
   type SpendEventRow,
   type SpendFilters,
@@ -433,6 +434,43 @@ export class MemoryGatewaySpendEventsRepository extends GatewaySpendEventsReposi
       ),
       ...(firsts.length === 0 ? {} : { firstRequestAt: Math.min(...firsts) }),
     };
+  }
+
+  async findDailyKeySpend(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<GatewayDailyKeySpend[]> {
+    const groups = new Map<
+      string,
+      { -readonly [Field in keyof GatewayDailyKeySpend]: GatewayDailyKeySpend[Field] } & {
+        nano: number;
+      }
+    >();
+    for (const row of this.#read(input.projectIds)) {
+      const at = row.occurredAt.epochMilliseconds;
+      if (at < input.since || at >= input.until) continue;
+      const day = at - (at % DAY_MS);
+      const key = `${row.tenantId}/${day}/${row.virtualKeyId}/${row.providerKey}`;
+      const group = groups.get(key) ?? {
+        projectId: row.tenantId,
+        day,
+        virtualKeyId: row.virtualKeyId,
+        providerId: row.providerKey,
+        requests: 0,
+        failedRequests: 0,
+        spendUsd: 0,
+        nano: 0,
+      };
+      group.requests += 1;
+      if (row.status === "failed") group.failedRequests += 1;
+      group.nano += row.costNanoUsd;
+      groups.set(key, group);
+    }
+    return [...groups.values()].map(({ nano, ...group }) => ({
+      ...group,
+      spendUsd: nano / NANO_PER_USD,
+    }));
   }
 
   #read(tenantIds: readonly string[]): SpendEventRow[] {

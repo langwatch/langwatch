@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:98`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:117`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -154,6 +154,14 @@ The usage report's figures (ADR-156, section 10).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<InstantEvalUsageCount>;
+```
+
+#### `findDailyRunCounts`
+
+Runs created in `[since, until)` per project and UTC day; epoch milliseconds.
+
+```typescript
+findDailyRunCounts(input: { projectIds: readonly string[]; since: number; until: number; }): Promise<InstantEvalDailyRunCount[]>;
 ```
 
 ## REST transport

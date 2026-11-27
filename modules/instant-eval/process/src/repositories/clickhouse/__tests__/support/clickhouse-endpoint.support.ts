@@ -1,14 +1,17 @@
 // Suites assert DDL↔repository contract on production schema; migrated
 // ClickHouse or skip if unconfigured.
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
 
 /**
  * `TEST_CLICKHOUSE_URL` names a database of its own and is taken verbatim.
- * `CI_CLICKHOUSE_URL` is the job-wide server, whose test database is
- * `test_langwatch` — the one the job migrates.
+ * `LANGWATCH_TEST_CLICKHOUSE_URL` (the native local server) and `CI_CLICKHOUSE_URL` name a
+ * server, whose test database is `test_langwatch`, the one the test setup migrates.
  */
 export function testClickHouseUrl(): URL | null {
-  const configured = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
+  const configured =
+    process.env.TEST_CLICKHOUSE_URL ??
+    process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
+    process.env.CI_CLICKHOUSE_URL;
   if (!configured) return null;
   const url = new URL(configured);
   if (!process.env.TEST_CLICKHOUSE_URL) url.pathname = "/test_langwatch";

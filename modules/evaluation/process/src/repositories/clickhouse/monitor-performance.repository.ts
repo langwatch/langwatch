@@ -7,6 +7,8 @@ import {
   MonitorPerformanceRepository,
   type EvaluatorOutcomeRow,
   type EvaluatorOutcomeRowQuery,
+  type EvaluatorTypeUsageRow,
+  type EvaluatorTypeUsageRowQuery,
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository.ts";
@@ -139,6 +141,15 @@ const OUTCOME_QUERY = `
   LIMIT {limit:UInt32}
 `;
 
+type ClickHouseTypeUsageRow = {
+  EvaluatorType: string;
+  Projects: string;
+  Runs: string;
+  Errors: string;
+  Skipped: string;
+  ErrorCodes: [string[], (number | string)[]];
+};
+
 type ClickHouseOutcomeRow = {
   EvaluatorId: string;
   EvaluatorType: string;
@@ -173,15 +184,21 @@ const toLabelCounts = (
   );
 };
 
+type MonitorPerformanceClickHouseOptions = {
+  resolveClient: EvaluationClickHouseResolver;
+  /** The organizations with a private ClickHouse; the shared one is always read too. */
+  privateOrganizations?: () => readonly string[];
+};
+
 /** Private parity query for the online-evaluation performance chart. */
 export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRepository {
-  static create(options: {
-    resolveClient: EvaluationClickHouseResolver;
-  }): ClickHouseMonitorPerformanceRepository {
+  static create(
+    options: MonitorPerformanceClickHouseOptions,
+  ): ClickHouseMonitorPerformanceRepository {
     return new ClickHouseMonitorPerformanceRepository(options);
   }
 
-  private constructor(private readonly options: { resolveClient: EvaluationClickHouseResolver }) {
+  private constructor(private readonly options: MonitorPerformanceClickHouseOptions) {
     super();
   }
 
@@ -262,4 +279,110 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
       };
     });
   }
+
+  /** Every placement holding `evaluation_runs` read once; a tenant's rows live on one of them. */
+  async findTypeUsageRows(input: EvaluatorTypeUsageRowQuery): Promise<EvaluatorTypeUsageRow[]> {
+    if (input.until <= input.since) return [];
+    const placements = [undefined, ...(this.options.privateOrganizations?.() ?? [])];
+    const perPlacement = await Promise.all(
+      placements.map((organizationId) => this.findTypeUsageRowsOn({ input, organizationId })),
+    );
+    return mergeTypeUsageRows({ rows: perPlacement.flat(), limit: input.limit });
+  }
+
+  private async findTypeUsageRowsOn({
+    input,
+    organizationId,
+  }: {
+    input: EvaluatorTypeUsageRowQuery;
+    organizationId: string | undefined;
+  }): Promise<EvaluatorTypeUsageRow[]> {
+    const client = await this.options.resolveClient("");
+    const result = await client.query({
+      ...(organizationId === undefined ? {} : { organizationId }),
+      // Every tenant's runs at their latest revision, per evaluator type.
+      query: `
+  SELECT
+    EvaluatorType,
+    uniqExact(TenantId) AS Projects,
+    count() AS Runs,
+    countIf(Status = 'error') AS Errors,
+    countIf(Status = 'skipped') AS Skipped,
+    sumMapIf([ErrorCode], [toUInt64(1)], Status = 'error') AS ErrorCodes
+  FROM (
+    SELECT
+      TenantId,
+      tupleElement(Latest, 1) AS EvaluatorType,
+      tupleElement(Latest, 2) AS Status,
+      tupleElement(Latest, 3) AS ErrorCode
+    FROM (
+      SELECT
+        TenantId,
+        EvaluationId,
+        argMax(
+          tuple(EvaluatorType, Status, if(Status = 'error', ${outcomeErrorCode.sql}, '')),
+          UpdatedAt
+        ) AS Latest
+      FROM evaluation_runs
+      WHERE ScheduledAt >= {since:DateTime64(3)}
+        AND ScheduledAt < {until:DateTime64(3)}
+      GROUP BY TenantId, EvaluationId
+    )
+  )
+  GROUP BY EvaluatorType
+  ORDER BY Runs DESC, EvaluatorType
+  LIMIT {limit:UInt32}
+`,
+      query_params: {
+        ...outcomeErrorCode.params,
+        since: clickHouseMomentOf(input.since),
+        until: clickHouseMomentOf(input.until),
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+      clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+      // A staff platform report (ADR-202): counts per evaluator type over every tenant at once.
+      SKIP_TENANT_CHECK: true,
+    });
+    return (await result.json<ClickHouseTypeUsageRow>()).map((row): EvaluatorTypeUsageRow => ({
+      evaluatorType: row.EvaluatorType,
+      projects: Number(row.Projects),
+      runs: Number(row.Runs),
+      errors: Number(row.Errors),
+      skipped: Number(row.Skipped),
+      errorsByCode: toLabelCounts(row.ErrorCodes),
+    }));
+  }
+}
+/** Per-placement rows summed per evaluator type: no tenant sits on two placements. */
+function mergeTypeUsageRows({
+  rows,
+  limit,
+}: {
+  rows: readonly EvaluatorTypeUsageRow[];
+  limit: number;
+}): EvaluatorTypeUsageRow[] {
+  const byType = new Map<string, EvaluatorTypeUsageRow>();
+  for (const row of rows) {
+    const known = byType.get(row.evaluatorType);
+    if (known === undefined) {
+      byType.set(row.evaluatorType, row);
+      continue;
+    }
+    const codes = new Map(Object.entries(known.errorsByCode));
+    for (const [code, count] of Object.entries(row.errorsByCode)) {
+      codes.set(code, (codes.get(code) ?? 0) + count);
+    }
+    byType.set(row.evaluatorType, {
+      evaluatorType: row.evaluatorType,
+      projects: known.projects + row.projects,
+      runs: known.runs + row.runs,
+      errors: known.errors + row.errors,
+      skipped: known.skipped + row.skipped,
+      errorsByCode: Object.fromEntries(codes),
+    });
+  }
+  return [...byType.values()]
+    .toSorted((a, b) => b.runs - a.runs || (a.evaluatorType < b.evaluatorType ? -1 : 1))
+    .slice(0, limit);
 }

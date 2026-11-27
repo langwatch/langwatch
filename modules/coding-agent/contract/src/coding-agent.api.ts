@@ -62,6 +62,18 @@ export interface CodingAgentUsageCount {
   readonly lastSessionAt?: number;
 }
 
+/**
+ * One project's coding agent sessions started on one UTC day by one agent, for staff
+ * investigation reads (ADR-202): counts only. `day` is the day's start, epoch milliseconds.
+ */
+export interface CodingAgentDailySessionCount {
+  readonly projectId: string;
+  readonly day: number;
+  readonly agent: string;
+  readonly sessions: number;
+  readonly users: number;
+}
+
 export interface CodingAgentApi {
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
   /** The session one trace belongs to, its name blanked unless the viewer may read content. */
@@ -149,6 +161,12 @@ export interface CodingAgentApi {
     projectIds: readonly string[];
     since?: number;
   }): Promise<CodingAgentUsageCount>;
+  /** Sessions started in `[since, until)` per project, UTC day and agent; epoch milliseconds. */
+  findDailySessionCounts(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<CodingAgentDailySessionCount[]>;
 }
 
 export const CodingAgentApi = moduleApi<CodingAgentApi>()("coding-agent");

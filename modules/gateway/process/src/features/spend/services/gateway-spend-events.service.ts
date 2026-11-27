@@ -2,6 +2,7 @@ import type {
   GatewayConfirmedSpendPage,
   GatewaySpendDay,
   GatewayUsageCount,
+  GatewayDailyKeySpend,
   SpendBucket,
   SpendEventRow,
   SpendFilters,
@@ -153,5 +154,15 @@ export class GatewaySpendEventsService {
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
     return this.repository.countUsage(input);
+  }
+
+  /** Staff investigation counts (ADR-202): ids, counts and USD only. */
+  findDailyKeySpend(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<GatewayDailyKeySpend[]> {
+    if (input.until <= input.since) return Promise.resolve([]);
+    return this.repository.findDailyKeySpend(input);
   }
 }

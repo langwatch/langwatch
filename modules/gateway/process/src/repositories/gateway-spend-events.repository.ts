@@ -3,6 +3,7 @@ import type {
   SpendBucket,
   SpendGroupByKey,
   GatewayUsageCount,
+  GatewayDailyKeySpend,
   SpendEventRow,
   SpendFilters,
 } from "@langwatch/gateway-contract";
@@ -174,4 +175,11 @@ export abstract class GatewaySpendEventsRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<GatewayUsageCount>;
+
+  /** Requests in `[since, until)` per project, UTC day, virtual key and provider row. */
+  abstract findDailyKeySpend(input: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<GatewayDailyKeySpend[]>;
 }

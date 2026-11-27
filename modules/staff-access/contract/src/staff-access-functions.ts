@@ -5,70 +5,39 @@
  */
 import { z } from "zod";
 
-export const STAFF_ACCESS_FUNCTION_LIMITS = {
-  /** How many functions one request may name. */
-  maxPerRequest: 12,
-  maxRangeDays: 31,
-  defaultPageSize: 50,
-  maxPageSize: 200,
-} as const;
+import {
+  countsByCode,
+  entry,
+  isoTime,
+  pageInput,
+  rangeInput,
+  staffAccessPageSchema,
+  type StaffAccessFunctionEntry,
+} from "./staff-access-function-shapes.ts";
+import { STAFF_ACCESS_ACTIVITY_FUNCTIONS } from "./staff-access-functions-activity.ts";
+import { STAFF_ACCESS_BILLING_FUNCTIONS } from "./staff-access-functions-billing.ts";
+import { STAFF_ACCESS_LANGY_FUNCTIONS } from "./staff-access-functions-langy.ts";
+import { STAFF_ACCESS_PEOPLE_FUNCTIONS } from "./staff-access-functions-people.ts";
+import { STAFF_ACCESS_PLATFORM_FUNCTIONS } from "./staff-access-functions-platform.ts";
+import { STAFF_ACCESS_TELEMETRY_FUNCTIONS } from "./staff-access-functions-telemetry.ts";
 
-/** `lookup` finds an id, `platform` spans organizations, `org` reads the approved org. */
-export const staffAccessFunctionScopeSchema = z.enum(["lookup", "platform", "org"]);
-export type StaffAccessFunctionScope = z.infer<typeof staffAccessFunctionScopeSchema>;
-
-const isoTime = z.iso.datetime({ offset: true });
-const pageInput = {
-  limit: z.number().int().min(1).max(STAFF_ACCESS_FUNCTION_LIMITS.maxPageSize).optional(),
-  cursor: z.string().min(1).max(500).optional(),
+export {
+  STAFF_ACCESS_TELEMETRY_FUNCTIONS,
+  STAFF_ACCESS_LANGY_FUNCTIONS,
+  STAFF_ACCESS_PEOPLE_FUNCTIONS,
+  STAFF_ACCESS_ACTIVITY_FUNCTIONS,
+  STAFF_ACCESS_PLATFORM_FUNCTIONS,
+  STAFF_ACCESS_BILLING_FUNCTIONS,
 };
-const rangeInput = {
-  /** Start of the range; at most 31 days before `until`. */
-  since: isoTime,
-  /** End of the range; now when left out. */
-  until: isoTime.optional(),
-};
+export {
+  STAFF_ACCESS_FUNCTION_LIMITS,
+  staffAccessFunctionScopeSchema,
+  staffAccessPageSchema,
+  type StaffAccessFunctionScope,
+  type StaffAccessPageSchema,
+} from "./staff-access-function-shapes.ts";
 
-/** A page of `item`: never a silent cut, `truncated` says more exist and `nextCursor` reads on. */
-export type StaffAccessPageSchema<Item extends z.ZodType> = z.ZodObject<
-  {
-    items: z.ZodArray<Item>;
-    total: z.ZodNumber;
-    truncated: z.ZodBoolean;
-    nextCursor: z.ZodNullable<z.ZodString>;
-  },
-  z.core.$strict
->;
-
-export function staffAccessPageSchema<Item extends z.ZodType>(
-  item: Item,
-): StaffAccessPageSchema<Item> {
-  return z
-    .object({
-      items: z.array(item),
-      total: z.number().int(),
-      truncated: z.boolean(),
-      nextCursor: z.string().nullable(),
-    })
-    .strict();
-}
-
-const countsByCode = z.record(z.string(), z.number().int());
-
-type Entry = Readonly<{
-  title: string;
-  scope: StaffAccessFunctionScope;
-  /** The investigation this read answers. */
-  answers: string;
-  /** Answers about one person, from one exact input. */
-  personal?: true;
-  input: z.ZodObject;
-  output: z.ZodType;
-}>;
-
-const entry = <E extends Entry>(declared: E): E => declared;
-
-export const STAFF_ACCESS_FUNCTIONS = {
+const STAFF_ACCESS_CORE_FUNCTIONS = {
   "orgs.find": entry({
     title: "Find organizations by name, slug or id",
     scope: "lookup",
@@ -152,9 +121,9 @@ export const STAFF_ACCESS_FUNCTIONS = {
       .strict(),
   }),
   "org.evaluator_errors": entry({
-    title: "Online evaluator runs and failures by error code",
+    title: "Online evaluator runs and failures by error code, who created it, and if it paused",
     scope: "org",
-    answers: "Which online evaluator fails, how often, and with which error codes.",
+    answers: "Which online evaluator fails, how often, with which codes, and whether it paused.",
     input: z.object({ ...rangeInput, ...pageInput }).strict(),
     output: staffAccessPageSchema(
       z
@@ -167,6 +136,10 @@ export const STAFF_ACCESS_FUNCTIONS = {
           skipped: z.number().int(),
           errorsByCode: countsByCode,
           lastErrorAt: isoTime.nullable(),
+          createdByUserId: z.string().nullable(),
+          disabledAt: isoTime.nullable(),
+          /** `error_rate` when it paused itself, `manual` when someone turned it off. */
+          disabledReasonCode: z.enum(["error_rate", "manual"]).nullable(),
         })
         .strict(),
     ),
@@ -227,7 +200,17 @@ export const STAFF_ACCESS_FUNCTIONS = {
         .strict(),
     ),
   }),
-} as const satisfies Record<string, Entry>;
+} as const satisfies Record<string, StaffAccessFunctionEntry>;
+
+export const STAFF_ACCESS_FUNCTIONS = {
+  ...STAFF_ACCESS_CORE_FUNCTIONS,
+  ...STAFF_ACCESS_TELEMETRY_FUNCTIONS,
+  ...STAFF_ACCESS_LANGY_FUNCTIONS,
+  ...STAFF_ACCESS_PEOPLE_FUNCTIONS,
+  ...STAFF_ACCESS_ACTIVITY_FUNCTIONS,
+  ...STAFF_ACCESS_PLATFORM_FUNCTIONS,
+  ...STAFF_ACCESS_BILLING_FUNCTIONS,
+} as const satisfies Record<string, StaffAccessFunctionEntry>;
 
 export type StaffAccessFunctionName = keyof typeof STAFF_ACCESS_FUNCTIONS;
 export type StaffAccessFunctionInput<Name extends StaffAccessFunctionName> = z.infer<
