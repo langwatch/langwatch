@@ -235,6 +235,7 @@ export function staffAccessWorld({
   });
 
   const copy = copyCatalog();
+  const platformMonitors = platformPeers.monitors();
   const summaries = [ACME, GLOBEX, INITECH].map((organization) => ({
     ...organization,
     createdAt: Temporal.Instant.from("2025-01-01T00:00:00Z"),
@@ -445,9 +446,9 @@ export function staffAccessWorld({
       billing,
       evaluators: copy.evaluators,
       monitors: createApiFixture<MonitorApi>({
-        getAllByIds: platformPeers.monitors().getAllByIds,
-        list: copy.monitors.list,
-        create: copy.monitors.create,
+        getAllByIds: (input) => platformMonitors.getAllByIds(input),
+        list: (input) => copy.monitors.list(input),
+        create: (input) => copy.monitors.create(input),
       }),
       prompts: copy.prompts,
       datasets: copy.datasets,
