@@ -354,3 +354,10 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the step replays the lane
     Then the other tenant's stream stops before the batch is split
     And every row is written once, as a replay that never hit the limit writes them
+
+  @integration
+  Scenario: Every projection replay step a worker installs runs after the claimed-groups fill
+    Given the worker's installed modules
+    When they list their upgrade steps
+    Then ops:fill-queue-tenant-claims is a background data step after old writers
+    And each projection replay step lists it in its after
