@@ -20,7 +20,7 @@ import {
 import {
   clearSplitSpan,
   fitsSpanBudget,
-  isAnsweredAsAlone,
+  isTooLongForModel,
   isPlaceablePiece,
   pieceTextOf,
   planSpan,
@@ -199,6 +199,15 @@ export class PiiRedactionModelService {
       return null;
     }
     const { organizationId, priced } = routing;
+    // The whole batch passes the size gates first; holding repeats only shrinks what is sent.
+    const splitting =
+      call.characters > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS &&
+      (await this.#isSplitting({ organizationId, projectId }));
+    if (isTooLongForModel({ characters: call.characters, splitting })) {
+      this.metrics.modelFellBack("too_long");
+      this.log.info({ ...call, findings: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
+      return null;
+    }
     const scope = {
       organizationId,
       piiRedactionLevel: input.piiRedactionLevel,
@@ -224,43 +233,33 @@ export class PiiRedactionModelService {
       organizationId,
       priced,
       projectId,
+      splitting,
       call: { ...call, texts: sent.texts.length, characters: batchCharactersOf(sent.texts) },
     });
     if (!cleared || cleared.length !== sent.texts.length) return null;
-    const sentCharacters = batchCharactersOf(sent.texts);
-    this.repeats.remember({
-      scope: { ...scope, spareNamesAndPlaces: sent.spareNamesAndPlaces },
-      texts: sent.texts,
-      cleared,
-      held: sent.texts.map((text) => isAnsweredAsAlone({ text, batchCharacters: sentCharacters })),
-    });
+    const sentScope = { ...scope, spareNamesAndPlaces: sent.spareNamesAndPlaces };
+    this.repeats.remember({ scope: sentScope, texts: sent.texts, cleared });
     return recall.merge(cleared);
   }
 
-  /** A routed batch, less the texts the process already holds: one call, split, or Presidio. */
+  /** The batch less the texts the process holds, sized by the whole batch: one call or split. */
   async #clearRouted({
     input,
     organizationId,
     priced,
     projectId,
+    splitting,
     call,
   }: {
     input: ModelClearInput;
     organizationId: string;
     priced: boolean;
     projectId: string;
+    splitting: boolean;
     call: Omit<PiiRedactionModelUsage, "findings" | "outcome" | "durationMs">;
   }): Promise<(string | null)[] | null> {
-    // Only a batch too long for one call asks whether it may split.
-    const splitting =
-      call.characters > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS &&
-      (await this.#isSplitting({ organizationId, projectId }));
     const plan = planSpan({ texts: input.texts, splitting });
-    if (plan.kind === "too_long") {
-      this.metrics.modelFellBack("too_long");
-      this.log.info({ ...call, findings: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
-      return null;
-    }
+    if (plan.kind === "too_long") return null;
     if (plan.kind === "split") {
       return this.#clearSplit({
         input,

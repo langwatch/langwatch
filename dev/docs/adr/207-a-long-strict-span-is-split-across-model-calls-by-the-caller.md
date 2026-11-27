@@ -118,6 +118,15 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
     off the model).
 12. **One usage line per span**, with a new `calls` count; fallback reasons gain `busy` and `unplaceable`.
 13. **One-off, not shared.** The planner and merge live in data-privacy rules; no shared package.
+14. **Repeated long texts are held per process (v4).** A process keeps the model's clearing of each
+    text of 2,000 characters or more for ten minutes (256 entries, oldest dropped first), keyed by
+    organisation, level, entities, spared flag and the text's SHA-256. The whole span passes the
+    size ranges (decision 2) first; held texts only shrink what is sent. Only an answer the text
+    gets alone is held: one call, a whole text in a split call, or a text over 8,000 (cut the same
+    way alone); never a text cut only because its span was long. Price and request id stay the
+    whole span's (ADR-201), so a span bills as with nothing held and a retry stays idempotent.
+    Rejected: a shared Redis cache (cross-process state for a ten-minute saving; masked text
+    leaves the process); pricing only what is sent (a retry would bill twice).
 
 ## Constants
 
@@ -145,12 +154,12 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 
 ## Assumptions
 
-| assumption                                                                             | what breaks if false                                                                                                              |
-| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| a 4,000-character call takes about 9 to 10 s warm (interpolated from 2,000 and 20,000) | an estimate: an aarch64 dev box measured 18.5 s; if Cloud is that slow, 32,000 misses the 50 s budget and the cap drops (R3 gate) |
-| at most 25 pods call the model at once on Cloud                                        | the reserve of 250 is shared thinner; throttles rise (R3's load test)                                                             |
-| long texts with backslashes (escaped JSON) are a minority of long spans                | most long spans keep falling back (R3 counts it on real-shaped traces)                                                            |
-| the model's prep and name rule stay as read on 2026-11-25                              | the guard keeps offsets safe (it falls back), but parity of the name rule drifts; the parity fixture catches it on the next run   |
+| assumption                                                                                           | what breaks if false                                                                                                              |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| a 4,000-character call takes about 9 to 10 s warm (interpolated from 2,000 and 20,000)               | an estimate: an aarch64 dev box measured 18.5 s; if Cloud is that slow, 32,000 misses the 50 s budget and the cap drops (R3 gate) |
+| at most 25 pods call the model at once on Cloud                                                      | the reserve of 250 is shared thinner; throttles rise (R3's load test)                                                             |
+| a cut of escaped JSON rarely reads as JSON on its own (v4: every long text sampled was escaped JSON) | such pieces send the span to Presidio; counted as `unplaceable`                                                                   |
+| the model's prep and name rule stay as read on 2026-11-25                                            | the guard keeps offsets safe (it falls back), but parity of the name rule drifts; the parity fixture catches it on the next run   |
 
 ## Gates
 
@@ -161,6 +170,7 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 | concurrency, budget, breaker (8, 9, 11)      | yes                                    | large (every Strict org on a pod)       | automated: unit tests with a fake clock; R3 load test on the dev Lambda before the flag widens                                                                                                                                                                                                                                                                              |
 | shared reserve of 250 (decision 9 trade-off) | yes                                    | large (short spans of every Strict org) | R3 load test on the Cloud dev Lambda, before the split flag leaves one organisation. Pass: short-span p95 unchanged with split on, and a 32,000-character span inside 50 s at 6 calls per process. If 32,000 does not fit, `PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS` drops to the largest size that does. The 9.5 s per piece is an estimate; the last one was off by half |
 | split on for one organisation                | yes                                    | small (one organisation)                | the existing per-organisation flag (`feature-flag.ts:55`, new key `release_pii_redaction_model_split_enabled`, off by default); no env var, column or allowlist                                                                                                                                                                                                             |
+| held texts (decision 14)                     | yes                                    | large (every Strict org on the model)   | unit tests: size ranges on the whole span before holding (8,001 split off and 32,001 held go to Presidio, priced for nobody), only alone-answers held, scope keys, ten minutes and 256 entries; human review of the PR                                                                                                                                                      |
 | G1 one channel, no new setting               | yes                                    | small                                   | review: `PII_REDACTION_MODEL_ENDPOINT` is read once; no second channel; split calls use `detect(request, { context })`                                                                                                                                                                                                                                                      |
 | G2 context rules in one table                | yes                                    | small                                   | typecheck: `MODEL_CALL_RULES` is a `Record<ModelCallContext, ModelCallRules>`; grep: no `context === "split"` outside it                                                                                                                                                                                                                                                    |
 | G3 "can split" is the channel's              | yes                                    | small                                   | typecheck: only `SplittingPresidioChannel` (the Lambda channel) accepts `split`; a split call on the HTTP channel fails to compile                                                                                                                                                                                                                                          |
@@ -171,7 +181,8 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 
 - Raise the 8,000 cap without splitting: the model passes its deadline near 15,000 to 20,000.
 - The model's own split: a model and infra change; texts run in series.
-- Copy the model's JSON and trim rules: drifts; a guard that falls back is safer.
+- Copy the model's trim rule: drifts; a guard that falls back is safer. (Its JSON test is copied
+  since v4, erring wide, decision 5: without it no escaped JSON message list ever split.)
 - Self-check alone (decision 5): a constructed case passes and leaks.
 - Abort sibling calls early to save cost: an aborted Lambda keeps running; the slot would lie.
 - One shared breaker; 8 calls per process (sums to 104 to 200 against v3's reserve of 50).

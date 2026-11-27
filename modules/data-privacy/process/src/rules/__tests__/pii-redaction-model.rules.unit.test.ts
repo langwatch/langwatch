@@ -64,7 +64,7 @@ describe("planSpan with splitting off", () => {
 });
 
 describe("MODEL_CALL_RULES", () => {
-  /** @scenario "A split span runs two calls at once and its later pieces on the slots it holds" */
+  /** @scenario "A split span runs up to six calls at once and its later pieces on the slots it holds" */
   it("holds every per-context rule: a single call unlimited, a split span six slots, 50 s each", () => {
     expect(MODEL_CALL_RULES).toEqual({
       single: { budgetMs: 50_000, slots: null },

@@ -388,7 +388,9 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({ ...batch("ask Rui"), recordKey: "trace-1:span-1" });
       memoryModel.answerWith(answered("ask <PERSON>"));
       await analysis.clearPresidio({ ...batch("ask Rui"), recordKey: "trace-1:span-1" });
+      expect(priced).toHaveLength(4);
       const [, , run, retry] = priced;
+      expect(run?.requestId).toEqual(expect.any(String));
       expect(retry?.requestId).toBe(run?.requestId);
     });
   });

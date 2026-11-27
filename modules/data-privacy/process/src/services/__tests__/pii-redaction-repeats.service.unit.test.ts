@@ -6,6 +6,7 @@ import {
 } from "../pii-redaction-repeats.service.ts";
 
 const TEXT = "a".repeat(2_500);
+const TEN_MINUTES = 10 * 60_000;
 const SCOPE = {
   organizationId: "org-1",
   piiRedactionLevel: "STRICT",
@@ -15,9 +16,20 @@ const SCOPE = {
 
 function holding({ now = () => 0 }: { now?: () => number } = {}) {
   const repeats = PiiRedactionRepeatsService.create({ now });
-  repeats.remember({ scope: SCOPE, texts: [TEXT], cleared: ["<held>"], held: [true] });
+  repeats.remember({ scope: SCOPE, texts: [TEXT], cleared: ["<held>"] });
   return repeats;
 }
+
+/** Holds `count` other long texts after whatever the service already holds. */
+function holdNewer({ repeats, count }: { repeats: PiiRedactionRepeatsService; count: number }) {
+  for (let index = 0; index < count; index++) {
+    const text = `${index}`.padEnd(2_000, "b");
+    repeats.remember({ scope: SCOPE, texts: [text], cleared: [null] });
+  }
+}
+
+const isHeld = ({ repeats, text = TEXT }: { repeats: PiiRedactionRepeatsService; text?: string }) =>
+  repeats.recall({ scope: SCOPE, texts: [text] }).pending.length === 0;
 
 describe("PiiRedactionRepeatsService", () => {
   /** @scenario "A held text is reused only in the same scope and for ten minutes" */
@@ -44,35 +56,64 @@ describe("PiiRedactionRepeatsService", () => {
   });
 
   /** @scenario "A held text is reused only in the same scope and for ten minutes" */
-  it("sends it again after ten minutes and once 256 newer texts are held", () => {
+  it("holds a text until ten minutes have passed, not a millisecond longer", () => {
     let now = 0;
     const repeats = holding({ now: () => now });
-    now = 10 * 60_000;
-    expect(repeats.recall({ scope: SCOPE, texts: [TEXT] }).pending).toEqual([0]);
 
-    const crowded = holding();
-    for (let index = 0; index < 256; index++) {
-      const text = `${index}`.padEnd(2_000, "b");
-      crowded.remember({ scope: SCOPE, texts: [text], cleared: [null], held: [true] });
-    }
-    expect(crowded.recall({ scope: SCOPE, texts: [TEXT] }).pending).toEqual([0]);
+    now = TEN_MINUTES - 1;
+    expect(isHeld({ repeats })).toBe(true);
+    const fresh = holding({ now: () => now });
+    now = TEN_MINUTES * 2 - 1;
+    expect(isHeld({ repeats: fresh })).toBe(false);
   });
 
   /** @scenario "A held text is reused only in the same scope and for ten minutes" */
-  it("never holds a short text, a text marked not held, or a batch answered short", () => {
+  it("keeps a text through 255 newer ones, drops it at 256, and a recall keeps it fresh", () => {
+    const kept = holding();
+    holdNewer({ repeats: kept, count: 255 });
+    expect(isHeld({ repeats: kept })).toBe(true);
+
+    const dropped = holding();
+    holdNewer({ repeats: dropped, count: 256 });
+    expect(isHeld({ repeats: dropped })).toBe(false);
+
+    const refreshed = holding();
+    holdNewer({ repeats: refreshed, count: 200 });
+    isHeld({ repeats: refreshed });
+    holdNewer({ repeats: refreshed, count: 100 });
+    expect(isHeld({ repeats: refreshed })).toBe(true);
+  });
+
+  /** @scenario "A held text is reused only in the same scope and for ten minutes" */
+  it("never holds a short text, a text cut only because its batch was long, or a short answer", () => {
     const repeats = PiiRedactionRepeatsService.create({ now: () => 0 });
     const short = "c".repeat(PII_REDACTION_REPEAT_MIN_CHARACTERS - 1);
-    repeats.remember({ scope: SCOPE, texts: [short], cleared: ["x"], held: [true] });
-    repeats.remember({ scope: SCOPE, texts: [TEXT], cleared: ["x"], held: [false] });
-    repeats.remember({ scope: SCOPE, texts: [TEXT, short], cleared: ["x"], held: [true, true] });
+    const cutBesideAnother = "d".repeat(5_000);
+    const wholeBesideIt = "e".repeat(4_000);
+    repeats.remember({ scope: SCOPE, texts: [short], cleared: ["x"] });
+    repeats.remember({
+      scope: { ...SCOPE, spareNamesAndPlaces: undefined },
+      texts: [cutBesideAnother, wholeBesideIt],
+      cleared: ["x", "y"],
+    });
+    repeats.remember({ scope: SCOPE, texts: [TEXT, short], cleared: ["x"] });
 
-    expect(repeats.recall({ scope: SCOPE, texts: [short, TEXT] }).pending).toEqual([0, 1]);
+    const scope = { ...SCOPE, spareNamesAndPlaces: undefined };
+    expect(repeats.recall({ scope, texts: [short, TEXT, cutBesideAnother] }).pending).toEqual([
+      0, 1, 2,
+    ]);
+    expect(repeats.recall({ scope, texts: [wholeBesideIt] }).pending).toEqual([]);
   });
 
   /** @scenario "A held text is reused only in the same scope and for ten minutes" */
-  it("refuses to merge a clearing that does not answer every text sent", () => {
-    const recall = holding().recall({ scope: SCOPE, texts: [TEXT, "d".repeat(2_100)] });
+  it("merges sent answers in order around held ones, and refuses a short clearing", () => {
+    const scope = { ...SCOPE, spareNamesAndPlaces: undefined };
+    const repeats = PiiRedactionRepeatsService.create({ now: () => 0 });
+    repeats.remember({ scope, texts: [TEXT], cleared: ["<held>"] });
+    const mixed = repeats.recall({ scope, texts: ["one", TEXT, "two"] });
 
-    expect(() => recall.merge([])).toThrow("does not answer every text sent");
+    expect(mixed.pending).toEqual([0, 2]);
+    expect(mixed.merge(["1", "2"])).toEqual(["1", "<held>", "2"]);
+    expect(() => mixed.merge(["1"])).toThrow("does not answer every text sent");
   });
 });

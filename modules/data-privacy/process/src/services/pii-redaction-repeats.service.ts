@@ -6,6 +6,9 @@
 
 import { createHash } from "node:crypto";
 
+import { batchCharactersOf } from "../rules/pii-redaction-model.rules.ts";
+import { isAnsweredAsAlone } from "../rules/pii-redaction-split.rules.ts";
+
 /** Shorter texts are cheap to send again; only long ones are worth holding. */
 export const PII_REDACTION_REPEAT_MIN_CHARACTERS = 2_000;
 const REPEAT_TTL_MS = 10 * 60_000;
@@ -52,30 +55,31 @@ export class PiiRedactionRepeatsService {
         if (clearedPending.length !== pending.length) {
           throw new Error("the model's clearing does not answer every text sent");
         }
+        let cursor = 0;
         return texts.map((_, index) =>
-          known.has(index)
-            ? (known.get(index) ?? null)
-            : (clearedPending[pending.indexOf(index)] ?? null),
+          known.has(index) ? (known.get(index) ?? null) : (clearedPending[cursor++] ?? null),
         );
       },
     };
   }
 
-  /** Holds each text `held` marks; `cleared` must answer every text, in order. */
+  /**
+   * Holds the long texts of a sent batch whose answer is the one each gets alone; `cleared`
+   * must answer every text, in order.
+   */
   remember({
     scope,
     texts,
     cleared,
-    held,
   }: {
     scope: RepeatScope;
     texts: readonly string[];
     cleared: readonly (string | null)[];
-    held: readonly boolean[];
   }): void {
     if (cleared.length !== texts.length) return;
+    const batchCharacters = batchCharactersOf(texts);
     texts.forEach((text, index) => {
-      if (!isHeld(text) || !held[index]) return;
+      if (!isHeld(text) || !isAnsweredAsAlone({ text, batchCharacters })) return;
       const key = keyOf({ scope, text, index });
       this.#entries.delete(key);
       this.#entries.set(key, {

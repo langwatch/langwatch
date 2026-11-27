@@ -5,6 +5,7 @@ import { filler, isPythonSpace } from "../../services/__tests__/pii-redaction-sp
 import {
   clearSplitSpan,
   fitsSpanBudget,
+  isAnsweredAsAlone,
   isPlaceablePiece,
   PII_REDACTION_MODEL_PIECE_CHARACTERS,
   type PieceAnswer,
@@ -197,7 +198,7 @@ describe("planSpan", () => {
 });
 
 describe("fitsSpanBudget", () => {
-  /** @scenario "A split span runs two calls at once and its later pieces on the slots it holds" */
+  /** @scenario "A split span runs up to six calls at once and its later pieces on the slots it holds" */
   it("fits 32,000 characters on two slots and not on one", () => {
     const calls = splitCalls([filler(32_000)]);
 
@@ -422,5 +423,19 @@ describe("clearSplitSpan", () => {
     ];
 
     expect(clearSplitSpan({ texts: [json], answers })).toEqual([`{"note":"line\\n${PERSON}"}`]);
+  });
+});
+
+describe("isAnsweredAsAlone", () => {
+  /** @scenario "A text cut only because its span was long is not reused where it would go whole" */
+  it.each([
+    { length: 4_000, batch: 9_000, alone: true },
+    { length: 4_001, batch: 9_000, alone: false },
+    { length: 8_000, batch: 9_000, alone: false },
+    { length: 8_001, batch: 9_001, alone: true },
+    { length: 5_000, batch: 8_000, alone: true },
+    { length: 5_000, batch: 8_001, alone: false },
+  ])("a $length-character text in a $batch-character batch: $alone", ({ length, batch, alone }) => {
+    expect(isAnsweredAsAlone({ text: "x".repeat(length), batchCharacters: batch })).toBe(alone);
   });
 });

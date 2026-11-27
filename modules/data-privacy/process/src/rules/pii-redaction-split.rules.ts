@@ -79,6 +79,18 @@ export function isAnsweredAsAlone({
   );
 }
 
+/** Whether a batch of `characters` goes to Presidio for its length (decision 2). */
+export function isTooLongForModel({
+  characters,
+  splitting,
+}: {
+  characters: number;
+  splitting: boolean;
+}): boolean {
+  if (characters <= PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS) return false;
+  return !splitting || characters > PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS;
+}
+
 /** The plan for a span batch; `splitting` says whether this batch may split (decisions 8, 9). */
 export function planSpan({
   texts,
@@ -88,10 +100,8 @@ export function planSpan({
   splitting: boolean;
 }): SpanPlan {
   const characters = batchCharactersOf(texts);
+  if (isTooLongForModel({ characters, splitting })) return { kind: "too_long" };
   if (characters <= PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS) return { kind: "single" };
-  if (!splitting || characters > PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS) {
-    return { kind: "too_long" };
-  }
   const pieces = texts.flatMap((text, index) =>
     text.length <= PII_REDACTION_MODEL_PIECE_CHARACTERS
       ? [{ text: index, start: 0, end: text.length, whole: true }]

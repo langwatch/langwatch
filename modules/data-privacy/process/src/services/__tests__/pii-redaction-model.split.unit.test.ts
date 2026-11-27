@@ -119,6 +119,48 @@ describe("PiiRedactionModelService, a long batch with splitting on (ADR-207)", (
     expect(usage.map((line) => line.outcome)).toEqual(["ok", "too_long"]);
   });
 
+  /** @scenario "The whole span passes the size limits before held texts are left out" */
+  it("sends a span of a held 6,000 and a new 3,000 to Presidio with splitting off, priced for nobody", async () => {
+    const { clear, presidio, priced, single } = setup({ splitFlag: false });
+    const held = filler(6_000);
+    await clear([held]);
+    presidio.answerWith(presidioAnswer(2));
+
+    const cleared = await clear([held, filler(3_000, 9_000)]);
+
+    expect(cleared).toEqual([PRESIDIO_MASK, PRESIDIO_MASK]);
+    expect(single.calls).toHaveLength(1);
+    expect(priced.map((fact) => fact.characters)).toEqual([6_000]);
+  });
+
+  /** @scenario "The whole span passes the size limits before held texts are left out" */
+  it("sends a span of 32,001 held characters to Presidio, priced for nobody", async () => {
+    const { clear, presidio, priced } = setup();
+    const [first, second] = [filler(16_000), filler(16_001, 9_000)];
+    await clear([first]);
+    await clear([second]);
+    presidio.answerWith(presidioAnswer(2));
+
+    const cleared = await clear([first, second]);
+
+    expect(cleared).toEqual([PRESIDIO_MASK, PRESIDIO_MASK]);
+    expect(priced.map((fact) => fact.characters)).toEqual([16_000, 16_001]);
+  });
+
+  /** @scenario "The whole span passes the size limits before held texts are left out" */
+  it("prices a span whose every text is held on all its characters, calling no model", async () => {
+    const { clear, priced, single } = setup();
+    const text = filler(6_000);
+    await clear([text], { recordKey: "trace-1:span-1" });
+
+    await clear([text], { recordKey: "trace-1:span-1" });
+
+    expect(single.calls).toHaveLength(1);
+    expect(priced).toHaveLength(2);
+    expect(priced[1]?.characters).toBe(text.length);
+    expect(priced[1]?.requestId).toBe(priced[0]?.requestId);
+  });
+
   /** @scenario "A text cut only because its span was long is not reused where it would go whole" */
   it("sends a text cut beside another again in one call when it comes back alone", async () => {
     const { clear, single, splitModel } = setup();
