@@ -639,6 +639,8 @@ export interface RetryWhileReplicasMissingDeps<T> {
   /** One attempt: a goose pass or a write that waits for every replica. */
   run: () => Promise<T>;
   waitSeconds: number;
+  /** The phase a failure past `waitSeconds` reports. */
+  phase: MigrationError["phase"];
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   log?: (message: string) => void;
@@ -656,7 +658,9 @@ export function describeTooFewReplicas(error: unknown): string | null {
     const [alive, required] = [Number(match[1]), Number(match[2])];
     return `${alive} of ${required} replicas are alive, ${required - alive} missing`;
   }
-  return /TOO_FEW_LIVE_REPLICAS|Code: 285\b/.test(message) ? "too few replicas are alive" : null;
+  return /TOO_FEW_LIVE_REPLICAS|Code: 285\b/.test(message)
+    ? "too few replicas are alive (counts unknown)"
+    : null;
 }
 
 /**
@@ -667,6 +671,7 @@ export function describeTooFewReplicas(error: unknown): string | null {
 export async function retryWhileReplicasMissing<T>({
   run,
   waitSeconds,
+  phase,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now = Date.now,
   log = (message) => logger.info(message),
@@ -683,7 +688,7 @@ export async function retryWhileReplicasMissing<T>({
       if (current >= deadline) {
         throw new MigrationError(
           `ClickHouse refused a write that waits for every replica after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): ${counts}`,
-          "migrate",
+          phase,
           error instanceof Error ? error : undefined,
         );
       }
@@ -806,6 +811,7 @@ async function bootstrapDatabase(
     await retryWhileReplicasMissing({
       run: () => insertInitialVersion({ client, config, verbose }),
       waitSeconds,
+      phase: "bootstrap",
     });
   });
 
@@ -1078,6 +1084,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
           allowDimensionsOutsideSortingKey: pass.allowDimensionsOutsideSortingKey,
         }),
       waitSeconds: options.waitSeconds ?? DEFAULT_CLICKHOUSE_WAIT_SECONDS,
+      phase: "migrate",
     });
   }
   logger.info("ClickHouse migrations completed.");
