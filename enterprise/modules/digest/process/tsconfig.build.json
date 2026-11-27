@@ -81,9 +81,6 @@
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/trace/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     }
   ],
