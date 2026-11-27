@@ -7,6 +7,8 @@ import {
   isContentVisible,
   isContentVisibleToPublic,
   needsAudienceFacts,
+  needsOwnerFact,
+  needsRoleEverywhere,
   ownsEveryGovernedProject,
   viewerFactsFrom,
   type ViewerFacts,
@@ -162,13 +164,15 @@ describe("needsAudienceFacts and isContentVisibleToPublic", () => {
 });
 
 describe("viewerFactsFrom", () => {
+  const permissions = (held: { view: boolean; update: boolean; manage: boolean }) => ({
+    "traces:view": held.view,
+    "traces:update": held.update,
+    "project:manage": held.manage,
+  });
   const facts = (held: { view: boolean; update: boolean; manage: boolean }) =>
     viewerFactsFrom({
-      held: {
-        "traces:view": held.view,
-        "traces:update": held.update,
-        "project:manage": held.manage,
-      },
+      held: permissions(held),
+      heldElsewhere: [],
       isProjectOwner: false,
       groupIds: [],
     });
@@ -206,6 +210,57 @@ describe("viewerFactsFrom", () => {
         isViewer: true,
       });
     });
+  });
+});
+
+describe("viewerFactsFrom across the projects a read spans", () => {
+  const permissions = (manage: boolean, update: boolean, view = true) => ({
+    "traces:view": view,
+    "traces:update": update,
+    "project:manage": manage,
+  });
+
+  /** @scenario "Admins-only content stays hidden when a read spans a project where the viewer is no admin" */
+  it("counts an admin only where they are admin at every project", () => {
+    const viewer = viewerFactsFrom({
+      held: permissions(true, true),
+      heldElsewhere: [permissions(false, true)],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+    expect(viewer).toMatchObject({ isAdmin: false, isMemberRole: false, isViewer: false });
+    expect(isContentVisible(eff("restrict", { admins: true }), viewer)).toBe(false);
+  });
+
+  it("keeps the read's own membership when they hold no role at the other project", () => {
+    const viewer = viewerFactsFrom({
+      held: permissions(true, true),
+      heldElsewhere: [permissions(false, false, false)],
+      isProjectOwner: false,
+      groupIds: [],
+    });
+
+    expect(isContentVisible(eff("capture"), viewer)).toBe(true);
+    expect(isContentVisible(eff("restrict", { allMembers: true }), viewer)).toBe(true);
+  });
+});
+
+describe("needsRoleEverywhere and needsOwnerFact", () => {
+  it("asks the role at the other projects only when a restriction names a role", () => {
+    expect(needsRoleEverywhere(eff("restrict", { admins: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { members: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { viewers: true }))).toBe(true);
+    expect(needsRoleEverywhere(eff("restrict", { allMembers: true, groupIds: ["g"] }))).toBe(false);
+    expect(needsRoleEverywhere(eff("capture"))).toBe(false);
+  });
+
+  it("reads ownership only for an owner audience, or for a viewer who is no member", () => {
+    const owner = [eff("restrict", { projectOwner: true })];
+    const admins = [eff("restrict", { admins: true }), eff("capture")];
+    expect(needsOwnerFact({ restrictions: owner, isMember: true })).toBe(true);
+    expect(needsOwnerFact({ restrictions: admins, isMember: true })).toBe(false);
+    expect(needsOwnerFact({ restrictions: admins, isMember: false })).toBe(true);
   });
 });
 

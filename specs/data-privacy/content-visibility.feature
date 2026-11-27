@@ -90,6 +90,14 @@ Feature: Restricting who can see trace content
     When "alice" reads traces or analytics across both projects
     Then the trace input is redacted for "alice"
 
+  @unit
+  Scenario: Admins-only content stays hidden when a read spans a project where the viewer is no admin
+    Given "alice" is an Admin of the aggregate project she reads from
+    And "alice" is only a Member of one of its member projects
+    And trace input is restricted to admins
+    When "alice" reads traces or analytics across both projects
+    Then the trace input is redacted for "alice"
+
   @integration
   Scenario: The owner-only audience can be widened with a chosen group
     Given a personal project "alice-workspace" owned by "alice"

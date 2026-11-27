@@ -6,12 +6,15 @@ import {
   describeAudience,
   isContentVisible,
   isContentVisibleToPublic,
+  needsOwnerFact,
+  needsRoleEverywhere,
   ownsEveryGovernedProject,
   viewerFactsFrom,
   type ContentCategory,
   type ResolvedCategory,
   type ResolvedDataPrivacy,
   type DataPrivacyApi,
+  type HeldRolePermissions,
   type ViewerRolePermission,
 } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -137,20 +140,17 @@ export class TraceViewerProtectionService {
       authorization?: Authorization;
     }>,
   ): Promise<Protections> {
-    const [canSeeCosts, held, isProjectOwner, window] = await Promise.all([
+    const policyProjectIds = policyProjectIdsOf(input);
+    const [canSeeCosts, held, window] = await Promise.all([
       this.permitted(input, "cost:view"),
-      askViewerRolePermissions((permission) => this.permitted(input, permission)),
-      this.isProjectOwner(input),
+      this.heldAt({ ...input, at: input.projectId }),
       this.getVisibilityWindow(input.projectId),
     ]);
 
     let policy: ResolvedDataPrivacy;
     try {
       policy = await this.options.dataPrivacy.getResolvedForProjects({
-        projectIds: policyProjectIdsOf({
-          projectId: input.projectId,
-          authorization: input.authorization,
-        }),
+        projectIds: policyProjectIds,
       });
     } catch (error) {
       this.logger.error(
@@ -170,12 +170,26 @@ export class TraceViewerProtectionService {
     }
 
     const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
+    const restrictions = CONTENT_CATEGORIES.map((category) => policy.categories[category]);
+    const [heldElsewhere, isProjectOwner] = await Promise.all([
+      restrictions.some(needsRoleEverywhere)
+        ? Promise.all(
+            policyProjectIds
+              .filter((id) => id !== input.projectId)
+              .map((at) => this.heldAt({ ...input, at })),
+          )
+        : Promise.resolve([]),
+      needsOwnerFact({ restrictions, isMember: held["traces:view"] })
+        ? this.isProjectOwner({ ...input, projectIds: policyProjectIds })
+        : Promise.resolve(false),
+    ]);
     const categories = await this.categoriesFor({
       policy,
       projectId: input.projectId,
       userId: input.userId,
       anonymous: input.publiclyShared || input.userId === undefined,
       held,
+      heldElsewhere,
       isProjectOwner,
     });
 
@@ -205,17 +219,19 @@ export class TraceViewerProtectionService {
     userId,
     anonymous,
     held,
+    heldElsewhere,
     isProjectOwner,
   }: {
     policy: ResolvedDataPrivacy;
     projectId: string;
     userId: string | undefined;
     anonymous: boolean;
-    held: Readonly<Record<ViewerRolePermission, boolean>>;
+    held: HeldRolePermissions;
+    heldElsewhere: readonly HeldRolePermissions[];
     isProjectOwner: boolean;
   }): Promise<Protections["contentCategories"]> {
     const groupIds = anonymous ? [] : await this.groupIdsFor({ policy, projectId, userId });
-    const viewer = viewerFactsFrom({ held, isProjectOwner, groupIds });
+    const viewer = viewerFactsFrom({ held, heldElsewhere, isProjectOwner, groupIds });
 
     return Object.fromEntries(
       CONTENT_CATEGORIES.map((category) => {
@@ -235,15 +251,11 @@ export class TraceViewerProtectionService {
 
   /** Ownership read the one shared way, over every project whose policy governs the read. */
   private isProjectOwner(
-    input: Readonly<{
-      projectId: string;
-      userId: string | undefined;
-      authorization?: Authorization;
-    }>,
+    input: Readonly<{ projectId: string; userId: string | undefined; projectIds: string[] }>,
   ): Promise<boolean> {
     return ownsEveryGovernedProject({
       userId: input.userId,
-      projectIds: policyProjectIdsOf(input),
+      projectIds: input.projectIds,
       ownerOf: async (projectId) =>
         (await this.options.projects.findWithTeam(projectId))?.ownerUserId,
       onLookupFailure: (error) =>
@@ -252,6 +264,15 @@ export class TraceViewerProtectionService {
           "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
         ),
     });
+  }
+
+  /** The viewer's role permissions at one project the read spans. */
+  private heldAt(
+    input: Readonly<{ at: string; userId: string | undefined }>,
+  ): Promise<HeldRolePermissions> {
+    return askViewerRolePermissions((permission) =>
+      this.permitted({ projectId: input.at, userId: input.userId }, permission),
+    );
   }
 
   /**

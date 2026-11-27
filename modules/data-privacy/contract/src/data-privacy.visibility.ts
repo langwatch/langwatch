@@ -14,25 +14,39 @@ export interface EffectiveRestriction {
 }
 /** The project permissions a viewer's role is read from, for every reader of captured content. */
 export type ViewerRolePermission = "traces:view" | "traces:update" | "project:manage";
+export type HeldRolePermissions = Readonly<Record<ViewerRolePermission, boolean>>;
 
 /** Admin is `project:manage`, never `project:update`: a Member holds that too. */
-export function viewerFactsFrom({
-  held,
-  isProjectOwner,
-  groupIds,
-}: {
-  held: Readonly<Record<ViewerRolePermission, boolean>>;
-  isProjectOwner: boolean;
-  groupIds: string[];
-}): ViewerFacts {
+function roleFrom(held: HeldRolePermissions): Omit<ViewerFacts, "isProjectOwner" | "groupIds"> {
   const isMember = held["traces:view"];
   const isAdmin = held["project:manage"];
   const isMemberRole = held["traces:update"] && !isAdmin;
+  return { isAdmin, isMember, isMemberRole, isViewer: isMember && !isAdmin && !isMemberRole };
+}
+
+/**
+ * `held` is the read's own project, whose proof entitles membership across the rest (ADR-177).
+ * A role audience opens only where the role holds at every project in `heldElsewhere` too.
+ */
+export function viewerFactsFrom({
+  held,
+  heldElsewhere,
+  isProjectOwner,
+  groupIds,
+}: {
+  held: HeldRolePermissions;
+  heldElsewhere: readonly HeldRolePermissions[];
+  isProjectOwner: boolean;
+  groupIds: string[];
+}): ViewerFacts {
+  const roles = [held, ...heldElsewhere].map(roleFrom);
+  const everywhere = (role: "isAdmin" | "isMemberRole" | "isViewer") =>
+    roles.every((at) => at[role]);
   return {
-    isAdmin,
-    isMember,
-    isMemberRole,
-    isViewer: isMember && !isAdmin && !isMemberRole,
+    isAdmin: everywhere("isAdmin"),
+    isMember: held["traces:view"],
+    isMemberRole: everywhere("isMemberRole"),
+    isViewer: everywhere("isViewer"),
     isProjectOwner,
     groupIds,
   };
@@ -41,13 +55,35 @@ export function viewerFactsFrom({
 /** Asks each role permission once, so every reader asks the same ones. */
 export async function askViewerRolePermissions(
   ask: (permission: ViewerRolePermission) => Promise<boolean>,
-): Promise<Record<ViewerRolePermission, boolean>> {
+): Promise<HeldRolePermissions> {
   const [view, update, manage] = await Promise.all([
     ask("traces:view"),
     ask("traces:update"),
     ask("project:manage"),
   ]);
   return { "traces:view": view, "traces:update": update, "project:manage": manage };
+}
+
+/** Whether a restriction opens to a role, so the role at the read's other projects matters. */
+export function needsRoleEverywhere(eff: EffectiveRestriction): boolean {
+  const { audience } = eff;
+  return (
+    eff.disposition === "restrict" && (audience.admins || audience.members || audience.viewers)
+  );
+}
+
+/** Whether ownership can change what this viewer sees: an owner audience or the non-member gate. */
+export function needsOwnerFact({
+  restrictions,
+  isMember,
+}: {
+  restrictions: readonly EffectiveRestriction[];
+  isMember: boolean;
+}): boolean {
+  return (
+    !isMember ||
+    restrictions.some((eff) => eff.disposition === "restrict" && eff.audience.projectOwner)
+  );
 }
 
 /**

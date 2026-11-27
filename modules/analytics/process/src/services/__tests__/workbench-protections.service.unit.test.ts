@@ -394,6 +394,70 @@ describe("resolveMemberProtections", () => {
       expect(resolved.canSeeCapturedInput).toBe(false);
     });
 
+    /** The member's built-in role at each project; none where the map names none. */
+    function authzWithRoleAt(roleAt: Record<string, "admin" | "member">) {
+      return authzGranting({
+        grants: ({ permission }) => builtinRoleGrants({ role: "admin", permission }),
+        overrides: {
+          hasPermission: async ({ permission, projectId }) => {
+            const role = projectId === undefined ? undefined : roleAt[projectId];
+            return role !== undefined && builtinRoleGrants({ role, permission });
+          },
+        },
+      }).authz;
+    }
+
+    function spanningProjectB(roleAt: Record<string, "admin" | "member">) {
+      return serviceOver({
+        authz: authzWithRoleAt(roleAt),
+        dataPrivacy: createApiFixture<DataPrivacyApi>(
+          { getResolvedForProjects: async () => bothRestrictedToAdmins() },
+          "workbench data privacy",
+        ),
+      }).resolveMemberProtections({
+        userId: "user-1",
+        projectId: "project-1",
+        authorization: analyticsProof({
+          projectId: "project-1",
+          shared: [{ projectId: "project_b", from: 0 }],
+        }),
+      });
+    }
+
+    /** @scenario "Admins-only content stays hidden when a read spans a project where the viewer is no admin" */
+    it("hides it from this project's Admin when the read also spans a project where they are only a Member", async () => {
+      const resolved = await spanningProjectB({ "project-1": "admin", project_b: "member" });
+
+      expect(resolved.canSeeCapturedInput).toBe(false);
+      expect(resolved.canSeeCapturedOutput).toBe(false);
+    });
+
+    it("shows it to an Admin of every project the read spans", async () => {
+      const resolved = await spanningProjectB({ "project-1": "admin", project_b: "admin" });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+    });
+
+    it("keeps captured content open across the read when they hold no role at the other project", async () => {
+      const resolved = await serviceOver({
+        authz: authzWithRoleAt({ "project-1": "admin" }),
+        dataPrivacy: createApiFixture<DataPrivacyApi>(
+          { getResolvedForProjects: async () => PLATFORM_DEFAULT_DATA_PRIVACY },
+          "workbench data privacy",
+        ),
+      }).resolveMemberProtections({
+        userId: "user-1",
+        projectId: "project-1",
+        authorization: analyticsProof({
+          projectId: "project-1",
+          shared: [{ projectId: "project_b", from: 0 }],
+        }),
+      });
+
+      expect(resolved.canSeeCapturedInput).toBe(true);
+    });
+
     it("hides captured content from a Viewer", async () => {
       const { dataPrivacy } = dataPrivacyResolving(async () => bothRestrictedToAdmins());
 
@@ -527,6 +591,64 @@ describe("resolveRunCaller", () => {
         },
       });
     });
+  });
+
+  describe("given input restricted to the project owner and a caller who owns the project", () => {
+    it("shows the owner the input, read off the project it already loaded", async () => {
+      const ownerOnlyInput = {
+        ...PLATFORM_DEFAULT_DATA_PRIVACY,
+        categories: {
+          ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+          input: {
+            disposition: "restrict" as const,
+            audience: {
+              ...bothRestrictedToAdmins().categories.input.audience,
+              admins: false,
+              projectOwner: true,
+            },
+          },
+        },
+      };
+      const { dataPrivacy } = dataPrivacyResolving(async () => ownerOnlyInput);
+      const { projects, findById } = projectsWith({
+        ...projectWith({ id: "project-1", lwqlKey: "lwql-secret" }),
+        ownerUserId: "user-1",
+      });
+
+      const caller = await serviceOver({
+        authz: authzGranting({
+          grants: ({ permission }) => builtinRoleGrants({ role: "member", permission }),
+        }).authz,
+        dataPrivacy,
+        projects,
+      }).resolveRunCaller({ userId: "user-1", projectId: "project-1" });
+
+      expect(caller.protections.canSeeCapturedInput).toBe(true);
+      expect(findById).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given no content audience that names the project owner", () => {
+  it("never reads who owns the projects the read spans", async () => {
+    const { authz } = authzAnswering(true);
+    const dataPrivacy = createApiFixture<DataPrivacyApi>(
+      { getResolvedForProjects: async () => bothRestrictedToAdmins() },
+      "workbench data privacy",
+    );
+    const { projects, findById } = projectsWith(null);
+
+    const resolved = await serviceOver({ authz, dataPrivacy, projects }).resolveMemberProtections({
+      userId: "user-1",
+      projectId: "project-1",
+      authorization: analyticsProof({
+        projectId: "project-1",
+        shared: [{ projectId: "project_b", from: 0 }],
+      }),
+    });
+
+    expect(resolved.canSeeCapturedInput).toBe(true);
+    expect(findById).not.toHaveBeenCalled();
   });
 });
 

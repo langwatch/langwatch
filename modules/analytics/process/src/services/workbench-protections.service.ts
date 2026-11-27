@@ -19,6 +19,8 @@ import {
   askViewerRolePermissions,
   isContentVisible,
   isContentVisibleToPublic,
+  needsOwnerFact,
+  needsRoleEverywhere,
   ownsEveryGovernedProject,
   viewerFactsFrom,
   type ContentCategory,
@@ -97,22 +99,30 @@ export class WorkbenchProtectionsService {
       ? [...new Set([projectId, ...projectIdsReadBy(input.authorization, "analytics:view")])]
       : [projectId];
     const scope = await this.projectScope(projectId);
-    const [catalogue, held, isProjectOwner] = await Promise.all([
-      this.catalogueFor({ principal: { type: "user", id: userId }, scope }),
+    const askAt = (at: string) =>
       askViewerRolePermissions((permission) =>
-        authz.hasPermission({ userId, permission, projectId }),
-      ),
-      this.ownsEvery({ userId, projectIds: policyProjectIds, loaded: input.loaded }),
+        authz.hasPermission({ userId, permission, projectId: at }),
+      );
+    const [catalogue, held, policy] = await Promise.all([
+      this.catalogueFor({ principal: { type: "user", id: userId }, scope }),
+      askAt(projectId),
+      this.policyFor(policyProjectIds),
     ]);
     const canSeeCosts = holdsCostView(catalogue);
-
-    const policy = await this.policyFor(policyProjectIds);
     if (!policy) {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
 
-    const groupIds = await this.groupIdsFor({ policy, userId, scope });
-    const viewer = viewerFactsFrom({ held, isProjectOwner, groupIds });
+    const restrictions = [policy.categories.input, policy.categories.output];
+    const others = policyProjectIds.filter((id) => id !== projectId);
+    const [heldElsewhere, isProjectOwner, groupIds] = await Promise.all([
+      restrictions.some(needsRoleEverywhere) ? Promise.all(others.map(askAt)) : Promise.resolve([]),
+      needsOwnerFact({ restrictions, isMember: held["traces:view"] })
+        ? this.ownsEvery({ userId, projectIds: policyProjectIds, loaded: input.loaded })
+        : Promise.resolve(false),
+      this.groupIdsFor({ policy, userId, scope }),
+    ]);
+    const viewer = viewerFactsFrom({ held, heldElsewhere, isProjectOwner, groupIds });
     const visible = (category: ContentCategory): boolean =>
       isContentVisible(policy.categories[category], viewer);
 
