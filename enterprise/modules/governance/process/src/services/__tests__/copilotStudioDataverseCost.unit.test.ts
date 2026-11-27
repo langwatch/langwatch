@@ -14,7 +14,7 @@
  */
 
 import { RedirectRefusedError } from "@langwatch/egress";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import capturedCostReply from "./fixtures/azureCostManagementDailyResponse.json";
 
@@ -82,6 +82,13 @@ function transcriptRow() {
 }
 
 const COST_HOST = "management.azure.com";
+
+// Every test re-imports the channel after resetModules; the first one also transformed its whole
+// module graph inside a test's 5s, which a loaded CI runner can exceed. Transform it up front.
+beforeAll(async () => {
+  await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
+  vi.resetModules();
+}, 60_000);
 
 beforeEach(() => {
   capturedCalls = [];
