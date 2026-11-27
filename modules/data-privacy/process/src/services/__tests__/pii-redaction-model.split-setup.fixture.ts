@@ -3,7 +3,7 @@ import type { PiiRedactionSpendPricedEventData } from "@langwatch/data-privacy-c
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { PiiDetectionOutcome } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ConcurrencyLimiter } from "@langwatch/limiter";
+import { ConcurrencyLimiter } from "@langwatch/limiter";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
@@ -189,7 +189,9 @@ export function setup({
   const splitModel = fakePiiModel({ planted, turns });
   const seen = observations();
   const channel = modelChannel({ single, splitModel, split, seen });
-  const analysis = analysisOver({ presidio, channel, slots, splitFlag, seen });
+  // Two slots keep the slot mechanics small to drive; the default count is the rules table's.
+  const twoSlots = new ConcurrencyLimiter({ maxConcurrent: 2, maxQueued: 0 });
+  const analysis = analysisOver({ presidio, channel, slots: slots ?? twoSlots, splitFlag, seen });
 
   const clear = (
     texts: string[],

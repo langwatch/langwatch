@@ -470,12 +470,49 @@ Feature: Redacting personal data out of a span at ingestion
     Then Presidio answers it and no model is called
     And its usage line records the outcome too_long
 
-  @unit
+  @regression
   Scenario: A piece the model could reshape sends the whole span to Presidio
     Given a split batch
-    When one of its pieces holds a backslash inside it, such as an escaped JSON line
+    When one of its pieces holds a backslash and reads as JSON on its own, NaN and Infinity included
     Then Presidio answers the whole batch and no piece's findings are used
     And a piece is never cut to start or end on a character the model trims, U+0085 included
+
+  @regression
+  Scenario: A long text sent again is cleared from the first answer, not sent to the model again
+    Given an organization on the PII redaction model
+    And a span whose texts are a 3,000-character system prompt and a short user message
+    When a second span within ten minutes carries the same system prompt and a new message
+    Then the model is sent only the new message
+    And the system prompt is cleared as the model cleared it the first time
+    And each span is priced on all its characters, as it would be without the repeat
+
+  @unit
+  Scenario: A held text is reused only in the same scope and for ten minutes
+    Given a process holds the model's clearing of a 2,500-character text
+    When the same text comes from another organisation, at another level, with other entities or another spared flag
+    Then it is sent to the model again
+    And after ten minutes, or once 256 newer texts are held, it is sent again too
+    And a text under 2,000 characters is never held
+
+  @regression
+  Scenario: The whole span passes the size limits before held texts are left out
+    Given a process holds the model's clearing of some of a span's texts
+    When the whole span is over 8,000 characters with splitting off, or over 32,000 with it on
+    Then the span goes to Presidio and is priced for nobody, as it would with nothing held
+    And a span whose every text is held is priced on all its characters with no model call
+
+  @regression
+  Scenario: A text cut only because its span was long is not reused where it would go whole
+    Given a 5,500-character text that was cut into pieces beside another long text
+    When the same text comes back alone, short enough for one call
+    Then the model is sent it again in one call, never served the cut answer
+
+  @regression
+  Scenario: A long escaped JSON message list splits and every piece is placed
+    Given a span whose text is an OpenTelemetry message list of 20,000 characters with escaped quotes and newlines
+    When the batch splits
+    Then every cut piece is placed by its offsets, since a cut through the list never reads as JSON
+    And the model's escapes are left as they are in the stored text
 
   @unit
   Scenario: A piece whose findings do not rebuild the model's own masked piece sends the whole span to Presidio
@@ -499,7 +536,7 @@ Feature: Redacting personal data out of a span at ingestion
     And its usage line records the outcome busy
 
   @unit
-  Scenario: A split span runs two calls at once and its later pieces on the slots it holds
+  Scenario: A split span runs up to six calls at once and its later pieces on the slots it holds
     Given a split batch of five pieces and two free split slots
     Then at most two of its calls are in flight at once and all five pieces are sent
     And with one free slot its pieces are sent one after another

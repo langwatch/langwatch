@@ -1,8 +1,12 @@
 import { ConcurrencyLimiter } from "@langwatch/limiter";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryPresidioChannel } from "../../channels/memory/memory.presidio.channel.ts";
 import { PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS } from "../../rules/pii-redaction-model.rules.ts";
+import { PiiRedactionSplitCallsService } from "../pii-redaction-split-calls.service.ts";
+import { PresidioRedactionService } from "../presidio-redaction.service.ts";
 import {
+  metrics,
   PRESIDIO_MASK,
   presidioAnswer,
   planSpanCalls,
@@ -47,7 +51,20 @@ describe("PiiRedactionModelService, running a split span's calls (ADR-207)", () 
     await holding;
   });
 
-  /** @scenario "A split span runs two calls at once and its later pieces on the slots it holds" */
+  /** @scenario "A split span runs up to six calls at once and its later pieces on the slots it holds" */
+  it("gives a process six split slots by default", () => {
+    const splitCalls = PiiRedactionSplitCallsService.create({
+      model: PresidioRedactionService.create({
+        presidio: MemoryPresidioChannel.create({ endpoint: "http://pii-redaction-model:8080" }),
+        metrics,
+        timeoutMs: 60_000,
+      }),
+    });
+
+    expect(splitCalls.freeSlots()).toBe(6);
+  });
+
+  /** @scenario "A split span runs up to six calls at once and its later pieces on the slots it holds" */
   it("runs two calls at once and sends each planned piece exactly once", async () => {
     vi.useFakeTimers();
     const text = filler(18_000);
@@ -68,7 +85,7 @@ describe("PiiRedactionModelService, running a split span's calls (ADR-207)", () 
     );
   });
 
-  /** @scenario "A split span runs two calls at once and its later pieces on the slots it holds" */
+  /** @scenario "A split span runs up to six calls at once and its later pieces on the slots it holds" */
   it("runs its pieces one after another on one free slot, and makes no call when they cannot fit", async () => {
     vi.useFakeTimers();
     const slots = new ConcurrencyLimiter({ maxConcurrent: 2, maxQueued: 0 });

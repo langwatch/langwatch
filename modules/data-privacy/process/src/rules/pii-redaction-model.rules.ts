@@ -33,7 +33,7 @@ type ModelCallRules = Readonly<{ budgetMs: number; slots: number | null }>;
  */
 export const MODEL_CALL_RULES: Readonly<Record<ModelCallContext, ModelCallRules>> = {
   single: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: null },
-  split: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: 2 },
+  split: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: 6 },
 };
 
 /** A function ARN, optionally qualified by an alias or version; the region is the fourth field. */
@@ -97,4 +97,29 @@ function isThrottled(error: unknown): boolean {
     error instanceof Error &&
     (error.name === "TooManyRequestsException" || error.name === "ThrottlingException")
   );
+}
+
+/** A batch's texts and their spared flags, and the whole batch they came from. */
+type NarrowableBatch = {
+  texts: readonly string[];
+  spareNamesAndPlaces?: readonly boolean[] | undefined;
+  batchTexts?: readonly string[] | undefined;
+};
+
+/** The batch narrowed to the texts at `pending`, keeping the whole batch for its price and id. */
+export function narrowedToPending<T extends NarrowableBatch>({
+  input,
+  pending,
+}: {
+  input: T;
+  pending: readonly number[];
+}): T {
+  if (pending.length === input.texts.length) return input;
+  const spared = input.spareNamesAndPlaces;
+  return {
+    ...input,
+    texts: pending.map((index) => input.texts[index] ?? ""),
+    spareNamesAndPlaces: spared && pending.map((index) => spared[index] ?? false),
+    batchTexts: input.texts,
+  };
 }

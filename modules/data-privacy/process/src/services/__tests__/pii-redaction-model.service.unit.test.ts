@@ -359,6 +359,42 @@ function spanWith(value: string): OtlpSpan {
 }
 
 describe("PiiRedactionModelService", () => {
+  describe("when a long text comes back within ten minutes", () => {
+    const prompt = `You help Ana Silva's team. ${"Answer politely and briefly. ".repeat(110)}`;
+    const answered = (...texts: string[]): PiiDetectionOutcome => ({
+      kind: "detected",
+      results: texts.map((text) => ({ status: "processed", raw_response: { anonymized: text } })),
+    });
+    const batch = (message: string) => ({ ...strictBatch(), texts: [prompt, message] });
+
+    /** @scenario "A long text sent again is cleared from the first answer, not sent to the model again" */
+    it("sends only the new text, clears the repeat as first answered and prices the whole span", async () => {
+      const { analysis, memoryModel, sent, priced } = setup();
+      const clearedPrompt = prompt.replace("Ana Silva", "<PERSON>");
+      memoryModel.answerWith(answered(clearedPrompt, "call <PERSON>"));
+      await analysis.clearPresidio(batch("call Ana"));
+      memoryModel.answerWith(answered("ask <PERSON>"));
+
+      const second = await analysis.clearPresidio(batch("ask Rui"));
+
+      expect(prompt.length).toBeGreaterThan(3_000);
+      expect(sent(memoryModel).map((request) => request.texts)).toEqual([
+        [prompt, "call Ana"],
+        ["ask Rui"],
+      ]);
+      expect(second).toEqual([prompt.replace("Ana Silva", "[PERSON]"), "ask [PERSON]"]);
+      expect(priced.map((fact) => fact.characters)).toEqual([prompt.length + 8, prompt.length + 7]);
+      memoryModel.answerWith(answered("ask <PERSON>"));
+      await analysis.clearPresidio({ ...batch("ask Rui"), recordKey: "trace-1:span-1" });
+      memoryModel.answerWith(answered("ask <PERSON>"));
+      await analysis.clearPresidio({ ...batch("ask Rui"), recordKey: "trace-1:span-1" });
+      expect(priced).toHaveLength(4);
+      const [, , run, retry] = priced;
+      expect(run?.requestId).toEqual(expect.any(String));
+      expect(retry?.requestId).toBe(run?.requestId);
+    });
+  });
+
   describe("given a self-hosted deployment that names the model, with its flag forced on", () => {
     describe("when the organization's active plan is not Enterprise", () => {
       /** @scenario "A self-hosted organization without an Enterprise licence keeps the Presidio path" */

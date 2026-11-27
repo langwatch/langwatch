@@ -42,7 +42,7 @@ export class PiiRedactionSplitCallsService {
   }
 
   private readonly model: PresidioRedactionService;
-  /** Per process: the split calls in flight, the same two slots for every span (decision 9). */
+  /** Per process: the split calls in flight, the same slots for every span (decision 9). */
   private readonly slots: ConcurrencyLimiter;
 
   private constructor(input: { model: PresidioRedactionService; slots: ConcurrencyLimiter }) {
@@ -57,7 +57,7 @@ export class PiiRedactionSplitCallsService {
 
   /** How many split slots are free now. */
   freeSlots(): number {
-    return SPLIT_SLOTS - this.slots.stats().inFlight;
+    return this.slots.capacity() - this.slots.stats().inFlight;
   }
 
   /**
