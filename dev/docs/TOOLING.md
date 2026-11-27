@@ -109,7 +109,9 @@ everything it depends on, and a few global configs (`sharedGlobals`,
 `typecheck` hashes what its dependencies' tasks emitted instead of their sources:
 their `.d.ts` files and the files their generators write. A change inside a function
 body leaves the declarations as they were, so only that package's typecheck runs and
-its dependants replay.
+its dependants replay. A dependency with no declaration build is read from source, so
+its dependants hash its production files, and the root configs a package extends are
+part of its hash too.
 
 That only works if "everything it depends on" is true. A package that imports
 `@langwatch/bar` without declaring it would never be rebuilt when `bar` changes,

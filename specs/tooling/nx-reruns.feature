@@ -47,6 +47,13 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     Then that package's typecheck runs
     And its dependants' typecheck replays from the cache, because the declarations they hash are unchanged
 
+  Scenario: A typecheck hashes the configs it extends and the sources of dependencies with no declarations
+    Given a project whose tsconfig extends a config outside the project
+    And a dependency that publishes no declarations, so tsc reads its sources
+    Then the extended config is part of the project's typecheck hash
+    And so are the production files of that dependency, and of such dependencies further down
+    But a dependency's devDependencies are not
+
   Scenario: Generated sources and built declarations exist before a project's typecheck
     Given a project whose sources import a generated file, or whose published types its build writes
     Then its typecheck runs that generator or that build first
@@ -67,6 +74,7 @@ Feature: test:affected and lint:changed rerun only what an edit can change
     Given a full or --base lint:types run
     Then every TypeScript project's typecheck runs or replays first, so the declarations it reads are built from hashed sources
     And every TypeScript project's lint:types is cached on its own files and its dependencies' sources, whatever the --base value
+    And the lint runner and its executor are lint globals, so a change to either relints every project
     And the projects Nx did not replay are linted in one oxlint run, each failing only on findings in its own files
     And an oxlint process that could not run fails every project in the run
     And the plain lint does not wait for typecheck

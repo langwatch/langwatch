@@ -506,8 +506,13 @@ its `build`. Inputs are the project's own files (`default` minus Markdown), `npm
 `typescript`, and the `.ts`/`.json` files every task it depends on emitted
 (`dependentTasksOutputFiles`, transitive): its dependencies' declarations and generated
 sources, never their sources. A dependency's body change that keeps its `.d.ts` leaves
-every dependant's hash unchanged. Outputs are the declaration globs of the 2026-09-30
-amendment per project, plus build info outside dist (apps/docs `.tsbuild`).
+every dependant's hash unchanged. Two inputs cover what tsc reads outside that: the
+configs a project's own configs extend from outside it (`tsconfig.emit.json`,
+`tsconfig.base.json`), and the `production` files of every dependency with no
+declaration build (no `tsconfig.build.json`, `types` not built), which tsc reads from
+source. That walk follows a dependency's runtime dependencies only. Outputs are the
+declaration globs of the 2026-09-30 amendment per project, plus build info outside dist
+(apps/docs `.tsbuild`).
 
 The 2026-10-10 removal measured 16 to 35 s per package on TypeScript 5. On TypeScript 7
 a package checks in 0.1 to 2.5 s cold, so the per-project run on a full miss costs
@@ -517,7 +522,8 @@ their build info. `pnpm typecheck` is `nx run-many -t typecheck`; `pnpm typechec
 stays the root build without test programs, cached on the tree.
 
 `lint:types` is cached per project on `default`, `^production` and `lintGlobals` (the
-plugin rules read dependency sources and the globals). One process per project was
+plugin rules read dependency sources and the globals; the globals include `dev/nx/lint.mjs`
+and the executor). One process per project was
 slower than the tree on a full miss (8 min 48 s against about 6 min in CI): each tsgolint
 process rebuilds its dependencies' programs. So its executor (`dev/nx/executors`) is a
 batch one: Nx replays every project it can and hands the rest to one `dev/nx/lint.mjs

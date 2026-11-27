@@ -4,7 +4,7 @@ import { dirname, join, matchesGlob } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { typecheckTarget } from "../typecheck-plugin.mjs";
+import { sourceOnlyDependencies, typecheckTarget } from "../typecheck-plugin.mjs";
 import { createNodes } from "../workspace-plugin.mjs";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -62,6 +62,32 @@ void describe("per-project typecheck", () => {
     assert.ok(time.outputs.includes("{workspaceRoot}/packages/time/dist/**/*.tsbuildinfo"));
   });
 
+  /** @scenario "A typecheck hashes the configs it extends and the sources of dependencies with no declarations" */
+  void it("hashes the root configs its own configs extend", () => {
+    assert.ok(time.inputs.includes("{workspaceRoot}/tsconfig.emit.json"));
+    assert.ok(time.inputs.includes("{workspaceRoot}/tsconfig.base.json"));
+  });
+
+  /** @scenario "A typecheck hashes the configs it extends and the sources of dependencies with no declarations" */
+  void it("hashes the production files of dependencies read from source, not devDependencies' own", () => {
+    const dirsByName = new Map([
+      ["langwatch", "sdks/typescript"],
+      ["@langwatch/e2e-stack", "dev/tests/e2e-stack"],
+      ["@langwatch/platform-api", "apps/api"],
+    ]);
+    const sdk = sourceOnlyDependencies(workspaceRoot, "sdks/typescript", dirsByName);
+    assert.deepEqual(sdk, ["@langwatch/e2e-stack"]);
+    const target = typecheckTarget(workspaceRoot, "sdks/typescript", dirsByName);
+    assert.ok(
+      target.inputs.some(
+        (input) => input.input === "production" && input.projects.includes("@langwatch/e2e-stack"),
+      ),
+    );
+    // The SDK's devDependency on e2e-stack never reaches the SDK's dependants.
+    const dependant = typecheckTarget(workspaceRoot, "modules/analytics/process", dirsByName);
+    assert.ok(dependant.inputs.every((input) => input.projects === undefined));
+  });
+
   /** @scenario "Generated sources and built declarations exist before a project's typecheck" */
   void it("runs the project's own generators and, when its published types are built, its build", () => {
     const prisma = typecheckTarget(workspaceRoot, "packages/prisma-client");
@@ -89,6 +115,8 @@ void describe("type-aware lint", () => {
     assert.equal(nx.targetDefaults["lint:types"].dependsOn, undefined);
     assert.equal(nx.targetDefaults["lint:types"].cache, true);
     assert.ok(nx.targetDefaults["lint:types"].inputs.includes("^production"));
+    assert.ok(nx.namedInputs.lintGlobals.includes("{workspaceRoot}/dev/nx/lint.mjs"));
+    assert.ok(nx.namedInputs.lintGlobals.includes("{workspaceRoot}/dev/nx/executors/**/*"));
     assert.ok(!targets["lint:tree"].dependsOn.some((task) => task.endsWith("typecheck")));
   });
 });

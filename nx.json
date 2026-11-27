@@ -27,6 +27,8 @@
       "{workspaceRoot}/.oxlintrc.jsonc",
       "{workspaceRoot}/.oxlintrc.*.jsonc",
       "{workspaceRoot}/packages/oxlint-rules/**/*",
+      "{workspaceRoot}/dev/nx/lint.mjs",
+      "{workspaceRoot}/dev/nx/executors/**/*",
       "{workspaceRoot}/packages/architecture-enforcer/oxlint*",
       "{workspaceRoot}/modules/catalogue.json",
       "{workspaceRoot}/modules/*/*/package.json",

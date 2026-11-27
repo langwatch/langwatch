@@ -45,6 +45,27 @@ export const referenced = (root, reference, seen, within = () => true) => {
   return seen;
 };
 
+const asConfig = (path) => (path.endsWith(".json") ? path : `${path}.json`);
+
+// Configs outside the project that its own configs extend (tsconfig.emit.json, a base).
+export const inheritedConfigs = (root, configs, dir) => {
+  const seen = new Set();
+  const visit = (file) => {
+    for (const parent of [readConfig(root, file).extends ?? []].flat()) {
+      if (!parent.startsWith(".")) continue;
+      const path = asConfig(normalize(join(dirname(file), parent)));
+      if (seen.has(path)) continue;
+      if (!existsSync(join(root, path))) continue;
+      seen.add(path);
+      visit(path);
+    }
+  };
+  for (const file of configs) visit(file);
+  return [...seen]
+    .filter((file) => !file.startsWith(`${dir}/`))
+    .toSorted((a, b) => a.localeCompare(b));
+};
+
 // Build info a config writes outside its dist (apps/docs keeps it in .tsbuild).
 export const buildInfoOutsideDist = (root, configs) =>
   [...configs].flatMap((file) => {
@@ -62,11 +83,43 @@ const GENERATORS = [
   "generate:setup-skill-bodies",
 ];
 
+const workspaceDeps = (manifest, { dev }) =>
+  Object.keys({
+    ...manifest.dependencies,
+    ...(dev ? manifest.devDependencies : {}),
+    ...manifest.peerDependencies,
+    ...manifest.optionalDependencies,
+  });
+
+// A dependency with no declaration build is read from source, so its dependants hash
+// its production files. Past the project itself only runtime dependencies count: a
+// dependency's devDependencies never reach its dependants.
+export const sourceOnlyDependencies = (root, dir, dirsByName) => {
+  const found = new Set();
+  const seen = new Set([dir]);
+  const visit = (at) => {
+    for (const name of workspaceDeps(manifestOf(root, at), { dev: at === dir })) {
+      const depDir = dirsByName.get(name);
+      if (depDir === undefined || seen.has(depDir)) continue;
+      seen.add(depDir);
+      const manifest = manifestOf(root, depDir);
+      const typesFromBuild =
+        manifest.scripts?.build !== undefined && typeof manifest.types === "string";
+      if (!existsSync(join(root, depDir, "tsconfig.build.json")) && !typesFromBuild)
+        found.add(name);
+      visit(depDir);
+    }
+  };
+  visit(dir);
+  return [...found].toSorted((a, b) => a.localeCompare(b));
+};
+
 /** One project's typecheck: its own files, and what its dependencies' tasks emitted. */
-export function typecheckTarget(root, dir) {
+export function typecheckTarget(root, dir, dirsByName = new Map()) {
   const manifest = manifestOf(root, dir);
   const scripts = manifest.scripts ?? {};
   const own = referenced(root, dir, new Set(), (file) => file.startsWith(`${dir}/`));
+  const sourceOnly = sourceOnlyDependencies(root, dir, dirsByName);
   // A package whose published types are its build's output (the SDK, ksuid) builds first,
   // and every `.d.ts` in its dist is a typecheck output too: dependants hash what is on
   // disk after the typecheck, whichever of the two wrote it, so a run and a replay agree.
@@ -86,7 +139,9 @@ export function typecheckTarget(root, dir) {
       "!{projectRoot}/**/*.md",
       "npmDeps",
       { externalDependencies: ["typescript"] },
+      ...inheritedConfigs(root, own, dir).map((file) => `{workspaceRoot}/${file}`),
       { dependentTasksOutputFiles: "**/*.{ts,tsx,mts,cts,json}", transitive: true },
+      ...(sourceOnly.length > 0 ? [{ input: "production", projects: sourceOnly }] : []),
     ],
     outputs: [...declarations, ...buildInfoOutsideDist(root, own)],
     syncGenerators: ["@nx/js:typescript-sync"],
@@ -95,12 +150,14 @@ export function typecheckTarget(root, dir) {
 
 export const createNodes = [
   `{${members.join(",")}}/tsconfig.json`,
-  (files, _options, { workspaceRoot }) =>
-    files
-      .filter((file) => existsSync(join(workspaceRoot, dirname(file), "package.json")))
-      .map((file) => {
-        const dir = dirname(file);
-        const targets = { typecheck: typecheckTarget(workspaceRoot, dir) };
-        return [join(dir, "package.json"), { projects: { [dir]: { targets } } }];
-      }),
+  (files, _options, { workspaceRoot }) => {
+    const dirs = files
+      .map((file) => dirname(file))
+      .filter((dir) => existsSync(join(workspaceRoot, dir, "package.json")));
+    const dirsByName = new Map(dirs.map((dir) => [manifestOf(workspaceRoot, dir).name, dir]));
+    return dirs.map((dir) => {
+      const targets = { typecheck: typecheckTarget(workspaceRoot, dir, dirsByName) };
+      return [join(dir, "package.json"), { projects: { [dir]: { targets } } }];
+    });
+  },
 ];
