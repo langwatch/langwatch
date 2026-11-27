@@ -142,7 +142,7 @@ describe("HttpManagedProviderCredentialsChannel", () => {
           .assumeCustomerRole(CONFIG)
           .then(
             () => "resolved",
-            (error: Error) => error.message,
+            (error: { code?: string }) => error.code,
           );
 
         await vi.advanceTimersByTimeAsync(1499);
@@ -150,7 +150,7 @@ describe("HttpManagedProviderCredentialsChannel", () => {
         await vi.advanceTimersByTimeAsync(1);
 
         expect(early).toBe("still waiting");
-        await expect(outcome).resolves.toBe("The managed Bedrock role hops ran out of time");
+        await expect(outcome).resolves.toBe("managed_role_hop_timeout");
         expect(sts.assumed.map((call) => call.roleArn)).toEqual([CONFIG.proxyRoleArn]);
       });
 
@@ -161,12 +161,12 @@ describe("HttpManagedProviderCredentialsChannel", () => {
           .assumeCustomerRole(CONFIG)
           .then(
             () => "resolved",
-            (error: Error) => error.message,
+            (error: { code?: string }) => error.code,
           );
 
         await vi.advanceTimersByTimeAsync(1500);
 
-        await expect(outcome).resolves.toBe("The managed Bedrock role hops ran out of time");
+        await expect(outcome).resolves.toBe("managed_role_hop_timeout");
       });
 
       it("bounds both hops with one deadline", async () => {

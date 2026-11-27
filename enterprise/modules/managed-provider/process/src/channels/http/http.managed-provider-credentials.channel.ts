@@ -6,6 +6,16 @@ import {
   ManagedProviderCredentialVendor,
 } from "../managed-provider-credentials.channel.ts";
 
+/** The role hops outlived their shared budget; the caller falls back to the row's stored keys. */
+export class ManagedRoleHopTimeoutError extends Error {
+  readonly code = "managed_role_hop_timeout";
+
+  constructor() {
+    super("The managed Bedrock role hops ran out of time");
+    this.name = "ManagedRoleHopTimeoutError";
+  }
+}
+
 /** Both hops share one budget under the gateway's 2s config fetch: a stalled STS fails one row. */
 const ROLE_HOP_BUDGET_MS = 1500;
 
@@ -27,7 +37,7 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
   async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
     const deadline = new AbortController();
     const timer = setTimeout(
-      () => deadline.abort(new Error("The managed Bedrock role hops ran out of time")),
+      () => deadline.abort(new ManagedRoleHopTimeoutError()),
       ROLE_HOP_BUDGET_MS,
     );
     const timedOut = new Promise<never>((_resolve, reject) => {
