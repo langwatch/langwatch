@@ -329,6 +329,9 @@ jobs:
       checks: read # to list the head commit's check runs while waiting for them
       contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
       pull-requests: write
+    # Empty until the LAZE_WAKE_KEY secret exists: the wake step below is then skipped.
+    env:
+      LAZE_WAKE_KEY: ${{ secrets.LAZE_WAKE_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -353,6 +356,23 @@ jobs:
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
+      # Wakes the Laze review bot once the required checks have passed. It is
+      # a plain HTTPS post and never fails this job: the bot action below runs
+      # either way.
+      - name: Wake the Laze review bot
+        if: env.LAZE_WAKE_KEY != ''
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          jq -n --arg c "channel_000000DRyU6OWikL71eevp2qhm9wW" \
+            --arg t "@LangWatch PR Review Bot review langwatch/langwatch#${PR_NUMBER} at ${HEAD_SHA:0:7}" \
+            '{channel: $c, body: $t}' |
+            curl -fsS -X POST https://laze.so/api/agents/me/messages \
+              -H "Authorization: Bearer ${LAZE_WAKE_KEY}" \
+              -H "Content-Type: application/json" --data-binary @-
       - uses: langwatch/langwatch-pr-review-bot@fbe577791f28fcb071ca68bbe904afc39e06164a # main 2026-11-26
         with:
           slack_notify: "false"
