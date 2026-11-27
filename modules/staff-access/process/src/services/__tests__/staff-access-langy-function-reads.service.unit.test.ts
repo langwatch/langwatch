@@ -35,6 +35,7 @@ function readsOver({ truncated }: { truncated: boolean }) {
 
 describe("the langy ops function reads", () => {
   describe("when the turn read stopped at its cap", () => {
+    /** @scenario "org.langy marks rows as floors when the turn read stopped at its cap" */
     it("marks every row's counts as floors", async () => {
       const answered = await readsOver({ truncated: true })["org.langy"]({
         input: { since: "2026-10-27T10:00:00Z" },
@@ -47,6 +48,7 @@ describe("the langy ops function reads", () => {
   });
 
   describe("when the turn read held the whole window", () => {
+    /** @scenario "org.langy marks rows complete when the turn read held the whole window" */
     it("marks the rows complete", async () => {
       const answered = await readsOver({ truncated: false })["org.langy"]({
         input: { since: "2026-10-27T10:00:00Z" },

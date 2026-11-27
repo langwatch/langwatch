@@ -20,6 +20,18 @@ Feature: Langy ops functions
     Then each row carries its day, model, turn state, failure code, failed tool calls by tool, turns and people
     And no message, tool argument or error text
 
+  @unit
+  Scenario: org.langy marks rows as floors when the turn read stopped at its cap
+    Given Langy's turn read for ACME stopped at its turn cap
+    When the agent calls "org.langy"
+    Then every row says its turn scan is not complete
+
+  @unit
+  Scenario: org.langy marks rows complete when the turn read held the whole window
+    Given Langy's turn read for ACME held every turn of the window
+    When the agent calls "org.langy"
+    Then every row says its turn scan is complete
+
   @integration
   Scenario: org.langy reads only the approved organization
     Given another organization ran Langy turns in the same days

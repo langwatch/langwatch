@@ -213,9 +213,12 @@ function postgresBackend(url: string): Backend {
 afterAll(async () => {
   if (!connection) return;
   const projects = { projectId: { in: [...new Set(seededProjects)] } };
-  await connection.client.langyConversationTurnProjection.deleteMany({ where: projects });
-  await connection.client.langyConversationProjection.deleteMany({ where: projects });
-  await connection.client.$disconnect();
+  try {
+    await connection.client.langyConversationTurnProjection.deleteMany({ where: projects });
+    await connection.client.langyConversationProjection.deleteMany({ where: projects });
+  } finally {
+    await connection.closeOnce();
+  }
 });
 
 const backends: readonly Backend[] = [
