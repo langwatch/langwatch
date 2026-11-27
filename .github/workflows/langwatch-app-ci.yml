@@ -185,6 +185,7 @@ jobs:
               # feeds. These entries cover every action this file uses
               # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
               - '.github/actions/detect-changes/**'
+              - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
@@ -215,6 +216,7 @@ jobs:
               - 'pkg/**'
               - 'services/langevals/**'
               - 'dev/scripts/**'
+              - 'dev/nx/**'
               - '.github/scripts/**'
               - '.gitattributes'
               - '.github/workflows/langwatch-app-ci.yml'
@@ -423,6 +425,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -529,6 +532,12 @@ jobs:
         with:
           install: ${{ needs.changes.outputs.relevant == 'true' && 'all' || '@langwatch/architecture-enforcer...' }}
           save-store: ${{ needs.changes.outputs.relevant == 'true' && 'true' || 'false' }}
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
+        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       # The parity scanner moved into @langwatch/architecture-enforcer with the
       # rest of the repository-wide checks.
@@ -863,6 +872,11 @@ jobs:
           echo "PASS: canary failed as expected and failures were extracted"
           cat apps/api/test-failures.txt
 
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -1032,6 +1046,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     # Bounded within a leg: PACKAGE_SUITES_CONCURRENCY suites at once, a heavy
     # suite alone, integration and browser suites one at a time (run-package-suites.ts).
     # Parallel across legs: over two hundred package suites run one after
@@ -1095,6 +1110,11 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "all"
+
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -1273,6 +1293,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
+
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
   package-suites-notify:
     timeout-minutes: 5
@@ -1314,6 +1339,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write # assume the Nx cache role (nx-remote-cache action)
     env:
       # Disable telemetry and optimize build for CI
       NEXT_TELEMETRY_DISABLED: 1
@@ -1401,6 +1427,11 @@ jobs:
         with:
           suffix: build
 
+      # The shared Nx task cache in S3, before the first nx call (nx-remote-cache action).
+      - uses: ./.github/actions/nx-remote-cache
+        with:
+          account-id: ${{ secrets.NX_CACHE_AWS_ACCOUNT_ID }}
+
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
 
@@ -1431,6 +1462,11 @@ jobs:
           # Under the runner's `bash -e`, a non-zero exit here fails the step
           # (the gate we want); the EXIT trap still stops the preview server.
           node scripts/smoke-boot.mjs
+
+      # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
+      - name: Nx remote cache log
+        if: ${{ !cancelled() }}
+        run: node dev/nx/remote-cache/launch.mjs report
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'

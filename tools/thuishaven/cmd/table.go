@@ -294,6 +294,9 @@ var baseTable = []commandSpec{
 			d.opts.Selection = sel
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")
+			if shouldSetUpNxRemoteCache(d.opts.IsStub, d.isAgent, stdoutIsTTY()) {
+				ensureNxRemoteCache(d.worktree)
+			}
 			if d.opts.IsStub {
 				return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 			}
