@@ -54,7 +54,7 @@ const logger = createLogger("langwatch:gateway:config-materialiser");
  */
 export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
-/** The one model-provider read the bundle needs. */
+/** Model provider reads: a row's keys for the bundle, and its keys window for the version token. */
 export type GatewayCustomKeys = Pick<
   ModelProviderApi,
   "getGatewayCustomKeys" | "getGatewayKeysEpoch"

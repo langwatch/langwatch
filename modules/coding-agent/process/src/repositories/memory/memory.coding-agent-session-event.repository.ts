@@ -118,7 +118,19 @@ function emptyTotals(held: CodingAgentSessionEventRecord): SessionModelTotalsRow
 }
 
 function asEvent(record: CodingAgentSessionEventRecord): CodingAgentSessionEvent {
-  const { tenantId: _tenantId, aiUnits: _aiUnits, ...event } = record;
+  const {
+    tenantId: _tenantId,
+    aiUnits: _aiUnits,
+    accountId: _accountId,
+    accountName: _accountName,
+    accountSource: _accountSource,
+    accountUsagePercent: _accountUsagePercent,
+    accountUsageWindow: _accountUsageWindow,
+    accountUsageResetsAtMs: _accountUsageResetsAtMs,
+    accountUsageReadAtMs: _accountUsageReadAtMs,
+    accountLimitedUntilMs: _accountLimitedUntilMs,
+    ...event
+  } = record;
   return event;
 }
 

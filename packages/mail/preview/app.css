@@ -2,33 +2,83 @@
 
 .mailroom-inspect {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  grid-template-areas:
-    "messages preview"
-    "props preview";
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
 
 .mailroom-messages {
-  grid-area: messages;
   min-width: 0;
 }
 
-/* Twenty-odd messages would push the props a screen down; the list scrolls instead. */
 .mailroom-message-list {
-  max-height: 440px;
+  max-height: max(640px, calc(100vh - 200px));
+}
+
+.mailroom-group-heading {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.mailroom-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mailroom-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-600);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mailroom-row:hover {
+  background: var(--paper-soft);
+  color: var(--ink-900);
+}
+
+.mailroom-row:focus-visible {
+  outline: var(--focus-ring);
+}
+
+.mailroom-row[aria-current] {
+  background: var(--brand-soft);
+  color: var(--ink-900);
+  font-weight: 600;
 }
 
 .mailroom-preview {
-  grid-area: preview;
   min-width: 0;
 }
 
-.mailroom-props {
-  grid-area: props;
-  min-width: 0;
+.mailroom-props > summary {
+  cursor: pointer;
+  color: var(--ink-600);
+  font-size: var(--text-md);
+}
+
+.mailroom-props[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+.mailroom-guide {
+  padding: var(--space-4) var(--space-8) 0;
 }
 
 /* Only the mail's own paint sits on this stage; the frame is the one line around it. */
@@ -102,11 +152,10 @@
 @media (max-width: 1023px) {
   .mailroom-inspect {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-    grid-template-areas:
-      "messages"
-      "preview"
-      "props";
+  }
+
+  .mailroom-message-list {
+    max-height: 320px;
   }
 }
 

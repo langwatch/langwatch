@@ -133,9 +133,19 @@ describe("HttpManagedProviderCredentialsChannel", () => {
       });
     });
 
+    describe("when both role hops answer", () => {
+      it("bounds both hops with one deadline", async () => {
+        await HttpManagedProviderCredentialsChannel.create().assumeCustomerRole(CONFIG);
+
+        const [proxyHop, customerHop] = sts.assumed;
+        expect(proxyHop?.abortSignal).toBeInstanceOf(AbortSignal);
+        expect(customerHop?.abortSignal).toBe(proxyHop?.abortSignal);
+      });
+    });
+
     describe("when the proxy role hop never answers", () => {
       /** @scenario "A stalled role hop gives up inside the gateway's config fetch" */
-      it("gives up at 1.5s, inside the gateway's 2s config fetch, without reaching the customer role", async () => {
+      it("gives up at 1.5s, inside the gateway's 2s background refresh, without reaching the customer role", async () => {
         vi.useFakeTimers();
         sts.proxyStalls = true;
         const outcome = HttpManagedProviderCredentialsChannel.create()
@@ -167,14 +177,6 @@ describe("HttpManagedProviderCredentialsChannel", () => {
         await vi.advanceTimersByTimeAsync(1500);
 
         await expect(outcome).resolves.toBe("managed_role_hop_timeout");
-      });
-
-      it("bounds both hops with one deadline", async () => {
-        await HttpManagedProviderCredentialsChannel.create().assumeCustomerRole(CONFIG);
-
-        const [proxyHop, customerHop] = sts.assumed;
-        expect(proxyHop?.abortSignal).toBeInstanceOf(AbortSignal);
-        expect(customerHop?.abortSignal).toBe(proxyHop?.abortSignal);
       });
     });
 

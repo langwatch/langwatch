@@ -2803,6 +2803,62 @@ const CODING_AGENT_SESSION_EVENTS: UngatedViewDefinition = {
       description: "Branch active when the event happened.",
       sourceColumns: ["Branch"],
     },
+    {
+      name: "AccountId",
+      type: "String",
+      description:
+        "Subscription account the call ran on: langwatch.account.id, else the agent's own account id. Set on model_call and rate_limit rows only; empty on other kinds and when none was sent.",
+      sourceColumns: ["AccountId"],
+    },
+    {
+      name: "AccountName",
+      type: "String",
+      description:
+        "Label the account's owner set. Set on model_call and rate_limit rows only; empty on other kinds and when none was sent.",
+      sourceColumns: ["AccountName"],
+    },
+    {
+      name: "AccountSource",
+      type: "LowCardinality(String)",
+      description:
+        "Where the login came from: personal, pool or computer, as the launcher reported it. Set on model_call and rate_limit rows only.",
+      sourceColumns: ["AccountSource"],
+    },
+    {
+      name: "AccountUsagePercent",
+      type: "Nullable(Float64)",
+      description:
+        "The provider's own usage figure for the account, 0 to 100, as reported with the call. Set on model_call and rate_limit rows only; NULL on other kinds and when none was sent.",
+      sourceColumns: ["AccountUsagePercent"],
+    },
+    {
+      name: "AccountUsageWindow",
+      type: "LowCardinality(String)",
+      description:
+        "Which usage window the reading is for, such as five_hour or seven_day. Set on model_call and rate_limit rows only, and only with a percent, reset or limit.",
+      sourceColumns: ["AccountUsageWindow"],
+    },
+    {
+      name: "AccountUsageResetsAt",
+      type: "Nullable(DateTime64(3))",
+      description:
+        "When that usage window resets. Set on model_call and rate_limit rows only; NULL when not reported.",
+      sourceColumns: ["AccountUsageResetsAt"],
+    },
+    {
+      name: "AccountUsageReadAt",
+      type: "Nullable(DateTime64(3))",
+      description:
+        "When the launcher read the usage figure. Set on model_call and rate_limit rows only, and only with a percent, reset or limit; NULL otherwise.",
+      sourceColumns: ["AccountUsageReadAt"],
+    },
+    {
+      name: "AccountLimitedUntil",
+      type: "Nullable(DateTime64(3))",
+      description:
+        "While the account is out of usage, when it can run again. Set on model_call and rate_limit rows only; NULL otherwise.",
+      sourceColumns: ["AccountLimitedUntil"],
+    },
   ],
 };
 
@@ -3468,6 +3524,14 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       RepositoryName: "inherit",
       Branch: "inherit",
       AiUnits: "omit",
+      AccountId: "inherit",
+      AccountName: "inherit",
+      AccountSource: "inherit",
+      AccountUsagePercent: "inherit",
+      AccountUsageWindow: "inherit",
+      AccountUsageResetsAt: "inherit",
+      AccountUsageReadAt: "inherit",
+      AccountLimitedUntil: "inherit",
     },
   }),
   coding_tool_results: defineTableCatalogue({

@@ -1,5 +1,7 @@
 import {
   AI_UNITS_SESSION_FACT,
+  type CodingAgentAccountColumns,
+  NO_ACCOUNT_COLUMNS,
   CODING_AGENT_MAP_COALESCE_MAX_BATCH,
   contributionFactsSchema,
   type ContributionFacts,
@@ -16,6 +18,7 @@ import {
 } from "@langwatch/eventing";
 import { z } from "zod";
 
+import { accountColumnsOf } from "../rules/coding-agent-account.rules.ts";
 import {
   genAiModelCallFacts,
   modelCallCostInput,
@@ -32,7 +35,7 @@ const spanIdentitySchema = z.object({ agent: z.string(), name: z.string() });
  * Per-call facts table. Each call is written from one signal only: log events, except for an
  * agent whose calls ride spans alone (`isSpanFedModelCall`), whose model-call spans write it.
  */
-export interface CodingAgentSessionEventRecord {
+export interface CodingAgentSessionEventRecord extends CodingAgentAccountColumns {
   tenantId: string;
   sessionId: string;
   timeUnixMs: number;
@@ -103,6 +106,9 @@ export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
   user_prompt: "user_prompt",
   subagent_completed: "subagent_completed",
 };
+
+/** The row kinds that carry the account they ran on. */
+const ACCOUNT_STAMPED_KINDS: ReadonlySet<string> = new Set(["model_call", "rate_limit"]);
 
 /** Enqueue-time gate (ADR-069 invariant 4); gates on resolveEventKind, mirrors map(). */
 const events = [logFactsContributedEventSchema, spanFactsContributedEventSchema] as const;
@@ -177,6 +183,7 @@ export class CodingAgentSessionEventsMapProjection
       repositoryOwner: span.repositoryOwner ?? "",
       repositoryName: span.repositoryName ?? "",
       branch: span.branch ?? "",
+      ...accountColumnsOf(span.facts),
     };
   }
 
@@ -248,6 +255,8 @@ export class CodingAgentSessionEventsMapProjection
       repositoryOwner: event.data.repositoryOwner ?? "",
       repositoryName: event.data.repositoryName ?? "",
       branch: event.data.branch ?? "",
+      // The account a call or rate limit ran on, and the usage it reported with it.
+      ...(ACCOUNT_STAMPED_KINDS.has(eventKind) ? accountColumnsOf(facts) : NO_ACCOUNT_COLUMNS),
     };
   }
 
@@ -303,6 +312,7 @@ export class CodingAgentSessionEventsMapProjection
       repositoryOwner: "",
       repositoryName: "",
       branch: "",
+      ...NO_ACCOUNT_COLUMNS,
     };
   }
 
