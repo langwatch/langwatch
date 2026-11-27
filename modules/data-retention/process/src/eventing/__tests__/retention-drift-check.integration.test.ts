@@ -10,6 +10,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { generate } from "@langwatch/ksuid";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -23,8 +24,10 @@ import {
   MemoryRetentionDirectory,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
+import type { DataRetentionDirectoryReader } from "../../app/data-retention.app.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
+import type { RetentionApplyStatusRepository } from "../../repositories/retention-apply-status.repository.ts";
 import { RetentionDriftCheckService } from "../../services/retention-drift-check.service.ts";
 import {
   RETENTION_DRIFT_AGGREGATE_TYPE,
@@ -37,6 +40,7 @@ const run = generate("test").toString();
 const drifting = `project-drifting-${run}`;
 const settled = `project-settled-${run}`;
 const outside = `project-outside-${run}`;
+const deferring = `project-deferring-${run}`;
 const PERIOD = 91;
 const DAY_MS = 86_400_000;
 const NOW = Date.now();
@@ -86,6 +90,12 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
           _retention_days: PERIOD,
         },
         {
+          TenantId: deferring,
+          TraceId: "kept-longer",
+          OccurredAt: inWindow(30),
+          _retention_days: 371,
+        },
+        {
           TenantId: outside,
           TraceId: "between-windows",
           OccurredAt: new Date(NOW - 45 * DAY_MS).toISOString(),
@@ -105,7 +115,7 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
     const drifts: CounterHandle = { inc: (attributes) => void calls.push({ ...attributes }) };
     const checker = RetentionDriftCheckService.create({
       projects: {
-        findScopeProjectIds: async () => [drifting, settled, outside],
+        findScopeProjectIds: async () => [drifting, settled, outside, deferring],
         getResolvedForProjects: async ({ projectIds }) =>
           new Map(
             projectIds.map((projectId) => [
@@ -116,6 +126,29 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
       },
       stamps: ClickHouseRetroactiveRetentionRepository.create({
         clickhouse: clickhouse.queryClient,
+      }),
+      applyStatus: createApiFixture<RetentionApplyStatusRepository>({
+        findForOrganization: async () => [
+          {
+            scopeType: "PROJECT",
+            scopeId: deferring,
+            changedAt: NOW - 3 * DAY_MS,
+            appliedAt: null,
+            shortenedAt: NOW - 3 * DAY_MS,
+            shortenedAtByCategory: { traces: NOW - 3 * DAY_MS },
+          },
+        ],
+      }),
+      directory: createApiFixture<DataRetentionDirectoryReader>({
+        findOrganizationDirectory: async () => ({
+          teams: [],
+          projects: [drifting, settled, outside, deferring].map((id) => ({
+            id,
+            name: id,
+            teamId: "team-1",
+            archived: false,
+          })),
+        }),
       }),
       logger,
       drifts,
@@ -129,15 +162,16 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
       const { checker, lines, calls } = service();
       const drifted = await checker.check({ organizationId, at: NOW });
 
-      expect(drifted).toEqual([
+      expect(drifted.filter((drift) => drift.projectId !== deferring)).toEqual([
         {
           projectId: drifting,
           category: "traces",
           expectedDays: PERIOD,
           found: [{ retentionDays: 30, rows: 1 }],
+          kind: "unexpected",
         },
       ]);
-      expect(calls).toEqual([{ category: "traces" }]);
+      expect(calls).toContainEqual({ category: "traces", kind: "unexpected" });
       expect(lines.findLine("error", "retention other than")).toMatchObject({
         projectId: drifting,
         expected_days: PERIOD,
@@ -198,6 +232,27 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
       } finally {
         await eventing.close();
       }
+    });
+  });
+
+  describe("when a project's traces are kept for 371 days under a shorter save not applied", () => {
+    /** @scenario "A deferred drift over stored rows is recorded apart from an unexpected one" */
+    it("records that project's drift as deferred and counts it apart", async () => {
+      const { checker, lines, calls } = service();
+      const drifted = await checker.check({ organizationId, at: NOW });
+
+      expect(drifted.find((drift) => drift.projectId === deferring)).toEqual({
+        projectId: deferring,
+        category: "traces",
+        expectedDays: PERIOD,
+        found: [{ retentionDays: 371, rows: 1 }],
+        kind: "deferred",
+      });
+      expect(calls).toEqual([
+        { category: "traces", kind: "unexpected" },
+        { category: "traces", kind: "deferred" },
+      ]);
+      expect(lines.findLine("warn", "not applied")).toMatchObject({ projectId: deferring });
     });
   });
 

@@ -20,7 +20,11 @@ import {
   type RetentionPolicyChangedEvent,
 } from "../../eventing/retention-extension.events.ts";
 import { MemoryRetentionApplyStatusRepository } from "../../repositories/memory/memory.retention-apply-status.repository.ts";
-import { storedApplyStatuses } from "../stored-apply-status.rules.ts";
+import {
+  hasDeferredShortening,
+  type ScopeApplyRecord,
+  storedApplyStatuses,
+} from "../stored-apply-status.rules.ts";
 
 const organizationId = "organization-1";
 const organization = { scopeType: "ORGANIZATION" as const, scopeId: organizationId };
@@ -89,6 +93,7 @@ describe("the apply status fold", () => {
         appliedAt: ELEVEN,
         raisedAt: null,
         shortenedAt: null,
+        shortenedAtByCategory: null,
       };
       expect(fold([changed(TEN), applied(ELEVEN)])).toEqual(expected);
       expect(fold([applied(ELEVEN), changed(TEN)])).toEqual(expected);
@@ -104,6 +109,7 @@ describe("the apply status fold", () => {
         appliedAt: null,
         raisedAt: ELEVEN,
         shortenedAt: null,
+        shortenedAtByCategory: null,
       });
     });
 
@@ -111,6 +117,13 @@ describe("the apply status fold", () => {
     it("stamps a shorter save and leaves an unchanged or longer one out", () => {
       expect(fold([changed(TEN, { shortens: true }), changed(ELEVEN)]).shortenedAt).toBe(TEN);
       expect(fold([changed(TEN), changed(ELEVEN)]).shortenedAt).toBeNull();
+    });
+
+    it("keeps each shorter save under the category it shortened", () => {
+      expect(
+        fold([changed(TEN, { shortens: true }), changed(ELEVEN)]).shortenedAtByCategory,
+      ).toEqual({ traces: TEN });
+      expect(fold([changed(TEN)]).shortenedAtByCategory).toBeNull();
     });
 
     it("keys both facts to the scope they name", () => {
@@ -305,5 +318,169 @@ describe("a scope's stored apply status", () => {
         }),
       ).toEqual([]);
     });
+
+    /** @scenario "A rule with no recorded change shows no status" */
+    it("names no status when no apply reached the scope either", () => {
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [{ ...project, savedAt: TEN }],
+          records: [],
+          teamOfProject,
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a rule saved at 10:00 lost its change record and the organization applied at 11:00", () => {
+    /** @scenario "An apply after a save whose change was not recorded reads as applied" */
+    it("reads as applied at 11:00", () => {
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [{ ...project, savedAt: TEN }],
+          records: [{ ...organization, changedAt: null, appliedAt: ELEVEN }],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...project, status: "applied", at: ELEVEN }]);
+    });
+
+    it("reads as applied at its own raise after the save", () => {
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [{ ...team, savedAt: TEN }],
+          records: [{ ...team, changedAt: null, appliedAt: null, raisedAt: ELEVEN }],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...team, status: "applied", at: ELEVEN }]);
+    });
+  });
+
+  describe("when the organization applied at 09:00 and a rule saved at 10:00 lost its change record", () => {
+    /** @scenario "A save whose change was not recorded after the last apply reads as pending" */
+    it("reads as pending since 10:00", () => {
+      const NINE = Date.UTC(2026, 10, 22, 9);
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [{ ...team, savedAt: TEN }],
+          records: [{ ...organization, changedAt: null, appliedAt: NINE }],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...team, status: "pending", at: TEN }]);
+    });
+  });
+});
+
+describe("a deferred shorter save on a project's chain", () => {
+  const records = (...rows: ScopeApplyRecord[]) => rows;
+  const deferred = (rows: ScopeApplyRecord[]) =>
+    hasDeferredShortening({
+      organizationId,
+      projectId: "project-1",
+      category: "traces",
+      records: rows,
+      teamOfProject,
+    });
+
+  it("holds while no exact apply at its scope or a wider one came after it", () => {
+    expect(
+      deferred(
+        records({
+          ...organization,
+          changedAt: TEN,
+          appliedAt: null,
+          shortenedAt: TEN,
+          shortenedAtByCategory: { traces: TEN },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("ends once an exact apply at its scope or a wider one came after it", () => {
+    expect(
+      deferred(
+        records({
+          ...organization,
+          changedAt: TEN,
+          appliedAt: ELEVEN,
+          shortenedAt: TEN,
+          shortenedAtByCategory: { traces: TEN },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      deferred(
+        records(
+          {
+            ...team,
+            changedAt: TEN,
+            appliedAt: null,
+            shortenedAt: TEN,
+            shortenedAtByCategory: { traces: TEN },
+          },
+          { ...organization, changedAt: null, appliedAt: ELEVEN },
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it("holds for a team save when the organization applied before it", () => {
+    expect(
+      deferred(
+        records(
+          {
+            ...team,
+            changedAt: ELEVEN,
+            appliedAt: null,
+            shortenedAt: ELEVEN,
+            shortenedAtByCategory: { traces: ELEVEN },
+          },
+          { ...organization, changedAt: null, appliedAt: TEN },
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("is not lifted by an apply on a narrower scope", () => {
+    expect(
+      deferred(
+        records(
+          {
+            ...organization,
+            changedAt: TEN,
+            appliedAt: null,
+            shortenedAt: TEN,
+            shortenedAtByCategory: { traces: TEN },
+          },
+          { ...project, changedAt: null, appliedAt: ELEVEN },
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("holds only for the category that was shortened", () => {
+    expect(
+      deferred(
+        records({
+          ...organization,
+          changedAt: TEN,
+          appliedAt: null,
+          shortenedAt: TEN,
+          shortenedAtByCategory: { experiments: TEN },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("never holds on a record folded before shortenings were kept per category", () => {
+    expect(
+      deferred(records({ ...organization, changedAt: TEN, appliedAt: null, shortenedAt: TEN })),
+    ).toBe(false);
+  });
+
+  it("never holds without a shorter save", () => {
+    expect(deferred(records({ ...organization, changedAt: TEN, appliedAt: null }))).toBe(false);
   });
 });

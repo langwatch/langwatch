@@ -270,6 +270,8 @@ export class DataRetentionModule implements DataRetentionApiContract {
       driftCheck: RetentionDriftCheckService.create({
         projects: retention,
         stamps: repositories.retroactive,
+        applyStatus: repositories.applyStatus,
+        directory: repositories.directory,
       }),
       driftRequests: RetentionDriftRequestService.create({ policies: repositories.policies }),
     });

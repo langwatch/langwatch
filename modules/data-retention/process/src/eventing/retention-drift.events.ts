@@ -7,7 +7,10 @@ import { retentionCategorySchema } from "@langwatch/data-retention-contract";
 import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 
-import { storedRetentionStampSchema } from "../rules/retention-drift.rules.ts";
+import {
+  retentionDriftKindSchema,
+  storedRetentionStampSchema,
+} from "../rules/retention-drift.rules.ts";
 
 export const RETENTION_DRIFT_PIPELINE_NAME = "data_retention_drift_check" as const;
 export const RETENTION_DRIFT_AGGREGATE_TYPE = "data_retention_drift" as const;
@@ -25,6 +28,8 @@ export const retentionDriftSchema = z
     expectedDays: z.number().int().nonnegative(),
     /** The other stamps found in the sampled windows, with their sampled row counts. */
     found: z.array(storedRetentionStampSchema).min(1),
+    /** Absent on facts recorded before drifts were told apart. */
+    kind: retentionDriftKindSchema.default("unexpected"),
   })
   .strict();
 export type RetentionDrift = z.infer<typeof retentionDriftSchema>;

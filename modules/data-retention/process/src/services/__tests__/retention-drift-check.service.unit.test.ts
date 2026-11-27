@@ -9,8 +9,10 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory, intentAccessorOf } from "@langwatch/eventing/testing";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { DataRetentionDirectoryReader } from "../../app/data-retention.app.ts";
 import { CheckRetentionDriftCommand } from "../../eventing/retention-drift.commands.ts";
 import type { CheckRetentionDriftCommandData } from "../../eventing/retention-drift.events.ts";
 import { buildRetentionDriftPipeline } from "../../eventing/retention-drift.pipeline.ts";
@@ -19,10 +21,12 @@ import {
   retentionDriftWake,
 } from "../../eventing/retention-drift.process.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
+import type { RetentionApplyStatusRepository } from "../../repositories/retention-apply-status.repository.ts";
 import {
   RETENTION_DRIFT_WINDOW_MS,
   retentionDriftWindows,
 } from "../../rules/retention-drift.rules.ts";
+import type { ScopeApplyRecord } from "../../rules/stored-apply-status.rules.ts";
 import { RetentionDriftCheckService } from "../retention-drift-check.service.ts";
 import { RetentionDriftRequestService } from "../retention-drift-request.service.ts";
 
@@ -39,7 +43,15 @@ function recordingCounter(): CounterHandle & { calls: Record<string, unknown>[] 
   return { calls, inc: (attributes) => void calls.push({ ...attributes }) };
 }
 
-function harness({ organizationIds = ["organization-1"] } = {}) {
+const ORGANIZATION = { scopeType: "ORGANIZATION" as const, scopeId: "organization-1" };
+const TEAM = { scopeType: "TEAM" as const, scopeId: "team-1" };
+const BEFORE = AT - 10 * DAY_MS;
+const SAVED = AT - 5 * DAY_MS;
+
+function harness({
+  organizationIds = ["organization-1"],
+  records = [] as ScopeApplyRecord[] | "unreadable",
+} = {}) {
   const stamps = MemoryRetroactiveRetentionRepository.create();
   const { logger, lines } = createTestLogger();
   const drifts = recordingCounter();
@@ -54,6 +66,27 @@ function harness({ organizationIds = ["organization-1"] } = {}) {
         new Map(projectIds.map((projectId) => [projectId, resolved(91)])),
     },
     stamps,
+    applyStatus: createApiFixture<RetentionApplyStatusRepository>(
+      {
+        findForOrganization: async () => {
+          if (records === "unreadable") throw new Error("projection store down");
+          return records;
+        },
+      },
+      "applyStatus",
+    ),
+    directory: createApiFixture<DataRetentionDirectoryReader>(
+      {
+        findOrganizationDirectory: async () => ({
+          teams: [{ id: "team-1", name: "Payments" }],
+          projects: [
+            { id: "project-1", name: "One", teamId: "team-1", archived: false },
+            { id: "project-2", name: "Two", teamId: "team-2", archived: false },
+          ],
+        }),
+      },
+      "directory",
+    ),
     logger,
     drifts,
   });
@@ -162,11 +195,143 @@ describe("an organization's check", () => {
           category: "traces",
           expectedDays: 91,
           found: [{ retentionDays: 30, rows: 2 }],
+          kind: "unexpected",
         },
       ]);
-      expect(drifts.calls).toEqual([{ category: "traces" }]);
+      expect(drifts.calls).toEqual([{ category: "traces", kind: "unexpected" }]);
       expect(lines.findLine("error", "retention other than")).toMatchObject({
         projectId: "project-1",
+      });
+    });
+  });
+
+  describe("when the organization saved a shorter period and did not apply it", () => {
+    const deferredSave: ScopeApplyRecord = {
+      ...ORGANIZATION,
+      changedAt: SAVED,
+      appliedAt: BEFORE,
+      shortenedAt: SAVED,
+      shortenedAtByCategory: { traces: SAVED },
+    };
+
+    /** @scenario "Rows kept longer after a shorter save that was not applied are deferred" */
+    it("records rows kept longer as deferred, counted apart and warned, not an error", async () => {
+      const { service, stamps, lines, drifts } = harness({ records: [deferredSave] });
+      stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
+
+      await expect(service.check({ organizationId: "organization-1", at: AT })).resolves.toEqual([
+        expect.objectContaining({ projectId: "project-1", category: "traces", kind: "deferred" }),
+      ]);
+      expect(drifts.calls).toEqual([{ category: "traces", kind: "deferred" }]);
+      expect(lines.findLine("warn", "not applied")).toMatchObject({
+        projectId: "project-1",
+        kind: "deferred",
+      });
+      expect(lines.findLine("error", "retention other than")).toBeUndefined();
+    });
+
+    /** @scenario "Rows kept shorter than the setting are unexpected even under a deferred save" */
+    it("records rows kept shorter as unexpected and logs an error", async () => {
+      const { service, stamps, lines } = harness({ records: [deferredSave] });
+      stamps.sampledStamps.set("project-1/traces", [
+        { retentionDays: 371, rows: 3 },
+        { retentionDays: 30, rows: 1 },
+      ]);
+
+      await expect(service.check({ organizationId: "organization-1", at: AT })).resolves.toEqual([
+        expect.objectContaining({ projectId: "project-1", kind: "unexpected" }),
+      ]);
+      expect(lines.findLine("error", "retention other than")).toMatchObject({
+        projectId: "project-1",
+      });
+    });
+  });
+
+  describe("when only traces were shortened and not applied", () => {
+    /** @scenario "Drift in a category that was not shortened stays unexpected" */
+    it("records experiments kept longer as unexpected beside deferred traces", async () => {
+      const { service, stamps } = harness({
+        records: [
+          {
+            ...ORGANIZATION,
+            changedAt: SAVED,
+            appliedAt: BEFORE,
+            shortenedAt: SAVED,
+            shortenedAtByCategory: { traces: SAVED },
+          },
+        ],
+      });
+      stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
+      stamps.sampledStamps.set("project-1/experiments", [{ retentionDays: 182, rows: 2 }]);
+
+      const drifted = await service.check({ organizationId: "organization-1", at: AT });
+      expect(drifted.map(({ category, kind }) => ({ category, kind }))).toEqual([
+        { category: "traces", kind: "deferred" },
+        { category: "experiments", kind: "unexpected" },
+      ]);
+    });
+  });
+
+  describe("when the shorter save was applied afterwards", () => {
+    /** @scenario "Rows kept longer after the shorter save was applied are unexpected" */
+    it("records rows still kept longer as unexpected", async () => {
+      const { service, stamps, lines } = harness({
+        records: [
+          {
+            ...ORGANIZATION,
+            changedAt: SAVED,
+            appliedAt: AT - DAY_MS,
+            shortenedAt: SAVED,
+            shortenedAtByCategory: { traces: SAVED },
+          },
+        ],
+      });
+      stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
+
+      await expect(service.check({ organizationId: "organization-1", at: AT })).resolves.toEqual([
+        expect.objectContaining({ projectId: "project-1", kind: "unexpected" }),
+      ]);
+      expect(lines.findLine("error", "retention other than")).toBeDefined();
+    });
+  });
+
+  describe("when the project's team saved a shorter period after the organization applied", () => {
+    /** @scenario "A deferred save at a scope that holds the project covers it" */
+    it("records the team's project as deferred and the other team's as unexpected", async () => {
+      const { service, stamps } = harness({
+        records: [
+          {
+            ...TEAM,
+            changedAt: SAVED,
+            appliedAt: null,
+            shortenedAt: SAVED,
+            shortenedAtByCategory: { traces: SAVED },
+          },
+          { ...ORGANIZATION, changedAt: null, appliedAt: BEFORE },
+        ],
+      });
+      stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
+      stamps.sampledStamps.set("project-2/traces", [{ retentionDays: 371, rows: 3 }]);
+
+      const drifted = await service.check({ organizationId: "organization-1", at: AT });
+      expect(drifted.map(({ projectId, kind }) => ({ projectId, kind }))).toEqual([
+        { projectId: "project-1", kind: "deferred" },
+        { projectId: "project-2", kind: "unexpected" },
+      ]);
+    });
+  });
+
+  describe("when the organization's apply status cannot be read", () => {
+    /** @scenario "An apply status that cannot be read leaves every drift unexpected" */
+    it("records the drift as unexpected and logs the failure", async () => {
+      const { service, stamps, lines } = harness({ records: "unreadable" });
+      stamps.sampledStamps.set("project-1/traces", [{ retentionDays: 371, rows: 3 }]);
+
+      await expect(service.check({ organizationId: "organization-1", at: AT })).resolves.toEqual([
+        expect.objectContaining({ projectId: "project-1", kind: "unexpected" }),
+      ]);
+      expect(lines.findLine("warn", "could not read the apply status")).toMatchObject({
+        organizationId: "organization-1",
       });
     });
   });

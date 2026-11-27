@@ -7,7 +7,9 @@ Feature: Each retention change and each apply to stored data is recorded
   is applied once an exact apply at that scope, or at a scope that holds it,
   landed at or after its last change. A lengthening save only raises stamps, so
   its raise counts as applied only when no shorter save since the last exact
-  apply left stamps above the period.
+  apply left stamps above the period. The rule's own saved time always counts as
+  a change, so a save whose change record was lost still reads as applied once
+  an apply lands after it, and as pending until then.
 
   Background:
     Given an organization on a paid plan with a team and two projects
@@ -99,7 +101,27 @@ Feature: Each retention change and each apply to stored data is recorded
   @unit
   Scenario: A rule with no recorded change shows no status
     Given a rule saved before changes were recorded
+    And no apply was recorded for its scope or a scope that holds it
     Then the snapshot names no status for its scope
+
+  @unit
+  Scenario: An apply after a save whose change was not recorded reads as applied
+    Given a rule saved at 10:00 whose change was not recorded
+    And the organization applied at 11:00
+    Then the rule's scope reads as applied at 11:00
+
+  @unit
+  Scenario: A save whose change was not recorded after the last apply reads as pending
+    Given the organization applied at 09:00
+    And a rule saved at 10:00 whose change was not recorded
+    Then the rule's scope reads as pending since 10:00
+
+  @unit
+  Scenario: Applying after a change that could not be recorded still says when it was applied
+    Given recording the change fails
+    And an admin saved 56 days for traces on the organization
+    When an admin applies the organization's period to stored data
+    Then the organization's scope reads as applied once every project's rewrite landed
 
   @integration
   Scenario: The settings page says when a scope was applied

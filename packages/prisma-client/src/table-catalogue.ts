@@ -1967,6 +1967,7 @@ export const prismaModelFieldCatalogue = {
     "appliedAt",
     "raisedAt",
     "shortenedAt",
+    "shortenedAtByCategory",
     "createdAt",
     "updatedAt",
     "occurredAt",

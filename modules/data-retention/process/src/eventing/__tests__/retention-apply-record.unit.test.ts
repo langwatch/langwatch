@@ -29,7 +29,10 @@ const organizationId = retentionTestGraph.organizationId ?? "";
 const organization = { scopeType: "ORGANIZATION" as const, scopeId: organizationId };
 const projectIds = [retentionTestGraph.projectId, "project-2"];
 
-function harness({ connected = true }: { connected?: boolean } = {}) {
+function harness({
+  connected = true,
+  changeFails = false,
+}: { connected?: boolean; changeFails?: boolean } = {}) {
   const retroactive = MemoryRetroactiveRetentionRepository.create();
   const applyStatus = MemoryRetentionApplyStatusRepository.create();
   const app = createDataRetentionTestApp({
@@ -49,7 +52,21 @@ function harness({ connected = true }: { connected?: boolean } = {}) {
   const extension = eventing.register(
     app.retentionExtensionPipeline({ applyRetryDelayMs: () => 10 }),
   );
-  if (connected) app.connectRetentionExtensionCommands(extension.commands);
+  if (connected) {
+    app.connectRetentionExtensionCommands(
+      changeFails
+        ? {
+            ...extension.commands,
+            recordRetentionPolicyChange: {
+              ...extension.commands.recordRetentionPolicyChange,
+              send: async () => {
+                throw new Error("event store down");
+              },
+            },
+          }
+        : extension.commands,
+    );
+  }
   const eventsOf = async ({ aggregateId, type }: { aggregateId: string; type: string }) =>
     (
       await eventStore.getEvents({
@@ -142,6 +159,42 @@ describe("given an organization on a paid plan with two projects", () => {
         await expect(
           app.getRetentionDays({ projectId: retentionTestGraph.projectId, category: "traces" }),
         ).resolves.toBe(56);
+      } finally {
+        await eventing.close();
+      }
+    });
+  });
+
+  describe("when recording the change fails and the admin applies afterwards", () => {
+    /** @scenario "Applying after a change that could not be recorded still says when it was applied" */
+    it("reads the organization's scope as applied once every rewrite landed", async () => {
+      const { app, eventing, applied, changes } = harness({ changeFails: true });
+      const snapshot = () =>
+        app.getPolicySnapshot({ projectId: retentionTestGraph.projectId, userId: "user-1" });
+      try {
+        await app.setForScope({
+          organizationId,
+          scope: organization,
+          category: "traces",
+          retentionDays: 91,
+        });
+        await save(app, 56);
+        expect(await changes()).toHaveLength(0);
+        expect((await snapshot()).storedApply).toEqual([]);
+
+        await app.applyScopeRetentionToStoredData({
+          organizationId,
+          scope: organization,
+          userId: "user-1",
+        });
+        await vi.waitFor(async () => expect(await applied()).toHaveLength(projectIds.length * 3), {
+          timeout: 10_000,
+        });
+        await vi.waitFor(async () =>
+          expect((await snapshot()).storedApply).toEqual([
+            expect.objectContaining({ ...organization, status: "applied" }),
+          ]),
+        );
       } finally {
         await eventing.close();
       }

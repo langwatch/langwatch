@@ -38,13 +38,14 @@ export class MemoryRetentionApplyStatusRepository implements RetentionApplyStatu
     return [...this.rows.values()]
       .map(({ state }) => state)
       .filter((state) => state.organizationId === organizationId)
-      .map(({ scopeType, scopeId, changedAt, appliedAt, raisedAt, shortenedAt }) => ({
+      .map(({ scopeType, scopeId, changedAt, appliedAt, raisedAt, shortenedAt, ...rest }) => ({
         scopeType,
         scopeId,
         changedAt,
         appliedAt,
         raisedAt,
         shortenedAt,
+        shortenedAtByCategory: rest.shortenedAtByCategory,
       }));
   }
 }
