@@ -1258,6 +1258,27 @@ describe("model_provider_invalid", () => {
   });
 });
 
+describe("model_provider_credentials_required", () => {
+  /** @scenario "A save refused for a missing key asks for it in the form" */
+  it("asks a key-based provider for its API key", () => {
+    const { description } = explainHandledError(
+      shape({ code: "model_provider_credentials_required", meta: { provider: "openai" } }),
+    );
+
+    expect(description).toContain("Add the API key");
+  });
+
+  /** @scenario "A save refused for a missing key asks for it in the form" */
+  it("asks Codex to sign in, since it takes no key", () => {
+    const { description } = explainHandledError(
+      shape({ code: "model_provider_credentials_required", meta: { provider: "openai_codex" } }),
+    );
+
+    expect(description).toContain("Sign in");
+    expect(description).not.toContain("API key");
+  });
+});
+
 describe("provider_endpoint_refused", () => {
   const explain = (refusal: string) =>
     explainHandledError(

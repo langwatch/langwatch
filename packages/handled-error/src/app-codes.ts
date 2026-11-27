@@ -635,6 +635,7 @@ export const APP_ERROR_CODES = [
   "model_execution_unavailable",
   "model_not_configured",
   "model_provider_anchor_required",
+  "model_provider_credentials_required",
   "model_provider_credentials_unreadable",
   "model_provider_credentials_would_be_dropped",
   "model_provider_custom_keys_missing",

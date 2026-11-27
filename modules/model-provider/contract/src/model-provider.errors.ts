@@ -454,6 +454,25 @@ export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
   }
 }
 
+/** A provider switched on with no credential it could reach: every call it serves would fail. */
+export class ModelProviderCredentialsRequiredError extends HandledError {
+  declare readonly code: "model_provider_credentials_required";
+
+  constructor({ provider }: { provider: string }) {
+    super(
+      "model_provider_credentials_required",
+      "This provider can't be switched on without credentials. Add them and save again.",
+      {
+        meta: { provider },
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("model_provider_credentials_required"),
+      },
+    );
+    this.name = "ModelProviderCredentialsRequiredError";
+  }
+}
+
 export class ModelProviderCredentialsUnreadableError extends HandledError {
   declare readonly code: "model_provider_credentials_unreadable";
 

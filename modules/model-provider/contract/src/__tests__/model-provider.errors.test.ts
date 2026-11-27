@@ -9,6 +9,7 @@ import {
   ModelDefaultValidationError,
   ModelNotConfiguredError,
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsRequiredError,
   ModelProviderCredentialsUnreadableError,
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
@@ -147,6 +148,12 @@ describe("model provider handled errors", () => {
           "This save would delete the credentials already stored for this provider. Send the credentials with it, or leave them out of the request entirely to keep them.",
         httpStatus: 400,
         meta: { provider: "azure" },
+      });
+      expectHandledWire(new ModelProviderCredentialsRequiredError({ provider: "openai" }), {
+        code: "model_provider_credentials_required",
+        message: "This provider can't be switched on without credentials. Add them and save again.",
+        httpStatus: 400,
+        meta: { provider: "openai" },
       });
       expectHandledWire(new ModelProviderCredentialsUnreadableError("azure"), {
         code: "model_provider_credentials_unreadable",

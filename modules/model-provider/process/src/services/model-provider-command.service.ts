@@ -38,6 +38,7 @@ import {
   modelsForWrite,
   rateLimitsForWrite,
 } from "../rules/model-provider-write.rules.ts";
+import { ModelProviderCredentialWriteService } from "./model-provider-credential-write.service.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import type { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
@@ -60,7 +61,11 @@ type ModelProviderCommandOptions = {
 };
 
 export class ModelProviderCommandService {
-  private constructor(private readonly options: ModelProviderCommandOptions) {}
+  private readonly credentials: ModelProviderCredentialWriteService;
+
+  private constructor(private readonly options: ModelProviderCommandOptions) {
+    this.credentials = ModelProviderCredentialWriteService.create(options);
+  }
 
   static create(options: ModelProviderCommandOptions): ModelProviderCommandService {
     return new ModelProviderCommandService(options);
@@ -84,6 +89,7 @@ export class ModelProviderCommandService {
       organizationId,
       routingHandle,
     });
+    this.credentials.assertCanBeSwitchedOn({ provider, existing });
     // Before the write and outside any transaction: this asks the provider over the network.
     const imported = await this.options.modelImport?.importIntoSave({ provider, existing });
     const saved = await this.saveProvider(imported?.provider ?? provider, existing, routingHandle);
@@ -364,7 +370,7 @@ export class ModelProviderCommandService {
   }): Promise<ModelProvider> {
     const { parsed, existing, scopes, organizationId, routingHandle } = input;
     const customKeys = await this.credentialsForWrite(parsed, existing);
-    const extraHeaders = this.headersForWrite(parsed, existing);
+    const extraHeaders = this.credentials.headersForWrite({ input: parsed, existing });
     const models = modelsForWrite(parsed, existing);
     const rateLimits = rateLimitsForWrite(parsed, existing);
     const now = toDate(nowInstant());
@@ -423,29 +429,6 @@ export class ModelProviderCommandService {
     });
     await this.options.catalog.assertEndpointAllowed(input.provider, merged);
     return merged;
-  }
-
-  private headersForWrite(
-    input: ModelProviderWriteInput,
-    existing: ModelProvider | null,
-  ): { key: string; value: string }[] {
-    const policy = this.options.credentialPolicy;
-    const endpointMoved = policy.endpointMoved({
-      incoming:
-        input.customKeys === undefined
-          ? null
-          : policy.normalizeKeys(input.provider, input.customKeys),
-      stored: existing?.customKeys ?? null,
-    });
-    if (input.extraHeaders === undefined) {
-      return endpointMoved ? [] : (existing?.extraHeaders ?? []);
-    }
-
-    return policy.mergeHeaders({
-      incoming: input.extraHeaders ?? [],
-      stored: existing?.extraHeaders ?? [],
-      endpointMoved,
-    });
   }
 
   private async saveProvider(
