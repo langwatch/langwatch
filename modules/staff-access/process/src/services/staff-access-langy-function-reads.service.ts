@@ -59,7 +59,7 @@ export class StaffAccessLangyFunctionReadsService {
       at,
     });
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
-    const counts = await this.deps.langy.findTurnOutcomeCounts({
+    const { counts, truncated } = await this.deps.langy.findTurnOutcomeCounts({
       projectIds,
       since: range.since.epochMilliseconds,
       until: range.until.epochMilliseconds,
@@ -72,6 +72,7 @@ export class StaffAccessLangyFunctionReadsService {
       toolErrorsByTool: { ...count.toolErrorsByTool },
       turns: count.turns,
       users: count.users,
+      turnScanComplete: !truncated,
     }));
     return pageOf({
       rows,

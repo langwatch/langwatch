@@ -3,6 +3,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
+  countsByPlainWord,
   imageTagOf,
   plainWordOf,
   upgradeErrorCodeOf,
@@ -20,6 +21,14 @@ describe("the platform ops function rules", () => {
     expect(imageTagOf("ghcr.io/langwatch/langwatch@sha256:feed")).toBe("other");
     expect(imageTagOf("langwatch:ACME build")).toBe("other");
     expect(imageTagOf("")).toBe("other");
+  });
+
+  it("sums the counts of stored states that both read as other", () => {
+    expect(countsByPlainWord({ done: 4, "ACME state": 2, "Another/State": 3, failed: 1 })).toEqual({
+      done: 4,
+      other: 5,
+      failed: 1,
+    });
   });
 
   /** @scenario "An upgrade error with no code reads as other" */

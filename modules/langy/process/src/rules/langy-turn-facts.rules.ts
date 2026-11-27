@@ -27,6 +27,19 @@ export type LangyTurnFactRow = Readonly<{
   toolCalls: readonly LangyTurnToolCall[];
 }>;
 
+/** What names a tool call's tool: its tool name and, for a shell call, its command. */
+export type LangyToolLabelInput = Readonly<Pick<LangyTurnToolCall, "toolName" | "command">>;
+
+/** One stored turn as the outcome counts read it: only its failed calls, only what names them. */
+export type LangyTurnOutcomeRow = Readonly<{
+  status: string;
+  error: string | null;
+  createdAt: number;
+  userId: string | null;
+  model: string | null;
+  failedToolCalls: readonly LangyToolLabelInput[];
+}>;
+
 /** The registry's codes: a stored error leaves only as one of these, never as its own text. */
 const KNOWN_CODES: ReadonlySet<string> = new Set([
   ...APP_ERROR_CODES,
@@ -122,7 +135,7 @@ export function failureCodeOf(error: string): string {
 }
 
 /** `langwatch.<group>` for a CLI call, the tool name for any other, `other` for an odd name. */
-export function toolLabelOf(call: LangyTurnToolCall): string {
+export function toolLabelOf(call: LangyToolLabelInput): string {
   const group = typeof call.command === "string" ? CLI_CALL.exec(call.command)?.[1] : undefined;
   if (group !== undefined) return `langwatch.${CLI_GROUPS.has(group) ? group : "other"}`;
   return TOOL.test(call.toolName) ? call.toolName : "other";
@@ -171,13 +184,17 @@ function toolCallFactsOf(call: LangyTurnToolCall): LangyToolCallFacts {
 export function turnFactsOf(row: LangyTurnFactRow): LangyTurnFacts {
   return {
     turnId: row.turnId,
-    state: TURN_STATES.has(row.status) ? row.status : "other",
+    state: turnStateOf(row.status),
     failureCode: row.error === null ? null : failureCodeOf(row.error),
     createdAt: row.createdAt,
     startedAt: row.startedAt,
     endedAt: row.endedAt,
     toolCalls: row.toolCalls.map(toolCallFactsOf),
   };
+}
+
+function turnStateOf(status: string): string {
+  return TURN_STATES.has(status) ? status : "other";
 }
 
 function modelLabelOf(model: string | null): string {
@@ -192,20 +209,20 @@ type OutcomeGroup = {
   toolErrors: Map<string, number>;
 };
 
-function addTurn(groups: Map<string, OutcomeGroup>, row: LangyTurnFactRow): void {
-  const facts = turnFactsOf(row);
+function addTurn(groups: Map<string, OutcomeGroup>, row: LangyTurnOutcomeRow): void {
   const key = {
     day: Temporal.Instant.fromEpochMilliseconds(row.createdAt).toString().slice(0, 10),
     model: modelLabelOf(row.model),
-    turnState: facts.state,
-    failureCode: facts.failureCode,
+    turnState: turnStateOf(row.status),
+    failureCode: row.error === null ? null : failureCodeOf(row.error),
   };
   const id = [key.day, key.model, key.turnState, key.failureCode ?? ""].join("|");
   const group = groups.get(id) ?? { key, turns: 0, users: new Set(), toolErrors: new Map() };
   group.turns += 1;
   if (row.userId !== null) group.users.add(row.userId);
-  for (const call of facts.toolCalls.filter((each) => each.status === "failed")) {
-    group.toolErrors.set(call.tool, (group.toolErrors.get(call.tool) ?? 0) + 1);
+  for (const call of row.failedToolCalls) {
+    const tool = toolLabelOf(call);
+    group.toolErrors.set(tool, (group.toolErrors.get(tool) ?? 0) + 1);
   }
   groups.set(id, group);
 }
@@ -216,7 +233,7 @@ function compareText(a: string, b: string): number {
 }
 
 /** Turns grouped by UTC day, model, state and failure code, in key order. */
-export function countTurnOutcomes(rows: readonly LangyTurnFactRow[]): LangyTurnOutcomeCount[] {
+export function countTurnOutcomes(rows: readonly LangyTurnOutcomeRow[]): LangyTurnOutcomeCount[] {
   const groups = new Map<string, OutcomeGroup>();
   for (const row of rows) addTurn(groups, row);
   return [...groups.entries()]

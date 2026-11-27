@@ -20,6 +20,7 @@ import {
   type LangyApi,
   LangyConversationNotFoundError,
   type LangyTurnOutcomeCount,
+  type LangyTurnOutcomeCounts,
 } from "@langwatch/langy-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import type { OpsApi, OpsPlatformOperator } from "@langwatch/ops-contract";
@@ -492,9 +493,9 @@ export function requestBody({
 export function langyStandIn(platform: PlatformPeerState = platformPeerState()) {
   return createApiFixture<LangyApi>({
     ...platformPeers.mirror(platform),
-    findTurnOutcomeCounts: async ({ projectIds }): Promise<LangyTurnOutcomeCount[]> => {
+    findTurnOutcomeCounts: async ({ projectIds }): Promise<LangyTurnOutcomeCounts> => {
       platform.langyProjectAsks.push([...projectIds]);
-      return projectIds.includes(`${ACME.id}_project`)
+      const counts: LangyTurnOutcomeCount[] = projectIds.includes(`${ACME.id}_project`)
         ? [
             {
               day: "2026-11-01",
@@ -516,6 +517,7 @@ export function langyStandIn(platform: PlatformPeerState = platformPeerState()) 
             },
           ]
         : [];
+      return { counts, truncated: false };
     },
     getTurnFacts: async ({ projectId, conversationId }) => {
       if (projectId !== `${ACME.id}_project` || conversationId !== "conv_acme") {

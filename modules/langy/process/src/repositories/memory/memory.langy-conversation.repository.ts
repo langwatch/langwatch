@@ -5,7 +5,7 @@ import {
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
-import type { LangyTurnFactRow } from "../../rules/langy-turn-facts.rules.ts";
+import type { LangyTurnFactRow, LangyTurnOutcomeRow } from "../../rules/langy-turn-facts.rules.ts";
 import {
   LangyConversationRepository,
   type LangyConversationListCursor,
@@ -104,16 +104,38 @@ export class MemoryLangyConversationRepository extends LangyConversationReposito
     };
   }
 
-  async findTurnFactRows(input: {
+  async findTurnOutcomeRows(input: {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnFactRow[]> {
+    limit: number;
+  }): Promise<{ rows: LangyTurnOutcomeRow[]; truncated: boolean }> {
     const projects = new Set(input.projectIds);
-    return this.turnFactRows().filter(
-      (row) =>
-        projects.has(row.projectId) && row.createdAt >= input.since && row.createdAt < input.until,
-    );
+    const found = this.turnFactRows()
+      .filter(
+        (row) =>
+          projects.has(row.projectId) &&
+          row.createdAt >= input.since &&
+          row.createdAt < input.until,
+      )
+      .toSorted((a, b) => a.createdAt - b.createdAt || compareIds(a.turnId, b.turnId));
+    return {
+      rows: found.slice(0, input.limit).map((row) => ({
+        status: row.status,
+        error: row.error,
+        createdAt: row.createdAt,
+        userId: row.userId,
+        model: row.model,
+        failedToolCalls: row.toolCalls
+          .filter((call) => call.status === "failed")
+          .map((call) =>
+            call.command === undefined
+              ? { toolName: call.toolName }
+              : { toolName: call.toolName, command: call.command },
+          ),
+      })),
+      truncated: found.length > input.limit,
+    };
   }
 
   async findConversationTurnFactRows(input: {

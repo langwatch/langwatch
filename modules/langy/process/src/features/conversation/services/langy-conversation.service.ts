@@ -4,7 +4,7 @@ import {
   LangyConversationNotFoundError,
   type LangyConversationTurnData,
   type LangyTurnFacts,
-  type LangyTurnOutcomeCount,
+  type LangyTurnOutcomeCounts,
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
@@ -43,6 +43,9 @@ export interface LangyConversationRuntime {
   generateId(resource: keyof typeof LANGY_ID_RESOURCES): string;
   createTurnId(): string;
 }
+
+/** The most turns one outcome read folds: a window past it answers floors, marked truncated. */
+const TURN_OUTCOME_SCAN_LIMIT = 50_000;
 
 const defaultRuntime: LangyConversationRuntime = {
   now: () => nowInstant().epochMilliseconds,
@@ -166,9 +169,13 @@ export class LangyConversationService {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnOutcomeCount[]> {
-    if (input.projectIds.length === 0) return [];
-    return countTurnOutcomes(await this.repository.findTurnFactRows(input));
+  }): Promise<LangyTurnOutcomeCounts> {
+    if (input.projectIds.length === 0) return { counts: [], truncated: false };
+    const { rows, truncated } = await this.repository.findTurnOutcomeRows({
+      ...input,
+      limit: TURN_OUTCOME_SCAN_LIMIT,
+    });
+    return { counts: countTurnOutcomes(rows), truncated };
   }
 
   /** @throws {LangyConversationNotFoundError} when the project holds no such conversation */

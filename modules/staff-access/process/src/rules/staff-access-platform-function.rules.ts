@@ -16,6 +16,18 @@ export function plainWordOf(value: string): string {
   return PLAIN_WORD.test(value) ? value : OTHER;
 }
 
+/** Counts keyed by stored word, re-keyed by {@link plainWordOf}; words that collapse are summed. */
+export function countsByPlainWord(
+  counts: Readonly<Record<string, number>>,
+): Record<string, number> {
+  const summed = new Map<string, number>();
+  for (const [word, count] of Object.entries(counts)) {
+    const plain = plainWordOf(word);
+    summed.set(plain, (summed.get(plain) ?? 0) + count);
+  }
+  return Object.fromEntries(summed);
+}
+
 export function releaseOf(value: string): string {
   return RELEASE.test(value) ? value : OTHER;
 }

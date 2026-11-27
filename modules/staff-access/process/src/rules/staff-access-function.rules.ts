@@ -19,7 +19,7 @@ import { z } from "zod";
 
 import { isoText } from "./staff-access.rules.ts";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 const cursorShape = z.object({ f: z.string(), k: z.string() });
 
 /** `lookup` and `platform` functions need `ops:read`; `org` functions an organization scope. */

@@ -69,7 +69,7 @@ import {
   type LangyServerConfig,
   type LangyUsageCount,
   type LangyTurnFacts,
-  type LangyTurnOutcomeCount,
+  type LangyTurnOutcomeCounts,
   type LangyRelayConnection,
   type LocalControlConnectionOpened,
   type LocalControlKeyHolder,
@@ -922,7 +922,7 @@ export class LangyModule implements LangyApiContract {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnOutcomeCount[]> {
+  }): Promise<LangyTurnOutcomeCounts> {
     return this.dependencies.langy.findTurnOutcomeCounts(input);
   }
 

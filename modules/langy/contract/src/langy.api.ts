@@ -113,6 +113,12 @@ export interface LangyTurnOutcomeCount {
   readonly users: number;
 }
 
+/** A window's outcome groups; `truncated` when the read hit its turn cap, so counts are floors. */
+export interface LangyTurnOutcomeCounts {
+  readonly counts: readonly LangyTurnOutcomeCount[];
+  readonly truncated: boolean;
+}
+
 /** One tool call as ids and codes: never its command, arguments, result or error text. */
 export interface LangyToolCallFacts {
   readonly tool: string;
@@ -418,7 +424,7 @@ export interface LangyApi {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnOutcomeCount[]>;
+  }): Promise<LangyTurnOutcomeCounts>;
   /** One conversation's turns; `LangyConversationNotFoundError` when the project holds none. */
   getTurnFacts(input: { projectId: string; conversationId: string }): Promise<LangyTurnFacts[]>;
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */

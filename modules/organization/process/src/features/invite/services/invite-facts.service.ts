@@ -12,7 +12,6 @@ import { resolveInviteDisplayStatus } from "../../../rules/invite-display-status
 export class OrganizationInviteFactsService {
   static create(dependencies: {
     invites: Pick<OrganizationInviteRepository, "findAllInvites">;
-    now?: () => number;
   }): OrganizationInviteFactsService {
     return new OrganizationInviteFactsService(dependencies);
   }
@@ -20,7 +19,6 @@ export class OrganizationInviteFactsService {
   private constructor(
     private readonly dependencies: {
       invites: Pick<OrganizationInviteRepository, "findAllInvites">;
-      now?: () => number;
     },
   ) {}
 
@@ -30,7 +28,7 @@ export class OrganizationInviteFactsService {
     organizationId: string;
   }): Promise<OrganizationInviteFact[]> {
     const invites = await this.dependencies.invites.findAllInvites({ organizationId });
-    const nowMs = this.dependencies.now?.() ?? nowInstant().epochMilliseconds;
+    const nowMs = nowInstant().epochMilliseconds;
     return invites.map((invite) => ({
       inviteId: invite.id,
       role: invite.role,

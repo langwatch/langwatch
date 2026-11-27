@@ -171,12 +171,15 @@ describe.skipIf(!databaseUrl)("given Langy turns in two projects", () => {
   describe("when the outcomes are counted for a window", () => {
     /** @scenario "Turn outcomes are counted per day, model, state and failure code over real Postgres" */
     it("groups turns by day, model, state and code, with owners and failed tool calls", async () => {
-      const rows = await repository.findTurnFactRows({
+      const { rows, truncated } = await repository.findTurnOutcomeRows({
         projectIds: [PROJECT_ID],
         since: Date.parse("2026-11-01T00:00:00Z"),
         until: Date.parse("2026-11-03T00:00:00Z"),
+        limit: 100,
       });
       const counts = countTurnOutcomes(rows);
+
+      expect(truncated).toBe(false);
 
       expect(counts).toEqual([
         {

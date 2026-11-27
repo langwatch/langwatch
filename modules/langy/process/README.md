@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:343`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:349`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 
@@ -219,7 +219,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<La
 Turns created in `[since, until)` epoch ms across `projectIds`, grouped for ops (ADR-202).
 
 ```typescript
-findTurnOutcomeCounts(input: { projectIds: readonly string[]; since: number; until: number; }): Promise<LangyTurnOutcomeCount[]>;
+findTurnOutcomeCounts(input: { projectIds: readonly string[]; since: number; until: number; }): Promise<LangyTurnOutcomeCounts>;
 ```
 
 #### `getTurnFacts`

@@ -16,6 +16,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { pageOf, rangeOf, isoOfMs, pageInputOf } from "../rules/staff-access-function.rules.ts";
 import {
   imageTagOf,
+  countsByPlainWord,
   plainWordOf,
   releaseOf,
   upgradeErrorCodeOf,
@@ -73,9 +74,7 @@ export class StaffAccessPlatformFunctionReadsService {
       imageCommit:
         version.kind === "development" && version.commit ? commitOf(version.commit) : null,
       upgradeState: plainWordOf(status.state),
-      stepsByStatus: Object.fromEntries(
-        Object.entries(status.counts).map(([state, count]) => [plainWordOf(state), count]),
-      ),
+      stepsByStatus: countsByPlainWord(status.counts),
       failedTargets: status.failedTargets,
       lastRunOutcome: status.lastRun?.outcome ? plainWordOf(status.lastRun.outcome) : null,
       lastRunFinishedAt: status.lastRun?.finishedAt ? isoTextOf(status.lastRun.finishedAt) : null,

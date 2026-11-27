@@ -4,7 +4,8 @@
  * backend the package can reach. The memory twin runs always; a Postgres
  * backend joins it when this package declares a datastore in its vitest config.
  */
-import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BillingRepositories } from "../billing.repositories.ts";
 import { MemoryBillingRepositories } from "../memory/memory.billing.repositories.ts";
@@ -149,6 +150,133 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       await expect(
         repositories.webhookOrganizations.findNameById("org-absent"),
       ).resolves.toBeNull();
+    });
+  });
+
+  describe("when the subscription rows the ops functions read are asked for", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function subscriptionAt({
+      repositories,
+      organizationId,
+      status,
+      at,
+    }: {
+      repositories: BillingRepositories;
+      organizationId: string;
+      status: "ACTIVE" | "CANCELLED" | "PENDING";
+      at: string;
+    }): Promise<string> {
+      vi.setSystemTime(new Date(at));
+      const created = await repositories.subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      if (status !== "PENDING") {
+        await repositories.subscriptions.updateStatus({ id: created.id, status });
+      }
+      return created.id;
+    }
+
+    async function twoOrganizationsAcrossTwoMonths(repositories: BillingRepositories) {
+      return {
+        acmeOld: await subscriptionAt({
+          repositories,
+          organizationId: "org-acme",
+          status: "CANCELLED",
+          at: "2026-10-05T00:00:00Z",
+        }),
+        acmeNew: await subscriptionAt({
+          repositories,
+          organizationId: "org-acme",
+          status: "ACTIVE",
+          at: "2026-11-03T00:00:00Z",
+        }),
+        globex: await subscriptionAt({
+          repositories,
+          organizationId: "org-globex",
+          status: "PENDING",
+          at: "2026-11-04T00:00:00Z",
+        }),
+      };
+    }
+
+    it("answers one organization's rows, cancelled included, newest first", async () => {
+      const repositories = create();
+      const ids = await twoOrganizationsAcrossTwoMonths(repositories);
+
+      const rows = await repositories.subscriptions.findForOrganization("org-acme");
+
+      expect(rows.map(({ id, status }) => [id, status])).toEqual([
+        [ids.acmeNew, "ACTIVE"],
+        [ids.acmeOld, "CANCELLED"],
+      ]);
+    });
+
+    it("answers no rows for an organization with none", async () => {
+      const repositories = create();
+      await twoOrganizationsAcrossTwoMonths(repositories);
+
+      await expect(repositories.subscriptions.findForOrganization("org-empty")).resolves.toEqual(
+        [],
+      );
+    });
+
+    it("answers November's rows across organizations, oldest first, and not October's", async () => {
+      const repositories = create();
+      const ids = await twoOrganizationsAcrossTwoMonths(repositories);
+
+      const rows = await repositories.subscriptions.findCreatedBetween({
+        since: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+        until: Temporal.Instant.from("2026-12-01T00:00:00Z"),
+      });
+
+      expect(rows.map(({ id, organizationId }) => [id, organizationId])).toEqual([
+        [ids.acmeNew, "org-acme"],
+        [ids.globex, "org-globex"],
+      ]);
+    });
+
+    it("takes a row created exactly at since and leaves out one created exactly at until", async () => {
+      const repositories = create();
+      const beforeSince = await subscriptionAt({
+        repositories,
+        organizationId: "org-acme",
+        status: "CANCELLED",
+        at: "2026-10-31T23:59:59.999Z",
+      });
+      const atSince = await subscriptionAt({
+        repositories,
+        organizationId: "org-acme",
+        status: "ACTIVE",
+        at: "2026-11-01T00:00:00Z",
+      });
+      const beforeUntil = await subscriptionAt({
+        repositories,
+        organizationId: "org-globex",
+        status: "PENDING",
+        at: "2026-11-30T23:59:59.999Z",
+      });
+      const atUntil = await subscriptionAt({
+        repositories,
+        organizationId: "org-globex",
+        status: "ACTIVE",
+        at: "2026-12-01T00:00:00Z",
+      });
+
+      const rows = await repositories.subscriptions.findCreatedBetween({
+        since: Temporal.Instant.from("2026-11-01T00:00:00Z"),
+        until: Temporal.Instant.from("2026-12-01T00:00:00Z"),
+      });
+
+      expect(rows.map(({ id }) => id)).toEqual([atSince, beforeUntil]);
+      expect([beforeSince, atUntil].some((id) => rows.some((row) => row.id === id))).toBe(false);
     });
   });
 });

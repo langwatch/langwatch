@@ -15,7 +15,7 @@ import {
   type LangyTurnResultInput,
   type LangyLocalRecord,
   type LangyTurnFacts,
-  type LangyTurnOutcomeCount,
+  type LangyTurnOutcomeCounts,
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
@@ -125,7 +125,7 @@ export class LangyService {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnOutcomeCount[]> {
+  }): Promise<LangyTurnOutcomeCounts> {
     return this.conversations.findTurnOutcomeCounts(input);
   }
 

@@ -5,9 +5,8 @@
 import type { InstantEvalDailyRunCount } from "@langwatch/instant-eval-contract";
 import type { StaffAccessFunctionOutput } from "@langwatch/staff-access-contract";
 
-import { isoOfMs } from "./staff-access-function.rules.ts";
+import { DAY_MS, isoOfMs } from "./staff-access-function.rules.ts";
 
-export const DAY_MS = 24 * 60 * 60 * 1000;
 export const WEEK_MS = 7 * DAY_MS;
 const PLAIN_CODE = /^[a-z][a-z0-9_.-]{0,63}$/;
 

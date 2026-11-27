@@ -1,6 +1,6 @@
 import type { LangyUsageCount } from "@langwatch/langy-contract";
 
-import type { LangyTurnFactRow } from "../rules/langy-turn-facts.rules.ts";
+import type { LangyTurnFactRow, LangyTurnOutcomeRow } from "../rules/langy-turn-facts.rules.ts";
 
 export interface LangyConversationRow {
   id: string;
@@ -54,12 +54,16 @@ export abstract class LangyConversationRepository {
     since?: number;
   }): Promise<LangyUsageCount>;
 
-  /** Turns created in `[since, until)` with owner and latest model; never an empty project list. */
-  abstract findTurnFactRows(input: {
+  /**
+   * The first `limit` turns created in `[since, until)`, oldest first, with owner, latest model and
+   * failed calls; `truncated` when more exist. Never an empty project list.
+   */
+  abstract findTurnOutcomeRows(input: {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnFactRow[]>;
+    limit: number;
+  }): Promise<{ rows: LangyTurnOutcomeRow[]; truncated: boolean }>;
 
   /** Every turn of one conversation, oldest first; empty when the project holds none. */
   abstract findConversationTurnFactRows(input: {

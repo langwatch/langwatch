@@ -49,6 +49,8 @@ export const STAFF_ACCESS_LANGY_FUNCTIONS = {
           turns: z.number().int(),
           /** Distinct conversation owners. */
           users: z.number().int(),
+          /** False when the read stopped at 50,000 turns: counts are floors. */
+          turnScanComplete: z.boolean(),
         })
         .strict(),
     ),

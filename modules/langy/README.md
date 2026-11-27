@@ -11,7 +11,7 @@ Langy, the in-product assistant: conversations, turns, messages, credentials and
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | conversation, credential, langy, message, relay, turn                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)    |
-| Api token      | `LangyApi` = `moduleApi<LangyApi>()("langy")`, `contract/src/langy.api.ts:567` (87 operations) |
+| Api token      | `LangyApi` = `moduleApi<LangyApi>()("langy")`, `contract/src/langy.api.ts:573` (87 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
 ## What langy owns

@@ -75,6 +75,7 @@ describe("given ACME's people use Langy", () => {
             toolErrorsByTool: {},
             turns: 9,
             users: 4,
+            turnScanComplete: true,
           },
           {
             day: "2026-11-01",
@@ -84,6 +85,7 @@ describe("given ACME's people use Langy", () => {
             toolErrorsByTool: { "langwatch.trace": 2 },
             turns: 3,
             users: 2,
+            turnScanComplete: true,
           },
         ],
         total: 2,

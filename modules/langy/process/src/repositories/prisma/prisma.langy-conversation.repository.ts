@@ -6,7 +6,7 @@ import {
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import type { LangyTurnFactRow } from "../../rules/langy-turn-facts.rules.ts";
+import type { LangyTurnFactRow, LangyTurnOutcomeRow } from "../../rules/langy-turn-facts.rules.ts";
 import { LangyConversationRepository } from "../langy-conversation-projection.repository.ts";
 import type {
   LangyConversationListCursor,
@@ -18,6 +18,18 @@ import type { LangyDatabase } from "./langy-database.mapper.ts";
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 
 const toolCallsSchema = z.array(langyTurnToolCallSchema);
+const failedToolCallsSchema = z.array(
+  z.object({ toolName: z.string(), command: z.string().optional() }),
+);
+
+type TurnOutcomeSqlRow = {
+  status: string;
+  error: string | null;
+  createdAt: number;
+  userId: string | null;
+  lastModel: string | null;
+  failedToolCalls: unknown;
+};
 const TURN_FACT_COLUMNS = {
   projectId: true,
   ConversationId: true,
@@ -121,20 +133,47 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
     };
   }
 
-  async findTurnFactRows({
+  /** One statement: the owner join and the failed-call cut run in Postgres, not the call bodies. */
+  async findTurnOutcomeRows({
     projectIds,
     since,
     until,
+    limit,
   }: {
     projectIds: readonly string[];
     since: number;
     until: number;
-  }): Promise<LangyTurnFactRow[]> {
-    const turns = await this.prisma.langyConversationTurnProjection.findMany({
-      where: { projectId: { in: [...projectIds] }, CreatedAt: { gte: since, lt: until } },
-      select: TURN_FACT_COLUMNS,
-    });
-    return this.withOwners({ turns, projectIds });
+    limit: number;
+  }): Promise<{ rows: LangyTurnOutcomeRow[]; truncated: boolean }> {
+    const found = await this.prisma.$queryRaw<TurnOutcomeSqlRow[]>`
+      SELECT t."status", t."error", t."createdAt", c."userId", c."lastModel",
+        COALESCE((
+          SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+            'toolName', call->'toolName', 'command', call->'command')))
+          FROM jsonb_array_elements(
+            CASE WHEN jsonb_typeof(t."toolCalls") = 'array' THEN t."toolCalls" ELSE '[]'::jsonb END
+          ) AS call
+          WHERE call->>'status' = 'failed'
+        ), '[]'::jsonb) AS "failedToolCalls"
+      FROM "LangyConversationTurnProjection" t
+      LEFT JOIN "LangyConversationProjection" c
+        ON c."projectId" = t."projectId" AND c."conversationId" = t."conversationId"
+      WHERE t."projectId" = ANY(${[...projectIds]})
+        AND t."createdAt" >= ${since} AND t."createdAt" < ${until}
+      ORDER BY t."createdAt", t."turnId"
+      LIMIT ${limit + 1}
+    `;
+    return {
+      rows: found.slice(0, limit).map((row) => ({
+        status: row.status,
+        error: row.error,
+        createdAt: Number(row.createdAt),
+        userId: row.userId,
+        model: row.lastModel,
+        failedToolCalls: failedToolCallsSchema.safeParse(row.failedToolCalls).data ?? [],
+      })),
+      truncated: found.length > limit,
+    };
   }
 
   async findConversationTurnFactRows({

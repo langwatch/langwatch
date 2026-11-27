@@ -91,7 +91,7 @@ class MemoryMonitorPerformanceRepository extends MonitorPerformanceRepository {
     }
     return [...rows.values()]
       .map(({ tenants, ...row }) => ({ ...row, projects: tenants.size }))
-      .toSorted((a, b) => b.runs - a.runs || a.evaluatorType.localeCompare(b.evaluatorType))
+      .toSorted((a, b) => b.runs - a.runs || (a.evaluatorType < b.evaluatorType ? -1 : 1))
       .slice(0, input.limit);
   }
 }

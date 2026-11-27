@@ -182,7 +182,7 @@ export abstract class SimulationService {
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
   /** Lifetime runs across one organization's projects, in one read: they share one route. */
   abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
-  /** Runs started in `[since, until)` per project across one organization, in one read. */
+  /** Runs started in `[since, until)` per project across one organization, one read per project. */
   abstract findRunCountsByProject(
     input: SimulationRunCountsInput,
   ): Promise<SimulationProjectRunCount[]>;

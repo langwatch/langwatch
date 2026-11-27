@@ -1518,7 +1518,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return Number(row?.Total ?? "0");
   }
 
-  /** One read for the organization's projects, routed by its first, latest version per run. */
+  /** One read per project, each routed to its own placement, latest version per run. */
   async findRunCountsByProject({
     projectIds,
     since,
