@@ -256,3 +256,9 @@ Feature: Stripe webhook handling grants and removes plans correctly
     When its next Growth invoice is paid while Stripe fails to answer for the old plan
     Then the delivery succeeds
     And the old plan is checked at Stripe again on the next Growth invoice
+
+  @unit @regression
+  Scenario: A subscription-active message on its own stops the old plan
+    Given an organization on a tiered plan whose Growth seat subscription is awaiting payment
+    When only the message that the Growth subscription became active arrives
+    Then the old plan is cancelled once at Stripe and in our records

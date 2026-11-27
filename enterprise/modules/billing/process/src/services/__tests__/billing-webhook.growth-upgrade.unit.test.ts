@@ -461,4 +461,21 @@ describe("given a tiered organization upgrading to Growth seats", () => {
     expect(settled.stripe.reads).toEqual([GROWTH_STRIPE, GROWTH_STRIPE, TIERED_STRIPE]);
     expect(settled.stripe.cancellations).toEqual([]);
   });
+
+  /** @scenario "A subscription-active message on its own stops the old plan" */
+  it("stops the old plan from the subscription-active message alone", async () => {
+    const upgrade = harness({
+      growth: { stripeSubscriptionId: GROWTH_STRIPE },
+      tiered: { status: "ACTIVE", stripeSubscriptionId: TIERED_STRIPE },
+    });
+
+    const [result] = await deliverTogether(upgrade, [subscriptionActive()]);
+
+    expect(result?.status).toBe("ok");
+    expect(rowOf(upgrade, GROWTH_ROW)?.status).toBe("ACTIVE");
+    expect(upgrade.stripe.cancellations).toEqual([
+      { subscriptionId: TIERED_STRIPE, prorate: true },
+    ]);
+    expect(rowOf(upgrade, TIERED_ROW)?.status).toBe("CANCELLED");
+  });
 });
