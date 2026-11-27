@@ -12,6 +12,7 @@ import {
   type Graph,
   type GraphAlert,
 } from "@langwatch/dashboard-contract";
+import { z } from "zod";
 
 /** Compatibility shape: the old Prisma transport exposed the discriminator. */
 const legacyGraph = <T extends Graph>(graph: T) => ({ ...graph, kind: "builder" as const });
@@ -22,10 +23,14 @@ type AlertActionParams = {
   slackIntegrationId?: string;
   slackChannelId?: string;
   seriesName?: string;
-  threshold: number;
-  operator: string;
-  timePeriod: number;
 };
+
+/** What makes a trigger an alert the bell can show and edit; one saved without it is none. */
+const alertConditionSchema = z.object({
+  threshold: z.number(),
+  operator: z.string(),
+  timePeriod: z.number(),
+});
 
 export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof graphTrpc> =
   defineTrpcRouter(DashboardApi, graphTrpc)
@@ -168,14 +173,17 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
  * allowed out: a threshold and a period are shown, the provider's own secrets
  * are already gone.
  */
-function alertOf(trigger: Trigger): GraphAlert {
+function alertOf(trigger: Trigger): GraphAlert | undefined {
+  const condition = alertConditionSchema.safeParse(trigger.actionParams);
+  if (!condition.success) return undefined;
+
   const parameters = trigger.actionParams as AlertActionParams;
 
   return {
     enabled: true as const,
-    threshold: parameters.threshold,
-    operator: parameters.operator,
-    timePeriod: parameters.timePeriod,
+    threshold: condition.data.threshold,
+    operator: condition.data.operator,
+    timePeriod: condition.data.timePeriod,
     seriesName: parameters.seriesName || "",
     type: trigger.alertType,
     action: trigger.action,

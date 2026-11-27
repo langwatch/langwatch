@@ -207,41 +207,43 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return rows.map((row) => row.slug);
   }
 
+  /**
+   * One statement per step, never an interactive transaction: the update's `archivedAt: null`
+   * is re-checked under the row lock, so an archive that lands first wins. A create that
+   * collides on an archived id is refused; any other collision is the caller's to retry.
+   */
   async saveActive(input: SaveExperimentInput & { slug: string }): Promise<Experiment> {
-    const row = await this.database.$transaction(async (transaction) => {
-      const existing = await transaction.experiment.findUnique({
+    const fields = {
+      name: input.name,
+      type: input.type,
+      slug: input.slug,
+      workflowId: input.workflowId ?? null,
+      workbenchState:
+        input.workbenchState === null
+          ? Prisma.JsonNull
+          : (input.workbenchState as Prisma.InputJsonValue),
+    };
+
+    const [updated] = await this.database.experiment.updateManyAndReturn({
+      where: { id: input.id, projectId: input.projectId, archivedAt: null },
+      data: fields,
+    });
+    if (updated) return mapExperiment(updated);
+
+    try {
+      const created = await this.database.experiment.create({
+        data: { id: input.id, projectId: input.projectId, ...fields },
+      });
+      return mapExperiment(created);
+    } catch (error) {
+      const existing = await this.database.experiment.findUnique({
         where: { id: input.id, projectId: input.projectId },
         select: { archivedAt: true },
       });
-      if (existing?.archivedAt) {
-        throw new ArchivedExperimentWriteError(input.id);
-      }
+      if (existing?.archivedAt) throw new ArchivedExperimentWriteError(input.id);
 
-      const workbenchState =
-        input.workbenchState === null
-          ? Prisma.JsonNull
-          : (input.workbenchState as Prisma.InputJsonValue);
-      return transaction.experiment.upsert({
-        where: { id: input.id, projectId: input.projectId },
-        create: {
-          id: input.id,
-          projectId: input.projectId,
-          name: input.name,
-          type: input.type,
-          slug: input.slug,
-          workflowId: input.workflowId ?? null,
-          workbenchState,
-        },
-        update: {
-          name: input.name,
-          type: input.type,
-          slug: input.slug,
-          workflowId: input.workflowId ?? null,
-          workbenchState,
-        },
-      });
-    });
-    return mapExperiment(row);
+      throw error;
+    }
   }
 
   async updateWorkbenchState(input: {
