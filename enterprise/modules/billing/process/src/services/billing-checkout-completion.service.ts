@@ -236,12 +236,43 @@ export class BillingCheckoutCompletionService {
 
     // A failed follow-up still lets the plan land, then fails the delivery so
     // Stripe redelivers it: every step here is safe to repeat.
+    const failures = await this.announcePaidCheckout({
+      subscriptionId,
+      pendingId: subscriptionClientReferenceId,
+      organizationId: subscriptionRecord?.organizationId ?? null,
+      selectedCurrency,
+    });
+
+    // Cancel any active trial subscriptions for this org
+    if (subscriptionRecord) {
+      await this.subscriptionRepository.cancelTrialSubscriptions(subscriptionRecord.organizationId);
+    }
+
+    await this.trySetAnnualEventsBillingThreshold(subscriptionId);
+
+    if (failures.length > 0) throw failures[0];
+
+    return { earlyReturn: false };
+  }
+
+  /** The currency choice and the held invites a paid checkout announces; failures returned. */
+  private async announcePaidCheckout({
+    subscriptionId,
+    pendingId,
+    organizationId,
+    selectedCurrency,
+  }: {
+    subscriptionId: string;
+    pendingId: string;
+    organizationId: string | null;
+    selectedCurrency?: string | null;
+  }): Promise<unknown[]> {
     const failures: unknown[] = [];
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
-    if (normalizedCurrency && subscriptionRecord) {
+    if (normalizedCurrency && organizationId !== null) {
       try {
         await this.announcer?.checkoutCurrencySelected({
-          organizationId: subscriptionRecord.organizationId,
+          organizationId,
           currency: normalizedCurrency,
         });
       } catch (err) {
@@ -254,12 +285,12 @@ export class BillingCheckoutCompletionService {
     }
 
     // Organization opens the PAYMENT_PENDING invites linked to this subscription from the fact.
-    if (this.announcer && subscriptionRecord) {
+    if (this.announcer && organizationId !== null) {
       try {
         // The invitations were held against the checkout's own row, even when it was adopted.
         await this.announcer.seatCheckoutPaid({
-          subscriptionId: subscriptionClientReferenceId,
-          organizationId: subscriptionRecord.organizationId,
+          subscriptionId: pendingId,
+          organizationId,
         });
       } catch (err) {
         logger.error(
@@ -269,17 +300,7 @@ export class BillingCheckoutCompletionService {
         failures.push(err);
       }
     }
-
-    // Cancel any active trial subscriptions for this org
-    if (subscriptionRecord) {
-      await this.subscriptionRepository.cancelTrialSubscriptions(subscriptionRecord.organizationId);
-    }
-
-    await this.trySetAnnualEventsBillingThreshold(subscriptionId);
-
-    if (failures.length > 0) throw failures[0];
-
-    return { earlyReturn: false };
+    return failures;
   }
 
   /**

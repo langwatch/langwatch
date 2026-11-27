@@ -443,6 +443,25 @@ const streamExecution = async ({
   }
 };
 
+/** The project a run starts in, or undefined after toasting why it cannot start. */
+const startableProjectId = ({
+  projectId,
+  hasDataset,
+}: {
+  projectId: string | undefined;
+  hasDataset: boolean;
+}): string | undefined => {
+  if (!projectId || !hasDataset) {
+    toastCannotExecute();
+    return undefined;
+  }
+  if (!readWorkbenchAccess().mayRun) {
+    toastRunNotAllowed();
+    return undefined;
+  }
+  return projectId;
+};
+
 // ============================================================================
 // Hook
 // ============================================================================
@@ -513,14 +532,11 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       scope: ExecutionScope = { type: "full" },
       options?: { onRunStarted?: (runId: string) => void },
     ) => {
-      if (!project?.id || !activeDataset) {
-        toastCannotExecute();
-        return;
-      }
-      if (!readWorkbenchAccess().mayRun) {
-        toastRunNotAllowed();
-        return;
-      }
+      const projectId = startableProjectId({
+        projectId: project?.id,
+        hasDataset: Boolean(activeDataset),
+      });
+      if (projectId === undefined) return;
 
       // Reset state
       setStatus("running");
@@ -542,7 +558,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           experimentSlug: experimentSlug ?? undefined,
           results: useEvaluationsV3Store.getState().results,
         },
-        projectId: project.id,
+        projectId,
         scope,
         concurrency,
       });

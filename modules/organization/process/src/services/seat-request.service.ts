@@ -9,7 +9,6 @@ import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { SignInIdpKind } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import {
-  type HeldMembership,
   type HeldMemberships,
   type MyAccessRequest,
   type OpenSeatRequests,
@@ -17,12 +16,10 @@ import {
   OrganizationUserRole,
   type RefusedSignInOutcome,
   type SeatApprovalCompletion,
-  type SeatApprovalPath,
   type SeatApprovalWithSeat,
   SeatRequestFullMemberError,
   SeatRequestNotFoundError,
   type SeatRequestResolved,
-  type SeatRequestSource,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
@@ -30,7 +27,7 @@ import type {
   SeatRequestRepository,
   SeatRequestRow,
 } from "../repositories/seat-request.repository.ts";
-import { type SeatApprovalPlan, seatApprovalPath } from "../rules/seat-approval-path.rules.ts";
+import type { SeatApprovalPlan } from "../rules/seat-approval-path.rules.ts";
 import type {
   AccessNoticeApproval,
   AccessNoticeRecipient,
@@ -41,9 +38,8 @@ import type {
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
 import { SeatRequestApprovalService } from "./seat-request-approval.service.ts";
-
-/** One person to contact about a held seat, in the order they are named. */
-type SeatContact = Readonly<{ userId: string; name: string | null; email: string | null }>;
+import { SeatRequestContactService } from "./seat-request-contact.service.ts";
+import { SeatRequestNoticeService } from "./seat-request-notice.service.ts";
 
 /** The membership operations an approval performs, all organization's own. */
 export interface SeatRequestMemberships {
@@ -130,9 +126,13 @@ export class SeatRequestService {
 
   private constructor(private readonly dependencies: Dependencies) {
     this.approval = SeatRequestApprovalService.create(dependencies);
+    this.notice = SeatRequestNoticeService.create(dependencies);
+    this.contacts = SeatRequestContactService.create(dependencies);
   }
 
   private readonly approval: SeatRequestApprovalService;
+  private readonly notice: SeatRequestNoticeService;
+  private readonly contacts: SeatRequestContactService;
 
   /**
    * Opens a request when an admission asked for a full seat and was left Lite or held (ruling
@@ -154,7 +154,7 @@ export class SeatRequestService {
     if (requested !== "MEMBER") return;
     const person = await this.memberOf({ organizationId, userId });
     if (!person?.email) return;
-    await this.open({
+    await this.notice.open({
       organizationId,
       email: person.email,
       userId,
@@ -194,7 +194,7 @@ export class SeatRequestService {
       return { outcome };
     }
     if (outcome === "seat_limit") {
-      await this.open({
+      await this.notice.open({
         organizationId,
         email: address,
         userId: null,
@@ -237,7 +237,7 @@ export class SeatRequestService {
     });
     const [rows, approval] = await Promise.all([
       this.dependencies.requests.findOpen({ organizationId }),
-      this.approvalOf({ organizationId }),
+      this.notice.approvalOf({ organizationId }),
     ]);
     return {
       requests: rows.map((row) => ({
@@ -273,7 +273,7 @@ export class SeatRequestService {
       throw new SeatRequestNotFoundError(request.id);
     }
     const resolved = await this.approval.approve({ ...input, openedAt: request.openedAt });
-    await this.tellRequester({ request, outcome: "approved" });
+    await this.notice.tellRequester({ request, outcome: "approved" });
     return resolved;
   }
 
@@ -294,7 +294,7 @@ export class SeatRequestService {
     });
     const bought: { purchase?: SeatPurchase } = {};
     const buySeat = async () => {
-      const { path } = await this.approvalOf({ organizationId });
+      const { path } = await this.notice.approvalOf({ organizationId });
       if (path.kind !== "stripe_seats") return false;
       bought.purchase = await this.dependencies.peers.addFullSeat({
         organizationId,
@@ -360,7 +360,7 @@ export class SeatRequestService {
     if (isFull && !membership.disabledAt) throw new SeatRequestFullMemberError();
     const email = membership.user.email?.toLowerCase();
     if (!email) throw new SeatRequestFullMemberError();
-    await this.open({
+    await this.notice.open({
       organizationId,
       email,
       userId,
@@ -409,31 +409,13 @@ export class SeatRequestService {
       at: this.dependencies.now(),
     });
     if (!declined) throw new SeatRequestNotFoundError(request.id);
-    await this.tellRequester({ request, outcome: "declined" });
+    await this.notice.tellRequester({ request, outcome: "declined" });
     return { outcome: "declined" };
   }
 
   /** The caller's memberships they cannot use, each with whom to contact (ruling R2). */
   async heldMemberships({ userId }: { userId: string }): Promise<HeldMemberships> {
-    const [states, requests] = await Promise.all([
-      this.dependencies.members.findMembershipStates({ userId }),
-      this.dependencies.requests.findForUser({ userId }),
-    ]);
-    const held: HeldMembership[] = [];
-    for (const state of states.filter((candidate) => candidate.disabled)) {
-      const request = requests.find((row) => row.organizationId === state.organizationId);
-      const contacts = await this.contacts({ organizationId: state.organizationId });
-      held.push({
-        organizationId: state.organizationId,
-        organizationName: state.organizationName,
-        reason: heldReason({ role: state.role, request }),
-        contacts: contacts.flatMap((contact) => {
-          const name = contact.name ?? contact.email;
-          return name ? [{ name, email: contact.email }] : [];
-        }),
-      });
-    }
-    return { hasActiveMembership: states.some((state) => !state.disabled), held };
+    return this.contacts.heldMemberships({ userId });
   }
 
   /** Active administrators first, then Billing members, each once, with an address. */
@@ -442,10 +424,7 @@ export class SeatRequestService {
   }: {
     organizationId: string;
   }): Promise<AccessNoticeRecipient[]> {
-    const contacts = await this.contacts({ organizationId });
-    return contacts.flatMap((contact) =>
-      contact.email ? [{ userId: contact.userId, email: contact.email }] : [],
-    );
+    return this.contacts.recipients({ organizationId });
   }
 
   /** The mail's wording of the approval, from the same path the requests list shows. */
@@ -454,144 +433,7 @@ export class SeatRequestService {
   }: {
     organizationId: string;
   }): Promise<AccessNoticeApproval> {
-    const { seatFree, path } = await this.approvalOf({ organizationId });
-    if (seatFree) return { kind: "seat_free" };
-    return path.kind === "stripe_seats"
-      ? { kind: "stripe_seats", seatPrice: path.seatPrice }
-      : { kind: path.kind };
-  }
-
-  private async open(input: {
-    organizationId: string;
-    email: string;
-    userId: string | null;
-    name: string | null;
-    source: SeatRequestSource;
-    idpRefused: boolean;
-    idpKind: SignInIdpKind | null;
-    reason?: string | null;
-    onlyIfAbsent?: boolean;
-  }): Promise<void> {
-    const { requests, notices, now, newId } = this.dependencies;
-    const opened = await requests.open({ ...input, id: newId(), at: now() });
-    // A member's own ask on an arrival's open request is still noticed, under the daily limit.
-    const asked = opened.outcome === "already_open" && input.source === "requested";
-    if (opened.outcome !== "opened" && opened.outcome !== "reopened" && !asked) return;
-    // The request is open either way, and a later arrival answers already_open, so sales are
-    // told even when the notice could not be recorded.
-    await notices
-      .record({
-        organizationId: input.organizationId,
-        kind: "seat_request",
-        email: input.email,
-        name: input.name,
-        idp: input.idpKind,
-        idpRefused: input.idpRefused,
-        heldWithoutAccess: input.source !== "lite" && input.source !== "requested",
-        ...(input.source === "requested"
-          ? { askedFor: { reason: input.reason ?? null }, seatRequestId: opened.request.id }
-          : {}),
-      })
-      .catch((error: unknown) => {
-        this.dependencies.logger.warn(
-          { organizationId: input.organizationId, error },
-          "could not record the seat request notice",
-        );
-      });
-    // The request is saved; a failed sales notice is logged and released for the next ask.
-    await this.tellSales({ request: opened.request }).catch((error: unknown) => {
-      this.dependencies.logger.warn(
-        { organizationId: input.organizationId, error },
-        "could not tell sales about the seat request",
-      );
-    });
-  }
-
-  /**
-   * The person who asked hears the answer, when LangWatch knows their account; never throws.
-   * A member who pressed Request access is also told in-app.
-   */
-  private async tellRequester({
-    request,
-    outcome,
-  }: {
-    request: SeatRequestRow;
-    outcome: "approved" | "declined";
-  }): Promise<void> {
-    if (!request.userId) return;
-    await this.dependencies.notices
-      .mailAnswer({
-        organizationId: request.organizationId,
-        seatRequestId: request.id,
-        openedAt: request.openedAt,
-        email: request.email,
-        outcome,
-      })
-      .catch((error: unknown) => {
-        this.dependencies.logger.warn(
-          { organizationId: request.organizationId, error },
-          "could not mail the seat request answer",
-        );
-      });
-    if (request.source !== "requested") return;
-    await this.dependencies.notices.pushAnswer({
-      organizationId: request.organizationId,
-      seatRequestId: request.id,
-      openedAt: request.openedAt,
-      userId: request.userId,
-      outcome,
-    });
-  }
-
-  /** Sales hear once per opening, and only where only sales can sell the seat. */
-  private async tellSales({ request }: { request: SeatRequestRow }): Promise<void> {
-    const { organizationId } = request;
-    const [plan, { path }] = await Promise.all([
-      this.dependencies.peers.activePlan({ organizationId }),
-      this.approvalOf({ organizationId }),
-    ]);
-    if (path.kind !== "contact_sales" || !this.dependencies.isSaas) return;
-    // Read before the claim, so a failed read leaves the notice to the next opening or ask.
-    const organizationName = await this.dependencies.peers.organizationName({ organizationId });
-    const claim = { id: request.id, at: this.dependencies.now() };
-    if (!(await this.dependencies.requests.claimSalesNotice(claim))) return;
-    let sent = false;
-    try {
-      ({ sent } = await this.dependencies.peers.notifySales({
-        organizationId,
-        organizationName,
-        plan: plan.type,
-        seats: plan.maxMembers,
-        requestedSeats: plan.maxMembers + 1,
-      }));
-    } finally {
-      // A notice that did not go out frees its claim, so the next ask sends it.
-      if (!sent) await this.dependencies.requests.releaseSalesNotice(claim);
-    }
-  }
-
-  private async approvalOf({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<{ seatFree: boolean; path: SeatApprovalPath }> {
-    const { peers, seats, isSaas } = this.dependencies;
-    const [plan, pricing, organizationName, full] = await Promise.all([
-      peers.activePlan({ organizationId }),
-      peers.pricing({ organizationId }),
-      peers.organizationName({ organizationId }),
-      seats.checkLimit({ organizationId, resource: "members" }),
-    ]);
-    return {
-      seatFree: full.allowed,
-      path: seatApprovalPath({
-        isSaas,
-        plan,
-        pricingModel: pricing.pricingModel,
-        currency: pricing.currency,
-        organizationName,
-      }),
-    };
+    return this.notice.noticeApproval({ organizationId });
   }
 
   private async memberOf({
@@ -609,48 +451,8 @@ export class SeatRequestService {
       });
     return row ? { name: row.user.name, email: row.user.email?.toLowerCase() ?? null } : undefined;
   }
-
-  private async contacts({ organizationId }: { organizationId: string }): Promise<SeatContact[]> {
-    const { memberships, peers, members, logger } = this.dependencies;
-    const [administrators, billing, rows] = await Promise.all([
-      memberships.findAdministrators({ organizationId }),
-      peers.billingMembers({ organizationId }).catch((error: unknown) => {
-        logger.warn({ organizationId, error }, "could not read the organization's Billing members");
-        return [];
-      }),
-      members.findMembersWithDepartments({ organizationId }),
-    ]);
-    const seen = new Set<string>();
-    const ordered: SeatContact[] = [];
-    for (const administrator of administrators) {
-      if (seen.has(administrator.userId)) continue;
-      seen.add(administrator.userId);
-      ordered.push(administrator);
-    }
-    for (const { userId } of billing) {
-      const row = rows.find(
-        (candidate) => candidate.userId === userId && candidate.disabledAt === null,
-      );
-      if (!row || seen.has(userId)) continue;
-      seen.add(userId);
-      ordered.push({ userId, name: row.user.name, email: row.user.email });
-    }
-    return ordered;
-  }
 }
 
-/** Over the seat limit while a request waits or the row is held Lite; otherwise turned off. */
-function heldReason({
-  role,
-  request,
-}: {
-  role: OrganizationUserRole;
-  request: SeatRequestRow | undefined;
-}): HeldMembership["reason"] {
-  if (request?.status === "OPEN") return "seat_limit";
-  if (request?.status === "DECLINED") return "access_turned_off";
-  return role === OrganizationUserRole.EXTERNAL ? "seat_limit" : "access_turned_off";
-}
 /** How a stored request reads to the person who asked. */
 const ACCESS_STATUS: Record<SeatRequestRow["status"], MyAccessRequest["status"]> = {
   OPEN: "open",

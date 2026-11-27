@@ -1,28 +1,20 @@
 import {
-  AmbiguousSubscriptionError,
   Currency,
   type Currency as CurrencyType,
   type BillingInterval,
   createCheckoutLineItems,
-  isGrowthSeatPrice,
-  NoActiveSubscriptionError,
   resolveGrowthSeatPlanType,
   SeatChangeBusyError,
   SeatChangeNeedsSupportError,
-  SeatCheckoutRequiredError,
   type StripePriceMap,
   SubscriptionItemNotFoundError,
   SubscriptionAlreadyActiveError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
-import type {
-  SeatEventSubscriptionRepository,
-  SeatSubscriptionRow,
-} from "../repositories/seat-event-subscription.repository.ts";
+import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import { blocksSeatCheckout, isCustomDeal } from "../rules/seat-checkout-guard.rules.ts";
 import {
   chargedAmounts,
@@ -30,18 +22,16 @@ import {
   resolveProrationDate,
   seatChange,
 } from "../rules/seat-event-quote.rules.ts";
-import { planSeatChange, type SeatChangePlan, seatsKeptAt } from "../rules/seat-kept.rules.ts";
+import type { SeatChangePlan } from "../rules/seat-kept.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { DuplicateSubscriptionAlerts } from "./duplicate-subscription-alert.service.ts";
+import { type SeatChangeTarget, SeatChangeTargetService } from "./seat-change-target.service.ts";
 import { SeatCheckoutSessionService } from "./seat-checkout-session.service.ts";
 import { type SeatLineGuard, SeatLineLeaseService } from "./seat-line-lease.service.ts";
 import { SeatLineMoveService } from "./seat-line-move.service.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
 const logger = createLogger("langwatch:billing:seatEventSubscription");
-
-/** The audit actor for a correction billing makes on its own, with no operator behind it. */
-const SELF_HEAL_ACTOR = "system:billing";
 
 /** How long a seat change waits for another change or a repair on the same subscription. */
 const SEAT_CHANGE_WAIT_MS = 15_000;
@@ -58,7 +48,7 @@ export class SeatEventSubscriptionService {
   private readonly seatLine: SeatLineMoveService;
   private readonly lease: SeatLineLeaseService;
   private readonly checkoutSessions: SeatCheckoutSessionService;
-  private readonly duplicates: DuplicateSubscriptionAlerts;
+  private readonly targets: SeatChangeTargetService;
 
   private constructor({
     stripeSubscriptions,
@@ -80,7 +70,13 @@ export class SeatEventSubscriptionService {
     this.abandoned = abandoned;
     this.prices = prices;
     this.customerCurrency = customerCurrency;
-    this.duplicates = duplicates;
+    this.targets = SeatChangeTargetService.create({
+      stripeSubscriptions,
+      subscriptions,
+      audit: abandoned,
+      prices,
+      duplicates,
+    });
     this.seatLine = SeatLineMoveService.create({ stripeSubscriptions, subscriptions });
     this.lease = SeatLineLeaseService.create({ subscriptions });
     this.checkoutSessions = SeatCheckoutSessionService.create({ stripeSubscriptions });
@@ -96,179 +92,6 @@ export class SeatEventSubscriptionService {
     duplicates: DuplicateSubscriptionAlerts;
   }): SeatEventSubscriptionService {
     return new SeatEventSubscriptionService(options);
-  }
-
-  /**
-   * The subscription a seat change should act on, or a named reason there isn't one.
-   */
-  private async findSeatSubscription(
-    organizationId: string,
-    { heal }: { heal: boolean } = { heal: false },
-  ) {
-    const candidates = await this.subscriptions.findSeatCandidates({ organizationId });
-
-    const linked = (subscription: (typeof candidates)[number]) =>
-      subscription.stripeSubscriptionId !== null;
-
-    const active = candidates.filter((s) => s.status === SubscriptionStatus.ACTIVE);
-
-    // Two active rows: when exactly one is live in Stripe, the others are local
-    // rows nothing bills; a change closes them and goes on, a read just uses the live one.
-    // Two live in Stripe, or a stray that is a custom deal, is for ops: refuse and tell them.
-    if (active.length > 1) {
-      const kept = await this.resolveStrayRows({ organizationId, active, heal });
-      if (kept) return kept;
-
-      const subscriptionIds = active.map((s) => s.id);
-      logger.error(
-        { organizationId, subscriptionIds, linkedCount: active.filter(linked).length },
-        "[billing] Organization has multiple active subscriptions; refusing to guess which one a seat change belongs to",
-      );
-      await this.duplicates.reportDuplicateActive({ organizationId, subscriptionIds });
-
-      throw new AmbiguousSubscriptionError(active.length);
-    }
-
-    // A live subscription we can act on beats everything.
-    const activeLinked = candidates.find(
-      (s) => s.status === SubscriptionStatus.ACTIVE && linked(s),
-    );
-    if (activeLinked?.stripeSubscriptionId) {
-      return {
-        ...activeLinked,
-        stripeSubscriptionId: activeLinked.stripeSubscriptionId,
-      };
-    }
-
-    // An ACTIVE row with no link outranks any cancelled one: it is the
-    // organization's current plan with nothing in Stripe to change, so the seats
-    // go through Checkout, whose completion links this row (landOnLivePlan).
-    const activeUnlinked = candidates.find(
-      (s) => s.status === SubscriptionStatus.ACTIVE && !linked(s),
-    );
-    if (activeUnlinked && isCustomDeal(activeUnlinked)) {
-      logger.warn(
-        { organizationId, subscriptionId: activeUnlinked.id },
-        "[billing] Active subscription is a custom plan with no Stripe link; seats change through support",
-      );
-      throw new SeatChangeNeedsSupportError();
-    }
-    if (activeUnlinked) {
-      logger.warn(
-        { organizationId, subscriptionId: activeUnlinked.id },
-        "[billing] Active subscription has no Stripe link; the seat change goes through checkout",
-      );
-
-      throw new SeatCheckoutRequiredError();
-    }
-
-    // Cancelled in our records but possibly still live at the provider —
-    // updating seats is how a customer reverses a scheduled cancellation.
-    const cancelledLinked = candidates.find((s) => linked(s));
-    if (cancelledLinked?.stripeSubscriptionId) {
-      return {
-        ...cancelledLinked,
-        stripeSubscriptionId: cancelledLinked.stripeSubscriptionId,
-      };
-    }
-
-    throw new NoActiveSubscriptionError();
-  }
-
-  /**
-   * The one ACTIVE row live in Stripe among several, or nothing when none or two are, or a stray
-   * is a custom deal (the caller then refuses). With `heal` (a seat change) the strays are closed,
-   * audited first; a read leaves them and asks Stripe only when two rows are linked.
-   */
-  private async resolveStrayRows({
-    organizationId,
-    active,
-    heal,
-  }: {
-    organizationId: string;
-    active: SeatSubscriptionRow[];
-    heal: boolean;
-  }): Promise<(SeatSubscriptionRow & { stripeSubscriptionId: string }) | null> {
-    const linkedRows = active.flatMap((row) =>
-      row.stripeSubscriptionId === null
-        ? []
-        : [{ ...row, stripeSubscriptionId: row.stripeSubscriptionId }],
-    );
-    const live: (SeatSubscriptionRow & { stripeSubscriptionId: string })[] = [];
-    for (const row of linkedRows) {
-      if (linkedRows.length === 1 && !heal) live.push(row);
-      else if (await this.isLiveInStripe(row.stripeSubscriptionId)) live.push(row);
-    }
-    const [kept] = live;
-    if (!kept || live.length > 1) return null;
-
-    const strays = active.filter((row) => row.id !== kept.id);
-    if (strays.some(isCustomDeal)) return null;
-    if (!heal) return kept;
-
-    const strayIds = strays.map((row) => row.id);
-    try {
-      await this.abandoned.audited({
-        tenantId: organizationId,
-        userId: SELF_HEAL_ACTOR,
-        action: "subscription.supersedeStrayRows",
-        args: { keptId: kept.id, strayIds },
-        targetKind: "organization",
-        targetId: organizationId,
-      });
-    } catch (error) {
-      logger.error(
-        { error, organizationId },
-        "[billing] Could not audit closing stray subscriptions",
-      );
-      return null;
-    }
-    await this.subscriptions.supersedeStrayRows({ ids: strayIds });
-    logger.warn(
-      { organizationId, keptId: kept.id, strayIds },
-      "[billing] Closed active subscriptions with no live Stripe subscription beside the live one",
-    );
-    return kept;
-  }
-
-  /** Whether Stripe still bills this subscription; an unreadable one counts as live, to refuse. */
-  private async isLiveInStripe(stripeSubscriptionId: string): Promise<boolean> {
-    try {
-      const { status } = await this.stripeSubscriptions.getSubscription({
-        subscriptionId: stripeSubscriptionId,
-      });
-      return status !== "canceled" && status !== "incomplete_expired";
-    } catch {
-      return true;
-    }
-  }
-
-  /** The subscription, its provider record, and the seat line to change. */
-  private async loadSeatChangeTarget(
-    organizationId: string,
-    options: { heal: boolean } = { heal: false },
-  ) {
-    const subscription = await this.findSeatSubscription(organizationId, options);
-
-    const stripeSubscription = await this.stripeSubscriptions.getSubscription({
-      subscriptionId: subscription.stripeSubscriptionId,
-    });
-
-    // Must still be live at the provider, even if scheduled for cancellation or behind on a
-    // payment: a past due subscription can still drop seats, and adding them is held upstream.
-    if (stripeSubscription.status !== "active" && stripeSubscription.status !== "past_due") {
-      throw new NoActiveSubscriptionError();
-    }
-
-    const seatItem = stripeSubscription.items.find((item) =>
-      isGrowthSeatPrice(item.priceId, this.prices),
-    );
-
-    if (!seatItem) {
-      throw new SubscriptionItemNotFoundError("seat");
-    }
-
-    return { subscription, stripeSubscription, seatItem };
   }
 
   // An arrow instance property, not a prototype method: tests hold a mock
@@ -455,7 +278,7 @@ export class SeatEventSubscriptionService {
     const prorationDate = resolveProrationDate(quotedAt);
 
     // One change or repair at a time per subscription, from its Stripe read to its last write.
-    const found = await this.findSeatSubscription(organizationId, { heal: true });
+    const found = await this.targets.getSubscription(organizationId, { heal: true });
     const held = await this.lease.hold({
       id: found.id,
       waitMs: SEAT_CHANGE_WAIT_MS,
@@ -483,10 +306,10 @@ export class SeatEventSubscriptionService {
     guard: SeatLineGuard;
   }): Promise<void> {
     // Read again under the lease: a change it waited behind may have moved the seats it keeps.
-    const target = await this.loadSeatChangeTarget(organizationId, { heal: true });
+    const target = await this.targets.load(organizationId, { heal: true });
     if (target.subscription.id !== leased) throw new SeatChangeBusyError();
     const { subscription, stripeSubscription, seatItem } = target;
-    const plan = this.planChange({ target, requested: totalMembers });
+    const plan = this.targets.plan({ target, requested: totalMembers });
 
     // Kept seats are recorded first: a provider webhook lowering the count before the final
     // write still finds the seats paid for, and a retry recomputes the same plan.
@@ -513,35 +336,6 @@ export class SeatEventSubscriptionService {
     });
   }
 
-  /** How a requested seat count reaches the provider, from what it bills and keeps now. */
-  private planChange({
-    target,
-    requested,
-  }: {
-    target: Awaited<ReturnType<SeatEventSubscriptionService["loadSeatChangeTarget"]>>;
-    requested: number;
-  }): SeatChangePlan {
-    const { subscription, stripeSubscription, seatItem } = target;
-    const billed = seatItem.quantity ?? subscription.maxMembers ?? 0;
-    const keptSeats = seatsKeptAt({
-      seatsKept: subscription.seatsKept,
-      seatsKeptUntil: subscription.seatsKeptUntil,
-      now: nowInstant(),
-    });
-    const periodEnd = stripeSubscription.currentPeriodEnd;
-    if (periodEnd == null) {
-      throw new SubscriptionItemNotFoundError("current_period_end");
-    }
-
-    return planSeatChange({
-      billed,
-      keptSeats,
-      keptUntil: subscription.seatsKeptUntil,
-      requested,
-      periodEnd: Temporal.Instant.fromEpochMilliseconds(periodEnd * 1000),
-    });
-  }
-
   /** The quote for `added` seats beyond the ones billed now; refuses as previewProration does. */
   async quoteAddedSeats({
     organizationId,
@@ -550,7 +344,7 @@ export class SeatEventSubscriptionService {
     organizationId: string;
     added: number;
   }): Promise<SeatEventProrationQuote> {
-    const { subscription, seatItem } = await this.loadSeatChangeTarget(organizationId);
+    const { subscription, seatItem } = await this.targets.load(organizationId);
     const billed = seatItem.quantity ?? subscription.maxMembers ?? 0;
     return this.previewProration({ organizationId, newTotalSeats: billed + added });
   }
@@ -568,9 +362,9 @@ export class SeatEventSubscriptionService {
   }): Promise<SeatEventProrationQuote> => {
     const prorationDate = resolveProrationDate(undefined);
 
-    const target = await this.loadSeatChangeTarget(organizationId);
+    const target = await this.targets.load(organizationId);
     const { subscription, stripeSubscription, seatItem } = target;
-    const plan = this.planChange({ target, requested: newTotalSeats });
+    const plan = this.targets.plan({ target, requested: newTotalSeats });
 
     // Recurring total: new seat count × per-seat price.
     const unitAmountCents = seatItem.unitAmount;
@@ -656,17 +450,16 @@ export class SeatEventSubscriptionService {
   seatChangeTarget = (
     organizationId: string,
     options: { heal: boolean } = { heal: false },
-  ): ReturnType<SeatEventSubscriptionService["loadSeatChangeTarget"]> =>
-    this.loadSeatChangeTarget(organizationId, options);
+  ): Promise<SeatChangeTarget> => this.targets.load(organizationId, options);
 
   /** How `requested` seats reach the provider from what the target bills and keeps now. */
   seatChangePlan = ({
     target,
     requested,
   }: {
-    target: Awaited<ReturnType<SeatEventSubscriptionService["seatChangeTarget"]>>;
+    target: SeatChangeTarget;
     requested: number;
-  }): SeatChangePlan => this.planChange({ target, requested });
+  }): SeatChangePlan => this.targets.plan({ target, requested });
 
   async seatEventBillingPortalUrl({
     customerId,
