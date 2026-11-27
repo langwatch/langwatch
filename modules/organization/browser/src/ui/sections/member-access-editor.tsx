@@ -15,7 +15,7 @@ import {
 import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
 import { SeatRoleOffer } from "../../behavior/lent-seat-role-offer.tsx";
@@ -702,12 +702,14 @@ function useMemberAccessEditor({
     reset,
     setPendingSeat,
   });
-  // The member open now: an answer for a member since closed leaves the editor alone.
+  // One visit per opening of a member, so reopening the same member is a new visit: an answer
+  // for a visit since closed leaves the editor alone.
   const thisMember = memberKey({ organizationId, userId });
-  const openMember = useRef(thisMember);
+  const thisVisit = useMemo(() => ({ member: thisMember }), [thisMember]);
+  const openVisit = useRef(thisVisit);
   useEffect(() => {
-    openMember.current = thisMember;
-  }, [thisMember]);
+    openVisit.current = thisVisit;
+  }, [thisVisit]);
 
   const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
@@ -771,7 +773,7 @@ function useMemberAccessEditor({
           bindingIdsToDelete: [...pendingGrantRemovals],
           bindingsToCreate: additions.map(bindingToCreate),
         }),
-      stillOpen: () => openMember.current === thisMember,
+      stillOpen: () => openVisit.current === thisVisit,
       uncommitted,
       removed: pendingGrantRemovals,
       added: pendingGrantAdditions,
@@ -794,7 +796,7 @@ function useMemberAccessEditor({
         applyStagedGrants,
         refresh: refreshAccessQueries,
         onBatchFailed: (error) => {
-          if (openMember.current === thisMember) keepStagedOnRoleRefresh.current = true;
+          if (openVisit.current === thisVisit) keepStagedOnRoleRefresh.current = true;
           showErrorToast({
             error,
             fallbackTitle: "The role changed, but the access rows did not save",

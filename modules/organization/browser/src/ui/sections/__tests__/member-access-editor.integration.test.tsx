@@ -945,6 +945,35 @@ describe("<MemberAccessEditor/>", () => {
     });
   });
 
+  describe("when a failed save answers after the admin left and reopened the member", () => {
+    /** @scenario "Access rows that do not save after the paid role change are named" */
+    it("stages nothing again in the new visit", async () => {
+      let refuse: (error: Error) => void = () => {};
+      mockApplyMemberGrants.mockImplementationOnce(
+        () => new Promise((_resolve, reject) => (refuse = reject)),
+      );
+      const props = {
+        memberRole: OrganizationUserRole.MEMBER,
+        canManage: true,
+        isCurrentUser: false,
+      };
+      const view = renderEditor();
+      fireEvent.click(screen.getByTestId("stub-fill-draft"));
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+      await vi.waitFor(() => expect(mockApplyMemberGrants).toHaveBeenCalledTimes(1));
+
+      view.rerender(<MemberAccessEditor organizationId="org-1" userId="user-2" {...props} />);
+      view.rerender(<MemberAccessEditor organizationId="org-1" userId="user-1" {...props} />);
+      refuse(new Error("boom"));
+
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
+      });
+      expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+  });
+
   describe("when no changes are pending", () => {
     it("leaves the Save button disabled", () => {
       renderEditor();

@@ -401,8 +401,9 @@ export class MemberRoleSeatPurchaseService {
         if (await this.dependencies.pending.settle({ organizationId, id, status: "failed" })) {
           return { status: "failed", reason: null };
         }
+        // A change that expired meanwhile is gone, the same as one expiring under the claim.
         const [current] = await this.dependencies.pending.findById({ organizationId, id });
-        return current ? outcomeOf(current) : { status: "failed", reason: null };
+        return current ? outcomeOf(current) : null;
       }
     }
 

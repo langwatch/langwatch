@@ -629,6 +629,20 @@ describe("MemberRoleSeatPurchaseService", () => {
     });
 
     /** @scenario "A failed or abandoned payment changes nothing" */
+    it("answers not found when the change expired while its failed settle lost", async () => {
+      let clock = 1_000;
+      const { service, settleSeatPayment } = await waiting(INVOICE, () => clock);
+      settleSeatPayment.mockImplementationOnce(async () => {
+        clock += 8 * 24 * 60 * 60 * 1000;
+        return { status: "failed" };
+      });
+
+      await expect(
+        service.complete({ organizationId: ORG, changeId: "change_1" }),
+      ).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    /** @scenario "A failed or abandoned payment changes nothing" */
     it("applies nothing when the change expired while it was being claimed", async () => {
       let clock = 1_000;
       const { state, service, pay, pending } = await waiting(INVOICE, () => clock);
