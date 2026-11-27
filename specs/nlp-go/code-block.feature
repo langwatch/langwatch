@@ -605,6 +605,12 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the code block executor is built
       Then code blocks refuse to run, naming the process and the variable it holds
 
+    @unit
+    Scenario: on AWS Lambda, the web adapter starts without the role's credentials
+      Given the image starts the web adapter through a readable launcher in /opt/extensions
+      When Lambda starts the extension with the role's credentials in its environment
+      Then the adapter runs execute-only with every other variable but none of the role's credentials
+
     # Lambda also refuses PR_SET_CHILD_SUBREAPER, so an orphan lands on PID 1
     # and the sweep cannot claim one that scrubbed the run's marks; the run is
     # kept in its process group instead.

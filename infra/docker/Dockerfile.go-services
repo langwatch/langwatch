@@ -62,6 +62,13 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
       -ldflags="-s -w -X main.Version=${VERSION}" -trimpath \
       -o /out/service ./cmd/service
+# The Lambda image's extension entry: starts the web adapter without the role's
+# credentials (cmd/lambdaextension).
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+      -ldflags="-s -w" -trimpath \
+      -o /out/lambda-extension ./cmd/lambdaextension
 
 # ─── Code-block sandbox libraries ──────────────────────────────────────────────
 # The curated set of packages available inside a Studio code block (see
@@ -120,9 +127,13 @@ ENTRYPOINT ["/usr/local/bin/service"]
 # needs must be readable by a non-root user, or for a binary executable by one.
 # https://docs.aws.amazon.com/lambda/latest/dg/images-create.html#images-reqs
 FROM service AS lambda
-# Execute-only for the same reason: the adapter runs as the function's user
-# with the role's credentials in its environment.
-COPY --from=lambda-adapter --chmod=0711 /lambda-adapter /opt/extensions/lambda-adapter
+# Lambda must read an extension to start it, so /opt/extensions holds a small
+# readable launcher (cmd/lambdaextension). It drops the role's credentials from
+# its environment and execs the real adapter, kept execute-only under the same
+# file name, which the adapter registers as. ciguard's lambda-extensions guard
+# holds both modes.
+COPY --from=go-build --chmod=0755 /out/lambda-extension /opt/extensions/lambda-adapter
+COPY --from=lambda-adapter --chmod=0711 /lambda-adapter /opt/lwa/lambda-adapter
 # nlpgo binds $SERVER_ADDR and serves /go/* and /healthz. The adapter probes
 # its liveness and streams each SSE flush as its own response chunk.
 ENV SERVER_ADDR=:8080
