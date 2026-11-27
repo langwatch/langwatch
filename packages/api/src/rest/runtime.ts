@@ -1020,7 +1020,14 @@ function authenticateMiddleware({
         await recordStaffRefusal({
           gate: ports.staffAccess,
           error,
-          ...staffRequestInput({ route, credential, request: context.req.raw, family }),
+          // Refused before its body was parsed, so no input is read.
+          ...staffRequestInput({
+            route,
+            credential,
+            request: context.req.raw,
+            family,
+            input: undefined,
+          }),
           scope: null,
         });
         throw error;
@@ -1602,7 +1609,13 @@ function handlerMiddleware<Api>({
       return answerWith({ context, next, route, result: anonymous });
     }
 
-    const staffInput = staffRequestInput({ route, credential, request: context.req.raw, family });
+    const staffInput = staffRequestInput({
+      route,
+      credential,
+      request: context.req.raw,
+      family,
+      input,
+    });
 
     const authorized = await (async () => {
       const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
@@ -1687,18 +1700,26 @@ function handlerMiddleware<Api>({
   };
 }
 
-/** What the staff gate is told of a route a staff key called, by its declaration (ADR-202). */
+/**
+ * What the staff gate is told of a route a staff key called, by its declaration read against
+ * this request's input (ADR-202).
+ */
 function staffRequestInput({
   route,
   credential,
   request,
   family,
+  input,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   request: Request;
   family: string;
+  input: unknown;
 }) {
+  const fields = (input ?? {}) as Readonly<Record<string, unknown>>;
+  const confirmation = route.confirmation;
+
   return {
     credential,
     request,
@@ -1707,8 +1728,9 @@ function staffRequestInput({
     route: {
       spends: route.spends === true,
       writes: routeWrites(route),
-      confirms: route.confirmation !== undefined,
+      confirms: confirmation !== undefined && (confirmation.when?.(fields) ?? true),
       servesContent: route.servesContent === true,
+      sendsToUrl: route.sendsToUrl?.when(fields) === true,
     },
   } as const;
 }

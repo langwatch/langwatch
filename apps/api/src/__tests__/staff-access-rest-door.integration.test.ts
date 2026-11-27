@@ -319,6 +319,9 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
       });
       await prisma.evaluator.deleteMany({ where: { projectId: organization.projectId } });
       await prisma.monitor.deleteMany({ where: { projectId: organization.projectId } });
+      await prisma.trigger.deleteMany({ where: { projectId: organization.projectId } });
+      await prisma.slackConnectionClaim.deleteMany({ where });
+      await prisma.slackIntegration.deleteMany({ where });
       await prisma.dataset.deleteMany({ where: { projectId: organization.projectId } });
       await prisma.llmPromptConfigVersion.deleteMany({
         where: { projectId: organization.projectId },
@@ -646,6 +649,85 @@ describe.skipIf(!stores)("given staff access keys on the live api", () => {
           where: { projectId: acme.projectId, name: `No spend ${ns}` },
         }),
       ).toBe(0);
+    });
+  });
+
+  describe("when a support key on ACME approved to spend points triggers somewhere", () => {
+    /** @scenario "A support key never points a trigger at a webhook" */
+    it("is refused a webhook on create and update, and creates and renames email and Slack ones", async () => {
+      const { apiKey, requestId } = await redeemedKey({
+        scopes: ["org:support"],
+        spendApproved: true,
+      });
+      const filters = { "traces.error": ["true"] };
+      const create = (body: Record<string, unknown>) =>
+        call({
+          path: "/api/triggers",
+          method: "POST",
+          bearer: apiKey,
+          projectId: acme.projectId,
+          body: { filters, ...body },
+        });
+
+      const webhook = await create({
+        name: `Staff webhook ${ns}`,
+        action: "SEND_WEBHOOK",
+        actionParams: { url: "https://collector.example.com/hook" },
+      });
+      const email = await create({
+        name: `Staff email ${ns}`,
+        action: "SEND_EMAIL",
+        actionParams: { members: ["olivia@acme.test"] },
+      });
+      const slack = await create({
+        name: `Staff slack ${ns}`,
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: "https://hooks.slack.com/services/T000/B000/staffsupport",
+        },
+      });
+
+      expect({ status: webhook.status, code: webhook.code }).toEqual({
+        status: 403,
+        code: "staff_webhook_not_allowed",
+      });
+      expect(email.status, email.text).toBe(201);
+      expect(slack.status, slack.text).toBe(201);
+      expect(
+        await prisma.trigger.count({
+          where: { projectId: acme.projectId, name: `Staff webhook ${ns}` },
+        }),
+      ).toBe(0);
+
+      const { id: emailId } = z.object({ id: z.string() }).parse(email.json);
+      const patch = (body: Record<string, unknown>) =>
+        call({
+          path: `/api/triggers/${emailId}`,
+          method: "PATCH",
+          bearer: apiKey,
+          projectId: acme.projectId,
+          body,
+        });
+      const toWebhook = await patch({
+        actionParams: { url: "https://collector.example.com/hook" },
+      });
+      const renamed = await patch({ name: `Staff email renamed ${ns}` });
+
+      expect({ status: toWebhook.status, code: toWebhook.code }).toEqual({
+        status: 403,
+        code: "staff_webhook_not_allowed",
+      });
+      expect(renamed.status, renamed.text).toBe(200);
+
+      const trail = await prisma.staffAccessEvent.findMany({
+        where: { requestId, errorCode: "staff_webhook_not_allowed" },
+        orderBy: { at: "asc" },
+      });
+      expect(trail.map(({ method, path, status }) => ({ method, path, status }))).toEqual([
+        { method: "POST", path: "/api/triggers", status: 403 },
+        { method: "PATCH", path: `/api/triggers/${emailId}`, status: 403 },
+      ]);
     });
   });
 

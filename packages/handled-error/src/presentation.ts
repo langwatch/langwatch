@@ -3111,6 +3111,11 @@ const presentations = {
     describe: () =>
       "Staff access never removes or switches off a record, and only changes what it was approved for.",
   },
+  staff_webhook_not_allowed: {
+    title: "Staff access cannot send data to a webhook",
+    describe: () =>
+      "Staff access may set up email and Slack automations, but never one that sends data to a URL it names.",
+  },
   staff_access_audit_unavailable: {
     title: "Staff access could not be recorded",
     describe: () =>

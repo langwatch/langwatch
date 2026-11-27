@@ -168,3 +168,10 @@ an agent that asked twice left two cards with no way to close one.
   data out, so both rest on the operator's approval and the spend tick like every other write
   outside datasets. The only routes a staff key never reaches are those declared
   `.withConfirmation`, which remove or switch off a record. Every write stays audited as before.
+
+## Amendment 2026-11-27: no webhooks for staff keys
+
+A route that can point a delivery at a URL the caller names declares `.sendsToUrl({ when })`, and
+the gate refuses a staff key whose request matches with `staff_webhook_not_allowed`, trailed like
+every refusal: trigger create and update to a webhook are refused, email and Slack stay allowed. A
+`.withConfirmation({ when })` route is refused only when its `when` holds for the request.

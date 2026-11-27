@@ -44,6 +44,7 @@ export {
   StaffAccessUnavailableError,
   StaffContentNotApprovedError,
   StaffSpendNotApprovedError,
+  StaffWebhookNotAllowedError,
   StaffWriteNotAllowedError,
   setOrganizationsCatchingUp,
   UnsupportedMediaTypeError,

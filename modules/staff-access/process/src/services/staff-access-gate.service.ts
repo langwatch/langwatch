@@ -7,6 +7,7 @@ import {
   StaffAccessUnavailableError,
   StaffContentNotApprovedError,
   StaffSpendNotApprovedError,
+  StaffWebhookNotAllowedError,
   StaffWriteNotAllowedError,
 } from "@langwatch/api";
 import type {
@@ -42,6 +43,7 @@ type Refusal =
   | StaffAccessOperatorLostError
   | StaffSpendNotApprovedError
   | StaffContentNotApprovedError
+  | StaffWebhookNotAllowedError
   | StaffWriteNotAllowedError;
 
 type GateDeps = Readonly<{
@@ -185,9 +187,9 @@ export class StaffAccessGateService implements RestStaffAccessGate {
   }
 
   /**
-   * What a live session may do on a route, failing closed (ADR-202). A read passes unless it
-   * serves content to a key without `org:content`. A write never removes or disables a record;
-   * without the spend tick it passes only when every permission it asks is a dataset write.
+   * What a live session may do on a route, failing closed (ADR-202). Nothing sends data to a URL
+   * the caller names; a read passes unless it serves content without `org:content`; a write never
+   * removes or disables a record, and without spend asks only dataset writes.
    */
   private routeRefusal({
     session,
@@ -200,6 +202,7 @@ export class StaffAccessGateService implements RestStaffAccessGate {
     if (request.servesContent && !session.scopes.includes("org:content")) {
       return new StaffContentNotApprovedError();
     }
+    if (request.sendsToUrl) return new StaffWebhookNotAllowedError();
     if (!request.writes) return null;
     if (request.confirms) return new StaffWriteNotAllowedError();
     if (session.spendApproved) return null;
