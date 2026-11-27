@@ -613,7 +613,7 @@ const CLUSTER_REPLICAS_QUERY = `SELECT toUInt32(if(countIf(database_shard_name =
     countIf(database_shard_name = ''), count())) AS replicas FROM system.clusters
   WHERE cluster = {cluster:String} GROUP BY shard_num ORDER BY replicas DESC LIMIT 1`;
 
-export async function readClusterReplicas({
+async function readClusterReplicas({
   client,
   clusterName,
 }: {
@@ -635,93 +635,85 @@ export async function readClusterReplicas({
   return replicas;
 }
 
-export interface WaitForClusterReplicasDeps {
-  /** How many of the cluster's replicas answer right now. */
-  countAnswering: () => Promise<number>;
-  clusterName: string;
-  replicas: number;
+export interface RetryWhileReplicasMissingDeps<T> {
+  /** One attempt: a goose pass or a write that waits for every replica. */
+  run: () => Promise<T>;
   waitSeconds: number;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   log?: (message: string) => void;
 }
 
+const TOO_FEW_REPLICAS =
+  /Number of alive replicas \((\d+)\) is less than requested quorum \((\d+)(?:\/(\d+))?\)/;
+const REPLICA_RETRY_MAX_MS = 10_000;
+
+/** What a TOO_FEW_LIVE_REPLICAS (Code 285) refusal says about the replicas, else null. */
+export function describeTooFewReplicas(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = TOO_FEW_REPLICAS.exec(message);
+  if (match) {
+    const [alive, required] = [Number(match[1]), Number(match[2])];
+    return `${alive} of ${required} replicas are alive, ${required - alive} missing`;
+  }
+  return /TOO_FEW_LIVE_REPLICAS|Code: 285\b/.test(message) ? "too few replicas are alive" : null;
+}
+
 /**
- * Waits until every replica of the cluster answers: goose's writes wait for all of them
- * (insert_quorum), so one still starting refuses each insert with TOO_FEW_LIVE_REPLICAS.
- * Logs every check; past `waitSeconds` fails naming how many replicas are missing.
+ * Runs `run` again while ClickHouse refuses a write for a replica still bringing a table up
+ * (TOO_FEW_LIVE_REPLICAS); goose skips the versions it already applied. Logs each wait; past
+ * `waitSeconds` fails naming how many replicas are missing. Any other failure is thrown.
  */
-export async function waitForClusterReplicas({
-  countAnswering,
-  clusterName,
-  replicas,
+export async function retryWhileReplicasMissing<T>({
+  run,
   waitSeconds,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now = Date.now,
   log = (message) => logger.info(message),
-}: WaitForClusterReplicasDeps): Promise<void> {
+}: RetryWhileReplicasMissingDeps<T>): Promise<T> {
   const startedAt = now();
   const deadline = startedAt + waitSeconds * 1000;
-  for (;;) {
-    const answering = await countAnswering();
-    if (answering >= replicas) return;
-    const current = now();
-    if (current >= deadline) {
-      throw new MigrationError(
-        `ClickHouse cluster "${clusterName}" has ${answering} of ${replicas} replicas answering after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): ${replicas - answering} missing, and every goose write waits for all of them`,
-        "bootstrap",
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      const counts = describeTooFewReplicas(error);
+      if (counts === null) throw error;
+      const current = now();
+      if (current >= deadline) {
+        throw new MigrationError(
+          `ClickHouse refused a write that waits for every replica after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): ${counts}`,
+          "migrate",
+          error instanceof Error ? error : undefined,
+        );
+      }
+      const waitMs = Math.min(
+        WAIT_RETRY_INTERVAL_MS * 2 ** (attempt - 1),
+        REPLICA_RETRY_MAX_MS,
+        deadline - current,
       );
+      const elapsed = Math.round((current - startedAt) / 1000);
+      log(
+        `ClickHouse refused a write that waits for every replica (${counts}); retrying in ${Math.round(waitMs / 1000)}s (${elapsed}s of ${waitSeconds}s)`,
+      );
+      await sleep(waitMs);
     }
-    const elapsed = Math.round((current - startedAt) / 1000);
-    log(
-      `Waiting for ClickHouse cluster "${clusterName}": ${answering} of ${replicas} replicas answer (${elapsed}s of ${waitSeconds}s)`,
-    );
-    await sleep(Math.min(WAIT_RETRY_INTERVAL_MS, deadline - current));
   }
 }
 
-/** The replicas of `clusterName` that answer a query; one that cannot be reached is skipped. */
-export async function countAnsweringReplicas({
-  client,
-  clusterName,
-}: {
-  client: ClickHouseClient;
-  clusterName: string;
-}): Promise<number> {
-  const cluster = clusterName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const result = await client.query({
-    query: `SELECT count() AS answering FROM clusterAllReplicas('${cluster}', system.one)`,
-    clickhouse_settings: { skip_unavailable_shards: 1 },
-    format: "JSONEachRow",
-  });
-  return Number((await result.json<{ answering: number | string }>())[0]?.answering ?? 0);
-}
-
-/**
- * On a cluster: counts the replicas goose's writes wait for, waits until each answers and
- * catches each one up.
- */
+/** On a cluster: counts the replicas goose's writes wait for and catches each one up. */
 async function syncClusterVersionTable({
   client,
   config,
   verbose,
-  waitSeconds,
 }: {
   client: ClickHouseClient;
   config: ClickHouseConfig;
   verbose: boolean | undefined;
-  waitSeconds: number;
 }): Promise<void> {
   const sync = gooseVersionSyncStatement({ config });
   if (!config.clusterName || !sync) return;
-  const clusterName = config.clusterName;
-  config.clusterReplicas = await readClusterReplicas({ client, clusterName });
-  await waitForClusterReplicas({
-    countAnswering: () => countAnsweringReplicas({ client, clusterName }),
-    clusterName,
-    replicas: config.clusterReplicas,
-    waitSeconds,
-  });
+  config.clusterReplicas = await readClusterReplicas({ client, clusterName: config.clusterName });
   if (verbose) logger.debug({ sql: sync }, "Executing bootstrap SQL");
   // An ON CLUSTER timeout arrives after the 200; waiting for the end puts it in the status.
   await client.command({ query: sync, clickhouse_settings: { wait_end_of_query: 1 } });
@@ -810,8 +802,11 @@ async function bootstrapDatabase(
       verbose,
     );
 
-    await syncClusterVersionTable({ client, config, verbose, waitSeconds });
-    await insertInitialVersion({ client, config, verbose });
+    await syncClusterVersionTable({ client, config, verbose });
+    await retryWhileReplicasMissing({
+      run: () => insertInitialVersion({ client, config, verbose }),
+      waitSeconds,
+    });
   });
 
   // Check if 'local_primary' storage policy exists on this CH instance.
@@ -1074,11 +1069,15 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
     requiresDimensionCompat: config.requiresDimensionCompat === true,
     upTo: options.upTo,
   })) {
-    result = await executeGoose({
-      command: pass.command,
-      config,
-      options,
-      allowDimensionsOutsideSortingKey: pass.allowDimensionsOutsideSortingKey,
+    result = await retryWhileReplicasMissing({
+      run: () =>
+        executeGoose({
+          command: pass.command,
+          config,
+          options,
+          allowDimensionsOutsideSortingKey: pass.allowDimensionsOutsideSortingKey,
+        }),
+      waitSeconds: options.waitSeconds ?? DEFAULT_CLICKHOUSE_WAIT_SECONDS,
     });
   }
   logger.info("ClickHouse migrations completed.");

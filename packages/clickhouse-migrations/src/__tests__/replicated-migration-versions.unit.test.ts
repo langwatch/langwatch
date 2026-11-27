@@ -12,29 +12,38 @@ import {
   gooseVersionWriteSettings,
   MigrationError,
   parseConnectionUrl,
-  waitForClusterReplicas,
+  retryWhileReplicasMissing,
 } from "../goose.migration-runner";
 
 const URL_WITH_DATABASE = "http://user:secret@clickhouse-lb:8123/langwatch";
 
-/** A clock that moves only when the wait sleeps, and a replica count that follows a script. */
-const fakeCluster = (answers: readonly number[]) => {
+const REFUSAL = new Error(
+  "[HTTP 500] response body: Code: 285. DB::Exception: Number of alive replicas (2) is less than requested quorum (3/3). (TOO_FEW_LIVE_REPLICAS)",
+);
+
+/** A clock that moves only when the retry sleeps, and a run refused a set number of times. */
+const refusedRun = ({ refusals, error = REFUSAL }: { refusals: number; error?: Error }) => {
   let time = 0;
-  let checks = 0;
+  let runs = 0;
   const logs: string[] = [];
+  const sleeps: number[] = [];
   return {
     deps: {
-      countAnswering: async () => answers[Math.min(checks++, answers.length - 1)] ?? 0,
-      clusterName: "langwatch",
-      replicas: 3,
+      run: async () => {
+        runs++;
+        if (runs <= refusals) throw error;
+        return "applied";
+      },
       now: () => time,
       sleep: async (ms: number) => {
+        sleeps.push(ms);
         time += ms;
       },
       log: (message: string) => logs.push(message),
     },
     logs,
-    checks: () => checks,
+    sleeps,
+    runs: () => runs,
   };
 };
 
@@ -61,45 +70,48 @@ describe("goose on a replicated ClickHouse", () => {
     });
   });
 
-  describe("when one of the three replicas is still starting", () => {
-    /** @scenario "On a cluster goose starts only once every replica answers" */
-    it("checks again until all three answer and logs each wait", async () => {
-      const cluster = fakeCluster([2, 2, 3]);
+  describe("when ClickHouse refuses a write for a replica that is still starting", () => {
+    /** @scenario "A write refused for a replica that is still starting is retried" */
+    it("logs the replica counts, backs off and runs again until the write is accepted", async () => {
+      const run = refusedRun({ refusals: 2 });
 
-      await waitForClusterReplicas({ ...cluster.deps, waitSeconds: 180 });
+      expect(await retryWhileReplicasMissing({ ...run.deps, waitSeconds: 180 })).toBe("applied");
 
-      expect(cluster.checks()).toBe(3);
-      expect(cluster.logs).toEqual([
-        'Waiting for ClickHouse cluster "langwatch": 2 of 3 replicas answer (0s of 180s)',
-        'Waiting for ClickHouse cluster "langwatch": 2 of 3 replicas answer (2s of 180s)',
+      expect(run.runs()).toBe(3);
+      expect(run.sleeps).toEqual([2_000, 4_000]);
+      expect(run.logs).toEqual([
+        "ClickHouse refused a write that waits for every replica (2 of 3 replicas are alive, 1 missing); retrying in 2s (0s of 180s)",
+        "ClickHouse refused a write that waits for every replica (2 of 3 replicas are alive, 1 missing); retrying in 4s (2s of 180s)",
       ]);
-    });
-
-    it("does not wait when every replica already answers", async () => {
-      const cluster = fakeCluster([3]);
-
-      await waitForClusterReplicas({ ...cluster.deps, waitSeconds: 180 });
-
-      expect(cluster.checks()).toBe(1);
-      expect(cluster.logs).toEqual([]);
     });
   });
 
-  describe("when a replica never answers", () => {
-    /** @scenario "A replica that never answers fails the run with the count it is missing" */
-    it("fails in the bootstrap phase naming the cluster and the missing count", async () => {
-      const cluster = fakeCluster([2]);
+  describe("when the refusals outlast CLICKHOUSE_MIGRATE_WAIT_SECONDS", () => {
+    /** @scenario "A replica that never comes back fails the run with the count it is missing" */
+    it("fails in the migrate phase naming the alive and missing replicas", async () => {
+      const run = refusedRun({ refusals: Number.POSITIVE_INFINITY });
 
-      const failure = await waitForClusterReplicas({ ...cluster.deps, waitSeconds: 10 }).catch(
+      const failure = await retryWhileReplicasMissing({ ...run.deps, waitSeconds: 20 }).catch(
         (error: unknown) => error,
       );
 
       expect(failure).toBeInstanceOf(MigrationError);
-      expect((failure as MigrationError).phase).toBe("bootstrap");
+      expect((failure as MigrationError).phase).toBe("migrate");
       expect((failure as MigrationError).message).toBe(
-        'ClickHouse cluster "langwatch" has 2 of 3 replicas answering after waiting 10s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): 1 missing, and every goose write waits for all of them',
+        "ClickHouse refused a write that waits for every replica after waiting 20s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): 2 of 3 replicas are alive, 1 missing",
       );
-      expect(cluster.checks()).toBe(6);
+      expect(run.sleeps).toEqual([2_000, 4_000, 8_000, 6_000]);
+    });
+
+    it("throws any other failure at once, without a retry", async () => {
+      const other = new Error("Code: 60. DB::Exception: Unknown table expression identifier");
+      const run = refusedRun({ refusals: 1, error: other });
+
+      await expect(retryWhileReplicasMissing({ ...run.deps, waitSeconds: 180 })).rejects.toBe(
+        other,
+      );
+      expect(run.runs()).toBe(1);
+      expect(run.logs).toEqual([]);
     });
   });
 

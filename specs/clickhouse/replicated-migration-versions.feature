@@ -21,18 +21,18 @@ Feature: goose never reruns a migration on a replicated ClickHouse
     And a replica that cannot catch up fails the run instead of serving goose a stale read
 
   @unit
-  Scenario: On a cluster goose starts only once every replica answers
-    Given CLICKHOUSE_CLUSTER is set and one of its three replicas is still starting
-    When the migration run prepares goose's version table
-    Then it waits, logging how many of the three replicas answer on each check
-    And it starts goose only once all three answer, so no all-replica write is refused for a missing replica
+  Scenario: A write refused for a replica that is still starting is retried
+    Given CLICKHOUSE_CLUSTER is set and one of the three replicas has not brought a table up yet
+    When ClickHouse refuses a goose write with TOO_FEW_LIVE_REPLICAS
+    Then the run logs the alive and required replica counts from the refusal and waits a short, growing backoff
+    And it runs goose again, which skips the versions it already applied, until the write is accepted
 
   @unit
-  Scenario: A replica that never answers fails the run with the count it is missing
-    Given CLICKHOUSE_CLUSTER is set and one of its three replicas does not answer
+  Scenario: A replica that never comes back fails the run with the count it is missing
+    Given ClickHouse keeps refusing goose's writes with TOO_FEW_LIVE_REPLICAS
     When CLICKHOUSE_MIGRATE_WAIT_SECONDS runs out
-    Then the run fails in the bootstrap phase, naming the cluster, the replicas that answer and how many are missing
-    And goose is not started
+    Then the run fails in the migrate phase, naming how many replicas are alive and how many are missing
+    And any other migration failure fails the run at once, without a retry
 
   @unit
   Scenario: A single ClickHouse runs goose exactly as before
