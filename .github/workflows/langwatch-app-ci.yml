@@ -416,8 +416,7 @@ jobs:
   # own step and every step runs even when an earlier one failed, so one run
   # reports every failure. They run in sequence, not in parallel: the
   # type-aware lint reads the packages' dist declarations, so typecheck runs
-  # first, after the dist snapshot is restored, and each project's lint:types
-  # replays the typecheck tasks it depends on. The CI self-test runs last: it
+  # first, and the type-aware lint replays it. The CI self-test runs last: it
   # stages a failing test in apps/api.
   checks:
     needs: changes
@@ -694,75 +693,11 @@ jobs:
           BASE: ${{ steps.lint-scope.outputs.base }}
         run: pnpm lint ${BASE:+--base "$BASE"}
 
-      # Each package writes its own .tsbuildinfo beside its output, to
-      # dist/tsconfig.<stem>.tsbuildinfo, per the repo rule that every package
-      # tsconfig sets `incremental` and its own tsBuildInfoFile -- never under
-      # node_modules. The whole dist/ is the cached unit, not the stamp alone:
-      # tsc -b rebuilds a project whose declaration outputs are absent, so
-      # caching the stamp without them still runs cold. Same unit nx.json
-      # declares as typecheck's outputs.
-      #
-      # The restore key is pinned to the lockfile and the root compiler
-      # options: a snapshot built against other dependency types is never
-      # restored. Saved below, once the typecheck has run; a pull request keeps one copy.
-      - name: Restore TypeScript incremental build info
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        id: tsbuildinfo
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # One level per package: a `**` walks every node_modules symlink below
-          # it, and the save then outlives the job's timeout.
-          path: |
-            packages/*/dist
-            modules/*/*/dist
-            enterprise/modules/*/*/dist
-            apps/*/dist
-            node_modules/.cache/typecheck-dist
-          key: ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-
-
-      # A restored dist is trusted only where the package and its workspace
-      # dependencies are unchanged since the snapshot: tsc 7 keeps a stale
-      # declaration once read and dependants re-emit it as up to date. Each
-      # changed package's dist and its dependants' are dropped and built cold
-      # (handoff: .claude/handoffs/ci-typecheck-stale-dist.md).
-      - name: Drop restored declarations whose sources changed
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        run: |
-          manifest=node_modules/.cache/typecheck-dist/sources.txt
-          current="$RUNNER_TEMP/typecheck-dist-sources.txt"
-          pnpm ls -r --depth -1 --json | jq -r --arg root "$PWD/" '.[].path | select(startswith($root)) | ltrimstr($root)' | LC_ALL=C sort > "$RUNNER_TEMP/typecheck-packages.txt"
-          while read -r dir; do
-            hash=$(cd "$dir" && find . \( -name node_modules -o -name dist \) -prune -o -type f ! -name '*.tsbuildinfo' -print0 | LC_ALL=C sort -z | xargs -0 -r sha1sum | sha1sum | cut -d' ' -f1)
-            echo "$dir $hash"
-          done < "$RUNNER_TEMP/typecheck-packages.txt" > "$current"
-          if [ ! -f "$manifest" ]; then
-            echo "No snapshot restored; every project builds cold."
-          else
-            changed=$(LC_ALL=C comm -13 <(LC_ALL=C sort "$manifest") <(LC_ALL=C sort "$current") | cut -d' ' -f1)
-            wiped=0
-            if [ -n "$changed" ]; then
-              filters=()
-              for dir in $changed; do filters+=("--filter=...{./$dir}"); done
-              for dir in $(pnpm "${filters[@]}" ls --depth -1 --json | jq -r --arg root "$PWD/" '.[].path | ltrimstr($root)'); do
-                if [[ $dir =~ ^(packages/[^/]+|modules/[^/]+/[^/]+|enterprise/modules/[^/]+/[^/]+|apps/[^/]+)$ ]] && [ -d "$dir/dist" ]; then
-                  rm -rf "$dir/dist"
-                  wiped=$((wiped + 1))
-                fi
-              done
-            fi
-            echo "$(echo "$changed" | wc -w) packages changed since the snapshot; dropped $wiped restored dist directories (them and their dependants)."
-            # ensure:built's outputs live in these dist directories too.
-            if [ "$wiped" -gt 0 ]; then pnpm run ensure:built; fi
-          fi
-          mkdir -p "$(dirname "$manifest")"
-          cp "$current" "$manifest"
-
       # One cached `typecheck` task per project (`tsc -b` in the package), after its
-      # dependencies' typecheck: a project whose own files and dependencies' declarations
-      # are unchanged replays from the Nx cache. Nx keeps running every task that does not
-      # depend on a failed one (tsc -b skips those too), and the job still fails.
+      # dependencies' typecheck. No dist is restored from an older run: every declaration
+      # comes from an Nx run or replay, so a dependant's hash never depends on what a
+      # snapshot left. Unchanged projects replay; Nx runs every task not downstream of a
+      # failed one, and the job still fails.
       - name: Run typecheck (every workspace package)
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
         id: typecheck
@@ -823,27 +758,6 @@ jobs:
             echo "::error::The committed OpenAPI clients or docs copy do not match the routes. Run 'make sync-all-openapi' and commit the result."
             exit 1
           fi
-
-      # Saved even when the typecheck fails, so one red commit on main does not
-      # leave every later run cold. Safe: tsbuildinfo keeps the errors, and a
-      # fix changes the package's sources, which drops it and its dependants.
-      - name: Save TypeScript incremental build info
-        if: ${{ !cancelled() && steps.tsbuildinfo.outputs.cache-hit != 'true' && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure') && ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            packages/*/dist
-            modules/*/*/dist
-            enterprise/modules/*/*/dist
-            apps/*/dist
-            node_modules/.cache/typecheck-dist
-          key: ${{ steps.tsbuildinfo.outputs.cache-primary-key }}
-
-      # After the save, so a run that fails before saving keeps the previous copy.
-      - uses: ./.github/actions/prune-pr-caches
-        if: ${{ !cancelled() && steps.typecheck.outcome != 'skipped' }}
-        with:
-          prefix: ${{ runner.os }}-pkg-dist-
 
       # Proves the failure pipeline (vitest exit code + extract-failures.sh)
       # still reports a failing test.
