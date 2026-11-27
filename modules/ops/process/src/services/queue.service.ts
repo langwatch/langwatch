@@ -26,22 +26,6 @@ const TENANT_COUNT_SCAN_BUDGET = 100_000;
 /** Groups per queue whose jobs a tenant count reads for its job total and oldest job. */
 const TENANT_COUNT_JOB_READ_BUDGET = 2_000;
 
-/** SCAN pages per saved slice of the claimed-groups backfill: ~100k keys between checkpoints. */
-const TENANT_CLAIMS_FILL_SCAN_CALLS = 200;
-
-/** Where the claimed-groups backfill resumes, and where each saved slice reports to. */
-export interface TenantClaimsFillInput {
-  resumeCursor: string;
-  signal: AbortSignal;
-  onSlice: (progress: { cursor: string; listed: number }) => Promise<void>;
-}
-
-/** Groups listed by this run; `finished` false when it stopped on its signal. */
-export type TenantClaimsFillOutcome = {
-  listed: number;
-  finished: boolean;
-};
-
 export class QueueService {
   private readonly repository: QueueRepository;
   private readonly audit: QueueAuditSink | undefined;
@@ -473,30 +457,6 @@ export class QueueService {
 
   scanQueues(input: { queueNames: string[] }): Promise<QueueInfo[]> {
     return this.repository.scanQueues(input);
-  }
-
-  /**
-   * Lists claims made before the claimed-groups index existed (ADR-092): one paced walk of the
-   * keyspace in slices of `TENANT_CLAIMS_FILL_SCAN_CALLS`, each cursor saved before the next.
-   */
-  async fillTenantClaims({
-    resumeCursor,
-    signal,
-    onSlice,
-  }: TenantClaimsFillInput): Promise<TenantClaimsFillOutcome> {
-    let cursor = resumeCursor;
-    let listed = 0;
-    do {
-      if (signal.aborted) return { listed, finished: false };
-      const slice = await this.repository.fillTenantClaims({
-        cursor,
-        maxScanCalls: TENANT_CLAIMS_FILL_SCAN_CALLS,
-      });
-      cursor = slice.cursor;
-      listed += slice.listed;
-      await onSlice({ cursor, listed });
-    } while (cursor !== "0");
-    return { listed, finished: true };
   }
 
   reconcilePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome> {

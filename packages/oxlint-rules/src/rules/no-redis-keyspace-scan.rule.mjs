@@ -102,12 +102,12 @@ export const noRedisKeyspaceScanRule = defineRule({
     keyspaceScan: {
       what: "`.{{method}}(...)` walks the Redis keyspace on a live path.",
       why: "A SCAN reads every key in Redis whatever MATCH says.",
-      fix: "Keep an index the owner writes (ADR-092) or add a budgeted, paced walk to the allowlist in no-redis-keyspace-scan with its reason.",
+      fix: "Keep an index the owner writes (ADR-092) or add a budgeted, paced walk to the allowlist in no-redis-keyspace-scan with its reason. Read the `eventing-and-worker` skill.",
     },
     luaKeyspaceScan: {
       what: "A Lua script calls {{command}}, which walks the Redis keyspace on a live path.",
       why: "SCAN and KEYS read every key in Redis whatever the pattern says, and a script blocks Redis while it runs.",
-      fix: "Keep an index the owner writes (ADR-092) and read that set in the script instead.",
+      fix: "Keep an index the owner writes (ADR-092) and read that set in the script instead. Read the `eventing-and-worker` skill.",
     },
   },
   create(context) {

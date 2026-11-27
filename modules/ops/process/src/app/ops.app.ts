@@ -380,10 +380,11 @@ import { ProcessFleetCollectionService } from "../services/process-fleet-collect
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueClaimsIndexReadinessService } from "../services/queue-claims-index-readiness.service.ts";
 import {
-  QueueService,
+  QueueTenantClaimsFillService,
   type TenantClaimsFillInput,
   type TenantClaimsFillOutcome,
-} from "../services/queue.service.ts";
+} from "../services/queue-tenant-claims-fill.service.ts";
+import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { SeatSharingCheckService } from "../services/seat-sharing-check.service.ts";
@@ -2822,6 +2823,7 @@ export class OpsOperations {
       }),
       anomalyState: repositories.anomalyState,
       queues,
+      claimsFill: QueueTenantClaimsFillService.create({ repository: repositories.queues }),
       explorers: this.options.explorers,
     });
   }

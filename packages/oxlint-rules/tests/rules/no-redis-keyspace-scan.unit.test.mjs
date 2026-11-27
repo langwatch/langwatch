@@ -28,7 +28,7 @@ describe("given a Redis client used on a live path", () => {
       expect(found.map((finding) => [finding.line, finding.data.method])).toEqual([[2, "scan"]]);
       expect(found[0].message).toBe(
         "`.scan(...)` walks the Redis keyspace on a live path. A SCAN reads every key in Redis whatever MATCH says." +
-          " Keep an index the owner writes (ADR-092) or add a budgeted, paced walk to the allowlist in no-redis-keyspace-scan with its reason.",
+          " Keep an index the owner writes (ADR-092) or add a budgeted, paced walk to the allowlist in no-redis-keyspace-scan with its reason. Read the `eventing-and-worker` skill.",
       );
     });
   });

@@ -2713,11 +2713,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                 | Environment variable                    | Declared at                        |
 | ------ | ------------------------------------ | --------------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:850`           |
-| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:851`           |
-| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:853`           |
-| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:854`           |
-| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:855`           |
+| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:851`           |
+| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:852`           |
+| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:854`           |
+| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:855`           |
+| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:856`           |
 | config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:32` |
 | config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:34` |
 | config | `clickhouseOpsPasswordFile`          | `CLICKHOUSE_OPS_PASSWORD_FILE`          | `../contract/src/ops.config.ts:36` |

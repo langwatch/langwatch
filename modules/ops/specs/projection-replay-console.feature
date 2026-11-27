@@ -157,3 +157,11 @@ Feature: Projection replay from the operator console
     Given the step "ops:fill-queue-tenant-claims" is done or not needed, and every live process ships it
     Then the replay's claimed-groups index is ready
     But while the step is pending, or a live process does not ship it, the index is not ready (ADR-092)
+
+  @unit
+  Scenario: The claimed-groups backfill resumes from its saved cursor and stops on its signal
+    Given the backfill step saved a cursor partway through the keyspace walk
+    When it runs again
+    Then it walks on from that cursor in slices, saving each slice's cursor and count
+    And it reports finished when the walk returns to cursor "0"
+    And when its signal is aborted it stops before the next slice and reports not finished
