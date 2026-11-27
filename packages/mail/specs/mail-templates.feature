@@ -79,16 +79,49 @@ Feature: The transactional messages LangWatch sends
     And the frame and the card read as one dark surface
 
   @unit
-  Scenario: The studio shows every message at once
-    When the gallery is asked to render every registered template
-    Then it returns one entry for every registered fixture
-    And every entry carries a non-empty subject line and a non-empty rendered body
+  Scenario: The studio opens on the weekly digests, and old links still land
+    Given the studio has two tabs, Weekly digests and All other emails
+    When it opens with no view in its link
+    Then it shows Weekly digests
+    And an old Inspect or Gallery link opens All other emails
+
+  @unit
+  Scenario: The weekly digests sit only on their own tab
+    When the studio builds the All other emails list
+    Then no weekly digest is in it
+    And the automation trigger email stays in it, under Alerts
 
   @unit
   Scenario: The studio lists every message under a plain heading
     When the studio groups the registered templates for its message list
     Then each template sits under one fixed heading, in the headings' order
     And a template no heading names sits under Other, last
+
+  @unit
+  Scenario: Digest review lists the digests that send, in the order the sender tries them
+    Given the studio's Weekly digests tab
+    Then it lists plan pressure, scenarios trend, coding-agent week and traces week, in that order
+    And each says who gets it and has a version A that sends today and a slot for a version B
+    And What's new follows them with its fixtures, marked "Not sent yet: nothing feeds it news"
+
+  @unit
+  Scenario: Digest review shows each digest as it would arrive today
+    Given a digest fixture with props the sender does not fill yet
+    When the Weekly digests tab renders it
+    Then those props are left out
+    And the subject starts with the organisation's name, as the sender writes it
+
+  @unit
+  Scenario: The studio's message list can be searched by name
+    Given the studio's message list
+    When a name is typed into the search box
+    Then only the emails whose name holds it, in any case, stay listed
+
+  @unit
+  Scenario: The hosted studio shows the LangWatch wordmark
+    Given the hosted studio only allows images from itself
+    When it shows a rendered email
+    Then the wordmark loads from the studio itself, taken from the app's own images
 
   @unit
   Scenario: The arrow keys step through each email's variants before the next email

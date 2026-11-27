@@ -17,13 +17,12 @@ import {
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createRoot } from "react-dom/client";
 
-import { GalleryView, type Density } from "./gallery-view.tsx";
+import { DigestReviewView } from "./digest-review-view.tsx";
 import { InspectView } from "./inspect-view.tsx";
-import { galleryUrl, isStaticStudio, templatesUrl } from "./studio-endpoints.ts";
+import { templatesUrl } from "./studio-endpoints.ts";
+import { isWeeklyDigest } from "./studio-groups.ts";
 import {
-  galleryResponseSchema,
   templatesResponseSchema,
-  type GalleryEntry,
   type PreviewScheme,
   type TemplateSummary,
   type WIDTHS,
@@ -51,9 +50,7 @@ const Studio = (): JSX.Element => {
   const [previewScheme, setPreviewScheme] = useState<PreviewScheme>(initialUrl.theme);
   const previewDark = useResolvedDark({ scheme: previewScheme });
 
-  const [everyFixture, setEveryFixture] = useState(initialUrl.everyFixture);
   const [width, setWidth] = useState<keyof typeof WIDTHS>(initialUrl.width);
-  const [density, setDensity] = useState<Density>(initialUrl.density);
 
   useEffect(() => {
     applyThemeChoice({ choice: previewScheme });
@@ -68,16 +65,22 @@ const Studio = (): JSX.Element => {
           setFailure(body.error);
           return;
         }
-        setTemplates(body);
+        // The weekly digests live on their own tab, which reads its own renders.
+        const others = body.filter((template) => !isWeeklyDigest(template.id));
+        setTemplates(others);
         const picked = pickFixture({
-          templates: body,
+          templates: others,
           templateId: initialUrl.templateId,
           fixtureName: initialUrl.fixtureName,
         });
         if (picked) {
           setSelected({ id: picked.template.id, fixture: picked.fixture.name });
           setCurrentProps(
-            initialPropsOverride !== undefined ? initialPropsOverride : picked.fixture.props,
+            propsOrFixture({
+              override: initialPropsOverride,
+              requestedId: initialUrl.templateId,
+              picked,
+            }),
           );
         }
       })
@@ -95,14 +98,6 @@ const Studio = (): JSX.Element => {
     [templates],
   );
 
-  const openInInspect = useCallback(
-    (templateId: string, fixtureName: string) => {
-      choose(templateId, fixtureName);
-      setView("inspect");
-    },
-    [choose],
-  );
-
   const inspectTemplates = useMemo(() => templates ?? [], [templates]);
 
   const suppressNextPush = useRef(false);
@@ -110,13 +105,10 @@ const Studio = (): JSX.Element => {
     view,
     selected,
     width,
-    density,
     previewScheme,
-    everyFixture,
     currentProps,
     suppressNextPush,
   });
-  const { galleryEntries, galleryFailure } = useGalleryEntries({ view, everyFixture });
 
   useEffect(() => {
     const onPopState = () => {
@@ -125,9 +117,7 @@ const Studio = (): JSX.Element => {
       suppressNextPush.current = true;
       setView(state.view);
       setWidth(state.width);
-      setDensity(state.density);
       setPreviewScheme(state.theme);
-      setEveryFixture(state.everyFixture);
       const picked = pickFixture({
         templates: templatesRef.current ?? [],
         templateId: state.templateId,
@@ -135,7 +125,7 @@ const Studio = (): JSX.Element => {
       });
       if (picked) {
         setSelected({ id: picked.template.id, fixture: picked.fixture.name });
-        setCurrentProps(props !== undefined ? props : picked.fixture.props);
+        setCurrentProps(propsOrFixture({ override: props, requestedId: state.templateId, picked }));
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -168,7 +158,9 @@ const Studio = (): JSX.Element => {
     );
   }
 
-  return view === "inspect" ? (
+  if (view === "review") return <DigestReviewView nav={nav} previewDark={previewDark} />;
+
+  return (
     <InspectView
       nav={nav}
       templates={inspectTemplates}
@@ -179,20 +171,6 @@ const Studio = (): JSX.Element => {
       previewDark={previewDark}
       width={width}
       onWidthChange={setWidth}
-    />
-  ) : (
-    <GalleryView
-      nav={nav}
-      entries={galleryEntries}
-      failure={galleryFailure}
-      everyFixture={everyFixture}
-      onEveryFixtureChange={setEveryFixture}
-      width={width}
-      onWidthChange={setWidth}
-      density={density}
-      onDensityChange={setDensity}
-      previewDark={previewDark}
-      onOpen={openInInspect}
     />
   );
 };
@@ -215,58 +193,38 @@ function pickFixture({
   return template && fixture ? { template, fixture } : undefined;
 }
 
-/** Every template's rendered fixtures while the gallery is open, refetched when the set changes. */
-function useGalleryEntries({ view, everyFixture }: { view: View; everyFixture: boolean }): {
-  galleryEntries: GalleryEntry[] | null;
-  galleryFailure: string | null;
-} {
-  const [galleryEntries, setGalleryEntries] = useState<GalleryEntry[] | null>(null);
-  const [galleryFailure, setGalleryFailure] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (view !== "gallery") return;
-    setGalleryEntries(null);
-    setGalleryFailure(null);
-    const controller = new AbortController();
-    fetch(galleryUrl({ everyFixture }), { signal: controller.signal })
-      .then((response) => response.json())
-      .then((json: unknown) => {
-        const body = galleryResponseSchema.parse(json);
-        if ("error" in body) {
-          setGalleryFailure(body.error);
-          return;
-        }
-        setGalleryEntries(body);
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setGalleryFailure(String(error));
-      });
-    return () => controller.abort();
-  }, [view, everyFixture]);
-
-  return { galleryEntries, galleryFailure };
+/** A link's edited props when it carries any, else the picked fixture's own. */
+/** A link's props belong to the template it names; a fallback template keeps its own fixture. */
+function propsOrFixture({
+  override,
+  requestedId,
+  picked,
+}: {
+  override: unknown;
+  requestedId: string | null;
+  picked: Picked;
+}): unknown {
+  return override !== undefined && picked.template.id === requestedId
+    ? override
+    : picked.fixture.props;
 }
 
 /**
  * Address-bar sync: template/fixture/view changes are places worth a back button entry; width,
- * density, theme and prop edits are preferences that replace the current entry instead.
+ * theme and prop edits are preferences that replace the current entry instead.
  */
 function useAddressBarSync({
   view,
   selected,
   width,
-  density,
   previewScheme,
-  everyFixture,
   currentProps,
   suppressNextPush,
 }: {
   view: View;
   selected: { id: string; fixture: string } | null;
   width: keyof typeof WIDTHS;
-  density: Density;
   previewScheme: PreviewScheme;
-  everyFixture: boolean;
   currentProps: unknown;
   /** Set by the back button, so the entry it lands on is replaced rather than pushed. */
   suppressNextPush: { current: boolean };
@@ -280,9 +238,7 @@ function useAddressBarSync({
       templateId: selected.id,
       fixtureName: selected.fixture,
       width,
-      density,
       theme: previewScheme,
-      everyFixture,
     });
     const hash = encodePropsFragment(currentProps);
     if (!historyReady.current) {
@@ -306,14 +262,12 @@ function useAddressBarSync({
       templateId: selected.id,
       fixtureName: selected.fixture,
       width,
-      density,
       theme: previewScheme,
-      everyFixture,
     });
     const hash = encodePropsFragment(currentProps);
     window.history.replaceState(null, "", `${search}${hash}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, density, previewScheme, everyFixture, currentProps]);
+  }, [width, previewScheme, currentProps]);
 }
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -331,8 +285,8 @@ function useResolvedDark({ scheme }: { scheme: PreviewScheme }): boolean {
 }
 
 const VIEW_OPTIONS: { value: View; label: string }[] = [
-  { value: "inspect", label: "Inspect" },
-  { value: "gallery", label: "Gallery" },
+  { value: "review", label: "Weekly digests" },
+  { value: "inspect", label: "All other emails" },
 ];
 
 /** The kit's ThemeToggle, but bound to the address bar's `theme` rather than localStorage. */
@@ -395,7 +349,7 @@ const readGuideDismissed = (): boolean => {
   }
 };
 
-/** A short "how to use this" note above both views, hidden for good once dismissed. */
+/** A short "how to use this" note above both tabs, hidden for good once dismissed. */
 function StudioGuide(): JSX.Element | null {
   const [dismissed, setDismissed] = useState(readGuideDismissed);
   if (dismissed) return null;
@@ -412,13 +366,10 @@ function StudioGuide(): JSX.Element | null {
       <Callout title="How to use this">
         <Stack gap={2}>
           <Text as="p">
-            Every email LangWatch sends, rendered with sample data. Pick an email on the left (some
-            have more than one version), switch Desktop or Mobile and HTML or Text above the
-            preview, or open Gallery to see them all at once. The left and right arrow keys step
-            through the emails and their versions.{" "}
-            {isStaticStudio
-              ? "This copy is read-only: run `pnpm --filter @langwatch/mail dev` to edit the sample data."
-              : "Open Edit sample data under the preview to change what it shows."}
+            Weekly digests shows each digest as it would arrive today, with who gets it, in the
+            order they are tried. All other emails lists every other email with sample data: search
+            it, step through it with the left and right arrow keys, and switch Desktop or Mobile and
+            HTML or Text above the preview.
           </Text>
           <div>
             <Button size="sm" variant="ghost" onClick={dismiss}>

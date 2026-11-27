@@ -12,7 +12,8 @@ export type TemplateSummary = z.infer<typeof templateSummarySchema>;
 const renderedSchema = z.object({ subject: z.string(), html: z.string(), text: z.string() });
 export type Rendered = z.infer<typeof renderedSchema>;
 
-const galleryEntrySchema = z.object({
+/** One fixture of a template, rendered: what a review card shows. */
+const renderedFixtureSchema = z.object({
   template: z.string(),
   title: z.string(),
   fixture: z.string(),
@@ -20,13 +21,33 @@ const galleryEntrySchema = z.object({
   html: z.string(),
   text: z.string(),
 });
-export type GalleryEntry = z.infer<typeof galleryEntrySchema>;
+export type RenderedFixture = z.infer<typeof renderedFixtureSchema>;
 
 /** Every studio endpoint answers its body or `{ error }`; Zod says which. */
 const failureSchema = z.object({ error: z.string() });
 export const templatesResponseSchema = z.union([failureSchema, z.array(templateSummarySchema)]);
 export const renderResponseSchema = z.union([failureSchema, renderedSchema]);
-export const galleryResponseSchema = z.union([failureSchema, z.array(galleryEntrySchema)]);
+
+const digestReviewVersionSchema = z.object({
+  label: z.string(),
+  cards: z.array(renderedFixtureSchema),
+});
+export type DigestReviewVersion = z.infer<typeof digestReviewVersionSchema>;
+
+const digestReviewSectionSchema = z.object({
+  templateId: z.string(),
+  title: z.string(),
+  whoGetsThis: z.string(),
+  notFilledToday: z.array(z.string()),
+  notSentBecause: z.string().nullable(),
+  versionA: digestReviewVersionSchema,
+  versionB: digestReviewVersionSchema.nullable(),
+});
+export type DigestReviewSection = z.infer<typeof digestReviewSectionSchema>;
+export const digestReviewResponseSchema = z.union([
+  failureSchema,
+  z.array(digestReviewSectionSchema),
+]);
 
 export const WIDTHS = { desktop: 680, mobile: 375 } as const;
 
@@ -76,6 +97,22 @@ const centerDocument = (html: string): string => {
   return html.slice(0, headEnd + 1) + CENTER_STYLE + html.slice(headEnd + 1);
 };
 
-/** The one place an iframe document is prepared, for Inspect and the gallery alike. */
+/**
+ * The hosted CSP allows only same-origin images and srcdoc frames inherit it, so the wordmarks
+ * load from the studio, which serves apps/ui/public/images under these paths (vite.config.ts).
+ * Only what the studio shows changes; Copy HTML keeps the real URLs.
+ */
+export const STUDIO_ASSETS: Record<string, string> = {
+  "https://app.langwatch.ai/images/logo-wordmark.png": "/images/logo-wordmark.png",
+  "https://app.langwatch.ai/images/logo-full-darktheme.svg": "/images/logo-full-darktheme.svg",
+};
+
+export const serveAssetsLocally = (html: string): string =>
+  Object.entries(STUDIO_ASSETS).reduce(
+    (out, [remote, local]) => out.replaceAll(remote, local),
+    html,
+  );
+
+/** The one place an iframe document is prepared, for both tabs. */
 export const prepareMailDocument = (html: string, dark: boolean): string =>
-  centerDocument(dark ? promoteDarkRules(html) : html);
+  centerDocument(serveAssetsLocally(dark ? promoteDarkRules(html) : html));

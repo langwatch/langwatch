@@ -4,6 +4,7 @@ import {
   CodeBlock,
   CopyButton,
   Inline,
+  Input,
   Link,
   Page,
   Panel,
@@ -12,11 +13,11 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system-internal";
-import { useEffect, useState, type JSX, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
 
 import { PropsForm } from "./props-form.tsx";
 import { documentUrl as documentUrlOf, fetchRender, isStaticStudio } from "./studio-endpoints.ts";
-import { groupTemplates, stepSelection } from "./studio-groups.ts";
+import { filterTemplates, groupTemplates, stepSelection } from "./studio-groups.ts";
 import {
   prepareMailDocument,
   renderResponseSchema,
@@ -65,12 +66,14 @@ export const InspectView = ({
   const [renderError, setRenderError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("html");
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  const [query, setQuery] = useState("");
+  const visible = useMemo(() => filterTemplates({ templates, query }), [templates, query]);
 
   const template = templates.find((entry) => entry.id === selected?.id) ?? null;
   const fixtureIndex =
     template?.fixtures.findIndex((fixture) => fixture.name === selected?.fixture) ?? -1;
 
-  useArrowKeyStepping({ templates, selected, onSelect, frame });
+  useArrowKeyStepping({ templates: visible, selected, onSelect, frame });
 
   useEffect(() => {
     if (!selected || currentProps === null) return;
@@ -119,9 +122,24 @@ export const InspectView = ({
     >
       <div className="mailroom-inspect">
         <nav className="mailroom-messages" aria-label="Messages">
-          <ScrollArea className="mailroom-message-list" label="Messages">
-            <MessageList templates={templates} selected={selected} onSelect={onSelect} />
-          </ScrollArea>
+          <Stack gap={3}>
+            <Input
+              type="search"
+              size="sm"
+              label="Search emails"
+              hideLabel
+              placeholder="Search emails by name"
+              value={query}
+              onChange={setQuery}
+            />
+            <ScrollArea className="mailroom-message-list" label="Messages">
+              {visible.length === 0 ? (
+                <Text tone="secondary">No email matches that name.</Text>
+              ) : (
+                <MessageList templates={visible} selected={selected} onSelect={onSelect} />
+              )}
+            </ScrollArea>
+          </Stack>
         </nav>
 
         <Stack gap={4} className="mailroom-preview">
@@ -280,7 +298,7 @@ function MessageRow({
         {entry.title}
       </button>
       {isCurrent && entry.fixtures.length > 1 && (
-        <Inline gap={1} wrap>
+        <Inline gap={1} wrap className="mailroom-variants">
           {entry.fixtures.map((fixture) => (
             <Button
               key={fixture.name}

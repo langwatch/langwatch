@@ -9,24 +9,33 @@ send. Rendering lives here; notification owns sending (`NotificationApi.sendEmai
 pnpm --filter @langwatch/mail dev     # http://localhost:5566
 ```
 
-Every message, every fixture, rendered live. The left rail lists them under plain
-headings (`preview/studio-groups.ts` maps each id; an unmapped one lands under Other);
-clicking one opens its first fixture, and a message with several fixtures shows them as
-chips under its row. The centre shows the email at desktop and mobile widths with HTML
-and plain-text tabs, copy-HTML and open-in-new-tab; under it, **Edit sample data** opens a
-form generated from the template's zod schema that re-renders as you type. Props that fail
-the schema are shown as a rejection rather than a broken email. A short guide sits at the
-top until it is dismissed.
+Every message, every fixture, rendered live, on two tabs.
+
+**Weekly digests** (the default) shows the weekly digests that send, in the order the sender
+tries them (`preview/digest-review.ts`, kept in step with the digest module's
+`digest-template.rules.ts`): who gets each, its subject with the organisation first, and
+every fixture without the props the sender does not fill yet, as version A, with a slot
+for a version B. What's new follows them, marked as not sent yet, so its fixtures can be
+reviewed too.
+
+**All other emails** lists every other message under plain headings
+(`preview/studio-groups.ts` maps each id; an unmapped one lands under Other). A search box
+filters it by name and the left and right arrow keys step through it; clicking one opens
+its first fixture, and a message with several fixtures shows them as chips under its row.
+The centre shows the email at desktop and mobile widths with HTML and plain-text tabs,
+copy-HTML and open-in-new-tab; under it, **Edit sample data** opens a form generated from
+the template's zod schema that re-renders as you type. Props that fail the schema are shown
+as a rejection rather than a broken email. Old `?view=inspect` and `?view=gallery` links
+open this tab.
+
+A short guide sits at the top until it is dismissed. Both tabs follow the system colour
+scheme by default, with a light / system / dark override to preview the other scheme on
+demand. The hosted studio only allows its own images, so it shows the wordmarks from
+`apps/ui/public/images`, which it serves in dev and copies into `dist/images` on build.
 
 It renders in Node through the same `@react-email` call the product sends with, so
 the preview cannot drift from the mail that arrives. Editing a template file
 re-renders it without a restart.
-
-A **Gallery** toggle next to Inspect shows every registered template's first
-fixture at once as a grid of scaled thumbnails (a "every fixture" toggle shows
-all twenty); clicking a card opens it in Inspect. Both views follow the
-system colour scheme by default, with a light / system / dark override to
-preview the other scheme on demand.
 
 ## Adding a template
 
