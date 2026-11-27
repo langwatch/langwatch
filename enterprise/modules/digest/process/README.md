@@ -247,7 +247,7 @@ Declared at `src/eventing/digest.pipeline.ts:73`. Events: `projectActivityRecord
 
 | Kind   | Leaf            | Environment variable | Declared at                          |
 | ------ | --------------- | -------------------- | ------------------------------------ |
-| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:73`           |
+| secret | `unsubscribe`   | `NEXTAUTH_SECRET`    | `src/app/digest.app.ts:74`           |
 | config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/digest.config.ts:5` |
 
 <!-- readme:generated:end -->

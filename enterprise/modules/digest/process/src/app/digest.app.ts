@@ -30,6 +30,7 @@ import { DigestOperatorsService } from "../services/digest-operators.service.ts"
 import { DigestSendService } from "../services/digest-send.service.ts";
 import { DigestSettingsService } from "../services/digest-settings.service.ts";
 import { DigestSourceService } from "../services/digest-source.service.ts";
+import { DigestTestSendService } from "../services/digest-test-send.service.ts";
 import { DigestTraceReadService } from "../services/digest-trace-read.service.ts";
 import { DigestUnsubscribeService } from "../services/digest-unsubscribe.service.ts";
 import { DigestUserErasureService } from "../services/digest-user-erasure.service.ts";
@@ -76,6 +77,7 @@ export class DigestModule implements DigestApiContract {
   readonly #commands: DigestCommandsService;
   readonly #settings: DigestSettingsService;
   readonly #sends: DigestSendService;
+  readonly #tests: DigestTestSendService;
   readonly #unsubscribes: DigestUnsubscribeService;
   readonly #pipeline: DigestPipeline;
   readonly #sendPipeline: DigestSendPipeline;
@@ -85,6 +87,7 @@ export class DigestModule implements DigestApiContract {
     commands: DigestCommandsService;
     settings: DigestSettingsService;
     sends: DigestSendService;
+    tests: DigestTestSendService;
     unsubscribes: DigestUnsubscribeService;
     pipeline: DigestPipeline;
     sendPipeline: DigestSendPipeline;
@@ -93,6 +96,7 @@ export class DigestModule implements DigestApiContract {
     this.#commands = parts.commands;
     this.#settings = parts.settings;
     this.#sends = parts.sends;
+    this.#tests = parts.tests;
     this.#unsubscribes = parts.unsubscribes;
     this.#pipeline = parts.pipeline;
     this.#sendPipeline = parts.sendPipeline;
@@ -151,6 +155,11 @@ export class DigestModule implements DigestApiContract {
       commands,
       settings: DigestSettingsService.create({ audience: repositories.audience, now: nowEpochMs }),
       sends,
+      tests: DigestTestSendService.create({
+        sends,
+        users: dependencies.users,
+        organizations: dependencies.organizations,
+      }),
       unsubscribes,
       pipeline: buildDigestPipeline({
         projectWeeks: repositories.projectWeeks,
@@ -198,10 +207,10 @@ export class DigestModule implements DigestApiContract {
   };
 
   sendMyTests: DigestApiContract["sendMyTests"] = async ({ operator }) =>
-    this.#sends.sendMyTests({ operatorId: await this.#operators.admitManager(operator) });
+    this.#tests.sendMyTests({ operatorId: await this.#operators.admitManager(operator) });
 
   sendTestFor: DigestApiContract["sendTestFor"] = async ({ operator, email, template }) =>
-    this.#sends.sendTestFor({
+    this.#tests.sendTestFor({
       email,
       template,
       operatorId: await this.#operators.admitManager(operator),

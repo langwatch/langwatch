@@ -3,14 +3,10 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   DigestMemberNotFoundError,
   DigestMemberUnsubscribedError,
-  type DigestMyTest,
-  type DigestMyTests,
   DigestNothingToSendError,
   DigestOperatorAddressMissingError,
-  DigestPersonNotFoundError,
   DigestPublicBaseUrlMissingError,
   type DigestTemplateId,
-  type DigestTestsFor,
   type DigestTestTemplate,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
@@ -49,7 +45,6 @@ import {
   type DigestTemplatePick,
   pickDigestTemplatesToTry,
 } from "../rules/digest-template.rules.ts";
-import { classifyDigestTestRefusal } from "../rules/digest-test.rules.ts";
 import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
@@ -88,10 +83,6 @@ type Deps = Readonly<{
     findProvisioningSummary: OrganizationApi["findProvisioningSummary"];
     /** Organization ids a page at a time, the install's hidden system one left out. */
     listAllIds: OrganizationApi["listAllIds"];
-    /** The organizations a person is an active member of, for the operator's own tests. */
-    organizationIdsForMember: OrganizationApi["organizationIdsForMember"];
-    /** Those organizations' names, the install's hidden system one left out as `listAllIds` does. */
-    findForOperators: OrganizationApi["findForOperators"];
   }>;
   /** A project's name, and each project's team, which is what its access is decided on. */
   projects: Pick<
@@ -100,8 +91,8 @@ type Deps = Readonly<{
   >;
   /** Which of the week's projects a member may view; the email shows no other. */
   access: Pick<AuthzApi, "canBatchByIds">;
-  /** The address an email goes to, read when sent and never stored; a test's person, by address. */
-  users: Pick<UserApi, "findById" | "findByEmail">;
+  /** The address an email goes to, read when it is sent and never stored. */
+  users: Pick<UserApi, "findById">;
   mail: DigestMailChannel;
   /** The digest templates' renders, injected so react-email stays at the app's composition. */
   renderer: DigestMailRender;
@@ -300,104 +291,6 @@ export class DigestSendService {
       }),
     );
     return composed.template.templateId;
-  }
-
-  /**
-   * The operator's own week in every organization the weekly send would mail them for (active
-   * memberships, the system organization left out), as tests, by name. A refusal that means nothing would go out is a skip; any
-   * other is logged and reported, and the rest still go. No address fails the whole call.
-   */
-  async sendMyTests({ operatorId }: { operatorId: string }): Promise<DigestMyTests> {
-    const operator = await this.deps.users.findById({ id: operatorId });
-    if (!operator?.email) throw new DigestOperatorAddressMissingError();
-    return {
-      organizations: await this.#testsOf({ userId: operatorId, operatorId, template: "auto" }),
-    };
-  }
-
-  /**
-   * The same tests of another person, found by address, mailed to the operator alone and never
-   * to them; `template` is what they would get ("auto") or one forced, skipped without its data.
-   */
-  async sendTestFor({
-    email,
-    template,
-    operatorId,
-  }: {
-    email: string;
-    template: DigestTestTemplate;
-    operatorId: string;
-  }): Promise<DigestTestsFor> {
-    const operator = await this.deps.users.findById({ id: operatorId });
-    if (!operator?.email) throw new DigestOperatorAddressMissingError();
-    const person = await this.deps.users.findByEmail({ email });
-    if (!person) throw new DigestPersonNotFoundError();
-    return {
-      person: { name: person.name, email },
-      organizations: await this.#testsOf({ userId: person.id, operatorId, template }),
-    };
-  }
-
-  /** One test per organization the person is an active member of, system one left out, by name. */
-  async #testsOf({
-    userId,
-    operatorId,
-    template,
-  }: {
-    userId: string;
-    operatorId: string;
-    template: DigestTestTemplate;
-  }): Promise<DigestMyTest[]> {
-    const organizationIds = await this.deps.organizations.organizationIdsForMember({ userId });
-    if (organizationIds.length === 0) return [];
-    const named = await this.deps.organizations.findForOperators({ organizationIds });
-    const organizations: DigestMyTest[] = [];
-    for (const { id, name } of named.toSorted((a, b) => a.name.localeCompare(b.name))) {
-      organizations.push(
-        await this.#test({
-          organizationId: id,
-          organizationName: name,
-          userId,
-          operatorId,
-          template,
-        }),
-      );
-    }
-    return organizations;
-  }
-
-  async #test({
-    organizationId,
-    organizationName,
-    userId,
-    operatorId,
-    template,
-  }: {
-    organizationId: string;
-    organizationName: string;
-    userId: string;
-    operatorId: string;
-    template: DigestTestTemplate;
-  }): Promise<DigestMyTest> {
-    const about = { organizationId, organizationName };
-    try {
-      const templateId = await this.sendTest({ organizationId, userId, operatorId, template });
-      return { outcome: "sent", ...about, templateId };
-    } catch (error) {
-      const reason = classifyDigestTestRefusal(error);
-      // A forced template with nothing to show has no data here, not an empty week.
-      if (reason === "nothing_to_send" && template !== "auto") {
-        return { outcome: "skipped", ...about, reason: "no_data_for_template" };
-      }
-      if (reason) return { outcome: "skipped", ...about, reason };
-      // No public base URL fails every organization alike, before any mail: the call fails.
-      if (error instanceof DigestPublicBaseUrlMissingError) throw error;
-      logger.error(
-        { error, organizationId, userId, operatorId },
-        "the digest could not send a test",
-      );
-      return { outcome: "failed", ...about };
-    }
   }
 
   /** An organization's active members, admins marked; names stay with the user module. */
