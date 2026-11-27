@@ -9,6 +9,7 @@ import {
   resolveClickHouseMigrationTaskConfig,
 } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
@@ -62,10 +63,12 @@ import {
 import {
   classifyLwqlSetupFailure,
   findKeyPeppers,
+  type LwqlSecretFamilyLookup,
   type LwqlSecretLookup,
   resolveLwqlSource,
   withChainedSecrets,
 } from "../rules/lwql-default-credentials.rules.ts";
+import { parsePrivateReaderPasswords } from "../rules/lwql-private-reader.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 import {
@@ -925,6 +928,7 @@ async function runLwqlProvisioningTask({
   database,
   source: environment,
   lookup,
+  lookupFamily,
   failOnError,
 }: {
   database: LwqlProvisioningDatabase;
@@ -932,9 +936,10 @@ async function runLwqlProvisioningTask({
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
   lookup: LwqlSecretLookup | undefined;
+  lookupFamily: LwqlSecretFamilyLookup | undefined;
 }): Promise<void> {
   const { source, isDerived } = resolveLwqlSource(
-    await withChainedSecrets({ environment, lookup }),
+    await withChainedSecrets({ environment, lookup, lookupFamily }),
   );
   const selfProvision = selfProvisioning.request({ source });
   if (!selfProvision.requested) {
@@ -972,6 +977,7 @@ async function runLwqlProvisioningTask({
     endpoints: privateEndpointsOf({ source }),
     sharedUrl: source.CLICKHOUSE_URL,
     keyPepper: findKeyPeppers(source)[0],
+    readerPasswords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
     shared: plan,
     converge: (privatePlan) => convergeLwqlPrivateClickHouse({ database, plan: privatePlan }),
   });
@@ -1056,6 +1062,7 @@ export class LwqlProvisionTask extends Task {
       database: () => LwqlProvisioningDatabase;
       source: Record<string, string | undefined>;
       lookup: LwqlSecretLookup | undefined;
+      lookupFamily: LwqlSecretFamilyLookup | undefined;
       skipped: boolean;
       failOnError: boolean;
     },
@@ -1072,6 +1079,7 @@ export class LwqlProvisionTask extends Task {
     database,
     source,
     lookup,
+    lookupFamily,
     skipped = false,
     failOnError = false,
   }: {
@@ -1080,11 +1088,20 @@ export class LwqlProvisionTask extends Task {
     source: Record<string, string | undefined>;
     /** The runner's secrets chain, so the passwords match what the api and worker derive. */
     lookup?: LwqlSecretLookup;
+    /** The same chain's families, so each private reader's own password is the api's. */
+    lookupFamily?: LwqlSecretFamilyLookup;
     skipped?: boolean;
     /** The upgrade's reconciler fails its run on a refusal; boot keeps the default. */
     failOnError?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask({ database, source, lookup, skipped, failOnError });
+    return new LwqlProvisionTask({
+      database,
+      source,
+      lookup,
+      lookupFamily,
+      skipped,
+      failOnError,
+    });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -1096,6 +1113,7 @@ export class LwqlProvisionTask extends Task {
       database: this.inputs.database(),
       source: this.inputs.source,
       lookup: this.inputs.lookup,
+      lookupFamily: this.inputs.lookupFamily,
       failOnError: this.inputs.failOnError,
     });
   }

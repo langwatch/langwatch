@@ -9,9 +9,15 @@ import {
   TenantScopeError,
 } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { privateReaderOf } from "../../../rules/lwql-private-reader.rules.ts";
+import {
+  parsePrivateReaderPasswords,
+  privateReaderLookupOf,
+  privateReaderNameOf,
+  privateReaderOf,
+} from "../../../rules/lwql-private-reader.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionResult,
@@ -19,6 +25,10 @@ import {
 } from "../../langwatch-ql-executor.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-routed-executor.repository.ts";
+
+/** The rules' parse with the private families' own name split, as every caller passes. */
+const readerPasswordsOf = (source: Record<string, string | undefined>) =>
+  parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf });
 
 const TEST_READER = ({ organizationId }: { organizationId: string }) =>
   privateReaderOf({ keyPepper: "test-pepper", organizationId });
@@ -477,6 +487,55 @@ describe("given a deployment with no key pepper to derive a private reader from"
     expect(built).toEqual(["shared"]);
     expect(privateDrivers()).toEqual([]);
     expect(shared?.query).not.toHaveBeenCalled();
+  });
+});
+
+describe("given an organization with its own reader password and no key pepper", () => {
+  const OWN_PASSWORD = "fake-own-reader-password-0123456789";
+  const lookup = () =>
+    privateReaderLookupOf({
+      passwords: readerPasswordsOf({
+        "LWQL_PRIVATE_READER_PASSWORD__acme__org-private": OWN_PASSWORD,
+      }),
+      keyPepper: undefined,
+      onFallback: () => undefined,
+    });
+
+  /** @scenario "A private ClickHouse's reader signs in with the instance's own password where one is set" */
+  it("signs in to the private ClickHouse as the organization's reader with that password", async () => {
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: lookup(),
+      connection: SHARED,
+      route: routeOf,
+      createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+    });
+
+    await runOn({ executor, tenantIds: ["project-private"] });
+
+    const [isolated] = privateDrivers();
+    expect(isolated?.config).toMatchObject({
+      url: "https://private.invalid:8443",
+      username: privateReaderNameOf({ organizationId: "org-private" }).username,
+      password: OWN_PASSWORD,
+    });
+  });
+
+  /** @scenario "A private route with no key pepper to derive a reader from is refused" */
+  it("refuses another private organization without a password of its own", async () => {
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: lookup(),
+      connection: SHARED,
+      route: routeOf,
+      createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+    });
+
+    const refusal = (await runOn({ executor, tenantIds: ["project-second-private"] }).catch(
+      (error: unknown) => error,
+    )) as HandledError;
+
+    expect(refusal).toMatchObject({ code: "lwql_unavailable" });
+    expect(refusal.reasons.map((r) => r.message)).toEqual(["no private reader"]);
+    expect(privateDrivers()).toEqual([]);
   });
 });
 

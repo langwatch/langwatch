@@ -6,19 +6,27 @@
 import { createHash } from "node:crypto";
 
 import type * as Observability from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   LangWatchQLSelfProvisioningService,
   LwqlPrivateCollectionAbsentError,
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
-import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
+import {
+  parsePrivateReaderPasswords,
+  privateReaderOf,
+} from "../../rules/lwql-private-reader.rules.ts";
 import {
   LwqlPrivateDatabaseNotReplicatedError,
   LwqlPrivateStaleSqlReaderError,
   provisionLwqlPrivateTargets,
 } from "../lwql-private-targets.task.ts";
 import { convergeLwqlPrivateRepository, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
+
+/** The rules' parse with the private families' own name split, as every caller passes. */
+const readerPasswordsOf = (source: Record<string, string | undefined>) =>
+  parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf });
 
 const { logCalls, policyRows, policyChecks, readerByUrl, readerStorage } = vi.hoisted(() => ({
   logCalls: [] as { level: string; fields: unknown; message: unknown }[],
@@ -103,20 +111,30 @@ const SHARED_PLAN: LwqlConvergencePlan = {
   },
 };
 
+/** The fake own reader password a run gives each organisation unless told otherwise. */
+const ownPasswordOf = (organizationId: string) =>
+  `fake-own-reader-password-0123456789-${organizationId}`;
+
 function run({
   endpoints,
   keyPepper = PEPPER,
+  readerPasswords,
   converge = async () => undefined,
   shared = SHARED_PLAN,
 }: {
   endpoints: { organizationId?: string; url: string }[];
   keyPepper?: string | null;
+  /** The reader password variables; by default each organisation has its own. */
+  readerPasswords?: Record<string, string>;
   converge?: (plan: LwqlConvergencePlan) => Promise<void>;
   shared?: LwqlConvergencePlan;
 }) {
+  const ownPasswords: Record<string, string> = {};
   for (const { organizationId, url } of endpoints) {
     if (organizationId) {
       readerByUrl.set(url, privateReaderOf({ keyPepper: PEPPER, organizationId }).username);
+      ownPasswords[`LWQL_PRIVATE_READER_PASSWORD__label__${organizationId}`] =
+        ownPasswordOf(organizationId);
     }
   }
   const converged = vi.fn(converge);
@@ -126,6 +144,7 @@ function run({
       endpoints,
       sharedUrl: SHARED_URL,
       keyPepper: keyPepper ?? undefined,
+      readerPasswords: readerPasswordsOf(readerPasswords ?? ownPasswords),
       shared,
       converge: converged,
     }),
@@ -326,11 +345,90 @@ describe("given a private route and no key pepper", () => {
     const { converged, done } = run({
       endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
       keyPepper: null,
+      readerPasswords: {},
     });
     await done;
 
     expect(converged).not.toHaveBeenCalled();
     expect(logCalls.some((call) => call.level === "warn")).toBe(true);
+  });
+
+  /** @scenario "A private ClickHouse's reader signs in with the instance's own password where one is set" */
+  it("still provisions an organisation that has its own reader password, and skips one without", async () => {
+    const { converged, done } = run({
+      endpoints: [
+        { organizationId: "org-acme", url: ADMIN_URL },
+        { organizationId: "org-other", url: OTHER_URL },
+      ],
+      keyPepper: null,
+      readerPasswords: {
+        "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": ownPasswordOf("org-acme"),
+      },
+    });
+    await done;
+
+    expect(converged).toHaveBeenCalledTimes(1);
+    const [plan] = converged.mock.calls[0] ?? [];
+    expect(plan?.request.connection.password).toBe(ownPasswordOf("org-acme"));
+    const warnings = logCalls.filter((call) => call.level === "warn");
+    expect(warnings.map((call) => call.fields)).toEqual([{ organizationId: "org-other" }]);
+  });
+});
+
+describe("given a private route and the organisation's own reader password", () => {
+  /** @scenario "A private ClickHouse's reader signs in with the instance's own password where one is set" */
+  it("provisions the reader with that password, never the key pepper's, and warns of no fallback", async () => {
+    const { converged, done } = run({
+      endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
+    });
+    await done;
+
+    const [plan] = converged.mock.calls[0] ?? [];
+    const derived = privateReaderOf({ keyPepper: PEPPER, organizationId: "org-acme" });
+    expect(plan?.request.connection.password).toBe(ownPasswordOf("org-acme"));
+    expect(plan?.request.connection.username).toBe(derived.username);
+    expect(JSON.stringify(plan)).not.toContain(derived.password);
+    expect(logCalls.filter((call) => call.level === "warn")).toEqual([]);
+  });
+});
+
+describe("given a private route with no reader password of its own", () => {
+  /** @scenario "Without its own password a private reader falls back to the key pepper and warns" */
+  it("provisions the reader derived from the key pepper and warns naming the organisation and the variable", async () => {
+    const { converged, done } = run({
+      endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
+      readerPasswords: {},
+    });
+    await done;
+
+    const [plan] = converged.mock.calls[0] ?? [];
+    const derived = privateReaderOf({ keyPepper: PEPPER, organizationId: "org-acme" });
+    expect(plan?.request.connection.password).toBe(derived.password);
+    const [warning] = logCalls.filter((call) => call.level === "warn");
+    expect(warning?.fields).toEqual({ organizationId: "org-acme" });
+    expect(String(warning?.message)).toContain(
+      "LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId>",
+    );
+    expect(JSON.stringify(logCalls)).not.toContain(derived.password);
+    expect(JSON.stringify(logCalls)).not.toContain(PEPPER);
+  });
+});
+
+describe("given a private route whose reader password variable is blank", () => {
+  /** @scenario "A blank or doubled private reader password is refused, never derived" */
+  it("converges nothing for it and warns naming the variable, though a key pepper is set", async () => {
+    const { converged, done } = run({
+      endpoints: [{ organizationId: "org-acme", url: ADMIN_URL }],
+      readerPasswords: { "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme": "   " },
+    });
+    await done;
+
+    expect(converged).not.toHaveBeenCalled();
+    const [warning] = logCalls.filter((call) => call.level === "warn");
+    expect(warning?.fields).toEqual({
+      organizationId: "org-acme",
+      variable: "LWQL_PRIVATE_READER_PASSWORD__acme__org-acme",
+    });
   });
 });
 

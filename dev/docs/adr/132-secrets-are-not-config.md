@@ -186,7 +186,10 @@ a set whose names the deployment chooses, so the chain gains exactly one bounded
 enumeration:
 
 - `Secret.family(prefix)` declares a handle whose value is a name-to-value map of
-  every set, non-empty name under `prefix`. An empty prefix names nothing.
+  every set name under `prefix`. An empty prefix names nothing. A name set to
+  an empty value is answered as `""` (2026-11-27): each family's owner refuses
+  it by name, where dropping it fell back silently. A single id still reads
+  an empty value as unset.
 - The env and `.env` adapters scan by prefix; per name the first adapter in the
   chain wins, as for a single id. 1Password answers none: a vault is never listed.
 - The resolver scopes a family like any handle (an owner resolves only the

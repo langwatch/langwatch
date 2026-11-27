@@ -32,21 +32,21 @@ export class LangWatchQLExternalCollectionAccessModelService {
 
   private constructor() {}
 
-  /** The reader's definition, its password kept only as a sha256 hex hash. */
-  build({
-    names,
-    restrictedPassword,
-    sourceDatabase,
-  }: {
-    names: LangWatchQLNames;
-    restrictedPassword: string;
-    sourceDatabase: string;
-  }): LwqlAccessModelDefinition {
+  /** The reader's definition, its password kept only as a sha256 hex hash, given or computed. */
+  build(
+    input: { names: LangWatchQLNames; sourceDatabase: string } & (
+      | { restrictedPassword: string }
+      | { restrictedPasswordSha256Hex: string }
+    ),
+  ): LwqlAccessModelDefinition {
     return accessModelDefinition.build({
-      names,
-      passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
+      names: input.names,
+      passwordSha256Hex:
+        "restrictedPasswordSha256Hex" in input
+          ? input.restrictedPasswordSha256Hex
+          : createHash("sha256").update(input.restrictedPassword).digest("hex"),
       namedCollection: NO_NAMED_COLLECTION_VALUES,
-      sourceDatabase,
+      sourceDatabase: input.sourceDatabase,
     });
   }
 }

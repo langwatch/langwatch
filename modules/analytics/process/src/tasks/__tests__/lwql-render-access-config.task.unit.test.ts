@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LWQL_SCOPED_SCHEMA } from "../../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
-import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
+import { privateReaderNameOf, privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
 import { privateNamesOf } from "../lwql-private-targets.task.ts";
 import {
@@ -364,8 +364,11 @@ describe("renderLwqlAccessConfig", () => {
         signal: new AbortController().signal,
       });
 
-      expect(logCalls).toHaveLength(1);
-      expect(logCalls[0]?.fields).toMatchObject({ user: reader.username, database: "private_db" });
+      const rendered = logCalls.filter(
+        (call) => call.message === "rendered the LangWatchQL access-model config",
+      );
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0]?.fields).toMatchObject({ user: reader.username, database: "private_db" });
       const logged = JSON.stringify(logCalls);
       const hash = createHash("sha256").update(reader.password).digest("hex");
       expect(logged).not.toContain(reader.password);
@@ -383,11 +386,185 @@ describe("renderLwqlAccessConfig", () => {
       expect(await readdir(outDir, { recursive: true })).toEqual([]);
     });
 
+    /** @scenario "Without its own password a private reader falls back to the key pepper and warns" */
+    it("warns naming the organisation and the variables to set when it derives from the key pepper", async () => {
+      logCalls.length = 0;
+
+      await writeLwqlAccessConfig({ outDir, source: PRIVATE_ENV });
+
+      const warning = logCalls.find((call) =>
+        String(call.message).includes("derived from the key pepper"),
+      );
+      expect(warning?.fields).toEqual({ organizationId: ORGANIZATION_ID });
+      expect(String(warning?.message)).toContain("LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256");
+      expect(String(warning?.message)).toContain(
+        "LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId>",
+      );
+      expect(JSON.stringify(logCalls)).not.toContain(reader.password);
+      expect(JSON.stringify(logCalls)).not.toContain(PEPPER);
+    });
+
     /** @scenario "The render task renders a private ClickHouse's reader as a users.d file, offline" */
     it("leaves no temporary file beside the rendered one", async () => {
       await writeLwqlAccessConfig({ outDir, source: PRIVATE_ENV });
 
       expect(await readdir(join(outDir, "users.d"))).toEqual(["lwql-access.yaml"]);
+    });
+  });
+
+  describe("when the private target is given its reader password's hash", () => {
+    const ORGANIZATION_ID = "org-hash-test";
+    const OWN_PASSWORD = "fake-own-reader-password-0123456789";
+    const HASH = createHash("sha256").update(OWN_PASSWORD).digest("hex");
+    const HASH_ENV: Record<string, string | undefined> = {
+      LWQL_RENDER_PRIVATE_ORGANIZATION_ID: ORGANIZATION_ID,
+      LWQL_RENDER_PRIVATE_DATABASE: "private_db",
+      LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256: HASH,
+    };
+    const name = privateReaderNameOf({ organizationId: ORGANIZATION_ID });
+
+    async function renderedUsersFile(source: Record<string, string | undefined>) {
+      await writeLwqlAccessConfig({ outDir, source });
+      return readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+    }
+
+    /** @scenario "The private render writes a given password hash and needs no key pepper" */
+    it("writes that hash for the organisation's reader with no key pepper set", async () => {
+      const contents = await renderedUsersFile(HASH_ENV);
+
+      expect(contents).toMatch(new RegExp(`^  ${name.username}:$`, "m"));
+      expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
+      expect(contents).toContain(`profile: "${name.settingsProfile}"`);
+      expect(contents).not.toContain(OWN_PASSWORD);
+    });
+
+    /** @scenario "The private render writes a given password hash and needs no key pepper" */
+    it("keeps the given hash over a key pepper and the organisation's own password", async () => {
+      const contents = await renderedUsersFile({
+        ...HASH_ENV,
+        API_KEY_PEPPER: "fake-test-pepper",
+        [`LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`]:
+          "fake-other-reader-password-0123456789",
+      });
+
+      expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
+    });
+
+    /** @scenario "The private render writes a given password hash and needs no key pepper" */
+    it("trims the hash a mounted file ends with a newline", async () => {
+      const contents = await renderedUsersFile({
+        ...HASH_ENV,
+        LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256: `${HASH}\n`,
+      });
+
+      expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
+    });
+
+    /** @scenario "The private render writes a given password hash and needs no key pepper" */
+    it("writes the sha256 of the organisation's own password where no hash is given", async () => {
+      const { LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256, ...env } = HASH_ENV;
+      void LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256;
+
+      const contents = await renderedUsersFile({
+        ...env,
+        API_KEY_PEPPER: "fake-test-pepper",
+        [`LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`]: OWN_PASSWORD,
+      });
+
+      expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
+      expect(contents).not.toContain(OWN_PASSWORD);
+    });
+
+    /** @scenario "The upgrade and render tasks read private reader passwords through the secrets chain" */
+    it("writes the sha256 of an own password only the secrets chain holds", async () => {
+      const { LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256, ...env } = HASH_ENV;
+      void LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256;
+      const lookupFamily = async (prefix: string) =>
+        new Map([[`${prefix}label__${ORGANIZATION_ID}`, OWN_PASSWORD]]);
+
+      await writeLwqlAccessConfig({ outDir, source: env, lookupFamily });
+      const contents = await readFile(join(outDir, "users.d", "lwql-access.yaml"), "utf8");
+
+      expect(contents).toContain(`password_sha256_hex: "${HASH}"`);
+    });
+
+    /** @scenario "The private render refuses a malformed password hash" */
+    it.each([
+      ["blank", "   "],
+      ["upper-case", HASH.toUpperCase()],
+      ["too short", HASH.slice(1)],
+      ["not hex", `${HASH.slice(1)}g`],
+    ])("fails naming the variable and writes no file for a %s hash", async (_kind, hash) => {
+      const source = {
+        ...HASH_ENV,
+        API_KEY_PEPPER: "fake-test-pepper",
+        LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256: hash,
+      };
+
+      await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
+        /LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 must be the reader password's sha256 as 64 lower-case hex characters/,
+      );
+      expect(await readdir(outDir, { recursive: true })).toEqual([]);
+    });
+
+    /** @scenario "The private render refuses a malformed password hash" */
+    it("fails rather than render the shared target when the hash names no organisation", async () => {
+      const source = { ...FULL_ENV, LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256: HASH };
+
+      await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
+        /LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 is set without LWQL_RENDER_PRIVATE_ORGANIZATION_ID/,
+      );
+      expect(await readdir(outDir, { recursive: true })).toEqual([]);
+    });
+
+    /** @scenario "A given password hash never stands in for a refused private reader password" */
+    it.each([
+      ["empty", { [`LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`]: "" }, "one"],
+      ["whitespace", { [`LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`]: "  " }, "one"],
+      [
+        "doubled",
+        {
+          [`LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`]: OWN_PASSWORD,
+          [`LWQL_PRIVATE_READER_PASSWORD__two__${ORGANIZATION_ID}`]:
+            "fake-second-reader-password-0123456789",
+        },
+        "two",
+      ],
+    ])(
+      "fails naming the %s own-password variable though the hash is given, writing no file",
+      async (_kind, variables, label) => {
+        const source = { ...HASH_ENV, API_KEY_PEPPER: "fake-test-pepper", ...variables };
+
+        await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
+          `LWQL_PRIVATE_READER_PASSWORD__${label}__${ORGANIZATION_ID} is blank`,
+        );
+        expect(await readdir(outDir, { recursive: true })).toEqual([]);
+      },
+    );
+
+    /** @scenario "A given password hash never stands in for a refused private reader password" */
+    it("fails though the hash is given when only the secrets chain holds the empty password", async () => {
+      const variable = `LWQL_PRIVATE_READER_PASSWORD__one__${ORGANIZATION_ID}`;
+      const lookupFamily = async () => new Map([[variable, ""]]);
+
+      await expect(
+        writeLwqlAccessConfig({ outDir, source: HASH_ENV, lookupFamily }),
+      ).rejects.toThrow(`${variable} is blank`);
+    });
+
+    /** @scenario "A blank or doubled private reader password is refused, never derived" */
+    it("fails naming a blank own-password variable rather than derive from the key pepper", async () => {
+      const { LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256, ...env } = HASH_ENV;
+      void LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256;
+      const variable = `LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`;
+      const source = { ...env, API_KEY_PEPPER: "fake-test-pepper", [variable]: " " };
+
+      await expect(writeLwqlAccessConfig({ outDir, source })).rejects.toThrow(
+        new RegExp(
+          `${variable} is blank, shorter than 32 characters, shared with another organisation or names an organisation another variable names too`,
+        ),
+      );
+      expect(await readdir(outDir, { recursive: true })).toEqual([]);
     });
   });
 });

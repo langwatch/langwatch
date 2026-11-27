@@ -1,7 +1,7 @@
 /**
  * Renders the access model's users.d/config.d files for a config-store ClickHouse, offline:
  * no ClickHouse connection, so the chart runs it before the StatefulSet exists (ADR-159). With
- * `LWQL_RENDER_PRIVATE_ORGANIZATION_ID` it renders that organisation's private reader instead.
+ * `LWQL_RENDER_PRIVATE_ORGANIZATION_ID` it renders that organisation's private reader (ADR-200).
  * @see specs/lwql/chart-delivery.feature
  * @see specs/lwql/api.feature
  */
@@ -11,6 +11,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { createLogger } from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { Task } from "@langwatch/task";
 
 import { LangWatchQLCollectionBindingService } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
@@ -22,10 +23,15 @@ import {
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   findKeyPeppers,
+  type LwqlSecretFamilyLookup,
   type LwqlSecretLookup,
   withChainedSecrets,
 } from "../rules/lwql-default-credentials.rules.ts";
-import { privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
+import {
+  parsePrivateReaderPasswords,
+  privateReaderNameOf,
+  resolvePrivateReader,
+} from "../rules/lwql-private-reader.rules.ts";
 import {
   LangWatchQLAccessModelDefinitionService,
   type LwqlAccessModelDefinition,
@@ -45,6 +51,16 @@ const sqlText = LangWatchQLSqlTextService.create();
 
 const DEFAULT_PRIVATE_DATABASE = "langwatch";
 
+/** The sha256 of an instance's own reader password, so the render needs neither it nor a pepper. */
+export const LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 =
+  "LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256";
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 /** The definition the app would converge, from the same environment the app reads. */
 export function lwqlAccessModelDefinitionFromSource(
   source: Record<string, string | undefined>,
@@ -60,7 +76,7 @@ export function lwqlAccessModelDefinitionFromSource(
   const names = production.names({ connection: request.connection });
   return accessModelDefinition.build({
     names,
-    passwordSha256Hex: createHash("sha256").update(request.connection.password).digest("hex"),
+    passwordSha256Hex: sha256Hex(request.connection.password),
     namedCollection: {
       collection: collectionBinding.namedCollection({ names, mode: "rendered" }),
       host: request.endpoint.host,
@@ -88,6 +104,50 @@ export interface LwqlRenderedPrivateReader {
   readonly database: string;
 }
 
+/** A refused own password fails first; then the given hash wins, else the own or pepper's. */
+function privateReaderPasswordSha256Of({
+  organizationId,
+  source,
+}: {
+  organizationId: string;
+  source: Record<string, string | undefined>;
+}): string {
+  const resolved = resolvePrivateReader({
+    organizationId,
+    passwords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
+    keyPepper: findKeyPeppers(source)[0],
+  });
+  if (resolved.kind === "refused") {
+    throw new Error(
+      `lwql-render-access-config: ${resolved.variable} is blank, shorter than 32 characters, shared with another organisation or names an organisation another variable names too`,
+    );
+  }
+  const given = source[LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256];
+  if (given !== undefined) {
+    const hash = given.trim();
+    if (!SHA256_HEX.test(hash)) {
+      throw new Error(
+        `lwql-render-access-config: ${LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256} must be the reader password's sha256 as 64 lower-case hex characters`,
+      );
+    }
+    return hash;
+  }
+  switch (resolved.kind) {
+    case "own":
+      return sha256Hex(resolved.reader.password);
+    case "derived":
+      logger.warn(
+        { organizationId },
+        `rendering the private reader with a password derived from the key pepper, as neither ${LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256} nor LWQL_PRIVATE_READER_PASSWORD__<label>__<organizationId> is set`,
+      );
+      return sha256Hex(resolved.reader.password);
+    case "absent":
+      throw new Error(
+        `lwql-render-access-config: missing required input API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET (the key pepper the private reader is derived from), or ${LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256}`,
+      );
+  }
+}
+
 /**
  * One organisation's private reader, exactly as the private SQL path would create it: the server's
  * own `lwql_postgres` holds the PostgreSQL login, so the definition carries no connection value.
@@ -99,22 +159,16 @@ export function lwqlPrivateAccessModelDefinitionFromSource({
   organizationId: string;
   source: Record<string, string | undefined>;
 }): LwqlAccessModelDefinition {
-  const [keyPepper] = findKeyPeppers(source);
-  if (keyPepper === undefined) {
-    throw new Error(
-      "lwql-render-access-config: missing required input API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET (the key pepper the private reader is derived from)",
-    );
-  }
+  const restrictedPasswordSha256Hex = privateReaderPasswordSha256Of({ organizationId, source });
   const database = privateDatabaseOf(source);
-  const reader = privateReaderOf({ keyPepper, organizationId });
   const names = privateNamesOf({
     database,
-    reader,
+    reader: privateReaderNameOf({ organizationId }),
     tenantSetting: source.LWQL_TENANT_SETTING ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
   });
   return externalCollectionAccessModel.build({
     names,
-    restrictedPassword: reader.password,
+    restrictedPasswordSha256Hex,
     sourceDatabase: database,
   });
 }
@@ -130,6 +184,15 @@ function renderedFilesOf(source: Record<string, string | undefined>): {
   if (organizationId === "") {
     throw new Error(
       "lwql-render-access-config: LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set but blank; set the organisation id or unset it for the shared target",
+    );
+  }
+  // A hash with no organisation would otherwise render the shared target for a private server.
+  if (
+    organizationId === undefined &&
+    source[LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256] !== undefined
+  ) {
+    throw new Error(
+      `lwql-render-access-config: ${LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256} is set without LWQL_RENDER_PRIVATE_ORGANIZATION_ID; set the organisation id or unset the hash for the shared target`,
     );
   }
   if (organizationId !== undefined) {
@@ -165,16 +228,18 @@ export async function writeLwqlAccessConfig({
   outDir,
   source: environment,
   lookup,
+  lookupFamily,
 }: {
   outDir: string;
   source: Record<string, string | undefined>;
   lookup?: LwqlSecretLookup;
+  lookupFamily?: LwqlSecretFamilyLookup;
 }): Promise<{
   files: RenderedConfigFile[];
   secretLength: number;
   privateReader?: LwqlRenderedPrivateReader;
 }> {
-  const source = await withChainedSecrets({ environment, lookup });
+  const source = await withChainedSecrets({ environment, lookup, lookupFamily });
   const { definition, files, privateReader } = renderedFilesOf(source);
   for (const file of files) {
     const absolute = join(outDir, file.relativePath);
@@ -197,6 +262,7 @@ export class LwqlRenderAccessConfigTask extends Task {
   private constructor(
     private readonly source: Record<string, string | undefined>,
     private readonly lookup: LwqlSecretLookup | undefined,
+    private readonly lookupFamily: LwqlSecretFamilyLookup | undefined,
   ) {
     super();
   }
@@ -204,13 +270,16 @@ export class LwqlRenderAccessConfigTask extends Task {
   static create({
     source,
     lookup,
+    lookupFamily,
   }: {
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
     /** The runner's secrets chain, so the reader derives from the pepper the upgrade reads. */
     lookup?: LwqlSecretLookup;
+    /** The same chain's families, so a private reader's own password is the api's. */
+    lookupFamily?: LwqlSecretFamilyLookup;
   }): LwqlRenderAccessConfigTask {
-    return new LwqlRenderAccessConfigTask(source, lookup);
+    return new LwqlRenderAccessConfigTask(source, lookup, lookupFamily);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -222,6 +291,7 @@ export class LwqlRenderAccessConfigTask extends Task {
       outDir,
       source: this.source,
       lookup: this.lookup,
+      lookupFamily: this.lookupFamily,
     });
     logger.info(
       { files: files.map((file) => file.relativePath), secretLength, ...privateReader },

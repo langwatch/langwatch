@@ -95,7 +95,16 @@ const ROUTED_ORIGIN = `http://${ROUTED}.memory.invalid:8123`;
  * `project-shared` on the LangWatchQL server, whose access model is answered provisioned. A
  * private server's answer is held only when `routedAnswer` names it; otherwise it is probed.
  */
-async function appOver({ routedAnswer }: { routedAnswer?: "provisioned" } = {}) {
+async function appOver({
+  routedAnswer,
+  routedPrivately = false,
+  environment = {},
+}: {
+  routedAnswer?: "provisioned";
+  /** Sends `project-routed` to its own ClickHouse through the router, signing in as its reader. */
+  routedPrivately?: boolean;
+  environment?: Readonly<Record<string, string>>;
+} = {}) {
   const inserts: Parameters<ClickHouseAdminStatements["insert"]>[0][] = [];
   const admin: ClickHouseAdminStatements = {
     command: () => Promise.resolve(),
@@ -166,6 +175,20 @@ async function appOver({ routedAnswer }: { routedAnswer?: "provisioned" } = {}) 
       }),
       langWatchQl: {
         ...memory.langWatchQl,
+        ...(routedPrivately
+          ? {
+              routeTenantSet: ({ tenantIds }: { tenantIds: readonly string[] }) =>
+                Promise.resolve(
+                  tenantIds.includes(ROUTED)
+                    ? {
+                        kind: "private" as const,
+                        organizationId: ORGANIZATION_ID,
+                        url: `${ROUTED_ORIGIN}/langwatch`,
+                      }
+                    : { kind: "shared" as const },
+                ),
+            }
+          : {}),
         admin: {
           configured: true,
           target: { url: "http://clickhouse.test:8123/", database: "langwatch" },
@@ -193,6 +216,7 @@ async function appOver({ routedAnswer }: { routedAnswer?: "provisioned" } = {}) 
     secrets: analyticsTestSecrets({
       NEXTAUTH_SECRET: TEST_SESSION_SECRET,
       LWQL_CLICKHOUSE_PASSWORD: "lwql-test-password",
+      ...environment,
     }),
   });
   return { app, inserts, resolveSession };
@@ -309,6 +333,38 @@ describe("AnalyticsModule LangWatchQL doors", () => {
       });
       expect(queryMock).toHaveBeenCalledTimes(5);
     });
+  });
+});
+
+describe("AnalyticsModule LangWatchQL on an organisation's own ClickHouse", () => {
+  const PASSWORD_VARIABLE = `LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`;
+
+  async function apiDoorWith(environment: Readonly<Record<string, string>>) {
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({
+      json: async () => ({
+        data: [{ one: 1 }],
+        meta: [{ name: "one", type: "UInt8" }],
+        statistics: { elapsed: 0, rows_read: 1, bytes_read: 1 },
+      }),
+    });
+    const { app } = await appOver({
+      routedAnswer: "provisioned",
+      routedPrivately: true,
+      environment,
+    });
+    return codeOf(app.runLangWatchQLForKey({ reach: keyFor(ROUTED), door: "rest_api", sql: SQL }));
+  }
+
+  /** @scenario "Without its own password a private reader falls back to the key pepper and warns" */
+  it("answers with the reader derived from the key pepper where no password variable is set", async () => {
+    expect(await apiDoorWith({})).toBe("answered");
+  });
+
+  /** @scenario "A blank or doubled private reader password is refused, never derived" */
+  it("refuses the organisation's runs when its password variable is set but empty", async () => {
+    expect(await apiDoorWith({ [PASSWORD_VARIABLE]: "" })).toBe("lwql_unavailable");
+    expect(queryMock).not.toHaveBeenCalled();
   });
 });
 

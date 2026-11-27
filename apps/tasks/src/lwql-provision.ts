@@ -25,6 +25,7 @@ export async function lwqlProvision({
     database: () => database.client,
     source: environment,
     lookup: (id) => chain.fetch(id),
+    lookupFamily: (prefix) => chain.fetchFamily(prefix),
     failOnError,
   }).run({
     args: [],

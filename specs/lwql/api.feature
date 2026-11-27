@@ -799,7 +799,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A private route with no key pepper to derive a reader from is refused
     Given an organization routed to its own ClickHouse
-    And this deployment has no key pepper
+    And this deployment has no key pepper and no reader password of that organization's own
     When a LangWatchQL query reads that organization's projects
     Then the query layer refuses it with error code lwql_unavailable before any client is built for that route
     And neither the route URL's login nor the shared LangWatchQL user and password is sent to the route's server
@@ -810,6 +810,52 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When their readers are derived
     Then each reader has a different lower-case login name and a different password
     And the same organization always derives the same reader
+
+  # A private instance's own reader password (ADR-200): the platform keeps it, the instance's
+  # server gets only its sha256, so no platform secret, nor anything derived from one, reaches it.
+  @unit
+  Scenario: A private ClickHouse's reader signs in with the instance's own password where one is set
+    Given LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> holds a password for an organization routed to its own ClickHouse
+    When a LangWatchQL query reads that organization's projects, or the upgrade provisions its server
+    Then the reader signs in and is provisioned with that password, whether or not a key pepper is set
+    And its login name is still the one derived from the organization id
+    And no password derived from the key pepper is used for that organization
+
+  @unit
+  Scenario: Without its own password a private reader falls back to the key pepper and warns
+    Given an organization routed to its own ClickHouse with no LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id>
+    And a key pepper is set
+    When the upgrade provisions its server, or the render task renders its reader
+    Then the reader's password is derived from the key pepper and the organization id, as before
+    And a warning names the organization and the variable to set, never a password
+
+  @unit
+  Scenario: A blank or doubled private reader password is refused, never derived
+    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is empty or holds only whitespace, or two such variables name it
+    And the empty value may come from the environment or the .env file the secrets chain reads
+    When a LangWatchQL query reads its projects, the upgrade provisions its server, or the render task renders its reader
+    Then the organization gets no reader: its queries are refused, its server is not converged and the render fails naming the variable
+    And no password derived from the key pepper stands in for it
+
+  @unit
+  Scenario: A short or shared private reader password is refused, never derived
+    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> holds fewer than 32 characters once trimmed, or the same value as another organization's
+    When its reader password is read
+    Then each such organization is refused as a blank one is, naming its variable
+    And no password derived from the key pepper stands in for it
+
+  @unit
+  Scenario: A private reader password variable naming no organization is ignored
+    Given a LWQL_PRIVATE_READER_PASSWORD__ variable with no organization id after its last "__", or one starting with "_"
+    When the reader passwords are read
+    Then it gives no organization a password and refuses none
+
+  @unit
+  Scenario: The upgrade and render tasks read private reader passwords through the secrets chain
+    Given LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is held by a source the secrets chain reads, such as the workspace .env file, and not by the task's environment
+    When the upgrade provisions that organization's server, or the render task renders its reader
+    Then the reader uses that password, as the api's does
+    And a blank value the task's environment carries is still refused
 
   @unit
   Scenario: Each private ClickHouse is provisioned with its own derived reader
@@ -919,7 +965,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: The private render target fails by name without a key pepper
     Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set
-    And none of API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET is set
+    And none of API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET is set, nor a password hash or the organization's own password
     When lwql-render-access-config runs
     Then it fails naming those inputs and writes no file
     And with a later pepper in that chain set it derives the same reader the upgrade does
@@ -945,6 +991,31 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When lwql-render-access-config runs
     Then the reader is derived from the trimmed organization id
     And it logs the reader's login name and the database, never the password, its hash or the pepper
+
+  @unit
+  Scenario: The private render writes a given password hash and needs no key pepper
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID names an organization
+    And LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 holds the sha256 of its reader password as 64 lower-case hex characters
+    And no key pepper is set
+    When lwql-render-access-config runs
+    Then users.d/lwql-access.yaml holds that hash as the organization's reader password_sha256_hex
+    And with a key pepper or the organization's own password also set, the given hash still wins
+    And the render with the organization's own password and no hash writes that password's sha256
+
+  @unit
+  Scenario: The private render refuses a malformed password hash
+    Given LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 is blank, is not 64 lower-case hex characters, or is set without LWQL_RENDER_PRIVATE_ORGANIZATION_ID
+    When lwql-render-access-config runs
+    Then it fails naming LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 and writes no file
+    And it never falls back to the key pepper or to the shared target
+
+  @unit
+  Scenario: A given password hash never stands in for a refused private reader password
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID names an organization and LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 holds a well-formed hash
+    And that organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is refused: empty, blank, short or shared, or two such variables name it
+    When lwql-render-access-config runs
+    Then it fails naming the refused variable and writes no file
+    And the given hash does not stand in for it, as the api and the upgrade refuse that organization too
 
   @unit
   Scenario: A private ClickHouse whose rendered reader is not loaded yet stays refused as not provisioned
