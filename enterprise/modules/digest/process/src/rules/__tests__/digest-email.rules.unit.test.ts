@@ -14,18 +14,24 @@ import {
   type DigestTemplateProps,
   digestTemplateInput,
   type OrganizationWeek,
-  pickHomeOrganization,
 } from "../digest-email.rules.ts";
 import { pickDigestTemplate } from "../digest-template.rules.ts";
 import {
   emptyProjectWeek,
   emptyUserWeek,
-  type ProjectWeekState,
+  type ProjectWeek,
   type UserWeekState,
 } from "../digest-week.rules.ts";
 
-const fold = (overrides: Partial<ProjectWeekState>): ProjectWeekState => ({
+const fold = (overrides: Partial<ProjectWeek>): ProjectWeek => ({
   ...emptyProjectWeek(),
+  traces: 0,
+  errors: 0,
+  tokens: 0,
+  costUsd: 0,
+  p50Ms: 0,
+  p95Ms: 0,
+  models: {},
   projectId: "project-1",
   organizationId: "org-1",
   isoWeek: "2026-W46",
@@ -85,7 +91,7 @@ function propsFor({
     userId: "u",
     names,
     baseUrl: BASE,
-    unsubscribeUrl: UNSUBSCRIBE,
+    preferencesUrl: UNSUBSCRIBE,
     now: NOW,
   });
   return { pick, props: built?.props };
@@ -98,6 +104,7 @@ function week(overrides: Partial<OrganizationWeek> = {}): OrganizationWeek {
     planUsage: { used: 100, limit: 1_000 },
     projects: [],
     history: [],
+    previousTraces: new Map(),
     users: new Map(),
     ...overrides,
   };
@@ -137,7 +144,7 @@ describe("buildDigestTemplateProps()", () => {
           evaluators: { exact_match: { runs: 10, passed: 8, failed: 2 } },
         }),
       ],
-      history: [fold({ isoWeek: "2026-W45", traces: 1_000 })],
+      previousTraces: new Map([["project-1", 1_000]]),
     });
 
     it("renders traces-week with its numbers, top three models first, and its links", () => {
@@ -146,7 +153,7 @@ describe("buildDigestTemplateProps()", () => {
       expect(pick.template).toBe("digest-traces-week");
       expect(parsedBy({ templateId: pick.template, props })).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: UNSUBSCRIBE,
+        preferencesUrl: UNSUBSCRIBE,
         projectName: "Support bot",
         traces: 1_200,
         changePercent: 20,
@@ -234,7 +241,7 @@ describe("buildDigestTemplateProps()", () => {
       expect(pick.template).toBe("digest-coding-agent-week");
       expect(parsedBy({ templateId: pick.template, props })).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: UNSUBSCRIBE,
+        preferencesUrl: UNSUBSCRIBE,
         sessions: 5,
         tokens: 1_200,
         costUsd: 1.25,
@@ -253,7 +260,7 @@ describe("buildDigestTemplateProps()", () => {
 
       expect(parsedBy({ templateId: pick.template, props })).toEqual({
         weekLabel: "Nov 9 to 15",
-        unsubscribeUrl: UNSUBSCRIBE,
+        preferencesUrl: UNSUBSCRIBE,
         sessions: 5,
         tokens: 0,
         costUsd: 0,
@@ -297,31 +304,5 @@ describe("buildDigestTemplateProps()", () => {
       expect(pick.template).toBe("digest-whats-new");
       expect(props).toBeUndefined();
     });
-  });
-});
-
-describe("pickHomeOrganization()", () => {
-  /** @scenario "A member of two enrolled organizations is sent the busier one's week" */
-  it("is the organization with the most activity", () => {
-    expect(
-      pickHomeOrganization([
-        { organizationId: "org-a", activity: 10 },
-        { organizationId: "org-b", activity: 30 },
-      ]),
-    ).toBe("org-b");
-  });
-
-  /** @scenario "A member of two enrolled organizations is sent the busier one's week" */
-  it("is the lowest organization id on a tie, whatever order they are listed in", () => {
-    const tied = [
-      { organizationId: "org-b", activity: 5 },
-      { organizationId: "org-a", activity: 5 },
-    ];
-    expect(pickHomeOrganization(tied)).toBe("org-a");
-    expect(pickHomeOrganization(tied.toReversed())).toBe("org-a");
-  });
-
-  it("is none without candidates", () => {
-    expect(pickHomeOrganization([])).toBeUndefined();
   });
 });

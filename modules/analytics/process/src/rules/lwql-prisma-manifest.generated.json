@@ -31443,7 +31443,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The send whose unsubscribe link or one-click header the person used."
+          "documentation": "The send whose unsubscribe link or one-click header the person used; the Profile switch writes\n`settings` here."
         },
         {
           "name": "updatedAt",
@@ -31507,7 +31507,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "The fold state: counts, sums, a fixed-bucket latency histogram, capped model and evaluator maps."
+          "documentation": "The fold state: evaluator and scenario outcome counts only; trace numbers are read from analytics."
         },
         {
           "name": "occurredAt",
@@ -31677,7 +31677,7 @@
     {
       "name": "DigestSend",
       "tableName": "DigestSend",
-      "documentation": "One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.",
+      "documentation": "One person's digest for one organisation for one ISO week, accepted by our own mailer. The id is\n`{userId}:{organizationId}:{isoWeek}`.",
       "primaryKey": [
         "id"
       ],

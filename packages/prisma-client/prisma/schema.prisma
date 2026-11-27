@@ -8363,7 +8363,8 @@ model DigestCohortOrganization {
 model DigestSubscription {
   userId                 String    @id
   unsubscribedAt         DateTime?
-  /// The send whose unsubscribe link or one-click header the person used.
+  /// The send whose unsubscribe link or one-click header the person used; the Profile switch writes
+  /// `settings` here.
   unsubscribedFromSendId String?
   updatedAt              DateTime  @updatedAt
 }
@@ -8374,7 +8375,7 @@ model DigestProjectWeek {
   projectId         String
   organizationId    String
   isoWeek           String
-  /// The fold state: counts, sums, a fixed-bucket latency histogram, capped model and evaluator maps.
+  /// The fold state: evaluator and scenario outcome counts only; trace numbers are read from analytics.
   state             Json
   occurredAt        DateTime
   lastEventId       String
@@ -8407,7 +8408,8 @@ model DigestUserWeek {
   @@index([userId])
 }
 
-/// One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.
+/// One person's digest for one organisation for one ISO week, accepted by our own mailer. The id is
+/// `{userId}:{organizationId}:{isoWeek}`.
 model DigestSend {
   id             String   @id
   userId         String

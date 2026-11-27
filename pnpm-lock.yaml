@@ -3094,6 +3094,9 @@ importers:
 
   enterprise/modules/digest/process:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
@@ -3148,9 +3151,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/trace/contract
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
@@ -16700,6 +16700,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-digest-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/digest/contract
       '@langwatch/enterprise-gateway-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/enterprise-gateway/contract

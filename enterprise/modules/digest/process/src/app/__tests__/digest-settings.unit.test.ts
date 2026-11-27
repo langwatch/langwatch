@@ -4,6 +4,7 @@
  * The operator's switches through the real digest, with ops admitting the operator: each answers
  * the settings as they now stand and leaves the audience so. Spec: digest.feature.
  */
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
@@ -25,6 +26,7 @@ async function digestAdmittingOperators() {
   const repositories = MemoryDigestRepositories.create();
   const digest = await DigestModule.create({
     dependencies: {
+      analytics: createApiFixture<AnalyticsApi>({}, "AnalyticsApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       ops: createApiFixture<OpsApi>(
         {
@@ -48,45 +50,58 @@ async function digestAdmittingOperators() {
   return { digest, audience: repositories.audience };
 }
 
-describe("the digest's operator switches", () => {
-  describe("when an admitted operator enrols and unenrols organizations", () => {
-    /** @scenario "An operator enrols and unenrols organizations" */
-    it("answers the enrolled organizations sorted, and the audience holds only those", async () => {
-      const { digest, audience } = await digestAdmittingOperators();
-
-      await expect(
-        digest.setEnrolled({ operator, organizationId: "org_zeta", enrolled: true }),
-      ).resolves.toEqual({ armed: false, enrolledOrganizationIds: ["org_zeta"] });
-      await expect(
-        digest.setEnrolled({ operator, organizationId: "org_acme", enrolled: true }),
-      ).resolves.toEqual({ armed: false, enrolledOrganizationIds: ["org_acme", "org_zeta"] });
-      await expect(
-        digest.setEnrolled({ operator, organizationId: "org_zeta", enrolled: false }),
-      ).resolves.toEqual({ armed: false, enrolledOrganizationIds: ["org_acme"] });
-
-      expect(await audience.findEnrolled()).toEqual(["org_acme"]);
-      expect((await audience.getSettings()).armed).toBe(false);
-    });
-  });
-
+describe("the digest's operator switch", () => {
   describe("when an admitted operator arms and disarms the send", () => {
     /** @scenario "An operator arms and disarms the weekly send" */
     it("answers the switch as set, and the audience settings hold it", async () => {
       const { digest, audience } = await digestAdmittingOperators();
-      await digest.setEnrolled({ operator, organizationId: "org_acme", enrolled: true });
 
-      await expect(digest.setArmed({ operator, armed: true })).resolves.toEqual({
-        armed: true,
-        enrolledOrganizationIds: ["org_acme"],
-      });
+      await expect(digest.setArmed({ operator, armed: true })).resolves.toEqual({ armed: true });
       expect((await audience.getSettings()).armed).toBe(true);
 
-      await expect(digest.setArmed({ operator, armed: false })).resolves.toEqual({
-        armed: false,
-        enrolledOrganizationIds: ["org_acme"],
-      });
+      await expect(digest.setArmed({ operator, armed: false })).resolves.toEqual({ armed: false });
       expect((await audience.getSettings()).armed).toBe(false);
-      expect(await audience.findEnrolled()).toEqual(["org_acme"]);
     });
+  });
+});
+
+describe("a person's own digest preference", () => {
+  /** @scenario "A person turns the weekly digest off and on in their settings" */
+  it("round-trips through the same opt-out the unsubscribe link writes", async () => {
+    const { digest, audience } = await digestAdmittingOperators();
+    const userId = "user_pat";
+
+    expect(await digest.getPreference({ userId })).toEqual({ subscribed: true });
+    await expect(digest.setPreference({ userId, subscribed: false })).resolves.toEqual({
+      subscribed: false,
+    });
+    expect(await audience.findUnsubscribed({ userIds: [userId] })).toEqual([userId]);
+    expect(await digest.getPreference({ userId })).toEqual({ subscribed: false });
+
+    await expect(digest.setPreference({ userId, subscribed: true })).resolves.toEqual({
+      subscribed: true,
+    });
+    expect(await audience.findUnsubscribed({ userIds: [userId] })).toEqual([]);
+  });
+
+  /** @scenario "A person turns the weekly digest off and on in their settings" */
+  it("shows an unsubscribe-link opt-out as off, and leaves everyone else's choice alone", async () => {
+    const { digest, audience } = await digestAdmittingOperators();
+    await audience.unsubscribe({ userId: "user_pat", sendId: "user_pat:org_acme:2026-W46", at: 1 });
+
+    expect(await digest.getPreference({ userId: "user_pat" })).toEqual({ subscribed: false });
+    expect(await digest.getPreference({ userId: "user_sam" })).toEqual({ subscribed: true });
+    await digest.setPreference({ userId: "user_pat", subscribed: true });
+    expect(await digest.getPreference({ userId: "user_pat" })).toEqual({ subscribed: true });
+  });
+
+  /** @scenario "Impersonating staff can see a person's email choice but not change it" */
+  it("refuses a change made while impersonating, and leaves the choice as it was", async () => {
+    const { digest } = await digestAdmittingOperators();
+
+    await expect(
+      digest.setPreference({ userId: "user_pat", subscribed: false, impersonatorId: "user_staff" }),
+    ).rejects.toMatchObject({ code: "digest_impersonation_refused" });
+    expect(await digest.getPreference({ userId: "user_pat" })).toEqual({ subscribed: true });
   });
 });

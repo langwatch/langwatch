@@ -4,82 +4,46 @@ import type {
   SpanFactsContribution,
 } from "@langwatch/coding-agent-contract";
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
-import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import type {
   ProjectActivity,
   ProjectFact,
   UserActivity,
 } from "../eventing/digest-activity.events.ts";
-import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import {
   evaluationFact,
   extractRepository,
   metricSeries,
   scenarioFact,
-  spanFact,
 } from "../rules/digest-activity.rules.ts";
 import { isoWeekOf } from "../rules/digest-week.rules.ts";
 
-const logger = createLogger("langwatch:digest");
-
-/** How stale this process's view of the enrolled cohort may be before it is read again. */
-const COHORT_REFRESH_MS = 60 * 1000;
-/** ponytail: an in-process memo, cleared whole when full; a shared cache if the fleet grows. */
-const MAX_REMEMBERED_OWNERS = 10_000;
-
-/** Each enrolled organization's projects, by project id. */
-type Cohort = Readonly<{ organizationOf: ReadonlyMap<string, string>; loadedAt: number }>;
+/** ponytail: in-process memos, cleared whole when full; a shared cache if the fleet grows. */
+const MAX_REMEMBERED = 10_000;
 
 type Deps = Readonly<{
-  audience: Pick<DigestAudienceRepository, "findEnrolled">;
-  projects: Pick<ProjectApi, "listIdsByOrganization" | "findPersonalWorkspaceOwner">;
+  projects: Pick<ProjectApi, "findOrganizationId" | "findPersonalWorkspaceOwner">;
   recordProject: (activity: ProjectActivity) => Promise<void>;
   recordUser: (activity: UserActivity) => Promise<void>;
-  now: () => number;
 }>;
 
 /**
  * Turns each owner's event into digest's own fact and sends it (§9's subscriber rule): the
- * owners never name digest. Only projects of enrolled organizations fold, so an empty cohort
- * folds nothing and stores nothing.
+ * owners never name digest. Every project folds, under the organization it belongs to; a project
+ * with no organization folds nothing.
  */
 export class DigestSourceService {
   static create(deps: Deps): DigestSourceService {
     return new DigestSourceService(deps);
   }
 
-  #cohort: Cohort | undefined;
-  #loading: Promise<Cohort> | undefined;
+  /** A project's organization never changes, so a lookup is remembered, absent answers too. */
+  readonly #organizations = new Map<string, Promise<string | null>>();
   readonly #owners = new Map<string, Promise<string | null>>();
 
   private constructor(private readonly deps: Deps) {}
-
-  /**
-   * The enqueue filter's answer, synchronous: a project outside the cohort mints no job. While
-   * the view is unread or stale it lets everything through and reads it again; the handler asks.
-   */
-  mayFold(projectId: string): boolean {
-    const cohort = this.#cohort;
-    if (cohort && !this.#isStale(cohort)) return cohort.organizationOf.has(projectId);
-    void this.#refresh().catch((error: unknown) => {
-      logger.warn({ error }, "the digest could not read its cohort; letting the project through");
-    });
-    return true;
-  }
-
-  spanRecorded(span: NormalizedSpan): Promise<void> {
-    return this.#project({
-      projectId: span.tenantId,
-      // The span's own start, as the client reported it, decides its week (ADR-001, Runtime).
-      occurredAt: span.startTimeUnixMs,
-      sourceKey: `span:${span.traceId}:${span.spanId}`,
-      fact: spanFact(span),
-    });
-  }
 
   evaluationCompleted(data: EvaluationLifecycleCompletedEventData): Promise<void> {
     return this.#project({
@@ -138,7 +102,7 @@ export class DigestSourceService {
     sourceKey: string;
     fact: ProjectFact;
   }): Promise<void> {
-    const organizationId = (await this.#current()).organizationOf.get(projectId);
+    const organizationId = await this.#organizationOf(projectId);
     if (!organizationId) return;
     await this.deps.recordProject({
       tenantId: projectId,
@@ -163,7 +127,7 @@ export class DigestSourceService {
     series: UserActivity["series"];
   }): Promise<void> {
     const projectId = contribution.tenantId;
-    const organizationId = (await this.#current()).organizationOf.get(projectId);
+    const organizationId = await this.#organizationOf(projectId);
     if (!organizationId) return;
     const userId = await this.#ownerOf({ projectId, organizationId });
     if (!userId) return;
@@ -190,7 +154,7 @@ export class DigestSourceService {
   }): Promise<string | null> {
     const known = this.#owners.get(projectId);
     if (known) return known;
-    if (this.#owners.size >= MAX_REMEMBERED_OWNERS) this.#owners.clear();
+    if (this.#owners.size >= MAX_REMEMBERED) this.#owners.clear();
     const lookup = this.deps.projects
       .findPersonalWorkspaceOwner({ organizationId, scopeId: projectId })
       .then((owner) => owner?.ownerUserId ?? null);
@@ -199,33 +163,15 @@ export class DigestSourceService {
     return lookup;
   }
 
-  #isStale(cohort: Cohort): boolean {
-    return this.deps.now() - cohort.loadedAt >= COHORT_REFRESH_MS;
-  }
-
-  async #current(): Promise<Cohort> {
-    const cohort = this.#cohort;
-    return cohort && !this.#isStale(cohort) ? cohort : this.#refresh();
-  }
-
-  #refresh(): Promise<Cohort> {
-    this.#loading ??= this.#load().finally(() => {
-      this.#loading = undefined;
-    });
-    return this.#loading;
-  }
-
-  async #load(): Promise<Cohort> {
-    const enrolled = await this.deps.audience.findEnrolled();
-    const pairs = await Promise.all(
-      enrolled.map(async (organizationId) =>
-        (await this.deps.projects.listIdsByOrganization({ organizationId })).map(
-          (projectId): [string, string] => [projectId, organizationId],
-        ),
-      ),
-    );
-    const cohort: Cohort = { organizationOf: new Map(pairs.flat()), loadedAt: this.deps.now() };
-    this.#cohort = cohort;
-    return cohort;
+  #organizationOf(projectId: string): Promise<string | null> {
+    const known = this.#organizations.get(projectId);
+    if (known) return known;
+    if (this.#organizations.size >= MAX_REMEMBERED) this.#organizations.clear();
+    const lookup = this.deps.projects
+      .findOrganizationId(projectId)
+      .then((organizationId) => organizationId ?? null);
+    this.#organizations.set(projectId, lookup);
+    void lookup.catch(() => this.#organizations.delete(projectId));
+    return lookup;
   }
 }

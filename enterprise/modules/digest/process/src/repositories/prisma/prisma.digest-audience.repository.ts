@@ -9,37 +9,10 @@ import type {
 const SETTINGS_ID = "singleton";
 
 export class PrismaDigestAudienceRepository
-  extends PrismaRepository.for("DigestCohortOrganization", "DigestSubscription", "DigestSettings")
+  extends PrismaRepository.for("DigestSubscription", "DigestSettings")
   implements DigestAudienceRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDigestAudienceRepository(prisma));
-
-  async findEnrolled(): Promise<string[]> {
-    const rows = await this.prisma.digestCohortOrganization.findMany({
-      select: { organizationId: true },
-    });
-    return rows.map((row) => row.organizationId);
-  }
-
-  async setEnrolled({
-    organizationId,
-    enrolled,
-    by,
-  }: {
-    organizationId: string;
-    enrolled: boolean;
-    by: string;
-  }): Promise<void> {
-    if (!enrolled) {
-      await this.prisma.digestCohortOrganization.deleteMany({ where: { organizationId } });
-      return;
-    }
-    await this.prisma.digestCohortOrganization.upsert({
-      where: { organizationId },
-      create: { organizationId, enrolledBy: by },
-      update: {},
-    });
-  }
 
   async findUnsubscribed({ userIds }: { userIds: readonly string[] }): Promise<string[]> {
     const rows = await this.prisma.digestSubscription.findMany({

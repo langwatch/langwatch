@@ -52,20 +52,6 @@ export class DigestOperatorAddressMissingError extends HandledError {
   }
 }
 
-/** A test was asked for an organization that is not enrolled in the digest. */
-export class DigestOrganizationNotEnrolledError extends HandledError {
-  declare readonly code: "digest_organization_not_enrolled";
-
-  constructor(organizationId: string) {
-    super("digest_organization_not_enrolled", "This organization is not enrolled in the digest.", {
-      meta: { organizationId },
-      httpStatus: 409,
-      fault: "customer",
-    });
-    this.name = "DigestOrganizationNotEnrolledError";
-  }
-}
-
 /** A test was asked for a member who opted out of the digest. */
 export class DigestMemberUnsubscribedError extends HandledError {
   declare readonly code: "digest_member_unsubscribed";
@@ -118,5 +104,19 @@ export class DigestUnsubscribeRateLimitedError extends HandledError {
       fault: "customer",
     });
     this.name = "DigestUnsubscribeRateLimitedError";
+  }
+}
+
+/** Staff impersonating a person may look at their email choice but never change it. */
+export class DigestImpersonationRefusedError extends HandledError {
+  declare readonly code: "digest_impersonation_refused";
+
+  constructor() {
+    super(
+      "digest_impersonation_refused",
+      "An email preference can't be changed while impersonating someone.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "DigestImpersonationRefusedError";
   }
 }
