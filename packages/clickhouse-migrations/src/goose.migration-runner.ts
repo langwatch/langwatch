@@ -613,7 +613,7 @@ const CLUSTER_REPLICAS_QUERY = `SELECT toUInt32(if(countIf(database_shard_name =
     countIf(database_shard_name = ''), count())) AS replicas FROM system.clusters
   WHERE cluster = {cluster:String} GROUP BY shard_num ORDER BY replicas DESC LIMIT 1`;
 
-async function readClusterReplicas({
+export async function readClusterReplicas({
   client,
   clusterName,
 }: {
@@ -635,19 +635,93 @@ async function readClusterReplicas({
   return replicas;
 }
 
-/** On a cluster: counts the replicas goose's writes wait for and catches each one up. */
+export interface WaitForClusterReplicasDeps {
+  /** How many of the cluster's replicas answer right now. */
+  countAnswering: () => Promise<number>;
+  clusterName: string;
+  replicas: number;
+  waitSeconds: number;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+  log?: (message: string) => void;
+}
+
+/**
+ * Waits until every replica of the cluster answers: goose's writes wait for all of them
+ * (insert_quorum), so one still starting refuses each insert with TOO_FEW_LIVE_REPLICAS.
+ * Logs every check; past `waitSeconds` fails naming how many replicas are missing.
+ */
+export async function waitForClusterReplicas({
+  countAnswering,
+  clusterName,
+  replicas,
+  waitSeconds,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = Date.now,
+  log = (message) => logger.info(message),
+}: WaitForClusterReplicasDeps): Promise<void> {
+  const startedAt = now();
+  const deadline = startedAt + waitSeconds * 1000;
+  for (;;) {
+    const answering = await countAnswering();
+    if (answering >= replicas) return;
+    const current = now();
+    if (current >= deadline) {
+      throw new MigrationError(
+        `ClickHouse cluster "${clusterName}" has ${answering} of ${replicas} replicas answering after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS): ${replicas - answering} missing, and every goose write waits for all of them`,
+        "bootstrap",
+      );
+    }
+    const elapsed = Math.round((current - startedAt) / 1000);
+    log(
+      `Waiting for ClickHouse cluster "${clusterName}": ${answering} of ${replicas} replicas answer (${elapsed}s of ${waitSeconds}s)`,
+    );
+    await sleep(Math.min(WAIT_RETRY_INTERVAL_MS, deadline - current));
+  }
+}
+
+/** The replicas of `clusterName` that answer a query; one that cannot be reached is skipped. */
+export async function countAnsweringReplicas({
+  client,
+  clusterName,
+}: {
+  client: ClickHouseClient;
+  clusterName: string;
+}): Promise<number> {
+  const cluster = clusterName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const result = await client.query({
+    query: `SELECT count() AS answering FROM clusterAllReplicas('${cluster}', system.one)`,
+    clickhouse_settings: { skip_unavailable_shards: 1 },
+    format: "JSONEachRow",
+  });
+  return Number((await result.json<{ answering: number | string }>())[0]?.answering ?? 0);
+}
+
+/**
+ * On a cluster: counts the replicas goose's writes wait for, waits until each answers and
+ * catches each one up.
+ */
 async function syncClusterVersionTable({
   client,
   config,
   verbose,
+  waitSeconds,
 }: {
   client: ClickHouseClient;
   config: ClickHouseConfig;
   verbose: boolean | undefined;
+  waitSeconds: number;
 }): Promise<void> {
   const sync = gooseVersionSyncStatement({ config });
   if (!config.clusterName || !sync) return;
-  config.clusterReplicas = await readClusterReplicas({ client, clusterName: config.clusterName });
+  const clusterName = config.clusterName;
+  config.clusterReplicas = await readClusterReplicas({ client, clusterName });
+  await waitForClusterReplicas({
+    countAnswering: () => countAnsweringReplicas({ client, clusterName }),
+    clusterName,
+    replicas: config.clusterReplicas,
+    waitSeconds,
+  });
   if (verbose) logger.debug({ sql: sync }, "Executing bootstrap SQL");
   // An ON CLUSTER timeout arrives after the 200; waiting for the end puts it in the status.
   await client.command({ query: sync, clickhouse_settings: { wait_end_of_query: 1 } });
@@ -674,7 +748,11 @@ async function insertInitialVersion({
 }
 
 // Must run BEFORE goose so goose_db_version is created with correct engine for replication
-async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): Promise<void> {
+async function bootstrapDatabase(
+  config: ClickHouseConfig,
+  verbose: boolean | undefined,
+  waitSeconds: number,
+): Promise<void> {
   logger.debug(
     { database: config.database, clusterName: config.clusterName },
     "Bootstrapping ClickHouse database",
@@ -732,7 +810,7 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
       verbose,
     );
 
-    await syncClusterVersionTable({ client, config, verbose });
+    await syncClusterVersionTable({ client, config, verbose, waitSeconds });
     await insertInitialVersion({ client, config, verbose });
   });
 
@@ -977,7 +1055,11 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   await preflight(config, options);
 
   // Bootstrap creates the database and goose_db_version table with correct engines
-  await bootstrapDatabase(config, options.verbose);
+  await bootstrapDatabase(
+    config,
+    options.verbose,
+    options.waitSeconds ?? DEFAULT_CLICKHOUSE_WAIT_SECONDS,
+  );
 
   // On a server that enforces the AggregatingMergeTree dimension check, the
   // merged history runs first with the compatibility setting relaxed.
