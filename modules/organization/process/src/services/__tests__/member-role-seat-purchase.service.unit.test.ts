@@ -222,6 +222,18 @@ describe("MemberRoleSeatPurchaseService", () => {
       });
     });
 
+    /** @scenario "Stuck billing still refuses by name when keeping the change fails" */
+    it("refuses with subscription_ambiguous even when keeping the change throws", async () => {
+      const { state, service, recordBlockedSeatChange } = world();
+      state.purchase = new AmbiguousSubscriptionError(2);
+      recordBlockedSeatChange.mockRejectedValueOnce(new Error("store unavailable"));
+
+      await expect(service.changeWithSeat(MAKE_ADMIN, ADMIN)).rejects.toMatchObject({
+        code: "subscription_ambiguous",
+      });
+      expect(state.roles.get(SAM)).toBe("EXTERNAL");
+    });
+
     /** @scenario "A seat offer refused for two live subscriptions is kept for the admin" */
     it("keeps the refused role change for the admin when the offer read was refused", async () => {
       const { state, service, recordBlockedSeatChange, addFullSeat } = world();

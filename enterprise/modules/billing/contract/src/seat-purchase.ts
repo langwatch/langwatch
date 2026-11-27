@@ -60,3 +60,8 @@ const seatOfferSchemaDefinition = z.discriminatedUnion("kind", [
 export interface SeatOfferSchema extends Named<typeof seatOfferSchemaDefinition> {}
 export const seatOfferSchema: SeatOfferSchema = seatOfferSchemaDefinition;
 export type SeatOffer = z.infer<typeof seatOfferSchema>;
+
+/** "an Admin", "a Member", "a Lite Member": a seat role label with its article. */
+export function withArticle(label: string): string {
+  return `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
+}

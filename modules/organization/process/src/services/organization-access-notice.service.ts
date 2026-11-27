@@ -44,10 +44,6 @@ type Dependencies = Readonly<{
   logger: Logger;
 }>;
 
-/**
- * The mail behind seat requests and refused sign-ins (ruling R5): each person's notice is mailed at
- * once, and the same person is noticed at most once a day per kind.
- */
 /** Where an administrator's push opens: the People tab, where seat requests are answered. */
 const SEAT_REQUESTS_PATH = "/settings/directory?tab=people";
 
@@ -59,6 +55,10 @@ function dayKeyOf(at: number): string {
   return Temporal.Instant.fromEpochMilliseconds(at).toString().slice(0, 10);
 }
 
+/**
+ * The mail behind seat requests and refused sign-ins (ruling R5): each person's notice is mailed at
+ * once, and the same person is noticed at most once a day per kind.
+ */
 export class OrganizationAccessNoticeService {
   static create(dependencies: Dependencies): OrganizationAccessNoticeService {
     return new OrganizationAccessNoticeService(dependencies);

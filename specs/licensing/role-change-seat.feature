@@ -226,6 +226,14 @@ Feature: Adding a seat with a role change
       And nothing is charged and "Sam" is still a Lite Member
       And ops were alerted
 
+    @unit
+    Scenario: Stuck billing still refuses by name when keeping the change fails
+      Given "ACME" has two subscriptions live in Stripe
+      And keeping the refused change for the admin fails
+      When I add a seat and make "Sam" an Admin
+      Then the change is refused with "subscription_ambiguous"
+      And "Sam" is still a Lite Member
+
   # UI: the member drawer (organization) and billing's lent seat offer.
 
   Rule: the member drawer offers the seat in place and buys it in one click

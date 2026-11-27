@@ -290,7 +290,12 @@ export class MemberRoleSeatPurchaseService {
       });
     } catch (error) {
       if (!HandledError.isHandled(error) || error.code !== "subscription_ambiguous") throw error;
-      await this.recordBlocked(input, by);
+      await this.recordBlocked(input, by).catch((recordError: unknown) => {
+        logger.error(
+          { organizationId, userId, error: recordError },
+          "refused seat change not kept",
+        );
+      });
       throw error;
     }
   }

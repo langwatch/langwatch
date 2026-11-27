@@ -11,13 +11,12 @@ import { Card } from "@langwatch/design-system/card";
 import { Alert, Button, HStack, List, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { SeatRoleOfferProps } from "@langwatch/enterprise-billing-client";
-import type { SeatOffer } from "@langwatch/enterprise-billing-contract";
+import { type SeatOffer, withArticle } from "@langwatch/enterprise-billing-contract";
 import { Clock, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { billingApi } from "../../../behavior/billing-api.ts";
 import { billingDay } from "../../../model/seat-change-summary.ts";
-import { withArticle } from "../../../model/seat-purchase.ts";
 
 type ChargeOffer = Extract<SeatOffer, { kind: "charge" }>;
 type BuyableOffer = Extract<SeatOffer, { kind: "charge" | "checkout" }>;

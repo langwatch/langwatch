@@ -14,6 +14,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { withArticle } from "@langwatch/enterprise-billing-contract";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
@@ -26,11 +27,7 @@ import {
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import {
-  type SeatRoleChanged,
-  useSeatRoleChange,
-  withArticle,
-} from "../../behavior/use-seat-role-change.ts";
+import { type SeatRoleChanged, useSeatRoleChange } from "../../behavior/use-seat-role-change.ts";
 import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import { BILLING_ONLY_SEAT, type InviteSeat } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";

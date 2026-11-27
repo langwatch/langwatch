@@ -5,6 +5,7 @@
  */
 
 import type { SeatRoleOfferKind } from "@langwatch/enterprise-billing-client";
+import { withArticle } from "@langwatch/enterprise-billing-contract";
 import type {
   MemberRoleWithSeatResult,
   PendingSeatRoleChange,
@@ -98,11 +99,6 @@ async function settleAnswer({
 
 /** What a seat-paid change did: `roleChanged` is false when only the seat was bought. */
 export type SeatRoleChanged = { teamsLeftWithoutAdmin: { name: string }[]; roleChanged: boolean };
-
-/** "an Admin", "a Member". */
-export function withArticle(label: string): string {
-  return `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
-}
 
 /** The toast line under "<Name> is now an Admin": the seat bought, then any team left adminless. */
 function seatToastDescription({

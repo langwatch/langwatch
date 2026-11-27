@@ -3,6 +3,7 @@
  * becomes the upgrade past it; on Growth it adds or lowers seats in place.
  * @see specs/licensing/seat-buying.feature
  */
+import { withArticle } from "@langwatch/enterprise-billing-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal } from "@langwatch/time";
 
@@ -834,11 +835,6 @@ const MEMBER_TYPE_ROLE: Record<string, string> = {
   BillingOnly: "Billing only",
   Developer: "Developer",
 };
-
-/** "an Admin", "a Member", "a Lite Member". */
-export function withArticle(label: string): string {
-  return `${/^[aeiou]/i.test(label) ? "an" : "a"} ${label}`;
-}
 
 /** "an Admin", "a Member", "a Lite Member": the role as the members page names it. */
 export function memberRoleWithArticle({
