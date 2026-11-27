@@ -75,3 +75,51 @@ export function decisionRequest({
     tool_choice: "required",
   };
 }
+
+/** The SDK's `criterionToParamName`: quotes dropped, non-alphanumerics `_`, lower, 70 long. */
+const sdkParamNameOf = (criterion: string) =>
+  criterion
+    .replace(/"/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "_")
+    .toLowerCase()
+    .substring(0, 70);
+
+/**
+ * The verdict call the SDK sends for these criteria: its `buildCriteriaList` (`N. criterion`
+ * joined by "\n") in the `<criteria>` block, and one finish_test key per criterion, no description.
+ */
+export function sdkVerdictRequestFor(criteria: readonly string[]): JudgePreviewChatRequest {
+  const listed = criteria.map((criterion, at) => `${at + 1}. ${criterion}`).join("\n");
+  const system = VERDICT_SYSTEM.replace(
+    /<criteria>[\s\S]*?<\/criteria>/,
+    () => `<criteria>\n${listed}\n</criteria>`,
+  );
+  const parameters = FINISH_TEST.function.parameters as {
+    properties: { criteria: { properties: Record<string, unknown>; required: string[] } };
+  };
+  const [entry] = Object.values(parameters.properties.criteria.properties);
+  const keys = criteria.map(sdkParamNameOf);
+  const request = verdictRequest({ system });
+  return {
+    ...request,
+    tools: [
+      {
+        ...FINISH_TEST,
+        function: {
+          ...FINISH_TEST.function,
+          parameters: {
+            ...parameters,
+            properties: {
+              ...parameters.properties,
+              criteria: {
+                ...parameters.properties.criteria,
+                properties: Object.fromEntries(keys.map((key) => [key, entry])),
+                required: keys,
+              },
+            },
+          },
+        },
+      },
+    ],
+  };
+}

@@ -41,6 +41,14 @@ Feature: LangWatch Judge (preview) as the scenario judge
     Then a criterion's text is its property's description less a leading "Criterion N:"
     And a property with no description is named by its key
 
+  @unit @regression
+  Scenario: A criterion written over several lines keeps its wording, and so do the others
+    Given a verdict request from scenario SDK 1.8.1 whose criterion holds a line end ("\n", "\r\n" or a lone "\r")
+    When it is read
+    Then that criterion's text is its whole wording, its lines joined by "\n"
+    And every other criterion's text is its own wording, not its key
+    And a criteria block with "\r\n" line ends reads the same as one with "\n"
+
   @unit
   Scenario: Trace exploration tools are never passed on
     Given a verdict request that also offers expand_trace, grep_trace and wait_for_traces

@@ -100,7 +100,7 @@ const verdictParametersSchema = z.object({
 });
 
 const CRITERIA_BLOCK = /<criteria>\s*([\s\S]*?)\s*<\/criteria>/;
-const LISTED_CRITERION = /^\d+\.\s(.*)$/;
+const LISTED_CRITERION = /^(\d+)\.\s(.*)$/;
 const CRITERION_PREFIX = /^Criterion \d+:\s*/;
 
 /**
@@ -128,13 +128,22 @@ function criteriaOf({
   }));
 }
 
-/** The `<criteria>` block's numbered lines; a criterion over several lines lists none. */
+/**
+ * The `<criteria>` block's criteria, numbered 1..N as the SDK joins them with "\n". A line that
+ * does not start the next number continues the criterion before it, so a criterion over several
+ * lines keeps its wording; a `\r` reads as a line end. A block not starting at 1 lists none.
+ */
 function listedCriteriaOf(system: string): string[] {
   const block = CRITERIA_BLOCK.exec(system)?.[1];
   if (!block) return [];
-  const lines = block.split("\n");
-  const texts = lines.map((line) => LISTED_CRITERION.exec(line)?.[1]);
-  return texts.every((text) => text !== undefined) ? (texts as string[]) : [];
+  const texts: string[] = [];
+  for (const line of block.split(/\r\n|\r|\n/)) {
+    const listed = LISTED_CRITERION.exec(line);
+    if (listed && Number(listed[1]) === texts.length + 1) texts.push(listed[2] ?? "");
+    else if (texts.length === 0) return [];
+    else texts[texts.length - 1] += `\n${line}`;
+  }
+  return texts;
 }
 
 type JudgedAnswer = Extract<InstantEvalScenarioJudgeAnswer, { outcome: "judged" }>;

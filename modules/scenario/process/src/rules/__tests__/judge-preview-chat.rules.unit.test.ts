@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   decisionRequest,
+  sdkVerdictRequestFor,
   verdictRequest,
 } from "../../__tests__/support/judge-preview-requests.fixture.ts";
 import {
@@ -102,6 +103,61 @@ describe("judgePreviewLeafCallOf", () => {
         { key: "the_agent_offers_a_refund", text: "The agent offers a refund" },
         { key: "the_agent_apologises", text: "the_agent_apologises" },
       ]);
+    });
+
+    describe('when a criterion holds a line end, as the SDK joins its criteria with "\\n"', () => {
+      /** @scenario "A criterion written over several lines keeps its wording, and so do the others" */
+      it.each([
+        ["\\n", "\n"],
+        ["\\r\\n", "\r\n"],
+        ["a lone \\r", "\r"],
+      ])("reads every criterion's wording when one holds %s", (_name, lineEnd) => {
+        const call = judgePreviewLeafCallOf(
+          sdkVerdictRequestFor([
+            `The agent offers a refund${lineEnd}- in the first reply`,
+            "The agent apologises",
+            "The agent names the order",
+          ]),
+        );
+
+        expect(call.criteria.map((criterion) => criterion.text)).toEqual([
+          "The agent offers a refund\n- in the first reply",
+          "The agent apologises",
+          "The agent names the order",
+        ]);
+        expect(call.criteria[0]?.key).toMatch(/^the_agent_offers_a_refund_+in_the_first_reply$/);
+      });
+
+      /** @scenario "A criterion written over several lines keeps its wording, and so do the others" */
+      it("keeps the end of a criterion longer than its 70-character key", () => {
+        const long =
+          "The agent explains the refund policy for orders that arrived more than ten days late\nand names the form";
+        const call = judgePreviewLeafCallOf(sdkVerdictRequestFor(["The agent apologises", long]));
+
+        expect(call.criteria.map((criterion) => criterion.text)).toEqual([
+          "The agent apologises",
+          long,
+        ]);
+        expect(call.criteria[1]?.key).toHaveLength(70);
+      });
+
+      /** @scenario "A criterion written over several lines keeps its wording, and so do the others" */
+      it("reads a criteria block with \\r\\n line ends as one with \\n", () => {
+        const request = sdkVerdictRequestFor(["The agent offers a refund", "The agent apologises"]);
+        const [system, ...rest] = request.messages;
+        const call = judgePreviewLeafCallOf({
+          ...request,
+          messages: [
+            { ...system!, content: String(system!.content).replace(/\n/g, "\r\n") },
+            ...rest,
+          ],
+        });
+
+        expect(call.criteria.map((criterion) => criterion.text)).toEqual([
+          "The agent offers a refund",
+          "The agent apologises",
+        ]);
+      });
     });
 
     /** @scenario "Trace exploration tools are never passed on" */
