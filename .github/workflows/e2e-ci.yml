@@ -127,19 +127,21 @@ jobs:
       # image pulls overlap the checkout and install, and the wait steps hold the
       # first step that reads each (specs/ci/app-ci-datastores.feature). The upgrade's
       # datastores pull first. No nlpgo runs here, so a scenario run is only queued.
+      # Postgres is checked over TCP and ClickHouse gets no CLICKHOUSE_DB: either init
+      # server answers a check inside the container before the published port is up.
       - name: Start the datastores and langevals in the background
         timeout-minutes: 1
         run: |
           {
             docker run -d --name postgres -p 5433:5432 \
               -e POSTGRES_DB=testdb -e POSTGRES_USER=prisma -e POSTGRES_PASSWORD=prisma \
-              --health-cmd "pg_isready -U prisma" --health-interval 2s --health-timeout 5s --health-retries 60 \
+              --health-cmd "pg_isready -h 127.0.0.1 -U prisma" --health-interval 2s --health-timeout 5s --health-retries 60 \
               postgres:16 &
             docker run -d --name redis -p 6380:6379 \
               --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 60 \
               redis:alpine &
             docker run -d --name clickhouse -p 8123:8123 \
-              -e CLICKHOUSE_DB=default -e CLICKHOUSE_USER=default -e CLICKHOUSE_PASSWORD=ci_password \
+              -e CLICKHOUSE_USER=default -e CLICKHOUSE_PASSWORD=ci_password \
               --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1" \
               --health-interval 2s --health-timeout 5s --health-retries 60 \
               clickhouse/clickhouse-server:26.8.36.3 &

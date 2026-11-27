@@ -1089,13 +1089,14 @@ jobs:
     steps:
       # In the background: the image pulls overlap the checkout and install, and
       # "Wait for Postgres and Redis" (cmd/waitcontainers) holds the first step that reads them.
+      # The Postgres check uses TCP: its first-boot init server listens only on the socket.
       - name: Start Postgres and Redis in the background
         timeout-minutes: 1
         run: |
           {
             docker run -d --name postgres -p 5432:5432 \
               -e POSTGRES_USER=langwatch_ci -e POSTGRES_PASSWORD=ci_password -e POSTGRES_DB=langwatch_test \
-              --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'" \
+              --health-cmd "PGPASSWORD=ci_password psql -h 127.0.0.1 -U langwatch_ci -d langwatch_test -c 'select 1'" \
               --health-interval 2s --health-timeout 5s --health-retries 60 \
               postgres:16 &
             docker run -d --name redis -p 6379:6379 \

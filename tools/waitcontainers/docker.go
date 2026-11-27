@@ -10,11 +10,16 @@ import (
 // CLI runs the docker binary on the runner.
 type CLI struct{}
 
-// Health reads the container's health status with docker inspect.
-func (CLI) Health(ctx context.Context, name string) (string, error) {
-	out, err := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Health.Status}}", name).Output()
+// State reads the container's run state and health with docker inspect.
+func (CLI) State(ctx context.Context, name string) (State, error) {
+	format := "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}"
+	out, err := exec.CommandContext(ctx, "docker", "inspect", "-f", format, name).Output()
+	if err != nil {
+		return State{}, err
+	}
+	status, health, _ := strings.Cut(strings.TrimSpace(string(out)), " ")
 
-	return strings.TrimSpace(string(out)), err
+	return State{Status: status, Health: health}, nil
 }
 
 // Diagnose writes docker ps -a and the container's last log lines.

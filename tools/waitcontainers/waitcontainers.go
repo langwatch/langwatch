@@ -16,11 +16,22 @@ import (
 
 // Docker is the part of the docker CLI the waiter uses.
 type Docker interface {
-	// Health returns the container's health status: starting, healthy or unhealthy.
-	Health(ctx context.Context, name string) (string, error)
+	// State returns the container's run state and, when it has a health check, its health.
+	State(ctx context.Context, name string) (State, error)
 	// Diagnose writes what explains a container that never became healthy.
 	Diagnose(ctx context.Context, name string, out io.Writer)
 }
+
+// State is what docker inspect reports for one container.
+type State struct {
+	// Status is created, running, restarting, paused, exited or dead.
+	Status string
+	// Health is starting, healthy or unhealthy; empty without a health check.
+	Health string
+}
+
+// notCreated is the status of a container docker does not know yet.
+const notCreated = "not created yet: the image may still be pulling"
 
 // Waiter waits for every named container in turn, within one shared deadline.
 type Waiter struct {
@@ -61,15 +72,19 @@ func (w *Waiter) Wait(ctx context.Context) error {
 	return nil
 }
 
-// waitOne polls one container until it is healthy or the context ends.
+// waitOne polls one container until it is healthy, it stops, or the context ends. A failed
+// inspect keeps the last status read, so a timeout never reports a started container as missing.
 func (w *Waiter) waitOne(ctx context.Context, name string) error {
+	status := notCreated
 	for {
-		status, err := w.Docker.Health(ctx, name)
-		if status == "healthy" {
-			return nil
-		}
-		if err != nil && status == "" {
-			status = "not created yet: the image may still be pulling"
+		if state, err := w.Docker.State(ctx, name); err == nil {
+			if state.Health == "healthy" {
+				return nil
+			}
+			if state.Status == "exited" || state.Status == "dead" {
+				return fmt.Errorf("%s stopped before it became healthy (status %q)", name, state.Status)
+			}
+			status = describe(state)
 		}
 		select {
 		case <-ctx.Done():
@@ -77,6 +92,15 @@ func (w *Waiter) waitOne(ctx context.Context, name string) error {
 		case <-time.After(w.Interval):
 		}
 	}
+}
+
+// describe names a container's state the way the timeout error reports it.
+func describe(state State) string {
+	if state.Health == "" {
+		return state.Status + ", no health status yet"
+	}
+
+	return state.Health
 }
 
 // diagnose writes the start log and the container's own state, on a fresh deadline.

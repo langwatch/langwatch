@@ -57,6 +57,42 @@ func TestAppCIJobsDeclareNoServicesBlock(t *testing.T) {
 	assert.Contains(t, problems[0], `job "suites" declares services: postgres, redis`)
 }
 
+// @scenario "Every datastore started in the background is waited for before a step reads it"
+func TestBackgroundContainersAreWaitedForBeforeAStepReadsThem(t *testing.T) {
+	problems := appCIProblems(t, `jobs:
+  waited:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          { docker run -d --name postgres postgres:16 & docker run -d --name redis redis:alpine & wait; } > log 2>&1 &
+      - uses: actions/checkout@v6
+      - run: pnpm run ensure:built
+      - timeout-minutes: 5
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 240s postgres redis
+      - run: pnpm task upgrade
+  unwaited:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the datastores
+        run: |
+          docker run -d --name postgres postgres:16 &
+          docker run --detach \
+            --name=clickhouse clickhouse/clickhouse-server &
+      - name: Upgrade
+        run: pnpm start:prepare:db
+      - name: Wait for Postgres
+        timeout-minutes: 5
+        run: go run ./cmd/waitcontainers -timeout 240s postgres
+      - name: Suites
+        run: pnpm --filter e2e test:unit
+`)
+
+	assert.ElementsMatch(t, []string{
+		`.github/workflows/langwatch-app-ci.yml job "unwaited": step "Upgrade" reads the datastores started by step "Start the datastores" before a go run ./cmd/waitcontainers step`,
+		`.github/workflows/langwatch-app-ci.yml job "unwaited": container "clickhouse" starts in the background but no later go run ./cmd/waitcontainers step names it`,
+	}, problems)
+}
+
 // @scenario "Every step that runs after a failure, and every container wait, has its own time limit"
 func TestStepsAfterAFailureAndContainerWaitsHaveTheirOwnTimeLimit(t *testing.T) {
 	problems := appCIProblems(t, `jobs:
@@ -84,6 +120,13 @@ func TestStepsAfterAFailureAndContainerWaitsHaveTheirOwnTimeLimit(t *testing.T) 
       - name: Report unless cancelled
         if: ${{ !cancelled() }}
         run: echo
+      - name: Clean up a cancelled run
+        if: cancelled()
+        run: echo
+      - if: always()
+        run: |
+          echo unnamed
+          echo second line
 `)
 
 	assert.ElementsMatch(t, []string{
@@ -91,5 +134,12 @@ func TestStepsAfterAFailureAndContainerWaitsHaveTheirOwnTimeLimit(t *testing.T) 
 		`.github/workflows/langwatch-app-ci.yml job "suites": step "Wait for Redis, spaced" needs its own timeout-minutes`,
 		`.github/workflows/langwatch-app-ci.yml job "suites": step "Upload the report" needs its own timeout-minutes`,
 		`.github/workflows/langwatch-app-ci.yml job "suites": step "Notify on failure" needs its own timeout-minutes`,
+		`.github/workflows/langwatch-app-ci.yml job "suites": step "Clean up a cancelled run" needs its own timeout-minutes`,
+		`.github/workflows/langwatch-app-ci.yml job "suites": step "echo unnamed" needs its own timeout-minutes`,
 	}, problems)
+}
+
+func TestStepLabelFallsBackToThePosition(t *testing.T) {
+	assert.Equal(t, "#3", stepLabel(&ciscan.Step{}, 2))
+	assert.Equal(t, "actions/cache@v6", stepLabel(&ciscan.Step{Uses: "actions/cache@v6"}, 0))
 }

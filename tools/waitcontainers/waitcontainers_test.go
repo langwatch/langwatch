@@ -14,23 +14,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeDocker answers each container's health from a scripted sequence, repeating the last.
+// fakeDocker answers each container's state from a scripted sequence, repeating the last.
+// "gone" fails that poll as if docker could not inspect the container.
 type fakeDocker struct {
 	statuses  map[string][]string
 	diagnosed []string
 }
 
-func (f *fakeDocker) Health(_ context.Context, name string) (string, error) {
+func (f *fakeDocker) State(_ context.Context, name string) (State, error) {
 	seq, ok := f.statuses[name]
 	if !ok {
-		return "", errors.New("no such container: " + name)
+		return State{}, errors.New("no such container: " + name)
 	}
-	status := seq[0]
+	health := seq[0]
 	if len(seq) > 1 {
 		f.statuses[name] = seq[1:]
 	}
+	switch health {
+	case "gone":
+		return State{}, errors.New("inspect failed")
+	case "exited", "dead":
+		return State{Status: health, Health: "unhealthy"}, nil
+	}
 
-	return status, nil
+	return State{Status: "running", Health: health}, nil
 }
 
 func (f *fakeDocker) Diagnose(_ context.Context, name string, out io.Writer) {
@@ -77,6 +84,35 @@ func TestWaitNamesAContainerThatWasNeverCreated(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not created yet: the image may still be pulling")
+}
+
+func TestWaitKeepsTheLastStatusWhenAnInspectFails(t *testing.T) {
+	docker := &fakeDocker{statuses: map[string][]string{"postgres": {"starting", "gone"}}}
+	w := Waiter{Names: []string{"postgres"}, Docker: docker, Interval: time.Millisecond, Timeout: 20 * time.Millisecond, Log: io.Discard}
+
+	err := w.Wait(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `(last status "starting")`)
+}
+
+// @scenario "A container that stops fails the wait at once"
+func TestWaitFailsAtOnceWhenAContainerStops(t *testing.T) {
+	for _, status := range []string{"exited", "dead"} {
+		t.Run(status, func(t *testing.T) {
+			docker := &fakeDocker{statuses: map[string][]string{"postgres": {"starting", status}}}
+			var log bytes.Buffer
+			w := Waiter{Names: []string{"postgres"}, Docker: docker, Interval: time.Millisecond, Timeout: time.Minute, Log: &log}
+			started := time.Now()
+
+			err := w.Wait(context.Background())
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), `postgres stopped before it became healthy (status "`+status+`")`)
+			assert.Less(t, time.Since(started), 10*time.Second)
+			assert.Equal(t, []string{"postgres"}, docker.diagnosed)
+		})
+	}
 }
 
 func TestValidateRefusesAWaitThatCouldNeverPass(t *testing.T) {
