@@ -23,11 +23,13 @@ package codeblock
 import (
 	"bytes"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"go.uber.org/zap"
 )
@@ -52,6 +54,12 @@ var (
 	hardeningOnce   sync.Once
 	subreaperActive bool
 	hideRefusal     syscall.Errno
+	// engineStartTicks dates this process, so the strays rule never claims what
+	// the platform started before it (Lambda's init and the web adapter), and
+	// engineParent is the other process that may adopt an orphan of a run: a
+	// supervisor marked as subreaper. On Lambda it is init.
+	engineStartTicks uint64
+	engineParent     int
 )
 
 // teardownDeadline bounds the sweep. SIGKILL is not refusable, so a pass that
@@ -87,18 +95,57 @@ func enableProcessHardening() {
 		_, _, errno = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
 		// A refusal is recorded, not fatal; detectExposure decides what it costs.
 		hideRefusal = errno
+		engineStartTicks, engineParent = runStartMarker(os.Getpid()), os.Getppid()
 	})
 }
 
-// confineRunGroup says whether the runner must keep user code in the run's
-// process group: whenever teardown could not otherwise find what a run leaves
-// behind. Without the subreaper flag (AWS Lambda refuses it) an orphan lands on
-// PID 1; from an execute-only interpreter its marks are unreadable, so beside an
-// older live run nothing claims it. Refusing setsid and setpgid leaves the group
-// as the whole run, and killing the group kills it.
-func confineRunGroup(python string) bool {
-	_, readable := interpreterReadable(python)
-	return !subreaperActive || !readable
+// runTeardownFor decides how runs are torn down. The process group is enough
+// while the engine adopts orphans and can read their marks. Otherwise (AWS
+// Lambda refuses PR_SET_CHILD_SUBREAPER, and an execute-only interpreter's marks
+// are unreadable) the runner confines the run to its group, and where the
+// platform refuses that filter too, teardown sweeps for strays instead.
+func runTeardownFor(python string) runTeardown {
+	if _, readable := interpreterReadable(python); subreaperActive && readable {
+		return teardownGroup
+	}
+	if confinementAvailable() {
+		return teardownConfined
+	}
+	return teardownStrays
+}
+
+// confinementAvailable tries what the runner confines a run with,
+// PR_SET_NO_NEW_PRIVS and then a seccomp filter (here one that allows
+// everything), on a thread of its own. Both are per thread, and a goroutine that
+// ends locked to its thread takes the thread with it, so the engine keeps none.
+func confinementAvailable() bool {
+	result := make(chan bool, 1)
+	go func() {
+		runtime.LockOSThread()
+		result <- installAllowAllFilter() == nil
+	}()
+	return <-result
+}
+
+// installAllowAllFilter is the runner's two prctls with a filter that refuses
+// nothing, so the probe changes nothing even on the thread it runs on.
+func installAllowAllFilter() error {
+	const (
+		prSetNoNewPrivs   = 38
+		prSetSeccomp      = 22
+		seccompModeFilter = 2
+		bpfRetAllow       = 0x06 // BPF_RET | BPF_K
+		seccompRetAllow   = 0x7fff0000
+	)
+	if _, _, errno := syscall.Syscall6(syscall.SYS_PRCTL, prSetNoNewPrivs, 1, 0, 0, 0, 0); errno != 0 {
+		return errno
+	}
+	filter := []syscall.SockFilter{{Code: bpfRetAllow, K: seccompRetAllow}}
+	prog := syscall.SockFprog{Len: uint16(len(filter)), Filter: &filter[0]}
+	if _, _, errno := syscall.Syscall6(syscall.SYS_PRCTL, prSetSeccomp, seccompModeFilter, uintptr(unsafe.Pointer(&prog)), 0, 0, 0); errno != 0 {
+		return errno
+	}
+	return nil
 }
 
 // terminateRunTree kills every process the execution still owns and reaps the
@@ -255,7 +302,7 @@ func (s sweep) claims(entry procEntry) bool {
 		return true
 	case s.scope.pgid > 0 && entry.pgid == s.scope.pgid:
 		return true
-	case entry.ppid == s.selfPid || entry.ppid == 1:
+	case entry.ppid == s.selfPid || entry.ppid == 1 || (s.scope.strays && entry.ppid == engineParent):
 		return s.claimsOrphan(entry)
 	default:
 		return false
@@ -301,11 +348,11 @@ func (s sweep) carriesRunMarks(pid int) bool {
 // nothing is waiting on it. Which finished execution it was does not matter:
 // whichever teardown finds it owes it the same SIGKILL.
 //
-// Only applied with the engine as subreaper, where a child of the engine is an
-// execution or came from one. Without that flag an orphan lands on PID 1 beside
-// the container's unrelated processes, and the marks are the only tie there is.
+// Only applied to an orphan that can have come from nothing but an execution
+// (adoptedFromARun). Elsewhere an orphan on PID 1 sits beside the container's
+// unrelated processes, and the marks are the only tie there is.
 func (s sweep) noLiveRunCanAccountForIt(entry procEntry) bool {
-	if !subreaperActive || entry.ppid != s.selfPid {
+	if !s.adoptedFromARun(entry) {
 		return false
 	}
 	for pid, startTicks := range s.live {
@@ -314,6 +361,18 @@ func (s sweep) noLiveRunCanAccountForIt(entry procEntry) bool {
 		}
 	}
 	return true
+}
+
+// adoptedFromARun says the orphan can only have come from an execution: the
+// engine adopted it, or, in strays mode, init or the engine's parent did after
+// the engine started. On AWS Lambda nothing else starts there then; the
+// platform's own processes, the web adapter among them, predate the engine.
+func (s sweep) adoptedFromARun(entry procEntry) bool {
+	if subreaperActive && entry.ppid == s.selfPid {
+		return true
+	}
+	adopter := entry.ppid == 1 || entry.ppid == engineParent
+	return s.scope.strays && adopter && entry.startTicks > engineStartTicks
 }
 
 // procPath names one of a process's /proc files. Built by hand rather than

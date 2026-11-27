@@ -36,6 +36,7 @@ on:
       - ".github/actions/**"
       - "charts/*/Chart.yaml"
       - "infra/docker/Dockerfile.*.lambda"
+      - "infra/docker/Dockerfile.go-services"
       - "go.work"
       - "go.work.sum"
   # Evaluate against the queued merge commit too, so the generated-code drift

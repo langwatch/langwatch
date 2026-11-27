@@ -26,8 +26,8 @@ func detectExposure(string) string { return "" }
 
 func runStartMarker(int) uint64 { return 0 }
 
-// confineRunGroup is off: the runner has no seccomp to confine with here.
-func confineRunGroup(string) bool { return false }
+// runTeardownFor is the process group alone: the runner has no seccomp here.
+func runTeardownFor(string) runTeardown { return teardownGroup }
 
 func terminateRunTree(scope runScope, _ *zap.Logger) {
 	if scope.pgid > 0 {

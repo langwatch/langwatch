@@ -250,27 +250,60 @@ func TestLambdaCredentials_NothingUserCodeStartsOutlivesItsRun(t *testing.T) {
 	runInLambdaSandbox(t, "lambda-left-behind", lambdaSandbox{execOnly: true})
 }
 
-// @scenario "on AWS Lambda, nothing user code starts outlives its run"
-func TestLambdaCredentials_ARunThatCannotBeConfinedDoesNotRun(t *testing.T) {
+// @scenario "on AWS Lambda, a run the platform will not confine still leaves nothing behind"
+func TestLambdaCredentials_ARunThatCannotBeConfinedLeavesNothingBehind(t *testing.T) {
 	runInLambdaSandbox(t, "lambda-cage-refused", lambdaSandbox{execOnly: true})
 }
 
-// runCageRefused is a platform that also refuses the seccomp filter: the run
-// must fail before any user code, naming why.
-func runCageRefused(t *testing.T) {
+// @scenario "on AWS Lambda, a run the platform will not confine still leaves nothing behind"
+func TestLambdaCredentials_ARunThatCannotBeConfinedLeavesNothingBehindOnTimeout(t *testing.T) {
+	runInLambdaSandbox(t, "lambda-cage-refused-timeout", lambdaSandbox{execOnly: true})
+}
+
+// @scenario "on AWS Lambda, a run the platform will not confine still leaves nothing behind"
+func TestLambdaCredentials_ARunThatCannotBeConfinedReadsNoCredential(t *testing.T) {
+	runInLambdaSandbox(t, "lambda-probe-all-unconfined", lambdaSandbox{execOnly: true, adapter: "exec-only"})
+}
+
+// runCageRefused is a platform that also refuses PR_SET_NO_NEW_PRIVS and the
+// seccomp filter, as AWS Lambda does: user code runs, its new session is
+// allowed, and the process in it is gone once the run returns or times out.
+func runCageRefused(t *testing.T, timesOut bool) {
 	t.Helper()
 	exe, err := codeblock.New(codeblock.Options{Python: os.Getenv(lambdaPythonEnv)})
 	require.NoError(t, err)
+	spool := filepath.Join(t.TempDir(), "pid")
+	code, timeout := leftBehind, 30*time.Second
+	if timesOut {
+		code, timeout = leftBehindThenHang, 3*time.Second
+	}
 	res, err := exe.Execute(context.Background(), codeblock.Request{
-		Code:            leftBehind,
-		Inputs:          map[string]any{"spool": filepath.Join(t.TempDir(), "pid")},
+		Code:            code,
+		Inputs:          map[string]any{"spool": spool},
 		DeclaredOutputs: []string{"how"},
-		Timeout:         30 * time.Second,
+		Timeout:         timeout,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, res.Error, "a run that cannot be confined must not run")
-	assert.Contains(t, res.Error.Message, "cannot keep this run in its process group")
+	if timesOut {
+		require.True(t, res.TimedOut, "the run must time out: %+v", res)
+	} else {
+		require.Nil(t, res.Error, "a run the platform will not confine must still run: %+v\nstderr: %s", res.Error, res.Stderr)
+		assert.Equal(t, "session", res.Outputs["how"], "with no filter to refuse it, user code gets its new session")
+	}
+	pid := spooledPid(t, spool)
+	assert.Eventually(t, func() bool { return !processRunsNow(pid) }, 5*time.Second, 20*time.Millisecond,
+		"pid %d, in a session of its own, was still running after its run returned", pid)
 }
+
+// leftBehindThenHang is leftBehind that then runs past its timeout.
+const leftBehindThenHang = leftBehind + `
+_left_behind = execute
+
+def execute(spool):
+    _left_behind(spool)
+    import time
+    time.sleep(120)
+`
 
 // runLeftBehind runs leftBehind on the Lambda image and requires the process
 // it started to be gone once the run returns.
@@ -299,6 +332,8 @@ var probeCategories = map[string][]string{
 	"lambda-probe-proc": {"/proc/"},
 	"lambda-probe-http": {"http "},
 	"lambda-probe-all":  {"own environment", "/proc/", "http "},
+	// lambda-probe-all on a platform that also refuses the run's filter.
+	"lambda-probe-all-unconfined": {"own environment", "/proc/", "http "},
 }
 
 // runLambdaProbe is the engine side: build the executor the way the Lambda image
@@ -306,7 +341,7 @@ var probeCategories = map[string][]string{
 func runLambdaProbe(t *testing.T, name string) {
 	t.Helper()
 	router := ""
-	if name == "lambda-probe-http" || name == "lambda-probe-all" {
+	if name == "lambda-probe-http" || strings.HasPrefix(name, "lambda-probe-all") {
 		srv := httptest.NewServer(httpapi.NewRouter(httpapi.RouterDeps{Health: health.New("test"), Version: "test"}))
 		defer srv.Close()
 		router = srv.URL
@@ -348,8 +383,11 @@ func runLambdaProbe(t *testing.T, name string) {
 
 func init() {
 	lambdaCases["lambda-left-behind"] = runLeftBehind
-	lambdaCases["lambda-cage-refused"] = runCageRefused
-	extraRefusals["lambda-cage-refused"] = []uint32{22} // PR_SET_SECCOMP
+	for name, timesOut := range map[string]bool{"lambda-cage-refused": false, "lambda-cage-refused-timeout": true} {
+		lambdaCases[name] = func(t *testing.T) { t.Helper(); runCageRefused(t, timesOut) }
+		extraRefusals[name] = []uint32{38, 22} // PR_SET_NO_NEW_PRIVS, PR_SET_SECCOMP
+	}
+	extraRefusals["lambda-probe-all-unconfined"] = []uint32{38, 22}
 	for name := range probeCategories {
 		lambdaCases[name] = func(t *testing.T) {
 			t.Helper()

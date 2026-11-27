@@ -620,7 +620,16 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When user code starts a process in a session of its own, or double forks one
       Then the new session is refused
       And the process is gone once the run returns
-      And a platform that also refuses the seccomp filter runs no user code at all
+
+    # AWS Lambda also refuses PR_SET_NO_NEW_PRIVS, so the runner cannot install
+    # the filter; the engine probes this once at start-up and sweeps instead.
+    @integration
+    Scenario: on AWS Lambda, a run the platform will not confine still leaves nothing behind
+      Given the platform refuses PR_SET_CHILD_SUBREAPER, PR_SET_NO_NEW_PRIVS and the seccomp filter
+      When user code starts a process in a session of its own, with no mark of the run it can be read by
+      Then the run still runs and the new session is allowed
+      And the process is gone once the run returns, and once it times out
+      And user code still reads no process that holds the role's credentials
 
     @integration
     Scenario: a run from an execute-only interpreter leaves nothing behind while an older run is live
