@@ -17,6 +17,7 @@ import {
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createRoot } from "react-dom/client";
 
+import { DigestReviewView } from "./digest-review-view.tsx";
 import { GalleryView, type Density } from "./gallery-view.tsx";
 import { InspectView } from "./inspect-view.tsx";
 import { galleryUrl, isStaticStudio, templatesUrl } from "./studio-endpoints.ts";
@@ -76,9 +77,7 @@ const Studio = (): JSX.Element => {
         });
         if (picked) {
           setSelected({ id: picked.template.id, fixture: picked.fixture.name });
-          setCurrentProps(
-            initialPropsOverride !== undefined ? initialPropsOverride : picked.fixture.props,
-          );
+          setCurrentProps(propsOrFixture({ override: initialPropsOverride, picked }));
         }
       })
       .catch((error: unknown) => setFailure(String(error)));
@@ -135,7 +134,7 @@ const Studio = (): JSX.Element => {
       });
       if (picked) {
         setSelected({ id: picked.template.id, fixture: picked.fixture.name });
-        setCurrentProps(props !== undefined ? props : picked.fixture.props);
+        setCurrentProps(propsOrFixture({ override: props, picked }));
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -168,6 +167,8 @@ const Studio = (): JSX.Element => {
     );
   }
 
+  if (view === "review") return <DigestReviewView nav={nav} previewDark={previewDark} />;
+
   return view === "inspect" ? (
     <InspectView
       nav={nav}
@@ -176,6 +177,7 @@ const Studio = (): JSX.Element => {
       currentProps={currentProps}
       onPropsChange={setCurrentProps}
       onSelect={choose}
+      onReviewDigests={() => setView("review")}
       previewDark={previewDark}
       width={width}
       onWidthChange={setWidth}
@@ -213,6 +215,11 @@ function pickFixture({
   const fixture =
     template?.fixtures.find((entry) => entry.name === fixtureName) ?? template?.fixtures[0];
   return template && fixture ? { template, fixture } : undefined;
+}
+
+/** A link's edited props when it carries any, else the picked fixture's own. */
+function propsOrFixture({ override, picked }: { override: unknown; picked: Picked }): unknown {
+  return override !== undefined ? override : picked.fixture.props;
 }
 
 /** Every template's rendered fixtures while the gallery is open, refetched when the set changes. */
@@ -333,6 +340,7 @@ function useResolvedDark({ scheme }: { scheme: PreviewScheme }): boolean {
 const VIEW_OPTIONS: { value: View; label: string }[] = [
   { value: "inspect", label: "Inspect" },
   { value: "gallery", label: "Gallery" },
+  { value: "review", label: "Digest review" },
 ];
 
 /** The kit's ThemeToggle, but bound to the address bar's `theme` rather than localStorage. */
@@ -415,7 +423,8 @@ function StudioGuide(): JSX.Element | null {
             Every email LangWatch sends, rendered with sample data. Pick an email on the left (some
             have more than one version), switch Desktop or Mobile and HTML or Text above the
             preview, or open Gallery to see them all at once. The left and right arrow keys step
-            through the emails and their versions.{" "}
+            through the emails and their versions. Digest review shows each weekly digest as it
+            would arrive today, with who gets it.{" "}
             {isStaticStudio
               ? "This copy is read-only: run `pnpm --filter @langwatch/mail dev` to edit the sample data."
               : "Open Edit sample data under the preview to change what it shows."}

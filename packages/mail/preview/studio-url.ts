@@ -1,7 +1,7 @@
 import type { Density } from "./gallery-view.tsx";
 import type { PreviewScheme, WIDTHS } from "./studio-shared.ts";
 
-export type View = "inspect" | "gallery";
+export type View = "inspect" | "gallery" | "review";
 
 export interface UrlState {
   view: View;
@@ -26,11 +26,15 @@ export const DEFAULT_URL_STATE: UrlState = {
   everyFixture: false,
 };
 
+const VIEWS: readonly View[] = ["inspect", "gallery", "review"];
+
+const parseView = (value: string | null): View => VIEWS.find((view) => view === value) ?? "inspect";
+
 export const parseUrlState = (search: string): UrlState => {
   const params = new URLSearchParams(search);
   const theme = params.get("theme");
   return {
-    view: params.get("view") === "gallery" ? "gallery" : "inspect",
+    view: parseView(params.get("view")),
     templateId: params.get("template"),
     fixtureName: params.get("fixture"),
     width: params.get("width") === "mobile" ? "mobile" : "desktop",

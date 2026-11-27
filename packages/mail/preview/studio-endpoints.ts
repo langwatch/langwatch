@@ -16,6 +16,9 @@ export const galleryUrl = ({ everyFixture }: { everyFixture: boolean }): string 
   return `/__gallery${everyFixture ? "?fixtures=all" : ""}`;
 };
 
+export const digestReviewUrl = (): string =>
+  isStaticStudio ? "/__digest-review.json" : "/__digest-review";
+
 /** A built studio has one render per fixture, so it is addressed by the fixture's position. */
 export const fetchRender = ({
   id,

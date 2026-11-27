@@ -91,6 +91,31 @@ Feature: The transactional messages LangWatch sends
     And a template no heading names sits under Other, last
 
   @unit
+  Scenario: Digest review lists the digests that send, in the order the sender tries them
+    Given the studio's digest review
+    Then it lists plan pressure, scenarios trend, coding-agent week and traces week, in that order
+    And each says who gets it and has a version A that sends today and a slot for a version B
+
+  @unit
+  Scenario: Digest review shows each digest as it would arrive today
+    Given a digest fixture with props the sender does not fill yet
+    When digest review renders it
+    Then those props are left out
+    And the subject starts with the organisation's name, as the sender writes it
+
+  @unit
+  Scenario: The studio's message list can be searched by name
+    Given the studio's message list
+    When a name is typed into the search box
+    Then only the emails whose name holds it, in any case, stay listed
+
+  @unit
+  Scenario: The hosted studio shows the LangWatch wordmark
+    Given the hosted studio only allows images from itself
+    When it shows a rendered email
+    Then the wordmark loads from the studio's own copy
+
+  @unit
   Scenario: The arrow keys step through each email's variants before the next email
     Given an email with more than one variant is open in the studio
     When the next stop in the message list is asked for

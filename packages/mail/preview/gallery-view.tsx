@@ -117,7 +117,8 @@ const readDocumentBackground = (doc: Document): string | null => {
   return null;
 };
 
-const GalleryCard = ({
+/** One rendered email, scaled to its card; without `onOpen` it has no "open in Inspect" button. */
+export const GalleryCard = ({
   entry,
   viewportWidth,
   density,
@@ -128,7 +129,7 @@ const GalleryCard = ({
   viewportWidth: number;
   density: Density;
   previewDark: boolean;
-  onOpen: (templateId: string, fixtureName: string) => void;
+  onOpen?: (templateId: string, fixtureName: string) => void;
 }): JSX.Element => {
   const previewRef = useRef<HTMLDivElement>(null);
   const [cardWidth, setCardWidth] = useState(CARD_WIDTH[density]);
@@ -146,7 +147,6 @@ const GalleryCard = ({
     return () => observer.disconnect();
   }, []);
 
-  const open = () => onOpen(entry.template, entry.fixture);
   const onIframeLoad = (event: SyntheticEvent<HTMLIFrameElement>) => {
     const doc = event.currentTarget.contentDocument;
     const body = doc?.body;
@@ -172,11 +172,13 @@ const GalleryCard = ({
       }
       meta={entry.fixture}
       actions={
-        <IconButton
-          label={`Open ${entry.title}, ${entry.fixture}, in Inspect`}
-          icon={<IconArrowUpRight />}
-          onClick={open}
-        />
+        onOpen && (
+          <IconButton
+            label={`Open ${entry.title}, ${entry.fixture}, in Inspect`}
+            icon={<IconArrowUpRight />}
+            onClick={() => onOpen(entry.template, entry.fixture)}
+          />
+        )
       }
     >
       <div

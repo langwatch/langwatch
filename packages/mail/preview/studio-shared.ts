@@ -28,6 +28,26 @@ export const templatesResponseSchema = z.union([failureSchema, z.array(templateS
 export const renderResponseSchema = z.union([failureSchema, renderedSchema]);
 export const galleryResponseSchema = z.union([failureSchema, z.array(galleryEntrySchema)]);
 
+const digestReviewVersionSchema = z.object({
+  label: z.string(),
+  cards: z.array(galleryEntrySchema),
+});
+export type DigestReviewVersion = z.infer<typeof digestReviewVersionSchema>;
+
+const digestReviewSectionSchema = z.object({
+  templateId: z.string(),
+  title: z.string(),
+  whoGetsThis: z.string(),
+  notFilledToday: z.array(z.string()),
+  versionA: digestReviewVersionSchema,
+  versionB: digestReviewVersionSchema.nullable(),
+});
+export type DigestReviewSection = z.infer<typeof digestReviewSectionSchema>;
+export const digestReviewResponseSchema = z.union([
+  failureSchema,
+  z.array(digestReviewSectionSchema),
+]);
+
 export const WIDTHS = { desktop: 680, mobile: 375 } as const;
 
 /**
@@ -76,6 +96,22 @@ const centerDocument = (html: string): string => {
   return html.slice(0, headEnd + 1) + CENTER_STYLE + html.slice(headEnd + 1);
 };
 
-/** The one place an iframe document is prepared, for Inspect and the gallery alike. */
+/**
+ * The hosted studio's CSP allows images from its own origin only, and a srcdoc frame inherits
+ * it, so the wordmarks load from the studio's copies (preview/public/images, kept identical to
+ * apps/ui/public/images). Only what the studio shows changes; Copy HTML keeps the real URLs.
+ */
+const STUDIO_ASSETS: Record<string, string> = {
+  "https://app.langwatch.ai/images/logo-wordmark.png": "/images/logo-wordmark.png",
+  "https://app.langwatch.ai/images/logo-full-darktheme.svg": "/images/logo-full-darktheme.svg",
+};
+
+export const serveAssetsLocally = (html: string): string =>
+  Object.entries(STUDIO_ASSETS).reduce(
+    (out, [remote, local]) => out.replaceAll(remote, local),
+    html,
+  );
+
+/** The one place an iframe document is prepared, for Inspect, the gallery and digest review. */
 export const prepareMailDocument = (html: string, dark: boolean): string =>
-  centerDocument(dark ? promoteDarkRules(html) : html);
+  centerDocument(serveAssetsLocally(dark ? promoteDarkRules(html) : html));

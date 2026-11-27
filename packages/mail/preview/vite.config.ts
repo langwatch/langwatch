@@ -5,8 +5,10 @@ import react from "@vitejs/plugin-react";
 import { createServer, defineConfig, type Plugin, type ViteDevServer } from "vite";
 
 import type * as indexModule from "../src/templates/index.ts";
+import { buildDigestReview } from "./digest-review.ts";
 import { buildGalleryEntries } from "./gallery-render.ts";
 import { STATIC_STUDIO_META } from "./studio-endpoints.ts";
+import { serveAssetsLocally } from "./studio-shared.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, "..");
@@ -66,6 +68,18 @@ const templateRenderer = (): Plugin => {
               { everyFixture },
             );
             respondJson(response, 200, entries);
+          })
+          .catch((error: unknown) => respondJson(response, 500, { error: describe(error) }));
+      });
+
+      server.middlewares.use("/__digest-review", (_request, response) => {
+        void load(server)
+          .then(async (registry) => {
+            const sections = await buildDigestReview({
+              templates: registry.mailTemplates,
+              render: registry.renderMailTemplate,
+            });
+            respondJson(response, 200, sections);
           })
           .catch((error: unknown) => respondJson(response, 500, { error: describe(error) }));
       });
@@ -130,11 +144,17 @@ const staticRenders = (): Plugin => ({
         });
         emit(fileName, JSON.stringify(entries));
       }
+      const review = await buildDigestReview({
+        templates: mailTemplates,
+        render: renderMailTemplate,
+      });
+      emit("__digest-review.json", JSON.stringify(review));
       for (const template of mailTemplates) {
         for (const [index, fixture] of template.fixtures.entries()) {
           const rendered = await renderMailTemplate(template, fixture.props);
           emit(`__render/${template.id}/${index}.json`, JSON.stringify(rendered));
-          emit(`__document/${template.id}/${index}.html`, rendered.html);
+          // Opened on its own under the hosted CSP, so it needs the studio's wordmarks too.
+          emit(`__document/${template.id}/${index}.html`, serveAssetsLocally(rendered.html));
         }
       }
     } finally {

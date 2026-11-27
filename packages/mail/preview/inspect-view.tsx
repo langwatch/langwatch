@@ -4,6 +4,7 @@ import {
   CodeBlock,
   CopyButton,
   Inline,
+  Input,
   Link,
   Page,
   Panel,
@@ -12,11 +13,11 @@ import {
   Stack,
   Text,
 } from "@langwatch/design-system-internal";
-import { useEffect, useState, type JSX, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
 
 import { PropsForm } from "./props-form.tsx";
 import { documentUrl as documentUrlOf, fetchRender, isStaticStudio } from "./studio-endpoints.ts";
-import { groupTemplates, stepSelection } from "./studio-groups.ts";
+import { DIGEST_HEADING, filterTemplates, groupTemplates, stepSelection } from "./studio-groups.ts";
 import {
   prepareMailDocument,
   renderResponseSchema,
@@ -45,6 +46,7 @@ export interface InspectViewProps {
   currentProps: unknown;
   onPropsChange: (next: unknown) => void;
   onSelect: (templateId: string, fixtureName: string) => void;
+  onReviewDigests: () => void;
   previewDark: boolean;
   width: keyof typeof WIDTHS;
   onWidthChange: (next: keyof typeof WIDTHS) => void;
@@ -57,6 +59,7 @@ export const InspectView = ({
   currentProps,
   onPropsChange,
   onSelect,
+  onReviewDigests,
   previewDark,
   width,
   onWidthChange,
@@ -65,12 +68,14 @@ export const InspectView = ({
   const [renderError, setRenderError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("html");
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  const [query, setQuery] = useState("");
+  const visible = useMemo(() => filterTemplates({ templates, query }), [templates, query]);
 
   const template = templates.find((entry) => entry.id === selected?.id) ?? null;
   const fixtureIndex =
     template?.fixtures.findIndex((fixture) => fixture.name === selected?.fixture) ?? -1;
 
-  useArrowKeyStepping({ templates, selected, onSelect, frame });
+  useArrowKeyStepping({ templates: visible, selected, onSelect, frame });
 
   useEffect(() => {
     if (!selected || currentProps === null) return;
@@ -119,9 +124,29 @@ export const InspectView = ({
     >
       <div className="mailroom-inspect">
         <nav className="mailroom-messages" aria-label="Messages">
-          <ScrollArea className="mailroom-message-list" label="Messages">
-            <MessageList templates={templates} selected={selected} onSelect={onSelect} />
-          </ScrollArea>
+          <Stack gap={3}>
+            <Input
+              type="search"
+              size="sm"
+              label="Search emails"
+              hideLabel
+              placeholder="Search emails by name"
+              value={query}
+              onChange={setQuery}
+            />
+            <ScrollArea className="mailroom-message-list" label="Messages">
+              {visible.length === 0 ? (
+                <Text tone="secondary">No email matches that name.</Text>
+              ) : (
+                <MessageList
+                  templates={visible}
+                  selected={selected}
+                  onSelect={onSelect}
+                  onReviewDigests={onReviewDigests}
+                />
+              )}
+            </ScrollArea>
+          </Stack>
         </nav>
 
         <Stack gap={4} className="mailroom-preview">
@@ -240,12 +265,18 @@ function MessageList({
   templates,
   selected,
   onSelect,
-}: Pick<InspectViewProps, "templates" | "selected" | "onSelect">): JSX.Element {
+  onReviewDigests,
+}: Pick<InspectViewProps, "templates" | "selected" | "onSelect" | "onReviewDigests">): JSX.Element {
   return (
     <Stack gap={4}>
       {groupTemplates({ templates }).map((group) => (
         <section key={group.heading} className="mailroom-group">
           <h2 className="mailroom-group-heading">{group.heading}</h2>
+          {group.heading === DIGEST_HEADING && (
+            <Button size="sm" variant="secondary" onClick={onReviewDigests}>
+              Review digests as they send
+            </Button>
+          )}
           <ul className="mailroom-group-list">
             {group.templates.map((entry) => (
               <MessageRow key={entry.id} entry={entry} selected={selected} onSelect={onSelect} />

@@ -25,6 +25,14 @@ describe("studio-url", () => {
       expect(parseUrlState(buildSearch(state))).toEqual(state);
     });
 
+    it("keeps the digest review view", () => {
+      expect(parseUrlState("?view=review").view).toBe("review");
+    });
+
+    it("falls back to Inspect for a view it does not know", () => {
+      expect(parseUrlState("?view=elsewhere").view).toBe("inspect");
+    });
+
     it("falls back to the default state when the query is empty", () => {
       expect(parseUrlState("")).toEqual(DEFAULT_URL_STATE);
     });

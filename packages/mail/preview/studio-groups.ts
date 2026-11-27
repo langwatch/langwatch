@@ -10,6 +10,9 @@ interface GroupRule {
   prefix?: string;
 }
 
+/** The weekly digests' heading, where the list offers Digest review. */
+export const DIGEST_HEADING = "Weekly digest";
+
 const GROUP_RULES: readonly GroupRule[] = [
   {
     heading: "Account and sign-in",
@@ -51,10 +54,22 @@ const GROUP_RULES: readonly GroupRule[] = [
     ],
   },
   { heading: "Alerts", ids: ["upgrade-alert", "monitor-auto-paused", "trigger-digest"] },
-  { heading: "Weekly digest", prefix: "digest-" },
+  { heading: DIGEST_HEADING, prefix: "digest-" },
 ];
 
 export const OTHER_HEADING = "Other";
+
+/** The templates whose name holds the query, ignoring case; an empty query keeps them all. */
+export const filterTemplates = <T extends { title: string }>({
+  templates,
+  query,
+}: {
+  templates: readonly T[];
+  query: string;
+}): T[] => {
+  const needle = query.trim().toLowerCase();
+  return templates.filter((template) => template.title.toLowerCase().includes(needle));
+};
 
 const headingFor = (id: string): string =>
   GROUP_RULES.find((rule) => rule.ids?.includes(id) || (rule.prefix && id.startsWith(rule.prefix)))

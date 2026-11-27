@@ -77,6 +77,25 @@
   margin-bottom: var(--space-3);
 }
 
+.mailroom-review-heading {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--ink-900);
+}
+
+.mailroom-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.mailroom-review-empty {
+  padding: var(--space-4);
+  border: 1px dashed var(--ink-500);
+  border-radius: var(--radius-sm);
+}
+
 .mailroom-guide {
   padding: var(--space-4) var(--space-8) 0;
 }

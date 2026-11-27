@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupTemplates, OTHER_HEADING, stepSelection } from "../studio-groups.ts";
+import { filterTemplates, groupTemplates, OTHER_HEADING, stepSelection } from "../studio-groups.ts";
 
 const headingsOf = (ids: string[]) =>
   groupTemplates({ templates: ids.map((id) => ({ id })) }).map((group) => ({
@@ -137,5 +137,29 @@ describe("stepSelection", () => {
     it("returns null", () => {
       expect(stepSelection({ templates: [], selected: null, direction: 1 })).toBeNull();
     });
+  });
+});
+
+describe("filterTemplates", () => {
+  const templates = [
+    { title: "Reset password" },
+    { title: "Weekly digest: traces week" },
+    { title: "Weekly digest: plan pressure" },
+  ];
+
+  /** @scenario "The studio's message list can be searched by name" */
+  it("keeps only the names holding the query, ignoring case and surrounding spaces", () => {
+    expect(filterTemplates({ templates, query: "  DIGEST " }).map((entry) => entry.title)).toEqual([
+      "Weekly digest: traces week",
+      "Weekly digest: plan pressure",
+    ]);
+  });
+
+  it("keeps every template for an empty query", () => {
+    expect(filterTemplates({ templates, query: "" })).toEqual(templates);
+  });
+
+  it("returns none when no name matches", () => {
+    expect(filterTemplates({ templates, query: "invoice" })).toEqual([]);
   });
 });

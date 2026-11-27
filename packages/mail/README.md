@@ -18,6 +18,14 @@ form generated from the template's zod schema that re-renders as you type. Props
 the schema are shown as a rejection rather than a broken email. A short guide sits at the
 top until it is dismissed.
 
+A search box above the rail filters it by name, and the left and right arrow keys step
+through it. **Digest review** shows the weekly digests that send, in the order the sender
+tries them (`preview/digest-review.ts`, kept in step with the digest module's
+`digest-template.rules.ts`): who gets each, its subject with the organisation first, and
+every fixture without the props the sender does not fill yet, as version A, with a slot
+for a version B. The hosted studio only allows its own images, so it shows the wordmarks
+from `preview/public/images` (copies of `apps/ui/public/images`).
+
 It renders in Node through the same `@react-email` call the product sends with, so
 the preview cannot drift from the mail that arrives. Editing a template file
 re-renders it without a restart.
