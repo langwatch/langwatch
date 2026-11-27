@@ -66,7 +66,7 @@ describe.skipIf(!databaseUrl)("the Prisma apply-status rows", () => {
 
   afterAll(async () => {
     await connection?.client.retentionApplyStatus.deleteMany({ where: { organizationId } });
-    await connection?.client.$disconnect();
+    await connection?.closeOnce();
   });
 
   describe("when a scope's traces were shortened", () => {
