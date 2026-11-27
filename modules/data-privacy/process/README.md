@@ -94,6 +94,14 @@ setScopeRule(input: DataPrivacyScopeTarget & { config: DataPrivacyConfig } & Dat
 removeScopeRule(input: DataPrivacyScopeTarget & DataPrivacyCallerInput): Promise<void>;
 ```
 
+#### `acceptPiiRedactionModel`
+
+Records an organization admin's acceptance of the PII Redaction Model's price, which a priced Cloud organization needs before Strict runs on the model (ADR-201 decision 15). The door authorizes the organization; a second acceptance keeps the first.
+
+```typescript
+acceptPiiRedactionModel(input: { organizationId: string } & DataPrivacyCallerInput): Promise<void>;
+```
+
 #### `dropsAnyContent`
 
 True when this project's resolved policy drops any span content at all — the interlock the ingest edge checks before externalizing inline media, so bytes are never stored for content the policy will discard.
@@ -138,13 +146,14 @@ None: this module declares no REST family.
 
 ### `dataPrivacy`
 
-Contract `../contract/src/data-privacy.trpc.ts:47`, router `src/transport/data-privacy.trpc.ts:36`.
+Contract `../contract/src/data-privacy.trpc.ts:55`, router `src/transport/data-privacy.trpc.ts:36`.
 
-| Procedure                    | Kind     | Gate                                                                                                                                                                                                                                                          | Input                               | Output                      |
-| ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------- |
-| `dataPrivacy.getSnapshot`    | query    | Permission `project:view`                                                                                                                                                                                                                                     | `dataPrivacyProjectScopeSchema`     | `dataPrivacySnapshotSchema` |
-| `dataPrivacy.setForScope`    | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, department, team or project named by `scope`, which the app anchors to this project's organization first — the `projectId` this input also carries is not acted on | inline                              | `dataPrivacyPolicySchema`   |
-| `dataPrivacy.removeForScope` | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, department, team or project named by `scope`, which the app anchors to this project's organization first — the `projectId` this input also carries is not acted on | `dataPrivacyScopeTargetInputSchema` | –                           |
+| Procedure                             | Kind     | Gate                                                                                                                                                                                                                                                          | Input                                | Output                      |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------- |
+| `dataPrivacy.getSnapshot`             | query    | Permission `project:view`                                                                                                                                                                                                                                     | `dataPrivacyProjectScopeSchema`      | `dataPrivacySnapshotSchema` |
+| `dataPrivacy.setForScope`             | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, department, team or project named by `scope`, which the app anchors to this project's organization first — the `projectId` this input also carries is not acted on | inline                               | `dataPrivacyPolicySchema`   |
+| `dataPrivacy.removeForScope`          | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, department, team or project named by `scope`, which the app anchors to this project's organization first — the `projectId` this input also carries is not acted on | `dataPrivacyScopeTargetInputSchema`  | –                           |
+| `dataPrivacy.acceptPiiRedactionModel` | mutation | Permission `organization:manage`                                                                                                                                                                                                                              | `dataPrivacyOrganizationInputSchema` | –                           |
 
 ```typescript
 // dataPrivacy.getSnapshot
@@ -152,14 +161,14 @@ Contract `../contract/src/data-privacy.trpc.ts:47`, router `src/transport/data-p
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:107
+type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:113
 
 // dataPrivacy.setForScope
-// Input: z.object({ ...dataPrivacyScopeTargetInputSchema.shape, config: dataPrivacyConfigSchema }) (inline, ../contract/src/data-privacy.trpc.ts:64)
+// Input: z.object({ ...dataPrivacyScopeTargetInputSchema.shape, config: dataPrivacyConfigSchema }) (inline, ../contract/src/data-privacy.trpc.ts:72)
 type Output = z.infer<typeof dataPrivacyPolicySchema>; // ../contract/src/data-privacy.ts:242
 
 // dataPrivacy.removeForScope
-// Input: dataPrivacyScopeTargetInputSchema, ../contract/src/data-privacy.trpc.ts:45
+// Input: dataPrivacyScopeTargetInputSchema, ../contract/src/data-privacy.trpc.ts:53
 interface Input {
   projectId: string;
   scope: {
@@ -167,6 +176,12 @@ interface Input {
     scopeId: string;
   };
   personalOnly: boolean;
+}
+
+// dataPrivacy.acceptPiiRedactionModel
+// Input: dataPrivacyOrganizationInputSchema, ../contract/src/data-privacy.trpc.ts:31
+interface Input {
+  organizationId: string;
 }
 ```
 
@@ -188,10 +203,10 @@ Declared at `src/eventing/pii-redaction-spend.pipeline.ts:35`. Events: `piiRedac
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:142`           |
-| secret | `requestIdKey`                 | `API_KEY_PEPPER`                     | `src/app/data-privacy.app.ts:144`           |
-| secret | `requestIdKeyFallback`         | `CREDENTIALS_SECRET`                 | `src/app/data-privacy.app.ts:145`           |
-| secret | `requestIdKeyLastFallback`     | `NEXTAUTH_SECRET`                    | `src/app/data-privacy.app.ts:146`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:146`           |
+| secret | `requestIdKey`                 | `API_KEY_PEPPER`                     | `src/app/data-privacy.app.ts:148`           |
+| secret | `requestIdKeyFallback`         | `CREDENTIALS_SECRET`                 | `src/app/data-privacy.app.ts:149`           |
+| secret | `requestIdKeyLastFallback`     | `NEXTAUTH_SECRET`                    | `src/app/data-privacy.app.ts:150`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

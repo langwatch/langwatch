@@ -4843,6 +4843,24 @@
           "documentation": "The member who switched them on, so the audit trail names a person and\nnot just a moment."
         },
         {
+          "name": "piiRedactionModelAcceptedAt",
+          "columnName": "piiRedactionModelAcceptedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When an organization admin accepted the PII Redaction Model's price, the\norganization's consent to be billed for it on LangWatch Cloud (ADR-201\ndecision 15). Null until then: Strict stays on the rule-based detector,\nunbilled, and billing counts no PII redaction spend from before it."
+        },
+        {
+          "name": "piiRedactionModelAcceptedByUserId",
+          "columnName": "piiRedactionModelAcceptedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The admin who accepted it, so the record names a person."
+        },
+        {
           "name": "connectLastSyncAt",
           "columnName": "connectLastSyncAt",
           "type": "DateTime",

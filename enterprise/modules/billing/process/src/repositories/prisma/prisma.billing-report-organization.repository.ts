@@ -112,6 +112,19 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
     };
   }
 
+  async findPiiRedactionModelAcceptedAtMs({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number | null> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { piiRedactionModelAcceptedAt: true },
+    });
+
+    return organization?.piiRedactionModelAcceptedAt?.getTime() ?? null;
+  }
+
   /**
    * The billing identity of a connected self-hosted customer: the invoice
    * customer and the usage subscription live on its `ConnectedBillingAccount`,

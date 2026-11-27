@@ -55,6 +55,7 @@ export function PrivacyRuleDrawer({
   projectId,
   isSaving,
   piiRedactionModelOffer = null,
+  piiRedactionModelAwaitsAcceptance = false,
   onSave,
   scopePicker,
 }: {
@@ -69,6 +70,8 @@ export function PrivacyRuleDrawer({
   isSaving: boolean;
   /** Shows what the PII level runs and its example; null hides them. */
   piiRedactionModelOffer?: PiiRedactionModelOffer;
+  /** No organization admin accepted the model's price yet, so Strict is rule-based. */
+  piiRedactionModelAwaitsAcceptance?: boolean;
   onSave: (scopes: PrivacyScopeEntry[], config: DataPrivacyConfig) => void;
   /** Renders the scope picker in add mode, wired to `value` and `onChange`. */
   scopePicker: (props: {
@@ -137,6 +140,7 @@ export function PrivacyRuleDrawer({
     <Drawer
       open={open}
       onClose={onClose}
+      busy={isSaving}
       title={editingRule ? "Edit privacy rule" : "Add privacy rule"}
       size="md"
       footer={{ primaryAction: { label: "Save", onClick: trySave, loading: isSaving } }}
@@ -204,6 +208,7 @@ export function PrivacyRuleDrawer({
           form={form}
           inheritedLevel={inheritedBaseline.pii.level}
           piiRedactionModelOffer={piiRedactionModelOffer}
+          piiRedactionModelAwaitsAcceptance={piiRedactionModelAwaitsAcceptance}
           onChange={update}
         />
 

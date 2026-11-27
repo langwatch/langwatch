@@ -10,6 +10,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -172,6 +173,10 @@ describe("given the PII redaction model wired into the module", () => {
           }),
           permissions,
           entitlements,
+          // An admin accepted the price, so the batch is routed to the model it refuses.
+          organizations: createApiFixture<OrganizationApi>({
+            isPiiRedactionModelAccepted: async () => true,
+          }),
         },
         settings: { langevalsEndpoint: LANGEVALS },
         channels: async () => ({

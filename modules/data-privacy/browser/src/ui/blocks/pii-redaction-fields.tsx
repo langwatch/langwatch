@@ -20,7 +20,10 @@ import {
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "../../model/pii-entity-labels.ts";
-import { type PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
+import {
+  type PiiRedactionModelOffer,
+  STRICT_AWAITS_ADMIN_NOTE,
+} from "../../model/pii-redaction-level-offer.ts";
 import { PatternListField } from "../elements/pattern-list-field.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
 import { StrictRuleBasedNote } from "../elements/strict-rule-based-note.tsx";
@@ -61,12 +64,15 @@ export function PiiRedactionFields({
   form,
   inheritedLevel,
   piiRedactionModelOffer = null,
+  piiRedactionModelAwaitsAcceptance = false,
   onChange,
 }: {
   form: PiiFields;
   inheritedLevel: PiiLevel;
   /** What the level runs, Strict's price and the example; null hides them. */
   piiRedactionModelOffer?: PiiRedactionModelOffer;
+  /** Strict stays rule-based until an organization admin accepts the model's price. */
+  piiRedactionModelAwaitsAcceptance?: boolean;
   onChange: (patch: Partial<PiiFields>) => void;
 }) {
   const toggleEntity = (entity: string) =>
@@ -144,6 +150,13 @@ export function PiiRedactionFields({
       {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (
         <StrictRuleBasedNote offer={piiRedactionModelOffer} />
       )}
+      {piiRedactionModelOffer?.kind === "model" &&
+        piiRedactionModelAwaitsAcceptance &&
+        effectiveLevel === "strict" && (
+          <Text fontSize="xs" color="fg.muted">
+            {STRICT_AWAITS_ADMIN_NOTE}
+          </Text>
+        )}
       {form.piiChoice === "custom" && (
         <VStack align="stretch" gap={3} paddingLeft={6}>
           <PiiEntityToggleGroup

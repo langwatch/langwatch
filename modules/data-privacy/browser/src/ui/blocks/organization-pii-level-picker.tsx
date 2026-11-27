@@ -1,6 +1,7 @@
 import { Card } from "@langwatch/design-system/card";
 import {
   Badge,
+  Button,
   Collapsible,
   Grid,
   HStack,
@@ -20,8 +21,11 @@ import {
   ESSENTIAL_MISSES,
   type OrganizationPiiLevel,
   PII_REDACTION_MODEL_NAME,
+  STRICT_ACCEPTANCE_NOTE,
   STRICT_BILLED_NOTE,
   STRICT_GAPS,
+  STRICT_RULE_BASED_BADGE,
+  SWITCH_TO_MODEL_LABEL,
 } from "../../model/pii-redaction-level-offer.ts";
 import { PiiRedactionExample } from "../elements/pii-redaction-example.tsx";
 import { PiiRedactionModelPrice } from "../elements/pii-redaction-model-price.tsx";
@@ -65,15 +69,21 @@ function StrictGaps() {
 /** One level as a radio card: its name, what sits beside it, a subtitle and what it does. */
 function LevelCard({
   value,
+  titleBadge,
   aside,
   subtitle,
   price,
+  action,
   points,
 }: {
   value: OrganizationPiiLevel;
+  /** Beside the name: what the level runs today, when that is not what the card offers. */
+  titleBadge?: ReactNode;
   aside: ReactNode;
   subtitle: string;
   price?: ReactNode;
+  /** Under the price: the one step that changes what the level runs. */
+  action?: ReactNode;
   points: string[];
 }) {
   return (
@@ -83,6 +93,7 @@ function LevelCard({
         <RadioCard.ItemContent>
           <HStack width="full">
             <RadioCard.ItemText>{LEVEL_LABELS[value]}</RadioCard.ItemText>
+            {titleBadge}
             <Spacer />
             {aside}
           </HStack>
@@ -90,6 +101,7 @@ function LevelCard({
             {subtitle}
           </Text>
           {price}
+          {action}
           <List.Root paddingLeft={4} fontSize="sm" color="fg.muted" gap={0.5}>
             {points.map((point) => (
               <List.Item key={point}>{point}</List.Item>
@@ -102,15 +114,46 @@ function LevelCard({
   );
 }
 
-/** Essential and Strict side by side; Strict carries the model, its price and the New badge. */
+/**
+ * The switch to the model on a rule-based Strict card. A button inside the card's label would
+ * also pick the card, so the click stops here.
+ */
+function SwitchToModelButton({ disabled, onSwitch }: { disabled: boolean; onSwitch: () => void }) {
+  return (
+    <Button
+      size="xs"
+      variant="outline"
+      alignSelf="start"
+      disabled={disabled}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSwitch();
+      }}
+    >
+      {SWITCH_TO_MODEL_LABEL}
+    </Button>
+  );
+}
+
+/**
+ * Essential and Strict side by side; Strict carries the model, its price and the New badge, and
+ * while it is rule-based until an admin accepts the price, says so and offers the switch.
+ */
 function LevelCards({
   free,
   licensed,
   split,
+  ruleBased,
+  isSaving,
+  onSwitchToModel,
 }: {
   free: boolean;
   licensed: boolean;
   split: boolean;
+  ruleBased: boolean;
+  isSaving: boolean;
+  onSwitchToModel?: (() => void) | undefined;
 }) {
   return (
     <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3}>
@@ -126,6 +169,13 @@ function LevelCards({
       />
       <LevelCard
         value="strict"
+        titleBadge={
+          ruleBased ? (
+            <Badge size="sm" variant="outline" colorPalette="gray">
+              {STRICT_RULE_BASED_BADGE}
+            </Badge>
+          ) : undefined
+        }
         aside={
           <Badge size="sm" variant="solid" colorPalette="orange">
             New
@@ -133,6 +183,11 @@ function LevelCards({
         }
         subtitle={PII_REDACTION_MODEL_NAME}
         price={<PiiRedactionModelPrice free={free} licensed={licensed} split={split} />}
+        action={
+          ruleBased && onSwitchToModel ? (
+            <SwitchToModelButton disabled={isSaving} onSwitch={onSwitchToModel} />
+          ) : undefined
+        }
         points={[
           "Names and full street addresses in 8 languages",
           "Plus everything Essential finds",
@@ -193,9 +248,12 @@ export function OrganizationPiiLevelPicker({
   free,
   licensed = false,
   split = false,
+  awaitingAcceptance = false,
+  strictRuleShown = false,
   canWrite,
   isSaving,
   onPick,
+  onSwitchToModel,
 }: {
   level: OrganizationPiiLevel | null;
   pendingLevel: OrganizationPiiLevel | null;
@@ -205,11 +263,22 @@ export function OrganizationPiiLevelPicker({
   licensed?: boolean;
   /** Long spans go to the model in parts (ADR-207): the small print names the split limit. */
   split?: boolean;
+  /** Strict is rule-based, at no charge, until an organization admin accepts the price. */
+  awaitingAcceptance?: boolean;
+  /** A team or project rule sets Strict, so Strict is in use with the organization on Essential. */
+  strictRuleShown?: boolean;
   canWrite: boolean;
   isSaving: boolean;
   onPick: (level: OrganizationPiiLevel) => void;
+  /** Present only for a reader who may accept the price. */
+  onSwitchToModel?: (() => void) | undefined;
 }) {
-  const currentLabel = level ? LEVEL_LABELS[level] : otherLevelLabel;
+  const ruleBased = level === "strict" && awaitingAcceptance;
+  // Any Strict the page shows offers the switch: an admin has no other place to accept it.
+  const strictRuleBased = awaitingAcceptance && (level === "strict" || strictRuleShown);
+  const currentLabel = level
+    ? `${LEVEL_LABELS[level]}${ruleBased ? " (rule-based)" : ""}`
+    : otherLevelLabel;
   const radios = useNativeRadiosAt({ level, pendingLevel });
   return (
     <SettingsSection
@@ -240,12 +309,19 @@ export function OrganizationPiiLevelPicker({
             }
           }}
         >
-          <LevelCards free={free} licensed={licensed} split={split} />
+          <LevelCards
+            free={free}
+            licensed={licensed}
+            split={split}
+            ruleBased={strictRuleBased}
+            isSaving={isSaving}
+            onSwitchToModel={onSwitchToModel}
+          />
         </RadioCard.Root>
         {level && <LevelExample level={level} />}
         {level === "strict" && !free && (
           <Text fontSize="xs" color="fg.muted">
-            {STRICT_BILLED_NOTE}
+            {awaitingAcceptance ? STRICT_ACCEPTANCE_NOTE : STRICT_BILLED_NOTE}
           </Text>
         )}
       </VStack>

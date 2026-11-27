@@ -327,6 +327,58 @@ Feature: Redacting personal data out of a span at ingestion
     When a strict batch is analysed
     Then the model answers it and the plan is not read
 
+  # On LangWatch Cloud a priced organization reaches the model only once an organization admin
+  # accepted its price (ADR-201 decision 15). An organization on Strict without a recorded
+  # acceptance, including one that confirmed the price before this change, keeps rule-based
+  # detection (Presidio) at no charge until an organization admin accepts again, however Strict
+  # was set. The free list needs no acceptance, and self-hosted never reads either.
+
+  @unit
+  Scenario: A Strict organization that never accepted the price stays on Presidio, unbilled
+    Given a LangWatch Cloud deployment that names the PII redaction model
+    And the organization is allowlisted for it, not on the free list, with no recorded acceptance of its price
+    And a price it confirmed before this change left no acceptance on record
+    When a strict batch is analysed
+    Then Presidio answers it and the model is not called
+    And the batch is counted with the reason not_accepted
+    And the organization logs one usage line a minute at most, not one per batch
+    And nothing is priced
+
+  @unit
+  Scenario: Strict set through the API, project settings or a rule stays on Presidio until the price is accepted
+    Given a LangWatch Cloud organization with the model flag on, not on the free list, that never accepted the price
+    When its project is set to Strict through project settings or the API, or its organization rule is set to Strict
+    And the project sends a span
+    Then Presidio redacts the span, the model is not called and nothing is priced
+
+  @unit
+  Scenario: An organization that accepted the price goes to the model and is priced
+    Given a LangWatch Cloud organization with the model flag on, not on the free list
+    And an organization admin accepted the model's price
+    When a strict batch is analysed
+    Then the model answers it and one priced fact is recorded at the published rate
+
+  @unit
+  Scenario: An organization on the free list reaches the model with no acceptance
+    Given a LangWatch Cloud organization with the model flag on and on the free list, that never accepted the price
+    When a strict batch is analysed
+    Then the model answers it and the call is recorded at a price of zero
+    And whether the organization accepted the price is not read
+
+  @unit
+  Scenario: The free list and the acceptance are read once a minute per organization
+    Given a LangWatch Cloud organization with the model flag on
+    When several strict batches of the organization are analysed within a minute
+    Then its free-list entry and its acceptance are each read once
+    And a free list or an acceptance that cannot be read sends the batch to Presidio with the reason routing_error, priced for nobody
+
+  @unit
+  Scenario: A free-list change during a model call never prices that call
+    Given a LangWatch Cloud organization on the free list when its batch is routed to the model
+    When the organization leaves the free list while the model is still answering
+    Then the call is recorded at a price of zero, as it was routed
+    And the free list is not read again to price it
+
   @unit
   Scenario: A model failure falls back to Presidio, never to unredacted text
     Given an organization allowlisted for the PII redaction model

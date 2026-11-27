@@ -70,6 +70,9 @@ export interface MemoryOrganizationRow {
   /** The organization's own Instant Evals consent; absent reads as not given. */
   instantEvalsEnabledAt?: Instant | null;
   instantEvalsEnabledByUserId?: string | null;
+  /** An admin's acceptance of the PII Redaction Model's price; absent reads as not given. */
+  piiRedactionModelAcceptedAt?: Instant | null;
+  piiRedactionModelAcceptedByUserId?: string | null;
   /** The private route labels the organization was first seen with; absent reads as none. */
   privateClickHouseLabel?: string | null;
   privateS3Label?: string | null;

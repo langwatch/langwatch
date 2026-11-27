@@ -4,6 +4,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { PiiDetectionOutcome } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ConcurrencyLimiter } from "@langwatch/limiter";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
@@ -17,6 +18,7 @@ import type { PresidioChannel, SplittingPresidioChannel } from "../../channels/p
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import {
   type ModelCallContext,
+  PII_REDACTION_MODEL_FREE_FLAG,
   PII_REDACTION_MODEL_SPLIT_FLAG,
   PII_REDACTION_MODEL_TIMEOUT_MS,
 } from "../../rules/pii-redaction-model.rules.ts";
@@ -125,11 +127,16 @@ function analysisOver({
       splitSlots: slots,
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: async (key) => {
+          // A paying organization: off the free list, so its accepted calls are priced.
+          if (key === PII_REDACTION_MODEL_FREE_FLAG) return false;
           if (key !== PII_REDACTION_MODEL_SPLIT_FLAG) return true;
           seen.splitFlagReads++;
           if (splitFlag === "unreadable") throw new Error("feature flag service unreachable");
           return splitFlag;
         },
+      }),
+      organizations: createApiFixture<OrganizationApi>({
+        isPiiRedactionModelAccepted: async () => true,
       }),
       scopes: DataPrivacyProjectScopeService.create({
         repository: MemoryDataPrivacyProjectScopeRepository.create({
@@ -139,9 +146,7 @@ function analysisOver({
       selfHosted: false,
       entitlements: createApiFixture<EntitlementApi>({}),
       spend: PiiRedactionSpendService.create({
-        selfHosted: false,
         requestIdKey: KEY,
-        featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
         recordSpendPriced: async (fact) => {
           seen.priced.push(fact);
         },

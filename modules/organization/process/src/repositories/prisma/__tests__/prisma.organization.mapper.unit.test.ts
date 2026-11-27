@@ -93,6 +93,8 @@ describe("organizationFromRecord", () => {
       selfHostedCustomer: false,
       instantEvalsEnabledAt: null,
       instantEvalsEnabledByUserId: null,
+      piiRedactionModelAcceptedAt: null,
+      piiRedactionModelAcceptedByUserId: null,
       connectServicesDisabled: [],
       connectLastSyncAt: null,
       connectLastSyncError: null,
