@@ -47,7 +47,11 @@ import type { BlobStoreService } from "./blob-store.service.ts";
 import type { ImpersonationService } from "./impersonation.service.ts";
 import type { InsightScheduleOpsService } from "./insight-schedule-ops.service.ts";
 import type { InstanceAdminService } from "./instance-admin.service.ts";
-import type { QueueService } from "./queue.service.ts";
+import type {
+  QueueService,
+  TenantClaimsFillInput,
+  TenantClaimsFillOutcome,
+} from "./queue.service.ts";
 import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
 
 /** The operations half of `OpsApi`, over the repositories and services this process composed. */
@@ -405,6 +409,10 @@ export class OpsService {
 
   reconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome> {
     return this.queues.reconcilePending(input);
+  }
+
+  fillQueueTenantClaims(input: TenantClaimsFillInput): Promise<TenantClaimsFillOutcome> {
+    return this.queues.fillTenantClaims(input);
   }
 
   readQueuePendingDrift(input: { queueNames: string[] }): Promise<number> {

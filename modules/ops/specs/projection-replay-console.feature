@@ -151,3 +151,9 @@ Feature: Projection replay from the operator console
     Given the api registers its pipelines for commands only
     When the projections and subscribers are listed
     Then the list carries the consume side the worker runs
+
+  @unit @replay
+  Scenario: An operator replay trusts the queue's claimed-groups index only once its backfill is done and no older image serves
+    Given the step "ops:fill-queue-tenant-claims" is done or not needed, and every live process ships it
+    Then the replay's claimed-groups index is ready
+    But while the step is pending, or a live process does not ship it, the index is not ready (ADR-092)

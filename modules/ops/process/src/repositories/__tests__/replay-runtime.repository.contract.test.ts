@@ -30,7 +30,7 @@ describe("given ops' replay runtime repository", () => {
         eventing: { definitions: [] },
       });
 
-      const runtime = replayRuntimes.create({ retention });
+      const runtime = replayRuntimes.create({ retention, claimsIndexReady: async () => true });
 
       expect(runtime.projections).toEqual([]);
       expect(runtime.mapProjections).toEqual([]);
@@ -47,7 +47,9 @@ describe("given ops' replay runtime repository", () => {
         processStore: InMemoryProcessStore.createForTesting(),
       });
 
-      expect(() => repositories.replayRuntimes.create({ retention })).toThrow(/memory process/);
+      expect(() =>
+        repositories.replayRuntimes.create({ retention, claimsIndexReady: async () => true }),
+      ).toThrow(/memory process/);
     });
   });
 });

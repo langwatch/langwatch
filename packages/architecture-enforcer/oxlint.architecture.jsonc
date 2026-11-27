@@ -17,6 +17,7 @@
     "langwatch/signature-mirror": "error",
     "langwatch/transport-declares": "error",
     "langwatch/clickhouse-no-version-order-limit": "error",
+    "langwatch/no-redis-keyspace-scan": "error",
     "langwatch/clickhouse-tenant-id": "error",
     "langwatch/skip-tenant-check-reason": "error",
     "langwatch/no-form-watch-in-child": "error",

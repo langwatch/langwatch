@@ -135,3 +135,18 @@ Feature: Projection replay
     Given a replay batch of aggregates
     When it reads the occurred-at bounds its later reads prune by
     Then that read is declared a full scan, since it must see every partition
+
+  @unit
+  Scenario: A replay drain asks the queue for a tenant's claimed groups instead of walking Redis
+    Given a map or state projection whose batch covers a tenant with one group still claimed
+    When the batch waits for work already admitted to the paused lane
+    Then it asks the queue for that tenant's claimed groups under the projection's prefix
+    And it waits until the group is no longer listed
+    And it sends no SCAN to Redis (ADR-092)
+
+  @unit
+  Scenario: A replay drain refuses an index that is not ready
+    Given the queue's claimed-groups index is not ready, because older workers still serve or the backfill has not finished
+    When a map or state batch waits for admitted work
+    Then the batch fails with the error code "replay_claims_index_not_ready"
+    And it never reports the lane drained

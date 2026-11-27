@@ -18,7 +18,7 @@ import {
   type ReplayEventSource,
   ReplayService,
 } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { EventStoreMemory, IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { LogApi } from "@langwatch/log-contract";
@@ -71,6 +71,7 @@ export function organizationIdPages({
 function replayEngineOver(eventSource: ReplayEventSource) {
   return () => ({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource,
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

@@ -378,7 +378,12 @@ import {
 import { ProcessAuditService } from "../services/process-audit.service.ts";
 import { ProcessFleetCollectionService } from "../services/process-fleet-collection.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
-import { QueueService } from "../services/queue.service.ts";
+import { QueueClaimsIndexReadinessService } from "../services/queue-claims-index-readiness.service.ts";
+import {
+  QueueService,
+  type TenantClaimsFillInput,
+  type TenantClaimsFillOutcome,
+} from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { SeatSharingCheckService } from "../services/seat-sharing-check.service.ts";
@@ -1581,6 +1586,10 @@ export class OpsModule implements OpsApi {
   reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome> {
     return this.#dependencies.ops.reconcileQueuePending(input);
   }
+  /** The one paced walk that lists claims made before the claimed-groups index (ADR-092). */
+  fillQueueTenantClaims(input: TenantClaimsFillInput): Promise<TenantClaimsFillOutcome> {
+    return this.#dependencies.ops.fillQueueTenantClaims(input);
+  }
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage> {
     return this.#dependencies.ops.listParkedQueueTenants(input);
   }
@@ -2643,6 +2652,11 @@ function buildOpsInfrastructure(input: {
               create: () =>
                 repositories.replayRuntimes.create({
                   retention: ReplayRetentionService.create(dependencies.retention),
+                  claimsIndexReady: () =>
+                    QueueClaimsIndexReadinessService.create({
+                      ledger: repositories.upgradeLedger,
+                      staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs,
+                    }).isReady(),
                 }),
             },
           }),

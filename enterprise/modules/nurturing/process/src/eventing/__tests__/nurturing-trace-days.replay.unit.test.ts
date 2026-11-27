@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- * Nurturing's trace days rebuilt at deploy: the real replay engine over a seeded trace log, the
- * module's own steps, memory repositories. Per-fact live delivery is the oracle.
- * Spec: enterprise/modules/nurturing/specs/project-usage.feature
- */
 import {
   type ReplayEvent,
   ReplayService,
@@ -12,6 +5,14 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * Nurturing's trace days rebuilt at deploy: the real replay engine over a seeded trace log, the
+ * module's own steps, memory repositories. Per-fact live delivery is the oracle.
+ * Spec: enterprise/modules/nurturing/specs/project-usage.feature
+ */
+import { IDLE_REPLAY_CLAIMS_INDEX } from "@langwatch/eventing/testing";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it, vi } from "vitest";
@@ -69,6 +70,7 @@ function deploy({ events, syncs = true }: { events: ReplayEvent[]; syncs?: boole
   });
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource: new NurturingSeededLog(events),
       redis: memoryRedisDouble({
         script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },

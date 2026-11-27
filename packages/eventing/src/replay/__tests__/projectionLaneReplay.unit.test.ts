@@ -13,6 +13,7 @@ import {
   projectionLaneReplayer,
   unionReplayTenants,
 } from "../projectionLaneReplay.ts";
+import { IDLE_REPLAY_CLAIMS_INDEX } from "../replayClaimsIndex.ts";
 import { CUTOFF_KEY_PREFIX, REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
 import {
   AGGREGATE_PAGE,
@@ -316,6 +317,7 @@ function setUpTwoTenants({
   });
   const replayer = projectionLaneReplayer({
     service: new ReplayService({
+      claims: IDLE_REPLAY_CLAIMS_INDEX,
       eventSource:
         directoryPages === undefined
           ? log
@@ -369,7 +371,7 @@ function setUp({ mapAppendFailure }: { mapAppendFailure?: () => Error } = {}) {
     stateProjections: [],
   };
   const replayer = projectionLaneReplayer({
-    service: new ReplayService({ eventSource: log, redis }),
+    service: new ReplayService({ eventSource: log, redis, claims: IDLE_REPLAY_CLAIMS_INDEX }),
     projections,
   });
   return { redis, store, readModel, otherReadModel, writes, mapRows, log, replayer };

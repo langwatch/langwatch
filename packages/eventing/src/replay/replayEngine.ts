@@ -785,6 +785,7 @@ async function markPauseAndDrain({
   emit("drain");
   await waitForAllActiveJobs({
     redis: ctx.redis,
+    claims: ctx.claims,
     aggregates: groups.batchAggregates,
     projections: selected.pausedProjectionEntries,
   });

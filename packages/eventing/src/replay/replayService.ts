@@ -2,6 +2,7 @@ import { toEpochMs } from "@langwatch/time";
 
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
+import { type ReplayClaimsIndex, UNWIRED_REPLAY_CLAIMS_INDEX } from "./replayClaimsIndex.ts";
 import { discoverProjectionAggregates } from "./replayDiscovery.ts";
 import { runFoldMapReplay } from "./replayEngine.ts";
 import type { ReplayEventSource } from "./replayEventSource.ts";
@@ -53,9 +54,12 @@ export class ReplayService {
      * default, matching pre-existing behaviour.
      */
     retentionPolicyResolver?: RetentionPolicyResolver;
+    /** The queue's claimed-groups index; without one, map/state batches fail closed (ADR-092). */
+    claims?: ReplayClaimsIndex;
   }) {
     this.ctx = {
       redis: deps.redis,
+      claims: deps.claims ?? UNWIRED_REPLAY_CLAIMS_INDEX,
       eventSource: deps.eventSource,
       accumulatorOpts: { retentionResolver: deps.retentionPolicyResolver },
     };
