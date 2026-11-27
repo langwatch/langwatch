@@ -113,7 +113,7 @@ Feature: The transactional messages LangWatch sends
   Scenario: The hosted studio shows the LangWatch wordmark
     Given the hosted studio only allows images from itself
     When it shows a rendered email
-    Then the wordmark loads from the studio's own copy
+    Then the wordmark loads from the studio itself, taken from the app's own images
 
   @unit
   Scenario: The arrow keys step through each email's variants before the next email

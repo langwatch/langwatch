@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,11 +9,12 @@ import type * as indexModule from "../src/templates/index.ts";
 import { buildDigestReview } from "./digest-review.ts";
 import { buildGalleryEntries } from "./gallery-render.ts";
 import { STATIC_STUDIO_META } from "./studio-endpoints.ts";
-import { serveAssetsLocally } from "./studio-shared.ts";
+import { serveAssetsLocally, STUDIO_ASSETS } from "./studio-shared.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, "..");
 const registryModule = resolve(packageRoot, "src/templates/index.ts");
+const appPublic = resolve(packageRoot, "../../apps/ui/public");
 
 /**
  * The studio renders every message in Node, through the same `@react-email`
@@ -113,6 +115,47 @@ const templateRenderer = (): Plugin => {
 };
 
 /**
+ * The wordmarks the studio's previews point at (STUDIO_ASSETS), read from the app's own public
+ * folder: served in dev, emitted into dist on build, so there is no copy to keep in step.
+ */
+const appAssets = (): Plugin => {
+  const paths = Object.values(STUDIO_ASSETS);
+  return {
+    name: "langwatch-mail-app-assets",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const path = request.url?.split("?")[0] ?? "";
+        if (!paths.includes(path)) {
+          next();
+          return;
+        }
+        void readFile(resolve(appPublic, `.${path}`))
+          .then((body) => {
+            response.setHeader(
+              "content-type",
+              path.endsWith(".svg") ? "image/svg+xml" : "image/png",
+            );
+            response.end(body);
+          })
+          .catch((error: unknown) => {
+            response.statusCode = 404;
+            response.end(describe(error));
+          });
+      });
+    },
+    async generateBundle() {
+      for (const path of paths) {
+        this.emitFile({
+          type: "asset",
+          fileName: path.slice(1),
+          source: await readFile(resolve(appPublic, `.${path}`)),
+        });
+      }
+    },
+  };
+};
+
+/**
  * `build:studio`: every fixture rendered once through the same call, written as
  * the files the built studio reads (studio-endpoints.ts). Haven serves the
  * result on the mail-room lane, so no dev server runs there.
@@ -191,6 +234,6 @@ const describe = (error: unknown): string =>
 
 export default defineConfig({
   root: here,
-  plugins: [react(), templateRenderer(), staticRenders()],
+  plugins: [react(), templateRenderer(), appAssets(), staticRenders()],
   server: { port: 5566, fs: { allow: [packageRoot, resolve(packageRoot, "../..")] } },
 });

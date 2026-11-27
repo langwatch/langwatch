@@ -24,7 +24,7 @@ tries them (`preview/digest-review.ts`, kept in step with the digest module's
 `digest-template.rules.ts`): who gets each, its subject with the organisation first, and
 every fixture without the props the sender does not fill yet, as version A, with a slot
 for a version B. The hosted studio only allows its own images, so it shows the wordmarks
-from `preview/public/images` (copies of `apps/ui/public/images`).
+from `apps/ui/public/images`, which it serves in dev and copies into `dist/images` on build.
 
 It renders in Node through the same `@react-email` call the product sends with, so
 the preview cannot drift from the mail that arrives. Editing a template file

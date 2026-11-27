@@ -97,11 +97,11 @@ const centerDocument = (html: string): string => {
 };
 
 /**
- * The hosted studio's CSP allows images from its own origin only, and a srcdoc frame inherits
- * it, so the wordmarks load from the studio's copies (preview/public/images, kept identical to
- * apps/ui/public/images). Only what the studio shows changes; Copy HTML keeps the real URLs.
+ * The hosted CSP allows only same-origin images and srcdoc frames inherit it, so the wordmarks
+ * load from the studio, which serves apps/ui/public/images under these paths (vite.config.ts).
+ * Only what the studio shows changes; Copy HTML keeps the real URLs.
  */
-const STUDIO_ASSETS: Record<string, string> = {
+export const STUDIO_ASSETS: Record<string, string> = {
   "https://app.langwatch.ai/images/logo-wordmark.png": "/images/logo-wordmark.png",
   "https://app.langwatch.ai/images/logo-full-darktheme.svg": "/images/logo-full-darktheme.svg",
 };
