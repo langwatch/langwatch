@@ -19,20 +19,18 @@ import {
 } from "../../utils/opsSession";
 import type { CommandResult } from "../../utils/output";
 import { printFacts } from "../management/_shared";
-import { opsAuthError, requireRequesterKey, staffAccessFetch } from "./_shared";
-
-/** How often a waiting request asks whether it was decided. */
-export const OPS_POLL_INTERVAL_MS = 2_000;
+import {
+  refuseUndecided,
+  type RequestStatus,
+  requireRequesterKey,
+  staffAccessFetch,
+  waitForDecision,
+} from "./_shared";
 
 interface CreatedRequest {
   requestId: string;
   approvalUrl: string;
   expiresAt: string;
-}
-
-interface RequestStatus {
-  status: string;
-  expiresAt?: string;
 }
 
 interface Redeemed {
@@ -47,8 +45,6 @@ interface Redeemed {
 
 const validationError = (message: string): Error =>
   Object.assign(new Error(message), commandValidationError(message));
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** What every session-bearing command reports: never a key or a token. */
 const describeSession = ({ session, file }: { session: OpsSession; file: string }) => {
@@ -147,41 +143,6 @@ const redeemInto = async ({
       sessionTable(summary);
     },
   };
-};
-
-/** Polls the request until it is decided or its approval window closes. */
-const waitForDecision = async ({
-  requestId,
-  endpoint,
-  requesterKey,
-  expiresAt,
-}: {
-  requestId: string;
-  endpoint: string;
-  requesterKey: string;
-  expiresAt: string;
-}): Promise<string> => {
-  const deadline = Date.parse(expiresAt);
-  for (;;) {
-    const current = await staffAccessFetch<RequestStatus>({
-      method: "GET",
-      path: `/api/staff-access/requests/${encodeURIComponent(requestId)}`,
-      bearer: requesterKey,
-      endpoint,
-    });
-    if (current.status !== "pending") return current.status;
-    if (Number.isFinite(deadline) && Date.now() >= deadline) return "expired";
-    await sleep(OPS_POLL_INTERVAL_MS);
-  }
-};
-
-const refuseUndecided = ({ requestId, status }: { requestId: string; status: string }): never => {
-  forgetPendingRequest({ requestId });
-  if (status === "denied") throw opsAuthError(`Request ${requestId} was denied.`);
-  if (status === "expired") {
-    throw opsAuthError(`Request ${requestId} expired before it was approved. Request again.`);
-  }
-  throw opsAuthError(`Request ${requestId} is ${status}; it cannot be redeemed.`);
 };
 
 /**

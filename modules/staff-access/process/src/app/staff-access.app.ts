@@ -8,16 +8,20 @@ import {
   type PasskeyAssertionResponse,
 } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
 import {
   StaffAccessApi,
   staffAccessConfig,
@@ -26,6 +30,8 @@ import {
   type StaffAccessApi as StaffAccessApiContract,
   type StaffAccessApprovalChoice,
   type StaffAccessApprovalView,
+  type StaffAccessCopyBody,
+  type StaffAccessCopyReport,
   type StaffAccessDoorSession,
   type StaffAccessEnrolled,
   type StaffAccessFunctionAnswer,
@@ -47,6 +53,7 @@ import { UserApi } from "@langwatch/user-contract";
 
 import type { StaffAccessRepositories } from "../repositories/staff-access.repositories.ts";
 import { StaffAccessAvailabilityService } from "../services/staff-access-availability.service.ts";
+import { StaffAccessCopyService } from "../services/staff-access-copy.service.ts";
 import { StaffAccessDoorService } from "../services/staff-access-door.service.ts";
 import { StaffAccessFunctionReadsService } from "../services/staff-access-function-reads.service.ts";
 import { StaffAccessFunctionService } from "../services/staff-access-function.service.ts";
@@ -96,6 +103,11 @@ export class StaffAccessModule implements StaffAccessApiContract {
     entitlements: EntitlementApi,
     /** Online evaluator runs and failures by error code. */
     evaluations: EvaluationApi,
+    /** The organization copy's allowlist, each read and written through its owner. */
+    evaluators: EvaluatorApi,
+    monitors: MonitorApi,
+    prompts: PromptApi,
+    datasets: DatasetApi,
   };
 
   readonly #availability: StaffAccessAvailabilityService;
@@ -104,6 +116,7 @@ export class StaffAccessModule implements StaffAccessApiContract {
   readonly #sessions: StaffAccessSessionService;
   readonly #opsRead: StaffAccessOpsReadService;
   readonly #functions: StaffAccessFunctionService;
+  readonly #copies: StaffAccessCopyService;
   readonly #auth: Pick<AuthApi, "hasPasskey">;
   /** The `staff_access` door the REST runtime opens for this module's routes. */
   readonly staffAccessDoor: RestIdentity;
@@ -179,6 +192,20 @@ export class StaffAccessModule implements StaffAccessApiContract {
         ops: dependencies.ops,
         auth: dependencies.auth,
       }),
+      now,
+    });
+    this.#copies = StaffAccessCopyService.create({
+      requests: repositories.requests,
+      events: repositories.events,
+      ledger: repositories.copyLedger,
+      ops: dependencies.ops,
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+      evaluators: dependencies.evaluators,
+      monitors: dependencies.monitors,
+      prompts: dependencies.prompts,
+      datasets: dependencies.datasets,
+      auditLog: dependencies.auditLog,
       now,
     });
     this.staffAccessDoor = StaffAccessDoorService.create({
@@ -374,6 +401,12 @@ export class StaffAccessModule implements StaffAccessApiContract {
 
   getQueueSummary(input: StaffAccessAgent): Promise<StaffAccessQueueSummary> {
     return this.#opsRead.getQueueSummary(input);
+  }
+
+  copyOrganization(
+    input: StaffAccessAgent & { body: StaffAccessCopyBody },
+  ): Promise<StaffAccessCopyReport> {
+    return this.#copies.copyOrganization(input);
   }
 
   sweepExpiredSessions({ at }: { at: number }): Promise<{ audited: number }> {

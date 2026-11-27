@@ -179,6 +179,8 @@ const monitorCreateInputSchemaDefinition = z
     parameters: monitorSettingsSchema,
     mappings: z.unknown().optional(),
     sample: z.number().min(0).max(1),
+    /** Whether the monitor runs once created; true when left out. */
+    enabled: z.boolean().optional(),
     executionMode: monitorExecutionModeSchema,
     evaluatorId: z.string().min(1).optional(),
     level: z.enum(["trace", "thread"]).optional(),

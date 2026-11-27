@@ -336,6 +336,8 @@ export class StaffAccessSessionService {
       organizationId: row.organizationId,
       organizationName: row.organizationName,
       functions: row.functions.map((name) => functionViewOf({ name })),
+      counterpartOrganizationId: row.counterpartOrganizationId,
+      counterpartOrganizationName: row.counterpartOrganizationName,
       reason: row.reason,
       machine: row.machine,
       requestIp: row.requestIp,

@@ -16,6 +16,9 @@ const fields = {
   functions: ["org.snapshot", "org.api_keys"],
   organizationId: "org_acme",
   organizationName: "ACME",
+  counterpartOrganizationId: null,
+  counterpartOrganizationName: null,
+  copyGrant: [] as string[],
   reason: "fix the evaluator",
   machine: "laptop",
   requestIp: "203.0.113.7",
@@ -45,6 +48,26 @@ describe("approvalChallengeOf", () => {
     expect(approvalChallengeOf({ ...fields, spendApproved: true })).not.toBe(base);
     expect(approvalChallengeOf({ ...fields, reason: "other" })).not.toBe(base);
     expect(approvalChallengeOf({ ...fields, requestIp: null })).not.toBe(base);
+  });
+
+  /** @scenario "The approval page shows the other organization and the target grant" */
+  it("signs a copy side's other organization and the target grant", () => {
+    const copy = {
+      ...fields,
+      scopes: ["copy:target"],
+      counterpartOrganizationId: "org_globex",
+      counterpartOrganizationName: "Globex",
+      copyGrant: ["project:create", "datasets:create"],
+    };
+    const base = approvalChallengeOf(copy);
+
+    expect(approvalChallengeOf({ ...copy, counterpartOrganizationId: "org_initech" })).not.toBe(
+      base,
+    );
+    expect(approvalChallengeOf({ ...copy, copyGrant: ["project:create"] })).not.toBe(base);
+    expect(approvalChallengeOf({ ...copy, copyGrant: ["datasets:create", "project:create"] })).toBe(
+      base,
+    );
   });
 });
 

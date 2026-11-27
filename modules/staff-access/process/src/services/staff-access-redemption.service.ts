@@ -12,6 +12,7 @@ import type {
   StaffAccessRequestRow,
 } from "../repositories/staff-access.repository.ts";
 import {
+  isCopySide,
   isoText,
   mintsOpsToken,
   mintsOrganizationKey,
@@ -64,15 +65,16 @@ export class StaffAccessRedemptionService {
       hashedOpsToken: opsToken?.hashedSecret ?? null,
       opsTokenLookupId: opsToken?.lookupId ?? null,
     });
-    const projects = row.organizationId
-      ? (
-          await this.deps.projects.listByOrganization({
-            organizationId: row.organizationId,
-            page: 1,
-            limit: PROJECTS_LISTED,
-          })
-        ).data.map((project) => ({ id: project.id, slug: project.slug, name: project.name }))
-      : [];
+    const projects =
+      row.organizationId && !isCopySide(scopes)
+        ? (
+            await this.deps.projects.listByOrganization({
+              organizationId: row.organizationId,
+              page: 1,
+              limit: PROJECTS_LISTED,
+            })
+          ).data.map((project) => ({ id: project.id, slug: project.slug, name: project.name }))
+        : [];
 
     return {
       ...(organizationKey ? { apiKey: organizationKey.token } : {}),

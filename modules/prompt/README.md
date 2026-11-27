@@ -36,6 +36,6 @@ Anything else prompt needs belongs to another module and is reached through its 
 
 ## Who depends on prompt
 
-[experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md) (as a peer).
+[experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [staff-access](../staff-access/README.md), [suite](../suite/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -19,6 +19,12 @@ Feature: Monitor service boundary
     Then MonitorEvaluatorRequiredError is thrown
 
   @unit
+  Scenario: A monitor can be created paused in one write
+    Given a create command with enabled set to false, and one that leaves enabled out
+    When the repository stores both
+    Then the first reads back disabled and the second reads back enabled
+
+  @unit
   Scenario: Monitor mappings are canonicalised
     Given a create or update command with empty mappings
     When the Monitor service persists it
