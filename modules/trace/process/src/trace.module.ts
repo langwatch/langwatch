@@ -264,7 +264,6 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             "Refolds the last 62 days of trace analytics rows so they carry the application version each trace ran on.",
           lane: TRACE_ANALYTICS_PROJECTION_NAME,
           since: nowInstant().subtract({ hours: WIDGET_COLUMNS_REPLAY_HOURS }).toString(),
-          needsOldWritersGone: true,
           after: [replayTraceAnalytics, replayEvaluationAnalytics, managedPromptVersion],
           replayer,
         }),
