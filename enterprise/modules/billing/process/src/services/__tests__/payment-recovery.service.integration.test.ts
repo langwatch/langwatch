@@ -151,10 +151,11 @@ describe.skipIf(!DB_URL)("PaymentRecoveryService over Postgres", () => {
   describe("given an older open case on another subscription of the organization", () => {
     /** @scenario "The first email belongs to the subscription that failed" */
     it("records day 3 on the failing subscription and leaves the older case's notice day", async () => {
+      // A tiered plan the seat plan has not retired yet: the only shape with two live linked rows.
       const older = await prisma.subscription.create({
         data: {
           organizationId,
-          plan: "GROWTH_SEAT_EUR_MONTHLY",
+          plan: "LAUNCH",
           status: "ACTIVE",
           stripeSubscriptionId: `sub_old_${ns}`,
         },
