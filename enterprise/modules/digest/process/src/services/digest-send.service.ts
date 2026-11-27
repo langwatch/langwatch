@@ -14,7 +14,7 @@ import {
   type OrganizationApi,
   type OrganizationRestMemberSummary,
 } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
@@ -354,7 +354,9 @@ export class DigestSendService {
     });
     if (liveIds.length === 0) return [];
     const identities = (await this.deps.projects.listNamesByIds({ projectIds: liveIds })).filter(
-      ({ isPersonal, ownerUserId }) => !isPersonal || ownerUserId === userId,
+      ({ isPersonal, ownerUserId, kind }) =>
+        // An aggregate reads its members' traces, which analytics refuses without a caller's proof.
+        !isAggregateProjectKind(kind) && (!isPersonal || ownerUserId === userId),
     );
     if (identities.length === 0) return [];
     const decided = await this.deps.access.canBatchByIds({

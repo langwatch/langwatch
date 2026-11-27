@@ -205,6 +205,8 @@ export function digestWorld() {
     archivedProjects: new Set<string>(),
     /** Projects of the internal governance kind, which no email counts. */
     governanceProjects: new Set<string>(),
+    /** Projects of the aggregate kind, which read their members and are never read for an email. */
+    aggregateProjects: new Set<string>(),
     /** The person behind each personal project, by project id; a shared project has none. */
     personalOwners: new Map<string, string>(),
   };
@@ -325,7 +327,9 @@ export function installDigest(
         listNamesByIds: async ({ projectIds }) =>
           projectIds
             .filter(knownProject)
-            .map((id) => projectIdentity(id, world.personalOwners.get(id))),
+            .map((id) =>
+              projectIdentity(id, world.personalOwners.get(id), world.aggregateProjects.has(id)),
+            ),
       },
       "ProjectApi",
     ),
@@ -632,7 +636,7 @@ function seriesLabel(series: AnalyticsSeries): string {
 }
 
 /** A project as the project module names it; every project sits on the one team. */
-function projectIdentity(id: string, ownerUserId: string | undefined) {
+function projectIdentity(id: string, ownerUserId: string | undefined, aggregate: boolean) {
   return {
     id,
     name: "Support bot",
@@ -641,7 +645,7 @@ function projectIdentity(id: string, ownerUserId: string | undefined) {
     organizationId: ORGANIZATION,
     isPersonal: ownerUserId !== undefined,
     ownerUserId: ownerUserId ?? null,
-    kind: "project",
+    kind: aggregate ? "aggregate" : "project",
   };
 }
 

@@ -29,6 +29,8 @@ digest, on each owner's pipeline (§9, nurturing's shape), extract bounded facts
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | coding-agent span/log/metric facts contributed | per user: sessions (distinct `sessionId`, capped set in the fold), tokens, cost, active time; from the agents' own OTel metrics via the contract's name normalisation: lines, commits, pull requests (`*.pull_request.count`) |
 | evaluation completed                           | runs, passed, failed, errored, per evaluator (capped)                                                                                                                                                                         |
+| scenario run finished (`scenarioRunFinished`)  | simulation runs: passed, failed, errored (`applyScenario`)                                                                                                                                                                    |
+| plan limit (read, not folded)                  | `EntitlementApi.getUsage`, read once per send for the plan-pressure pick                                                                                                                                                      |
 
 Suite items are not folded: no template reads them. Every live project folds.
 

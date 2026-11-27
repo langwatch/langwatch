@@ -96,6 +96,13 @@ Feature: Weekly digest emails
     And a member is still shown their own personal project
 
   @integration
+  Scenario: An aggregate project is never read for an email
+    Given an organization with a project and an aggregate project reading its members
+    When an admin of the organization is sent the week
+    Then the email shows the project alone and analytics is not asked about the aggregate
+    And a member whose only project is an aggregate is sent nothing and nothing fails
+
+  @integration
   Scenario: A failed read of last week drops the change line, not the email
     Given analytics cannot answer the week before the sent one
     When a member is sent the week

@@ -117,6 +117,35 @@ describe("a member's traces email", () => {
       expect(digest.world.analyticsReads.join(" ")).not.toMatch(/personal|archived|governance/);
     });
 
+    /** @scenario "An aggregate project is never read for an email" */
+    it("reads no aggregate project of the organization", async () => {
+      const AGGREGATE = "project-aggregate";
+      digest.world.projects = [PROJECT, AGGREGATE];
+      digest.world.aggregateProjects.add(AGGREGATE);
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 1_100 });
+      digest.world.traceNumbers.set(`${AGGREGATE}:${SENT_WEEK}`, { traces: 99_999 });
+
+      await sendTo(ADMIN);
+
+      expect(digest.mail.map((mail) => mail.props)).toEqual([
+        expect.objectContaining({ traces: 1_100 }),
+      ]);
+      expect(digest.world.analyticsReads.join(" ")).not.toMatch(/aggregate/);
+    });
+
+    /** @scenario "An aggregate project is never read for an email" */
+    it("sends nothing, and does not fail, to a member whose only project is an aggregate", async () => {
+      const AGGREGATE = "project-aggregate";
+      digest.world.projects = [AGGREGATE];
+      digest.world.aggregateProjects.add(AGGREGATE);
+      digest.world.traceNumbers.set(`${AGGREGATE}:${SENT_WEEK}`, { traces: 99_999 });
+
+      await sendTo(MEMBER);
+
+      expect(digest.mail).toEqual([]);
+      expect(digest.world.analyticsReads).toEqual([]);
+    });
+
     /** @scenario "An email counts only the live, shared or own projects the recipient may view" */
     it("still shows a member their own personal project", async () => {
       digest.world.projects = [PROJECT, PERSONAL];
