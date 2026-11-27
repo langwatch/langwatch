@@ -107,6 +107,33 @@ describe("copyTotals and auditedPlan", () => {
   });
 });
 
+describe("promptFields and dataset links", () => {
+  const inline = { records: { question: ["2+2?"] }, columnTypes: [] };
+  const linkedFields: Partial<VersionedPrompt> = {
+    id: "prompt_1",
+    prompt: "Answer",
+    messages: [],
+    inputs: [],
+    outputs: [],
+    model: "openai/gpt-5",
+    demonstrations: { id: "dataset_acme_1", name: "ACME golden", inline },
+    promptingTechnique: {
+      type: "few_shot" as const,
+      demonstrations: { id: "dataset_acme_2", name: "ACME shots" },
+    },
+  };
+  const linked = linkedFields as VersionedPrompt;
+
+  /** @scenario "A copied prompt never points at a dataset of the source organization" */
+  it("keeps inline demonstration rows and drops every source dataset id and name", () => {
+    const fields = promptFields(linked);
+
+    expect(fields.demonstrations).toEqual({ inline });
+    expect(fields.promptingTechnique).toEqual({ type: "few_shot" });
+    expect(JSON.stringify(fields)).not.toMatch(/dataset_acme|ACME/);
+  });
+});
+
 describe("refusedBeforeMaking", () => {
   /** @scenario "Only a handled refusal below 500 counts as refused before anything was made" */
   it("counts a handled error below 500 and nothing else", () => {
@@ -143,7 +170,7 @@ describe("promptFields", () => {
     reasoning: "high",
     verbosity: "low",
     promptingTechnique: { type: "chain_of_thought" as const },
-    demonstrations: { name: "Golden answers" },
+    demonstrations: { inline: { records: { question: ["2+2?"] }, columnTypes: [] } },
     responseFormat: { type: "json_schema" as const, json_schema: { name: "answer", schema: {} } },
   } satisfies Partial<VersionedPrompt>;
 

@@ -102,6 +102,32 @@ Feature: Copying an organization's setup into another organization
     Then the monitor is skipped with "evaluator_not_copied"
 
   @unit
+  Scenario: A project whose copy in the target was archived is not copied into again
+    Given ACME's project was copied into Globex and that copy was archived since
+    When a copy plans ACME again
+    Then the project is skipped with "target_project_gone" and nothing in it is planned
+
+  @unit
+  Scenario: An item a concurrent run reserved first is not made twice
+    Given another run reserved ACME's evaluator in Globex first
+    When the copy runs
+    Then the evaluator is skipped with "copied_by_a_concurrent_run" and not made
+
+  @unit
+  Scenario: Items of a project whose copy failed are skipped
+    Given the project owner fails to create ACME's project in Globex
+    When the copy runs
+    Then the project is reported failed
+    And every item in it is skipped with "project_not_copied"
+
+  @integration
+  Scenario: A dry run skips what the target grant does not cover, as a real run would
+    Given a target request whose stored grant has no "datasets:create"
+    When the agent copies ACME into Globex as a dry run
+    Then the dataset is skipped with "outside_copy_grant"
+    And the planned-copy audit rows do not name the dataset
+
+  @unit
   Scenario: An owner's refusal by name releases the reservation so a rerun retries the item
     Given the dataset owner refuses a copy with a handled error below 500 before it makes anything
     When the copy runs and then runs again once the owner accepts
@@ -113,6 +139,13 @@ Feature: Copying an organization's setup into another organization
     Given a handled error below 500, a handled error at 500 and a plain error
     When the copy decides whether the owner made nothing
     Then only the handled error below 500 counts as refused before making
+
+  @unit
+  Scenario: A copied prompt never points at a dataset of the source organization
+    Given an ACME prompt version whose demonstrations and prompting technique name ACME datasets
+    When the copy reads the fields it writes into Globex
+    Then the inline demonstration rows are kept
+    And no dataset id or name of ACME is carried
 
   @unit
   Scenario: A copied prompt version carries every model setting it has and no other

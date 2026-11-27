@@ -245,6 +245,7 @@ export function copyCatalog() {
       language: string;
       framework: string;
     }) => {
+      await hooks.beforeProjectCreate();
       const teamId = input.teamId ?? fresh("team");
       if (!input.teamId) data.teams.push({ id: teamId, organizationId: input.organizationId });
       return addProject({ organizationId: input.organizationId, name: input.name, teamId });
@@ -266,6 +267,7 @@ export function copyCatalog() {
     afterDatasetCreate: async (_made: { targetDatasetId: string }) => {},
     afterPromptCreate: async () => {},
     beforeDatasetCopy: async () => {},
+    beforeProjectCreate: async () => {},
   };
 
   const evaluators = createApiFixture<EvaluatorApi>({

@@ -126,6 +126,7 @@ export class StaffAccessCopyService {
         source: source.organization,
         target: target.organization,
         projects: body.projects,
+        grant: target.row.copyGrant,
       });
       await this.writeAudit({
         bearer,

@@ -37,7 +37,8 @@ The copy is an ops operation of the `staff-access` module:
   (`copyGrant`) when the request is made. The approval page shows that stored
   list, the passkey signs it, and the run checks each item against it before
   making it, so a deploy that changes the constant never widens a request
-  already made. An item outside the grant is skipped with `outside_copy_grant`.
+  already made. An item outside the grant is skipped with `outside_copy_grant`
+  when the copy is planned, so a dry run reports what a real run would make.
 - **No organization key.** Copy scopes are platform scopes: redeeming either
   side answers only an ops token. The server reads the source itself through
   the owners' APIs, so the agent never holds a key that reads the source's
@@ -61,7 +62,9 @@ The copy is an ops operation of the `staff-access` module:
   run already name the copy in both organizations.
 - **An allowlist.** A copy carries projects, evaluators, monitors (created
   paused, in the same write),
-  prompts with every version, and ready datasets. It never carries secrets,
+  prompts with every version (demonstrations keep their inline rows; a dataset
+  they name in the source organization is left behind), and ready datasets.
+  It never carries secrets,
   API keys, model providers, members, roles, SSO, billing, licence or usage.
   A kind not on the list is not read at all. Projects are listed through
   `ProjectApi.listByOrganization`, whose rows hold the project's own keys; the

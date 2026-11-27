@@ -30,8 +30,11 @@ import {
 
 const logger = createLogger("langwatch:staff-access:copy");
 
-/** A ledger row reserved by a run that never named its target: its outcome is unknown. */
-const INTERRUPTED: Placed = { targetId: "", targetProjectId: "" };
+/**
+ * What the ledger knows of one source object: `reserved` by a run that never named its target
+ * (its outcome is unknown, so it is never made again), or `made` with where it went.
+ */
+type LedgerState = { status: "reserved" } | { status: "made"; placed: Placed };
 const INTERRUPTED_REASON = "copy_interrupted";
 
 const PAGE = 100;
@@ -83,26 +86,32 @@ export class StaffAccessCopyRunService {
     source,
     target,
     projects: named,
+    grant,
   }: {
     source: Organization;
     target: Organization;
     projects: readonly string[] | undefined;
+    /** The stored target grant: a planned item it does not cover is skipped here, dry run too. */
+    grant: readonly string[];
   }): Promise<StaffAccessCopyPlan> {
     const ledger = await this.deps.ledger.findForPair({
       sourceOrganizationId: source.id,
       targetOrganizationId: target.id,
     });
-    const placed = new Map<string, Placed>();
+    const known = new Map<string, LedgerState>();
     for (const row of ledger) {
       const key = keyOf(row.kind as StaffAccessCopyKind, row.sourceId);
-      placed.set(
+      known.set(
         key,
         row.targetId === null || row.targetProjectId === null
-          ? INTERRUPTED
+          ? { status: "reserved" }
           : {
-              targetId: row.targetId,
-              targetProjectId: row.targetProjectId,
-              ...(row.incomplete ? { incomplete: row.incomplete } : {}),
+              status: "made",
+              placed: {
+                targetId: row.targetId,
+                targetProjectId: row.targetProjectId,
+                ...(row.incomplete ? { incomplete: row.incomplete } : {}),
+              },
             },
       );
     }
@@ -118,10 +127,20 @@ export class StaffAccessCopyRunService {
       work: null,
     }));
     for (const project of selected) {
-      steps.push(...(await this.planProject({ project, source, placed })));
+      steps.push(...(await this.planProject({ project, source, known })));
     }
-    const finished = new Map([...placed].filter(([, where]) => where !== INTERRUPTED));
-    return { items: steps.map((step) => step.item), steps, placed: finished };
+    const placed = new Map<string, Placed>();
+    for (const [key, state] of known) if (state.status === "made") placed.set(key, state.placed);
+    const granted = steps.map((step): Step => {
+      if (step.item.outcome !== "planned" || withinGrant({ kind: step.item.kind, grant })) {
+        return step;
+      }
+      return {
+        item: { ...step.item, outcome: "skipped", reason: "outside_copy_grant" },
+        work: null,
+      };
+    });
+    return { items: granted.map((step) => step.item), steps: granted, placed };
   }
 
   /**
@@ -293,18 +312,19 @@ export class StaffAccessCopyRunService {
   private async planProject({
     project,
     source,
-    placed,
+    known,
   }: {
     project: Project;
     source: Organization;
-    placed: ReadonlyMap<string, Placed>;
+    known: ReadonlyMap<string, LedgerState>;
   }): Promise<Step[]> {
     const at = { sourceProjectId: project.id };
-    const earlier = placed.get(keyOf("project", project.id));
-    if (earlier === INTERRUPTED) {
+    const state = known.get(keyOf("project", project.id));
+    if (state?.status === "reserved") {
       const base = { kind: "project" as const, name: project.name, sourceId: project.id, ...at };
       return [{ item: copyItem(base, "skipped", { reason: INTERRUPTED_REASON }), work: null }];
     }
+    const earlier = state?.placed;
     const projectStep: Step = {
       item: earlier
         ? copyItem(
@@ -323,7 +343,7 @@ export class StaffAccessCopyRunService {
         },
       ];
     }
-    return [projectStep, ...(await this.planContents({ project, source, placed }))];
+    return [projectStep, ...(await this.planContents({ project, source, known }))];
   }
 
   private async isLive({ projectId }: { projectId: string }): Promise<boolean> {
@@ -335,11 +355,11 @@ export class StaffAccessCopyRunService {
   private async planContents({
     project,
     source,
-    placed,
+    known,
   }: {
     project: Project;
     source: Organization;
-    placed: ReadonlyMap<string, Placed>;
+    known: ReadonlyMap<string, LedgerState>;
   }): Promise<Step[]> {
     const at = { sourceProjectId: project.id };
     const [evaluators, monitors, prompts, datasets] = await Promise.all([
@@ -355,12 +375,12 @@ export class StaffAccessCopyRunService {
 
     const step = (work: Work, name: string, skipped?: string): Step => {
       const base = { kind: work.kind, name, sourceId: work.source.id, ...at };
-      const done = placed.get(keyOf(work.kind, work.source.id));
-      if (done === INTERRUPTED) {
+      const state = known.get(keyOf(work.kind, work.source.id));
+      if (state?.status === "reserved") {
         return { item: copyItem(base, "skipped", { reason: INTERRUPTED_REASON }), work: null };
       }
-      if (done) {
-        const { targetId, targetProjectId, incomplete } = done;
+      if (state) {
+        const { targetId, targetProjectId, incomplete } = state.placed;
         const item = copyItem(base, "already_copied", {
           targetId,
           targetProjectId,

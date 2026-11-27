@@ -12,17 +12,26 @@ import {
 const AT = Temporal.Instant.from("2026-11-13T09:00:00Z");
 const ACME = { id: "org_acme", slug: "acme", name: "ACME", createdAt: AT };
 const GLOBEX = { id: "org_globex", slug: "globex", name: "Globex", createdAt: AT };
+const FULL_GRANT = [
+  "project:create",
+  "evaluations:create",
+  "prompts:create",
+  "prompts:update",
+  "datasets:create",
+];
 
 describe("StaffAccessCopyRunService.execute", () => {
   let catalog: CopyCatalog;
   let run: StaffAccessCopyRunService;
   let plan: StaffAccessCopyPlan;
   let sourceProjectId: string;
+  let ledger: MemoryStaffAccessCopyLedgerRepository;
 
   beforeEach(async () => {
     catalog = copyCatalog();
+    ledger = MemoryStaffAccessCopyLedgerRepository.create();
     run = StaffAccessCopyRunService.create({
-      ledger: MemoryStaffAccessCopyLedgerRepository.create(),
+      ledger,
       organizations: catalog.organizations as never,
       projects: catalog.projects as never,
       evaluators: catalog.evaluators,
@@ -35,7 +44,12 @@ describe("StaffAccessCopyRunService.execute", () => {
     catalog.addEvaluator({ projectId: project.id, name: "Exact match" });
     catalog.addDataset({ projectId: project.id, name: "Golden answers" });
     sourceProjectId = project.id;
-    plan = await run.plan({ source: ACME, target: GLOBEX, projects: [project.id] });
+    plan = await run.plan({
+      source: ACME,
+      target: GLOBEX,
+      projects: [project.id],
+      grant: FULL_GRANT,
+    });
   });
 
   /** @scenario "A copy makes only what the target approval granted" */
@@ -92,7 +106,12 @@ describe("StaffAccessCopyRunService.execute", () => {
     const first = await execute(plan);
     catalog.hooks.beforeDatasetCopy = async () => {};
     const rerun = await execute(
-      await run.plan({ source: ACME, target: GLOBEX, projects: [sourceProjectId] }),
+      await run.plan({
+        source: ACME,
+        target: GLOBEX,
+        projects: [sourceProjectId],
+        grant: FULL_GRANT,
+      }),
     );
 
     expect(first.items.find((item) => item.kind === "dataset")).toMatchObject({
@@ -105,20 +124,13 @@ describe("StaffAccessCopyRunService.execute", () => {
     expect(catalog.data.datasets.filter((d) => d.projectId !== sourceProjectId)).toHaveLength(1);
   });
 
-  const fullGrant = [
-    "project:create",
-    "evaluations:create",
-    "prompts:create",
-    "prompts:update",
-    "datasets:create",
-  ];
   const executeAll = (current: StaffAccessCopyPlan) =>
     run.execute({
       plan: current,
       requestId: "staffrequest_1",
       source: ACME,
       target: GLOBEX,
-      grant: fullGrant,
+      grant: FULL_GRANT,
       stillLive: async () => null,
     });
 
@@ -132,7 +144,12 @@ describe("StaffAccessCopyRunService.execute", () => {
       archivedAt: new Date(AT.epochMilliseconds),
     });
 
-    const everything = await run.plan({ source: ACME, target: GLOBEX, projects: undefined });
+    const everything = await run.plan({
+      source: ACME,
+      target: GLOBEX,
+      projects: undefined,
+      grant: FULL_GRANT,
+    });
 
     expect(
       everything.items.filter((item) => item.kind === "project").map((item) => item.name),
@@ -166,7 +183,12 @@ describe("StaffAccessCopyRunService.execute", () => {
     });
 
     const { items } = await executeAll(
-      await run.plan({ source: ACME, target: GLOBEX, projects: [sourceProjectId] }),
+      await run.plan({
+        source: ACME,
+        target: GLOBEX,
+        projects: [sourceProjectId],
+        grant: FULL_GRANT,
+      }),
     );
 
     expect(items.find((item) => item.kind === "monitor")).toMatchObject({
@@ -176,5 +198,64 @@ describe("StaffAccessCopyRunService.execute", () => {
     expect(catalog.data.monitors.some((monitor) => monitor.projectId !== sourceProjectId)).toBe(
       false,
     );
+  });
+
+  /** @scenario "A project whose copy in the target was archived is not copied into again" */
+  it("skips a project whose earlier target was archived, with everything in it", async () => {
+    await executeAll(plan);
+    const made = catalog.data.projects.find((project) => project.organizationId === GLOBEX.id);
+    if (made) made.archivedAt = new Date(AT.epochMilliseconds);
+
+    const rerun = await run.plan({
+      source: ACME,
+      target: GLOBEX,
+      projects: [sourceProjectId],
+      grant: FULL_GRANT,
+    });
+
+    expect(rerun.items.map((item) => [item.kind, item.outcome, item.reason])).toEqual([
+      ["project", "skipped", "target_project_gone"],
+    ]);
+  });
+
+  /** @scenario "An item a concurrent run reserved first is not made twice" */
+  it("skips an item whose reservation another run took first", async () => {
+    const evaluator = plan.items.find((item) => item.kind === "evaluator");
+    await ledger.reserve({
+      id: "staffcopy_other_run",
+      requestId: "staffrequest_other",
+      sourceOrganizationId: ACME.id,
+      targetOrganizationId: GLOBEX.id,
+      kind: "evaluator",
+      sourceId: evaluator?.sourceId ?? "",
+      targetId: null,
+      sourceProjectId,
+      targetProjectId: null,
+      incomplete: null,
+      createdAt: AT,
+    });
+
+    const { items } = await executeAll(plan);
+
+    expect(items.find((item) => item.kind === "evaluator")).toMatchObject({
+      outcome: "skipped",
+      reason: "copied_by_a_concurrent_run",
+    });
+    expect(catalog.data.evaluators.filter((e) => e.projectId !== sourceProjectId)).toEqual([]);
+  });
+
+  /** @scenario "Items of a project whose copy failed are skipped" */
+  it("skips everything in a project the copy could not make", async () => {
+    catalog.hooks.beforeProjectCreate = async () => {
+      throw new Error("project store unavailable");
+    };
+
+    const { items } = await executeAll(plan);
+
+    expect(items.map((item) => [item.kind, item.outcome, item.reason])).toEqual([
+      ["project", "failed", "unexpected_error"],
+      ["evaluator", "skipped", "project_not_copied"],
+      ["dataset", "skipped", "project_not_copied"],
+    ]);
   });
 });

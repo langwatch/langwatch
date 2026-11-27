@@ -14,7 +14,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { StaffAccessDoorSession } from "@langwatch/staff-access-contract";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import { PostgresStaffAccessRepositories } from "../../repositories/prisma/prisma.staff-access.repositories.ts";
@@ -531,10 +531,14 @@ function scenarios(backend: Backend): void {
     });
 
     describe("when the target grant changed after the target request was made", () => {
-      /** @scenario "A copy runs on the grant stored with the request, not today's" */
-      it("shows, signs and enforces the grant stored on the request", async () => {
-        const w = world();
-        const seeded = seedAcme(w);
+      let w: ReturnType<typeof world>;
+      let seeded: ReturnType<typeof seedAcme>;
+      let source: Awaited<ReturnType<typeof pairedApprovals>>["source"];
+      let target: Awaited<ReturnType<typeof pairedApprovals>>["target"];
+
+      beforeEach(async () => {
+        w = world();
+        seeded = seedAcme(w);
         const requests = w.repositories.requests;
         const create = requests.create.bind(requests);
         requests.create = (row) =>
@@ -542,8 +546,29 @@ function scenarios(backend: Backend): void {
             ...row,
             copyGrant: row.copyGrant.filter((permission) => permission !== "datasets:create"),
           });
-        const { source, target } = await pairedApprovals(w);
-        const [stored] = await requests.findById({ id: target.requestId });
+        ({ source, target } = await pairedApprovals(w));
+      });
+
+      /** @scenario "A dry run skips what the target grant does not cover, as a real run would" */
+      it("skips an item outside the stored grant on a dry run and leaves it out of the audit", async () => {
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id], dryRun: true },
+        });
+
+        expect(report.items.find((item) => item.kind === "dataset")).toMatchObject({
+          outcome: "skipped",
+          reason: "outside_copy_grant",
+        });
+        const planned = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyPlanned");
+        expect(planned[0]?.metadata).toMatchObject({
+          items: expect.not.arrayContaining([expect.stringMatching(/^dataset:/)]),
+        });
+      });
+
+      /** @scenario "A copy runs on the grant stored with the request, not today's" */
+      it("shows, signs and enforces the grant stored on the request", async () => {
+        const [stored] = await w.repositories.requests.findById({ id: target.requestId });
 
         const view = await w.app.getApprovalRequest({
           ...w.operator(OLIVIA),

@@ -168,6 +168,25 @@ export type PromptVersionFields = Pick<
 > &
   Partial<Pick<VersionedPrompt, PromptSetting>>;
 
+type Demonstrations = NonNullable<VersionedPrompt["demonstrations"]>;
+type Technique = NonNullable<VersionedPrompt["promptingTechnique"]>;
+
+/**
+ * Demonstrations without the dataset they name: the id and name point at a dataset of the source
+ * organization, so only the inline rows go along, and nothing when there are none.
+ */
+function inlineDemonstrations(
+  demonstrations: Demonstrations | undefined,
+): { demonstrations: Demonstrations } | Record<string, never> {
+  if (!demonstrations?.inline) return {};
+  return { demonstrations: { inline: demonstrations.inline } };
+}
+
+function techniqueWithoutDatasetLink(technique: Technique): Technique {
+  const { demonstrations, ...rest } = technique;
+  return { ...rest, ...inlineDemonstrations(demonstrations) };
+}
+
 /** The configuration one prompt version carries; ids, authors, tags and lineage stay behind. */
 export function promptFields(version: VersionedPrompt): PromptVersionFields {
   return {
@@ -193,8 +212,8 @@ export function promptFields(version: VersionedPrompt): PromptVersionFields {
     ...(version.verbosity === undefined ? {} : { verbosity: version.verbosity }),
     ...(version.promptingTechnique === undefined
       ? {}
-      : { promptingTechnique: version.promptingTechnique }),
-    ...(version.demonstrations === undefined ? {} : { demonstrations: version.demonstrations }),
+      : { promptingTechnique: techniqueWithoutDatasetLink(version.promptingTechnique) }),
+    ...inlineDemonstrations(version.demonstrations),
     ...(version.responseFormat === undefined ? {} : { responseFormat: version.responseFormat }),
   };
 }
