@@ -37,8 +37,6 @@ export class CodingAgentAccountBurndownService {
     });
 
     return {
-      fromMs,
-      toMs: nowMs,
       accounts: buildAccountBurndowns({ groups, days, canSeeCosts: input.canSeeCosts, nowMs }),
     };
   }

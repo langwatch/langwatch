@@ -71,6 +71,11 @@
       "note": "retention rules set per heavy organization",
       "cells": ["C1", "C3"]
     },
+    "dashboard:mark-my-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a member's My dashboard written by the previous release, before the mark existed"
+    },
     "dataset:move-content-to-object-storage": {
       "status": "pending",
       "seed": "product-seeds:dataset",

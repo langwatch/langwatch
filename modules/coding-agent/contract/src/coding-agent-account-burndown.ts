@@ -102,11 +102,9 @@ export const codingAgentAccountBurndownSchema: CodingAgentAccountBurndownSchema 
   codingAgentAccountBurndownSchemaDefinition;
 export type CodingAgentAccountBurndown = z.infer<typeof codingAgentAccountBurndownSchema>;
 
-/** The week's accounts for one project, newest reading first. */
+/** The week's accounts for one project, sorted by account name. */
 const codingAgentAccountBurndownPageSchemaDefinition = z
   .object({
-    fromMs: z.number(),
-    toMs: z.number(),
     accounts: z.array(codingAgentAccountBurndownSchema),
   })
   .strict();

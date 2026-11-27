@@ -291,7 +291,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof codingAgentAccountBurndownPageSchema>; // ../contract/src/coding-agent-account-burndown.ts:117
+type Output = z.infer<typeof codingAgentAccountBurndownPageSchema>; // ../contract/src/coding-agent-account-burndown.ts:115
 
 // codingAgents.recentSessions
 // Input: codingAgentTrpcRecentSessionsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:62

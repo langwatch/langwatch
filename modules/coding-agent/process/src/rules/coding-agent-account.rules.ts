@@ -7,6 +7,7 @@ import {
   ACCOUNT_USAGE_READ_AT_ATTRIBUTE,
   ACCOUNT_USAGE_RESETS_AT_ATTRIBUTE,
   ACCOUNT_USAGE_WINDOW_ATTRIBUTE,
+  AGENT_ACCOUNT_ID_KEYS,
   type CodingAgentAccountBurndown,
   type CodingAgentAccountColumns,
   type CodingAgentAccountDay,
@@ -24,7 +25,7 @@ type FactValue = ContributionFacts[string] | undefined;
  * Where an account's id comes from, first match wins: the launcher's own id, then the ids the
  * agents send themselves (Claude Code's account uuid, Codex's account id). Never an email.
  */
-const ACCOUNT_KEY_FACTS = [ACCOUNT_ID_ATTRIBUTE, "user.account_uuid", "user.account_id"] as const;
+const ACCOUNT_KEY_FACTS = [ACCOUNT_ID_ATTRIBUTE, ...AGENT_ACCOUNT_ID_KEYS];
 
 /** The most models a card names. */
 const TOP_MODEL_COUNT = 3;

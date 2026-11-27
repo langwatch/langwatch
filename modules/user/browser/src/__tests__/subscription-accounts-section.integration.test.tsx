@@ -77,7 +77,7 @@ function renderWith(accounts: CodingAgentAccountBurndown[]) {
     isLoading: false,
     isError: false,
     refetch,
-    data: { fromMs: 0, toMs: 0, accounts },
+    data: { accounts },
   };
   return renderSection();
 }
@@ -198,7 +198,7 @@ describe("SubscriptionAccountsSection", () => {
         isError: true,
         error: new Error("boom"),
         refetch,
-        data: { fromMs: 0, toMs: 0, accounts: [account()] },
+        data: { accounts: [account()] },
       };
       renderSection();
 
@@ -212,7 +212,7 @@ describe("SubscriptionAccountsSection", () => {
         isError: true,
         error: new Error("boom"),
         refetch,
-        data: { fromMs: 0, toMs: 0, accounts: [] },
+        data: { accounts: [] },
       };
       renderSection();
 
