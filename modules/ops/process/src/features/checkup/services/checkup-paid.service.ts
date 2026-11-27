@@ -127,8 +127,13 @@ export class CheckupPaidService {
     if (probe.kind === "unreachable") {
       return {
         outcome: "unchecked",
-        detail: `The checkup could not read the gateway's control plane from the signed GET /internal/control-plane: ${probe.reason}. An older gateway build has no such route, and a 401 means the two sides hold different secrets.`,
-        fix: "Upgrade the gateway to the release that ships with this app, set the same LW_GATEWAY_INTERNAL_SECRET on the app and the gateway, then run this check again.",
+        detail:
+          "The checkup could not read the gateway's control plane from the signed " +
+          `GET /internal/control-plane: ${probe.reason}. An older gateway build has no such ` +
+          "route, and a 401 means the two sides hold different secrets.",
+        fix:
+          "Upgrade the gateway to the release that ships with this app, set the same " +
+          "LW_GATEWAY_INTERNAL_SECRET on the app and the gateway, then run this check again.",
         docsPath: CHECKUP_DOCS.gateway,
       };
     }
