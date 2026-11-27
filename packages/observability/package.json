@@ -53,6 +53,10 @@
       "types": "./dist/metrics/testing.d.ts",
       "default": "./src/metrics/testing.ts"
     },
+    "./trace/testing": {
+      "types": "./dist/trace/testing.d.ts",
+      "default": "./src/trace/testing.ts"
+    },
     "./register": {
       "types": "./dist/register.d.ts",
       "default": "./src/register.ts"

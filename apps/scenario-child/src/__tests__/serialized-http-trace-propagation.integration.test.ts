@@ -3,15 +3,13 @@
  * @vitest-environment node
  */
 
+import {
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
-import { context, propagation, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
-import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
+import { context, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -27,6 +25,7 @@ const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9]{2})$/;
 describe("HTTP trace context propagation", () => {
   let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
   let echoServer: Awaited<ReturnType<typeof createOtelEchoServer>>;
 
   beforeAll(async () => {
@@ -34,20 +33,14 @@ describe("HTTP trace context propagation", () => {
     provider = new TracerProvider({
       spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-    propagation.setGlobalPropagator(
-      new CompositePropagator({
-        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
-      }),
-    );
+    tracing = installTestTracing({ provider });
 
     echoServer = await createOtelEchoServer();
   });
 
   afterAll(async () => {
     await echoServer.close();
-    await provider.shutdown();
+    await tracing.uninstall();
   });
 
   afterEach(() => {

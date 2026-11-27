@@ -4,13 +4,7 @@
  * these tests assert the span and value the proxy actually produces —
  * a stub can agree with a wrapper that is wrong.
  */
-import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
-import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
+import { SpanStatusCode } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
@@ -19,6 +13,7 @@ import {
 } from "@opentelemetry/sdk-trace";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { installTestTracing, type InstalledTestTracing } from "../testing.ts";
 import { traced } from "../traced.ts";
 
 class ExampleService {
@@ -95,26 +90,18 @@ class ExampleService {
 describe("traced()", () => {
   let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
     provider = new TracerProvider({
       spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-    propagation.setGlobalPropagator(
-      new CompositePropagator({
-        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
-      }),
-    );
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   afterEach(() => {

@@ -13,13 +13,11 @@ import {
   type ProcessRef,
   ProcessRuntime,
 } from "@langwatch/eventing";
-import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
+import { SpanKind, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -61,6 +59,7 @@ const subscriberContext: EventSubscriberContext = {
 describe("Langy process trace continuity", () => {
   let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
   let store: InMemoryProcessStore;
 
   beforeAll(() => {
@@ -68,20 +67,11 @@ describe("Langy process trace continuity", () => {
     provider = new TracerProvider({
       spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-    propagation.setGlobalPropagator(
-      new CompositePropagator({
-        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
-      }),
-    );
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   beforeEach(() => {

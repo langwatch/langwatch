@@ -1,11 +1,5 @@
 /** @see modules/auth/specs/request-credential-census.feature */
-import { context, propagation, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
-import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
+import { trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -24,6 +18,7 @@ import {
   runWithCredentialSlot,
   type CensusRequest,
 } from "../request/credentialCensus.ts";
+import { installTestTracing, type InstalledTestTracing } from "../trace/testing.ts";
 
 function inMemoryLogger() {
   const lines: Record<string, unknown>[] = [];
@@ -196,22 +191,14 @@ describe("censusClientOf()", () => {
 describe("noteRequestCredential()", () => {
   const exporter = new InMemorySpanExporter();
   const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  let tracing: InstalledTestTracing;
 
   beforeAll(() => {
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-    propagation.setGlobalPropagator(
-      new CompositePropagator({
-        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
-      }),
-    );
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   describe("when two credentials are noted for one request", () => {

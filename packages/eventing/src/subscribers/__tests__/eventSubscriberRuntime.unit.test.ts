@@ -2,13 +2,12 @@
  * @vitest-environment node
  * Runtime-boundary proofs for the event-subscriber seam (ADR-049 §3). These
  */
-import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+
 import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
+import { context, SpanKind, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   type ReadableSpan,
@@ -81,26 +80,18 @@ const context_ = createTestEventStoreReadContext(tenantId);
 
 let provider: TracerProvider;
 let exporter: InMemorySpanExporter;
+let tracing: InstalledTestTracing;
 
 beforeAll(() => {
   exporter = new InMemorySpanExporter();
   provider = new TracerProvider({
     spanProcessors: [new SimpleSpanProcessor({ exporter })],
   });
-  trace.setGlobalTracerProvider(provider);
-  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-  propagation.setGlobalPropagator(
-    new CompositePropagator({
-      propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
-    }),
-  );
+  tracing = installTestTracing({ provider });
 });
 
 afterAll(async () => {
-  await provider.shutdown();
-  trace.disable();
-  context.disable();
-  propagation.disable();
+  await tracing.uninstall();
 });
 
 afterEach(() => {

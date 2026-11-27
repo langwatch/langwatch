@@ -3,13 +3,12 @@
  *
  * Tests OTel W3C carrier propagation and trace continuity across dispatch.
  */
-import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+
 import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
+  installTestTracing,
+  type InstalledTestTracing,
+} from "@langwatch/observability/trace/testing";
+import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -33,6 +32,7 @@ const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/
 describe("process-manager trace continuity", () => {
   let provider: TracerProvider;
   let exporter: InMemorySpanExporter;
+  let tracing: InstalledTestTracing;
   let store: InMemoryProcessStore;
   let service: ProcessManagerService<PilotState>;
 
@@ -41,20 +41,11 @@ describe("process-manager trace continuity", () => {
     provider = new TracerProvider({
       spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-    propagation.setGlobalPropagator(
-      new CompositePropagator({
-        propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
-      }),
-    );
+    tracing = installTestTracing({ provider });
   });
 
   afterAll(async () => {
-    await provider.shutdown();
-    trace.disable();
-    context.disable();
-    propagation.disable();
+    await tracing.uninstall();
   });
 
   beforeEach(() => {
