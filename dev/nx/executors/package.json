@@ -1,0 +1,6 @@
+{
+  "name": "@langwatch/nx-executors",
+  "private": true,
+  "description": "Local Nx executors, referenced by path from dev/nx plugins (ADR-150).",
+  "executors": "./executors.json"
+}

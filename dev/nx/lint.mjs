@@ -8,9 +8,9 @@ import { memberRoots } from "./workspace-members.mjs";
 
 // `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel processes;
 // `--types` adds the type-aware rules as a third. One unused-directive check spans them.
-// `--changed` and `--base <sha>` narrow a plain run to the changed files, a `--types` run
-// to the projects a change reached. All but `--changed` lint through the cached
-// `workspace:lint:tree` target, the resolved scope as its arguments. ADR-150, TOOLING.md.
+// `--changed` lints the working tree's changes itself. Otherwise a plain run lints its
+// scope (`--base <sha>`: the changed files) through the cached `workspace:lint:tree`
+// target, and `--types` runs every project's cached `lint:types`. ADR-150, TOOLING.md.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const OXLINT = join(root, "node_modules/.bin/oxlint");
 const LINTABLE = /\.(?:[cm]?[jt]sx?)$/;
@@ -165,20 +165,49 @@ function print(diagnostic) {
   return `${diagnostic.filename}:${line}:${column}: ${diagnostic.message}${rule}${help}`;
 }
 
-/** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
-function lintThroughNx({ types, paths }) {
-  const target = types ? "workspace:lint:tree:types" : "workspace:lint:tree";
-  const args = ["exec", "nx", "run", target, "--outputStyle=static", "--"];
-  const scoped = [...args, "--resolved", ...(types ? ["--types"] : []), ...paths];
+/** Runs one Nx command; resolves its exit status. */
+function nxStatus(args) {
   const env = { ...process.env, FORCE_COLOR: "0", NX_LOAD_DOT_ENV_FILES: "false" };
-  const run = spawnSync("pnpm", scoped, { cwd: root, stdio: "inherit", env });
+  const run = spawnSync("pnpm", ["exec", "nx", ...args, "--outputStyle=static"], {
+    cwd: root,
+    stdio: "inherit",
+    env,
+  });
 
-  process.exit(run.status ?? 1);
+  return run.status ?? 1;
+}
+
+const nx = (args) => process.exit(nxStatus(args));
+
+/**
+ * Every project's `lint:types`, after every `typecheck` wrote the declarations it reads.
+ * Two runs, not a dependsOn: with no task dependencies Nx batches every miss into one
+ * oxlint run (dev/nx/executors/lint-types.mjs) instead of one per dependency level.
+ */
+function lintProjects() {
+  const typecheck = nxStatus(["run-many", "-t", "typecheck"]);
+  const lint = nxStatus(lintTypesArgs({ typecheck }));
+
+  process.exit(typecheck || lint);
+}
+
+/** After a failed typecheck some declarations are missing: lint still reports, never caches. */
+export const lintTypesArgs = ({ typecheck }) => [
+  "run-many",
+  "-t",
+  "lint:types",
+  ...(typecheck === 0 ? [] : ["--skip-nx-cache"]),
+];
+
+/** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
+function lintThroughNx({ paths }) {
+  nx(["run", "workspace:lint:tree", "--", "--resolved", ...paths]);
 }
 
 /**
- * What a run does with its flags: lint the paths Nx handed back (`resolved`), lint the
- * working tree's changes itself (`direct`), or resolve a scope and lint it through Nx.
+ * Lint the paths Nx handed back (`resolved`), the working tree's changes (`direct`), every
+ * project's cached `lint:types` (`projects`, `--base` ignored), or a resolved plain scope
+ * through Nx (`nx`).
  */
 export function routeFlags(flags) {
   const baseFlag = flags.indexOf("--base");
@@ -189,6 +218,7 @@ export function routeFlags(flags) {
     return { route: "resolved", types, paths };
   }
   if (flags.includes("--changed")) return { route: "direct", types };
+  if (types) return { route: "projects", types };
 
   return { route: "nx", types, base };
 }
@@ -203,10 +233,11 @@ function ownScopes(flags) {
     if (files.length === 0) process.exit(0);
     return scopes({ types, files, base: undefined });
   }
+  if (decision.route === "projects") return lintProjects();
   const paths = scopes({ types, files: undefined, base: decision.base }).flatMap((s) => s.paths);
   if (paths.length === 0) process.exit(0);
 
-  return lintThroughNx({ types, paths });
+  return lintThroughNx({ paths });
 }
 
 async function main() {
@@ -246,7 +277,8 @@ async function main() {
   );
   process.stdout.write(`\n${diagnostics.length} problem(s)\n`);
 
-  process.exit(diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1);
+  // exitCode, not exit(): a piped stdout flushes before the process ends.
+  process.exitCode = diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1;
 }
 
 const runDirectly = process.argv[1] === fileURLToPath(import.meta.url);

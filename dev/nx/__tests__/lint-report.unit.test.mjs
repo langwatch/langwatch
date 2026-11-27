@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseReport, routeFlags, widenedScope } from "../lint.mjs";
+import { lintTypesArgs, parseReport, routeFlags, widenedScope } from "../lint.mjs";
 
 void describe("parseReport", () => {
   /** @scenario "A lint run whose every path is ignored has no problems" */
@@ -34,6 +34,13 @@ void describe("widenedScope", () => {
     assert.deepEqual(widenedScope({ roots, reached: ["a", "c"] }), ["a", "c"]);
   });
 });
+void describe("lintTypesArgs", () => {
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("lints without the cache after a failed typecheck, so nothing it writes is cached", () => {
+    assert.deepEqual(lintTypesArgs({ typecheck: 0 }), ["run-many", "-t", "lint:types"]);
+    assert.ok(lintTypesArgs({ typecheck: 1 }).includes("--skip-nx-cache"));
+  });
+});
 void describe("routeFlags", () => {
   /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
   void it("lints a --changed run directly, never through Nx", () => {
@@ -42,12 +49,21 @@ void describe("routeFlags", () => {
   });
 
   /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
-  void it("sends a full or --base run through Nx", () => {
+  void it("sends a full or --base plain run through the tree target", () => {
     assert.deepEqual(routeFlags([]), { route: "nx", types: false, base: undefined });
-    assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {
+    assert.deepEqual(routeFlags(["--base", "abc123"]), {
       route: "nx",
-      types: true,
+      types: false,
       base: "abc123",
+    });
+  });
+
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("sends a full or --base type-aware run to every project's lint:types", () => {
+    assert.deepEqual(routeFlags(["--types"]), { route: "projects", types: true });
+    assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {
+      route: "projects",
+      types: true,
     });
   });
 

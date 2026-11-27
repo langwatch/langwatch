@@ -16,6 +16,8 @@ name: nightly
 #   test that was not flaky last night (.github/scripts/nightly-flaky.ts).
 # - upgrade-lab: one representative upgradelab cell, the last release upgraded
 #   to head under traffic (tools/upgradelab).
+# - uncached-checks: the full typecheck and type-aware lint with no Nx cache, on
+#   the default branch, until 2026-12-28. Red means a cache key misses an input.
 # - dashboard: after every job, rewrites the pinned issue labelled
 #   codebase-health-dashboard and raises a failed job as a nightly-regression
 #   issue. On any branch but the default one it writes the run summary only.
@@ -150,8 +152,9 @@ jobs:
       - name: Oxlint, whole tree
         run: pnpm lint > hygiene/lint.txt 2>&1 || tail -n 3 hygiene/lint.txt
 
+      # The typecheck above wrote the declarations, so only the lint:types targets run.
       - name: Oxlint type-aware, every project
-        run: pnpm lint:types > hygiene/lint-types.txt 2>&1 || tail -n 3 hygiene/lint-types.txt
+        run: FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm exec nx run-many -t lint:types --outputStyle=static > hygiene/lint-types.txt 2>&1 || tail -n 3 hygiene/lint-types.txt
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -607,6 +610,56 @@ jobs:
           --known-failing B1,N4,I5:inconclusive
 
   # ---------------------------------------------------------------------------
+  # Typecheck and type-aware lint with no Nx cache at all, on the default branch
+  # only. CI replays both per project (ADR-150, 2026-11-27); a failure here that
+  # main's cached run did not have is a cache key missing an input. Temporary: from
+  # UNCACHED_CHECKS_END the job skips and says it can be deleted.
+
+  uncached-checks:
+    name: typecheck and type-aware lint, uncached
+    if: ${{ github.ref_name == github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SKIP_ENV_VALIDATION: "true"
+      LANGWATCH_LINT_SLOTS: "0"
+      # No local reads or writes; no nx-remote-cache step, so no remote either.
+      NX_SKIP_NX_CACHE: "true"
+      UNCACHED_CHECKS_END: "2026-12-28"
+    steps:
+      - name: Still within the trial month
+        id: window
+        run: |
+          if [[ "$(date -u +%F)" < "$UNCACHED_CHECKS_END" ]]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The uncached nightly typecheck and lint ran its month (to $UNCACHED_CHECKS_END) with no cached against uncached disagreement. Delete the uncached-checks job from nightly.yml."
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        if: steps.window.outputs.open == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        if: steps.window.outputs.open == 'true'
+        with:
+          install: all
+
+      - uses: ./.github/actions/prepare-generated-files
+        if: steps.window.outputs.open == 'true'
+
+      - name: Typecheck, every project, uncached
+        if: steps.window.outputs.open == 'true'
+        run: pnpm typecheck --skip-nx-cache
+
+      # After the typecheck above, so only the lint:types targets run.
+      - name: Oxlint type-aware, every project, uncached
+        if: steps.window.outputs.open == 'true'
+        run: FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false pnpm exec nx run-many -t lint:types --outputStyle=static
+
+  # ---------------------------------------------------------------------------
 
   dashboard:
     name: nightly dashboard
@@ -619,6 +672,7 @@ jobs:
         hygiene-report,
         flaky-report,
         upgrade-lab,
+        uncached-checks,
       ]
     if: ${{ always() }}
     runs-on: ubuntu-latest
