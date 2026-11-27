@@ -317,7 +317,7 @@ func runLambdaProbe(t *testing.T, name string) {
 	res, err := exe.Execute(context.Background(), codeblock.Request{
 		Code: credentialProbe,
 		// The test process that started this engine stands outside the sandbox
-		// being modelled, and what it holds depends on which tests ran first.
+		// under test, and what it holds depends on which tests ran first.
 		Inputs:          map[string]any{"router": router, "harness": os.Getppid()},
 		DeclaredOutputs: []string{"found", "statuses"},
 		Timeout:         60 * time.Second,
