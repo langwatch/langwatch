@@ -94,7 +94,7 @@ function world({
   let ids = 0;
   const service = MemberRoleSeatPurchaseService.create({
     changeMemberRole,
-    roleVersion: async () => state.roleVersion,
+    memberships: { getRoleVersion: async () => state.roleVersion },
     billing: createApiFixture<BillingApi>(
       { addFullSeat, settleSeatPayment, recordBlockedSeatChange },
       "BillingApi",

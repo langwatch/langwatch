@@ -235,43 +235,11 @@ export class OrganizationMemberRoleService {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId, caller } = params;
 
     const currentMember = await this.repo.getMembership({ organizationId, userId });
-    // A caller who names a personal workspace outright is told so. Without
-    // this the shared-teams-only set below would answer "that team is not in
-    // the organization", which is both wrong and no help.
-    const [personalTeam] = await this.repo.findPersonalTeamsInScopes({
-      scopes: (teamRoleUpdates ?? []).map((update) => ({
-        scopeType: GrantScopeTier.TEAM,
-        scopeId: update.teamId,
-      })),
-    });
-    if (personalTeam) {
-      throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
-    }
-
-    // Only the teams the organization shares. A seat decision is about the
-    // person, so it applies to the teams they work in with other people and
-    // leaves the workspace that is only theirs alone. Including it would ask
-    // the organization to demote a team's last admin, which is refused, and
-    // the whole role change would go down with the refusal.
-    const organizationTeamIds = await this.repo.findSharedTeamIds({ organizationId });
-
-    const currentTeamBindings = await this.repo.findTeamGrants({
+    const { organizationTeamIds, currentMemberships, userPermissions } = await this.teamStandingOf({
       organizationId,
       userId,
-      teamIds: organizationTeamIds,
+      teamRoleUpdates,
     });
-
-    const currentMemberships = currentTeamBindings.map((binding) => ({
-      teamId: binding.scopeId,
-      role: binding.role,
-    }));
-
-    const grantedPermissions = await findCustomRolePermissionGrants({
-      repository: this.repo,
-      organizationId,
-      currentTeamBindings,
-    });
-    const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
     const effectiveTeamRoleUpdates = this.effectiveTeamRoleUpdatesOf({
       userId,
       role,
@@ -316,6 +284,59 @@ export class OrganizationMemberRoleService {
       });
     }
     return result;
+  }
+
+  /**
+   * The member's standing on the organization's shared teams before the change: a personal
+   * workspace named outright is refused, and custom-role grants are read for the seat decision.
+   */
+  private async teamStandingOf({
+    organizationId,
+    userId,
+    teamRoleUpdates,
+  }: {
+    organizationId: string;
+    userId: string;
+    teamRoleUpdates: { teamId: string }[] | undefined;
+  }) {
+    // A caller who names a personal workspace outright is told so. Without
+    // this the shared-teams-only set below would answer "that team is not in
+    // the organization", which is both wrong and no help.
+    const [personalTeam] = await this.repo.findPersonalTeamsInScopes({
+      scopes: (teamRoleUpdates ?? []).map((update) => ({
+        scopeType: GrantScopeTier.TEAM,
+        scopeId: update.teamId,
+      })),
+    });
+    if (personalTeam) {
+      throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
+    }
+
+    // Only the teams the organization shares. A seat decision is about the
+    // person, so it applies to the teams they work in with other people and
+    // leaves the workspace that is only theirs alone. Including it would ask
+    // the organization to demote a team's last admin, which is refused, and
+    // the whole role change would go down with the refusal.
+    const organizationTeamIds = await this.repo.findSharedTeamIds({ organizationId });
+
+    const currentTeamBindings = await this.repo.findTeamGrants({
+      organizationId,
+      userId,
+      teamIds: organizationTeamIds,
+    });
+
+    const currentMemberships = currentTeamBindings.map((binding) => ({
+      teamId: binding.scopeId,
+      role: binding.role,
+    }));
+
+    const grantedPermissions = await findCustomRolePermissionGrants({
+      repository: this.repo,
+      organizationId,
+      currentTeamBindings,
+    });
+    const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
+    return { organizationTeamIds, currentMemberships, userPermissions };
   }
 
   /** The role change's seat and its write, under the seat lease the caller holds. */

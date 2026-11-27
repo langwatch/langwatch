@@ -12,7 +12,10 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { RoleVersionMovedError } from "../repositories/organization-membership.repository.ts";
+import {
+  type OrganizationMembershipRepository,
+  RoleVersionMovedError,
+} from "../repositories/organization-membership.repository.ts";
 import type {
   PendingSeatRoleChangeRecord,
   PendingSeatRoleChangeRepository,
@@ -23,16 +26,12 @@ import {
   type SeatPaymentRef,
   seatRoleChangeReturnPath,
 } from "../rules/seat-role-change.rules.ts";
+import { REPLACED, SeatRoleChangeClaimService } from "./seat-role-change-claim.service.ts";
 
 const logger = createLogger("langwatch:organization:memberRoleSeatPurchase");
 
 /** What the admin reads when the role write fails for a cause we did not name. */
 const UNKNOWN_REFUSAL = "something went wrong on our side";
-/** How often a role write renews its claim, well inside the claim period. */
-const CLAIM_RENEW_MS = 30_000;
-/** How often settling a change a newer role write replaced is tried. */
-const SUPERSEDE_ATTEMPTS = 3;
-const REPLACED = "a later role change for this member replaced it";
 
 type RoleChange = (
   input: Readonly<{
@@ -54,8 +53,8 @@ type ChangeInput = Readonly<{
 
 type Dependencies = {
   changeMemberRole: RoleChange;
-  /** The member's role version; every role write moves it, so a paid change sees a newer one. */
-  roleVersion: (input: { organizationId: string; userId: string }) => Promise<number>;
+  /** The member's role version: every role write moves it, so a paid change sees a newer one. */
+  memberships: Pick<OrganizationMembershipRepository, "getRoleVersion">;
   billing: Pick<BillingApi, "addFullSeat" | "settleSeatPayment" | "recordBlockedSeatChange">;
   /** The member's name as the members page shows it. */
   memberName: (input: { organizationId: string; userId: string }) => Promise<string>;
@@ -89,7 +88,11 @@ export class MemberRoleSeatPurchaseService {
     return new MemberRoleSeatPurchaseService(dependencies);
   }
 
-  private constructor(private readonly dependencies: Dependencies) {}
+  private constructor(private readonly dependencies: Dependencies) {
+    this.claims = SeatRoleChangeClaimService.create(dependencies);
+  }
+
+  private readonly claims: SeatRoleChangeClaimService;
 
   async changeWithSeat(
     input: ChangeInput,
@@ -106,7 +109,10 @@ export class MemberRoleSeatPurchaseService {
     if (waiting) return this.resumeWaiting({ waiting, input });
 
     // Read before the seat is bought: any role write after it replaces this change.
-    const roleVersion = await this.dependencies.roleVersion({ organizationId, userId });
+    const roleVersion = await this.dependencies.memberships.getRoleVersion({
+      organizationId,
+      userId,
+    });
     const purchase = await this.buySeat({ input, by });
     if (purchase.status === "added") {
       try {
@@ -164,93 +170,22 @@ export class MemberRoleSeatPurchaseService {
     by: OrganizationCaller;
   }): Promise<MemberRoleWithSeatResult | undefined> {
     const { organizationId, userId, role } = input;
-    const held = await this.holdWaiting({ organizationId, userId });
+    const waiting = await this.claims.claimWaiting({ organizationId, userId });
+    const held = waiting.status === "held" ? { id: waiting.id, token: waiting.token } : undefined;
     const write = () =>
       this.dependencies.changeMemberRole({ organizationId, userId, role, planUser: by }, by);
     try {
       const { teamsLeftWithoutAdmin } = held
-        ? await this.underClaim({ organizationId, ...held }, write)
+        ? await this.claims.underClaim({ organizationId, ...held }, write)
         : await write();
-      if (held) await this.supersede({ organizationId, id: held.id });
+      if (held) await this.claims.supersede({ organizationId, id: held.id });
       return { status: "changed", seatAdded: false, teamsLeftWithoutAdmin };
     } catch (error) {
       const refusal = readSeatRefusal(error);
       if (refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") throw error;
       return undefined;
     } finally {
-      if (held) await this.release({ organizationId, ...held });
-    }
-  }
-
-  /**
-   * Settles the change a newer role write replaced. Retried; when every try fails the change
-   * stays waiting, and its paid write is refused later because the role version moved.
-   */
-  private async supersede({ organizationId, id }: { organizationId: string; id: string }) {
-    for (let attempt = 1; attempt <= SUPERSEDE_ATTEMPTS; attempt++) {
-      try {
-        await this.dependencies.pending.settle({
-          organizationId,
-          id,
-          status: "superseded",
-          reason: REPLACED,
-        });
-        return;
-      } catch (error) {
-        logger.error(
-          { organizationId, changeId: id, error, attempt },
-          "replaced change not settled",
-        );
-      }
-    }
-  }
-
-  /** Frees a claim; a failed release is logged, the claim lapses on its own. */
-  private async release(claim: { organizationId: string; id: string; token: string }) {
-    await this.dependencies.pending.release(claim).catch((error: unknown) => {
-      logger.warn(
-        { organizationId: claim.organizationId, changeId: claim.id, error },
-        "claim not released",
-      );
-    });
-  }
-
-  /** Claims the member's waiting change; refuses while its paid write is under way. */
-  private async holdWaiting(member: {
-    organizationId: string;
-    userId: string;
-  }): Promise<{ id: string; token: string } | undefined> {
-    const [latest] = await this.dependencies.pending.findLatestForMember(member);
-    if (latest?.status !== "waiting") return undefined;
-    const held = { id: latest.id, token: this.dependencies.newId() };
-    if (
-      !(await this.dependencies.pending.claim({ organizationId: member.organizationId, ...held }))
-    ) {
-      throw new SeatPaymentWaitingError();
-    }
-    return held;
-  }
-
-  /**
-   * Runs a role write while renewing the claim, so the claim lapses only when its holder is gone
-   * or cannot reach the store, and no second applier writes beside a live one.
-   */
-  private async underClaim<T>(
-    claim: { organizationId: string; id: string; token: string },
-    work: () => Promise<T>,
-  ): Promise<T> {
-    const renewal = setInterval(() => {
-      this.dependencies.pending.renew(claim).catch((error: unknown) => {
-        logger.warn(
-          { organizationId: claim.organizationId, changeId: claim.id, error },
-          "claim not renewed",
-        );
-      });
-    }, CLAIM_RENEW_MS);
-    try {
-      return await work();
-    } finally {
-      clearInterval(renewal);
+      if (held) await this.claims.release({ organizationId, ...held });
     }
   }
 
@@ -429,7 +364,7 @@ export class MemberRoleSeatPurchaseService {
       if (current.status !== "waiting") return outcomeOf(current);
       return await this.writeRole({ record: current, token });
     } finally {
-      await this.release({ organizationId, id, token });
+      await this.claims.release({ organizationId, id, token });
     }
   }
 
@@ -462,7 +397,7 @@ export class MemberRoleSeatPurchaseService {
     }
     if (!(await stillHeld())) return waitingOutcome;
     try {
-      await this.underClaim({ organizationId, id, token }, () =>
+      await this.claims.underClaim({ organizationId, id, token }, () =>
         this.dependencies.changeMemberRole(
           {
             organizationId,

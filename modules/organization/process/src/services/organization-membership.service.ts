@@ -470,11 +470,6 @@ export class OrganizationMembershipService {
     return { ...(await this.getMember({ organizationId, userId })), teamsLeftWithoutAdmin };
   }
 
-  /** The member's role version, which every role write moves (role-change-seat.feature). */
-  async getRoleVersion(params: { organizationId: string; userId: string }): Promise<number> {
-    return this.repo.getRoleVersion(params);
-  }
-
   async changeMemberRole(
     params: Parameters<OrganizationMemberRoleService["changeMemberRole"]>[0],
   ): ReturnType<OrganizationMemberRoleService["changeMemberRole"]> {

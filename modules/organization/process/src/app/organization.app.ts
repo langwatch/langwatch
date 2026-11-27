@@ -442,7 +442,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#joinRequests = infrastructure.joinRequests;
     application.#seatRoleChanges = MemberRoleSeatPurchaseService.create({
       changeMemberRole: (input, by) => application.changeMemberRole(input, by),
-      roleVersion: (input) => application.#dependencies.membership.getRoleVersion(input),
+      memberships: membershipRepository,
       billing: setup.dependencies.billing,
       pending: setup.repositories.pendingSeatRoleChanges,
       memberName: async (input) => {
