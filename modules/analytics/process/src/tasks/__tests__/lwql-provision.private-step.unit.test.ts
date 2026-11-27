@@ -55,7 +55,8 @@ vi.mock("@langwatch/clickhouse-migrations", async (importActual) => {
     },
   };
 });
-vi.mock("../lwql-private-targets.task.ts", () => ({
+vi.mock("../lwql-private-targets.task.ts", async (importActual) => ({
+  ...(await importActual<object>()),
   provisionLwqlPrivateTargets: async ({ endpoints }: { endpoints: readonly unknown[] }) => {
     events.push(`private:${endpoints.length}`);
   },

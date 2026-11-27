@@ -212,3 +212,23 @@ export function classifyLwqlSetupFailure({
   }
   return otherFailure(summary);
 }
+
+/** Reads one secret through the runner's chain: the sources the api and worker boot with. */
+export type LwqlSecretLookup = (id: string) => Promise<string | undefined>;
+
+/** The environment with each credential secret the chain answers laid over it. */
+export async function withChainedSecrets({
+  environment,
+  lookup,
+}: {
+  environment: Record<string, string | undefined>;
+  lookup: LwqlSecretLookup | undefined;
+}): Promise<Record<string, string | undefined>> {
+  if (!lookup) return environment;
+  const resolved = { ...environment };
+  for (const id of LWQL_CREDENTIAL_SECRETS) {
+    const value = await lookup(id);
+    if (value !== undefined) resolved[id] = value;
+  }
+  return resolved;
+}
