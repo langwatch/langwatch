@@ -4059,6 +4059,97 @@ Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeS
 
 Also check: [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation, for an evaluator declared in the test itself that grades every run against a golden answer, with the same mappings and the same gate as one attached on the platform.
 
+## 6. Set Up and Clean Up Test Data
+
+When your scenarios need data to exist first, such as a test customer or organisation, create it in a pytest fixture. Everything after `yield` runs when the test ends, even if the test fails, so the cleanup always happens.
+
+```python
+import pytest
+
+@pytest.fixture
+def seeded_customer():
+    # Set up: create the data the scenario needs
+    customer = create_test_customer(name="Test Customer", plan="pro")
+    created_order_ids = []
+    customer["created_order_ids"] = created_order_ids
+
+    yield customer
+
+    # Clean up: delete only what this run created, even if the test failed
+    for order_id in created_order_ids:
+        delete_order(order_id)
+    delete_test_customer(customer["id"])
+```
+
+`create_test_customer`, `delete_order` and `delete_test_customer` are your own helpers, for example calls to your API or database.
+
+Pass the seeded ids to your agent, and tell the judge about the seeded state with `additional_context` on the `scenario.judge()` script step. The judge reads it under `<additional_context>`, so your criteria can name the real facts.
+
+```python
+import pytest
+import scenario
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_support_agent_knows_the_customer(seeded_customer):
+    class SupportAgent(scenario.AgentAdapter):
+        async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+            return support_agent(
+                input.messages,
+                customer_id=seeded_customer["id"],
+            )
+
+    result = await scenario.run(
+        name="customer asks about their plan",
+        description="The customer asks which plan they are on.",
+        agents=[
+            SupportAgent(),
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(criteria=[
+                "Agent should state the customer's plan correctly",
+            ]),
+        ],
+        script=[
+            scenario.user(),
+            scenario.agent(),
+            scenario.judge(
+                additional_context=(
+                    f"Seeded state: customer {seeded_customer['id']} "
+                    f"is on the {seeded_customer['plan']} plan."
+                ),
+            ),
+        ],
+    )
+
+    assert result.success
+```
+
+### One test per region
+
+To run the same scenario in several regions, seed once with a session-scoped fixture and use `pytest.mark.parametrize` for one test per region. The fixture deletes only what the run created, and only once, after the last test.
+
+```python
+@pytest.fixture(scope="session")
+def seeded_regions():
+    customers = {
+        region: create_test_customer(name="Test Customer", region=region)
+        for region in ["eu", "us"]
+    }
+
+    yield customers
+
+    for customer in customers.values():
+        delete_test_customer(customer["id"])
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("region", ["eu", "us"])
+async def test_support_agent_per_region(seeded_regions, region):
+    customer = seeded_regions[region]
+    ...  # build the adapter and run the scenario as above
+```
+
+If your agent is connected to LangWatch and you run scenarios from the platform, use [setup and teardown hooks](/agent-testing/setup-and-teardown-hooks) instead.
+
 ---
 
 # FILE: ./agent-testing/scenarios.mdx
