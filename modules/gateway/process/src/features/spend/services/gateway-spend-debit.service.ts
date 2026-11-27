@@ -4,6 +4,7 @@ import {
   type GatewayBudgetLedgerStatus,
   type GatewayResolvedBudget,
 } from "@langwatch/gateway-contract";
+import { isHandledTransientRefusal } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
@@ -55,10 +56,17 @@ export class GatewaySpendDebitService {
         this.debitRows(payload, budgets, providerKey),
       );
     } catch (error) {
-      logger.error(
-        { projectId: payload.project_id, gatewayRequestId: payload.gateway_request_id, error },
-        "failed to write gateway budget debits",
-      );
+      const fields = {
+        projectId: payload.project_id,
+        gatewayRequestId: payload.gateway_request_id,
+        error,
+      };
+      // A transient refusal (ClickHouse busy) is the outbox retry's to absorb, so it warns.
+      if (isHandledTransientRefusal(error)) {
+        logger.warn(fields, "gateway budget debits refused for now; the outbox retries");
+      } else {
+        logger.error(fields, "failed to write gateway budget debits");
+      }
       // Rethrown for the outbox retry: a lost debit under-enforces the cap.
       throw error;
     }
