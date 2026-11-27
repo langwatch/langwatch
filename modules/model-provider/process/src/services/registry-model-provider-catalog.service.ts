@@ -1,3 +1,4 @@
+import type { ManagedBedrockCredentials } from "@langwatch/enterprise-managed-provider-contract";
 import {
   allFeatures,
   buildProviderOnboardingDefaultPlan,
@@ -176,6 +177,11 @@ export abstract class ModelProviderCatalog {
   isManagedProvider(_input: { organizationId: string; provider: string }): boolean {
     return false;
   }
+  getManagedBedrockCredentials(_input: {
+    organizationId: string;
+  }): Promise<ManagedBedrockCredentials> {
+    return Promise.reject(new Error("This catalogue manages no Bedrock credentials."));
+  }
   prepareExecution(input: {
     parameters: Record<string, string>;
     projectId: string;
@@ -350,6 +356,12 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
 
   isManagedProvider(input: { organizationId: string; provider: string }): boolean {
     return this.options.managed.isManaged(input);
+  }
+
+  getManagedBedrockCredentials(input: {
+    organizationId: string;
+  }): Promise<ManagedBedrockCredentials> {
+    return this.options.managed.getBedrockCredentials(input);
   }
 
   prepareExecution(input: {

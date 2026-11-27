@@ -75,7 +75,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
         projects,
         chRepo: null,
         budgetDecisions: memoryGatewayService({ store, projects }).service,
-        modelProviders: createApiFixture<ModelProviderApi>(),
+        modelProviders: createApiFixture<ModelProviderApi>({ getGatewayKeysEpoch: () => "" }),
         assembly,
         a2aTargets,
       });
@@ -130,7 +130,7 @@ describe("GatewayConfigMaterialiserService.versionToken", () => {
         projects,
         chRepo: null,
         budgetDecisions: memoryGatewayService({ store, projects }).service,
-        modelProviders: createApiFixture<ModelProviderApi>(),
+        modelProviders: createApiFixture<ModelProviderApi>({ getGatewayKeysEpoch: () => "" }),
         assembly,
         a2aTargets,
       });
