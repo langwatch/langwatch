@@ -62,7 +62,7 @@ export class HttpConnectorBlockChannel implements ConnectorBlockChannel {
       if (controller.signal.aborted) {
         throw new ConnectorBlockError({
           message: connectorTimeoutMessage({ kind, timeoutMs }),
-          isTimeout: true,
+          code: "agent_call_timeout",
         });
       }
       const code =

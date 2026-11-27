@@ -7,12 +7,13 @@
 import {
   AgentNotFoundError,
   CONNECTOR_ROWS_MAX_BYTES,
+  CONNECTOR_SECRET_NAMES_MAX,
   DEFAULT_CALL_TIMEOUT_MS,
   MAX_CALL_TIMEOUT_MS,
   type AgentApi,
   type ConnectorAgentConfig,
 } from "@langwatch/agent-contract";
-import { DATASET_PAGE_LIMIT_MAX, type DatasetApi } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { type ConnectorAgentData, ScenarioTargetNotFoundError } from "@langwatch/scenario-contract";
@@ -26,6 +27,11 @@ const SCENARIO_CONNECTOR_STEPS_FLAG_KEY = "release_scenario_connector_steps";
 /** What every block of a connector agent records while the release is off for its project. */
 const SCENARIO_CONNECTOR_NOT_RELEASED_MESSAGE =
   "Connector steps are not released for this project yet.";
+
+/** Fixture rows read per dataset page, so an oversize set is refused before it is all loaded. */
+const FIXTURE_PAGE_SIZE = 100;
+/** A row is at least `{}` and a comma, so rows under the cap never fill more pages than this. */
+const FIXTURE_MAX_PAGES = Math.ceil(CONNECTOR_ROWS_MAX_BYTES / 3 / FIXTURE_PAGE_SIZE) + 1;
 
 type ConnectorTargetOptions = {
   agents: Pick<AgentApi, "getById">;
@@ -117,6 +123,13 @@ export class ScenarioConnectorTargetService implements ConnectorTargetReader {
     runSecretValues: Record<string, string>;
   }): Promise<Pick<ConnectorAgentData, "secrets" | "rows" | "refusal">> {
     const { secretNames } = config;
+    // A config saved before the schema's cap could still name more.
+    if (secretNames.length > CONNECTOR_SECRET_NAMES_MAX) {
+      return {
+        secrets: {},
+        refusal: `The connector names ${secretNames.length} secrets; at most ${CONNECTOR_SECRET_NAMES_MAX} may be named.`,
+      };
+    }
     const projectValues =
       secretNames.length === 0
         ? {}
@@ -139,6 +152,7 @@ export class ScenarioConnectorTargetService implements ConnectorTargetReader {
       : { secrets, ...fixtures };
   }
 
+  /** The rows page by page, refused as soon as their JSON passes the cap. */
   private async fixtureRows({
     projectId,
     datasetId,
@@ -146,23 +160,27 @@ export class ScenarioConnectorTargetService implements ConnectorTargetReader {
     projectId: string;
     datasetId: string;
   }): Promise<{ rows: Record<string, unknown>[] } | { refusal: string }> {
-    const page = await this.options.datasets.findDatasetPage({
-      projectId,
-      slugOrId: datasetId,
-      limit: DATASET_PAGE_LIMIT_MAX,
-    });
-    if (!page) return { refusal: "The connector's fixtures dataset no longer exists." };
-    const rows = page.datasetRecords.map(({ entry }) => entry);
-    if (page.count > rows.length) {
-      return {
-        refusal: `The connector's fixtures dataset has more than the ${DATASET_PAGE_LIMIT_MAX} rows a block may receive.`,
-      };
+    const tooLarge = `The connector's fixtures dataset is over the ${CONNECTOR_ROWS_MAX_BYTES / 1024} KiB a block may receive.`;
+    const rows: Record<string, unknown>[] = [];
+    // The size of `JSON.stringify(rows)`: the opening bracket, then each row and its comma or `]`.
+    let bytes = 1;
+    for (let page = 1; page <= FIXTURE_MAX_PAGES; page++) {
+      const found = await this.options.datasets.findDatasetPage({
+        projectId,
+        slugOrId: datasetId,
+        page,
+        limit: FIXTURE_PAGE_SIZE,
+      });
+      if (!found) return { refusal: "The connector's fixtures dataset no longer exists." };
+      for (const { entry } of found.datasetRecords) {
+        bytes += Buffer.byteLength(JSON.stringify(entry), "utf8") + 1;
+        if (bytes > CONNECTOR_ROWS_MAX_BYTES) {
+          return { refusal: tooLarge };
+        }
+        rows.push(entry);
+      }
+      if (found.datasetRecords.length === 0 || rows.length >= found.count) return { rows };
     }
-    if (Buffer.byteLength(JSON.stringify(rows), "utf8") > CONNECTOR_ROWS_MAX_BYTES) {
-      return {
-        refusal: `The connector's fixtures dataset is over the ${CONNECTOR_ROWS_MAX_BYTES / 1024} KiB a block may receive.`,
-      };
-    }
-    return { rows };
+    return { refusal: tooLarge };
   }
 }

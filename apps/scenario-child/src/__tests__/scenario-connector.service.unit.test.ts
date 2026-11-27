@@ -113,6 +113,7 @@ describe("ScenarioConnectorService", () => {
       ]);
     });
 
+    /** @scenario "Each call turn of a connector run gets its own idempotency key" */
     it("gives each turn's call block its own key", async () => {
       const { connector, posts } = connectorWith();
 
@@ -221,6 +222,96 @@ describe("ScenarioConnectorService", () => {
     });
   });
 
+  describe("when setup makes data and then fails on its state", () => {
+    const token = "acct-token-value";
+
+    /** The secrets and state the teardown block was posted with. */
+    function teardownPost(posts: Posted[]) {
+      const post = posts.find(({ kind }) => kind === "teardown");
+      return { state: post?.input.state, secrets: post?.workflow.secrets };
+    }
+
+    /** @scenario "A connector setup that fails on its state still lets teardown remove its data" */
+    it("hands teardown the run-scoped secret and the scrubbed state when the state is over 64 KiB", async () => {
+      const state = { accountId: "acc_1", echoed: token, blob: "x".repeat(65 * 1024) };
+      const { hooks, posts } = connectorWith(
+        {},
+        { setup: { state, secrets: { ACCOUNT_TOKEN: token } } },
+      );
+
+      const recorded = await recordedHooks(hooks.around(async () => "turns"));
+
+      expect(recorded.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("64 KiB"),
+      });
+      expect(recorded.setup).not.toHaveProperty("state");
+      expect(JSON.stringify(recorded.setup)).not.toContain(token);
+      expect(teardownPost(posts).state).toMatchObject({ accountId: "acc_1", echoed: "[redacted]" });
+      expect(teardownPost(posts).secrets).toEqual({
+        SHOP_ADMIN_KEY: "shop-admin-key-value",
+        ACCOUNT_TOKEN: token,
+      });
+      expect(recorded.teardown?.status).toBe("ok");
+    });
+
+    /** @scenario "A connector setup that fails on its state still lets teardown remove its data" */
+    it("hands teardown the run-scoped secret and an empty state when the state is not an object", async () => {
+      const { hooks, posts } = connectorWith(
+        {},
+        { setup: { state: "acc_1", secrets: { ACCOUNT_TOKEN: token } } },
+      );
+
+      const recorded = await recordedHooks(hooks.around(async () => "turns"));
+
+      expect(recorded.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("JSON object"),
+      });
+      expect(teardownPost(posts).state).toEqual({});
+      expect(teardownPost(posts).secrets).toMatchObject({ ACCOUNT_TOKEN: token });
+    });
+  });
+
+  describe("when setup returns a secret it may not return", () => {
+    const value = "setup-own-value";
+
+    /** @scenario "A connector setup secret whose name is not a secret name fails setup" */
+    it("fails setup naming the name and not the value, and never hands the secret on", async () => {
+      const { hooks, posts } = connectorWith(
+        {},
+        { setup: { state: {}, secrets: { "account-token": value } } },
+      );
+
+      const recorded = await recordedHooks(hooks.around(async () => "turns"));
+
+      expect(recorded.setup).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("account-token"),
+      });
+      expect(recorded.setup?.error).not.toContain(value);
+      const teardown = posts.find(({ kind }) => kind === "teardown");
+      expect(teardown?.workflow.secrets).not.toHaveProperty("account-token");
+    });
+
+    /** @scenario "A connector setup secret cannot replace a project secret of the same name" */
+    it("fails setup naming the clash and keeps the project's value for teardown", async () => {
+      const { hooks, posts } = connectorWith(
+        {},
+        { setup: { state: {}, secrets: { SHOP_ADMIN_KEY: value } } },
+      );
+
+      const recorded = await recordedHooks(hooks.around(async () => "turns"));
+
+      expect(recorded.setup).toMatchObject({
+        status: "failed",
+        error: "Setup returned secret SHOP_ADMIN_KEY, which is already a project secret.",
+      });
+      const teardown = posts.find(({ kind }) => kind === "teardown");
+      expect(teardown?.workflow.secrets).toEqual({ SHOP_ADMIN_KEY: "shop-admin-key-value" });
+    });
+  });
+
   describe("when the call block returns no reply", () => {
     it("fails the turn naming the { reply } shape", async () => {
       const { connector } = connectorWith({}, { call: { answer: "hi" } });
@@ -233,6 +324,7 @@ describe("ScenarioConnectorService", () => {
     /**
      * @scenario "A connector agent that names a missing secret fails setup before any block runs"
      * @scenario "A connector agent whose fixtures are over 64 KiB fails setup before any block runs"
+     * @scenario "A refused connector records its teardown as not run"
      */
     it.each([
       "The connector names project secrets that do not exist: GONE_KEY.",
@@ -244,7 +336,8 @@ describe("ScenarioConnectorService", () => {
 
       expect(posts).toEqual([]);
       expect(recorded.setup).toMatchObject({ status: "failed", error: refusal });
-      expect(recorded.teardown).toMatchObject({ status: "failed", error: refusal });
+      expect(recorded.teardown?.status).toBe("not_run");
+      expect(recorded.teardown?.error).not.toContain(refusal);
     });
 
     /** @scenario "Without the release flag a connector agent runs no block and is not scored" */

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CONNECTOR_BLOCK_MAX_BYTES,
+  CONNECTOR_SECRET_NAMES_MAX,
   connectorAgentConfigSchema,
   parseAgentConfig,
 } from "../config/index.ts";
@@ -70,6 +71,21 @@ describe("connectorAgentConfigSchema", () => {
     it.each(["shop_key", "1KEY", "SHOP-KEY", ""])("refuses %j", (name) => {
       expect(connectorAgentConfigSchema.validate({ call: block(), secretNames: [name] })).toBe(
         false,
+      );
+    });
+  });
+
+  describe("given more secret names than a connector may name", () => {
+    const names = (count: number) => Array.from({ length: count }, (_, index) => `KEY_${index}`);
+
+    /** @scenario "A connector config names at most 50 secrets" */
+    it("refuses 51 names and accepts 50", () => {
+      expect(CONNECTOR_SECRET_NAMES_MAX).toBe(50);
+      expect(connectorAgentConfigSchema.validate({ call: block(), secretNames: names(51) })).toBe(
+        false,
+      );
+      expect(connectorAgentConfigSchema.validate({ call: block(), secretNames: names(50) })).toBe(
+        true,
       );
     });
   });

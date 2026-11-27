@@ -26,8 +26,8 @@ import {
 import { vi } from "vitest";
 
 import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
-import type { ConnectorTargetReader } from "../../features/prefetch/services/scenario-connector-target.service.ts";
 import type { JudgePreviewAvailabilityService } from "../../features/judge-preview/services/judge-preview-availability.service.ts";
+import type { ConnectorTargetReader } from "../../features/prefetch/services/scenario-connector-target.service.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,

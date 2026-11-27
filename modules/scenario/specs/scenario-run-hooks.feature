@@ -354,6 +354,19 @@ Feature: Scenario run hooks: setup and teardown
       And teardown receives the state setup returned
 
     @unit
+    Scenario: Each call turn of a connector run gets its own idempotency key
+      Given a connector run that plays two turns
+      When the call block is called for each turn
+      Then the first call's key ends in ":call:0" and the second's in ":call:1"
+
+    @unit
+    Scenario: Agent testing never runs a connector agent's call block
+      Given a connector agent
+      When it is picked for a one-turn agent test
+      Then the test is refused as not testable
+      And no call block runs
+
+    @unit
     Scenario: A connector agent's blocks receive only the secrets it names
       Given a project with the secrets SHOP_ADMIN_KEY and OTHER_KEY
       And a connector agent that names SHOP_ADMIN_KEY
@@ -413,6 +426,27 @@ Feature: Scenario run hooks: setup and teardown
       Then setup records "failed" naming the expected { state, secrets? } shape
 
     @unit
+    Scenario: A connector setup that fails on its state still lets teardown remove its data
+      Given a setup block that makes test data, returns the run-scoped secret ACCOUNT_TOKEN and a state over 64 KiB or not an object
+      When a scenario runs against the agent
+      Then setup records "failed" with no state and no secret value
+      And the teardown block can read ACCOUNT_TOKEN
+      And it receives the state setup returned, scrubbed, when that state is an object
+
+    @unit
+    Scenario: A connector setup secret whose name is not a secret name fails setup
+      Given a setup block that returns the run-scoped secret "account-token"
+      Then setup records "failed" naming "account-token"
+      And the error holds no secret value
+
+    @unit
+    Scenario: A connector setup secret cannot replace a project secret of the same name
+      Given a connector agent that names the project secret SHOP_ADMIN_KEY
+      And a setup block that returns its own SHOP_ADMIN_KEY
+      Then setup records "failed" with "Setup returned secret SHOP_ADMIN_KEY, which is already a project secret."
+      And the teardown block reads the project's SHOP_ADMIN_KEY
+
+    @unit
     Scenario: A connector agent that names a missing secret fails setup before any block runs
       Given a connector agent that names a secret the project does not have
       When the run is prepared and started
@@ -420,10 +454,38 @@ Feature: Scenario run hooks: setup and teardown
       And the code runner is not called
 
     @unit
+    Scenario: A connector config names at most 50 secrets
+      Given a connector config that names 51 secrets
+      Then the config is refused
+      And a config that names 50 secrets is accepted
+
+    @unit
+    Scenario: A connector agent that names more than 50 secrets fails setup before any secret is read
+      Given a connector agent saved before the cap that names 51 secrets
+      When the run is prepared
+      Then the run carries a refusal naming the limit of 50
+      And no secret is read
+
+    @unit
     Scenario: A connector agent whose fixtures are over 64 KiB fails setup before any block runs
       Given a connector agent whose fixtures dataset is over 64 KiB
       When the run is prepared and started
       Then setup records "failed" naming the cap
+      And the code runner is not called
+
+    @unit
+    Scenario: Fixtures over 64 KiB are refused without loading the rest of the dataset
+      Given a fixtures dataset whose first page of rows already passes 64 KiB
+      When the run is prepared
+      Then the run carries a refusal naming the cap
+      And no later page of rows is read
+
+    @unit
+    Scenario: A refused connector records its teardown as not run
+      Given a connector agent with a teardown block that is refused before it runs
+      When a scenario runs against it
+      Then setup records "failed" with the refusal
+      And teardown records "not_run"
       And the code runner is not called
 
     @unit

@@ -4,7 +4,7 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
-import { STATE_MAX_BYTES } from "@langwatch/agent-contract";
+import { CONNECTOR_SECRET_NAME_PATTERN, STATE_MAX_BYTES } from "@langwatch/agent-contract";
 import type { ConnectorBlockData, RunParameterValues } from "@langwatch/scenario-contract";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 
@@ -31,16 +31,25 @@ export const CODE_TIMEOUT_HEADROOM_MS = 5_000;
 const CODE_BLOCK_TIMEOUT = "code_block_timeout";
 
 /**
- * A block that did not answer with what it must. `agent_call_timeout` is the code the hook service
- * reads as "timed out"; anything else is "failed".
+ * How the hook service records a block error: `agent_call_timeout` as "timed out", `hook_not_run`
+ * (a teardown on a connector refused before any block ran) as "not run", `hook_failed` as "failed".
  */
-export class ConnectorBlockError extends Error {
-  readonly code: "agent_call_timeout" | "hook_failed";
+export type ConnectorBlockErrorCode = "agent_call_timeout" | "hook_not_run" | "hook_failed";
 
-  constructor({ message, isTimeout = false }: { message: string; isTimeout?: boolean }) {
+/** A block that did not answer with what it must, or that was never run. */
+export class ConnectorBlockError extends Error {
+  readonly code: ConnectorBlockErrorCode;
+
+  constructor({
+    message,
+    code = "hook_failed",
+  }: {
+    message: string;
+    code?: ConnectorBlockErrorCode;
+  }) {
     super(message);
     this.name = "ConnectorBlockError";
-    this.code = isTimeout ? "agent_call_timeout" : "hook_failed";
+    this.code = code;
   }
 }
 
@@ -224,50 +233,98 @@ export function connectorBlockOutputs({
   }
   if (answer.status === "error") {
     const error = answer.nodes?.[CONNECTOR_BLOCK_NODE_ID]?.error ?? answer.error;
-    const isTimeout = error?.type === CODE_BLOCK_TIMEOUT;
+    const code = error?.type === CODE_BLOCK_TIMEOUT ? "agent_call_timeout" : "hook_failed";
     const rawDetail = error?.traceback || error?.message || error?.type || "no error detail";
     const detail = redactInternalAddresses(cleanErrorDetail(rawDetail));
-    throw new ConnectorBlockError({ message: `The ${kind} block failed: ${detail}`, isTimeout });
+    throw new ConnectorBlockError({ message: `The ${kind} block failed: ${detail}`, code });
   }
   const outputs = answer.nodes?.[CONNECTOR_BLOCK_NODE_ID]?.outputs;
   return isObject(outputs) ? outputs : {};
 }
 
-/**
- * Setup's answer, checked: `state` (an object, at most 64 KiB) and run-scoped `secrets` (name to
- * string), nothing else. @throws ConnectorBlockError when the answer breaks that shape.
- */
-export function connectorSetupAnswer(outputs: ConnectorObject): {
+/** Setup's answer: what teardown can still use, and why setup fails when it breaks its shape. */
+export type ConnectorSetupAnswer = {
+  /** The state when it is an object, kept even over the cap so teardown can clean up. */
   state?: ConnectorObject;
-  secrets?: Record<string, string>;
-} {
+  /** The run-scoped secrets with a valid name that no project secret already holds. */
+  secrets: Record<string, string>;
+  /** Every string secret value setup returned, usable or not, to scrub from what is shown. */
+  secretValues: string[];
+  /** Set when setup must fail; names no secret value. */
+  problem?: string;
+};
+
+/**
+ * Setup's answer, checked: `state` (an object, at most 64 KiB) and run-scoped `secrets` (a valid
+ * name, not a project secret's, to a string), nothing else. Never throws: the usable part is kept
+ * beside the first problem, so a failed setup's data can still be torn down.
+ */
+export function connectorSetupAnswer({
+  outputs,
+  projectSecretNames,
+}: {
+  outputs: ConnectorObject;
+  projectSecretNames: readonly string[];
+}): ConnectorSetupAnswer {
   const { state, secrets, ...rest } = outputs;
-  const unknownKeys = Object.keys(rest);
-  if (unknownKeys.length > 0) {
-    // A bare `{"accountId": ...}` would otherwise record ok with an empty state.
-    throw new ConnectorBlockError({
-      message: `The setup block must return { state, secrets? }; it also returned: ${unknownKeys.join(", ")}.`,
-    });
-  }
-  if (state !== undefined && state !== null && !isObject(state)) {
-    throw new ConnectorBlockError({ message: "The setup block's state must be a JSON object." });
-  }
-  if (isObject(state) && byteLength(state) > STATE_MAX_BYTES) {
-    throw new ConnectorBlockError({
-      message: `The setup block's state is over the ${STATE_MAX_BYTES / 1024} KiB a run keeps.`,
-    });
-  }
+  const entries = isObject(secrets) ? Object.entries(secrets) : [];
+  const named = entries.filter((entry): entry is [string, string] => typeof entry[1] === "string");
+  const names = named.map(([name]) => name);
+  const badNames = names.filter((name) => !CONNECTOR_SECRET_NAME_PATTERN.test(name));
+  const clashes = names.filter((name) => projectSecretNames.includes(name));
   const isSecretMap =
-    isObject(secrets) && Object.values(secrets).every((value) => typeof value === "string");
-  if (secrets !== undefined && secrets !== null && !isSecretMap) {
-    throw new ConnectorBlockError({
-      message: "The setup block's secrets must map each name to a string.",
-    });
-  }
+    secrets === undefined ||
+    secrets === null ||
+    (isObject(secrets) && named.length === entries.length);
+  const problem = setupProblem({
+    unknownKeys: Object.keys(rest),
+    state,
+    isSecretMap,
+    badNames,
+    clashes,
+  });
   return {
     ...(isObject(state) ? { state } : {}),
-    ...(isSecretMap ? { secrets: secrets as Record<string, string> } : {}),
+    secrets: Object.fromEntries(
+      named.filter(([name]) => !badNames.includes(name) && !clashes.includes(name)),
+    ),
+    secretValues: named.map(([, value]) => value),
+    ...(problem ? { problem } : {}),
   };
+}
+
+/** The first way setup's answer breaks its shape, naming keys and secret names, never values. */
+function setupProblem({
+  unknownKeys,
+  state,
+  isSecretMap,
+  badNames,
+  clashes,
+}: {
+  unknownKeys: string[];
+  state: unknown;
+  isSecretMap: boolean;
+  badNames: string[];
+  clashes: string[];
+}): string | undefined {
+  // A bare `{"accountId": ...}` would otherwise record ok with an empty state.
+  if (unknownKeys.length > 0) {
+    return `The setup block must return { state, secrets? }; it also returned: ${unknownKeys.join(", ")}.`;
+  }
+  if (state !== undefined && state !== null && !isObject(state)) {
+    return "The setup block's state must be a JSON object.";
+  }
+  if (isObject(state) && byteLength(state) > STATE_MAX_BYTES) {
+    return `The setup block's state is over the ${STATE_MAX_BYTES / 1024} KiB a run keeps.`;
+  }
+  if (!isSecretMap) return "The setup block's secrets must map each name to a string.";
+  if (badNames.length > 0) {
+    return `Setup returned the secret name ${badNames.join(", ")}, which must be capital letters, digits and underscores, starting with a letter.`;
+  }
+  if (clashes.length > 0) {
+    return `Setup returned secret ${clashes.join(", ")}, which is already a project secret.`;
+  }
+  return undefined;
 }
 
 /** The call block's reply text. @throws ConnectorBlockError without a `reply`. */

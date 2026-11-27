@@ -33,23 +33,33 @@ function connectorAgent(
   };
 }
 
-function page(entries: Record<string, unknown>[], count = entries.length): DatasetPage {
+/** One page of a dataset holding `entries`, as the dataset API answers it. */
+function pageOf({
+  entries,
+  page,
+  limit,
+}: {
+  entries: Record<string, unknown>[];
+  page: number;
+  limit: number;
+}): DatasetPage {
+  const start = (page - 1) * limit;
   return {
     id: "dataset_1",
     name: "Fixtures",
     columnTypes: [],
-    datasetRecords: entries.map((entry, index) => ({
-      id: `record_${index}`,
+    datasetRecords: entries.slice(start, start + limit).map((entry, index) => ({
+      id: `record_${start + index}`,
       datasetId: "dataset_1",
       projectId: PROJECT_ID,
       entry,
       createdAt: new Date(0),
       updatedAt: new Date(0),
     })),
-    count,
-    page: 1,
-    limit: 1000,
-    totalPages: 1,
+    count: entries.length,
+    page,
+    limit,
+    totalPages: Math.ceil(entries.length / limit),
   };
 }
 
@@ -62,9 +72,13 @@ function serviceWith({
   agent?: Agent | "missing";
   released?: boolean | "unreadable";
   projectSecrets?: Record<string, string>;
-  dataset?: DatasetPage | null;
+  /** The dataset's rows, or null when it no longer exists. */
+  dataset?: Record<string, unknown>[] | null;
 }) {
-  const reads = { secretNames: [] as string[][], datasets: [] as string[] };
+  const reads = {
+    secretNames: [] as string[][],
+    datasets: [] as { slugOrId: string; page?: number }[],
+  };
   const agents: Pick<AgentApi, "getById"> = {
     getById: async () => {
       if (agent === "missing") throw new AgentNotFoundError("agent-1");
@@ -80,9 +94,9 @@ function serviceWith({
     },
   };
   const datasets: Pick<DatasetApi, "findDatasetPage"> = {
-    findDatasetPage: async ({ slugOrId }) => {
-      reads.datasets.push(slugOrId);
-      return dataset;
+    findDatasetPage: async ({ slugOrId, page = 1, limit = 50 }) => {
+      reads.datasets.push({ slugOrId, page });
+      return dataset ? pageOf({ entries: dataset, page, limit }) : null;
     },
   };
   const featureFlags: Pick<FeatureFlagApi, "isEnabled"> = {
@@ -156,7 +170,7 @@ describe("ScenarioConnectorTargetService", () => {
         released: false,
         agent: connectorAgent({ secretNames: ["SHOP_ADMIN_KEY"], fixturesDatasetId: "dataset_1" }),
         projectSecrets: { SHOP_ADMIN_KEY: "admin-value" },
-        dataset: page([{ persona: "gold" }]),
+        dataset: [{ persona: "gold" }],
       });
 
       const data = await read();
@@ -170,6 +184,20 @@ describe("ScenarioConnectorTargetService", () => {
       const { read } = serviceWith({ released: "unreadable" });
 
       await expect(read()).resolves.toMatchObject({ refusal: NOT_RELEASED });
+    });
+  });
+
+  describe("given a connector agent saved before the cap that names more than 50 secrets", () => {
+    /** @scenario "A connector agent that names more than 50 secrets fails setup before any secret is read" */
+    it("carries a refusal naming the limit and reads no secret", async () => {
+      const secretNames = Array.from({ length: 51 }, (_, index) => `KEY_${index}`);
+      const { read, reads } = serviceWith({ agent: connectorAgent({ secretNames }) });
+
+      const data = await read();
+
+      expect(data?.refusal).toContain("at most 50");
+      expect(data?.secrets).toEqual({});
+      expect(reads.secretNames).toEqual([]);
     });
   });
 
@@ -194,17 +222,28 @@ describe("ScenarioConnectorTargetService", () => {
       const rows = [{ persona: "gold" }, { persona: "basic" }];
       const { read } = serviceWith({
         agent: connectorAgent({ fixturesDatasetId: "dataset_1" }),
-        dataset: page(rows),
+        dataset: rows,
       });
 
       await expect(read()).resolves.toMatchObject({ rows });
+    });
+
+    it("reads every page of a dataset larger than one page", async () => {
+      const rows = Array.from({ length: 250 }, (_, index) => ({ index }));
+      const { read, reads } = serviceWith({
+        agent: connectorAgent({ fixturesDatasetId: "dataset_1" }),
+        dataset: rows,
+      });
+
+      await expect(read()).resolves.toMatchObject({ rows });
+      expect(reads.datasets.map(({ page }) => page)).toEqual([1, 2, 3]);
     });
 
     /** @scenario "A connector agent whose fixtures are over 64 KiB fails setup before any block runs" */
     it("carries a refusal naming the cap when the rows are over 64 KiB", async () => {
       const { read } = serviceWith({
         agent: connectorAgent({ fixturesDatasetId: "dataset_1" }),
-        dataset: page([{ text: "x".repeat(64 * 1024) }]),
+        dataset: [{ text: "x".repeat(64 * 1024) }],
       });
 
       const data = await read();
@@ -213,15 +252,19 @@ describe("ScenarioConnectorTargetService", () => {
       expect(data).not.toHaveProperty("rows");
     });
 
-    it("carries a refusal naming the row limit when the dataset has more rows than a page", async () => {
-      const { read } = serviceWith({
+    /** @scenario "Fixtures over 64 KiB are refused without loading the rest of the dataset" */
+    it("refuses on the first page that passes the cap and reads no later page", async () => {
+      const rows = Array.from({ length: 300 }, (_, index) => ({ index, text: "x".repeat(1024) }));
+      const { read, reads } = serviceWith({
         agent: connectorAgent({ fixturesDatasetId: "dataset_1" }),
-        dataset: page([{ persona: "gold" }], 1001),
+        dataset: rows,
       });
 
-      await expect(read()).resolves.toMatchObject({
-        refusal: expect.stringContaining("1000 rows"),
-      });
+      const data = await read();
+
+      expect(data?.refusal).toContain("64 KiB");
+      expect(data).not.toHaveProperty("rows");
+      expect(reads.datasets.map(({ page }) => page)).toEqual([1]);
     });
 
     /** @scenario "A connector agent whose fixtures dataset was deleted fails setup before any block runs" */

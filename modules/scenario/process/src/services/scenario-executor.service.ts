@@ -19,8 +19,8 @@ import type {
   ScenarioGoChildChannel,
 } from "../channels/scenario-child.channel.ts";
 import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
-import { ScenarioConnectorTargetService } from "../features/prefetch/services/scenario-connector-target.service.ts";
 import type { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
+import { ScenarioConnectorTargetService } from "../features/prefetch/services/scenario-connector-target.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";

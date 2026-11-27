@@ -55,6 +55,8 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
   private state: ConnectorObject | null = null;
   private turnCount = 0;
   private secrets: Record<string, string> = {};
+  /** Every secret value setup returned, kept or refused, so none is shown. */
+  private setupSecretValues: string[] = [];
 
   private constructor(options: ScenarioConnectorOptions) {
     this.config = options.config;
@@ -93,15 +95,21 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
   }): Promise<{ state?: ConnectorObject }> {
     return this.scrubbingFailures(async () => {
       const block = this.config[kind];
-      if (!block) throw this.refusal();
+      if (!block) throw this.refusal(kind);
       const outputs = await this.runBlock({ kind, block, timeoutMs });
       if (kind === "teardown") {
         const answer = connectorTeardownAnswer(outputs);
         return answer.state ? { state: this.scrubbed(answer.state) } : {};
       }
-      const answer = connectorSetupAnswer(outputs);
-      this.secrets = answer.secrets ?? {};
+      const answer = connectorSetupAnswer({
+        outputs,
+        projectSecretNames: Object.keys(this.config.secrets),
+      });
+      // Kept before the answer is judged, so a failed setup's data can still be torn down.
+      this.setupSecretValues = answer.secretValues;
+      this.secrets = answer.secrets;
       this.state = answer.state ? this.scrubbed(answer.state) : null;
+      if (answer.problem) throw new ConnectorBlockError({ message: answer.problem });
       return this.state ? { state: this.state } : {};
     });
   }
@@ -123,10 +131,20 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     });
   }
 
-  /** A refused connector, or a hook without a block, fails before the code runner is called. */
-  private refusal(): ConnectorBlockError {
+  /**
+   * A refused connector, or a hook without a block, fails before the code runner is called. Only
+   * setup records a refusal as failed; a refused teardown never ran, so it records not run.
+   */
+  private refusal(kind: ConnectorBlockKind): ConnectorBlockError {
+    const { refusal } = this.config;
+    if (refusal !== undefined && kind === "teardown") {
+      return new ConnectorBlockError({
+        message: "The connector was refused before any block ran, so teardown did not run.",
+        code: "hook_not_run",
+      });
+    }
     return new ConnectorBlockError({
-      message: this.config.refusal ?? "The connector has no block for this step.",
+      message: refusal ?? "The connector has no block for this step.",
     });
   }
 
@@ -143,7 +161,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     turn?: { message: string; history: ConnectorMessage[] };
     turnIndex?: number;
   }): Promise<ConnectorObject> {
-    if (this.config.refusal !== undefined) throw this.refusal();
+    if (this.config.refusal !== undefined) throw this.refusal(kind);
     const input = connectorBlockInput({
       kind,
       run: this.run,
@@ -163,7 +181,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
       block,
       input,
       params: this.parameters,
-      // A run-scoped secret overrides a project secret of the same name, for this run only.
+      // Setup's own secrets never share a project secret's name (connectorSetupAnswer).
       secrets: kind === "setup" ? this.config.secrets : { ...this.config.secrets, ...this.secrets },
       projectApiKey: this.projectApiKey,
       codeTimeoutMs: connectorCodeTimeoutMs(timeoutMs),
@@ -177,18 +195,14 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
       return await run();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const isTimeout = error instanceof ConnectorBlockError && error.code === "agent_call_timeout";
-      throw new ConnectorBlockError({ message: this.scrub(message), isTimeout });
+      const code = error instanceof ConnectorBlockError ? error.code : "hook_failed";
+      throw new ConnectorBlockError({ message: this.scrub(message), code });
     }
   }
 
-  /** Every secret value this run holds: the named ones, setup's own, and the run key. */
+  /** Every secret value this run has seen: the named ones, all setup returned, the run key. */
   private get knownSecretValues(): string[] {
-    return [
-      ...Object.values(this.config.secrets),
-      ...Object.values(this.secrets),
-      this.projectApiKey,
-    ];
+    return [...Object.values(this.config.secrets), ...this.setupSecretValues, this.projectApiKey];
   }
 
   private scrub(text: string): string {

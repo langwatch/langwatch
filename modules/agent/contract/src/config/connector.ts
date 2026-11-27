@@ -18,7 +18,10 @@ export const CONNECTOR_BLOCK_MAX_BYTES = 64 * 1024;
 export const CONNECTOR_ROWS_MAX_BYTES = 64 * 1024;
 
 /** SECRET_NAME_PATTERN in the secret contract, which this package does not depend on. */
-const SECRET_NAME = /^[A-Z][A-Z0-9_]*$/;
+export const CONNECTOR_SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;
+
+/** The most project secrets one connector may name; the prefetch refuses more before any read. */
+export const CONNECTOR_SECRET_NAMES_MAX = 50;
 
 /** UTF-8 size without TextEncoder, which this isomorphic package's lib does not declare. */
 function utf8ByteLength(text: string): number {
@@ -58,9 +61,13 @@ const connectorAgentConfigSchemaDefinition = z.object({
       z
         .string()
         .regex(
-          SECRET_NAME,
+          CONNECTOR_SECRET_NAME_PATTERN,
           "A secret name is capital letters, digits and underscores, starting with a letter.",
         ),
+    )
+    .max(
+      CONNECTOR_SECRET_NAMES_MAX,
+      `A connector names at most ${CONNECTOR_SECRET_NAMES_MAX} secrets.`,
     )
     .default([]),
   /** The dataset whose rows every block receives as `rows`. */

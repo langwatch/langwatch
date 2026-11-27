@@ -158,9 +158,9 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
-import { ScenarioConnectorTargetService } from "../features/prefetch/services/scenario-connector-target.service.ts";
 import { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { JudgePreviewChatService } from "../features/judge-preview/services/judge-preview-chat.service.ts";
+import { ScenarioConnectorTargetService } from "../features/prefetch/services/scenario-connector-target.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";

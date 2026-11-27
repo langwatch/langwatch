@@ -52,8 +52,8 @@ const tracer = trace.getTracer("langwatch-scenario-child");
 function statusOf(error: unknown): ScenarioHookStatus {
   const code = typeof error === "object" && error !== null && "code" in error ? error.code : null;
   if (code === "agent_call_timeout") return "timed_out";
-  // No instance took the call, so the hook never ran.
-  if (code === "agent_offline") return "not_run";
+  // No instance took the call, or a refused connector ran no block, so the hook never ran.
+  if (code === "agent_offline" || code === "hook_not_run") return "not_run";
   return "failed";
 }
 
