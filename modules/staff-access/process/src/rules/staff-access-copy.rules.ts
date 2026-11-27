@@ -161,7 +161,8 @@ type PromptSetting =
   | "verbosity"
   | "promptingTechnique"
   | "demonstrations"
-  | "responseFormat";
+  | "responseFormat"
+  | "parameters";
 export type PromptVersionFields = Pick<
   VersionedPrompt,
   "prompt" | "messages" | "inputs" | "outputs" | "model"
@@ -215,5 +216,6 @@ export function promptFields(version: VersionedPrompt): PromptVersionFields {
       : { promptingTechnique: techniqueWithoutDatasetLink(version.promptingTechnique) }),
     ...inlineDemonstrations(version.demonstrations),
     ...(version.responseFormat === undefined ? {} : { responseFormat: version.responseFormat }),
+    ...(version.parameters === undefined ? {} : { parameters: version.parameters }),
   };
 }

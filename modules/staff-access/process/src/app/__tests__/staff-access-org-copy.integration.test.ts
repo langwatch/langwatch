@@ -14,7 +14,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { StaffAccessDoorSession } from "@langwatch/staff-access-contract";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryStaffAccessRepositories } from "../../repositories/memory/memory.staff-access.repositories.ts";
 import { PostgresStaffAccessRepositories } from "../../repositories/prisma/prisma.staff-access.repositories.ts";
@@ -45,11 +45,11 @@ async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
   }
 }
 
-function requestFrom({ bearer }: { bearer: string }): Request {
+function requestFrom({ bearer, ip = AGENT_IP }: { bearer: string; ip?: string }): Request {
   const request = new Request("https://app.langwatch.test/api/staff-access/ops/copies", {
     headers: { authorization: `Bearer ${bearer}`, "user-agent": "langwatch-cli" },
   });
-  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: AGENT_IP });
+  ClientAddress.fromTrustedProxies({}).handle({ request, socketAddress: ip });
   return request;
 }
 
@@ -70,6 +70,7 @@ async function liveApproval({
   requestId: string;
   opsToken: string;
   apiKey: string | undefined;
+  projects: readonly { id: string }[];
   session: StaffAccessDoorSession;
 }> {
   const created = await w.app.createRequest({
@@ -94,12 +95,13 @@ async function liveApproval({
   });
   const opsToken = answer.opsToken ?? "";
   const caller = await w.app.staffAccessDoor.identify?.({
-    request: requestFrom({ bearer: opsToken }),
+    request: requestFrom({ bearer: opsToken, ip: agent.session.ipAddress }),
   });
   return {
     requestId: created.requestId,
     opsToken,
     apiKey: answer.apiKey,
+    projects: answer.projects,
     session: caller?.session as StaffAccessDoorSession,
   };
 }
@@ -315,6 +317,46 @@ function scenarios(backend: Backend): void {
         const stopped = w.state.audit.filter((row) => row.action === "staffAccess.orgCopyStopped");
         expect(stopped.map((row) => row.organizationId)).toEqual([ACME.id, GLOBEX.id]);
         expect(stopped[0]?.metadata).toMatchObject({ stoppedBecause: "source_approval_ended" });
+      });
+
+      /** @scenario "A revoked approval stops a running copy" */
+      it("stops at the next item once the target session is revoked mid-run", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        w.copy.hooks.beforeEvaluatorCreate = async () => {
+          await w.app.revokeSession({ ...w.operator(OLIVIA), requestId: target.requestId });
+        };
+
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+        });
+
+        expect(report.stoppedBecause).toBe("target_approval_ended");
+        expect(report.items.map((item) => item.outcome)).toEqual([
+          "copied",
+          "copied",
+          "stopped",
+          "stopped",
+          "stopped",
+        ]);
+      });
+
+      /** @scenario "A trail row that cannot be closed does not fail the copy" */
+      it("answers the report when closing the trail rows fails", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        vi.spyOn(w.repositories.events, "finish").mockRejectedValue(new Error("trail store down"));
+
+        const report = await w.app.copyOrganization({
+          session: target.session,
+          body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+        });
+
+        expect(report.stoppedBecause).toBeNull();
+        expect(report.totals.copied).toBe(5);
       });
 
       /** @scenario "A stop row that fails every attempt does not lose the stopped report" */
@@ -602,6 +644,23 @@ function scenarios(backend: Backend): void {
         expect(w.state.minted).toEqual([]);
       });
 
+      /** @scenario "A copy side's redeem answer lists no project of its organization" */
+      it("lists no project to a copy side and the projects to an organization scope", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { agent, source, target } = await pairedApprovals(w);
+        const support = await liveApproval({
+          w,
+          agent,
+          scopes: ["org:metadata"],
+          organization: ACME,
+        });
+
+        expect(source.projects).toEqual([]);
+        expect(target.projects).toEqual([]);
+        expect(support.projects.map((project) => project.id)).toContain(seeded.project.id);
+      });
+
       /** @scenario "The approval page shows the other organization and the target grant" */
       it("shows the counterpart on both sides and the grant on the target only", async () => {
         const w = world();
@@ -693,6 +752,72 @@ function scenarios(backend: Backend): void {
             }),
           ),
         ).resolves.toBe("staff_copy_window_closed");
+      });
+
+      /** @scenario "Approvals redeemed from different addresses do not pair" */
+      it("refuses a target redeemed from another address than the source", async () => {
+        const w = world();
+        const agent = await w.enrol();
+        const source = await liveApproval({
+          w,
+          agent,
+          scopes: ["copy:source"],
+          organization: ACME,
+          counterpart: GLOBEX,
+        });
+        const moved = { ...agent, session: { ...agent.session, ipAddress: "198.51.100.9" } };
+        const target = await liveApproval({
+          w,
+          agent: moved,
+          scopes: ["copy:target"],
+          organization: GLOBEX,
+          counterpart: ACME,
+        });
+
+        await expect(
+          codeOf(
+            w.app.copyOrganization({
+              session: target.session,
+              body: { sourceOpsToken: source.opsToken },
+            }),
+          ),
+        ).resolves.toBe("staff_access_ip_mismatch");
+      });
+
+      /** @scenario "A copy whose approver is no longer a platform operator is refused" */
+      it("refuses the copy once the approving operator lost the platform role", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        w.state.operators = [PEDRO];
+
+        await expect(
+          codeOf(
+            w.app.copyOrganization({
+              session: target.session,
+              body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+            }),
+          ),
+        ).resolves.toBe("staff_access_operator_lost");
+        expect(w.copy.data.projects.some((p) => p.organizationId === GLOBEX.id)).toBe(false);
+      });
+
+      /** @scenario "A copy into an organization that no longer exists is refused" */
+      it("refuses the copy when the target organization is gone", async () => {
+        const w = world();
+        const seeded = seedAcme(w);
+        const { source, target } = await pairedApprovals(w);
+        w.state.organizationsGone.add(GLOBEX.id);
+
+        await expect(
+          codeOf(
+            w.app.copyOrganization({
+              session: target.session,
+              body: { sourceOpsToken: source.opsToken, projects: [seeded.project.id] },
+            }),
+          ),
+        ).resolves.toBe("not_found");
+        expect(w.copy.data.projects.some((p) => p.organizationId === GLOBEX.id)).toBe(false);
       });
 
       /** @scenario "Approvals from different agents do not pair" */

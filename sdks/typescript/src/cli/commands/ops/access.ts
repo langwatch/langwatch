@@ -150,7 +150,10 @@ const redeemInto = async ({
   };
 };
 
-/** Polls the request until it is decided or its approval window closes. */
+/**
+ * Polls the request until it is decided or its approval window closes. A failed read keeps it
+ * polling, and each distinct failure is said once on stderr so an outage is never silent.
+ */
 export const waitForDecision = async ({
   requestId,
   endpoint,
@@ -163,15 +166,25 @@ export const waitForDecision = async ({
   expiresAt: string;
 }): Promise<string> => {
   const deadline = Date.parse(expiresAt);
+  let lastFailure: string | undefined;
   for (;;) {
     const current = await pollStatus({ requestId, endpoint, requesterKey });
-    if (current && current.status !== "pending") return current.status;
+    if ("failure" in current) {
+      if (current.failure !== lastFailure) {
+        console.error(
+          chalk.yellow(`Could not read request ${requestId} (${current.failure}); still waiting.`),
+        );
+      }
+      lastFailure = current.failure;
+    } else if (current.status !== "pending") {
+      return current.status;
+    }
     if (Number.isFinite(deadline) && Date.now() >= deadline) return "expired";
     await sleep(OPS_POLL_INTERVAL_MS);
   }
 };
 
-/** One status read; a failed read the platform did not refuse by name answers undefined. */
+/** One status read; a failed read the platform did not refuse by name answers its failure. */
 const pollStatus = async ({
   requestId,
   endpoint,
@@ -180,7 +193,7 @@ const pollStatus = async ({
   requestId: string;
   endpoint: string;
   requesterKey: string;
-}): Promise<RequestStatus | undefined> => {
+}): Promise<RequestStatus | { failure: string }> => {
   try {
     return await staffAccessFetch<RequestStatus>({
       method: "GET",
@@ -190,7 +203,7 @@ const pollStatus = async ({
     });
   } catch (error) {
     if (isLangWatchHandledError(error) && error.httpStatus < 500) throw error;
-    return undefined;
+    return { failure: error instanceof Error ? error.message : String(error) };
   }
 };
 

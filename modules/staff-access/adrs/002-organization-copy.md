@@ -70,7 +70,11 @@ The copy is an ops operation of the `staff-access` module:
   `ProjectApi.listByOrganization`, whose rows hold the project's own keys; the
   copy keeps them in memory for the request, passes only the name, language
   and framework on, and writes no project field beyond id and name to a report,
-  trail or audit row.
+  trail or audit row. Copies start on the target's defaults: project
+  settings (default and embeddings models, PII level) are the target
+  project's, an evaluator resolves the target project's models, and a monitor
+  pinned to an evaluator label runs its copied evaluator's only version,
+  since the source's labelled versions are not copied.
 - **Owners' APIs only.** Each kind is read and created through its owner's
   `*Api` (`ProjectApi`, `EvaluatorApi`, `MonitorApi`, `PromptApi`,
   `DatasetApi`, `OrganizationApi`). The copy uses plain create operations, not

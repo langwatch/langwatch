@@ -35,6 +35,10 @@ let requests: Record<string, unknown>[] = [];
 let copyCall: { auth: string; body: Record<string, unknown> } | null = null;
 let ended: string[] = [];
 let endRefused = new Set<string>();
+let statusFailures = 0;
+let decisions: Record<string, string> = {};
+let redeemWithoutToken = false;
+let stoppedBecause: string | null = null;
 
 const run = (args: string[]): Promise<RunResult> =>
   new Promise((resolve) => {
@@ -108,14 +112,19 @@ const requesterRoute = ({ method, url, body }: { method: string; url: string; bo
   const requestId = match?.[1] ?? "";
   if (!match || !OPS_TOKENS[requestId]) return { status: 404, payload: { error: "not_found" } };
   if (match[2] === "/redeem") {
-    return { status: 200, payload: { organizationId: "org", opsToken: OPS_TOKENS[requestId] } };
+    const opsToken = redeemWithoutToken ? {} : { opsToken: OPS_TOKENS[requestId] };
+    return { status: 200, payload: { organizationId: "org", ...opsToken } };
   }
   if (match[2] === "/end") {
     if (endRefused.has(requestId)) return { status: 500, payload: { error: "internal" } };
     ended.push(requestId);
     return { status: 200, payload: { status: "revoked" } };
   }
-  return { status: 200, payload: { status: "approved" } };
+  if (statusFailures > 0) {
+    statusFailures -= 1;
+    return { status: 500, payload: { error: "internal" } };
+  }
+  return { status: 200, payload: { status: decisions[requestId] ?? "approved" } };
 };
 
 const route = ({ req, body }: { req: http.IncomingMessage; body: string }): Reply => {
@@ -123,7 +132,7 @@ const route = ({ req, body }: { req: http.IncomingMessage; body: string }): Repl
   const auth = req.headers.authorization ?? "";
   if (req.method === "POST" && url === "/api/staff-access/ops/copies") {
     copyCall = { auth, body: JSON.parse(body) as Record<string, unknown> };
-    return { status: 200, payload: report };
+    return { status: 200, payload: stoppedBecause ? { ...report, stoppedBecause } : report };
   }
   if (auth !== `Bearer ${REQUESTER_KEY}`) {
     return { status: 401, payload: { error: "unauthorized" } };
@@ -156,6 +165,10 @@ beforeEach(() => {
   copyCall = null;
   ended = [];
   endRefused = new Set();
+  statusFailures = 0;
+  decisions = {};
+  redeemWithoutToken = false;
+  stoppedBecause = null;
 });
 
 afterEach(() => {
@@ -193,8 +206,19 @@ describe("langwatch ops copy", () => {
     expect(fs.readdirSync(stateDir)).toEqual([]);
   }, 30_000);
 
+  /** @scenario "The CLI says once that it cannot read an approval and keeps waiting" */
+  it("warns once about repeated failed status reads and still copies", async () => {
+    statusFailures = 2;
+
+    const result = await run(["ops", "copy", "--from", "acme", "--to", "globex", "--dry-run"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr.match(/Could not read request req_source/g)).toHaveLength(1);
+    expect(copyCall).not.toBeNull();
+  }, 30_000);
+
   /** @scenario "The CLI says which copy session it could not end and fails" */
-  it("names the session whose end failed and exits non-zero", async () => {
+  it("names the session whose end failed, with its cause, and exits non-zero", async () => {
     endRefused = new Set(["req_target"]);
 
     const result = await run([
@@ -214,7 +238,7 @@ describe("langwatch ops copy", () => {
       ok: false,
       error: { code: "copy_sessions_still_live", meta: { requestIds: ["req_target"] } },
     });
-    expect(result.stderr).toContain("req_target");
+    expect(result.stderr).toMatch(/Could not end copy session req_target: \S.*/);
     expect(ended).toEqual(["req_source"]);
   }, 30_000);
 
@@ -239,5 +263,104 @@ describe("langwatch ops copy", () => {
       error: { code: "validation_error" },
     });
     expect(requests).toEqual([]);
+  }, 30_000);
+
+  /** @scenario "The CLI stops when an organization denies its copy approval" */
+  it("names the denied request and copies nothing", async () => {
+    decisions = { req_source: "denied" };
+
+    const result = await run(["ops", "copy", "--from", "acme", "--to", "globex"]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(/Request req_source was denied/);
+    expect(copyCall).toBeNull();
+  }, 30_000);
+
+  /** @scenario "The CLI stops when an approval expires before it is decided" */
+  it("names the expired request and copies nothing", async () => {
+    decisions = { req_target: "expired" };
+
+    const result = await run(["ops", "copy", "--from", "acme", "--to", "globex"]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(
+      /Request req_target expired before it was approved/,
+    );
+    expect(copyCall).toBeNull();
+    expect(ended).toEqual(["req_source"]);
+  }, 30_000);
+
+  /** @scenario "The CLI stops when a redeemed approval carries no ops token" */
+  it("refuses a redeem answer without an ops token and copies nothing", async () => {
+    redeemWithoutToken = true;
+
+    const result = await run(["ops", "copy", "--from", "acme", "--to", "globex"]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(
+      /Request req_source was redeemed without an ops token/,
+    );
+    expect(copyCall).toBeNull();
+  }, 30_000);
+
+  /** @scenario "The CLI refuses a copy into the same organization" */
+  it("refuses --from and --to naming the same organization before any request", async () => {
+    const result = await run([
+      "ops",
+      "copy",
+      "--from",
+      "acme",
+      "--to",
+      " acme ",
+      "--format",
+      "json",
+    ]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: expect.stringMatching(/name the same organization/),
+      },
+    });
+    expect(requests).toEqual([]);
+  }, 30_000);
+
+  /** @scenario "The CLI refuses a reason over 500 characters" */
+  it("refuses a reason over 500 characters before any request", async () => {
+    const result = await run([
+      "ops",
+      "copy",
+      "--from",
+      "acme",
+      "--to",
+      "globex",
+      "--reason",
+      "x".repeat(501),
+      "--format",
+      "json",
+    ]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: expect.stringMatching(/limited to 500 characters/),
+      },
+    });
+    expect(requests).toEqual([]);
+  }, 30_000);
+
+  /** @scenario "The CLI says why a copy stopped early" */
+  it("prints why the copy stopped early", async () => {
+    stoppedBecause = "approval_revoked";
+
+    const result = await run(["ops", "copy", "--from", "acme", "--to", "globex", "--dry-run"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/Stopped early \(approval_revoked\): an approval ended\./);
+    expect(ended.toSorted()).toEqual(["req_source", "req_target"]);
   }, 30_000);
 });

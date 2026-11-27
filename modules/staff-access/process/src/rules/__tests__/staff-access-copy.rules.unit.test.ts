@@ -171,6 +171,7 @@ describe("promptFields", () => {
     verbosity: "low",
     promptingTechnique: { type: "chain_of_thought" as const },
     demonstrations: { inline: { records: { question: ["2+2?"] }, columnTypes: [] } },
+    parameters: { tone: "friendly", retries: 2 },
     responseFormat: { type: "json_schema" as const, json_schema: { name: "answer", schema: {} } },
   } satisfies Partial<VersionedPrompt>;
 

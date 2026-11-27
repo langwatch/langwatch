@@ -118,7 +118,9 @@ export class StaffAccessCopyService {
               errorCode,
               durationMs: this.deps.now().epochMilliseconds - startedAt.epochMilliseconds,
             })
-            .catch(() => undefined),
+            .catch((error: unknown) => {
+              logger.warn({ error, eventId: id }, "a staff access copy trail row was not closed");
+            }),
         ),
       );
     try {

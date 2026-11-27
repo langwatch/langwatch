@@ -81,6 +81,13 @@ Feature: Large dataset storage
     And no dataset is created in the other project
 
   @unit
+  Scenario: A dataset in object storage with no chunk count fails before its copy exists
+    Given a ready dataset in object storage whose chunk count is missing
+    When I copy it to another project
+    Then the copy fails as a platform error, not a refusal by name
+    And no dataset is created in the other project
+
+  @unit
   Scenario: A copy that fails after its dataset exists names the dataset it made
     Given a dataset in object storage being copied to another project
     When the copy fails after the new dataset was created there

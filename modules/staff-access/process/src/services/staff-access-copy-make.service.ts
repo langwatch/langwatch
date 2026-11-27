@@ -161,7 +161,10 @@ export class StaffAccessCopyMakeService {
     return created.id;
   }
 
-  /** A copied monitor starts paused: it would run on the target's traces and spend there. */
+  /**
+   * A copied monitor starts paused: it would run on the target's traces and spend there. Its
+   * evaluator label stays behind, since the labelled versions it names are not copied (ADR-002).
+   */
   private async copyMonitor({
     monitor,
     projectId,

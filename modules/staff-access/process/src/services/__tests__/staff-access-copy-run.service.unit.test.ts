@@ -1,6 +1,6 @@
 import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { Temporal } from "@langwatch/time";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copyCatalog, type CopyCatalog } from "../../app/__tests__/support/copy-catalog.ts";
 import { MemoryStaffAccessCopyLedgerRepository } from "../../repositories/memory/memory.staff-access-copy-ledger.repository.ts";
@@ -257,5 +257,79 @@ describe("StaffAccessCopyRunService.execute", () => {
       ["evaluator", "skipped", "project_not_copied"],
       ["dataset", "skipped", "project_not_copied"],
     ]);
+  });
+
+  const replan = () =>
+    run.plan({ source: ACME, target: GLOBEX, projects: [sourceProjectId], grant: FULL_GRANT });
+
+  /** @scenario "A project whose copy was interrupted is skipped with everything in it" */
+  it("reports an interrupted project on the rerun and plans nothing in it", async () => {
+    catalog.hooks.beforeProjectCreate = async () => {
+      throw new Error("project store unavailable");
+    };
+    await executeAll(plan);
+    catalog.hooks.beforeProjectCreate = async () => {};
+
+    const rerun = await replan();
+    await executeAll(rerun);
+
+    expect(rerun.items.map((item) => [item.kind, item.outcome, item.reason])).toEqual([
+      ["project", "skipped", "copy_interrupted"],
+    ]);
+    expect(catalog.data.projects.some((project) => project.organizationId === GLOBEX.id)).toBe(
+      false,
+    );
+  });
+
+  /** @scenario "A ledger write that fails fails the item" */
+  it("fails an item whose reservation cannot be written and makes nothing for it", async () => {
+    vi.spyOn(ledger, "reserve").mockRejectedValue(new Error("ledger unavailable"));
+
+    const { items } = await executeAll(plan);
+
+    expect(items[0]).toMatchObject({
+      kind: "project",
+      outcome: "failed",
+      reason: "unexpected_error",
+    });
+    expect(catalog.data.projects.some((project) => project.organizationId === GLOBEX.id)).toBe(
+      false,
+    );
+  });
+
+  /** @scenario "A ledger write that fails fails the item" */
+  it("fails an item whose completion cannot be written and names the target it made", async () => {
+    vi.spyOn(ledger, "complete").mockRejectedValue(new Error("ledger unavailable"));
+
+    const { items } = await executeAll(plan);
+
+    const made = catalog.data.projects.find((project) => project.organizationId === GLOBEX.id);
+    expect(items[0]).toMatchObject({
+      kind: "project",
+      outcome: "failed",
+      reason: "unexpected_error",
+      targetId: made?.id,
+    });
+  });
+
+  /** @scenario "A refused item whose reservation cannot be released stays interrupted" */
+  it("reports the item interrupted on the rerun when its release failed", async () => {
+    catalog.hooks.beforeDatasetCopy = async () => {
+      throw new DatasetNotReadyError({ status: "processing" });
+    };
+    vi.spyOn(ledger, "release").mockRejectedValue(new Error("ledger unavailable"));
+    const first = await executeAll(plan);
+    catalog.hooks.beforeDatasetCopy = async () => {};
+
+    const rerun = await replan();
+
+    expect(first.items.find((item) => item.kind === "dataset")).toMatchObject({
+      outcome: "failed",
+      reason: "dataset_not_ready",
+    });
+    expect(rerun.items.find((item) => item.kind === "dataset")).toMatchObject({
+      outcome: "skipped",
+      reason: "copy_interrupted",
+    });
   });
 });

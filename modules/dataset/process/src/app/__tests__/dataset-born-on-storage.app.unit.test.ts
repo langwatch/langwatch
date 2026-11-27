@@ -359,6 +359,32 @@ describe("copying a dataset in object storage that is not ready", () => {
       await repositories.datasets.findAll({ projectId: "project-target", page: 1, limit: 10 }),
     ).toEqual([]);
   });
+
+  /** @scenario "A dataset in object storage with no chunk count fails before its copy exists" */
+  it("fails the copy as a platform error and creates no dataset in the target project", async () => {
+    const repositories = MemoryDatasetRepositories.create();
+    const app = createDatasetTestApp({ repositories });
+    const source = await app.upsertDataset({ projectId, name: "Drifted", columnTypes });
+    await repositories.content.update({
+      id: source.id,
+      projectId,
+      data: { contentLayout: "s3_jsonl", status: "ready", chunkCount: null },
+    });
+
+    const failure = await app
+      .copyDataset({
+        sourceDatasetId: source.id,
+        sourceProjectId: projectId,
+        targetProjectId: "project-target",
+      })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ name: "DatasetChunkCountMissingError" });
+    expect(failure).not.toHaveProperty("httpStatus");
+    expect(
+      await repositories.datasets.findAll({ projectId: "project-target", page: 1, limit: 10 }),
+    ).toEqual([]);
+  });
 });
 
 describe("copying a dataset in object storage when the copy fails after its dataset exists", () => {

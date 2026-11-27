@@ -129,7 +129,13 @@ const endSide = async ({
     endpoint,
   }).then(
     () => true,
-    () => false,
+    (error: unknown) => {
+      const cause = error instanceof Error ? error.message : String(error);
+      console.error(
+        chalk.yellow(`Could not end copy session ${requestId}: ${sanitizeTerminalText(cause)}`),
+      );
+      return false;
+    },
   );
 
 /** Ends every approved side, warns on stderr about each one still live, and answers their ids. */

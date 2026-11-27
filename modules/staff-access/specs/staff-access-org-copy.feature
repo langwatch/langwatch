@@ -41,6 +41,13 @@ Feature: Copying an organization's setup into another organization
     And the server reads the source itself, so the agent never holds a key that reads ACME's traces
 
   @integration
+  Scenario: A copy side's redeem answer lists no project of its organization
+    Given ACME has a project
+    When the agent redeems approved "copy:source" and "copy:target" requests and an "org:metadata" request for ACME
+    Then neither copy side's answer lists a project
+    And the "org:metadata" answer lists ACME's project
+
+  @integration
   Scenario: The door answers opsCopy:create only for a session approved for copy:target
     Given redeemed "copy:target", "copy:source" and "ops:read" sessions
     Then the door permits "opsCopy:create" to the "copy:target" session and refuses it to the others
@@ -114,6 +121,27 @@ Feature: Copying an organization's setup into another organization
     Then the evaluator is skipped with "copied_by_a_concurrent_run" and not made
 
   @unit
+  Scenario: A project whose copy was interrupted is skipped with everything in it
+    Given an earlier run reserved ACME's project in Globex and failed before it was made
+    When the copy runs again
+    Then the project is skipped with "copy_interrupted"
+    And nothing in it is planned or made
+
+  @unit
+  Scenario: A ledger write that fails fails the item
+    Given the ledger cannot reserve an item, or cannot complete one the owner made
+    When the copy runs
+    Then that item is reported failed and the failure is logged
+    And an item whose target was made names that target
+
+  @unit
+  Scenario: A refused item whose reservation cannot be released stays interrupted
+    Given the dataset owner refuses the copy by name and the ledger cannot release the reservation
+    When the copy runs and then runs again
+    Then the first run reports the dataset failed with the owner's code
+    And the rerun reports it skipped with "copy_interrupted"
+
+  @unit
   Scenario: Items of a project whose copy failed are skipped
     Given the project owner fails to create ACME's project in Globex
     When the copy runs
@@ -149,7 +177,7 @@ Feature: Copying an organization's setup into another organization
 
   @unit
   Scenario: A copied prompt version carries every model setting it has and no other
-    Given a prompt version with every optional model setting set, and one with none
+    Given a prompt version with every optional model setting and its runtime parameters set, and one with none
     When the copy reads the fields it writes into the target
     Then each setting is carried with its value
     And a setting the version does not have stays absent
@@ -211,6 +239,13 @@ Feature: Copying an organization's setup into another organization
     And they never name an item an earlier run copied
 
   @integration
+  Scenario: A trail row that cannot be closed does not fail the copy
+    Given the trail store fails to close the copy's trail rows
+    When the agent copies ACME into Globex
+    Then the copy answers its report with every item copied
+    And the failure is logged as a warning
+
+  @integration
   Scenario: A stop row that fails every attempt does not lose the stopped report
     Given a copy is running and Globex's audit log refuses every stop row
     When Olivia revokes the source session after the evaluator was made
@@ -236,6 +271,27 @@ Feature: Copying an organization's setup into another organization
     And a target approval made after it
     When the agent copies ACME into Globex
     Then the copy is refused with "staff_copy_window_closed"
+
+  @integration
+  Scenario: Approvals redeemed from different addresses do not pair
+    Given the agent redeemed the "copy:source" request from one address
+    And it redeemed the "copy:target" request from another
+    When it calls the copy
+    Then the copy is refused with "staff_access_ip_mismatch"
+
+  @integration
+  Scenario: A copy whose approver is no longer a platform operator is refused
+    Given both copy approvals are live
+    And the operator who approved them is no longer a platform operator
+    When the agent calls the copy
+    Then the copy is refused with "staff_access_operator_lost" and nothing is made
+
+  @integration
+  Scenario: A copy into an organization that no longer exists is refused
+    Given both copy approvals are live
+    And Globex no longer exists
+    When the agent calls the copy
+    Then the copy is refused with "not_found" and nothing is made
 
   @integration
   Scenario: Approvals from different agents do not pair
@@ -276,12 +332,49 @@ Feature: Copying an organization's setup into another organization
     And it ends both sessions afterwards
 
   @integration
+  Scenario: The CLI says once that it cannot read an approval and keeps waiting
+    Given the server fails the first two status reads of the source request
+    When the agent runs "langwatch ops copy --from acme --to globex --dry-run"
+    Then it says once on stderr that it could not read the request
+    And it keeps waiting and runs the copy once the request reads approved
+
+  @integration
   Scenario: The CLI says which copy session it could not end and fails
     Given the server refuses to end the target session after a copy
     When the agent runs "langwatch ops copy --from acme --to globex --dry-run"
-    Then it names the target session as still live on stderr
+    Then it names the target session as still live on stderr, with why it could not end it
     And it exits non-zero with "copy_sessions_still_live"
     And the source session is still ended
+
+  @integration
+  Scenario: The CLI stops when an organization denies its copy approval
+    When the source organization denies its copy approval
+    Then the CLI names the denied request, copies nothing and exits non-zero
+
+  @integration
+  Scenario: The CLI stops when an approval expires before it is decided
+    When the target approval expires before anyone decides it
+    Then the CLI names the expired request, copies nothing, ends the approved session and exits non-zero
+
+  @integration
+  Scenario: The CLI stops when a redeemed approval carries no ops token
+    When redeeming an approved request answers without an ops token
+    Then the CLI names that request, copies nothing and exits non-zero
+
+  @integration
+  Scenario: The CLI refuses a copy into the same organization
+    When "--from" and "--to" name the same organization
+    Then the CLI refuses before asking any approval and exits non-zero
+
+  @integration
+  Scenario: The CLI refuses a reason over 500 characters
+    When the reason is longer than 500 characters
+    Then the CLI refuses before asking any approval and exits non-zero
+
+  @integration
+  Scenario: The CLI says why a copy stopped early
+    When the copy report says it stopped early and why
+    Then the CLI prints that reason, ends both sessions and exits zero
 
   @integration
   Scenario: The CLI refuses a project list that names no project

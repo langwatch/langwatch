@@ -92,6 +92,8 @@ export function staffAccessWorld({
     /** Refuses only this action in this organization, counting each refused try. */
     auditRefusedFor: null as { organizationId: string; action: string } | null,
     auditRefusedTries: 0,
+    /** Organizations the organization owner no longer answers for. */
+    organizationsGone: new Set<string>(),
     usersRefused: false,
     keyRevokeRefused: new Set<string>(),
     mail: [] as SendEmailCommand[],
@@ -183,7 +185,9 @@ export function staffAccessWorld({
   }));
   const organizations = createApiFixture<OrganizationApi>({
     findProvisioningSummary: async (id: string) =>
-      summaries.find((summary) => summary.id === id) ?? null,
+      state.organizationsGone.has(id)
+        ? null
+        : (summaries.find((summary) => summary.id === id) ?? null),
     listProvisioningSummaries: async () => summaries,
     getAllMembers: async () => [{ id: "member_1" }, { id: "member_2" }] as never,
     getOpsSnapshot: async ({ organizationId }) => ({
