@@ -40,7 +40,7 @@ sendMyTests(input: Operated): Promise<DigestMyTests>;
 
 #### `sendTestFor`
 
-Mails the operator, as tests, the person's week in each organization they are an active member of: what they would get, or the template forced, skipped where it has no data. An address no account has is refused with `digest_person_not_found`.
+Mails the operator (or, with `deliverTo: "person"`, the person at their own address, never an address typed in), as tests, the person's week in each organization they are an active member of: what they would get, or the template forced, skipped where it has no data. An address no account has is refused with `digest_person_not_found`.
 
 ```typescript
 sendTestFor(input: DigestSendTestForInput & Operated): Promise<DigestTestsFor>;
@@ -194,6 +194,7 @@ interface Input {
     | "digest-scenarios-trend"
     | "digest-coding-agent-week"
     | "digest-traces-week";
+  deliverTo?: "me" | "person";
 }
 type Output = z.infer<typeof digestTestsForSchema>; // ../contract/src/digest.ts:128
 

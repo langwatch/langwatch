@@ -423,7 +423,6 @@ describe("the weekly digest send", () => {
         preferencesUrl: `${BASE_URL}/settings/profile#email-preferences`,
         sessions: 5,
         tokens: 1_200,
-        costUsd: 2.5,
         activeMinutes: 30,
         linesChanged: 140,
         commits: 3,

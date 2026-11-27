@@ -5,6 +5,7 @@ import {
   DigestOperatorAddressMissingError,
   DigestPersonNotFoundError,
   DigestPublicBaseUrlMissingError,
+  type DigestTestDelivery,
   type DigestTestsFor,
   type DigestTestTemplate,
 } from "@langwatch/enterprise-digest-contract";
@@ -55,17 +56,20 @@ export class DigestTestSendService {
   }
 
   /**
-   * The same tests of another person, found by address, mailed to the operator alone and never
-   * to them; `template` is what they would get ("auto") or one forced, skipped without its data.
+   * The same tests of another person, found by address, mailed to the operator, or with
+   * `deliverTo: "person"` to that person's own address, never to one typed in; `template` is what
+   * they would get ("auto") or one forced, skipped without its data.
    */
   async sendTestFor({
     email,
     template,
     operatorId,
+    deliverTo = "me",
   }: {
     email: string;
     template: DigestTestTemplate;
     operatorId: string;
+    deliverTo?: DigestTestDelivery;
   }): Promise<DigestTestsFor> {
     const operator = await this.deps.users.findById({ id: operatorId });
     if (!operator?.email) throw new DigestOperatorAddressMissingError();
@@ -74,7 +78,7 @@ export class DigestTestSendService {
     return {
       // The matched account's own address, so a match that differs from what was typed shows.
       person: { name: person.name, email: person.email ?? email },
-      organizations: await this.#testsOf({ userId: person.id, operatorId, template }),
+      organizations: await this.#testsOf({ userId: person.id, operatorId, template, deliverTo }),
     };
   }
 
@@ -83,10 +87,12 @@ export class DigestTestSendService {
     userId,
     operatorId,
     template,
+    deliverTo = "me",
   }: {
     userId: string;
     operatorId: string;
     template: DigestTestTemplate;
+    deliverTo?: DigestTestDelivery;
   }): Promise<DigestMyTest[]> {
     const organizationIds = await this.deps.organizations.organizationIdsForMember({ userId });
     if (organizationIds.length === 0) return [];
@@ -100,6 +106,7 @@ export class DigestTestSendService {
           userId,
           operatorId,
           template,
+          deliverTo,
         }),
       );
     }
@@ -112,12 +119,14 @@ export class DigestTestSendService {
     userId,
     operatorId,
     template,
+    deliverTo = "me",
   }: {
     organizationId: string;
     organizationName: string;
     userId: string;
     operatorId: string;
     template: DigestTestTemplate;
+    deliverTo?: DigestTestDelivery;
   }): Promise<DigestMyTest> {
     const about = { organizationId, organizationName };
     try {
@@ -126,6 +135,7 @@ export class DigestTestSendService {
         userId,
         operatorId,
         template,
+        deliverTo,
       });
       return { outcome: "sent", ...about, templateId };
     } catch (error) {

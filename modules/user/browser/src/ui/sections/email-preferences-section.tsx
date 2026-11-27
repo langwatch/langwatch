@@ -1,7 +1,7 @@
 /**
  * Email preferences: the weekly digest, on or off for you across every organization you are in;
  * the email's one-click unsubscribe writes the same choice. Staff holding ops:manage can also
- * send themselves their own or a person's digests, marked [Test]. Spec: digest.feature
+ * send test digests to themselves or a person. Spec: digest.feature
  */
 
 import {
@@ -20,6 +20,7 @@ import { ToggleRow } from "@langwatch/design-system/toggle-row";
 import type {
   DigestMyTest,
   DigestTemplateId,
+  DigestTestDelivery,
   DigestTestTemplate,
 } from "@langwatch/enterprise-digest-contract";
 import { Mail } from "lucide-react";
@@ -191,16 +192,17 @@ function SendMyDigests() {
   );
 }
 
-/** Staff only: a person's digests, by their address, mailed to you as tests and never to them. */
+/** Staff only: a person's digests, by their address, mailed as tests to you or to them. */
 function SendTestFor() {
   const host = usePersonalWorkspaceHost();
   const send = api.digest.sendTestFor.useMutation();
   const [email, setEmail] = useState("");
   const [template, setTemplate] = useState<DigestTestTemplate>("auto");
+  const [deliverTo, setDeliverTo] = useState<DigestTestDelivery>("me");
 
   const press = async () => {
     try {
-      await send.mutateAsync({ email: email.trim(), template });
+      await send.mutateAsync({ email: email.trim(), template, deliverTo });
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't send their digests" });
     }
@@ -214,8 +216,8 @@ function SendTestFor() {
           <Badge size="sm">Staff</Badge>
         </HStack>
         <Text textStyle="sm" color="fg.muted">
-          Emails you, marked [Test], a person's digest for each organization they are in: what
-          they'd get this week, or one digest forced. Nothing is sent to them.
+          Emails, marked [Test], a person's digest for each organization they are in: what they'd
+          get this week, or one digest forced. It goes to you unless you choose to send it to them.
         </Text>
       </Stack>
       <HStack gap={2}>
@@ -243,6 +245,18 @@ function SendTestFor() {
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
+        <NativeSelect.Root size="sm" width="auto" flexShrink={0}>
+          <NativeSelect.Field
+            aria-label="Send to"
+            value={deliverTo}
+            onChange={(event) => setDeliverTo(event.target.value as DigestTestDelivery)}
+            data-testid="send-test-for-deliver-to"
+          >
+            <option value="me">Send to me</option>
+            <option value="person">Send to them</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
         <Button
           size="xs"
           variant="outline"
@@ -252,7 +266,7 @@ function SendTestFor() {
           onClick={() => void press()}
           data-testid="send-test-for-button"
         >
-          Send test to me
+          {deliverTo === "person" ? "Send test to them" : "Send test to me"}
         </Button>
       </HStack>
       {send.data ? (

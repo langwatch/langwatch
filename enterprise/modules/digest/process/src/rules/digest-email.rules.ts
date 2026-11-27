@@ -290,7 +290,6 @@ function buildCodingAgentWeekProps({
     ...common,
     sessions: totals.sessions,
     tokens: totals.tokens,
-    costUsd: totals.costUsd,
     activeMinutes: Math.round(totals.activeSeconds / 60),
     ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
     ...(totals.commits > 0 ? { commits: totals.commits } : {}),

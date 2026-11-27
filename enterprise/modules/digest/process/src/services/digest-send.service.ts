@@ -7,6 +7,7 @@ import {
   DigestOperatorAddressMissingError,
   DigestPublicBaseUrlMissingError,
   type DigestTemplateId,
+  type DigestTestDelivery,
   type DigestTestTemplate,
 } from "@langwatch/enterprise-digest-contract";
 import { createLogger } from "@langwatch/observability";
@@ -248,17 +249,20 @@ export class DigestSendService {
    * A member's last week in one organization, mailed to the operator alone, its signed unsubscribe
    * header naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
    * arming, so a test can come first. A forced `template` is sent in place of the member's pick.
+   * With `deliverTo: "person"` it goes to the member instead, its unsubscribe header naming them.
    */
   async sendTest({
     organizationId,
     userId,
     operatorId,
     template = "auto",
+    deliverTo = "me",
   }: {
     organizationId: string;
     userId: string;
     operatorId: string;
     template?: DigestTestTemplate;
+    deliverTo?: DigestTestDelivery;
   }): Promise<DigestTemplateId> {
     const membership = await this.#membership({ organizationId, userId });
     if (membership.kind === "gone") throw new DigestMemberNotFoundError(userId);
@@ -266,15 +270,16 @@ export class DigestSendService {
     if ((await this.deps.audience.findUnsubscribed({ userIds: [userId] })).length > 0) {
       throw new DigestMemberUnsubscribedError(userId);
     }
-    const operator = await this.deps.users.findById({ id: operatorId });
-    if (!operator?.email) throw new DigestOperatorAddressMissingError();
+    const recipientId = deliverTo === "person" ? userId : operatorId;
+    const recipient = await this.deps.users.findById({ id: recipientId });
+    if (!recipient?.email) throw new DigestOperatorAddressMissingError();
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
     const week = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
       week,
       member,
-      recipient: { userId: operatorId, sendId: `test:${isoWeek}` },
+      recipient: { userId: recipientId, sendId: `test:${isoWeek}` },
       template,
     });
     if (!composed) throw new DigestNothingToSendError(userId);
@@ -282,7 +287,7 @@ export class DigestSendService {
       await renderDigestMail({
         mail: {
           ...composed.template,
-          to: operator.email,
+          to: recipient.email,
           oneClickUnsubscribeUrl: composed.oneClick,
           organizationName: composed.organizationName,
           test: true,

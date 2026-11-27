@@ -462,6 +462,7 @@ async function memberInBothOrganizationsThisMonday() {
 const testsFor = (input: {
   email: string;
   template: Parameters<InstalledDigest["sendTestFor"]>[0]["template"];
+  deliverTo?: "me" | "person";
 }) => digest.sendTestFor({ ...input, operatorId: OPERATOR });
 
 describe("an operator sending themself another person's digests", () => {
@@ -493,6 +494,23 @@ describe("an operator sending themself another person's digests", () => {
       expect(
         digest.mail.every((mail) => mail.test && mail.email.subject.startsWith("[Test] ")),
       ).toBe(true);
+    });
+  });
+
+  describe("when they deliver the tests to the person", () => {
+    /** @scenario "Staff send a person's digests to the person, not to themselves" */
+    it("mails the person at their own address and the operator nothing", async () => {
+      await memberInBothOrganizationsThisMonday();
+
+      const answer = await testsFor({
+        email: emailOf(MEMBER),
+        template: "auto",
+        deliverTo: "person",
+      });
+
+      expect(answer.organizations.map((each) => each.outcome)).toEqual(["sent", "sent"]);
+      expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(MEMBER), emailOf(MEMBER)]);
+      expect(digest.mail.every((mail) => mail.test)).toBe(true);
     });
   });
 

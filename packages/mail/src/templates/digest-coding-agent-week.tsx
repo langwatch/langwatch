@@ -6,7 +6,6 @@ import {
   formatCompact,
   formatCount,
   formatMinutes,
-  formatUsd,
 } from "./digest-parts.tsx";
 import { ActionRow, DetailTable } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
@@ -15,7 +14,6 @@ export const digestCodingAgentWeekProps = z.object({
   ...digestCommonFields,
   sessions: z.number().int().positive().describe("Coding-agent sessions this week, 5 or more"),
   tokens: z.number().int().nonnegative(),
-  costUsd: z.number().nonnegative(),
   activeMinutes: z.number().nonnegative(),
   linesChanged: z
     .number()
@@ -46,23 +44,21 @@ const floorOf = ({
 
 export const digestCodingAgentWeekSubject = ({
   sessions,
-  costUsd,
+  tokens,
   totalsAtLeast,
 }: DigestCodingAgentWeekProps): string => {
-  const cost = floorOf({ totalsAtLeast, text: formatUsd(costUsd) });
-  return `Your coding agents this week: ${formatCount(sessions)} sessions, ${cost}`;
+  const tokensText = floorOf({ totalsAtLeast, text: formatCompact(tokens) });
+  return `Your coding agents this week: ${formatCount(sessions)} sessions, ${tokensText} tokens`;
 };
 
 export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
-  const { sessions, tokens, costUsd, activeMinutes, linesChanged, commits, pullRequests, topRepo } =
-    props;
+  const { sessions, tokens, activeMinutes, linesChanged, commits, pullRequests, topRepo } = props;
   const floor = (text: string) => floorOf({ totalsAtLeast: props.totalsAtLeast, text });
   const tokensText = floor(formatCompact(tokens));
-  const costText = floor(formatUsd(costUsd));
 
   return (
     <DigestFrame
-      preview={`${formatCount(sessions)} sessions, ${tokensText} tokens, ${costText}`}
+      preview={`${formatCount(sessions)} sessions, ${tokensText} tokens`}
       heading={`Your coding-agent week, ${props.weekLabel}`}
       hero={{
         value: formatCount(sessions),
@@ -74,7 +70,6 @@ export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
     >
       <DetailTable
         rows={[
-          { label: "Cost", value: costText },
           { label: "Tokens", value: tokensText },
           ...(linesChanged === undefined
             ? []
@@ -110,7 +105,6 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
       weekLabel: "Sep 22 to 28",
       sessions: 64,
       tokens: 18_400_000,
-      costUsd: 212.4,
       activeMinutes: 1_215,
       linesChanged: 9_870,
       commits: 41,
@@ -129,7 +123,6 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
       weekLabel: "Sep 22 to 28",
       sessions: 5,
       tokens: 420_000,
-      costUsd: 3.85,
       activeMinutes: 48,
       ...links,
     },
@@ -137,7 +130,6 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
       weekLabel: "Sep 22 to 28",
       sessions: 17,
       tokens: 2_900_000,
-      costUsd: 27.1,
       activeMinutes: 312,
       commits: 9,
       topRepo: "northwind/billing",
