@@ -73,6 +73,16 @@ describe("given a private server probed as the organisation's reader", () => {
     expect(await probe.probe({ projectIds: ["project-a"] })).toBe("not_provisioned");
   });
 
+  /** @scenario "A private ClickHouse whose rendered reader is not loaded yet stays refused as not provisioned" */
+  it("is not provisioned while the server does not know the reader, though its views exist", async () => {
+    const unknownReader = new LangWatchQLUnavailableError({
+      message: "LangWatchQL is not set up on this organization's ClickHouse yet.",
+    });
+    const { probe } = probeOver({ outcome: () => Promise.reject(unknownReader) });
+
+    expect(await probe.probe({ projectIds: ["project-a"] })).toBe("not_provisioned");
+  });
+
   /** @scenario "A private server that cannot be probed refuses rather than falling back" */
   it("rethrows any other failure, so the gate refuses as undecided", async () => {
     const { probe } = probeOver({ outcome: () => Promise.reject(new Error("socket hang up")) });

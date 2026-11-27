@@ -69,6 +69,7 @@ import {
   type OwnDecisionModelGate,
 } from "./model-provider-decision-model.service.ts";
 import { ModelProviderExecutionService } from "./model-provider-execution.service.ts";
+import { ModelProviderGatewayKeysService } from "./model-provider-gateway-keys.service.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import { ModelProviderQueryService } from "./model-provider-query.service.ts";
 import { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
@@ -112,6 +113,7 @@ export class ModelProviderService {
   private readonly defaultWrites: ModelProviderDefaultsWriteService;
   private readonly decisionModels: ModelProviderDecisionModelService;
   private readonly execution: ModelProviderExecutionService;
+  private readonly gatewayKeys: ModelProviderGatewayKeysService;
   private readonly query: ModelProviderQueryService;
   private readonly resolution: ModelProviderResolutionService;
   private readonly writeAuthorization: ModelProviderWriteAuthorizationService;
@@ -139,6 +141,10 @@ export class ModelProviderService {
     });
     this.execution = ModelProviderExecutionService.create({
       query: this.query,
+      catalog: options.catalog,
+    });
+    this.gatewayKeys = ModelProviderGatewayKeysService.create({
+      repository: options.repository,
       catalog: options.catalog,
     });
     this.commands = ModelProviderCommandService.create({
@@ -239,6 +245,15 @@ export class ModelProviderService {
       organizationId: row.organizationId,
       customKeys: row.customKeys,
     };
+  }
+
+  /** The keys the AI gateway runs a row with; see ModelProviderGatewayKeysService. */
+  getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
+    return this.gatewayKeys.getCustomKeys(input);
+  }
+
+  getGatewayKeysEpoch(input: { organizationId: string }): string {
+    return this.gatewayKeys.getEpoch(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {

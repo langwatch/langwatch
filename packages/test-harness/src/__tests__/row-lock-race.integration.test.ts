@@ -85,6 +85,49 @@ describe.skipIf(!DB_URL)("raceOnOneRow (real DB)", () => {
     });
   });
 
+  describe("when the second step sends several writes at once", () => {
+    const keyIfMissingOutsideTheRace = (userHashKey: string): Promise<number> =>
+      prisma.$executeRaw`
+        ${skipTenantCheck({
+          // User is global; the row is the one this suite created.
+          SKIP_TENANT_CHECK: true,
+        })}
+        UPDATE "User" SET "userHashKey" = ${userHashKey}
+         WHERE id = ${userId} AND "userHashKey" IS NULL
+      `;
+
+    /** @scenario "A second step with several writes parks every one of them" */
+    it("commits the first only once all of them wait, and each re-reads the row", async () => {
+      await prisma.user.update({ where: { id: userId }, data: { userHashKey: null } });
+
+      const answers = await raceOnOneRow<number | number[]>({
+        prisma,
+        table: "User",
+        parked: 3,
+        first: (tx) => storeKeyIfMissing(tx, "first"),
+        second: () => Promise.all(["a", "b", "c"].map((key) => keyIfMissingOutsideTheRace(key))),
+      });
+
+      expect(answers).toEqual({ first: 1, second: [0, 0, 0] });
+    });
+
+    /** @scenario "A race waiting for more parked writes than are sent says so" */
+    it("rejects when fewer writes park than it waits for", async () => {
+      await prisma.user.update({ where: { id: userId }, data: { userHashKey: null } });
+
+      const race = raceOnOneRow<number>({
+        prisma,
+        table: "User",
+        parked: 3,
+        first: (tx) => storeKeyIfMissing(tx, "first"),
+        second: () => keyIfMissingOutsideTheRace("only"),
+      });
+
+      await expect(race).rejects.toThrow("3 UPDATEs of User to park on the row lock");
+      // The harness polls for 10 s before it gives up; the race must end inside the test.
+    }, 30_000);
+  });
+
   describe("when the first write throws", () => {
     /** @scenario "A failing first write is reported as itself" */
     it("rejects with that error and rolls the first write back", async () => {

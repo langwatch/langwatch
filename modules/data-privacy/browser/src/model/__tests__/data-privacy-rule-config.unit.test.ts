@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ALL_MEMBERS_VALUE,
+  API_KEY_VALUE_PREFIX,
   type AudienceFormState,
   applyAudienceSelection,
   audienceConfig,
@@ -26,6 +27,7 @@ import {
   ruleSummary,
   type SecretsChoice,
   selectionToAudience,
+  withDispositions,
 } from "../data-privacy-rule-config.ts";
 import { ruleHasChange } from "../data-privacy-rule-form.ts";
 
@@ -407,6 +409,20 @@ describe("ruleSummary", () => {
   it("reads as inherits everything for an empty config", () => {
     expect(ruleSummary({})).toBe("Inherits everything");
   });
+
+  /** @scenario The rules table counts the keys a rule names */
+  it("says how many API keys read the restricted content", () => {
+    const restrict = (apiKeyIds: string[]) => ({
+      disposition: "restrict" as const,
+      audience: { admins: true, apiKeyIds },
+    });
+    expect(
+      ruleSummary({ categories: { input: restrict(["k1"]), output: restrict(["k1", "k2"]) } }),
+    ).toBe("Input restrict · Output restrict · 2 API keys read restricted content");
+    expect(ruleSummary({ categories: { input: restrict(["k1"]) } })).toBe(
+      "Input restrict · 1 API key reads restricted content",
+    );
+  });
 });
 
 describe("audience selection", () => {
@@ -431,8 +447,83 @@ describe("audience selection", () => {
         members: true,
         viewers: true,
         groupIds: ["g1", "g2"],
+        apiKeyIds: ["key-1"],
       });
       expect(selectionToAudience(audienceToSelection(state))).toEqual(state);
+    });
+  });
+
+  describe("when API keys are picked next to All members", () => {
+    it("keeps the keys either way, since a key is not a member", () => {
+      const key = `${API_KEY_VALUE_PREFIX}key-1`;
+      expect(applyAudienceSelection([key], [key, ALL_MEMBERS_VALUE])).toEqual([
+        ALL_MEMBERS_VALUE,
+        key,
+      ]);
+      expect(applyAudienceSelection([ALL_MEMBERS_VALUE], [ALL_MEMBERS_VALUE, key])).toEqual([
+        ALL_MEMBERS_VALUE,
+        key,
+      ]);
+    });
+  });
+
+  describe("when a key is picked without Admins", () => {
+    /** @scenario A named key never sees more than Admins */
+    it("adds Admins, and dropping Admins drops the keys", () => {
+      const key = `${API_KEY_VALUE_PREFIX}key-1`;
+      expect(applyAudienceSelection(["group:security"], ["group:security", key])).toEqual([
+        "group:security",
+        key,
+        ROLE_VALUES.admins,
+      ]);
+      expect(applyAudienceSelection([ROLE_VALUES.admins, key], [key])).toEqual([]);
+    });
+
+    it("drops the keys when All members is removed, as when Admins is", () => {
+      const key = `${API_KEY_VALUE_PREFIX}key-1`;
+      expect(applyAudienceSelection([ALL_MEMBERS_VALUE, key], [key])).toEqual([]);
+    });
+
+    it("keeps the keys and adds Admins when a narrower group replaces All members", () => {
+      const key = `${API_KEY_VALUE_PREFIX}key-1`;
+      expect(
+        applyAudienceSelection(
+          [ALL_MEMBERS_VALUE, key],
+          [ALL_MEMBERS_VALUE, key, "group:security"],
+        ),
+      ).toEqual([key, "group:security", ROLE_VALUES.admins]);
+    });
+  });
+
+  describe("when no content category restricts any more", () => {
+    it("drops the picked keys, which only content categories may name", () => {
+      const form: RuleFormState = {
+        ...inheritFormState(),
+        dispositions: { ...inheritDispositions, input: "restrict" },
+        audience: audience({ admins: true, apiKeyIds: ["key-1"] }),
+        customAttributes: [{ pattern: "app.billing.*", disposition: "restrict" }],
+      };
+      const captured = withDispositions(form, { ...inheritDispositions, input: "capture" });
+      expect(captured.audience).toEqual(audience({ admins: true }));
+      const stillRestricted = withDispositions(form, {
+        ...inheritDispositions,
+        output: "restrict",
+      });
+      expect(stillRestricted.audience.apiKeyIds).toEqual(["key-1"]);
+    });
+  });
+
+  describe("when the rule restricts content and attributes to a named key", () => {
+    /** @scenario A key named in the audience sees restricted content */
+    it("names the key on the content categories but never on an attribute rule", () => {
+      const config = build({
+        dispositions: { ...inheritDispositions, input: "restrict" },
+        aud: audience({ admins: true, apiKeyIds: ["key-1"] }),
+        customAttributes: [{ pattern: "app.billing.*", disposition: "restrict" }],
+      });
+      expect(config.categories?.input?.audience).toEqual({ admins: true, apiKeyIds: ["key-1"] });
+      expect(config.customAttributes?.[0]?.audience).toEqual({ admins: true });
+      expect(configToFormState(config).audience.apiKeyIds).toEqual(["key-1"]);
     });
   });
 });

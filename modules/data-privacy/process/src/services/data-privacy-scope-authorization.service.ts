@@ -19,11 +19,10 @@ export class DataPrivacyScopeAuthorizationService {
   /** The permission a rule write at one tier demands. */
   static requiredWritePermission(
     scopeType: DataPrivacyScopeType,
-  ): "organization:manage" | "team:manage" | "project:update" {
-    // Departments are an organization-level lens, managed by whoever manages
-    // the organization. A team MEMBER holds `project:update` but not
-    // `project:manage`, and the snapshot already shows them their own project
-    // as writable, so PROJECT gates on the narrower of the two.
+  ): "organization:manage" | "team:manage" | "project:manage" {
+    // Departments are an organization-level lens, managed by whoever manages the organization.
+    // PROJECT is `project:manage`: a Member holds `project:update`, and a project rule beats
+    // the tiers above it, so `project:update` would let a Member lift an Admins-only rule.
     if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
       return "organization:manage";
     }
@@ -32,7 +31,7 @@ export class DataPrivacyScopeAuthorizationService {
       return "team:manage";
     }
 
-    return "project:update";
+    return "project:manage";
   }
 
   static create(options: {
@@ -115,7 +114,7 @@ export class DataPrivacyScopeAuthorizationService {
       return decisions.get(scope.scopeId) === true;
     }
 
-    const decisions = await this.permissions.canUpdateProjects({
+    const decisions = await this.permissions.canManageProjects({
       userId,
       organizationId: await this.directory.findScopeOrganizationId({ scope }),
       projectIds: [scope.scopeId],

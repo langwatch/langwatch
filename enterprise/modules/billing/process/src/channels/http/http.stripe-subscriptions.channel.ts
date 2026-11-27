@@ -179,6 +179,7 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
     id: subscription.id,
     status: subscription.status,
     canceledAt: subscription.canceled_at ?? null,
+    ...(typeof subscription.ended_at === "number" ? { endedAt: subscription.ended_at } : {}),
     billingThreshold: threshold
       ? {
           amountGte: threshold.amount_gte,
@@ -194,6 +195,7 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
       quantity: item.quantity ?? null,
       ...(item.price.lookup_key ? { lookupKey: item.price.lookup_key } : {}),
       ...langwatchKeyOf(item.price.metadata),
+      createdAt: item.created,
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,

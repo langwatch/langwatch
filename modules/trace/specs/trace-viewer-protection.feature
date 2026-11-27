@@ -56,6 +56,13 @@ Scenario: A failed group membership read hides group-restricted trace content
     Then the trace input is hidden from it
 
   @unit
+  Scenario: An API key the rule's audience names reads restricted trace content
+    Given trace input, output, system instructions and tool calls are restricted to "Admins" and one named API key
+    When that API key reads a trace over REST
+    Then it sees all four, as Admins do
+    And any other API key still sees none of them
+
+  @unit
   Scenario: A project-bound access token's read folds in the policies its proof reads
     Given a project-bound access token reads through a proof that shares another project
     When its trace content protections are resolved

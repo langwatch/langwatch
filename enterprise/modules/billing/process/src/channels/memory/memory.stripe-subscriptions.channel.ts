@@ -34,7 +34,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   private readonly lineItems = new Map<string, BillingPurchasedLineItem[]>();
   private readonly refusals = new Map<
     Operation,
-    { error: Error; allowed: number; times: number }
+    { error: Error; allowed: number; times: number; endedElsewhere: boolean }
   >();
   private readonly subscriptionCheckouts = new Map<string, BillingSubscriptionCheckout>();
   readonly checkoutLookups: string[] = [];
@@ -91,20 +91,23 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
 
   /**
    * Makes `operation` throw `error`, as a failing provider would: after `allowed` more calls
-   * succeed (default none), for `times` calls (default every one from then on).
+   * succeed (default none), for `times` calls (default every one from then on). With
+   * `endedElsewhere`, the refused call finds its subscription already cancelled by another caller.
    */
   refuse({
     operation,
     error,
     allowed = 0,
     times = Number.POSITIVE_INFINITY,
+    endedElsewhere = false,
   }: {
     operation: Operation;
     error: Error;
     allowed?: number;
     times?: number;
+    endedElsewhere?: boolean;
   }): void {
-    this.refusals.set(operation, { error, allowed, times });
+    this.refusals.set(operation, { error, allowed, times, endedElsewhere });
   }
 
   async getSubscription({
@@ -149,7 +152,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     subscriptionId: string;
     prorate?: boolean;
   }): Promise<BillingSubscription> {
-    this.throwIfRefused("cancelSubscription");
+    this.throwIfRefused("cancelSubscription", subscriptionId);
     const cancelled: BillingSubscription = { ...this.find(subscriptionId), status: "canceled" };
     this.held.set(subscriptionId, cancelled);
     this.cancellations.push(
@@ -216,7 +219,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     return preview;
   }
 
-  private throwIfRefused(operation: Operation): void {
+  private throwIfRefused(operation: Operation, subscriptionId?: string): void {
     const refusal = this.refusals.get(operation);
     if (!refusal) return;
     if (refusal.allowed > 0) {
@@ -225,6 +228,9 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     }
     refusal.times -= 1;
     if (refusal.times <= 0) this.refusals.delete(operation);
+    if (refusal.endedElsewhere && subscriptionId) {
+      this.held.set(subscriptionId, { ...this.find(subscriptionId), status: "canceled" });
+    }
     throw refusal.error;
   }
 

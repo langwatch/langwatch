@@ -6,6 +6,7 @@ import type {
 } from "@langwatch/data-privacy-contract";
 import { Building2, Folder, Users } from "lucide-react";
 
+import { apiKeyLabel } from "./audience-api-keys.ts";
 import type { AudienceFormState } from "./data-privacy-rule-config.ts";
 
 /**
@@ -68,5 +69,6 @@ export function describeAudienceSelection(
   for (const id of audience.groupIds) {
     parts.push(options.groups.find((group) => group.id === id)?.name ?? "a group");
   }
+  for (const id of audience.apiKeyIds) parts.push(apiKeyLabel(id, options));
   return parts.length > 0 ? `Visible to: ${parts.join(", ")}` : "No one (fully hidden)";
 }

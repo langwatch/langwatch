@@ -7,13 +7,13 @@ import { createLogger } from "@langwatch/observability";
 import {
   BillingWebhookSubscriptionRepository,
   type ActivateSubscriptionResult,
-  type CancelledSubscription,
   type SubscriptionMutationResult,
   type SubscriptionWithOrg,
 } from "../billing-webhook-subscription.repository.ts";
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
+  SupersededSubscription,
 } from "../subscription.repository.ts";
 
 const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
@@ -84,11 +84,11 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.cancelTrialSubscriptions(organizationId);
   }
 
-  migrateToSeatEvent(input: {
+  findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]> {
-    return this.subscriptions.migrateToSeatEvent(input);
+  }): Promise<SupersededSubscription[]> {
+    return this.subscriptions.findSupersededBySeatEvent(input);
   }
 
   async updateQuantities(input: {

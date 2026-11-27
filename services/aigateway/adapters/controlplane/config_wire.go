@@ -537,6 +537,8 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"secret_key":    getString("secret_key"),
 			"session_token": getString("session_token"),
 			"region":        getString("region"),
+			// A managed row's private runtime endpoint; bedrockVPCEEndpoint validates it.
+			"bedrock_runtime_endpoint": getString("bedrock_runtime_endpoint"),
 		}
 	case domain.ProviderVertex:
 		cred.Extra = map[string]string{

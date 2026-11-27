@@ -24,6 +24,7 @@
     "@aws-sdk/client-lambda": "catalog:",
     "@google-cloud/dlp": "^6.7.0",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/config": "workspace:*",

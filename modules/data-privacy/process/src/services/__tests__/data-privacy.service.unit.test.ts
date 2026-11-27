@@ -1,6 +1,8 @@
+import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -37,12 +39,43 @@ const lineage = createApiFixture<AuthzApi>({
   },
 });
 
+/** The organization's keys as api-key lists them: live, customer-made, this organization's. */
+function orgKey(id: string, overrides: Partial<ApiKey> = {}): ApiKey {
+  const at = new Date(0);
+  return {
+    id,
+    name: id,
+    description: null,
+    organizationId: ORGANIZATION_ID,
+    userId: null,
+    createdByUserId: null,
+    createdByDeviceLabel: null,
+    lookupId: `lookup-${id}`,
+    permissionMode: "all",
+    expiresAt: null,
+    revokedAt: null,
+    lastUsedAt: null,
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    createdAt: at,
+    updatedAt: at,
+    grants: [],
+    ...overrides,
+  };
+}
+
 function build({
   projectScopes = scopes,
   departmentOrganizationId = null,
+  keys = [],
+  listAll = async () => keys,
+  clock,
 }: {
   projectScopes?: DataPrivacyProjectScopeService;
   departmentOrganizationId?: string | null;
+  keys?: ApiKey[];
+  listAll?: () => Promise<ApiKey[]>;
+  clock?: () => Instant;
 } = {}) {
   const repository = MemoryDataPrivacyPolicyRepository.create();
 
@@ -55,12 +88,283 @@ function build({
       departments: MemoryDataPrivacyDirectoryRepository.create({
         scopeOrganizationId: departmentOrganizationId,
       }),
+      apiKeys: { listAll },
+      ...(clock ? { clock } : {}),
     }),
     stored: () => repository.findAllInOrganization({ organizationId: ORGANIZATION_ID }),
   };
 }
 
+const RESTRICT_INPUT_TO = (apiKeyIds: string[]): DataPrivacyConfig => ({
+  categories: { input: { disposition: "restrict", audience: { admins: true, apiKeyIds } } },
+});
+
 describe("DataPrivacyService", () => {
+  describe("when a rule's audience names API keys", () => {
+    const PROJECT_SCOPE: DataPrivacyScope = { scopeType: "PROJECT", scopeId: "project-1" };
+
+    it("saves a rule naming a live key of the organization", async () => {
+      const { service, stored } = build({ keys: [orgKey("key-agent")] });
+      await service.setForScope({
+        scope: PROJECT_SCOPE,
+        organizationId: ORGANIZATION_ID,
+        personalOnly: false,
+        mayNameNewKeys: true,
+        config: RESTRICT_INPUT_TO(["key-agent"]),
+      });
+      const [row] = await stored();
+      expect(row?.config.categories?.input?.audience?.apiKeyIds).toEqual(["key-agent"]);
+    });
+
+    /** @scenario Saving a rule that names a key the organization does not have is refused */
+    it("refuses a key from another organization or one LangWatch minted for itself", async () => {
+      const { service, stored } = build({
+        keys: [orgKey("key-agent"), orgKey("key-langy", { isSystemManaged: true })],
+      });
+      for (const named of ["key-elsewhere", "key-langy"]) {
+        await expect(
+          service.setForScope({
+            scope: PROJECT_SCOPE,
+            organizationId: ORGANIZATION_ID,
+            personalOnly: false,
+            mayNameNewKeys: true,
+            config: RESTRICT_INPUT_TO(["key-agent", named]),
+          }),
+        ).rejects.toMatchObject({
+          code: "data_privacy_config_invalid",
+          meta: { reason: expect.stringContaining("audience") },
+        });
+      }
+      await expect(stored()).resolves.toHaveLength(0);
+    });
+
+    /** @scenario Saving a rule that names a personal key is refused */
+    it("refuses a personal key, which never reads more than the member it acts as", async () => {
+      const { service, stored } = build({ keys: [orgKey("key-mine", { userId: "user-member" })] });
+      await expect(
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config: RESTRICT_INPUT_TO(["key-mine"]),
+        }),
+      ).rejects.toMatchObject({
+        code: "data_privacy_config_invalid",
+        meta: { reason: expect.stringContaining("audience") },
+      });
+      await expect(stored()).resolves.toHaveLength(0);
+    });
+
+    it("keeps a key the stored rule already named after it was revoked", async () => {
+      const keys = [orgKey("key-agent")];
+      const { service, stored } = build({ keys });
+      const save = (config: DataPrivacyConfig) =>
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config,
+        });
+      await save(RESTRICT_INPUT_TO(["key-agent"]));
+      keys.length = 0;
+      await save({
+        categories: {
+          input: {
+            disposition: "restrict",
+            audience: { admins: true, members: true, apiKeyIds: ["key-agent"] },
+          },
+        },
+      });
+      const [row] = await stored();
+      expect(row?.config.categories?.input?.audience?.members).toBe(true);
+    });
+
+    /** @scenario Saving a rule that names a key without Admins in the audience is refused */
+    it("refuses keys in an audience Admins are not in, since a key reads as Admins do", async () => {
+      const { service, stored } = build({ keys: [orgKey("key-agent")] });
+      await expect(
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config: {
+            categories: {
+              input: {
+                disposition: "restrict",
+                audience: { projectOwner: true, apiKeyIds: ["key-agent"] },
+              },
+            },
+          },
+        }),
+      ).rejects.toMatchObject({ code: "data_privacy_config_invalid" });
+      await expect(stored()).resolves.toHaveLength(0);
+    });
+
+    /** @scenario Saving a rule whose restricted categories name different keys is refused */
+    it("refuses categories that name different keys, which one edit would merge", async () => {
+      const { service, stored } = build({ keys: [orgKey("key-agent")] });
+      await expect(
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config: {
+            categories: {
+              input: {
+                disposition: "restrict",
+                audience: { admins: true, apiKeyIds: ["key-agent"] },
+              },
+              output: { disposition: "restrict", audience: { admins: true } },
+            },
+          },
+        }),
+      ).rejects.toMatchObject({ code: "data_privacy_config_invalid" });
+      await expect(stored()).resolves.toHaveLength(0);
+    });
+
+    it("refuses a key that has expired", async () => {
+      const { service } = build({
+        keys: [orgKey("key-old", { expiresAt: new Date("2020-01-01T00:00:00Z") })],
+      });
+      await expect(
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config: RESTRICT_INPUT_TO(["key-old"]),
+        }),
+      ).rejects.toMatchObject({ code: "data_privacy_config_invalid" });
+    });
+
+    it("takes a key up to the moment it expires, read from the service's clock", async () => {
+      const expiresAt = new Date("2026-12-01T00:00:00Z");
+      const save = (at: string) =>
+        build({
+          keys: [orgKey("key-ending", { expiresAt })],
+          clock: () => fromDate(new Date(at)),
+        }).service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config: RESTRICT_INPUT_TO(["key-ending"]),
+        });
+      await expect(save("2026-11-30T23:59:59.999Z")).resolves.toBeDefined();
+      await expect(save("2026-12-01T00:00:00Z")).rejects.toMatchObject({
+        code: "data_privacy_config_invalid",
+      });
+    });
+
+    /** @scenario Only an organization admin adds a key to a rule */
+    it("refuses a new key from someone who may not name one, but keeps the rule's own", async () => {
+      const { service, stored } = build({ keys: [orgKey("key-agent"), orgKey("key-ci")] });
+      const save = (config: DataPrivacyConfig, mayNameNewKeys: boolean) =>
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          config,
+          mayNameNewKeys,
+        });
+      await save(RESTRICT_INPUT_TO(["key-agent"]), true);
+      await expect(save(RESTRICT_INPUT_TO(["key-agent", "key-ci"]), false)).rejects.toMatchObject({
+        code: "data_privacy_api_key_add_forbidden",
+        httpStatus: 403,
+        meta: { requiredPermission: "organization:manage" },
+      });
+      await save(RESTRICT_INPUT_TO(["key-agent"]), false);
+      await expect(stored()).resolves.toHaveLength(1);
+    });
+
+    it("keeps only the keys of the rule being saved, not of the personal-projects rule beside it", async () => {
+      const { service } = build({ keys: [orgKey("key-agent")] });
+      const save = (personalOnly: boolean, mayNameNewKeys: boolean) =>
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly,
+          config: RESTRICT_INPUT_TO(["key-agent"]),
+          mayNameNewKeys,
+        });
+      await save(true, true);
+      await expect(save(false, false)).rejects.toMatchObject({
+        code: "data_privacy_api_key_add_forbidden",
+      });
+    });
+
+    it("refuses keys on a category that is captured or dropped, where nothing is restricted", async () => {
+      const { service, stored } = build({ keys: [orgKey("key-agent")] });
+      for (const disposition of ["capture", "drop"] as const) {
+        await expect(
+          service.setForScope({
+            scope: PROJECT_SCOPE,
+            organizationId: ORGANIZATION_ID,
+            personalOnly: false,
+            mayNameNewKeys: true,
+            config: {
+              categories: {
+                input: { disposition, audience: { admins: true, apiKeyIds: ["key-agent"] } },
+              },
+            },
+          }),
+        ).rejects.toMatchObject({
+          code: "data_privacy_config_invalid",
+          meta: { reason: expect.stringContaining("Only a restricted category") },
+        });
+      }
+      await expect(stored()).resolves.toHaveLength(0);
+    });
+
+    it("saves a rule that adds no key even while api-key cannot list the keys", async () => {
+      let apiKeyUp = true;
+      const { service } = build({
+        listAll: async () => {
+          if (!apiKeyUp) throw new Error("api-key unavailable");
+          return [orgKey("key-agent")];
+        },
+      });
+      const save = (mayNameNewKeys: boolean) =>
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          config: RESTRICT_INPUT_TO(["key-agent"]),
+          mayNameNewKeys,
+        });
+      await save(true);
+      apiKeyUp = false;
+      await expect(save(false)).resolves.toBeDefined();
+      await expect(save(true)).resolves.toBeDefined();
+    });
+
+    /** @scenario Saving a custom attribute rule that names a key is refused */
+    it("refuses a key on a custom attribute rule, which no key reads", async () => {
+      const { service } = build({ keys: [orgKey("key-agent")] });
+      await expect(
+        service.setForScope({
+          scope: PROJECT_SCOPE,
+          organizationId: ORGANIZATION_ID,
+          personalOnly: false,
+          mayNameNewKeys: true,
+          config: {
+            customAttributes: [
+              {
+                pattern: "app.billing.*",
+                disposition: "restrict",
+                audience: { apiKeyIds: ["key-agent"] },
+              },
+            ],
+          },
+        }),
+      ).rejects.toMatchObject({ code: "data_privacy_config_invalid" });
+    });
+  });
+
   /**
    * @scenario "Unsafe customer patterns are rejected before persistence"
    * @scenario An unsafe custom pattern is rejected when saving the rule
@@ -72,6 +376,7 @@ describe("DataPrivacyService", () => {
         scope: { scopeType: "PROJECT", scopeId: "project-1" },
         organizationId: ORGANIZATION_ID,
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { secrets: { enabled: true, customPatterns: ["("] } },
       }),
     ).rejects.toMatchObject({
@@ -90,6 +395,7 @@ describe("DataPrivacyService", () => {
         scope: { scopeType: "PROJECT", scopeId: "project-1" },
         organizationId: ORGANIZATION_ID,
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { secrets: { enabled: true, customPatterns: [".*"] } },
       }),
     ).rejects.toMatchObject({
@@ -105,6 +411,7 @@ describe("DataPrivacyService", () => {
       scope: { scopeType: "TEAM", scopeId: "team-1" },
       organizationId: ORGANIZATION_ID,
       personalOnly: false,
+      mayNameNewKeys: true,
       config: { categories: { input: { disposition: "drop" } } },
     });
     expect(policy.scopeId).toBe("team-1");
@@ -119,6 +426,7 @@ describe("DataPrivacyService", () => {
         scope: { scopeType: "PROJECT", scopeId: "project-1" },
         organizationId: ORGANIZATION_ID,
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { pii: { level: "essential", exceptPatterns: ["(a+)+$"] } },
       }),
     ).rejects.toMatchObject({
@@ -136,6 +444,7 @@ describe("DataPrivacyService", () => {
         scope: { scopeType: "PROJECT", scopeId: "project-1" },
         organizationId: ORGANIZATION_ID,
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { pii: { level: "essential", exceptPatterns: [".*"] } },
       }),
     ).rejects.toMatchObject({
@@ -175,6 +484,7 @@ describe("DataPrivacyService", () => {
         organizationId: "some-other-org",
         scope: { scopeType: "TEAM", scopeId: "team-1" },
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { categories: { input: { disposition: "drop" } } },
       }),
     ).rejects.toMatchObject({
@@ -193,6 +503,7 @@ describe("DataPrivacyService", () => {
         organizationId: "some-other-org",
         scope: { scopeType: "PROJECT", scopeId: dataPrivacyTestGraph.projectId },
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { categories: { input: { disposition: "drop" } } },
       }),
     ).rejects.toMatchObject({ code: "data_privacy_scope_target_not_found", httpStatus: 404 });
@@ -206,6 +517,7 @@ describe("DataPrivacyService", () => {
       organizationId: ORGANIZATION_ID,
       scope: { scopeType: "TEAM", scopeId: dataPrivacyTestGraph.teamId },
       personalOnly: false,
+      mayNameNewKeys: true,
       config: { categories: { input: { disposition: "drop" } } },
     });
 
@@ -222,6 +534,7 @@ describe("DataPrivacyService", () => {
       organizationId: ORGANIZATION_ID,
       scope: { scopeType: "DEPARTMENT", scopeId: "department-1" },
       personalOnly: false,
+      mayNameNewKeys: true,
       config: { categories: { input: { disposition: "drop" } } },
     });
 
@@ -242,6 +555,7 @@ describe("DataPrivacyService", () => {
         organizationId: ORGANIZATION_ID,
         scope: { scopeType: "DEPARTMENT", scopeId: "department-1" },
         personalOnly: false,
+        mayNameNewKeys: true,
         config: { categories: { input: { disposition: "drop" } } },
       }),
     ).rejects.toMatchObject({ code: "data_privacy_scope_target_not_found" });
@@ -257,6 +571,7 @@ describe("DataPrivacyService", () => {
         organizationId: ORGANIZATION_ID,
         scope: PROJECT_SCOPE,
         personalOnly: false,
+        mayNameNewKeys: true,
         config,
       });
 

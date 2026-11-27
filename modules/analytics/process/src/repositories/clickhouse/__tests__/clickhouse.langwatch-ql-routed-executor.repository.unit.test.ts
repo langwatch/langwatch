@@ -369,6 +369,19 @@ describe("given a private ClickHouse where LangWatchQL is not set up", () => {
     await executor.close();
   });
 
+  /** @scenario "A private ClickHouse whose rendered reader is not loaded yet stays refused as not provisioned" */
+  it("refuses the derived reader's login as not set up while the server does not know it", async () => {
+    const { executor, run } = fixture();
+    await run(["project-private"]);
+    privateDrivers()[0]?.query.mockRejectedValueOnce(serverError("192", "UNKNOWN_USER"));
+
+    await expect(run(["project-private"])).rejects.toMatchObject({
+      code: "lwql_unavailable",
+      message: "LangWatchQL is not set up on this organization's ClickHouse yet.",
+    });
+    await executor.close();
+  });
+
   it("keeps the shared ClickHouse's own refusal for the same failure there", async () => {
     const { shared, run } = fixture();
     shared.query.mockRejectedValueOnce(serverError("60", "UNKNOWN_TABLE"));
