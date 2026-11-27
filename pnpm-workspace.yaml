@@ -296,12 +296,12 @@ overrides:
   '@modelcontextprotocol/sdk>@hono/node-server': '>=2.1.3 <3'
   '@modelcontextprotocol/sdk@>=1.10.0 <1.32.0': '>=1.32.0 <2'
   '@opensearch-project/opensearch': '-'
-  '@opentelemetry/core@<2.8.0': '>=2.8.0'
   # One API copy per process: a second one refuses the first one's global registrations.
   '@opentelemetry/api': 'catalog:'
+  '@opentelemetry/core@<2.8.0': '>=2.8.0'
+  '@opentelemetry/exporter-prometheus@<0.217.0': '>=0.217.0'
   # otlp-transformer 0.55.0 imports only types from the deprecated sdk-trace-base.
   '@opentelemetry/otlp-transformer@0.55.0>@opentelemetry/sdk-trace-base': npm:@opentelemetry/sdk-trace@3.1.1
-  '@opentelemetry/exporter-prometheus@<0.217.0': '>=0.217.0'
   '@opentelemetry/propagator-jaeger@<2.9.0': '>=2.9.0'
   '@opentelemetry/sdk-node@<0.217.0': '>=0.217.0'
   '@tiptap/core@<3.30.4': '>=3.30.4 <4'
