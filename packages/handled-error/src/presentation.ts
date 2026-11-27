@@ -4997,6 +4997,16 @@ const presentations = {
   },
 
   // ---- weekly digest emails ----
+  digest_member_address_missing: {
+    title: "Member has no email address",
+    describe: () =>
+      "This member has no email address, so a test can't be sent to them. Send it to yourself instead.",
+  },
+  digest_member_deactivated: {
+    title: "Member is deactivated",
+    describe: () =>
+      "This member's account is deactivated, so no test is sent to them. Send it to yourself instead.",
+  },
   digest_member_not_found: {
     title: "Member not found",
     describe: () =>
