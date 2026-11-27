@@ -98,3 +98,9 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # a credential; the stub now reads `signed-dev-seats`, so only this pull
 # request's history still carries the literal.
 913bf65da63f16c127d03e9484c997f5652feb5a:modules/ops/browser/src/features/admin/__tests__/license-developer-seats.integration.test.tsx:generic-api-key:91
+
+# A Langy turn-facts rules test fed a made-up `sk_live_` string to prove an unknown failure code
+# reads as `other`. It was never a credential; the fixture now reads `acme_key_not_a_code`, so the
+# tree is clean and only this pull request's history still carries the literal.
+f06e730c02b078050502cad0cb8e70547d556583:modules/langy/process/src/rules/__tests__/langy-turn-facts.rules.unit.test.ts:stripe-access-token:20
+f06e730c02b078050502cad0cb8e70547d556583:modules/langy/process/src/rules/__tests__/langy-turn-facts.rules.unit.test.ts:stripe-access-token:21
