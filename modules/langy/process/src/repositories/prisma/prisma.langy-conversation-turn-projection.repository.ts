@@ -16,6 +16,7 @@ import {
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
+import { stripNulCharacters } from "../../rules/langy-projection-nul.rules.ts";
 import type { LangyDatabase } from "./langy-database.mapper.ts";
 
 /**
@@ -126,7 +127,9 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
     // the boundary where an unrecognised status must stop rather than land in a
     // column that will happily hold it.
     turnStatusSchema.parse(state.Status);
-    const data = {
+    // Question, answer and tool content come from the user and the model: Postgres refuses
+    // a NUL in text or jsonb, so it is scrubbed here, at the write boundary.
+    const data = stripNulCharacters({
       ...state,
       ConversationId,
       TurnId,
@@ -143,7 +146,7 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
     } satisfies Omit<
       Prisma.LangyConversationTurnProjectionUncheckedCreateInput,
       "id" | "projectId"
-    >;
+    >);
 
     await this.prisma.langyConversationTurnProjection.upsert({
       where: {

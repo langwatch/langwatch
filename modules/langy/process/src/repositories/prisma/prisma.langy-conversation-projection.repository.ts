@@ -7,6 +7,7 @@ import type {
 import type { LangyConversationStateData } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
+import { stripNulCharacters } from "../../rules/langy-projection-nul.rules.ts";
 import type { LangyDatabase } from "./langy-database.mapper.ts";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
@@ -62,7 +63,8 @@ export class PrismaLangyConversationProjectionRepository implements StateProject
     const projectId = String(context.tenantId);
     const ConversationId = context.aggregateId;
     const { LastEventOccurredAt: _checkpoint, ...state } = projection.state;
-    const data = {
+    // Title and LastError can quote user or model text: Postgres refuses a NUL in text.
+    const data = stripNulCharacters({
       ...state,
       ConversationId,
       CreatedAt: projection.createdAt,
@@ -71,7 +73,7 @@ export class PrismaLangyConversationProjectionRepository implements StateProject
       AcceptedAt: projection.cursor.acceptedAt,
       LastEventId: projection.cursor.eventId,
       ProjectionVersion: projection.version,
-    } satisfies Omit<Prisma.LangyConversationProjectionUncheckedCreateInput, "id" | "projectId">;
+    } satisfies Omit<Prisma.LangyConversationProjectionUncheckedCreateInput, "id" | "projectId">);
 
     await this.prisma.langyConversationProjection.upsert({
       where: {
