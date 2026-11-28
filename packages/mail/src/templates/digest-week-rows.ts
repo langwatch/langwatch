@@ -131,10 +131,11 @@ function evalsCopy(row: Extract<DigestWeekRow, { kind: "evals" }>): RowCopy {
   return {
     kind: row.kind,
     title: recovered
-      ? `${row.projectName}'s ${name} passed ${passed} of traces, up from ${baseline}`
-      : `${row.projectName}'s ${name} passed ${passed} of traces, down from ${baseline}`,
+      ? `${row.projectName}'s ${name} passed ${passed} of checks, up from ${baseline}`
+      : `${row.projectName}'s ${name} passed ${passed} of checks, down from ${baseline}`,
     href: row.url,
-    context: `${formatCount(row.failed)} of ${formatCount(row.checks)} checked traces failed this week.`,
+    // Counts checks, not traces: two evaluators on one trace are two checks.
+    context: `${formatCount(row.failed)} of ${formatCount(row.checks)} checks failed this week.`,
     needsYou: false,
     previewPhrase: recovered ? `${row.projectName}'s ${name} recovering` : `a drop in the ${name}`,
   };

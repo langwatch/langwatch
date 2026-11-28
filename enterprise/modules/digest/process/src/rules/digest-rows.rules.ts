@@ -219,22 +219,21 @@ function newRows({ projects }: DigestRowsInput): DigestRow[] {
     .map(({ projectId }) => ({ kind: "new" as const, projectId }));
 }
 
-/** One per evaluator, its checks summed across projects: the line names no project to tell two apart. */
+/**
+ * One per evaluator, its checks summed across projects: the line names no project to tell two
+ * apart, so an evaluator that moved on any project is steady on none.
+ */
 function steadyEvalsOf(
   input: DigestRowsInput,
   shownOrFolded: readonly DigestRow[],
 ): DigestRowSelection["steadyEvals"] {
   const moved = new Set(
-    shownOrFolded.flatMap((row) =>
-      row.kind === "evals" ? [`${row.projectId}:${row.evaluatorType}`] : [],
-    ),
+    shownOrFolded.flatMap((row) => (row.kind === "evals" ? [row.evaluatorType] : [])),
   );
   const steady = new Map<string, DigestRowCounts>();
-  for (const { projectId, evaluators } of input.projects) {
+  for (const { evaluators } of input.projects) {
     for (const evaluator of evaluators) {
-      if (!hasEnoughChecks(evaluator) || moved.has(`${projectId}:${evaluator.evaluatorType}`)) {
-        continue;
-      }
+      if (!hasEnoughChecks(evaluator) || moved.has(evaluator.evaluatorType)) continue;
       const counted = steady.get(evaluator.evaluatorType) ?? { total: 0, failed: 0 };
       steady.set(evaluator.evaluatorType, {
         total: counted.total + evaluator.week.total,

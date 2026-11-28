@@ -109,6 +109,34 @@ const SECONDARY_ROW_BUTTON: CSSProperties = {
 /** A row's action: the first in the email is the ink one, the second is outlined. */
 export type FeedRowButton = Readonly<{ label: string; href: string; primary: boolean }>;
 
+type FeedRowLink = Readonly<{ before?: string; label: string; href: string }>;
+
+/** The row's button, then its text link, with any plain words leading into the link unlinked. */
+const FeedRowActions = ({ button, link }: { button?: FeedRowButton; link?: FeedRowLink }) => (
+  <Text style={{ margin: "8px 0 0", fontSize: "13px", lineHeight: "20px" }}>
+    {button && (
+      <Button
+        className={button.primary ? "lw-action" : "lw-action-secondary"}
+        href={button.href}
+        style={button.primary ? PRIMARY_ROW_BUTTON : SECONDARY_ROW_BUTTON}
+      >
+        {button.label}
+      </Button>
+    )}
+    {button && link && " "}
+    {link?.before && (
+      <span className="lw-muted" style={{ fontSize: "13px", color: light.textMuted }}>
+        {link.before}
+      </span>
+    )}
+    {link && (
+      <InlineLink href={link.href}>
+        <span style={{ fontSize: "13px" }}>{link.label}</span>
+      </InlineLink>
+    )}
+  </Text>
+);
+
 /**
  * One feed row as two table cells (Outlook keeps cells side by side): the chip, then a linked
  * title, one context line, and the row's button and quieter text link when it has them.
@@ -126,7 +154,7 @@ export const FeedRow = ({
   href: string;
   context: string;
   button?: FeedRowButton;
-  link?: Readonly<{ before?: string; label: string; href: string }>;
+  link?: FeedRowLink;
 }) => {
   const cellBorder = { borderTop: `1px solid ${light.hairline}` };
   return (
@@ -158,28 +186,7 @@ export const FeedRow = ({
           {context}
         </Text>
         {(button || link) && (
-          <Text style={{ margin: "8px 0 0", fontSize: "13px", lineHeight: "20px" }}>
-            {button && (
-              <Button
-                className={button.primary ? "lw-action" : "lw-action-secondary"}
-                href={button.href}
-                style={button.primary ? PRIMARY_ROW_BUTTON : SECONDARY_ROW_BUTTON}
-              >
-                {button.label}
-              </Button>
-            )}
-            {button && link && " "}
-            {link?.before && (
-              <span className="lw-muted" style={{ fontSize: "13px", color: light.textMuted }}>
-                {link.before}
-              </span>
-            )}
-            {link && (
-              <InlineLink href={link.href}>
-                <span style={{ fontSize: "13px" }}>{link.label}</span>
-              </InlineLink>
-            )}
-          </Text>
+          <FeedRowActions {...(button ? { button } : {})} {...(link ? { link } : {})} />
         )}
       </td>
     </tr>

@@ -222,6 +222,33 @@ describe("selectDigestRows()", () => {
         { evaluatorType: "ragas/faithfulness", week: { total: 800, failed: 32 } },
       ]);
     });
+
+    /** @scenario "An eval that moved on one project is steady on none" */
+    it("leaves an eval out of the steady line when it moved on another project", () => {
+      const selected = selectDigestRows(
+        input({
+          projects: [
+            settled({
+              projectId: "p",
+              evaluators: [
+                evaluator({ total: 400, failed: 16, baselineTotal: 1_600, baselineFailed: 64 }),
+              ],
+            }),
+            settled({
+              projectId: "q",
+              evaluators: [
+                evaluator({ total: 100, failed: 30, baselineTotal: 400, baselineFailed: 20 }),
+              ],
+            }),
+          ],
+        }),
+      );
+
+      expect(selected?.shown).toContainEqual(
+        expect.objectContaining({ kind: "evals", projectId: "q" }),
+      );
+      expect(selected?.steadyEvals).toEqual([]);
+    });
   });
 
   describe("when more than two rates got worse", () => {

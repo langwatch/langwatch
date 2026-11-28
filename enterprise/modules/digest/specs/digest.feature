@@ -81,6 +81,12 @@ Feature: Weekly digest emails
     Then "Also this week" counts it as one steady eval, its checks summed across the two
 
   @unit
+  Scenario: An eval that moved on one project is steady on none
+    Given the faithfulness eval held its rate on one project and fell on another
+    When the rows are picked
+    Then the fall has its own row and "Also this week" does not call the eval steady
+
+  @unit
   Scenario: At most two regressions show, biggest first, and the rest fold
     Given three scenario or eval rates that got 10 points worse or more
     When the rows are picked

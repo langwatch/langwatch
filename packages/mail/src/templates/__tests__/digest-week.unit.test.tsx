@@ -50,7 +50,7 @@ describe("the weekly digest's rows", () => {
         title: "Support agent's scenarios failed 19% of runs, up from 6%",
         button: { label: "See the failing runs" },
       });
-      expect(evals?.title).toBe("Support agent's tone eval passed 81% of traces, down from 93%");
+      expect(evals?.title).toBe("Support agent's tone eval passed 81% of checks, down from 93%");
       expect(evals?.button).toBeUndefined();
       expect(quiet?.title).toBe("Order search sent no traces this week");
       expect(props.rows.map((row) => row.kind)).toEqual([
