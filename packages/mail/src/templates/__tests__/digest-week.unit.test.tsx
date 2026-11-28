@@ -202,6 +202,11 @@ describe("every weekly digest fixture", () => {
       fixture("flooded organisation, admin"),
     );
     expect(html).toContain("background-color:transparent");
+    // Quiet's and Coding's light colours are too faint on the dark card: each takes its own there.
+    expect(html).toContain('class="lw-chip-quiet"');
+    expect(html).toContain('class="lw-chip-coding"');
+    expect(html).toContain(".lw-chip-quiet { color: #a0aec0 !important;");
+    expect(html).toContain(".lw-chip-coding { color: #a78bfa !important;");
     expect(html).not.toContain("background-color:#ffffff;color:#b7791f");
   });
 });

@@ -27,18 +27,21 @@ export const DigestFrame = ({
   heading,
   reason,
   preferencesUrl,
+  darkStyles,
   children,
 }: {
   preview: string;
   heading: string;
   reason: string;
   preferencesUrl: string;
+  darkStyles?: string;
   children?: ReactNode;
 }) => (
   <EmailLayout
     preview={preview}
     heading={heading}
     footNote={<DigestFootNote reason={reason} preferencesUrl={preferencesUrl} />}
+    {...(darkStyles ? { darkStyles } : {})}
   >
     {children}
   </EmailLayout>
@@ -47,18 +50,22 @@ export const DigestFrame = ({
 /**
  * A row's kind, as a small label. Its text takes no `lw-*` class, which the dark cut would turn
  * pale on pale. An outlined chip has no ground of its own, so it shows the card's in either
- * scheme rather than a white pill in dark mode. Solid means it needs you.
+ * scheme; `darkClass` names its own dark-mode colour when its light one is too faint on the dark
+ * card. Solid means it needs you.
  */
 export const Chip = ({
   label,
   colour,
   solid,
+  darkClass,
 }: {
   label: string;
   colour: string;
   solid: boolean;
+  darkClass?: string;
 }) => (
   <span
+    {...(!solid && darkClass ? { className: darkClass } : {})}
     style={{
       display: "inline-block",
       minWidth: "74px",

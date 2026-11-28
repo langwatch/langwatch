@@ -145,6 +145,27 @@ const CHIP_COLOURS: Readonly<Record<DigestWeekRow["kind"], string>> = {
   new: "#7a869a",
 };
 
+/**
+ * Dark-mode text for the outlined chips whose light colour falls under 4.5:1 on the dark card
+ * (#131316). No one colour clears 4.5:1 on both white and that card, so these switch with it.
+ */
+const CHIP_DARK_COLOURS: ReadonlyMap<DigestWeekRow["kind"], string> = new Map<
+  DigestWeekRow["kind"],
+  string
+>([
+  ["quiet", "#a0aec0"],
+  ["coding", "#a78bfa"],
+]);
+
+const chipDarkClass = (kind: DigestWeekRow["kind"]) => `lw-chip-${kind}`;
+
+const CHIP_DARK_STYLES = [...CHIP_DARK_COLOURS]
+  .map(
+    ([kind, colour]) =>
+      `  .${chipDarkClass(kind)} { color: ${colour} !important; border-color: ${colour} !important; }`,
+  )
+  .join("\n");
+
 const AlsoThisWeek = (props: DigestWeekProps) => {
   const also = alsoThisWeek(props);
   return (
@@ -188,6 +209,7 @@ export const DigestWeek = (props: DigestWeekProps) => {
       heading={digestWeekHeading(props)}
       reason={digestWeekReason(props)}
       preferencesUrl={props.preferencesUrl}
+      darkStyles={CHIP_DARK_STYLES}
     >
       <Text
         className="lw-muted"
@@ -214,6 +236,9 @@ export const DigestWeek = (props: DigestWeekProps) => {
                     label={CHIP_LABELS[copy.kind]}
                     colour={CHIP_COLOURS[copy.kind]}
                     solid={copy.needsYou}
+                    {...(CHIP_DARK_COLOURS.has(copy.kind)
+                      ? { darkClass: chipDarkClass(copy.kind) }
+                      : {})}
                   />
                 }
                 title={copy.title}

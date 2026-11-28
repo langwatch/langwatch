@@ -161,6 +161,7 @@ export const EmailLayout = ({
   heading,
   children,
   footNote,
+  darkStyles,
 }: {
   /** The line shown beside the subject. Say the outcome, not the product. */
   preview: string;
@@ -168,12 +169,18 @@ export const EmailLayout = ({
   children: ReactNode;
   /** One sentence under the rule saying why this arrived. */
   footNote?: ReactNode;
+  /** Dark-mode rules one template alone needs, kept out of every other email's stylesheet. */
+  darkStyles?: string;
 }) => (
   <Html lang="en" dir="ltr">
     <Head>
       <meta name="color-scheme" content="light dark" />
       <meta name="supported-color-schemes" content="light dark" />
-      <style>{STYLESHEET}</style>
+      <style>
+        {darkStyles
+          ? `${STYLESHEET}@media (prefers-color-scheme: dark) {\n${darkStyles}\n}\n`
+          : STYLESHEET}
+      </style>
     </Head>
     <Preview>{preview}</Preview>
     <Body className="lw-body" style={{ margin: 0, padding: 0, backgroundColor: light.page }}>
