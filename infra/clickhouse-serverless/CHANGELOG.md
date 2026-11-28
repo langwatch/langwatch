@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-image@v0.5.0...clickhouse-serverless-image@v0.5.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **ci:** retry the flaky metrics probe, Playwright install, clipboard read and apt update ([#9978](https://github.com/langwatch/langwatch/issues/9978)) ([e9cce5d](https://github.com/langwatch/langwatch/commit/e9cce5de64586c5b83d0f1c4a7a9e0811174ef01))
+* **instant-evals:** judge on the Conversations lens, settle ended runs, judge questions typed in search ([#9876](https://github.com/langwatch/langwatch/issues/9876)) ([24af415](https://github.com/langwatch/langwatch/commit/24af415ff68747952f2669cc5bde7611fcb85024))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-image@v0.4.0...clickhouse-serverless-image@v0.5.0) (2026-11-16)
 
 
