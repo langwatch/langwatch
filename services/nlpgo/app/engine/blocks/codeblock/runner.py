@@ -294,8 +294,8 @@ def fence_runtime_api(address: str, syscall_filter: bool) -> None:
     to the API's port on any loopback or unspecified address, to any
     link-local address, or by unresolved name; starting another program (a
     forked child keeps the hook); ctypes; native modules from anywhere user code can write; and
-    /proc/<pid>/mem. Every primitive it judges with is bound here, so patching
-    a module afterwards changes nothing. Where the platform allows a seccomp
+    /proc/<pid>/mem; and another interpreter. Every primitive it judges with
+    is bound here, so patching a module afterwards changes nothing it reads. Where the platform allows a seccomp
     filter (`syscall_filter`) it also refuses execve and execveat. Rationale:
     specs/nlp-go/_shared/contract.md §7.
     """
@@ -309,7 +309,7 @@ def fence_runtime_api(address: str, syscall_filter: bool) -> None:
     inet_pton, af_inet, af_inet6 = _socket.inet_pton, _socket.AF_INET, _socket.AF_INET6
     family_of = _socket.socket.family.__get__
     item, cut, as_int, starts = tuple.__getitem__, str.partition, int.__int__, str.startswith
-    is_a, size = isinstance, len
+    is_a, size, attr = isinstance, len, getattr
     realpath, normpath, fsdecode = os.path.realpath, os.path.normpath, os.fsdecode
     mapped_prefix, refusal = b"\0" * 10 + b"\xff\xff", PermissionError
 
@@ -341,9 +341,22 @@ def fence_runtime_api(address: str, syscall_filter: bool) -> None:
         return port == api_port and (local or ip == api_packed)
 
     def refused_target(sock, target) -> bool:
-        if family_of(sock) not in (af_inet, af_inet6):
+        # sendmsg on a connected socket names no address: its connect was judged.
+        if target is None or family_of(sock) not in (af_inet, af_inet6):
             return False
         return refused_ip(packed(item(target, 0)), as_int(item(target, 1)))
+
+    import posix
+
+    o_path, open_fd, read_link, close_fd = posix.O_PATH | posix.O_CLOEXEC, posix.open, posix.readlink, posix.close
+
+    def resolved(path: str) -> str:
+        """The file `path` names, as the kernel resolves it: C calls only."""
+        fd = open_fd(path, o_path)
+        try:
+            return read_link(f"/proc/self/fd/{fd}")
+        finally:
+            close_fd(fd)
 
     # Native code loads only from the read-only library directories this
     # interpreter started with: a library user code wrote runs outside the hook.
@@ -358,11 +371,28 @@ def fence_runtime_api(address: str, syscall_filter: bool) -> None:
     foreign = frozenset(("ctypes.dlopen", "ctypes.call_function", "ctypes.cdata"))
     # fork_exec raises no audit event, so it goes, from subprocess's copy too
     # (loaded first, so `import subprocess` still works and Popen is refused).
-    unaudited = frozenset(("_posixsubprocess",))
+    # A sub-interpreter starts without this hook, so none may be created.
+    unaudited = frozenset(("_posixsubprocess", "_xxsubinterpreters", "_xxinterpchannels"))
+    import _imp
     import _posixsubprocess
     import subprocess
 
     del _posixsubprocess.fork_exec, subprocess._fork_exec
+    last_part = str.rpartition
+
+    def withheld(name) -> bool:
+        return is_a(name, str) and last_part(name, ".")[2] in unaudited
+
+    def guarded(create):
+        def create_module(spec, *rest):
+            if withheld(attr(spec, "name", None)):
+                raise ImportError(f"{spec.name} is not available to code blocks on AWS Lambda")
+            return create(spec, *rest)
+
+        return create_module
+
+    # A built-in or extension module can be created without an import event.
+    _imp.create_builtin, _imp.create_dynamic = guarded(_imp.create_builtin), guarded(_imp.create_dynamic)
 
     def hook(event, args):
         if event in ("socket.connect", "socket.sendto", "socket.sendmsg"):
@@ -372,10 +402,12 @@ def fence_runtime_api(address: str, syscall_filter: bool) -> None:
             raise refusal("code blocks on AWS Lambda cannot start other programs")
         elif event in foreign:
             raise refusal("code blocks on AWS Lambda cannot call native code through ctypes")
+        elif event == "cpython.PyInterpreterState_New":
+            raise refusal("code blocks on AWS Lambda cannot start another interpreter")
         elif event == "import":
-            if args[0] in unaudited:
+            if withheld(args[0]):
                 raise ImportError(f"{args[0]} is not available to code blocks on AWS Lambda")
-            if is_a(args[1], str) and args[2] is None and not starts(realpath(args[1]), trusted):
+            if is_a(args[1], str) and args[2] is None and not starts(resolved(args[1]), trusted):
                 raise ImportError(f"native module {args[0]} is not from the sandbox libraries")
         elif event == "open" and is_a(args[0], (str, bytes)):
             if proc_mem(normpath(fsdecode(args[0]))):

@@ -92,6 +92,27 @@ def execute(api, other):
                 os._exit(0)
         os.waitpid(pid, 0)
 
+    def subinterpreter():
+        import _xxsubinterpreters as interpreters
+        interpreters.run_string(interpreters.create(), f"import socket; socket.create_connection(('{host}', {port}), timeout=2)")
+
+    def recreated_builtin():
+        import _imp, importlib.machinery as machinery
+        fresh = _imp.create_builtin(machinery.ModuleSpec("_posixsubprocess", machinery.BuiltinImporter))
+        fresh.fork_exec
+
+    def extension_loader():
+        import glob, importlib.machinery as machinery, importlib.util as util
+        paths = glob.glob("/usr/**/_posixsubprocess*.so", recursive=True)
+        if not paths:
+            raise ImportError("_posixsubprocess is built in here")
+        spec = util.spec_from_loader("pkg._posixsubprocess", machinery.ExtensionFileLoader("pkg._posixsubprocess", paths[0]))
+        util.module_from_spec(spec).fork_exec
+
+    def connected_sendmsg():
+        with socket.create_connection(("127.0.0.1", int(other)), timeout=2) as s:
+            s.sendmsg([b"ping"])
+
     def shell():
         if os.system(f"exec 3<>/dev/tcp/{host}/{port}") != 0:
             raise OSError("the shell could not connect")
@@ -114,6 +135,10 @@ def execute(api, other):
         "forked_child": attempt(lambda: child_process("fork")),
         "spawned_child": attempt(lambda: child_process("spawn")),
         "forked": attempt(forked),
+        "subinterpreter": attempt(subinterpreter),
+        "recreated_builtin": attempt(recreated_builtin),
+        "extension_loader": attempt(extension_loader),
+        "connected_sendmsg": attempt(connected_sendmsg),
         "other_service": attempt(lambda: socket.create_connection(("127.0.0.1", int(other)), timeout=2).close()),
     }}
 `
@@ -177,6 +202,10 @@ func runRuntimeAPIFence(t *testing.T) {
 	assert.Equal(t, "AttributeError", outcomes["unaudited_exec"], "fork_exec raises no audit event, so it is gone: %v", outcomes)
 	assert.Equal(t, "ImportError", outcomes["reimported_exec"], "a fresh import would bring fork_exec back: %v", outcomes)
 	assert.NotEqual(t, "reached", outcomes["spawned_child"], "a spawned interpreter would start without the hook: %v", outcomes)
+	assert.Equal(t, "ImportError", outcomes["subinterpreter"], "a sub-interpreter starts without the hook: %v", outcomes)
+	assert.Equal(t, "ImportError", outcomes["recreated_builtin"], "a fresh built-in module would bring fork_exec back: %v", outcomes)
+	assert.Equal(t, "ImportError", outcomes["extension_loader"], "a renamed extension module would bring fork_exec back: %v", outcomes)
+	assert.Equal(t, "reached", outcomes["connected_sendmsg"], "sendmsg on a connected socket is judged at its connect: %v", outcomes)
 	// A forked child keeps the hook, so forked and forked_child return; the
 	// listener's count below is what proves their connection was refused.
 	time.Sleep(200 * time.Millisecond)

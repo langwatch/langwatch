@@ -676,7 +676,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     @integration
     Scenario: on AWS Lambda, the runner refuses user code the usual routes to the Lambda runtime API
       Given AWS_LAMBDA_RUNTIME_API names a listener on this machine
-      When user code tries urllib, a socket by address and by name, TCP fast open, the unspecified address, a link-local address, a socket subclass that lies about its family, a patched address parser, ctypes, another program, a shell, a forked, multiprocessing or spawned child and the unaudited fork_exec
+      When user code tries urllib, a socket by address and by name, TCP fast open, the unspecified address, a link-local address, a socket subclass that lies about its family, a patched address parser, ctypes, another program, a shell, a forked, multiprocessing or spawned child, a sub-interpreter and the unaudited fork_exec (also from a re-created built-in or a renamed extension module)
       Then every route is refused and the listener sees no connection
       And an ordinary loopback service stays reachable
 
