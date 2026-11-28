@@ -140,11 +140,18 @@ export class PrismaActivationCodeRepository implements ActivationCodeRepository 
     at: Instant;
     revokedById: string;
   }): Promise<boolean> {
-    const updated = await this.prisma.activationCode.updateMany({
-      where: { id, revokedAt: null },
-      data: { revokedAt: toDate(at), revokedById },
-    });
-    return updated.count === 1;
+    const updated = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "ActivationCode"
+         SET "revokedAt" = ${toDate(at)},
+             "revokedById" = ${revokedById},
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "revokedAt" IS NULL
+    `;
+    return updated === 1;
   }
 }
 

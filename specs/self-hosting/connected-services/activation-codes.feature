@@ -164,6 +164,20 @@ Feature: Activating a self-hosted install with a code
     Then the row records one redemption
     And four callers are refused
 
+  @integration
+  Scenario: Exactly one of two simultaneous revokes marks an activation code
+    Given an activation code that has not been revoked
+    When two operators revoke it at the same time
+    Then exactly one is told the code was revoked
+    And the row records that operator
+
+  @integration
+  Scenario: A revoke waiting on a row does not overwrite the earlier revocation
+    Given an activation code another operator revoked while this revoke waited
+    When the waiting revoke reaches the row
+    Then it is not reported as a revocation
+    And the earlier operator stays recorded
+
   @unit
   Scenario: A claim whose license could not be signed is released again
     Given a code whose license signing fails
