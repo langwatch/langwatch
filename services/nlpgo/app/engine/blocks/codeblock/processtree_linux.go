@@ -22,6 +22,7 @@ package codeblock
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"runtime"
 	"strconv"
@@ -32,6 +33,7 @@ import (
 	"unsafe"
 
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 )
 
 // prSetChildSubreaper is PR_SET_CHILD_SUBREAPER: orphaned descendants reparent
@@ -51,9 +53,14 @@ const (
 // seccomp answers EPERM) gave PR_SET_DUMPABLE, or 0 when it took; it is
 // reported, and detectExposure decides what it means.
 var (
-	hardeningOnce   sync.Once
-	subreaperActive bool
-	hideRefusal     syscall.Errno
+	hardeningOnce    sync.Once
+	subreaperActive  bool
+	hideRefusal      syscall.Errno
+	subreaperRefusal syscall.Errno
+	// confinementRefusal names the prctl the platform refused the runner's
+	// seccomp filter with ("" when it may install one); probed once.
+	confinementOnce    sync.Once
+	confinementRefusal string
 	// engineStartTicks dates this process, so the strays rule never claims what
 	// the platform started before it (Lambda's init and the web adapter), and
 	// engineParent is the other process that may adopt an orphan of a run: a
@@ -91,7 +98,7 @@ const teardownDeadline = 2 * time.Second
 func enableProcessHardening() {
 	hardeningOnce.Do(func() {
 		_, _, errno := syscall.Syscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0)
-		subreaperActive = errno == 0
+		subreaperActive, subreaperRefusal = errno == 0, errno
 		_, _, errno = syscall.Syscall(syscall.SYS_PRCTL, prSetDumpable, 0, 0)
 		// A refusal is recorded, not fatal; detectExposure decides what it costs.
 		hideRefusal = errno
@@ -100,36 +107,64 @@ func enableProcessHardening() {
 }
 
 // runTeardownFor decides how runs are torn down. The process group is enough
-// while the engine adopts orphans and can read their marks. Otherwise (AWS
-// Lambda refuses PR_SET_CHILD_SUBREAPER, and an execute-only interpreter's marks
-// are unreadable) the runner confines the run to its group, and where the
-// platform refuses that filter too, teardown sweeps for strays instead.
-func runTeardownFor(python string) runTeardown {
-	if _, readable := interpreterReadable(python); subreaperActive && readable {
+// while the engine adopts orphans and can read their marks. Otherwise the
+// runner confines the run to its group, and where the platform refuses that
+// too, teardown sweeps for strays, but only on AWS Lambda, whose sandbox holds
+// nothing else of this user's; elsewhere a sweep could kill a stranger.
+func runTeardownFor(python string, onLambda bool) runTeardown {
+	_, readable := interpreterReadable(python)
+	return chooseTeardown(subreaperActive && readable, confinementAvailable, onLambda)
+}
+
+// chooseTeardown is runTeardownFor's rule; confinable is asked only when the
+// group alone does not hold.
+func chooseTeardown(groupHolds bool, confinable func() bool, onLambda bool) runTeardown {
+	switch {
+	case groupHolds:
+		return teardownGroup
+	case confinable():
+		return teardownConfined
+	case onLambda:
+		return teardownStrays
+	default:
 		return teardownGroup
 	}
-	if confinementAvailable() {
-		return teardownConfined
-	}
-	return teardownStrays
 }
 
 // confinementAvailable tries what the runner confines a run with,
 // PR_SET_NO_NEW_PRIVS and then a seccomp filter (here one that allows
-// everything), on a thread of its own. Both are per thread, and a goroutine that
-// ends locked to its thread takes the thread with it, so the engine keeps none.
+// everything), once, on a thread of its own. Both are per thread, and a goroutine
+// that ends locked to its thread takes the thread with it, so the engine keeps none.
 func confinementAvailable() bool {
-	result := make(chan bool, 1)
-	go func() {
-		runtime.LockOSThread()
-		result <- installAllowAllFilter() == nil
-	}()
-	return <-result
+	confinementOnce.Do(func() {
+		result := make(chan string, 1)
+		go func() {
+			runtime.LockOSThread()
+			result <- installAllowAllFilter()
+		}()
+		confinementRefusal = <-result
+	})
+	return confinementRefusal == ""
+}
+
+// platformRefusals names what the platform answered to each prctl the engine
+// relies on, for the start-up record.
+func platformRefusals() []zap.Field {
+	confinement := "accepted"
+	if !confinementAvailable() {
+		confinement = confinementRefusal
+	}
+	return []zap.Field{
+		zap.String("prctl", errnoText(hideRefusal)),
+		zap.String("subreaper", errnoText(subreaperRefusal)),
+		zap.String("confinement", confinement),
+	}
 }
 
 // installAllowAllFilter is the runner's two prctls with a filter that refuses
-// nothing, so the probe changes nothing even on the thread it runs on.
-func installAllowAllFilter() error {
+// nothing, so the probe changes nothing even on the thread it runs on. It names
+// the prctl the platform refused, or returns "".
+func installAllowAllFilter() string {
 	const (
 		prSetNoNewPrivs   = 38
 		prSetSeccomp      = 22
@@ -138,14 +173,14 @@ func installAllowAllFilter() error {
 		seccompRetAllow   = 0x7fff0000
 	)
 	if _, _, errno := syscall.Syscall6(syscall.SYS_PRCTL, prSetNoNewPrivs, 1, 0, 0, 0, 0); errno != 0 {
-		return errno
+		return "prctl(PR_SET_NO_NEW_PRIVS): " + errno.Error()
 	}
 	filter := []syscall.SockFilter{{Code: bpfRetAllow, K: seccompRetAllow}}
 	prog := syscall.SockFprog{Len: uint16(len(filter)), Filter: &filter[0]}
 	if _, _, errno := syscall.Syscall6(syscall.SYS_PRCTL, prSetSeccomp, seccompModeFilter, uintptr(unsafe.Pointer(&prog)), 0, 0, 0); errno != 0 {
-		return errno
+		return "prctl(PR_SET_SECCOMP): " + errno.Error()
 	}
-	return nil
+	return ""
 }
 
 // terminateRunTree kills every process the execution still owns and reaps the
@@ -182,13 +217,32 @@ func terminateRunTree(scope runScope, logger *zap.Logger) {
 func killAndReap(claimed []procEntry, selfPid int) {
 	for _, proc := range claimed {
 		if !proc.zombie {
-			_ = syscall.Kill(proc.pid, syscall.SIGKILL)
+			killClaimed(proc)
 		}
 		if proc.ppid == selfPid {
 			var status syscall.WaitStatus
 			_, _ = syscall.Wait4(proc.pid, &status, syscall.WNOHANG, nil)
 		}
 	}
+}
+
+// killClaimed kills proc through a pidfd, once /proc confirms the pid still
+// names the process the sweep read: a pid the kernel handed to a new process
+// in between is never sent the signal. Where pidfds are refused, a plain kill.
+func killClaimed(proc procEntry) {
+	fd, err := unix.PidfdOpen(proc.pid, 0)
+	if errors.Is(err, unix.ESRCH) {
+		return
+	}
+	if err != nil {
+		_ = syscall.Kill(proc.pid, syscall.SIGKILL)
+		return
+	}
+	defer unix.Close(fd)
+	if now, ok := readProcEntry(proc.pid); !ok || now.startTicks != proc.startTicks {
+		return
+	}
+	_ = unix.PidfdSendSignal(fd, unix.SIGKILL, nil, 0)
 }
 
 func pidsOf(entries []procEntry) []int {

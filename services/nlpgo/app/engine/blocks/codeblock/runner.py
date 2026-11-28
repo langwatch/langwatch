@@ -69,7 +69,10 @@ NLPGO_CODE_BLOCK_CHANNEL, or read from stdin where there is none):
       "result_path": "<where to write the result>",
       "work_dir":    "<the run's directory, which this process moves into>",
       "nonce":       "<stamped on the result so nlpgo knows it is ours>",
-      "env":         {"NAME": "value", ...}
+      "env":         {"NAME": "value", ...},
+      "confine_process_group": true | false,
+      "fence_runtime_api":     "<host:port of the Lambda runtime API>" | "",
+      "syscall_filter":        true | false,
     }
 
 The optional `secrets` map is the project's decrypted secrets (rides on
@@ -210,43 +213,43 @@ def format_user_traceback() -> str:
 
 _PAYLOAD_TIMEOUT_S = 30
 
-# (audit arch, setsid, setpgid) per machine, for the filter below.
-_GROUP_SYSCALLS = {
-    "x86_64": (0xC000003E, 112, 109),
-    "aarch64": (0xC00000B7, 157, 154),
+# (audit arch, setsid, setpgid, execve, execveat) per machine, for the filters below.
+_SYSCALLS = {
+    "x86_64": (0xC000003E, 112, 109, 59, 322),
+    "aarch64": (0xC00000B7, 157, 154, 221, 281),
 }
 
 
-def confine_process_group() -> None:
-    """Refuse setsid and setpgid to this process and everything it starts.
-
-    nlpgo asks for this where it cannot adopt orphans (AWS Lambda refuses
-    PR_SET_CHILD_SUBREAPER): a process that left the run's process group
-    there would outlive the run. With both calls refused the group is the
-    whole run, and nlpgo kills the group when the run ends. A seccomp filter
-    cannot be removed, so user code that runs after this cannot undo it.
-    """
-    import ctypes
+def _machine_syscalls() -> tuple:
     import platform
 
-    numbers = _GROUP_SYSCALLS.get(platform.machine())
+    numbers = _SYSCALLS.get(platform.machine())
     if numbers is None:
-        raise OSError(0, f"no process-group filter for {platform.machine()}")
-    arch, setsid, setpgid = numbers
+        raise OSError(0, f"no syscall filter for {platform.machine()}")
+    return numbers
 
+
+def _refuse_syscalls(refused: tuple) -> None:
+    """Install a seccomp filter refusing `refused` (EPERM) and every other ABI.
+
+    A filter cannot be removed, and it holds for this process and everything
+    it starts, so user code that runs after this cannot undo it.
+    """
+    import ctypes
+
+    arch = _machine_syscalls()[0]
     ld_abs, jeq, jge, ret = 0x20, 0x15, 0x35, 0x06
     allow, refuse = 0x7FFF0000, 0x00050000 | 1  # SECCOMP_RET_ERRNO | EPERM
+    count = len(refused)
     program = [
-        (ld_abs, 0, 0, 4),           # 0 arch
-        (jeq, 1, 0, arch),           # 1 native -> 3
-        (ret, 0, 0, refuse),         # 2 any other ABI is refused outright
-        (ld_abs, 0, 0, 0),           # 3 syscall number
-        (jge, 3, 0, 0x40000000),     # 4 x32 numbers -> 8 refuse
-        (jeq, 2, 0, setsid),         # 5 -> 8 refuse
-        (jeq, 1, 0, setpgid),        # 6 -> 8 refuse
-        (ret, 0, 0, allow),          # 7
-        (ret, 0, 0, refuse),         # 8
+        (ld_abs, 0, 0, 4),                # arch
+        (jeq, 1, 0, arch),                # native -> load the number
+        (ret, 0, 0, refuse),              # any other ABI is refused outright
+        (ld_abs, 0, 0, 0),                # syscall number
+        (jge, count + 1, 0, 0x40000000),  # x32 numbers -> refuse
     ]
+    program += [(jeq, count - i, 0, number) for i, number in enumerate(refused)]
+    program += [(ret, 0, 0, allow), (ret, 0, 0, refuse)]
 
     class SockFilter(ctypes.Structure):
         _fields_ = [("code", ctypes.c_ushort), ("jt", ctypes.c_ubyte),
@@ -263,6 +266,122 @@ def confine_process_group() -> None:
         raise OSError(ctypes.get_errno(), "prctl(PR_SET_NO_NEW_PRIVS) failed")
     if libc.prctl(pr_set_seccomp, seccomp_mode_filter, ctypes.byref(fprog), 0, 0) != 0:
         raise OSError(ctypes.get_errno(), "prctl(PR_SET_SECCOMP) failed")
+
+
+def confine_process_group() -> None:
+    """Refuse setsid and setpgid to this process and everything it starts.
+
+    nlpgo asks for this where it cannot adopt orphans (AWS Lambda refuses
+    PR_SET_CHILD_SUBREAPER): a process that left the run's process group
+    there would outlive the run. With both calls refused the group is the
+    whole run, and nlpgo kills the group when the run ends.
+    """
+    _, setsid, setpgid, _, _ = _machine_syscalls()
+    _refuse_syscalls((setsid, setpgid))
+
+
+_RUNTIME_API_REFUSAL = "code blocks cannot reach the Lambda runtime API"
+
+
+def fence_runtime_api(address: str, syscall_filter: bool) -> None:
+    """Keep user code off the Lambda runtime API at `address` ("host:port").
+
+    That API hands out the function's invocations. An invocation carries only
+    the project's own run, so this is a second layer, not the boundary: an
+    audit hook shares the interpreter with the code it judges, so code that
+    reaches the hook's own objects or an unaudited native call gets past it.
+    Before any user code, and never removed, it refuses a connection or send
+    to the API's port on any loopback or unspecified address, to any
+    link-local address, or by unresolved name; starting another program (a
+    forked child keeps the hook); ctypes; native modules from anywhere user code can write; and
+    /proc/<pid>/mem. Every primitive it judges with is bound here, so patching
+    a module afterwards changes nothing. Where the platform allows a seccomp
+    filter (`syscall_filter`) it also refuses execve and execveat. Rationale:
+    specs/nlp-go/_shared/contract.md §7.
+    """
+    import _socket
+    import re
+
+    if syscall_filter:
+        _, _, _, execve, execveat = _machine_syscalls()
+        _refuse_syscalls((execve, execveat))
+
+    inet_pton, af_inet, af_inet6 = _socket.inet_pton, _socket.AF_INET, _socket.AF_INET6
+    family_of = _socket.socket.family.__get__
+    item, cut, as_int, starts = tuple.__getitem__, str.partition, int.__int__, str.startswith
+    is_a, size = isinstance, len
+    realpath, normpath, fsdecode = os.path.realpath, os.path.normpath, os.fsdecode
+    mapped_prefix, refusal = b"\0" * 10 + b"\xff\xff", PermissionError
+
+    def packed(host) -> bytes:
+        """The literal address `host` names; a name is refused."""
+        if is_a(host, str):
+            host = cut(host, "%")[0]
+            for family in (af_inet, af_inet6):
+                try:
+                    return inet_pton(family, host)
+                except OSError:
+                    pass
+        raise refusal("code blocks connect to a resolved address, as socket.create_connection does")
+
+    api_host, _, api_port = address.rpartition(":")
+    api_packed, api_port = packed(api_host.strip("[]")), int(api_port)
+
+    def refused_ip(ip: bytes, port: int) -> bool:
+        if size(ip) == 16 and ip[:12] == mapped_prefix:
+            ip = ip[12:]
+        if size(ip) == 4:
+            if ip[0] == 169 and ip[1] == 254:
+                return True
+            local = ip[0] == 127 or ip == b"\0\0\0\0"
+        else:
+            if ip[0] == 0xFE and ip[1] & 0xC0 == 0x80:
+                return True
+            local = ip[:15] == b"\0" * 15 and ip[15] in (0, 1)
+        return port == api_port and (local or ip == api_packed)
+
+    def refused_target(sock, target) -> bool:
+        if family_of(sock) not in (af_inet, af_inet6):
+            return False
+        return refused_ip(packed(item(target, 0)), as_int(item(target, 1)))
+
+    # Native code loads only from the read-only library directories this
+    # interpreter started with: a library user code wrote runs outside the hook.
+    trusted = tuple(
+        realpath(entry) + os.sep
+        for entry in sys.path
+        if entry and os.path.isdir(entry) and not os.access(entry, os.W_OK)
+    )
+    proc_mem = re.compile(r"^/proc/(self|thread-self|\d+)(/task/\d+)?/mem$").match
+    # A forked child keeps this hook; only an exec'd one would not.
+    starters = frozenset(("os.exec", "os.posix_spawn", "os.spawn", "os.system", "subprocess.Popen"))
+    foreign = frozenset(("ctypes.dlopen", "ctypes.call_function", "ctypes.cdata"))
+    # fork_exec raises no audit event, so it goes, from subprocess's copy too
+    # (loaded first, so `import subprocess` still works and Popen is refused).
+    unaudited = frozenset(("_posixsubprocess",))
+    import _posixsubprocess
+    import subprocess
+
+    del _posixsubprocess.fork_exec, subprocess._fork_exec
+
+    def hook(event, args):
+        if event in ("socket.connect", "socket.sendto", "socket.sendmsg"):
+            if refused_target(args[0], args[1]):
+                raise refusal(_RUNTIME_API_REFUSAL)
+        elif event in starters:
+            raise refusal("code blocks on AWS Lambda cannot start other programs")
+        elif event in foreign:
+            raise refusal("code blocks on AWS Lambda cannot call native code through ctypes")
+        elif event == "import":
+            if args[0] in unaudited:
+                raise ImportError(f"{args[0]} is not available to code blocks on AWS Lambda")
+            if is_a(args[1], str) and args[2] is None and not starts(realpath(args[1]), trusted):
+                raise ImportError(f"native module {args[0]} is not from the sandbox libraries")
+        elif event == "open" and is_a(args[0], (str, bytes)):
+            if proc_mem(normpath(fsdecode(args[0]))):
+                raise refusal("code blocks cannot open process memory")
+
+    sys.addaudithook(hook)
 
 
 def read_payload() -> str:
@@ -334,6 +453,13 @@ def main() -> int:
             confine_process_group()
         except OSError as e:
             sys.stderr.write(f"runner: cannot keep this run in its process group: {e}\n")
+            return 1
+    runtime_api = payload.get("fence_runtime_api")
+    if runtime_api:
+        try:
+            fence_runtime_api(runtime_api, bool(payload.get("syscall_filter")))
+        except (OSError, ValueError) as e:
+            sys.stderr.write(f"runner: cannot keep this run off the Lambda runtime API: {e}\n")
             return 1
 
     stub_source = payload.get("dspy_stub")

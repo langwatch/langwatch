@@ -245,6 +245,31 @@ def execute(spool):
     return {"how": how}
 `
 
+// leftBehindByFork is leftBehind for a run that may start no other program,
+// as on AWS Lambda: the process it leaves is a fork of the interpreter.
+const leftBehindByFork = `import os, time
+
+def execute(spool):
+    read, write = os.pipe()
+    if os.fork() == 0:
+        try:
+            os.setsid()
+            how = "session"
+        except PermissionError:
+            how = "double fork"
+        if os.fork() == 0:
+            os.chdir("/")
+            os.write(write, f"{how}:{os.getpid()}".encode())
+            time.sleep(120)
+            os._exit(0)
+        os._exit(0)
+    how, pid = os.read(read, 64).decode().split(":")
+    time.sleep(0.2)
+    with open(spool, "w") as handle:
+        handle.write(pid)
+    return {"how": how}
+`
+
 // @scenario "on AWS Lambda, nothing user code starts outlives its run"
 func TestLambdaCredentials_NothingUserCodeStartsOutlivesItsRun(t *testing.T) {
 	runInLambdaSandbox(t, "lambda-left-behind", lambdaSandbox{execOnly: true})
@@ -273,7 +298,7 @@ func runCageRefused(t *testing.T, timesOut bool) {
 	exe, err := codeblock.New(codeblock.Options{Python: os.Getenv(lambdaPythonEnv)})
 	require.NoError(t, err)
 	spool := filepath.Join(t.TempDir(), "pid")
-	code, timeout := leftBehind, 30*time.Second
+	code, timeout := leftBehindByFork, 30*time.Second
 	if timesOut {
 		code, timeout = leftBehindThenHang, 3*time.Second
 	}
@@ -295,8 +320,8 @@ func runCageRefused(t *testing.T, timesOut bool) {
 		"pid %d, in a session of its own, was still running after its run returned", pid)
 }
 
-// leftBehindThenHang is leftBehind that then runs past its timeout.
-const leftBehindThenHang = leftBehind + `
+// leftBehindThenHang is leftBehindByFork that then runs past its timeout.
+const leftBehindThenHang = leftBehindByFork + `
 _left_behind = execute
 
 def execute(spool):
@@ -313,7 +338,7 @@ func runLeftBehind(t *testing.T) {
 	require.NoError(t, err)
 	spool := filepath.Join(t.TempDir(), "pid")
 	res, err := exe.Execute(context.Background(), codeblock.Request{
-		Code:            leftBehind,
+		Code:            leftBehindByFork,
 		Inputs:          map[string]any{"spool": spool},
 		DeclaredOutputs: []string{"how"},
 		Timeout:         30 * time.Second,
@@ -388,6 +413,9 @@ func init() {
 		extraRefusals[name] = []uint32{38, 22} // PR_SET_NO_NEW_PRIVS, PR_SET_SECCOMP
 	}
 	extraRefusals["lambda-probe-all-unconfined"] = []uint32{38, 22}
+	lambdaCases["lambda-runtime-api"] = runRuntimeAPIFence
+	lambdaCases["lambda-runtime-api-unconfined"] = runRuntimeAPIFence
+	extraRefusals["lambda-runtime-api-unconfined"] = []uint32{38, 22}
 	for name := range probeCategories {
 		lambdaCases[name] = func(t *testing.T) {
 			t.Helper()

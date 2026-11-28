@@ -187,7 +187,15 @@ type Executor struct {
 	// teardown is how runs are kept from outliving themselves; see
 	// runTeardownFor.
 	teardown runTeardown
+	// runtimeAPI is the Lambda runtime API address (AWS_LAMBDA_RUNTIME_API),
+	// "" off Lambda. The runner keeps user code off it; see runner.py
+	// fence_runtime_api.
+	runtimeAPI string
 }
+
+// lambdaRuntimeAPIEnv names the host:port of the Lambda runtime API, which
+// serves the function's invocations to whoever asks: never to user code.
+const lambdaRuntimeAPIEnv = "AWS_LAMBDA_RUNTIME_API"
 
 // hideMode says whether code blocks are served.
 type hideMode string
@@ -212,11 +220,10 @@ func hideModeFor(exposure string) hideMode {
 // New: the other block types must keep working.
 func resolveHideMode(exposure string, teardown runTeardown, logger *zap.Logger) hideMode {
 	mode := hideModeFor(exposure)
-	fields := []zap.Field{
+	fields := append([]zap.Field{
 		zap.String("mode", string(mode)),
-		zap.String("prctl", errnoText(hideRefusal)),
 		zap.String("teardown", string(teardown)),
-	}
+	}, platformRefusals()...)
 	if mode == hideStrict {
 		logger.Info("nlpgo_code_block_hide_mode", fields...)
 	} else {
@@ -225,7 +232,7 @@ func resolveHideMode(exposure string, teardown runTeardown, logger *zap.Logger) 
 	return mode
 }
 
-// errnoText names what the platform answered to PR_SET_DUMPABLE.
+// errnoText names what the platform answered to a prctl.
 func errnoText(errno syscall.Errno) string {
 	if errno == 0 {
 		return "accepted"
@@ -295,11 +302,13 @@ func New(opts Options) (*Executor, error) {
 		return nil, err
 	}
 	exposure := detectExposure(opts.Python)
-	teardown := runTeardownFor(opts.Python)
+	runtimeAPI := os.Getenv(lambdaRuntimeAPIEnv)
+	teardown := runTeardownFor(opts.Python, runtimeAPI != "")
 	return &Executor{
 		mode:           resolveHideMode(exposure, teardown, opts.logger()),
 		exposure:       exposure,
 		teardown:       teardown,
+		runtimeAPI:     runtimeAPI,
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
@@ -602,6 +611,8 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		"work_dir":              runDir,
 		"nonce":                 nonce,
 		"confine_process_group": e.teardown == teardownConfined,
+		"fence_runtime_api":     e.runtimeAPI,
+		"syscall_filter":        confinementAvailable(),
 		"env":                   runnerEnv(sandboxCredential(req.SandboxAPIKey, e.opts.SandboxEndpoint), runDir, token),
 	})
 	if err != nil {

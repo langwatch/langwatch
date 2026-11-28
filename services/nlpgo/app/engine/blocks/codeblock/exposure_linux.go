@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+
+	"github.com/langwatch/langwatch/pkg/cloudcredentials"
 )
 
 // prGetDumpable is PR_GET_DUMPABLE; suidDumpUser is the value it returns for a
@@ -36,13 +38,7 @@ const (
 // ambientCredentialVariables are the variables a cloud platform puts the
 // workload's own identity in. A readable process holding one of them hands it
 // to every code block, so finding one disables code blocks.
-var ambientCredentialVariables = []string{
-	"AWS_ACCESS_KEY_ID",
-	"AWS_SECRET_ACCESS_KEY",
-	"AWS_SESSION_TOKEN",
-	"AWS_CONTAINER_AUTHORIZATION_TOKEN",
-	"AZURE_CLIENT_SECRET",
-}
+var ambientCredentialVariables = cloudcredentials.Names()
 
 // detectExposure names the first thing a code block could read that it must
 // not, or returns "" when there is none. python is the interpreter the

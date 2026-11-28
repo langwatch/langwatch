@@ -631,6 +631,37 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the process is gone once the run returns, and once it times out
       And user code still reads no process that holds the role's credentials
 
+    # A sweep kills orphans by age, which is safe only in a sandbox that holds
+    # nothing else of this user's, as Lambda's does.
+    @unit
+    Scenario: off AWS Lambda, teardown never sweeps for strays
+      Given the platform refuses both adopting orphans and confining a run
+      When the engine runs anywhere but AWS Lambda
+      Then runs are torn down by their process group alone, never by a sweep
+
+    @unit
+    Scenario: teardown signals a swept process only while its pid still names it
+      Given teardown read a process to kill
+      When that pid now names a process that started at another time
+      Then teardown does not signal it
+
+    @unit
+    Scenario: the start-up record names what the platform refused
+      When the code block executor is built
+      Then nlpgo_code_block_hide_mode names the answer to PR_SET_DUMPABLE, PR_SET_CHILD_SUBREAPER and the prctl that refused confinement
+
+    @unit
+    Scenario: the web adapter launcher strips every credential the exposure check looks for
+      Given the variables the engine counts as a workload credential
+      When the launcher starts the adapter with each of them set
+      Then the adapter gets none of them
+
+    @unit
+    Scenario: only the Lambda image ships the code-block interpreter execute-only
+      Given infra/docker/Dockerfile.go-services
+      Then the lambda stage copies python3.11 with a mode that leaves others no read
+      And no other stage does, so the k8s and self-hosted images keep setsid and setpgid for user code
+
     @integration
     Scenario: a run from an execute-only interpreter leaves nothing behind while an older run is live
       Given the interpreter is execute-only, so the marks teardown reads are closed
@@ -638,6 +669,16 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When user code starts a process that leaves the run's session
       Then the run is kept in its process group
       And the process is gone once the run returns, and the older run finishes untouched
+
+    # A second layer: the boundary is that an invocation carries only the
+    # project's own run. The hook shares the interpreter with user code, so
+    # code that rewrites the hook's own objects gets past it (contract §7).
+    @integration
+    Scenario: on AWS Lambda, the runner refuses user code the usual routes to the Lambda runtime API
+      Given AWS_LAMBDA_RUNTIME_API names a listener on this machine
+      When user code tries urllib, a socket by address and by name, TCP fast open, the unspecified address, a link-local address, a socket subclass that lies about its family, a patched address parser, ctypes, another program, a shell, a forked, multiprocessing or spawned child and the unaudited fork_exec
+      Then every route is refused and the listener sees no connection
+      And an ordinary loopback service stays reachable
 
     @integration
     Scenario: on AWS Lambda, the runner's loopback listener serves no credential and no debug route
