@@ -257,8 +257,27 @@ jobs:
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
       - run: go test -count=1 -race $GO_PKGS
       - run: go test -count=1 -tags dev ./cmd/service/...
-      # Memory ceilings skip under -race (it multiplies memory and time), so
-      # they run here in a plain build.
+
+  # Memory ceilings skip under -race (it multiplies memory and time), so they run
+  # in a plain build. A job of their own, beside `test` rather than after it.
+  memory-ceilings:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
+    runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+      - uses: ./.github/actions/go-build-cache
+        with:
+          suffix: memory-ceilings
       - run: go test -count=1 -run 'TestLargePlanWalkStaysUnder256MB' ./tools/seedgen/
 
   lint:
