@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -34,20 +35,48 @@ func TestCredentialHolder_TheProcessThatStartedTheEngine(t *testing.T) {
 
 // @scenario "a credential held in another PID namespace disables code blocks with advice that fits it"
 func TestCredentialHolder_AProcessInAnotherPIDNamespace(t *testing.T) {
-	unshare := []string{"unshare", "--user", "--pid", "--fork"}
+	// --kill-child ends the namespace with unshare: left running, the holder
+	// would disable code blocks for every test after this one.
+	unshare := []string{"unshare", "--user", "--pid", "--fork", "--kill-child"}
 	if err := exec.Command(unshare[0], append(unshare[1:], "true")...).Run(); err != nil { //nolint:gosec // fixed arguments
 		t.Skipf("this host cannot start a process in a PID namespace of its own: %v", err)
 	}
 	cmd := exec.Command(unshare[0], append(unshare[1:], "env", roleSecretEnv+"="+credentialCanary, "sleep", "120")...) //nolint:gosec // fixed arguments
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	require.NoError(t, cmd.Start())
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _, _ = cmd.Process.Wait() })
 	holder := 0
+	t.Cleanup(func() { endHolder(t, cmd, holder) })
 	require.Eventually(t, func() bool {
 		holder = childHolding(cmd.Process.Pid, credentialCanary)
 		return holder != 0
 	}, 5*time.Second, 20*time.Millisecond, "the process in the new namespace never took the credential")
 	runChild(t, "holder-in-another-pid-namespace", holderPidEnv+"="+strconv.Itoa(holder))
+}
+
+// endHolder kills unshare's process group and waits until the holder is gone.
+func endHolder(t *testing.T, cmd *exec.Cmd, holder int) {
+	t.Helper()
+	_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	_, _ = cmd.Process.Wait()
+	if holder == 0 {
+		return
+	}
+	require.Eventually(t, func() bool { return processEnded(holder) }, 5*time.Second, 20*time.Millisecond,
+		"process %d still holds the credential after its test", holder)
+}
+
+// processEnded reaps pid if it became this process's child (the engine under
+// test marks itself subreaper), and reports it gone or a zombie.
+func processEnded(pid int) bool {
+	var status syscall.WaitStatus
+	_, _ = syscall.Wait4(pid, &status, syscall.WNOHANG, nil)
+	stat, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return true
+	}
+	fields := strings.Fields(string(stat[bytes.LastIndexByte(stat, ')')+1:]))
+	return len(fields) > 0 && fields[0] == "Z"
 }
 
 // childHolding returns the child of parent whose environment holds value, or 0.
