@@ -889,6 +889,12 @@ func TestPRReviewBotScopesTheWakeKeyToTheWakeStep(t *testing.T) {
 				"          go-version-file: go.work\n      - run: echo '${{ secrets.LAZE_WAKE_KEY }}'\n", 1),
 			want: []string{`"echo '${{ secrets.LAZE_WAKE_KEY }}'" is handed LAZE_WAKE_KEY`},
 		},
+		"another step's script, index form": {
+			broken: strings.Replace(goodPRReviewBotWorkflow,
+				"          go-version-file: go.work\n",
+				"          go-version-file: go.work\n      - run: echo '${{ secrets['LAZE_WAKE_KEY'] }}'\n", 1),
+			want: []string{`"echo '${{ secrets['LAZE_WAKE_KEY'] }}'" is handed LAZE_WAKE_KEY`},
+		},
 		"another step's if": {
 			broken: strings.Replace(goodPRReviewBotWorkflow,
 				"      - uses: langwatch/langwatch-pr-review-bot@",
@@ -906,7 +912,7 @@ func TestPRReviewBotScopesTheWakeKeyToTheWakeStep(t *testing.T) {
 	}
 }
 
-// toJSON(secrets) hands a step every secret the job can reach, the wake key included.
+// toJSON(secrets) hands a step, or every step under an env, every secret, the wake key included.
 // @scenario "The Laze wake key is scoped to the wake step"
 func TestPRReviewBotRejectsAStepPassingEverySecret(t *testing.T) {
 	cases := map[string]struct{ broken, want string }{
@@ -917,6 +923,16 @@ func TestPRReviewBotRejectsAStepPassingEverySecret(t *testing.T) {
       - run: echo '${{ toJSON(secrets) }}'
 `,
 			want: `job "dump" step "echo '${{ toJSON(secrets) }}'" passes toJSON(secrets)`,
+		},
+		"another job's env": {
+			broken: goodPRReviewBotWorkflow + `  dump:
+    runs-on: ubuntu-latest
+    env:
+      ALL: ${{ toJSON(secrets) }}
+    steps:
+      - run: echo hi
+`,
+			want: `job "dump" env passes toJSON(secrets)`,
 		},
 		"the bot's input": {
 			broken: strings.Replace(goodPRReviewBotWorkflow,

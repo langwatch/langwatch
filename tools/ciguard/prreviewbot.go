@@ -64,12 +64,10 @@ var prReviewBotRequiredPermissions = map[string]string{
 // workflow's pins are allowed to carry.
 var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
-// PRReviewBot reports every way the PR Review Bot workflow has drifted from
-// the invariants specs/ci/pr-review-bot.feature describes: the wait for
-// ci-complete, the wait for every other check, the skip gate, the trigger
-// types that can run a review, single-review-in-flight concurrency, full-SHA
-// pinning on every action it uses, the required permissions block, and the
-// Laze wake step with its key scoped to that step.
+// PRReviewBot reports every drift of the PR Review Bot workflow from
+// specs/ci/pr-review-bot.feature: the waits for ci-complete and every other check, the
+// skip gate, trigger types, concurrency, full-SHA pinning, the permissions block, and the
+// Laze wake step's key scope.
 func PRReviewBot(repoRoot string) ([]string, error) {
 	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
 	if err != nil {
@@ -381,7 +379,7 @@ func wakeStepProblems(step ciscan.Step) []string {
 
 // wakeKeyLeaks reports every place outside the wake step that is handed the key:
 // the workflow or job env, another step's env, `with:`, `run:` or `if:`, and any
-// step in the workflow passing toJSON(secrets).
+// env or step in the workflow passing toJSON(secrets).
 func wakeKeyLeaks(workflow *ciscan.Workflow, job ciscan.Job, wake int) []string {
 	var problems []string
 	if envCarriesWakeKey(workflow.Env) {
@@ -405,21 +403,31 @@ func wakeKeyLeaks(workflow *ciscan.Workflow, job ciscan.Job, wake int) []string 
 	return append(problems, secretsDumps(workflow)...)
 }
 
-// stepIsHandedWakeKey reports whether a step's env, `with:`, `run:` or `if:` carries the key.
+// stepIsHandedWakeKey reports whether a step's env, `with:`, `run:` or `if:` names the key.
+// The bare name also catches the index form, secrets['LAZE_WAKE_KEY'].
 func stepIsHandedWakeKey(step *ciscan.Step) bool {
-	secret := "secrets." + prReviewBotWakeKey
-
 	return envCarriesWakeKey(step.Env) ||
 		strings.Contains(fmt.Sprint(step.With), prReviewBotWakeKey) ||
-		strings.Contains(step.Run, secret) ||
-		strings.Contains(step.If, secret)
+		strings.Contains(step.Run, prReviewBotWakeKey) ||
+		strings.Contains(step.If, prReviewBotWakeKey)
 }
 
-// secretsDumps reports every step, in any job, that passes toJSON(secrets).
+// secretsDumps reports the workflow env, and every job env or step, passing toJSON(secrets).
 func secretsDumps(workflow *ciscan.Workflow) []string {
 	var problems []string
+	if secretsDumpPattern.MatchString(fmt.Sprint(workflow.Env)) {
+		problems = append(problems, fmt.Sprintf(
+			"%s workflow env passes toJSON(secrets), which hands every step every secret, %s included",
+			PRReviewBotWorkflow, prReviewBotWakeKey))
+	}
 	for _, name := range slices.Sorted(maps.Keys(workflow.Jobs)) {
-		steps := workflow.Jobs[name].Steps
+		job := workflow.Jobs[name]
+		if secretsDumpPattern.MatchString(fmt.Sprint(job.Env)) {
+			problems = append(problems, fmt.Sprintf(
+				"%s job %q env passes toJSON(secrets), which hands every step of the job every secret, %s included",
+				PRReviewBotWorkflow, name, prReviewBotWakeKey))
+		}
+		steps := job.Steps
 		for i := range steps {
 			step := &steps[i]
 			if !secretsDumpPattern.MatchString(step.Run + "\n" + step.If + "\n" + fmt.Sprint(step.Env) + "\n" + fmt.Sprint(step.With)) {
