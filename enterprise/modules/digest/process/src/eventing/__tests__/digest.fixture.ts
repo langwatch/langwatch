@@ -172,6 +172,8 @@ export function digestWorld() {
     /** The projects each person may not view; everyone may view every other. */
     hiddenFrom: new Map<string, readonly string[]>(),
     usage: { currentMonthMessagesCount: 10, maxMonthlyUsageLimit: 1_000 },
+    /** The plan's usage cannot be read, as when the entitlement service is down. */
+    failingUsage: false,
     /** People the user module knows, by id; anyone else has no address. */
     users: [ADMIN, MEMBER, OTHER_MEMBER, OPERATOR],
     /** How far this process's clock runs ahead of the wall clock. */
@@ -282,7 +284,12 @@ export function installDigest(
     projectWeeks: repositories.projectWeeks,
     userWeeks: repositories.userWeeks,
     entitlement: createApiFixture<WeekDeps["entitlement"]>(
-      { getUsage: async () => world.usage },
+      {
+        getUsage: async () => {
+          if (world.failingUsage) throw new Error("usage cannot be read");
+          return world.usage;
+        },
+      },
       "EntitlementApi",
     ),
   });
@@ -595,12 +602,16 @@ export function installDigest(
       return folds.find((fold) => fold.projectId === PROJECT);
     },
     userWeek: async ({ isoWeek, userId }: { isoWeek: string; userId: string }) => {
-      const folds = await repositories.userWeeks.findWeeks({
+      const [fold] = await repositories.userWeeks.findWeeks({
         isoWeeks: [isoWeek],
         organizationId: ORGANIZATION,
+        userId,
       });
-      return folds.find((fold) => fold.userId === userId);
+      return fold;
     },
+    /** The week one reader is built, as the send reads it. */
+    organizationWeek: (input: Parameters<DigestWeekService["organizationWeek"]>[0]) =>
+      weeks.organizationWeek(input),
     close: () => eventing.close(),
   };
 }

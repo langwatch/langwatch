@@ -70,7 +70,7 @@ const organizationWeek = (overrides: Partial<OrganizationWeek>): OrganizationWee
   projects: [],
   history: [],
   previousTraces: new Map(),
-  users: new Map(),
+  codingAgents: null,
   ...overrides,
 });
 
@@ -192,25 +192,20 @@ const flooded: Shape = {
       ["search-ranker", 31_000],
       ["docs-agent", 7_000],
     ]),
-    users: new Map([
-      [
-        READER,
-        {
-          ...emptyUserWeek(),
-          userId: READER,
-          organizationId: "org",
-          isoWeek: SENT_WEEK,
-          sessions: Array.from({ length: 64 }, (_, index) => `session-${index}`),
-          series: {
-            tokens: { metric: "token_usage", type: null, value: 41_200_000 },
-            cost: { metric: "cost_usage", type: null, value: 318.4 },
-            commits: { metric: "commit", type: null, value: 23 },
-            pulls: { metric: "pull_request", type: null, value: 7 },
-          },
-          repositories: { "quillmark/checkout-service": 38, "quillmark/claims": 26 },
-        },
-      ],
-    ]),
+    codingAgents: {
+      ...emptyUserWeek(),
+      userId: READER,
+      organizationId: "org",
+      isoWeek: SENT_WEEK,
+      sessions: Array.from({ length: 64 }, (_, index) => `session-${index}`),
+      series: {
+        tokens: { metric: "token_usage", type: null, value: 41_200_000 },
+        cost: { metric: "cost_usage", type: null, value: 318.4 },
+        commits: { metric: "commit", type: null, value: 23 },
+        pulls: { metric: "pull_request", type: null, value: 7 },
+      },
+      repositories: { "quillmark/checkout-service": 38, "quillmark/claims": 26 },
+    },
   }),
 };
 
@@ -224,7 +219,6 @@ const fixtureNamed = (name: string) =>
 const build = ({ shape, admin }: { shape: Shape; admin: boolean }) =>
   buildDigestWeekProps({
     week: shape.week,
-    userId: READER,
     admin,
     mode: "auto",
     organizationName: shape.organizationName,

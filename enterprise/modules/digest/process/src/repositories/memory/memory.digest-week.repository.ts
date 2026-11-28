@@ -28,18 +28,24 @@ export class MemoryDigestWeekRepository<State extends WeekState> {
     return Promise.resolve();
   };
 
+  /** A person's weeks are read by `userId`; a project's week, which names no one, is not. */
   findWeeks({
     isoWeeks,
     organizationId,
+    userId,
   }: {
     isoWeeks: readonly string[];
     organizationId: string;
+    userId?: string;
   }): Promise<State[]> {
     return Promise.resolve(
       [...this.#rows.values()]
         .map((row) => row.state)
         .filter(
-          (state) => state.organizationId === organizationId && isoWeeks.includes(state.isoWeek),
+          (state) =>
+            state.organizationId === organizationId &&
+            isoWeeks.includes(state.isoWeek) &&
+            (userId === undefined || state.userId === userId),
         ),
     );
   }

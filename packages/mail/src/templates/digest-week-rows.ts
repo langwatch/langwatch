@@ -9,6 +9,7 @@ import {
   formatLatency,
   formatPercent,
   formatUsd,
+  percentOf,
 } from "./digest-parts.tsx";
 import type {
   DigestWeekEvaluator,
@@ -27,12 +28,14 @@ export const CHIP_LABELS: Readonly<Record<DigestWeekRow["kind"], string>> = {
   evals: "Evals",
   quiet: "Quiet",
   setup: "Set up",
-  coding: "Coding agents",
+  coding: "Coding",
   traces: "Traces",
   new: "New",
 };
 
 type Action = Readonly<{ label: string; href: string }>;
+/** A text link, with any plain words that lead into it kept out of the link. */
+type TextLink = Action & Readonly<{ before?: string }>;
 
 /** One row in words. A row with a button needs the reader, and its chip is solid. */
 export type RowCopy = Readonly<{
@@ -41,7 +44,7 @@ export type RowCopy = Readonly<{
   href: string;
   context: string;
   button?: Action;
-  link?: Action;
+  link?: TextLink;
   needsYou: boolean;
   /** How the header's "Needs you" line names it, when it needs the reader. */
   needsYouPhrase?: string;
@@ -59,9 +62,6 @@ export const joinAnd = (parts: readonly string[]): string =>
   parts.length <= 1
     ? (parts[0] ?? "")
     : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1) ?? ""}`;
-
-const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
-  whole > 0 ? (part * 100) / whole : 0;
 
 /** A catalogue evaluator's name, or the custom ones together. */
 const evalName = (evaluator: DigestWeekEvaluator): string =>
@@ -90,7 +90,7 @@ function planCopy(row: Extract<DigestWeekRow, { kind: "plan" }>): RowCopy {
     href: row.url,
     context: `${formatCount(row.used)} of the ${formatCount(row.limit)} traces your plan includes. The count resets on ${row.resetsOn}, in ${days}.`,
     button: { label: "Raise the limit", href: row.upgradeUrl },
-    link: { label: "or choose which traces to keep", href: row.url },
+    link: { before: "or ", label: "choose which traces to keep", href: row.url },
     needsYou: true,
     needsYouPhrase: "the plan",
     previewPhrase: "this month's plan usage",
@@ -166,18 +166,19 @@ function setupCopy(row: Extract<DigestWeekRow, { kind: "setup" }>): RowCopy {
 
 /** No cost, anywhere in the row: what a person's agents spent is not this email's to say. */
 function codingCopy(row: Extract<DigestWeekRow, { kind: "coding" }>): RowCopy {
-  const floor = (text: string) => (row.totalsAtLeast ? `at least ${text}` : text);
   const totals = [
-    `${floor(formatCompact(row.tokens))} tokens`,
+    `${formatCompact(row.tokens)} tokens`,
     ...(row.commits === undefined
       ? []
-      : [`${floor(formatCount(row.commits))} ${row.commits === 1 ? "commit" : "commits"}`]),
+      : [`${formatCount(row.commits)} ${row.commits === 1 ? "commit" : "commits"}`]),
     ...(row.pullRequests === undefined
       ? []
       : [
-          `${floor(formatCount(row.pullRequests))} ${row.pullRequests === 1 ? "pull request" : "pull requests"}`,
+          `${formatCount(row.pullRequests)} ${row.pullRequests === 1 ? "pull request" : "pull requests"}`,
         ]),
   ];
+  // One "at least" covers the whole list: every total was floored by the same series cap.
+  const floor = row.totalsAtLeast ? "at least " : "";
   const repository = row.topRepository
     ? `, ${formatCount(row.topRepository.sessions)} of the sessions in ${row.topRepository.name}`
     : "";
@@ -185,7 +186,7 @@ function codingCopy(row: Extract<DigestWeekRow, { kind: "coding" }>): RowCopy {
     kind: row.kind,
     title: `Your coding agents ran ${plural({ count: row.sessions, one: "session", many: "sessions" })}`,
     href: row.url,
-    context: `${capitalise(joinAnd(totals))}${repository}.`,
+    context: `${capitalise(`${floor}${joinAnd(totals)}`)}${repository}.`,
     needsYou: false,
     previewPhrase: "your coding agents' week",
   };
@@ -284,8 +285,8 @@ export function digestWeekReason({
   organizationName,
 }: Pick<DigestWeekProps, "organizationName">): string {
   return organizationName
-    ? `You are a member of ${organizationName}.`
-    : "You have a LangWatch account.";
+    ? `You get this because you're in ${organizationName}.`
+    : "You get this because you have a LangWatch account.";
 }
 
 const steadyEvalsPart = (steadyEvals: DigestWeekProps["steadyEvals"]): string | null => {

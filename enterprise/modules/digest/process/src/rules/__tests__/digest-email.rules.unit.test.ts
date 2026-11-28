@@ -71,7 +71,6 @@ function propsFor({
 }) {
   const props = buildDigestWeekProps({
     week: organizationWeek,
-    userId: "u",
     admin,
     mode: "auto",
     organizationName: "Acme",
@@ -96,7 +95,7 @@ function week(overrides: Partial<OrganizationWeek> = {}): OrganizationWeek {
     projects: [],
     history: [],
     previousTraces: new Map(),
-    users: new Map(),
+    codingAgents: null,
     ...overrides,
   };
 }
@@ -163,6 +162,23 @@ describe("buildDigestWeekProps()", () => {
     it("sends nothing when the only project's name cannot be read", () => {
       expect(propsFor({ week: busy, projects: new Map() })).toBeUndefined();
     });
+
+    /** @scenario "A row whose project has no name is left out of the email" */
+    it("leaves unnamed projects out before the cap, so they take no named project's place", () => {
+      const unnamedQuiet = ["a", "b", "c", "d", "e"].map((id) => `unnamed-${id}`);
+      const crowded = week({
+        planUsage: null,
+        projects: [...busy.projects, ...unnamedQuiet.map((projectId) => fold({ projectId }))],
+        previousTraces: new Map(unnamedQuiet.map((projectId) => [projectId, 500])),
+      });
+
+      const props = propsFor({ week: crowded });
+
+      expect(props?.rows.map((row) => row.kind)).toContain("traces");
+      expect([...(props?.rows ?? []), ...(props?.folded ?? [])]).not.toContainEqual(
+        expect.objectContaining({ kind: "quiet" }),
+      );
+    });
   });
 
   describe("when an admin's organization is at 90% of its plan", () => {
@@ -187,7 +203,7 @@ describe("buildDigestWeekProps()", () => {
   });
 
   describe("when a member had five coding-agent sessions", () => {
-    const codingWeek = (user: UserWeekState) => week({ users: new Map([["u", user]]) });
+    const codingWeek = (user: UserWeekState) => week({ codingAgents: user });
 
     /** @scenario "A coding-agent row never shows cost" */
     it("shows every count the agent reported, and no cost", () => {
@@ -272,7 +288,6 @@ describe("digestRowsInput()", () => {
             }),
           ],
         }),
-        userId: "u",
         admin: false,
         mode: "auto",
       });

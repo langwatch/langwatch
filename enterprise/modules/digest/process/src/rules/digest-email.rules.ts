@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What one person's weekly email says: the rows' input read off the week, and the email's props. */
-import type { DigestTestTemplate } from "@langwatch/enterprise-digest-contract";
 import type { UsageStats } from "@langwatch/entitlement-contract";
 import type {
   DigestWeekEvaluator,
@@ -15,6 +14,7 @@ import {
   type DigestRowCounts,
   type DigestRowsEvaluator,
   type DigestRowsInput,
+  type DigestRowsMode,
   type DigestRowsProject,
   selectDigestRows,
 } from "./digest-rows.rules.ts";
@@ -40,10 +40,11 @@ export type DigestProjectName = Readonly<{ name: string; slug: string }>;
 /** The month's count against a finite plan limit; null when the plan has none to press on. */
 export type PlanUsage = Readonly<{ used: number; limit: number }>;
 
-/** One organization's finished week: its folds and its plan usage, read once. */
+/** One organization's finished week as one reader may see it: their projects' folds and their own. */
 export type OrganizationWeek = Readonly<{
   organizationId: string;
   isoWeek: string;
+  /** Read for an admin alone, since only an admin is shown the plan row. */
   planUsage: PlanUsage | null;
   /** Each project's fold for the week. */
   projects: readonly ProjectWeek[];
@@ -51,7 +52,8 @@ export type OrganizationWeek = Readonly<{
   history: readonly ProjectWeekState[];
   /** Each visible project's traces the week before; a project absent from it failed that read. */
   previousTraces: ReadonlyMap<string, number>;
-  users: ReadonlyMap<string, UserWeekState>;
+  /** The reader's own coding-agent fold; no other member's is ever read into their week. */
+  codingAgents: UserWeekState | null;
 }>;
 
 /** Multiplied before dividing, so 900 of 1,000 reads exactly 90. */
@@ -153,21 +155,18 @@ const evaluationRunsOf = (folds: readonly ProjectWeekState[]): number =>
 /** What the row rules read for one member of the organization. */
 export function digestRowsInput({
   week,
-  userId,
   admin,
   mode,
 }: {
   week: OrganizationWeek;
-  userId: string;
   admin: boolean;
-  mode: DigestTestTemplate;
+  mode: DigestRowsMode;
 }): DigestRowsInput {
-  const user = week.users.get(userId);
   return {
     mode,
     admin,
     plan: week.planUsage,
-    codingAgentSessions: user ? userWeekTotals(user).sessions : 0,
+    codingAgentSessions: week.codingAgents ? userWeekTotals(week.codingAgents).sessions : 0,
     projects: week.projects.map((project): DigestRowsProject => {
       const baseline = baselineFoldsOf({ week, projectId: project.projectId });
       return {
@@ -200,13 +199,12 @@ export function evaluatorOf(evaluatorType: string): DigestWeekEvaluator {
 
 type RowContext = Readonly<{
   week: OrganizationWeek;
-  userId: string;
   projects: ReadonlyMap<string, DigestProjectName>;
   baseUrl: string;
   now: number;
 }>;
 
-/** A row's props, or none when what it shows cannot be read, such as a project's name. */
+/** A row's props, or none when what it shows cannot be read, such as a plan with no usage. */
 function foldableMailRows({
   row,
   context,
@@ -214,7 +212,7 @@ function foldableMailRows({
   row: DigestFoldedRow;
   context: RowContext;
 }): DigestWeekFoldedRow[] {
-  const { week, userId, projects, baseUrl, now } = context;
+  const { week, projects, baseUrl, now } = context;
   if (row.kind === "plan") {
     const usage = week.planUsage;
     if (!usage) return [];
@@ -231,8 +229,7 @@ function foldableMailRows({
     ];
   }
   if (row.kind === "coding") {
-    const user = week.users.get(userId);
-    return user ? codingRows({ user, baseUrl }) : [];
+    return week.codingAgents ? codingRows({ user: week.codingAgents, baseUrl }) : [];
   }
   const project = projects.get(row.projectId);
   if (!project) return [];
@@ -361,11 +358,11 @@ function mailRows({ row, context }: { row: DigestRow; context: RowContext }): Di
 /**
  * The person's email for one organization (`@langwatch/mail` digest-week.tsx), its links built
  * on the deployment's origin; none when no row but New has something to say, so nothing is sent.
- * A row whose project has no name is left out rather than shown nameless.
+ * A project with no name is left out before the rows are picked, so the cap never counts a row
+ * that cannot be shown.
  */
 export function buildDigestWeekProps({
-  week,
-  userId,
+  week: readWeek,
   admin,
   mode,
   organizationName,
@@ -375,9 +372,8 @@ export function buildDigestWeekProps({
   now,
 }: {
   week: OrganizationWeek;
-  userId: string;
   admin: boolean;
-  mode: DigestTestTemplate;
+  mode: DigestRowsMode;
   organizationName: string | null;
   projects: ReadonlyMap<string, DigestProjectName>;
   baseUrl: string;
@@ -385,8 +381,12 @@ export function buildDigestWeekProps({
   preferencesUrl: string;
   now: number;
 }): DigestWeekProps | undefined {
-  const selection = selectDigestRows(digestRowsInput({ week, userId, admin, mode }));
-  const context: RowContext = { week, userId, projects, baseUrl, now };
+  const week: OrganizationWeek = {
+    ...readWeek,
+    projects: readWeek.projects.filter(({ projectId }) => projects.has(projectId)),
+  };
+  const selection = selectDigestRows(digestRowsInput({ week, admin, mode }));
+  const context: RowContext = { week, projects, baseUrl, now };
   const rows = selection.shown.flatMap((row) => mailRows({ row, context }));
   if (!rows.some((row) => row.kind !== "new")) return undefined;
   const withTraces = week.projects.filter(({ traces }) => traces > 0);

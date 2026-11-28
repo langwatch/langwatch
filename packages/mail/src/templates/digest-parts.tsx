@@ -17,7 +17,7 @@ const DigestFootNote = ({ reason, preferencesUrl }: { reason: string; preference
   <>
     {`${reason} `}
     <InlineLink href={preferencesUrl}>Manage your email preferences</InlineLink>
-    {" to turn off the weekly summary."}
+    {" to turn off the weekly digest."}
   </>
 );
 
@@ -45,8 +45,9 @@ export const DigestFrame = ({
 );
 
 /**
- * A row's kind, as a small label. It keeps its own ground in both colour schemes, so its text
- * takes no `lw-*` class, which the dark cut would turn pale on pale. Solid means it needs you.
+ * A row's kind, as a small label. Its text takes no `lw-*` class, which the dark cut would turn
+ * pale on pale. An outlined chip has no ground of its own, so it shows the card's in either
+ * scheme rather than a white pill in dark mode. Solid means it needs you.
  */
 export const Chip = ({
   label,
@@ -66,7 +67,7 @@ export const Chip = ({
       fontWeight: 700,
       padding: "3px 6px",
       borderRadius: "4px",
-      backgroundColor: solid ? colour : "#ffffff",
+      backgroundColor: solid ? colour : "transparent",
       color: solid ? "#ffffff" : colour,
       border: `1px solid ${colour}`,
     }}
@@ -119,7 +120,7 @@ export const FeedRow = ({
   href: string;
   context: string;
   button?: FeedRowButton;
-  link?: Readonly<{ label: string; href: string }>;
+  link?: Readonly<{ before?: string; label: string; href: string }>;
 }) => {
   const cellBorder = { borderTop: `1px solid ${light.hairline}` };
   return (
@@ -162,6 +163,11 @@ export const FeedRow = ({
               </Button>
             )}
             {button && link && " "}
+            {link?.before && (
+              <span className="lw-muted" style={{ fontSize: "13px", color: light.textMuted }}>
+                {link.before}
+              </span>
+            )}
             {link && (
               <InlineLink href={link.href}>
                 <span style={{ fontSize: "13px" }}>{link.label}</span>
@@ -184,6 +190,10 @@ export const formatUsd = (value: number): string =>
   value.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 export const formatPercent = (value: number): string => `${Math.round(value)}%`;
+
+/** Multiplied before dividing, so 900 of 1,000 reads exactly 90. */
+export const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
+  whole > 0 ? (part * 100) / whole : 0;
 
 export const formatLatency = (milliseconds: number): string =>
   milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(1)} s`;

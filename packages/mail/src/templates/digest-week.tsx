@@ -149,7 +149,7 @@ const AlsoThisWeek = (props: DigestWeekProps) => {
   const also = alsoThisWeek(props);
   return (
     <Text
-      className="lw-muted"
+      className="lw-muted lw-rule"
       style={{
         margin: 0,
         padding: "12px 0 0",
@@ -379,7 +379,6 @@ const floodedAlso: Pick<DigestWeekProps, "steadyEvals" | "organizationTraces"> =
   steadyEvals: [
     { evaluator: { kind: "catalogue", name: "faithfulness" }, passRatePercent: 96 },
     { evaluator: { kind: "catalogue", name: "pii detection" }, passRatePercent: 99 },
-    { evaluator: { kind: "catalogue", name: "faithfulness" }, passRatePercent: 96 },
   ],
   organizationTraces: { traces: 659_750, projects: 5 },
 };
@@ -450,7 +449,13 @@ export const digestWeekTemplate = defineTemplate({
     "coding totals past the series cap": {
       ...common,
       organizationName: "Northwind Labs",
-      rows: [{ ...floodedCoding, totalsAtLeast: true }],
+      rows: [
+        {
+          ...floodedCoding,
+          topRepository: { name: "northwind/storefront", sessions: 38 },
+          totalsAtLeast: true,
+        },
+      ],
       folded: [],
       steadyEvals: [],
     },

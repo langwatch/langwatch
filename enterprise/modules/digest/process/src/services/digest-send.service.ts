@@ -213,7 +213,12 @@ export class DigestSendService {
     const user = await this.deps.users.findById({ id: userId });
     if (!user?.email) return skip("member has no email address");
     if (user.deactivatedAt !== null) return skip("member is deactivated");
-    const memberWeek = await this.#weekOf({ organizationId, isoWeek, userId });
+    const memberWeek = await this.#weekOf({
+      organizationId,
+      isoWeek,
+      userId,
+      admin: membership.admin,
+    });
     const composed = await this.#compose({
       memberWeek,
       member: { userId, admin: membership.admin },
@@ -282,7 +287,7 @@ export class DigestSendService {
     }
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
-    const memberWeek = await this.#weekOf({ organizationId, isoWeek, userId });
+    const memberWeek = await this.#weekOf({ organizationId, isoWeek, ...member });
     const composed = await this.#compose({
       memberWeek,
       member,
@@ -352,16 +357,19 @@ export class DigestSendService {
     organizationId,
     isoWeek,
     userId,
+    admin,
   }: {
     organizationId: string;
     isoWeek: string;
     userId: string;
+    admin: boolean;
   }): Promise<MemberWeek> {
     const visible = await this.#visibleProjects({ organizationId, userId });
     const week = await this.deps.weeks.organizationWeek({
       organizationId,
       isoWeek,
       projectIds: visible.map(({ id }) => id),
+      reader: { userId, admin },
     });
     return { week, projects: new Map(visible.map(({ id, name, slug }) => [id, { name, slug }])) };
   }
@@ -410,7 +418,6 @@ export class DigestSendService {
       (await this.deps.organizations.findProvisioningSummary(week.organizationId))?.name ?? null;
     const props = buildDigestWeekProps({
       week,
-      userId: member.userId,
       admin: member.admin,
       mode: template,
       organizationName,

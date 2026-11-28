@@ -201,6 +201,27 @@ describe("selectDigestRows()", () => {
         { evaluatorType: "ragas/faithfulness", week: { total: 400, failed: 16 } },
       ]);
     });
+
+    /** @scenario "An eval steady on two projects is counted once" */
+    it("counts the same eval on two projects once, its checks summed", () => {
+      const steadyFaithfulness = evaluator({
+        total: 400,
+        failed: 16,
+        baselineTotal: 1_600,
+        baselineFailed: 64,
+      });
+      const selected = selectDigestRows(
+        input({
+          projects: ["p", "q"].map((projectId) =>
+            settled({ projectId, evaluators: [steadyFaithfulness] }),
+          ),
+        }),
+      );
+
+      expect(selected?.steadyEvals).toEqual([
+        { evaluatorType: "ragas/faithfulness", week: { total: 800, failed: 32 } },
+      ]);
+    });
   });
 
   describe("when more than two rates got worse", () => {

@@ -119,9 +119,13 @@ describe.skipIf(!databaseUrl)("given digest weeks around a cutoff in two organiz
     );
   const userWeeksIn = async (organizationId: string) =>
     Object.fromEntries(
-      (await userWeeks.findWeeks({ isoWeeks: [BEFORE, CUTOFF, AFTER], organizationId })).map(
-        ({ isoWeek, sessionOverflow }) => [isoWeek, sessionOverflow],
-      ),
+      (
+        await userWeeks.findWeeks({
+          isoWeeks: [BEFORE, CUTOFF, AFTER],
+          organizationId,
+          userId: userIdOf(organizationId),
+        })
+      ).map(({ isoWeek, sessionOverflow }) => [isoWeek, sessionOverflow]),
     );
   /** What the two organizations hold in each table, week by week, and how many rows. */
   const snapshot = async () => {

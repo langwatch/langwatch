@@ -39,7 +39,7 @@ Feature: Weekly digest emails
   Scenario: A flooded organization's admin sees the plan first and at most two buttons
     Given an organization at 94% of its plan with failing scenarios, a dropped eval, a quiet project and a heavy coding-agent week
     When an admin's email is built
-    Then it shows five rows, the plan first with "Raise the limit" and an "or choose which traces to keep" link
+    Then it shows five rows, the plan first with "Raise the limit" and, after a plain "or", a "choose which traces to keep" link
     And no more than two rows carry a button
 
   @unit
@@ -73,6 +73,12 @@ Feature: Weekly digest emails
     Given an eval whose pass rate moved by more than 10 points
     When it had fewer than 20 checks this week or in the four weeks before
     Then it has no row and is not called steady
+
+  @unit
+  Scenario: An eval steady on two projects is counted once
+    Given the faithfulness eval held its rate on two projects
+    When the rows are picked
+    Then "Also this week" counts it as one steady eval, its checks summed across the two
 
   @unit
   Scenario: At most two regressions show, biggest first, and the rest fold
@@ -113,9 +119,11 @@ Feature: Weekly digest emails
     Then its top repository is the one with the most sessions
 
   @unit
-  Scenario: No weekly digest reads like an ad
+  Scenario: Every weekly digest says why it arrived, whatever the reader's role
     When every weekly digest fixture is rendered
-    Then none says "Sample what you keep" and none carries the coloured promo card
+    Then its footer says "You get this because you're in" the organization, never that they are a member
+    And it offers to turn off the weekly digest
+    And its outlined chips and the "Also this week" divider take the dark cut's colours
 
   @unit
   Scenario: The studio's fixtures are what the digest's rules build
@@ -341,6 +349,19 @@ Feature: Weekly digest emails
     When their send is handled
     Then their email has a coding-agent row with their sessions and metric totals, and no cost
     And it names the repository where most of their sessions ran
+
+  @integration
+  Scenario: A member's week never carries another member's coding-agent usage
+    Given another member of the organization had 5 coding-agent sessions
+    When a member's week is read
+    Then it holds no coding-agent week but the member's own
+
+  @integration
+  Scenario: A member's week is sent though the plan cannot be read
+    Given the plan's usage cannot be read
+    When a member's send is handled
+    Then their week is sent, since only an admin is shown the plan
+    And an admin's send fails, for the outbox to retry
 
   @integration
   Scenario: An unsubscribed member is skipped

@@ -63,7 +63,7 @@ export const DIGEST_MY_TEST_SKIP_REASONS = [
   "deactivated",
   /** Delivery to the person was asked for, and they have no email address. */
   "no_address",
-  /** An every-row test had no row with data for the person here. */
+  /** No row has data for the person here in every-row mode; the name predates the one template. */
   "no_data_for_template",
 ] as const;
 

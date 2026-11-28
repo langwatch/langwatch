@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Which rows a person's weekly email shows, in what order, and which the cap cuts (ADR-003). */
-import type { DigestTestTemplate } from "@langwatch/enterprise-digest-contract";
 
 /** Tuned from the Cloud admin gallery; ADR-003 explains each. */
 export const DIGEST_ROW_THRESHOLDS = {
@@ -38,9 +37,11 @@ export type DigestRowsProject = Readonly<{
   evaluationRuns: number;
 }>;
 
+/** "auto" is the weekly send; "every-row" lifts the thresholds and the cap for a staff test. */
+export type DigestRowsMode = "auto" | "every-row";
+
 export type DigestRowsInput = Readonly<{
-  /** "auto" is the weekly send; "every-row" lifts the thresholds and the cap for a staff test. */
-  mode: DigestTestTemplate;
+  mode: DigestRowsMode;
   admin: boolean;
   /** The month's count against a finite plan limit; null when the plan has none. */
   plan: Readonly<{ used: number; limit: number }> | null;
@@ -218,6 +219,7 @@ function newRows({ projects }: DigestRowsInput): DigestRow[] {
     .map(({ projectId }) => ({ kind: "new" as const, projectId }));
 }
 
+/** One per evaluator, its checks summed across projects: the line names no project to tell two apart. */
 function steadyEvalsOf(
   input: DigestRowsInput,
   shownOrFolded: readonly DigestRow[],
@@ -227,14 +229,20 @@ function steadyEvalsOf(
       row.kind === "evals" ? [`${row.projectId}:${row.evaluatorType}`] : [],
     ),
   );
-  return input.projects.flatMap(({ projectId, evaluators }) =>
-    evaluators
-      .filter(
-        (evaluator) =>
-          hasEnoughChecks(evaluator) && !moved.has(`${projectId}:${evaluator.evaluatorType}`),
-      )
-      .map(({ evaluatorType, week }) => ({ evaluatorType, week })),
-  );
+  const steady = new Map<string, DigestRowCounts>();
+  for (const { projectId, evaluators } of input.projects) {
+    for (const evaluator of evaluators) {
+      if (!hasEnoughChecks(evaluator) || moved.has(`${projectId}:${evaluator.evaluatorType}`)) {
+        continue;
+      }
+      const counted = steady.get(evaluator.evaluatorType) ?? { total: 0, failed: 0 };
+      steady.set(evaluator.evaluatorType, {
+        total: counted.total + evaluator.week.total,
+        failed: counted.failed + evaluator.week.failed,
+      });
+    }
+  }
+  return [...steady].map(([evaluatorType, week]) => ({ evaluatorType, week }));
 }
 
 /** At most two regressions and five rows, in rank order; what does not fit folds. */

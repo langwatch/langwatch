@@ -439,6 +439,44 @@ describe("the weekly digest send", () => {
     });
   });
 
+  describe("when another member of the organization had coding-agent sessions", () => {
+    /** @scenario "A member's week never carries another member's coding-agent usage" */
+    it("reads the reader's own coding-agent week alone into theirs", async () => {
+      for (const index of [0, 1, 2, 3, 4]) {
+        await codingAgentFact({ sessionId: `session-${index}`, userId: OTHER_MEMBER });
+      }
+      await vi.waitFor(async () => {
+        const week = await digest.userWeek({ isoWeek: SENT_WEEK, userId: OTHER_MEMBER });
+        expect(week?.sessions).toHaveLength(5);
+      });
+
+      const week = await digest.organizationWeek({
+        organizationId: ORGANIZATION,
+        isoWeek: SENT_WEEK,
+        projectIds: [PROJECT],
+        reader: { userId: MEMBER, admin: false },
+      });
+
+      expect(week.codingAgents).toBeNull();
+    });
+  });
+
+  describe("when the plan's usage cannot be read", () => {
+    /** @scenario "A member's week is sent though the plan cannot be read" */
+    it("still sends a member their week, since only an admin is shown the plan", async () => {
+      await arm();
+      digest.world.failingUsage = true;
+      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 1_200 });
+
+      await sendFor({ userId: MEMBER, isoWeek: SENT_WEEK });
+
+      expect(recipients()).toEqual([emailOf(MEMBER)]);
+      await expect(sendFor({ userId: ADMIN, isoWeek: SENT_WEEK })).rejects.toThrow(
+        "usage cannot be read",
+      );
+    });
+  });
+
   describe("when a member's week has nothing to show", () => {
     /** @scenario "A member whose week has nothing to show is sent nothing" */
     it("mails them nothing and records no send", async () => {
@@ -936,10 +974,12 @@ function codingAgentFact({
   sessionId,
   repository = null,
   series = null,
+  userId = MEMBER,
 }: {
   sessionId: string;
   repository?: string | null;
   series?: { metric: string; value: number } | null;
+  userId?: string;
 }) {
   return digest.recordUser({
     tenantId: PROJECT,
@@ -947,7 +987,7 @@ function codingAgentFact({
     organizationId: ORGANIZATION,
     isoWeek: SENT_WEEK,
     sourceKey: `${sessionId}:${series?.metric ?? "span"}`,
-    userId: MEMBER,
+    userId,
     sessionId,
     repository,
     series: series && { seriesId: `${sessionId}:${series.metric}`, type: null, ...series },

@@ -138,16 +138,23 @@ function folded<State>(state: State): StoredProjection<State> {
   };
 }
 
-/** One kind of week fold: its repository on a backend, and a fold whose `count` marks it. */
-type WeekKind<State> = Readonly<{
+/**
+ * One kind of week fold: its repository on a backend, a fold whose `count` marks it, and the
+ * scope a read of that organization's folds names (a person's weeks are read by person).
+ */
+type WeekKind<State, Scope> = Readonly<{
   name: string;
-  repository: (backend: Backend) => StateProjectionStore<State> & DigestWeekReadRepository<State>;
+  repository: (
+    backend: Backend,
+  ) => StateProjectionStore<State> & DigestWeekReadRepository<State, Scope>;
   fold: (input: Readonly<{ organizationId: string; isoWeek: string; count: number }>) => State;
+  scopeOf: (organizationId: string) => Scope;
 }>;
 
-const projectWeekKind: WeekKind<ProjectWeekState> = {
+const projectWeekKind: WeekKind<ProjectWeekState, Readonly<Record<never, never>>> = {
   name: "project",
   repository: (backend) => backend.projectWeeks(),
+  scopeOf: () => ({}),
   fold: ({ organizationId, isoWeek, count }) => ({
     ...emptyProjectWeek(),
     projectId: `project-of-${organizationId}`,
@@ -157,9 +164,10 @@ const projectWeekKind: WeekKind<ProjectWeekState> = {
   }),
 };
 
-const userWeekKind: WeekKind<UserWeekState> = {
+const userWeekKind: WeekKind<UserWeekState, Readonly<{ userId: string }>> = {
   name: "user",
   repository: (backend) => backend.userWeeks(),
+  scopeOf: (organizationId) => ({ userId: `user-of-${organizationId}` }),
   fold: ({ organizationId, isoWeek, count }) => ({
     ...emptyUserWeek(),
     userId: `user-of-${organizationId}`,
@@ -187,9 +195,9 @@ async function storeFold<State extends { organizationId: string; isoWeek: string
 const byWeek = <State extends { isoWeek: string }>(states: State[]) =>
   states.toSorted((left, right) => left.isoWeek.localeCompare(right.isoWeek));
 
-function weekCases<State extends { organizationId: string; isoWeek: string }>(
+function weekCases<State extends { organizationId: string; isoWeek: string }, Scope>(
   backend: Backend,
-  kind: WeekKind<State>,
+  kind: WeekKind<State, Scope>,
 ): void {
   describe(`given the ${kind.name} weeks`, () => {
     // Weeks no real fold reaches, at or after the retention test's cutoff, so its sweep keeps them.
@@ -246,7 +254,11 @@ function weekCases<State extends { organizationId: string; isoWeek: string }>(
         ];
         for (const state of stored) await storeFold(weeks, folded(state));
 
-        const read = await weeks.findWeeks({ isoWeeks: [W30, W31], organizationId: mine });
+        const read = await weeks.findWeeks({
+          isoWeeks: [W30, W31],
+          organizationId: mine,
+          ...kind.scopeOf(mine),
+        });
 
         expect(byWeek(read)).toEqual(stored.slice(0, 2));
       });
@@ -267,7 +279,11 @@ function weekCases<State extends { organizationId: string; isoWeek: string }>(
 
         await weeks.deleteBefore({ isoWeek: CUTOFF });
 
-        const left = await weeks.findWeeks({ isoWeeks: [BEFORE, CUTOFF, AFTER], organizationId });
+        const left = await weeks.findWeeks({
+          isoWeeks: [BEFORE, CUTOFF, AFTER],
+          organizationId,
+          ...kind.scopeOf(organizationId),
+        });
         expect(byWeek(left).map(({ isoWeek }) => isoWeek)).toEqual([CUTOFF, AFTER]);
       });
     });
@@ -393,6 +409,33 @@ describe.each(backends)("given the $name digest repositories", (backend) => {
   weekCases(backend, projectWeekKind);
   weekCases(backend, userWeekKind);
 
+  describe("given two people's weeks in one organization", () => {
+    describe("when one person's weeks are read", () => {
+      it("answers that person's fold alone, never the other member's", async () => {
+        const userWeeks = backend.userWeeks();
+        const organizationId = organization();
+        const [reader, other] = [person(), person()];
+        for (const userId of [reader, other]) {
+          await storeFold(
+            userWeeks,
+            folded({
+              ...userWeekKind.fold({ organizationId, isoWeek: "2001-W30", count: 1 }),
+              userId,
+            }),
+          );
+        }
+
+        const read = await userWeeks.findWeeks({
+          isoWeeks: ["2001-W30"],
+          organizationId,
+          userId: reader,
+        });
+
+        expect(read.map(({ userId }) => userId)).toEqual([reader]);
+      });
+    });
+  });
+
   describe("given a person's weeks in two organizations", () => {
     describe("when the person's weeks are forgotten twice", () => {
       it("drops them in both organizations and keeps another person's", async () => {
@@ -412,9 +455,15 @@ describe.each(backends)("given the $name digest repositories", (backend) => {
         await userWeeks.forgetUser({ userId: forgotten });
 
         const ownersIn = async (organizationId: string) =>
-          (await userWeeks.findWeeks({ isoWeeks: ["2001-W30"], organizationId })).map(
-            ({ userId }) => userId,
-          );
+          (
+            await Promise.all(
+              [forgotten, kept].map((userId) =>
+                userWeeks.findWeeks({ isoWeeks: ["2001-W30"], organizationId, userId }),
+              ),
+            )
+          )
+            .flat()
+            .map(({ userId }) => userId);
         expect(await ownersIn(first)).toEqual([kept]);
         expect(await ownersIn(second)).toEqual([]);
       });

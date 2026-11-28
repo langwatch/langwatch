@@ -4,6 +4,7 @@ import {
   alsoThisWeek,
   buttonSlots,
   digestWeekPreview,
+  digestWeekReason,
   digestWeekSubheading,
   digestWeekSubject,
   rowCopy,
@@ -74,7 +75,7 @@ describe("the weekly digest's rows", () => {
       expect(copies[0]).toMatchObject({
         title: "You have used 94% of this month's traces",
         button: { label: "Raise the limit" },
-        link: { label: "or choose which traces to keep" },
+        link: { before: "or ", label: "choose which traces to keep" },
       });
       expect(props.rows).toHaveLength(5);
       expect(buttonSlots(copies).filter((slot) => slot !== null)).toHaveLength(2);
@@ -89,7 +90,7 @@ describe("the weekly digest's rows", () => {
       expect(also.folded.map((row) => row.label)).toEqual([
         "Checkout agent sent 412,800 traces, up from 378,700 last week",
       ]);
-      expect(also.lead).toBe("659,750 traces across 5 projects and 3 evals held steady.");
+      expect(also.lead).toBe("659,750 traces across 5 projects and 2 evals held steady.");
       const { html } = await renderMailTemplate(digestWeekTemplate, props);
       expect(html).not.toContain("Test conversations before you ship");
       expect(html).not.toContain("first scenario");
@@ -173,7 +174,7 @@ describe("the coding-agent row", () => {
       .map(rowCopy);
 
     expect(capped?.context).toBe(
-      "At least 41.2M tokens, at least 23 commits and at least 7 pull requests, 38 of the sessions in quillmark/checkout-service.",
+      "At least 41.2M tokens, 23 commits and 7 pull requests, 38 of the sessions in northwind/storefront.",
     );
     expect(plain?.context).not.toContain("at least");
   });
@@ -187,15 +188,20 @@ describe("every weekly digest fixture", () => {
     }
   });
 
-  /** @scenario "No weekly digest reads like an ad" */
-  it("carries neither the old sampling button nor the coloured promo card", async () => {
+  /** @scenario "Every weekly digest says why it arrived, whatever the reader's role" */
+  it("gives a role-neutral reason and keeps outlined chips and dividers dark in dark mode", async () => {
     for (const { props } of digestWeekTemplate.fixtures) {
-      const { html, text } = await renderMailTemplate(digestWeekTemplate, props);
-      for (const rendered of [html, text]) {
-        expect(rendered).not.toContain("Sample what you keep");
-      }
-      // The removed card's gradient grounds.
-      for (const ground of ["#ffe6d2", "#e8f0fd", "#e6f5ec"]) expect(html).not.toContain(ground);
+      const { html } = await renderMailTemplate(digestWeekTemplate, props);
+
+      expect(digestWeekReason(digestWeekProps.parse(props))).toMatch(/^You get this because you/);
+      expect(html).toContain("turn off the weekly digest.");
+      expect(html).toContain('class="lw-muted lw-rule"');
     }
+    const { html } = await renderMailTemplate(
+      digestWeekTemplate,
+      fixture("flooded organisation, admin"),
+    );
+    expect(html).toContain("background-color:transparent");
+    expect(html).not.toContain("background-color:#ffffff;color:#b7791f");
   });
 });

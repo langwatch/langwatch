@@ -45,11 +45,17 @@ const sessionOf = (userId: string) =>
 
 const weekOwners = async () =>
   (
-    await digest.repositories.userWeeks.findWeeks({
-      isoWeeks: [SENT_WEEK],
-      organizationId: ORGANIZATION,
-    })
+    await Promise.all(
+      [MEMBER, OTHER_MEMBER].map((userId) =>
+        digest.repositories.userWeeks.findWeeks({
+          isoWeeks: [SENT_WEEK],
+          organizationId: ORGANIZATION,
+          userId,
+        }),
+      ),
+    )
   )
+    .flat()
     .map(({ userId }) => userId)
     .toSorted();
 
