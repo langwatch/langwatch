@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.5.0...clickhouse-serverless@v0.5.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **charts:** render integer tunables as digits in every chart, not floats ([#9965](https://github.com/langwatch/langwatch/issues/9965)) ([3d478cb](https://github.com/langwatch/langwatch/commit/3d478cb15bfc4c919421cbe38fab77e28ffc4878))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.4.0...clickhouse-serverless@v0.5.0) (2026-11-17)
 
 
