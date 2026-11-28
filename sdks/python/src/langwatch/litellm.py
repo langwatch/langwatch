@@ -34,6 +34,8 @@ from langwatch.utils.capture import (
     capture_chunks_with_timings_and_reyield,
 )
 
+from langwatch.openai import _merge_tool_call_deltas, _prune_blank_tool_calls
+
 from litellm import CustomStreamWrapper
 from litellm.types.utils import ModelResponse, Choices, StreamingChoices
 
@@ -192,18 +194,7 @@ class LiteLLMPatch:
                             "arguments": delta.function_call.arguments or "",
                         }
                     if delta.tool_calls:
-                        chat_message["tool_calls"] = [
-                            {
-                                "id": tool.id or "",
-                                "type": tool.type or "",
-                                "function": {
-                                    "name": safe_get(tool, "function", "name") or "",
-                                    "arguments": safe_get(tool, "function", "arguments")
-                                    or "",
-                                },
-                            }
-                            for tool in delta.tool_calls
-                        ]
+                        _merge_tool_call_deltas(chat_message, delta.tool_calls)
                     if index not in chat_outputs:
                         chat_outputs[index] = []
                     chat_outputs[index].append(chat_message)
@@ -217,25 +208,15 @@ class LiteLLMPatch:
                             delta.function_call.arguments or ""
                         )
                 elif delta.tool_calls:
-                    last_item = chat_outputs[index][-1]
-                    if (
-                        "tool_calls" in last_item
-                        and last_item["tool_calls"]
-                        and len(last_item["tool_calls"]) > 0
-                    ):
-                        for tool in delta.tool_calls:
-                            last_item["tool_calls"][tool.index]["function"][
-                                "arguments"
-                            ] = last_item["tool_calls"][tool.index]["function"].get(
-                                "arguments", ""
-                            ) + (
-                                safe_get(tool, "function", "arguments") or ""
-                            )
+                    _merge_tool_call_deltas(chat_outputs[index][-1], delta.tool_calls)
                 elif delta.content:
                     chat_outputs[index][-1]["content"] = (
                         chat_outputs[index][-1].get("content", "") or ""
                     ) + delta.content
 
+        for output in chat_outputs.values():
+            for message in output:
+                _prune_blank_tool_calls(message)
         LiteLLMPatch.end_span(
             span=span,
             outputs=[
