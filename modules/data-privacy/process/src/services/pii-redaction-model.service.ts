@@ -8,6 +8,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
+import { presidioEntitiesFor } from "../rules/pii-analysis.rules.ts";
 import {
   batchCharactersOf,
   failureName,
@@ -59,8 +60,11 @@ export type PiiRedactionModelUsage = Readonly<{
   texts: number;
   characters: number;
   findings: number;
-  outcome: "ok" | PiiRedactionModelFallbackReason;
+  /** `held`: every text was cleared from an earlier answer, so nothing was sent. */
+  outcome: "ok" | "held" | PiiRedactionModelFallbackReason;
   durationMs: number;
+  /** Texts cleared from an earlier answer and not sent (ADR-207 decision 14). */
+  held?: number;
   /** A split span only (ADR-207): how many calls it was planned into, sent or not. */
   calls?: number;
   /** On an error only: the failure's class name. */
@@ -68,6 +72,9 @@ export type PiiRedactionModelUsage = Readonly<{
 }>;
 
 const USAGE_MESSAGE = "PII redaction model call";
+
+/** What the service counts: its fallbacks to Presidio and the texts it did not send again. */
+type ModelMetrics = Pick<PiiAnalysisMetricsOtelService, "modelFellBack" | "modelRepeatsHeld">;
 
 /**
  * Whether this process sends routed batches to the model. Closed: every batch tries it. Open:
@@ -112,7 +119,7 @@ export class PiiRedactionModelService {
     selfHosted: boolean;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     spend: PiiRedactionSpendService;
-    metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
+    metrics: ModelMetrics;
     log?: UsageLogger;
     now?: () => number;
   }): PiiRedactionModelService {
@@ -141,7 +148,7 @@ export class PiiRedactionModelService {
   private readonly repeats: PiiRedactionRepeatsService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly spend: PiiRedactionSpendService;
-  private readonly metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
+  private readonly metrics: ModelMetrics;
   private readonly log: UsageLogger;
   private readonly now: () => number;
 
@@ -154,7 +161,7 @@ export class PiiRedactionModelService {
     selfHosted: boolean;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     spend: PiiRedactionSpendService;
-    metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
+    metrics: ModelMetrics;
     log: UsageLogger;
     now: () => number;
   }) {
@@ -211,13 +218,17 @@ export class PiiRedactionModelService {
     const scope = {
       organizationId,
       piiRedactionLevel: input.piiRedactionLevel,
-      entities: input.entities ?? [],
+      // Keyed on the entities in force: none given means the level's own, never "none".
+      entities: presidioEntitiesFor(input.piiRedactionLevel, input.entities),
       spareNamesAndPlaces: input.spareNamesAndPlaces,
     };
     const recall = this.repeats.recall({ scope, texts: input.texts });
     const sent = narrowedToPending({ input, pending: recall.pending });
+    const held = input.texts.length - sent.texts.length || undefined;
     if (sent.texts.length === 0) {
       // Every text is held: priced as the batch, with no call of ours to cost.
+      this.metrics.modelRepeatsHeld(input.texts.length);
+      this.log.info({ ...call, held, findings: 0, outcome: "held", durationMs: 0 }, USAGE_MESSAGE);
       await this.spend.record({
         organizationId,
         projectId,
@@ -234,9 +245,10 @@ export class PiiRedactionModelService {
       priced,
       projectId,
       splitting,
-      call: { ...call, texts: sent.texts.length, characters: batchCharactersOf(sent.texts) },
+      call: { ...call, texts: sent.texts.length, characters: batchCharactersOf(sent.texts), held },
     });
     if (!cleared || cleared.length !== sent.texts.length) return null;
+    this.metrics.modelRepeatsHeld(input.texts.length - sent.texts.length);
     const sentScope = { ...scope, spareNamesAndPlaces: sent.spareNamesAndPlaces };
     this.repeats.remember({ scope: sentScope, texts: sent.texts, cleared });
     return recall.merge(cleared);
@@ -352,7 +364,7 @@ export class PiiRedactionModelService {
     calls: readonly SplitCall[];
   }): Promise<(string | null)[] | null> {
     const fallBack = (
-      outcome: Exclude<PiiRedactionModelUsage["outcome"], "ok">,
+      outcome: Exclude<PiiRedactionModelUsage["outcome"], "ok" | "held">,
       durationMs = 0,
     ) => {
       this.metrics.modelFellBack(outcome);

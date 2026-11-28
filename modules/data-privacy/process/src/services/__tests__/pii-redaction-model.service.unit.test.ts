@@ -251,6 +251,7 @@ function setup({
   };
 
   const fallbacks: PiiRedactionModelFallbackReason[] = [];
+  const held: number[] = [];
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
   const priced: PiiRedactionSpendPricedEventData[] = [];
   const spend = PiiRedactionSpendService.create({
@@ -279,7 +280,10 @@ function setup({
       selfHosted,
       entitlements,
       spend,
-      metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
+      metrics: {
+        modelFellBack: (reason) => fallbacks.push(reason),
+        modelRepeatsHeld: (texts) => held.push(texts),
+      },
       log: {
         info: (fields, message) => usage.push({ level: "info", fields, message }),
         warn: (fields, message) => {
@@ -309,6 +313,7 @@ function setup({
     failNextScopeRead,
     sent,
     fallbacks,
+    held,
     usage,
     priced,
   };
@@ -392,6 +397,42 @@ describe("PiiRedactionModelService", () => {
       const [, , run, retry] = priced;
       expect(run?.requestId).toEqual(expect.any(String));
       expect(retry?.requestId).toBe(run?.requestId);
+    });
+
+    /** @scenario "A long text sent again is cleared from the first answer, not sent to the model again" */
+    it("leaves one usage line per span, naming and counting the texts it held", async () => {
+      const { analysis, memoryModel, held, usage } = setup();
+      memoryModel.answerWith(answered(prompt, "call <PERSON>"));
+      await analysis.clearPresidio(batch("call Ana"));
+      memoryModel.answerWith(answered("ask <PERSON>"));
+      await analysis.clearPresidio(batch("ask Rui"));
+      await analysis.clearPresidio({ ...strictBatch(), texts: [prompt] });
+
+      expect(
+        usage.map((line) => [line.fields.outcome, line.fields.texts, line.fields.held]),
+      ).toEqual([
+        ["ok", 2, undefined],
+        ["ok", 1, 1],
+        ["held", 1, 1],
+      ]);
+      expect(usage[2]?.fields).toMatchObject({ characters: prompt.length, durationMs: 0 });
+      expect(held).toEqual([0, 1, 1]);
+    });
+
+    /** @scenario "A held text is reused only in the same scope and for ten minutes" */
+    it("never reuses a text cleared for no entities where the level's own entities apply", async () => {
+      const { analysis, memoryModel, sent } = setup();
+      memoryModel.answerWith(answered(prompt, "call Ana"));
+      await analysis.clearPresidio({ ...batch("call Ana"), entities: [] });
+      memoryModel.answerWith(answered(prompt.replace("Ana Silva", "<PERSON>"), "ask <PERSON>"));
+
+      const second = await analysis.clearPresidio(batch("ask Rui"));
+
+      expect(sent(memoryModel).map((request) => request.texts)).toEqual([
+        [prompt, "call Ana"],
+        [prompt, "ask Rui"],
+      ]);
+      expect(second?.[0]).not.toContain("Ana Silva");
     });
   });
 

@@ -120,11 +120,14 @@ ModelCallRules>` (the time a batch has, and the slots), so a context without its
 13. **One-off, not shared.** The planner and merge live in data-privacy rules; no shared package.
 14. **Repeated long texts are held per process (v4).** A process keeps the model's clearing of each
     text of 2,000 characters or more for ten minutes (256 entries, oldest dropped first), keyed by
-    organisation, level, entities, spared flag and the text's SHA-256. The whole span passes the
+    organisation, level, entities in force (none given means the level's own, never an empty
+    list), spared flag and the text's SHA-256. The whole span passes the
     size ranges (decision 2) first; held texts only shrink what is sent. Only an answer the text
     gets alone is held: one call, a whole text in a split call, or a text over 8,000 (cut the same
     way alone); never a text cut only because its span was long. Price and request id stay the
     whole span's (ADR-201), so a span bills as with nothing held and a retry stays idempotent.
+    The span's one usage line (decision 12) counts the texts it held, outcome `held` when none was
+    sent, and `pii_redaction_model_repeats_held` counts every held text.
     Rejected: a shared Redis cache (cross-process state for a ten-minute saving; masked text
     leaves the process); pricing only what is sent (a retry would bill twice).
 

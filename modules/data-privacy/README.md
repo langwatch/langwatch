@@ -100,14 +100,20 @@ organization.
 - **Split batches.** Where the model is a Lambda function (`PII_REDACTION_MODEL_ENDPOINT` an ARN)
   and the organization has `release_pii_redaction_model_split_enabled`, a batch of 8,001 to
   32,000 characters (`PII_REDACTION_MODEL_MAX_SPLIT_CHARACTERS`) is cut into pieces of about
-  4,000 that overlap by 200, sent on two calls at once per process, and merged by widest range
-  (ADR-207). Split calls go to the same endpoint as single calls, each naming its context; what
-  differs by context sits in one table, `MODEL_CALL_RULES`. A piece with a backslash or a
-  trimmed edge, or whose findings do not rebuild the model's own masked text, sends the whole
+  4,000 that overlap by 200, sent on up to six calls at once per process, and merged by widest
+  range (ADR-207). Split calls go to the same endpoint as single calls, each naming its context;
+  what differs by context sits in one table, `MODEL_CALL_RULES`. A piece that holds a backslash
+  and would read as JSON on its own, a piece with a trimmed edge, or one whose findings do not
+  rebuild the model's own masked text, sends the whole
   batch to Presidio as `unplaceable`; so do a busy process (`busy`), a call that fails and a
   span over its 50 s budget (the usual reasons). Split calls have their own cool-down, and the
   batch is billed once on its characters. Over 32,000 characters, a model reached over HTTP, or
   the flag off, stays `too_long`.
+- **Repeated long texts.** A process keeps the model's clearing of each text of 2,000 characters
+  or more for ten minutes, so a system prompt sent on every call is analysed once per process
+  (ADR-207 decision 14). The span is still billed on all its characters, its usage line counts the
+  held texts (outcome `held` when nothing was sent), and `pii_redaction_model_repeats_held`
+  counts them.
 - **Cool-down after a timeout.** When a model call times out, or Lambda throttles it
   (`TooManyRequestsException`), the process skips the model for 2 minutes
   (`PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS`): every routed batch goes straight to Presidio,
