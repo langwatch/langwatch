@@ -52,6 +52,9 @@ export interface FeatureFlagFamily {
   family: string;
 }
 
+/** The release flag for Scenario Connector steps (ADR-194), read by the scenario prefetch too. */
+export const SCENARIO_CONNECTOR_FLAG_KEY = "release_scenario_connector_steps" as const;
+
 export const FEATURE_FLAGS = [
   // ----- SYSTEM -----
   {
@@ -249,7 +252,7 @@ export const FEATURE_FLAGS = [
       "Runs a project's non-voice scenario runs on the Go scenario runner shipped in the worker image instead of the Node scenario child. Off by default; enable per project or organization via the operator store. Voice runs always stay on the Node child, and a worker without the binary keeps every run on Node.",
   },
   {
-    key: "release_scenario_connector_steps",
+    key: SCENARIO_CONNECTOR_FLAG_KEY,
     scope: "PRODUCT",
     defaultValue: false,
     description:

@@ -134,8 +134,9 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
         turn,
         turnIndex: this.turnCount++,
       });
-      // Scrubbed as JSON first: a stringified object reply holds each secret JSON-escaped.
-      return this.scrub(connectorCallReply(this.scrubbed(outputs)));
+      // The reply is scrubbed as JSON before it is text, where each secret would be JSON-escaped.
+      const reply = connectorCallReply(outputs, (value) => this.activeScrubber.json(value));
+      return this.scrub(reply);
     });
   }
 

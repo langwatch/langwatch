@@ -563,6 +563,7 @@ Feature: Scenario run hooks: setup and teardown
       When setup's answer is checked
       Then setup records "failed" naming the limit and no value
       And none of those secrets reaches the call or teardown
+      And setup's state still reaches teardown, so its data can be removed
 
     @integration
     Scenario: A failed connector teardown leaves the verdict unchanged

@@ -413,6 +413,17 @@ describe("ScenarioConnectorService", () => {
     });
   });
 
+  describe("when a secret's value is the word reply", () => {
+    it("still reads the call block's reply", async () => {
+      const { connector } = connectorWith(
+        { secrets: { ODD_KEY: "reply" } },
+        { call: { reply: "hello there" } },
+      );
+
+      await expect(connector.callTurn(turn)).resolves.toBe("hello there");
+    });
+  });
+
   describe("when setup returns more secrets than a run takes", () => {
     const secretsOf = (count: number, size = 8) =>
       Object.fromEntries(
@@ -423,7 +434,7 @@ describe("ScenarioConnectorService", () => {
       );
 
     /** @scenario "A connector setup that returns more than 50 secrets, or over 64 KiB of them, fails setup" */
-    it("fails setup on 51 secrets and hands none of them on", async () => {
+    it("fails setup on 51 secrets, hands none of them on, and keeps the state for teardown", async () => {
       const { hooks, posts } = connectorWith(
         {},
         { setup: { state: { accountId: "acc_1" }, secrets: secretsOf(51) } },
@@ -437,6 +448,7 @@ describe("ScenarioConnectorService", () => {
       });
       const teardown = posts.find(({ kind }) => kind === "teardown");
       expect(Object.keys(teardown?.workflow.secrets ?? {})).toEqual(["SHOP_ADMIN_KEY"]);
+      expect(teardown?.input).toMatchObject({ state: { accountId: "acc_1" } });
     });
 
     /** @scenario "A connector setup that returns more than 50 secrets, or over 64 KiB of them, fails setup" */

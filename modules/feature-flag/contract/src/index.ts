@@ -11,6 +11,7 @@ export {
   listFeatureFlagFamilies,
   listFeatureFlags,
   pickFlagDefinition,
+  SCENARIO_CONNECTOR_FLAG_KEY,
 } from "./feature-flag.ts";
 export {
   deriveFeatureFlagEnvVarName,
@@ -156,7 +157,6 @@ export {
 } from "./frontend-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS, FrontendFlags } from "./frontend-feature-flags.ts";
 export { VOICE_AGENTS_DISABLED_MESSAGE, VOICE_AGENTS_FLAG_KEY } from "./voice-agents.ts";
-export { SCENARIO_CONNECTOR_FLAG_KEY } from "./scenario-connector.ts";
 export {
   LEGACY_PROJECT_KEY_FULL_ACCESS_FLAG_KEY,
   LEGACY_PROJECT_KEY_SCOPE_ENFORCED_FLAG_KEY,

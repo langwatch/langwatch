@@ -277,9 +277,8 @@ export function connectorSetupAnswer({
   const { state, secrets, ...rest } = outputs;
   const entries = isObject(secrets) ? Object.entries(secrets) : [];
   const named = entries.filter((entry): entry is [string, string] => typeof entry[1] === "string");
+  // Over the cap no secret is handed on, but the state is kept so teardown can still clean up.
   const overCap = secretMapOverCap(named);
-  // Over the cap the whole answer is dropped: nothing is kept that so many values would scrub.
-  if (overCap) return { secrets: {}, secretValues: [], problem: overCap };
   const names = named.map(([name]) => name);
   const badNames = names.filter((name) => !CONNECTOR_SECRET_NAME_PATTERN.test(name));
   const clashes = names.filter((name) => projectSecretNames.includes(name));
@@ -287,18 +286,22 @@ export function connectorSetupAnswer({
     secrets === undefined ||
     secrets === null ||
     (isObject(secrets) && named.length === entries.length);
-  const problem = setupProblem({
-    unknownKeys: Object.keys(rest),
-    state,
-    isSecretMap,
-    badNames,
-    clashes,
-  });
+  const problem =
+    overCap ??
+    setupProblem({
+      unknownKeys: Object.keys(rest),
+      state,
+      isSecretMap,
+      badNames,
+      clashes,
+    });
   return {
     ...(isObject(state) ? { state } : {}),
-    secrets: Object.fromEntries(
-      named.filter(([name]) => !badNames.includes(name) && !clashes.includes(name)),
-    ),
+    secrets: overCap
+      ? {}
+      : Object.fromEntries(
+          named.filter(([name]) => !badNames.includes(name) && !clashes.includes(name)),
+        ),
     secretValues: named.map(([, value]) => value),
     ...(problem ? { problem } : {}),
   };
@@ -350,13 +353,21 @@ function setupProblem({
   return undefined;
 }
 
-/** The call block's reply text. @throws ConnectorBlockError without a `reply`. */
-export function connectorCallReply(outputs: ConnectorObject): string {
+/**
+ * The call block's reply text. `scrubbed` is applied to the reply alone, before an object reply is
+ * turned into text (where each secret would be JSON-escaped), never to the `{ reply }` envelope.
+ * @throws ConnectorBlockError without a `reply`.
+ */
+export function connectorCallReply(
+  outputs: ConnectorObject,
+  scrubbed: (value: unknown) => unknown = (value) => value,
+): string {
   const { reply } = outputs;
   if (reply === undefined || reply === null) {
     throw new ConnectorBlockError({ message: "The call block must return { reply }." });
   }
-  return typeof reply === "string" ? reply : JSON.stringify(reply);
+  const clean = scrubbed(reply);
+  return typeof clean === "string" ? clean : JSON.stringify(clean);
 }
 
 /** Teardown's whole answer, which the run only shows. */
