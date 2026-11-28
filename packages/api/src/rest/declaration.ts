@@ -192,6 +192,11 @@ export const browserSessionContext = defineMiddlewareContext(
  */
 export const callerAddressContext = defineMiddlewareContext("callerAddress", z.string().nullable());
 
+/** When a route points a delivery at a URL the caller names, read from its parsed input. */
+export type RestSendsToUrl = Readonly<{
+  when: (input: Readonly<Record<string, unknown>>) => boolean;
+}>;
+
 /** What a superseded family or route answers with, and what replaces it. */
 export type RestDeprecation = Readonly<{
   /** The path of the family or route that replaces this one. */
@@ -659,6 +664,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly spendExempt?: string;
   /** Present exactly when the route answers what an organization's users or runs wrote. */
   readonly servesContent?: true;
+  /** Present exactly when the route can point a delivery at a URL the caller names. */
+  readonly sendsToUrl?: RestSendsToUrl;
   /** Present exactly when operator flags open the route to a legacy project key. */
   readonly legacyKeyScopes?: readonly [string, ...string[]];
   /** Present exactly when the route's create is replayable under a caller key. */
@@ -750,6 +757,7 @@ type RouteState = Readonly<{
   spends?: true;
   spendExempt?: string;
   servesContent?: true;
+  sendsToUrl?: RestSendsToUrl;
   legacyKeyScopes?: readonly [string, ...string[]];
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
@@ -1247,6 +1255,22 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
       path: this.path,
       operation: this.operation,
       state: { ...this.state, servesContent: true },
+    });
+  }
+
+  /**
+   * When `when` holds for the input, the route points a delivery of the organization's data at a
+   * URL the caller names, such as a webhook: a staff key is refused it (ADR-202).
+   */
+  sendsToUrl(mark: RestSendsToUrl): RouteBuilder<Api, S> {
+    if (this.state.sendsToUrl) throw new Error("REST route already declared sendsToUrl()");
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, sendsToUrl: mark },
     });
   }
 
@@ -2187,15 +2211,23 @@ function legacyKeyScopesOf(scopes: RestLegacyKeyScopes): readonly [string, ...st
   return typeof scopes === "string" ? [scopes] : scopes;
 }
 
+/** What the staff access gate reads of a route: whether it spends, serves content, sends out. */
+function staffParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
+  return {
+    ...(state.spends ? { spends: state.spends } : {}),
+    ...(state.spendExempt ? { spendExempt: state.spendExempt } : {}),
+    ...(state.servesContent ? { servesContent: state.servesContent } : {}),
+    ...(state.sendsToUrl ? { sendsToUrl: state.sendsToUrl } : {}),
+  };
+}
+
 /** What the door reads of a route beyond its permission: gates, credential, audit. */
 function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.refusedOnAggregate ? { refusedOnAggregate: state.refusedOnAggregate } : {}),
-    ...(state.spends ? { spends: state.spends } : {}),
-    ...(state.spendExempt ? { spendExempt: state.spendExempt } : {}),
-    ...(state.servesContent ? { servesContent: state.servesContent } : {}),
+    ...staffParts(state),
     ...(state.legacyKeyScopes ? { legacyKeyScopes: state.legacyKeyScopes } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),

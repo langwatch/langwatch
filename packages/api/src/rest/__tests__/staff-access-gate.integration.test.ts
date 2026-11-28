@@ -48,6 +48,8 @@ interface ItemsApi {
   search(): Promise<unknown>;
   remove(): Promise<unknown>;
   results(): Promise<unknown>;
+  notify(): Promise<unknown>;
+  toggle(): Promise<unknown>;
 }
 
 const ItemsApi = moduleApi<ItemsApi>()("evaluator");
@@ -151,6 +153,33 @@ const router = defineRestRouter(ItemsApi)
     await app.remove();
     return { removed: true };
   })
+  .post("/notify", "notify")
+  .withAudit("items.notify")
+  .keepsRecords()
+  .withInput(z.object({ channel: z.enum(["email", "webhook"]) }))
+  .withPermission("triggers:create")
+  .sendsToUrl({ when: (input) => input.channel === "webhook" })
+  .withOutput(z.object({ sent: z.boolean() }))
+  .handle(async ({ app }) => {
+    await app.notify();
+    return { sent: true };
+  })
+  .post("/toggle", "toggle")
+  .withAudit("items.toggle")
+  .withInput(z.object({ id: z.string(), active: z.boolean() }))
+  .withConfirmation({
+    resource: "item",
+    action: "disable",
+    idParam: "id",
+    when: (input) => input.active === false,
+    name: async () => null,
+  })
+  .withPermission("triggers:update")
+  .withOutput(z.object({ toggled: z.boolean() }))
+  .handle(async ({ app }) => {
+    await app.toggle();
+    return { toggled: true };
+  })
   .get("/results", "results")
   .withPermission("evaluations:view")
   .servesContent()
@@ -194,6 +223,8 @@ const app: ItemsApi = {
   search: async () => void order.push("handler"),
   remove: async () => void order.push("handler"),
   results: async () => void order.push("handler"),
+  notify: async () => void order.push("handler"),
+  toggle: async () => void order.push("handler"),
   list: async () => void order.push("handler"),
   run: async () => {
     order.push("handler");
@@ -331,6 +362,7 @@ describe("the staff access gate", () => {
           writes: false,
           confirms: false,
           servesContent: false,
+          sendsToUrl: false,
           ipAddress: null,
           userAgent: "langwatch-cli/1.0",
         },
@@ -430,6 +462,46 @@ describe("the staff access gate", () => {
         { operation: "items.remove", confirms: true, servesContent: false },
         { operation: "items.results", confirms: false, servesContent: true },
       ]);
+    });
+
+    /** @scenario "A support key never points a trigger at a webhook" */
+    it("tells the gate a request sends to a URL only when its input does", async () => {
+      await call({
+        gate: recordingGate(),
+        method: "POST",
+        path: "/notify",
+        body: { channel: "webhook" },
+      });
+      await call({
+        gate: recordingGate(),
+        method: "POST",
+        path: "/notify",
+        body: { channel: "email" },
+      });
+      await call({ gate: recordingGate(), path: "/results" });
+
+      expect(admitted.map(({ operation, sendsToUrl }) => ({ operation, sendsToUrl }))).toEqual([
+        { operation: "items.notify", sendsToUrl: true },
+        { operation: "items.notify", sendsToUrl: false },
+        { operation: "items.results", sendsToUrl: false },
+      ]);
+    });
+
+    it("tells the gate a conditional confirmation asks only when its condition holds", async () => {
+      await call({
+        gate: recordingGate(),
+        method: "POST",
+        path: "/toggle",
+        body: { id: "item-1", active: false },
+      });
+      await call({
+        gate: recordingGate(),
+        method: "POST",
+        path: "/toggle",
+        body: { id: "item-1", active: true },
+      });
+
+      expect(admitted.map(({ confirms }) => confirms)).toEqual([true, false]);
     });
 
     /** @scenario "Refused staff calls leave a trail row" */

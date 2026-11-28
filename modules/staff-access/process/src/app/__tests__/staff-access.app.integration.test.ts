@@ -66,6 +66,7 @@ function gateRequest(overrides: Partial<RestStaffAccessRequest> & { apiKeyId: st
     writes: false,
     confirms: false,
     servesContent: false,
+    sendsToUrl: false,
     ipAddress: AGENT_IP,
     userAgent: "langwatch-cli",
     ...overrides,
@@ -609,6 +610,37 @@ function scenarios(backend: Backend): void {
             ),
           ),
         ).resolves.toBe("staff_write_not_allowed");
+      });
+
+      /** @scenario "A support key never points a trigger at a webhook" */
+      it("refuses a request that sends to a URL, even with spend, and trails it", async () => {
+        const w = world();
+        const { requestId } = await redeemed(w, { scopes: ["org:support"], spendApproved: true });
+        const apiKeyId = w.state.minted[0]?.apiKeyId ?? "";
+        const trigger = {
+          apiKeyId,
+          method: "POST",
+          path: "/api/triggers",
+          operation: "triggers.postApiTriggers",
+          permissions: ["triggers:create"],
+          writes: true,
+        };
+
+        await expect(
+          codeOf(w.app.staffAccessGate.admit(gateRequest({ ...trigger, sendsToUrl: true }))),
+        ).resolves.toBe("staff_webhook_not_allowed");
+        await expect(w.app.staffAccessGate.admit(gateRequest(trigger))).resolves.toMatchObject({
+          spendApproved: true,
+        });
+
+        await expect(w.repositories.events.findByRequest({ requestId })).resolves.toEqual([
+          expect.objectContaining({
+            path: "/api/triggers",
+            status: 403,
+            errorCode: "staff_webhook_not_allowed",
+          }),
+          expect.objectContaining({ path: "/api/triggers", status: null, errorCode: null }),
+        ]);
       });
 
       /** @scenario "A key without org:content cannot read run results or stored files" */

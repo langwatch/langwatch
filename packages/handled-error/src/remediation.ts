@@ -1404,6 +1404,11 @@ const registry = {
   staff_write_not_allowed: {
     tips: ["Ask a member of the organization to make this change"],
   },
+  staff_webhook_not_allowed: {
+    tips: [
+      "Use an email or Slack destination, or ask a member of the organization to add the webhook",
+    ],
+  },
   staff_access_audit_unavailable: {
     tips: ["Try again in a moment"],
   },

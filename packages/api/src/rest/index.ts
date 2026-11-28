@@ -49,6 +49,7 @@ export {
   type RestPermissionReach,
   type RestPermissionTarget,
   type RestRouteAnswers,
+  type RestSendsToUrl,
   type RestTransportDeclaration,
   type RestTransportRoute,
 } from "./declaration.ts";

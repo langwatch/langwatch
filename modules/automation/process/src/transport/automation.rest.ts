@@ -112,6 +112,13 @@ function firePageWire(page: TriggerFirePage): AutomationRestFirePage {
   };
 }
 
+/** An update that names the webhook channel or sends a delivery URL: a webhook's own fields. */
+function setsWebhookDelivery(input: Readonly<Record<string, unknown>>): boolean {
+  const params = input.actionParams;
+  const namesUrl = typeof params === "object" && params !== null && "url" in params;
+  return input.action === "SEND_WEBHOOK" || namesUrl;
+}
+
 /** The click an automation route asks a Langy key for, named from the automation itself. */
 function automationConfirmation({
   action,
@@ -214,6 +221,7 @@ export function createAutomationRest(): Readonly<{
       .withAudit("automation.create")
       .withInput(automationRestCreateInputSchema)
       .withPermission("triggers:create")
+      .sendsToUrl({ when: (input) => input.action === "SEND_WEBHOOK" })
       .withOutput(automationRestResponseSchema)
       .withStatus(201)
       .withDocs({
@@ -240,6 +248,7 @@ export function createAutomationRest(): Readonly<{
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestUpdateInputSchema)
       .withPermission("triggers:update")
+      .sendsToUrl({ when: setsWebhookDelivery })
       // An update that pauses the automation is a disable, and the disable route's click covers it.
       .withConfirmation(
         automationConfirmation({ action: "disable", when: (input) => input.active === false }),

@@ -316,6 +316,18 @@ export class StaffWriteNotAllowedError extends HandledError {
   }
 }
 
+/** A staff key asked a route to send the organization's data to a URL it names, a webhook. */
+export class StaffWebhookNotAllowedError extends HandledError {
+  constructor() {
+    super("staff_webhook_not_allowed", "Staff access cannot send data to a webhook", {
+      httpStatus: 403,
+      fault: "customer",
+      ...remediation("staff_webhook_not_allowed"),
+    });
+    this.name = "StaffWebhookNotAllowedError";
+  }
+}
+
 /** The staff trail row could not be written before the handler, so the request is refused. */
 export class StaffAccessAuditUnavailableError extends HandledError {
   constructor() {

@@ -914,6 +914,7 @@ export const APP_ERROR_CODES = [
   "staff_function_scope_mismatch",
   "staff_function_unknown",
   "staff_spend_not_approved",
+  "staff_webhook_not_allowed",
   "staff_write_not_allowed",
   "step_after_cycle",
   "step_after_unknown",

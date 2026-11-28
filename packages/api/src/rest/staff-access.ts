@@ -28,10 +28,12 @@ export type RestStaffAccessRequest = Readonly<{
   spends: boolean;
   /** The route changes something, by its declared kind rather than its permissions. */
   writes: boolean;
-  /** The route removes or disables a record (`.withConfirmation`). */
+  /** This request removes or disables a record (`.withConfirmation`, its `when` included). */
   confirms: boolean;
   /** The route answers content under a metadata permission (`.servesContent()`). */
   servesContent: boolean;
+  /** This request points a delivery at a URL the caller names (`.sendsToUrl()`). */
+  sendsToUrl: boolean;
   ipAddress: string | null;
   userAgent: string | null;
 }>;
@@ -151,7 +153,13 @@ export type StaffRequestInput = Readonly<{
   operation: string;
   permissions: readonly string[];
   scope: AuthzDeclaredScopeId | null;
-  route: Readonly<{ spends: boolean; writes: boolean; confirms: boolean; servesContent: boolean }>;
+  route: Readonly<{
+    spends: boolean;
+    writes: boolean;
+    confirms: boolean;
+    servesContent: boolean;
+    sendsToUrl: boolean;
+  }>;
 }>;
 
 function staffRequestOf({

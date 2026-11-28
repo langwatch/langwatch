@@ -26,6 +26,20 @@ Feature: Using ops agent access
     And prompt text is content, not metadata
 
   @integration
+  Scenario: A support key never points a trigger at a webhook
+    Given a redeemed "org:support" key on ACME approved to spend
+    When the agent creates a trigger that sends to a webhook
+    Then it is refused with "staff_webhook_not_allowed"
+    And no trigger was created
+    And the refusal wrote a trail row with its status and error code
+    When the agent changes an existing trigger's delivery to a webhook URL
+    Then it is refused with "staff_webhook_not_allowed"
+    When the agent creates a trigger that sends an email and one that posts to Slack
+    Then both are created
+    When the agent renames the email trigger
+    Then it answers 200
+
+  @integration
   Scenario: A read key reads traces, analytics and LWQL in its organization
     Given a redeemed "org:content" key on ACME
     When the agent searches traces, asks an analytics timeseries and runs an LWQL query
