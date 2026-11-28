@@ -1,8 +1,8 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import {
-  type ModelDefaultResolveInput,
-  type ModelProviderApi,
-  type ModelProviderTextGenerationInput,
+import type {
+  ModelDefaultResolveInput,
+  ModelProviderApi,
+  ModelProviderTextGenerationInput,
 } from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
