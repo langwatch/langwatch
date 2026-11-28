@@ -96,6 +96,13 @@ Feature: Self-Serving License Purchase
     Then only the first holds the claim
     And once it is delivered a later claim finds it delivered
 
+  @integration
+  Scenario: Only one retry takes over an expired renewal claim
+    Given two retries of the same paid renewal invoice after the claim lease
+    When both take over the stale claim in billing's store
+    Then only one retry holds the claim
+    And the other waits for Stripe to deliver the invoice again
+
   # Error handling
   @integration @unimplemented
   Scenario: Handle missing private key gracefully

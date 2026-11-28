@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { generate } from "@langwatch/ksuid";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -11,7 +12,7 @@ import {
   type LicenseRenewalClaimOutcome,
 } from "../license-renewal-claim.repository.ts";
 
-type LicenseRenewalClaimDatabase = Pick<PrismaClient, "licenseRenewalClaim">;
+type LicenseRenewalClaimDatabase = Pick<PrismaClient, "licenseRenewalClaim" | "$executeRaw">;
 
 /** A released claim with a minted licence keeps its row; this lease is long over. */
 const RELEASED_AT = new Date(0);
@@ -53,14 +54,28 @@ export class PrismaLicenseRenewalClaimRepository extends LicenseRenewalClaimRepo
     if (existing.claimedAt.getTime() > now.epochMilliseconds - leaseMs)
       return { outcome: "in_flight" };
 
-    const takeover = await this.prisma.licenseRenewalClaim.updateMany({
-      where: { stripeInvoiceId, claimToken: existing.claimToken, deliveredAt: null },
-      data: { claimToken: token, claimedAt: toDate(now) },
-    });
-    if (takeover.count !== 1) return { outcome: "in_flight" };
+    const staleBefore = new Date(now.epochMilliseconds - leaseMs);
+    // Prisma's updateMany selects ids first and drops the condition under a race, so both
+    // retries could take over the same stale claim. One UPDATE rechecks the row under its lock.
+    const taken = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // A renewal claim is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "LicenseRenewalClaim"
+         SET "claimToken" = ${token},
+             "claimedAt" = ${toDate(now)}
+       WHERE "stripeInvoiceId" = ${stripeInvoiceId}
+         AND "claimToken" = ${existing.claimToken}
+         AND "deliveredAt" IS NULL
+         AND "claimedAt" <= ${staleBefore}
+    `;
+    if (taken !== 1) return { outcome: "in_flight" };
     // Read after the takeover: the stale holder may have kept a licence since the first read.
-    const taken = await this.prisma.licenseRenewalClaim.findUnique({ where: { stripeInvoiceId } });
-    const kept = issuedRenewalLicenseSchema.safeParse(taken?.issuedLicense);
+    const claimedRow = await this.prisma.licenseRenewalClaim.findUnique({
+      where: { stripeInvoiceId },
+    });
+    const kept = issuedRenewalLicenseSchema.safeParse(claimedRow?.issuedLicense);
     return { outcome: "claimed", token, issued: kept.success ? kept.data : null };
   }
 
