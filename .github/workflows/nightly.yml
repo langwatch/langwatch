@@ -67,6 +67,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     secrets: inherit
 
   # ---------------------------------------------------------------------------
