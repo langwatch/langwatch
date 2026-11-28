@@ -3880,8 +3880,8 @@ Create an agent adapter that calls your agent, then run a scenario against it. F
                         then provide a complete recipe. Keep your responses concise and focused.
                     """,
                 },
-                # Scenario adds a trace_id to each message; send only role and content
-                *({"role": m["role"], "content": m["content"]} for m in messages),
+                # Scenario tags each message with a trace_id that strict providers reject
+                *({k: v for k, v in m.items() if k != "trace_id"} for m in messages),
             ],
         )
         return response.choices[0].message
@@ -4062,7 +4062,7 @@ Also check: [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/eva
 
 ## 6. Set Up and Clean Up Test Data
 
-When your scenarios need data to exist first, such as a test customer or organisation, create it in a pytest fixture. Everything after `yield` runs when the test ends, even if the test fails, so the cleanup always happens.
+When your scenarios need data to exist first, such as a test customer or organization, create it in a pytest fixture. Everything after `yield` runs when the test ends, so the cleanup runs whether the test passes or fails.
 
 ```python
 import pytest
@@ -4106,6 +4106,7 @@ import scenario
 async def test_support_agent_knows_the_customer(seeded_customer):
     class SupportAgent(scenario.AgentAdapter):
         async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+            # On strict providers, support_agent drops each message's trace_id as in the quickstart
             return support_agent(
                 input.messages,
                 customer_id=seeded_customer["id"],
@@ -4141,20 +4142,22 @@ async def test_support_agent_knows_the_customer(seeded_customer):
 To run the same scenario in several regions, seed once with a session-scoped fixture and use `pytest.mark.parametrize` for one test per region. The fixture deletes only what the run created, and only once, after the last test.
 
 ```python
+REGIONS = ["eu", "us"]
+
 @pytest.fixture(scope="session")
 def seeded_regions(request):
     customers = {}
-    for region in ["eu", "us"]:
+    for region in REGIONS:
         customer = create_test_customer(name="Test Customer", region=region)
         # Register cleanup right after each create, so a later failure still cleans up
-        request.addfinalizer(lambda id=customer["id"]: delete_test_customer(id))
+        request.addfinalizer(lambda customer_id=customer["id"]: delete_test_customer(customer_id))
         customers[region] = customer
 
     return customers
 
 @pytest.mark.agent_test
 @pytest.mark.asyncio
-@pytest.mark.parametrize("region", ["eu", "us"])
+@pytest.mark.parametrize("region", REGIONS)
 async def test_support_agent_per_region(seeded_regions, region):
     customer = seeded_regions[region]
     ...  # build the adapter and run the scenario as above
