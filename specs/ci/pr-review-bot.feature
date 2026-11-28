@@ -158,6 +158,49 @@ Feature: PR Review Bot workflow
     And a slow CI ends with the wait step's message naming the pending checks
 
   # ============================================================================
+  # Waking the Laze review bot
+  # ============================================================================
+  #
+  # Once the required checks pass, a step posts "@LangWatch PR Review Bot review
+  # <repo>#<pr> at <sha>" to a Laze channel. The bot step after it runs an LLM
+  # agent with a shell over untrusted PR content, so only the wake step is handed the key.
+
+  @unit
+  Scenario: The Laze wake runs after the wait and before the bot
+    Given the review job's wait step has passed
+    When the review job continues
+    Then the wake step posts to Laze before the bot step runs
+
+  # A step's `if:` cannot read that step's own env, so the skip is in the script.
+  @unit
+  Scenario: The Laze wake skips when its secret is empty
+    Given the LAZE_WAKE_KEY secret is empty
+    When the wake step runs
+    Then its script exits 0 before posting anything
+
+  @unit
+  Scenario: The Laze wake can never fail the review job
+    Given Laze is down or refuses the post
+    When the wake step fails
+    Then continue-on-error keeps the review job going and the bot step still runs
+    And the wake step's timeout-minutes of at most 5 ends a hung post
+
+  # Defence in depth, not isolation: steps share one runner, which holds every
+  # secret the job references. The key can only post to chat.
+  @unit
+  Scenario: The Laze wake key is scoped to the wake step
+    When the review job runs
+    Then only the wake step's env sets LAZE_WAKE_KEY
+    And neither the workflow env, the job env nor any other step's env, with:, run: or if: has it
+    And no step in the workflow passes toJSON(secrets)
+
+  # Laze mentions are plain text; a message without one wakes nobody.
+  @unit
+  Scenario: The Laze wake message mentions the review bot
+    When the wake step posts
+    Then the message mentions "@LangWatch PR Review Bot"
+
+  # ============================================================================
   # Gating: Dependabot PRs
   # ============================================================================
 

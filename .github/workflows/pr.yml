@@ -357,6 +357,26 @@ jobs:
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
+      # Wakes the Laze review bot once the checks pass; it never fails this job.
+      # The chat:post key is in this step's env only, never the job's or another
+      # step's: defence in depth, as steps share one runner and the bot runs an
+      # LLM agent with a shell over PR content. An `if:` can't see a step's own
+      # env, so the skip is in the script (tools/ciguard).
+      - name: Wake the Laze review bot
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          LAZE_WAKE_KEY: ${{ secrets.LAZE_WAKE_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [ -n "$LAZE_WAKE_KEY" ] || { echo "LAZE_WAKE_KEY not set; skipping wake"; exit 0; }
+          jq -n --arg c "channel_000000DS08HpOve0vz6RzGSu0ZAC8" \
+            --arg t "@LangWatch PR Review Bot review langwatch/langwatch#${PR_NUMBER} at ${HEAD_SHA:0:7}" \
+            '{channel: $c, body: $t}' |
+            curl -fsS -X POST https://laze.so/api/agents/me/messages \
+              -H "Authorization: Bearer ${LAZE_WAKE_KEY}" \
+              -H "Content-Type: application/json" --data-binary @-
       - uses: langwatch/langwatch-pr-review-bot@fbe577791f28fcb071ca68bbe904afc39e06164a # main 2026-11-26
         with:
           slack_notify: "false"
