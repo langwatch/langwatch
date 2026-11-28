@@ -5,10 +5,12 @@
 import { describe, expect, it } from "vitest";
 
 import { authFailureMessage, ssoHandOffFailureMessage } from "../auth-failure-message.ts";
+import { explainErrorCode } from "../error-presentation.ts";
 import { frontDoorErrorCopy } from "../front-door-error-copy.ts";
 
+/** The title the screens render for a code: the front door's own copy, else the shared registry. */
 const registryCopy = (code: string): string => {
-  const explanation = frontDoorErrorCopy({
+  const explanation = explainErrorCode({
     code,
     httpStatus: 500,
     meta: {},

@@ -1,4 +1,8 @@
-import { isSafeReturnToPath, type SignUpEnrollment } from "@langwatch/auth-contract";
+import {
+  isSafeReturnToPath,
+  isSignUpRefusalCode,
+  type SignUpEnrollment,
+} from "@langwatch/auth-contract";
 import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -915,9 +919,13 @@ function PostLinkRoutingFailure({
   error: unknown;
   onRetry: () => Promise<void>;
 }) {
+  // A sign-up refusal is no success, so the card does not lead with the confirmation.
+  const refused = isSignUpRefusalCode(readHandledError(error)?.code);
   return (
     <AuthCard
-      title={addressConfirmed ? "Your email is confirmed" : "Create your LangWatch account"}
+      title={
+        addressConfirmed && !refused ? "Your email is confirmed" : "Create your LangWatch account"
+      }
     >
       <div data-testid="post-link-routing-failure" hidden />
       {error ? (

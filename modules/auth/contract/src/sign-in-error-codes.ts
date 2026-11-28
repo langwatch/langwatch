@@ -89,6 +89,15 @@ export const STABLE_AUTH_ERRORS = [
 export const isStableAuthError = (error: string | null | undefined): boolean =>
   !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
 
+/** The codes the sign-up policy refuses a new address with; the registry has words for each. */
+export const SIGN_UP_REFUSAL_CODES = [
+  "auth_sign_up_restricted",
+  "auth_sign_up_disposable_email",
+] as const;
+
+export const isSignUpRefusalCode = (code: string | null | undefined): boolean =>
+  !!code && (SIGN_UP_REFUSAL_CODES as readonly string[]).includes(code);
+
 /** The one code every failure we have not written down arrives as. */
 export const GENERIC_SIGN_IN_ERROR_CODE = "sign_in_failed";
 
