@@ -5,20 +5,23 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { TEST_DATASTORES as DATASTORES } from "../test-datastores.mjs";
 
 const nx = JSON.parse(readFileSync(new URL("../../../nx.json", import.meta.url), "utf8"));
-const DATASTORES = [
-  "LANGWATCH_TEST_DATABASE_URL",
-  "LANGWATCH_TEST_REDIS_URL",
-  "LANGWATCH_TEST_CLICKHOUSE_URL",
-];
+const workspaceRoot = fileURLToPath(new URL("../../..", import.meta.url));
 
 const runtimeOf = (name) => nx.namedInputs[name][0].runtime;
 const run = (command, extra) => {
   const base = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !DATASTORES.includes(key)),
   );
-  return spawnSync("sh", ["-c", command], { env: { ...base, ...extra }, encoding: "utf8" }).stdout;
+  return spawnSync("sh", ["-c", command], {
+    cwd: workspaceRoot,
+    env: { ...base, ...extra },
+    encoding: "utf8",
+  }).stdout;
 };
 
 const everyInput = (value) => {
@@ -34,7 +37,9 @@ describe("task hash inputs", () => {
     const ci = Object.fromEntries(DATASTORES.map((name) => [name, `ci://${name}`]));
     const laptop = Object.fromEntries(DATASTORES.map((name) => [name, `laptop://${name}/5`]));
     assert.equal(run(command, ci), run(command, laptop));
-    assert.notEqual(run(command, ci), run(command, { ...ci, LANGWATCH_TEST_REDIS_URL: "" }));
+    for (const name of DATASTORES) {
+      assert.notEqual(run(command, ci), run(command, { ...ci, [name]: "" }), name);
+    }
     assert.doesNotMatch(run(command, ci), /ci:\/\//);
   });
 
