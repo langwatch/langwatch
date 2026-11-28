@@ -44,7 +44,7 @@ vi.mock("../../../behavior/personal-workspace-api.ts", async () => {
         outcome: "sent",
         organizationId: "org-acme",
         organizationName: "Acme",
-        templateId: "digest-traces-week",
+        templateId: "digest-week",
       },
       {
         outcome: "skipped",
@@ -61,7 +61,7 @@ vi.mock("../../../behavior/personal-workspace-api.ts", async () => {
         outcome: "sent",
         organizationId: "org-acme",
         organizationName: "Acme",
-        templateId: "digest-traces-week",
+        templateId: "digest-week",
       },
       {
         outcome: "skipped",
@@ -255,7 +255,7 @@ describe("given the email preferences band and the staff send of one's own diges
 
       const results = await screen.findByTestId("send-my-digests-results");
       expect(results.textContent).toContain("Acme");
-      expect(results.textContent).toContain("Sent: Traces week");
+      expect(results.textContent).toContain("Sent: Weekly digest");
       expect(results.textContent).toContain("Quiet Co");
       expect(results.textContent).toContain("Skipped: nothing to show you this week");
       expect(stored.sendMyTestsCalls).toBe(1);
@@ -302,16 +302,19 @@ describe("given the email preferences band and the staff send of a person's dige
       });
 
       await userEvent.type(screen.getByTestId("send-test-for-email"), " sam@acme.test ");
-      await userEvent.selectOptions(screen.getByTestId("send-test-for-template"), "Traces week");
+      await userEvent.selectOptions(
+        screen.getByTestId("send-test-for-template"),
+        "Every row with data",
+      );
       await userEvent.click(screen.getByTestId("send-test-for-button"));
 
       const results = await screen.findByTestId("send-test-for-results");
       expect(stored.sendTestForCalls).toEqual([
-        { email: "sam@acme.test", template: "digest-traces-week", deliverTo: "me" },
+        { email: "sam@acme.test", template: "every-row", deliverTo: "me" },
       ]);
       expect(screen.getByText("For Sam Lee (sam@acme.test)")).toBeTruthy();
-      expect(results.textContent).toContain("Sent: Traces week");
-      expect(results.textContent).toContain("Skipped: no data for this digest");
+      expect(results.textContent).toContain("Sent: Weekly digest");
+      expect(results.textContent).toContain("Skipped: no row has data here");
     });
   });
 

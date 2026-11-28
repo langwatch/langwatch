@@ -1,7 +1,4 @@
-import type { DigestCodingAgentWeekProps } from "./templates/digest-coding-agent-week.tsx";
-import type { DigestPlanPressureProps } from "./templates/digest-plan-pressure.tsx";
-import type { DigestScenariosTrendProps } from "./templates/digest-scenarios-trend.tsx";
-import type { DigestTracesWeekProps } from "./templates/digest-traces-week.tsx";
+import type { DigestWeekProps } from "./templates/digest-week.tsx";
 import type { MonitorAutoPausedEmailProps } from "./templates/monitor-auto-paused-email.tsx";
 import type { PlatformOperatorChangeEmailProps } from "./templates/platform-operator-change-email.tsx";
 import type { StaffAccessNoticeEmailProps } from "./templates/staff-access-notice-email.tsx";
@@ -50,23 +47,6 @@ export abstract class MailRender {
     input: PlatformOperatorChangeEmailProps,
   ): Promise<{ subject: string; html: string }>;
 
-  /** An admin's weekly digest when the month's usage presses on the plan limit. */
-  abstract renderDigestPlanPressure(
-    input: DigestPlanPressureProps,
-  ): Promise<{ subject: string; html: string }>;
-
-  /** A member's weekly digest when the focus project's scenario failure rate moved. */
-  abstract renderDigestScenariosTrend(
-    input: DigestScenariosTrendProps,
-  ): Promise<{ subject: string; html: string }>;
-
-  /** A person's weekly digest of their own coding-agent sessions. */
-  abstract renderDigestCodingAgentWeek(
-    input: DigestCodingAgentWeekProps,
-  ): Promise<{ subject: string; html: string }>;
-
-  /** A member's weekly digest of the focus project's traces. */
-  abstract renderDigestTracesWeek(
-    input: DigestTracesWeekProps,
-  ): Promise<{ subject: string; html: string }>;
+  /** A person's weekly digest of one organisation: its feed rows, capped. */
+  abstract renderDigestWeek(input: DigestWeekProps): Promise<{ subject: string; html: string }>;
 }

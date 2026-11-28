@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { RenderedDigestMail } from "../../channels/digest-mail.channel.ts";
 import {
   ADMIN,
   installDigest,
@@ -27,6 +28,10 @@ beforeEach(async () => {
 afterEach(async () => {
   await digest.close();
 });
+
+/** The traces row of an email: the busiest visible project's week. */
+const tracesRowOf = (mail: RenderedDigestMail) =>
+  mail.props.rows.find((row) => row.kind === "traces");
 
 const sendTo = (userId: string) =>
   digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek: SENT_WEEK });
@@ -49,19 +54,17 @@ describe("a member's traces email", () => {
       await sendTo(MEMBER);
 
       const [mail] = digest.mail;
-      expect(mail?.templateId).toBe("digest-traces-week");
-      expect(mail?.props).toMatchObject({
+      expect(mail?.templateId).toBe("digest-week");
+      expect(mail?.props.rows.find((row) => row.kind === "traces")).toEqual({
+        kind: "traces",
+        projectName: "Support bot",
         traces: 1_500,
-        changePercent: 50,
+        previousTraces: 1_000,
         errors: 30,
-        tokens: 2_000_000,
         costUsd: 12.5,
-        p50Milliseconds: 420,
         p95Milliseconds: 3_100,
-        topModels: [
-          { name: "gpt-5", calls: 900 },
-          { name: "claude-sonnet", calls: 400 },
-        ],
+        topModel: { name: "gpt-5", traces: 900 },
+        url: "https://app.example.test/support-bot/traces",
       });
     });
   });
@@ -111,9 +114,7 @@ describe("a member's traces email", () => {
 
       await sendTo(ADMIN);
 
-      expect(digest.mail.map((mail) => mail.props)).toEqual([
-        expect.objectContaining({ traces: 1_100 }),
-      ]);
+      expect(digest.mail.map(tracesRowOf)).toEqual([expect.objectContaining({ traces: 1_100 })]);
       expect(digest.world.analyticsReads.join(" ")).not.toMatch(/personal|archived|governance/);
     });
 
@@ -127,9 +128,7 @@ describe("a member's traces email", () => {
 
       await sendTo(ADMIN);
 
-      expect(digest.mail.map((mail) => mail.props)).toEqual([
-        expect.objectContaining({ traces: 1_100 }),
-      ]);
+      expect(digest.mail.map(tracesRowOf)).toEqual([expect.objectContaining({ traces: 1_100 })]);
       expect(digest.world.analyticsReads.join(" ")).not.toMatch(/aggregate/);
     });
 
@@ -155,9 +154,7 @@ describe("a member's traces email", () => {
 
       await sendTo(MEMBER);
 
-      expect(digest.mail.map((mail) => mail.props)).toEqual([
-        expect.objectContaining({ traces: 1_300 }),
-      ]);
+      expect(digest.mail.map(tracesRowOf)).toEqual([expect.objectContaining({ traces: 1_300 })]);
     });
   });
 
@@ -169,9 +166,9 @@ describe("a member's traces email", () => {
 
       await sendTo(MEMBER);
 
-      const [mail] = digest.mail;
-      expect(mail?.props).toMatchObject({ traces: 1_500 });
-      expect(mail?.props).not.toHaveProperty("changePercent");
+      const row = digest.mail.map(tracesRowOf)[0];
+      expect(row).toMatchObject({ traces: 1_500 });
+      expect(row).not.toHaveProperty("previousTraces");
     });
   });
 
@@ -222,9 +219,7 @@ describe("a member's traces email", () => {
 
       await sendTo(MEMBER);
 
-      expect(digest.mail.map((mail) => mail.props)).toEqual([
-        expect.objectContaining({ traces: 1_200 }),
-      ]);
+      expect(digest.mail.map(tracesRowOf)).toEqual([expect.objectContaining({ traces: 1_200 })]);
     });
   });
 

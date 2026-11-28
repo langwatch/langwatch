@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The weekly send where a person sits in several organizations (one email each), where a picked
- * template cannot be built, where the person is deactivated, and where one organization cannot
+ * The weekly send where a person sits in several organizations (one email each), where the
+ * organization has no name, where the person is deactivated, and where one organization cannot
  * be read; and an operator sending themself, as tests, the digests they or a person would get.
  * @see enterprise/modules/digest/specs/digest.feature
  */
@@ -41,9 +41,12 @@ const arm = () => digest.repositories.audience.setArmed({ armed: true });
 const sendIn = ({ userId, organizationId }: { userId: string; organizationId: string }) =>
   digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK });
 
-/** The week's trace count an email shows; only the traces-week template shows one. */
+/** The busiest project's trace count an email shows in its traces row, shown or folded. */
 const tracesOf = (mail: RenderedDigestMail): number | undefined =>
-  mail.templateId === "digest-traces-week" ? mail.props.traces : undefined;
+  [...mail.props.rows, ...mail.props.folded].find((row) => row.kind === "traces")?.traces;
+
+/** The kinds of the rows an email shows, in order. */
+const kindsOf = (mail: RenderedDigestMail | undefined) => mail?.props.rows.map((row) => row.kind);
 
 /** The send intents asked so far, waited for since the plan's requests become intents async. */
 async function asked(expected: number) {
@@ -167,11 +170,10 @@ describe("a member of two organizations", () => {
   });
 });
 
-describe("when the picked template cannot be built", () => {
-  /** @scenario "A pick that cannot be built falls through to the next eligible template" */
-  it("sends the next eligible template instead of nothing", async () => {
+describe("when the organization has no name", () => {
+  /** @scenario "An organization without a name is sent its rows under a plain heading" */
+  it("sends the admin their rows, plan first, with no name in the subject", async () => {
     await arm();
-    // The admin is eligible for plan-pressure first, which needs a name the module lacks.
     digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
     digest.world.unnamedOrganizations.add(ORGANIZATION);
     await digest.seedProjectWeek({
@@ -182,7 +184,10 @@ describe("when the picked template cannot be built", () => {
 
     await sendIn({ userId: ADMIN, organizationId: ORGANIZATION });
 
-    expect(digest.mail.map((mail) => mail.templateId)).toEqual(["digest-traces-week"]);
+    const [mail] = digest.mail;
+    expect(kindsOf(mail)?.[0]).toBe("plan");
+    expect(mail?.props.organizationName).toBeNull();
+    expect(mail?.email.subject).toBe("You have used 90% of this month's traces");
   });
 });
 
@@ -330,13 +335,13 @@ describe("an operator sending themself their digests", () => {
           outcome: "sent",
           organizationId: ORGANIZATION,
           organizationName: "Acme",
-          templateId: "digest-traces-week",
+          templateId: "digest-week",
         },
         {
           outcome: "sent",
           organizationId: OTHER_ORGANIZATION,
           organizationName: `Org ${OTHER_ORGANIZATION}`,
-          templateId: "digest-traces-week",
+          templateId: "digest-week",
         },
       ]);
       expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(OPERATOR), emailOf(OPERATOR)]);
@@ -480,13 +485,13 @@ describe("an operator sending themself another person's digests", () => {
             outcome: "sent",
             organizationId: ORGANIZATION,
             organizationName: "Acme",
-            templateId: "digest-traces-week",
+            templateId: "digest-week",
           },
           {
             outcome: "sent",
             organizationId: OTHER_ORGANIZATION,
             organizationName: `Org ${OTHER_ORGANIZATION}`,
-            templateId: "digest-traces-week",
+            templateId: "digest-week",
           },
         ],
       });
@@ -563,20 +568,38 @@ describe("an operator sending themself another person's digests", () => {
     });
   });
 
-  describe("when they force traces week for a quiet week below its threshold", () => {
-    /** @scenario "Staff force one digest for a person, past its threshold" */
-    it("sends traces week where there are traces and skips where there are none", async () => {
+  describe("when they ask for every row of an admin whose plan is far from its limit", () => {
+    /** @scenario "Staff send a person every row with data, past the thresholds" */
+    it("sends the plan row that the weekly send leaves out below 80%", async () => {
       await memberInBothOrganizationsThisMonday();
-      digest.world.traceNumbers.set(`${PROJECT}:${SENT_WEEK}`, { traces: 40 });
+
+      const auto = await testsFor({ email: emailOf(ADMIN), template: "auto" });
+      const every = await testsFor({ email: emailOf(ADMIN), template: "every-row" });
+
+      for (const answer of [auto, every]) {
+        expect(answer.organizations).toEqual([
+          expect.objectContaining({ outcome: "sent", templateId: "digest-week" }),
+        ]);
+      }
+      const [autoMail, everyMail] = digest.mail;
+      expect(kindsOf(autoMail)).not.toContain("plan");
+      expect(kindsOf(everyMail)?.[0]).toBe("plan");
+    });
+  });
+
+  describe("when they ask for every row where the person has no data", () => {
+    /** @scenario "An every-row test with no data for the person is skipped, not sent" */
+    it("sends where there are rows and skips the organization with none", async () => {
+      await memberInBothOrganizationsThisMonday();
       digest.world.traceNumbers.delete(`${OTHER_PROJECT}:${SENT_WEEK}`);
 
-      const answer = await testsFor({ email: emailOf(MEMBER), template: "digest-traces-week" });
+      const answer = await testsFor({ email: emailOf(MEMBER), template: "every-row" });
 
       expect(answer.organizations).toEqual([
         expect.objectContaining({
           organizationId: ORGANIZATION,
           outcome: "sent",
-          templateId: "digest-traces-week",
+          templateId: "digest-week",
         }),
         {
           outcome: "skipped",
@@ -585,32 +608,7 @@ describe("an operator sending themself another person's digests", () => {
           reason: "no_data_for_template",
         },
       ]);
-      expect(digest.mail.map((mail) => tracesOf(mail))).toEqual([40]);
-    });
-  });
-
-  describe("when they force plan usage for an admin and for a member who is not one", () => {
-    /** @scenario "A forced digest with no data for the person is skipped, not sent" */
-    it("sends the admin's and skips each of the member's with no data", async () => {
-      await memberInBothOrganizationsThisMonday();
-
-      const admin = await testsFor({ email: emailOf(ADMIN), template: "digest-plan-pressure" });
-      const member = await testsFor({ email: emailOf(MEMBER), template: "digest-plan-pressure" });
-
-      expect(admin.organizations).toEqual([
-        expect.objectContaining({
-          organizationId: ORGANIZATION,
-          outcome: "sent",
-          templateId: "digest-plan-pressure",
-        }),
-      ]);
-      expect(member.organizations).toEqual([
-        expect.objectContaining({ outcome: "skipped", reason: "no_data_for_template" }),
-        expect.objectContaining({ outcome: "skipped", reason: "no_data_for_template" }),
-      ]);
-      expect(digest.mail.map((mail) => [mail.to, mail.templateId])).toEqual([
-        [emailOf(OPERATOR), "digest-plan-pressure"],
-      ]);
+      expect(digest.mail.map((mail) => tracesOf(mail))).toEqual([1_200]);
     });
   });
 

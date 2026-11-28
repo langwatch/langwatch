@@ -23,7 +23,7 @@ type Deps = Readonly<{
   userWeeks: Pick<DigestUserWeekRepository, "findWeeks" | "deleteBefore">;
   /** Trace numbers per project and week, read from analytics rather than folded. */
   traces: Pick<DigestTraceReadService, "getProjectWeek" | "getPreviousTraces">;
-  /** `EntitlementApi.getUsage`, read for the two numbers the plan-pressure pick needs. */
+  /** `EntitlementApi.getUsage`, read for an admin's plan row alone. */
   entitlement: Readonly<{
     getUsage(input: {
       organizationId: string;
@@ -43,25 +43,28 @@ export class DigestWeekService {
   private constructor(private readonly deps: Deps) {}
 
   /**
-   * The week of `projectIds` alone: the caller names the projects the recipient may see, so
-   * analytics is never asked about one they may not.
+   * The reader's week: of `projectIds` alone, which the caller names as the ones they may see, so
+   * analytics is never asked about one they may not; of their own coding agents, no other
+   * member's; and of the plan only for an admin, so a failed plan read never sinks a member's week.
    */
   async organizationWeek({
     organizationId,
     isoWeek,
     projectIds,
+    reader,
   }: {
     organizationId: string;
     isoWeek: string;
     projectIds: readonly string[];
+    reader: Readonly<{ userId: string; admin: boolean }>;
   }): Promise<OrganizationWeek> {
     const before = weeksBefore({ isoWeek, count: BASELINE_WEEKS });
     const [lastWeek] = before;
     const visible = new Set(projectIds);
-    const [folds, users, usage] = await Promise.all([
+    const [folds, [codingAgents], usage] = await Promise.all([
       this.deps.projectWeeks.findWeeks({ isoWeeks: [isoWeek, ...before], organizationId }),
-      this.deps.userWeeks.findWeeks({ isoWeeks: [isoWeek], organizationId }),
-      this.deps.entitlement.getUsage({ organizationId }),
+      this.deps.userWeeks.findWeeks({ isoWeeks: [isoWeek], organizationId, userId: reader.userId }),
+      reader.admin ? this.deps.entitlement.getUsage({ organizationId }) : undefined,
     ]);
     const mine = folds.filter(({ projectId }) => visible.has(projectId));
     // A project whose read fails is left out of this email and logged; only when every one fails
@@ -87,39 +90,34 @@ export class DigestWeekService {
     });
     const firstFailure = reads.find((read) => read.status === "rejected");
     if (projects.length === 0 && firstFailure) throw firstFailure.reason;
-    // Only a project with traces this week shows a change, so only it needs last week's count; a
-    // read that fails leaves that project without one, and the email goes without the change line.
+    // Every project's last week: a busy one shows its change, an empty one may have gone quiet. A
+    // read that fails leaves the project without one: no change line, and never called quiet.
     const previousTraces = new Map<string, number>();
     await Promise.all(
-      projects
-        .filter(({ traces }) => traces > 0)
-        .map(async ({ projectId }) => {
-          if (!lastWeek) return;
-          try {
-            previousTraces.set(
+      projects.map(async ({ projectId }) => {
+        if (!lastWeek) return;
+        try {
+          previousTraces.set(
+            projectId,
+            await this.deps.traces.getPreviousTraces({
+              organizationId,
               projectId,
-              await this.deps.traces.getPreviousTraces({
-                organizationId,
-                projectId,
-                isoWeek: lastWeek,
-              }),
-            );
-          } catch (error) {
-            logger.warn(
-              { error, organizationId, projectId },
-              "the digest could not read last week",
-            );
-          }
-        }),
+              isoWeek: lastWeek,
+            }),
+          );
+        } catch (error) {
+          logger.warn({ error, organizationId, projectId }, "the digest could not read last week");
+        }
+      }),
     );
     return {
       organizationId,
       isoWeek,
-      planUsage: derivePlanUsage(usage) ?? null,
+      planUsage: usage ? (derivePlanUsage(usage) ?? null) : null,
       projects,
       history: mine.filter((fold) => fold.isoWeek !== isoWeek),
       previousTraces,
-      users: new Map(users.map((user) => [user.userId, user])),
+      codingAgents: codingAgents ?? null,
     };
   }
 

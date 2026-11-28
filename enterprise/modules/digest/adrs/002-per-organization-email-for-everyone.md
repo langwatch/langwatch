@@ -1,6 +1,6 @@
 # ADR-002: The digest is on for everyone, one email per organization, opt-out in settings
 
-**Status:** Accepted (2026-11-26)
+**Status:** Accepted (2026-11-26). Amended 2026-11-27 by [ADR-003](./003-one-feed-email.md): what one email says.
 
 **Behavioural contract:** [Weekly digest emails](../specs/digest.feature)
 

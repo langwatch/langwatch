@@ -69,12 +69,14 @@ export class PrismaDigestUserWeekRepository
   async findWeeks({
     isoWeeks,
     organizationId,
+    userId,
   }: {
     isoWeeks: readonly string[];
     organizationId: string;
+    userId: string;
   }): Promise<UserWeekState[]> {
     const rows = await this.database.digestUserWeek.findMany({
-      where: { organizationId, isoWeek: { in: [...isoWeeks] } },
+      where: { organizationId, userId, isoWeek: { in: [...isoWeeks] } },
       select: { state: true },
     });
     return rows.map((row) => userWeekStateSchema.parse(row.state));

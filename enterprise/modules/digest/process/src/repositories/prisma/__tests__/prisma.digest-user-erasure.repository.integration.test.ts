@@ -61,7 +61,7 @@ describe.skipIf(!databaseUrl)("given digest rows naming two people in two organi
           userId,
           organizationId,
           isoWeek: sendWeek,
-          templateId: "digest-coding-agent-week",
+          templateId: "digest-week",
           sentAt: AT,
         });
         const key = `${organizationId}:${userId}:${ISO_WEEK}`;
@@ -93,9 +93,15 @@ describe.skipIf(!databaseUrl)("given digest rows naming two people in two organi
   });
 
   const weekOwnersIn = async (organizationId: string) =>
-    (await userWeeks.findWeeks({ isoWeeks: [ISO_WEEK], organizationId })).map(
-      ({ userId }) => userId,
-    );
+    (
+      await Promise.all(
+        [erased, kept].map((userId) =>
+          userWeeks.findWeeks({ isoWeeks: [ISO_WEEK], organizationId, userId }),
+        ),
+      )
+    )
+      .flat()
+      .map(({ userId }) => userId);
   const sendersIn = async (organizationId: string) =>
     (
       await connection.client.digestSend.findMany({

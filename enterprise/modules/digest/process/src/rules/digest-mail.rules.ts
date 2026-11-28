@@ -16,14 +16,8 @@ export const DIGEST_UNSUBSCRIBE_PATH = "/api/digest/unsubscribe";
  */
 export const DIGEST_EMAIL_PREFERENCES_PATH = "/settings/profile#email-preferences";
 
-/** The digest's own renders on `@langwatch/mail`'s `MailRender`, one per template that sends. */
-export type DigestMailRender = Pick<
-  MailRender,
-  | "renderDigestPlanPressure"
-  | "renderDigestScenariosTrend"
-  | "renderDigestCodingAgentWeek"
-  | "renderDigestTracesWeek"
->;
+/** The digest's own render on `@langwatch/mail`'s `MailRender`: its one template. */
+export type DigestMailRender = Pick<MailRender, "renderDigestWeek">;
 
 /**
  * Renders a composed digest email and parses notification's command: everything short of the
@@ -37,7 +31,7 @@ export async function renderDigestMail({
   mail: DigestMail;
   renderer: DigestMailRender;
 }): Promise<RenderedDigestMail> {
-  const { subject: templateSubject, html } = await renderTemplate({ mail, renderer });
+  const { subject: templateSubject, html } = await renderer.renderDigestWeek(mail.props);
   // A person in several organizations gets one email per organization: the name tells them apart.
   const subject = mail.organizationName
     ? `${mail.organizationName}: ${templateSubject}`
@@ -50,23 +44,4 @@ export async function renderDigestMail({
     ...(mail.idempotencyKey === undefined ? {} : { idempotencyKey: mail.idempotencyKey }),
   });
   return { ...mail, email };
-}
-
-function renderTemplate({
-  mail,
-  renderer,
-}: {
-  mail: DigestMail;
-  renderer: DigestMailRender;
-}): Promise<{ subject: string; html: string }> {
-  switch (mail.templateId) {
-    case "digest-plan-pressure":
-      return renderer.renderDigestPlanPressure(mail.props);
-    case "digest-scenarios-trend":
-      return renderer.renderDigestScenariosTrend(mail.props);
-    case "digest-coding-agent-week":
-      return renderer.renderDigestCodingAgentWeek(mail.props);
-    case "digest-traces-week":
-      return renderer.renderDigestTracesWeek(mail.props);
-  }
 }

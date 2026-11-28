@@ -1,77 +1,154 @@
 Feature: Weekly digest emails
   LangWatch Cloud sends each person a weekly email for each organization they are in, about that
-  organization's week alone and naming it, picked from five templates by what their data shows,
-  and sent through our own mailer. Every organization is in: there is no enrolment. Operators arm
+  organization's week alone and naming it: one feed of up to five rows picked from what their data
+  shows (ADR-003), sent through our own mailer. Every organization is in: there is no enrolment. Operators arm
   the send in Cloud admin; nothing is sent until they do. A person opts out once, for every
   organization, in one click from the email or with a switch in their settings; an unsubscribe is
   recorded.
   Design: dev/docs/plans/weekly-digest.md
 
-  # Built: the pick, the folds' redelivery rule, the weekly send through our own mailer, the
+  # Built: the row pick, the folds' redelivery rule, the weekly send through our own mailer, the
   # one-click unsubscribe and its rate limit, the operators' switch and clearing digest rows on
-  # user erasure, and the settings switch. The other folds' peer intake, click tracking and its rate limit, the "what's
-  # new" card and the Cloud admin gallery and its metrics are @unimplemented.
+  # user erasure, and the settings switch. The other folds' peer intake, click tracking and its
+  # rate limit, and the Cloud admin gallery and its metrics are @unimplemented.
 
-  # Picking a template
-
-  @unit
-  Scenario: An admin of an organization near its plan limit gets the plan-pressure email
-    Given an organization at 85% of its monthly limit
-    And a member who is an organization admin with 20 coding-agent sessions this week
-    When the template is picked for that member
-    Then it is digest-plan-pressure
+  # Picking the rows
 
   @unit
-  Scenario: A member who is not an admin never gets the plan-pressure email
-    Given an organization at 100% of its monthly limit
-    And a member who is not an organization admin with 20 coding-agent sessions this week
-    When the template is picked for that member
-    Then it is digest-coding-agent-week
+  Scenario: A thin organization is asked to add an eval
+    Given one project with 37 traces this week, 12 last week, and no eval or scenario run in five weeks
+    When its member's email is built
+    Then its rows are Set up with an "Add an eval" button, the project's traces, and New
+    And the New row offers "Write your first scenario" as a text link, never a button
 
   @unit
-  Scenario: A scenario failure rate that moved from its baseline picks the scenarios trend
-    Given a project whose scenario failure rate was 10% on average over the last four weeks
-    And 30% of its scenario runs failed this week
-    When the template is picked for a member of that project
-    Then it is digest-scenarios-trend and it says more are failing than usual
+  Scenario: An organization with no traces this week or last is sent nothing
+    Given an organization whose projects sent no traces this week or last
+    When a member's rows are picked
+    Then none is picked and no email is sent
 
   @unit
-  Scenario: A falling failure rate reads as getting better
-    Given a project whose scenario failure rate was 30% on average over the last four weeks
-    And 10% of its scenario runs failed this week
-    When the template is picked for a member of that project
-    Then it is digest-scenarios-trend and it says the runs are getting better
+  Scenario: A moderate organization sees its regressions, a quiet project and its traces
+    Given a project whose scenario failure rate rose from 6% to 19% and whose tone eval fell from 93% to 81%
+    And a second project that sent 640 traces last week and none this week
+    When a member's email is built
+    Then its rows are the scenario regression with "See the failing runs", the eval drop with no button, the quiet project, the traces and New
+    And the "Also this week" line names the eval that held steady
 
   @unit
-  Scenario: A project with no scenario history has no trend
+  Scenario: A flooded organization's admin sees the plan first and at most two buttons
+    Given an organization at 94% of its plan with failing scenarios, a dropped eval, a quiet project and a heavy coding-agent week
+    When an admin's email is built
+    Then it shows five rows, the plan first with "Raise the limit" and, after a plain "or", a "choose which traces to keep" link
+    And no more than two rows carry a button
+
+  @unit
+  Scenario: Only an admin near the plan limit sees the plan row, and first
+    Given an organization at 80% or more of a plan with a limit
+    When an admin's rows are picked
+    Then the plan row is first, and at 79.9% there is none
+    And a member, or an admin on a plan with no limit, never gets a plan row
+
+  @unit
+  Scenario: Rows cut by the cap are named in the Also line, and a cut New row is dropped
+    Given more than five rows with something to say
+    When the email is built
+    Then the five highest in priority show and each row cut is named by its title in the "Also this week" line
+    And a New row that does not fit appears nowhere
+
+  @unit
+  Scenario: A move of exactly 10 points shows a row, and 9.9 does not
+    Given a project whose scenario failure rate is 10 points above its runs-weighted four-week baseline
+    When the rows are picked
+    Then it has a scenario regression row, and a move of 9.9 points has none
+
+  @unit
+  Scenario: A project with no scenario history has no scenario row
     Given a project with scenario runs this week and none in the four weeks before
-    When the template is picked for a member of that project
-    Then it is not digest-scenarios-trend
+    When the rows are picked
+    Then it has no scenario row
 
   @unit
-  Scenario: A busy project picks the traces week
-    Given a project with 12,000 traces this week and no coding-agent sessions
-    When the template is picked for a member of that project
-    Then it is digest-traces-week
+  Scenario: An eval with fewer than 20 checks this week or in its baseline has no row
+    Given an eval whose pass rate moved by more than 10 points
+    When it had fewer than 20 checks this week or in the four weeks before
+    Then it has no row and is not called steady
 
   @unit
-  Scenario: Low usage falls back to what's new
-    Given a member with 40 traces and no coding-agent sessions this week
-    When the template is picked for that member
-    Then it is digest-whats-new
+  Scenario: An eval steady on two projects is counted once
+    Given the faithfulness eval held its rate on two projects
+    When the rows are picked
+    Then "Also this week" counts it as one steady eval, its checks summed across the two
 
   @unit
-  Scenario: A coding-agent week shows only the counts its agent reported
-    Given a member with 5 coding-agent sessions this week
-    When their digest-coding-agent-week email is built
-    Then it shows their sessions, tokens and active minutes, and no cost
-    And lines changed, commits, pull requests and a top repository only when they were reported
+  Scenario: An eval that moved on one project is steady on none
+    Given the faithfulness eval held its rate on one project and fell on another
+    When the rows are picked
+    Then the fall has its own row and "Also this week" does not call the eval steady
+
+  @unit
+  Scenario: At most two regressions show, biggest first, and the rest fold
+    Given three scenario or eval rates that got 10 points worse or more
+    When the rows are picked
+    Then the two biggest moves show, biggest first, and the third folds into the last line
+
+  @unit
+  Scenario: A recovery shows without a button
+    Given a scenario failure rate 10 points or more below its baseline
+    When the email is built
+    Then it shows as a recovery after the traces row, with no button
+
+  @unit
+  Scenario: A project is quiet only when last week's count was read and above none
+    Given projects with no traces this week
+    When the rows are picked
+    Then only the one whose last week was read and had traces is called quiet
+
+  @unit
+  Scenario: The setup row shows only where no eval ran on any visible project in five weeks
+    Given an organization with traces this week
+    When no eval ran on any project the reader may view, this week or in the four before
+    Then the busiest project gets a Set up row asking for an eval, and none when any eval ran
+
+  @unit
+  Scenario: A coding-agent row never shows cost
+    Given a member with 5 or more coding-agent sessions this week, which cost money
+    When their email is built
+    Then their coding-agent row shows sessions, tokens, and commits, pull requests and a top repository when reported
+    And neither the row, the subject nor the preview shows "$" or a cost
+    And 4 sessions show no row
 
   @unit
   Scenario: A coding-agent week names the repository with the most sessions
     Given a member whose coding-agent sessions this week ran in three repositories
-    When their digest-coding-agent-week email is built
+    When their coding-agent row is built
     Then its top repository is the one with the most sessions
+
+  @unit
+  Scenario: Every weekly digest says why it arrived, whatever the reader's role
+    When every weekly digest fixture is rendered
+    Then its footer says "You get this because you're in" the organization, never that they are a member
+    And it offers to turn off the weekly digest
+    And its outlined chips and the "Also this week" divider take the dark cut's colours
+
+  @unit
+  Scenario: The studio's fixtures are what the digest's rules build
+    Given the thin, moderate and flooded organizations' weeks
+    When each is built for an admin and for a member by the digest's own rules
+    Then each equals the mail studio's fixture of that name
+
+  @unit
+  Scenario: A row whose project has no name is left out of the email
+    Given a week whose only project's name cannot be read
+    When the email is built
+    Then its rows are left out, and with nothing else to show no email is sent
+
+  @unit
+  Scenario: The plan row and the subject never name the organization twice
+    Given an admin of Acme at 90% of its plan
+    When their email is rendered
+    Then its subject is "Acme: You have used 90% of this month's traces", naming Acme once, in the prefix
+    And no row's title has a colon of its own, so every subject has the prefix's one colon at most
 
   # Folding the week
 
@@ -160,7 +237,7 @@ Feature: Weekly digest emails
   @unit
   Scenario: A person's week past its series cap reads its totals as floors
     Given a person's week that received more coding-agent metric series than it keeps
-    When their digest-coding-agent-week email is built
+    When their coding-agent row is built
     Then its totals are the sums of the series it kept, each shown as "at least"
     And a week whose series all fit shows its totals without "at least"
 
@@ -268,15 +345,29 @@ Feature: Weekly digest emails
   Scenario: An organization admin near the plan limit is sent the plan's numbers
     Given the send is armed and an organization at 90% of its monthly limit
     When the week's emails are sent
-    Then its admin's email is digest-plan-pressure with the usage, the count and the limit
-    And its other members' emails are not
+    Then its admin's email leads with the plan row, its count and its limit
+    And its subject names the organization once: "Acme: You have used 90% of this month's traces"
+    And its other members get no plan row
 
   @integration
   Scenario: A member with coding-agent sessions is sent their coding-agent week
     Given the send is armed and a member with 5 coding-agent sessions in two repositories
     When their send is handled
-    Then their email is digest-coding-agent-week with their sessions and metric totals
+    Then their email has a coding-agent row with their sessions and metric totals, and no cost
     And it names the repository where most of their sessions ran
+
+  @integration
+  Scenario: A member's week never carries another member's coding-agent usage
+    Given another member of the organization had 5 coding-agent sessions
+    When a member's week is read
+    Then it holds no coding-agent week but the member's own
+
+  @integration
+  Scenario: A member's week is sent though the plan cannot be read
+    Given the plan's usage cannot be read
+    When a member's send is handled
+    Then their week is sent, since only an admin is shown the plan
+    And an admin's send fails, for the outbox to retry
 
   @integration
   Scenario: An unsubscribed member is skipped
@@ -294,7 +385,7 @@ Feature: Weekly digest emails
   Scenario: A member's role is read when their email is sent
     Given the week's sends are planned while a member is an organization admin
     When they become a plain member before their send is handled
-    Then their email is picked for a plain member
+    Then their email has no plan row
 
   @integration
   Scenario: A member's email shows only the projects they may view
@@ -302,7 +393,7 @@ Feature: Weekly digest emails
     And a member who may not view that project
     When the week's emails are sent
     Then that member's email does not name the project
-    And a member who may view it is sent its scenarios trend
+    And a member who may view it is sent its scenario row
 
   @integration
   Scenario: Disarming after the week is planned sends nothing more
@@ -311,9 +402,8 @@ Feature: Weekly digest emails
     Then no member receives one
 
   @integration
-  Scenario: A member whose pick has nothing to show this week is sent nothing
-    Given the send is armed and a member whose pick is digest-whats-new
-    And no "what's new" card is published for the week
+  Scenario: A member whose week has nothing to show is sent nothing
+    Given the send is armed and a member whose week has no row besides New
     When the week's emails are sent
     Then that member receives none and no send is recorded for them
 
@@ -338,10 +428,10 @@ Feature: Weekly digest emails
     Then they receive none
 
   @integration
-  Scenario: A pick that cannot be built falls through to the next eligible template
-    Given a member whose first eligible template lacks something it needs to show
-    When their email is sent
-    Then they receive the next eligible template that can be built
+  Scenario: An organization without a name is sent its rows under a plain heading
+    Given an organization the organization module has no name for, near its plan limit
+    When its admin's email is sent
+    Then it leads with the plan row and its subject carries no organization name
 
   @integration
   Scenario: A deactivated person is sent nothing
@@ -647,17 +737,19 @@ Feature: Weekly digest emails
     And no email is sent
 
   @unit @integration
-  Scenario: Staff force one digest for a person, past its threshold
-    Given a member whose busiest project had 40 traces this week, below the traces-week threshold
-    When the operator sends themself the member's digests with traces week forced
-    Then the operator receives the traces-week email for that week, though the weekly send would pick nothing
+  Scenario: Staff send a person every row with data, past the thresholds
+    Given an admin of an organization at 1% of its plan
+    When the operator sends themself the admin's digests with every row
+    Then the test leads with the plan row the weekly send leaves out below 80%
+    And every row with data shows, past the thresholds and the five-row cap
+    And a member is still sent no plan row
 
-  @unit @integration
-  Scenario: A forced digest with no data for the person is skipped, not sent
-    Given a member who is not an admin, and an admin, of an organization with a plan limit
-    When the operator forces plan usage for each in turn
-    Then the admin's test is sent with plan usage
-    And each of the member's organizations is reported as skipped with no data for this digest
+  @integration
+  Scenario: An every-row test with no data for the person is skipped, not sent
+    Given a member of two organizations, one of which has nothing at all for them this week
+    When the operator sends themself the member's digests with every row
+    Then the one with data is sent
+    And the other is reported as skipped with no row with data
 
   @integration
   Scenario: Sending a person's digests to an address no account has is refused
@@ -669,7 +761,7 @@ Feature: Weekly digest emails
   @integration
   Scenario: Staff send themselves a person's digests from their settings
     Given Cloud admin staff holding ops:manage on their Profile page
-    When they enter a person's email, choose a digest and press "Send test to me"
+    When they enter a person's email, choose what they'd get or every row, and press "Send test to me"
     Then the person and each of their organizations are listed with what was sent, or why nothing was
 
   @integration
@@ -680,15 +772,9 @@ Feature: Weekly digest emails
 
   @integration @unimplemented
   Scenario: Metrics count sends, unique clickers and unsubscribes by template and week
-    Given ten sends of digest-traces-week this week, three members who clicked twice each and one unsubscribe
+    Given ten sends of digest-week this week, three members who clicked twice each and one unsubscribe
     When the metrics are read
-    Then digest-traces-week shows 10 sent, 3 clickers, a 30% click rate and 1 unsubscribe
-
-  @integration @unimplemented
-  Scenario: The what's new card appears under the hero when published
-    Given an update published for this week
-    When any template is rendered
-    Then the card sits under the hero with its title, body and link
+    Then digest-week shows 10 sent, 3 clickers, a 30% click rate and 1 unsubscribe
 
   # User erasure
 

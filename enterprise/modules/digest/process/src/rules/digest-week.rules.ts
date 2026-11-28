@@ -97,6 +97,12 @@ export function nextMonthLabel(now: number): string {
   return dayLabel(utcDayOf(now).with({ day: 1 }).add({ months: 1 }));
 }
 
+/** Whole UTC days from `now`'s day to the first of next month: 8 on Nov 23. */
+export function daysUntilNextMonth(now: number): number {
+  const today = utcDayOf(now);
+  return today.until(today.with({ day: 1 }).add({ months: 1 }), { largestUnit: "days" }).days;
+}
+
 const outcomeCountsSchema = z.object({
   runs: z.number(),
   passed: z.number(),

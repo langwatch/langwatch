@@ -58,7 +58,7 @@ export class DigestTestSendService {
   /**
    * The same tests of another person, found by address, mailed to the operator, or with
    * `deliverTo: "person"` to that person's own address, never to one typed in; `template` is what
-   * they would get ("auto") or one forced, skipped without its data.
+   * they would get ("auto") or every row with data ("every-row"), skipped where there is none.
    */
   async sendTestFor({
     email,
@@ -140,7 +140,7 @@ export class DigestTestSendService {
       return { outcome: "sent", ...about, templateId };
     } catch (error) {
       const reason = classifyDigestTestRefusal(error);
-      // A forced template with nothing to show has no data here, not an empty week.
+      // An every-row test with nothing to show has no data here, not an empty week.
       if (reason === "nothing_to_send" && template !== "auto") {
         return { outcome: "skipped", ...about, reason: "no_data_for_template" };
       }

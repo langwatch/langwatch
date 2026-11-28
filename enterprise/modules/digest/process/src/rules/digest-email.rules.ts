@@ -1,16 +1,26 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** What one person's weekly email says: the template input, and the picked template's props. */
+/** What one person's weekly email says: the rows' input read off the week, and the email's props. */
 import type { UsageStats } from "@langwatch/entitlement-contract";
 import type {
-  DigestCodingAgentWeekProps,
-  DigestPlanPressureProps,
-  DigestScenariosTrendProps,
-  DigestTracesWeekProps,
+  DigestWeekEvaluator,
+  DigestWeekFoldedRow,
+  DigestWeekProps,
+  DigestWeekRow,
 } from "@langwatch/mail";
 
-import type { DigestTemplateInput, DigestTemplatePick } from "./digest-template.rules.ts";
+import {
+  type DigestFoldedRow,
+  type DigestRow,
+  type DigestRowCounts,
+  type DigestRowsEvaluator,
+  type DigestRowsInput,
+  type DigestRowsMode,
+  type DigestRowsProject,
+  selectDigestRows,
+} from "./digest-rows.rules.ts";
 import {
   BASELINE_WEEKS,
+  daysUntilNextMonth,
   nextMonthLabel,
   type OutcomeCounts,
   type ProjectWeek,
@@ -21,47 +31,30 @@ import {
   weeksBefore,
 } from "./digest-week.rules.ts";
 
-/**
- * A template that has something to send and its props, typed by `@langwatch/mail`'s own props
- * type. "What's new" is absent: it never sends until its card is published.
- */
-export type DigestTemplateProps =
-  | Readonly<{ templateId: "digest-plan-pressure"; props: DigestPlanPressureProps }>
-  | Readonly<{ templateId: "digest-scenarios-trend"; props: DigestScenariosTrendProps }>
-  | Readonly<{ templateId: "digest-coding-agent-week"; props: DigestCodingAgentWeekProps }>
-  | Readonly<{ templateId: "digest-traces-week"; props: DigestTracesWeekProps }>;
+/** The one template's props, typed by `@langwatch/mail`'s own props type. */
+export type DigestTemplateProps = Readonly<{ templateId: "digest-week"; props: DigestWeekProps }>;
 
-/** The names an email shows, read from their owners when it is rendered and never stored. */
-export type DigestNames = Readonly<{
-  organizationName: string | null;
-  /** The focus project's name and the slug its links are built on, when it has one. */
-  project: Readonly<{ name: string; slug: string }> | null;
-}>;
+/** A visible project's name and the slug its links are built on, read when the email is built. */
+export type DigestProjectName = Readonly<{ name: string; slug: string }>;
 
 /** The month's count against a finite plan limit; null when the plan has none to press on. */
 export type PlanUsage = Readonly<{ used: number; limit: number }>;
 
-/** One organization's finished week: its folds and its plan usage, read once. */
+/** One organization's finished week as one reader may see it: their projects' folds and their own. */
 export type OrganizationWeek = Readonly<{
   organizationId: string;
   isoWeek: string;
+  /** Read for an admin alone, since only an admin is shown the plan row. */
   planUsage: PlanUsage | null;
   /** Each project's fold for the week. */
   projects: readonly ProjectWeek[];
   /** Each project's folds for the weeks before it, as far back as the baseline reads. */
   history: readonly ProjectWeekState[];
-  /**
-   * Each project's traces the week before; a project absent from it has none to compare, either
-   * because the read failed or because there were none.
-   */
+  /** Each visible project's traces the week before; a project absent from it failed that read. */
   previousTraces: ReadonlyMap<string, number>;
-  users: ReadonlyMap<string, UserWeekState>;
+  /** The reader's own coding-agent fold; no other member's is ever read into their week. */
+  codingAgents: UserWeekState | null;
 }>;
-
-/** What every template's props open with. */
-type CommonProps = Readonly<{ weekLabel: string; preferencesUrl: string }>;
-
-const TOP_ROWS = 3;
 
 /** Multiplied before dividing, so 900 of 1,000 reads exactly 90. */
 const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
@@ -100,262 +93,321 @@ export function derivePlanUsage(
   return { used: usage.currentMonthMessagesCount, limit };
 }
 
-/** The project the email is about: the busiest by traces, then by scenario runs. */
-export function pickFocusProject(week: OrganizationWeek): ProjectWeek | undefined {
-  return week.projects.toSorted(
-    (left, right) => right.traces - left.traces || right.scenarios.runs - left.scenarios.runs,
-  )[0];
-}
+const NO_COUNTS: DigestRowCounts = { total: 0, failed: 0 };
+const NO_OUTCOMES: OutcomeCounts = { runs: 0, passed: 0, failed: 0 };
 
-function baselineOf({
+const addCounts = (left: DigestRowCounts, right: DigestRowCounts): DigestRowCounts => ({
+  total: left.total + right.total,
+  failed: left.failed + right.failed,
+});
+
+/** Scenarios count every run; a run that neither passed nor failed still ran. */
+const runsOf = ({ runs, failed }: OutcomeCounts): DigestRowCounts => ({ total: runs, failed });
+
+/** Evals count only checks that passed or failed; a skipped one checked nothing. */
+const checksOf = ({ passed, failed }: OutcomeCounts): DigestRowCounts => ({
+  total: passed + failed,
+  failed,
+});
+
+// Own keys only: an evaluator named `constructor` must not read the prototype's.
+const outcomesOf = (record: Readonly<Record<string, OutcomeCounts>>, key: string) =>
+  (Object.hasOwn(record, key) ? record[key] : undefined) ?? NO_OUTCOMES;
+
+/** The project's folds for the four weeks before the sent one; a week with none is absent. */
+function baselineFoldsOf({
   week,
   projectId,
 }: {
   week: OrganizationWeek;
   projectId: string;
-}): OutcomeCounts[] {
-  return weeksBefore({ isoWeek: week.isoWeek, count: BASELINE_WEEKS }).map(
-    (isoWeek) =>
-      week.history.find((fold) => fold.projectId === projectId && fold.isoWeek === isoWeek)
-        ?.scenarios ?? { runs: 0, passed: 0, failed: 0 },
-  );
+}): ProjectWeekState[] {
+  const before = new Set(weeksBefore({ isoWeek: week.isoWeek, count: BASELINE_WEEKS }));
+  return week.history.filter((fold) => fold.projectId === projectId && before.has(fold.isoWeek));
 }
 
-/** What the template rules read for one member of the organization. */
-export function digestTemplateInput({
+/** Each evaluator that ran this week or in the baseline: its checks, the baseline's summed. */
+function evaluatorsOf({
+  project,
+  baseline,
+}: {
+  project: ProjectWeek;
+  baseline: readonly ProjectWeekState[];
+}): DigestRowsEvaluator[] {
+  const types = new Set([
+    ...Object.keys(project.evaluators),
+    ...baseline.flatMap((fold) => Object.keys(fold.evaluators)),
+  ]);
+  return [...types].map((evaluatorType) => ({
+    evaluatorType,
+    week: checksOf(outcomesOf(project.evaluators, evaluatorType)),
+    baseline: baseline
+      .map((fold) => checksOf(outcomesOf(fold.evaluators, evaluatorType)))
+      .reduce(addCounts, NO_COUNTS),
+  }));
+}
+
+const evaluationRunsOf = (folds: readonly ProjectWeekState[]): number =>
+  folds
+    .flatMap((fold) => Object.values(fold.evaluators))
+    .reduce((total, counts) => total + counts.runs, 0);
+
+/** What the row rules read for one member of the organization. */
+export function digestRowsInput({
   week,
-  userId,
   admin,
+  mode,
 }: {
   week: OrganizationWeek;
-  userId: string;
   admin: boolean;
-}): DigestTemplateInput {
-  const user = week.users.get(userId);
-  const focus = pickFocusProject(week);
-  const usage = week.planUsage;
+  mode: DigestRowsMode;
+}): DigestRowsInput {
   return {
-    member: {
-      isOrganizationAdmin: admin,
-      codingAgentSessions: user ? userWeekTotals(user).sessions : 0,
-    },
-    organization: {
-      monthlyLimitUsedPercent: usage ? percentOf({ part: usage.used, whole: usage.limit }) : null,
-    },
-    project: focus
-      ? {
-          traces: focus.traces,
-          scenarioRuns: focus.scenarios.runs,
-          scenarioFailures: focus.scenarios.failed,
-          baselineWeeks: baselineOf({ week, projectId: focus.projectId }).map(
-            ({ runs, failed }) => ({ runs, failures: failed }),
-          ),
-        }
-      : null,
+    mode,
+    admin,
+    plan: week.planUsage,
+    codingAgentSessions: week.codingAgents ? userWeekTotals(week.codingAgents).sessions : 0,
+    projects: week.projects.map((project): DigestRowsProject => {
+      const baseline = baselineFoldsOf({ week, projectId: project.projectId });
+      return {
+        projectId: project.projectId,
+        traces: project.traces,
+        previousTraces: week.previousTraces.get(project.projectId) ?? null,
+        scenarios: runsOf(project.scenarios),
+        scenarioBaseline: baseline
+          .map((fold) => runsOf(fold.scenarios))
+          .reduce(addCounts, NO_COUNTS),
+        evaluators: evaluatorsOf({ project, baseline }),
+        evaluationRuns: evaluationRunsOf([project, ...baseline]),
+      };
+    }),
   };
 }
 
+const CUSTOM: DigestWeekEvaluator = { kind: "custom" };
+
 /**
- * The picked template with its props (`@langwatch/mail` digest-*.tsx), links built on the
- * deployment's origin; none when the template has nothing to show, so nothing is sent. "What's
- * new" has no published card yet (the update editor is not built), so it never sends.
+ * A catalogue evaluator named from its type (`ragas/faithfulness` reads "faithfulness"); a
+ * custom or workflow one is custom, since its type carries an id rather than a name.
  */
-export function buildDigestTemplateProps({
-  pick,
+export function evaluatorOf(evaluatorType: string): DigestWeekEvaluator {
+  const [family = "", ...rest] = evaluatorType.split("/");
+  if (rest.length === 0 || ["custom", "evaluators", "workflow"].includes(family)) return CUSTOM;
+  const name = rest.join(" ").replaceAll(/[_-]+/g, " ").trim();
+  return name ? { kind: "catalogue", name } : CUSTOM;
+}
+
+type RowContext = Readonly<{
+  week: OrganizationWeek;
+  projects: ReadonlyMap<string, DigestProjectName>;
+  baseUrl: string;
+  now: number;
+}>;
+
+/** A row's props, or none when what it shows cannot be read, such as a plan with no usage. */
+function foldableMailRows({
+  row,
+  context,
+}: {
+  row: DigestFoldedRow;
+  context: RowContext;
+}): DigestWeekFoldedRow[] {
+  const { week, projects, baseUrl, now } = context;
+  if (row.kind === "plan") {
+    const usage = week.planUsage;
+    if (!usage) return [];
+    return [
+      {
+        kind: "plan",
+        used: usage.used,
+        limit: usage.limit,
+        daysLeft: daysUntilNextMonth(now),
+        resetsOn: nextMonthLabel(now),
+        url: `${baseUrl}/settings/usage`,
+        upgradeUrl: `${baseUrl}/settings/subscription`,
+      },
+    ];
+  }
+  if (row.kind === "coding") {
+    return week.codingAgents ? codingRows({ user: week.codingAgents, baseUrl }) : [];
+  }
+  const project = projects.get(row.projectId);
+  if (!project) return [];
+  if (row.kind === "traces") {
+    const fold = week.projects.find(({ projectId }) => projectId === row.projectId);
+    return fold ? [tracesRow({ week, fold, project, baseUrl })] : [];
+  }
+  return [projectRow({ row, project, baseUrl })];
+}
+
+function projectRow({
+  row,
+  project,
+  baseUrl,
+}: {
+  row: Extract<DigestFoldedRow, { kind: "scenarios" | "evals" | "quiet" | "setup" }>;
+  project: DigestProjectName;
+  baseUrl: string;
+}): DigestWeekFoldedRow {
+  const projectUrl = `${baseUrl}/${project.slug}`;
+  switch (row.kind) {
+    case "scenarios":
+      return {
+        kind: "scenarios",
+        direction: row.direction,
+        projectName: project.name,
+        runs: row.week.total,
+        failed: row.week.failed,
+        baselineFailurePercent: percentOf({ part: row.baseline.failed, whole: row.baseline.total }),
+        url: `${projectUrl}/simulations/scenarios`,
+      };
+    case "evals":
+      return {
+        kind: "evals",
+        direction: row.direction,
+        projectName: project.name,
+        evaluator: evaluatorOf(row.evaluatorType),
+        checks: row.week.total,
+        failed: row.week.failed,
+        baselinePassPercent: percentOf({
+          part: row.baseline.total - row.baseline.failed,
+          whole: row.baseline.total,
+        }),
+        url: `${projectUrl}/online-evaluations`,
+      };
+    case "quiet":
+      return {
+        kind: "quiet",
+        projectName: project.name,
+        previousTraces: row.previousTraces,
+        url: `${projectUrl}/traces`,
+      };
+    case "setup":
+      return { kind: "setup", projectName: project.name, url: `${projectUrl}/online-evaluations` };
+  }
+}
+
+/** The reader's own coding agents: counts only, never what they cost. */
+function codingRows({
+  user,
+  baseUrl,
+}: {
+  user: UserWeekState;
+  baseUrl: string;
+}): DigestWeekFoldedRow[] {
+  const totals = userWeekTotals(user);
+  if (totals.sessions === 0) return [];
+  const [topRepository] = Object.entries(user.repositories).toSorted(
+    ([, left], [, right]) => right - left,
+  );
+  return [
+    {
+      kind: "coding",
+      sessions: totals.sessions,
+      tokens: totals.tokens,
+      ...(totals.commits > 0 ? { commits: totals.commits } : {}),
+      ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
+      ...(topRepository && topRepository[1] > 0
+        ? { topRepository: { name: topRepository[0], sessions: topRepository[1] } }
+        : {}),
+      totalsAtLeast: totals.atLeast,
+      url: baseUrl,
+    },
+  ];
+}
+
+function tracesRow({
   week,
-  userId,
-  names,
+  fold,
+  project,
+  baseUrl,
+}: {
+  week: OrganizationWeek;
+  fold: ProjectWeek;
+  project: DigestProjectName;
+  baseUrl: string;
+}): DigestWeekFoldedRow {
+  const previous = week.previousTraces.get(fold.projectId);
+  const [topModel] = Object.entries(fold.models).toSorted(([, left], [, right]) => right - left);
+  return {
+    kind: "traces",
+    projectName: project.name,
+    traces: fold.traces,
+    ...(previous === undefined ? {} : { previousTraces: previous }),
+    errors: fold.errors,
+    costUsd: fold.costUsd,
+    p95Milliseconds: Math.round(fold.p95Ms),
+    ...(topModel ? { topModel: { name: topModel[0], traces: topModel[1] } } : {}),
+    url: `${baseUrl}/${project.slug}/traces`,
+  };
+}
+
+function mailRows({ row, context }: { row: DigestRow; context: RowContext }): DigestWeekRow[] {
+  if (row.kind !== "new") return foldableMailRows({ row, context });
+  const project = context.projects.get(row.projectId);
+  if (!project) return [];
+  return [
+    {
+      kind: "new",
+      projectName: project.name,
+      url: `${context.baseUrl}/${project.slug}/simulations/scenarios`,
+    },
+  ];
+}
+
+/**
+ * The person's email for one organization (`@langwatch/mail` digest-week.tsx), its links built
+ * on the deployment's origin; none when no row but New has something to say, so nothing is sent.
+ * A project with no name is left out before the rows are picked, so the cap never counts a row
+ * that cannot be shown.
+ */
+export function buildDigestWeekProps({
+  week: readWeek,
+  admin,
+  mode,
+  organizationName,
+  projects,
   baseUrl,
   preferencesUrl,
   now,
 }: {
-  pick: DigestTemplatePick;
   week: OrganizationWeek;
-  userId: string;
-  names: DigestNames;
+  admin: boolean;
+  mode: DigestRowsMode;
+  organizationName: string | null;
+  projects: ReadonlyMap<string, DigestProjectName>;
   baseUrl: string;
   /** The email-preferences page the footer link opens. */
   preferencesUrl: string;
   now: number;
-}): DigestTemplateProps | undefined {
-  const common = { weekLabel: weekLabel(week.isoWeek), preferencesUrl };
-  switch (pick.template) {
-    case "digest-plan-pressure": {
-      const props = buildPlanPressureProps({ week, names, baseUrl, now, common });
-      return props && { templateId: pick.template, props };
-    }
-    case "digest-scenarios-trend": {
-      const props = buildScenariosTrendProps({
-        week,
-        names,
-        baseUrl,
-        direction: pick.direction,
-        common,
-      });
-      return props && { templateId: pick.template, props };
-    }
-    case "digest-coding-agent-week": {
-      const props = buildCodingAgentWeekProps({ user: week.users.get(userId), baseUrl, common });
-      return props && { templateId: pick.template, props };
-    }
-    case "digest-traces-week": {
-      const props = buildTracesWeekProps({ week, names, baseUrl, common });
-      return props && { templateId: pick.template, props };
-    }
-    case "digest-whats-new":
-      return undefined;
-  }
-}
-
-function buildPlanPressureProps({
-  week,
-  names,
-  baseUrl,
-  now,
-  common,
-}: {
-  week: OrganizationWeek;
-  names: DigestNames;
-  baseUrl: string;
-  now: number;
-  common: CommonProps;
-}): DigestPlanPressureProps | undefined {
-  const usage = week.planUsage;
-  if (!usage || !names.organizationName) return undefined;
-  return {
-    ...common,
-    organizationName: names.organizationName,
-    usagePercentage: percentOf({ part: usage.used, whole: usage.limit }),
-    used: usage.used,
-    limit: usage.limit,
-    unit: "traces",
-    resetsOn: nextMonthLabel(now),
-    samplingUrl: `${baseUrl}/settings/usage`,
-    redactionUrl: `${baseUrl}/settings`,
-    upgradeUrl: `${baseUrl}/settings/subscription`,
+}): DigestWeekProps | undefined {
+  const week: OrganizationWeek = {
+    ...readWeek,
+    projects: readWeek.projects.filter(({ projectId }) => projects.has(projectId)),
   };
-}
-
-function buildScenariosTrendProps({
-  week,
-  names,
-  baseUrl,
-  direction,
-  common,
-}: {
-  week: OrganizationWeek;
-  names: DigestNames;
-  baseUrl: string;
-  direction: Extract<DigestTemplatePick, { template: "digest-scenarios-trend" }>["direction"];
-  common: CommonProps;
-}): DigestScenariosTrendProps | undefined {
-  const focus = pickFocusProject(week);
-  const project = names.project;
-  if (!focus || !project || focus.scenarios.runs === 0) return undefined;
-  const baseline = baselineOf({ week, projectId: focus.projectId });
+  const selection = selectDigestRows(digestRowsInput({ week, admin, mode }));
+  const context: RowContext = { week, projects, baseUrl, now };
+  const rows = selection.shown.flatMap((row) => mailRows({ row, context }));
+  if (!rows.some((row) => row.kind !== "new")) return undefined;
+  const withTraces = week.projects.filter(({ traces }) => traces > 0);
   return {
-    ...common,
-    projectName: project.name,
-    direction: direction === "more_failing" ? "worse" : "better",
-    failureRatePercent: percentOf({
-      part: focus.scenarios.failed,
-      whole: focus.scenarios.runs,
-    }),
-    baselinePercent: percentOf({
-      part: baseline.reduce((sum, counts) => sum + counts.failed, 0),
-      whole: baseline.reduce((sum, counts) => sum + counts.runs, 0),
-    }),
-    runs: focus.scenarios.runs,
-    failed: focus.scenarios.failed,
-    scenariosUrl: `${baseUrl}/${project.slug}/simulations/scenarios`,
-  };
-}
-
-function buildCodingAgentWeekProps({
-  user,
-  baseUrl,
-  common,
-}: {
-  user: UserWeekState | undefined;
-  baseUrl: string;
-  common: CommonProps;
-}): DigestCodingAgentWeekProps | undefined {
-  if (!user) return undefined;
-  const totals = userWeekTotals(user);
-  if (totals.sessions === 0) return undefined;
-  const topRepo = Object.entries(user.repositories).toSorted(
-    ([, left], [, right]) => right - left,
-  )[0]?.[0];
-  return {
-    ...common,
-    sessions: totals.sessions,
-    tokens: totals.tokens,
-    activeMinutes: Math.round(totals.activeSeconds / 60),
-    ...(totals.linesChanged > 0 ? { linesChanged: totals.linesChanged } : {}),
-    ...(totals.commits > 0 ? { commits: totals.commits } : {}),
-    ...(totals.pullRequests > 0 ? { pullRequests: totals.pullRequests } : {}),
-    ...(totals.atLeast ? { totalsAtLeast: true } : {}),
-    ...(topRepo ? { topRepo } : {}),
-    weekUrl: baseUrl,
-  };
-}
-
-function buildTracesWeekProps({
-  week,
-  names,
-  baseUrl,
-  common,
-}: {
-  week: OrganizationWeek;
-  names: DigestNames;
-  baseUrl: string;
-  common: CommonProps;
-}): DigestTracesWeekProps | undefined {
-  const focus = pickFocusProject(week);
-  const project = names.project;
-  if (!focus || !project || focus.traces === 0) return undefined;
-  return {
-    ...common,
-    projectName: project.name,
-    ...tracesWeekNumbers({ week, focus }),
-    tracesUrl: `${baseUrl}/${project.slug}/traces`,
-  };
-}
-
-function tracesWeekNumbers({
-  week,
-  focus,
-}: {
-  week: OrganizationWeek;
-  focus: ProjectWeek;
-}): Omit<DigestTracesWeekProps, keyof CommonProps | "whatsNew" | "projectName" | "tracesUrl"> {
-  const previous = week.previousTraces.get(focus.projectId);
-  return {
-    traces: focus.traces,
-    ...(previous !== undefined && previous > 0
+    weekLabel: weekLabel(week.isoWeek),
+    preferencesUrl,
+    organizationName,
+    rows,
+    folded: selection.folded.flatMap((row) => foldableMailRows({ row, context })),
+    steadyEvals: selection.steadyEvals.map(({ evaluatorType, week: counts }) => ({
+      evaluator: evaluatorOf(evaluatorType),
+      passRatePercent: percentOf({ part: counts.total - counts.failed, whole: counts.total }),
+    })),
+    ...(withTraces.length > 1
       ? {
-          changePercent: percentOf({
-            part: focus.traces - previous,
-            whole: previous,
-          }),
+          organizationTraces: {
+            traces: withTraces.reduce((total, { traces }) => total + traces, 0),
+            projects: withTraces.length,
+          },
         }
       : {}),
-    errors: focus.errors,
-    costUsd: focus.costUsd,
-    tokens: Math.round(focus.tokens),
-    p50Milliseconds: Math.round(focus.p50Ms),
-    p95Milliseconds: Math.round(focus.p95Ms),
-    topModels: Object.entries(focus.models)
-      .toSorted(([, left], [, right]) => right - left)
-      .slice(0, TOP_ROWS)
-      .map(([name, calls]) => ({ name, calls })),
-    evaluations: Object.entries(focus.evaluators)
-      .filter(([, counts]) => counts.passed + counts.failed > 0)
-      .toSorted(([, left], [, right]) => right.runs - left.runs)
-      .slice(0, TOP_ROWS)
-      .map(([name, counts]) => ({
-        name,
-        passRatePercent: percentOf({ part: counts.passed, whole: counts.passed + counts.failed }),
-      })),
+    everythingUrl: baseUrl,
   };
 }

@@ -45,11 +45,17 @@ const sessionOf = (userId: string) =>
 
 const weekOwners = async () =>
   (
-    await digest.repositories.userWeeks.findWeeks({
-      isoWeeks: [SENT_WEEK],
-      organizationId: ORGANIZATION,
-    })
+    await Promise.all(
+      [MEMBER, OTHER_MEMBER].map((userId) =>
+        digest.repositories.userWeeks.findWeeks({
+          isoWeeks: [SENT_WEEK],
+          organizationId: ORGANIZATION,
+          userId,
+        }),
+      ),
+    )
   )
+    .flat()
     .map(({ userId }) => userId)
     .toSorted();
 
@@ -68,7 +74,7 @@ async function rowsForBoth() {
       userId,
       organizationId: ORGANIZATION,
       isoWeek: SENT_WEEK,
-      templateId: "digest-coding-agent-week",
+      templateId: "digest-week",
       sentAt: WAKE_AT,
     });
     await sessionOf(userId);

@@ -4,7 +4,7 @@
  * notification sends, and refused here, before any claim, when either schema refuses it.
  * @see enterprise/modules/digest/specs/digest.feature
  */
-import { type DigestPlanPressureProps, ReactEmailMailRenderer } from "@langwatch/mail";
+import { type DigestWeekProps, ReactEmailMailRenderer } from "@langwatch/mail";
 import { describe, expect, it } from "vitest";
 
 import type { DigestMail } from "../../channels/digest-mail.channel.ts";
@@ -12,30 +12,34 @@ import { renderDigestMail } from "../digest-mail.rules.ts";
 
 const ONE_CLICK = "https://app.example.test/api/digest/unsubscribe?token=signed";
 
-/** Props the plan-pressure template's schema accepts. */
-const PLAN_PRESSURE: DigestPlanPressureProps = {
+/** Props the weekly digest's schema accepts: an admin's plan row alone. */
+const PLAN_ROW: DigestWeekProps = {
   weekLabel: "Nov 9 to 15",
   preferencesUrl: ONE_CLICK,
   organizationName: "Acme",
-  usagePercentage: 90,
-  used: 900,
-  limit: 1_000,
-  unit: "traces",
-  resetsOn: "Dec 1",
-  samplingUrl: "https://app.example.test/settings/usage",
-  redactionUrl: "https://app.example.test/settings",
-  upgradeUrl: "https://app.example.test/settings/subscription",
+  rows: [
+    {
+      kind: "plan",
+      used: 900,
+      limit: 1_000,
+      daysLeft: 15,
+      resetsOn: "Dec 1",
+      url: "https://app.example.test/settings/usage",
+      upgradeUrl: "https://app.example.test/settings/subscription",
+    },
+  ],
+  folded: [],
+  steadyEvals: [],
+  everythingUrl: "https://app.example.test",
 };
 
 const renderer = ReactEmailMailRenderer.create();
 
-type PlanPressureMail = Extract<DigestMail, { templateId: "digest-plan-pressure" }>;
-
-function mail(overrides: Partial<PlanPressureMail> = {}): PlanPressureMail {
+function mail(overrides: Partial<DigestMail> = {}): DigestMail {
   return {
     to: "member@example.test",
-    templateId: "digest-plan-pressure",
-    props: PLAN_PRESSURE,
+    templateId: "digest-week",
+    props: PLAN_ROW,
     oneClickUnsubscribeUrl: ONE_CLICK,
     organizationName: null,
     idempotencyKey: "digest:user-member:org-1:2026-W46",
@@ -73,6 +77,14 @@ describe("renderDigestMail", () => {
       expect(named.email.subject).toBe(`Acme: ${plain.email.subject}`);
       expect(test.email.subject).toBe(`[Test] Acme: ${plain.email.subject}`);
     });
+
+    /** @scenario "The plan row and the subject never name the organization twice" */
+    it("names the organization once, in the prefix, and the plan row not at all", async () => {
+      const named = await renderDigestMail({ mail: mail({ organizationName: "Acme" }), renderer });
+
+      expect(named.email.subject).toBe("Acme: You have used 90% of this month's traces");
+      expect(named.email.subject).not.toMatch(/Acme: Acme/);
+    });
   });
 
   describe("when it is an operator's test", () => {
@@ -89,7 +101,7 @@ describe("renderDigestMail", () => {
 
   describe("when the template's schema refuses the props", () => {
     it("rejects before anything is sent", async () => {
-      const props = { ...PLAN_PRESSURE, preferencesUrl: "not a url" };
+      const props = { ...PLAN_ROW, preferencesUrl: "not a url" };
 
       // The template's schema names the field it refused.
       await expect(renderDigestMail({ mail: mail({ props }), renderer })).rejects.toThrow(

@@ -2,7 +2,7 @@
   "name": "@langwatch/enterprise-digest-process",
   "version": "0.1.0",
   "private": true,
-  "description": "Weekly digest emails: folds the week's usage, picks one of five templates per person and sends it through our own mailer.",
+  "description": "Weekly digest emails: folds the week's usage, picks up to five rows per person and sends one feed email through our own mailer.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
   "files": [
     "src"

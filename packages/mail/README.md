@@ -11,12 +11,11 @@ pnpm --filter @langwatch/mail dev     # http://localhost:5566
 
 Every message, every fixture, rendered live, on two tabs.
 
-**Weekly digests** (the default) shows the weekly digests that send, in the order the sender
-tries them (`preview/digest-review.ts`, kept in step with the digest module's
-`digest-template.rules.ts`): who gets each, its subject with the organisation first, and
-every fixture without the props the sender does not fill yet, as version A, with a slot
-for a version B. What's new follows them, marked as not sent yet, so its fixtures can be
-reviewed too.
+**Weekly digests** (the default) shows the one weekly digest, `digest-week`
+(`preview/digest-review.ts`, kept in step with the digest module's `digest-rows.rules.ts`):
+who gets it, its subject with the organisation first, and every fixture (thin, moderate and
+flooded organisations read as an admin and as a member, then the edge cases) as version A,
+with a slot for a version B. Its words live in `src/templates/digest-week-rows.ts`.
 
 **All other emails** lists every other message under plain headings
 (`preview/studio-groups.ts` maps each id; an unmapped one lands under Other). A search box

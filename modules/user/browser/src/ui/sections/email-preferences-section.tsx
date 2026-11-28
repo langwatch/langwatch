@@ -39,20 +39,13 @@ const EMAIL_PREFERENCES_ANCHOR = "email-preferences";
 const OPS_MANAGE_PERMISSION = "ops:manage";
 
 const TEMPLATE_LABELS: Record<DigestTemplateId, string> = {
-  "digest-plan-pressure": "Plan usage",
-  "digest-scenarios-trend": "Scenarios trend",
-  "digest-coding-agent-week": "Coding-agent week",
-  "digest-traces-week": "Traces week",
-  "digest-whats-new": "What's new",
+  "digest-week": "Weekly digest",
 };
 
 /** The choices for a person's test, in the order offered; "auto" is the weekly send's own pick. */
 const TEST_TEMPLATE_LABELS: Record<DigestTestTemplate, string> = {
   auto: "What they'd get",
-  "digest-plan-pressure": TEMPLATE_LABELS["digest-plan-pressure"],
-  "digest-scenarios-trend": TEMPLATE_LABELS["digest-scenarios-trend"],
-  "digest-coding-agent-week": TEMPLATE_LABELS["digest-coding-agent-week"],
-  "digest-traces-week": TEMPLATE_LABELS["digest-traces-week"],
+  "every-row": "Every row with data",
 };
 
 type SkipLabels = Record<Extract<DigestMyTest, { outcome: "skipped" }>["reason"], string>;
@@ -63,7 +56,7 @@ const MY_SKIP_LABELS: SkipLabels = {
   not_a_member: "Skipped: you are no longer a member",
   deactivated: "Skipped: your account is deactivated",
   no_address: "Skipped: your account has no email address",
-  no_data_for_template: "Skipped: no data for this digest",
+  no_data_for_template: "Skipped: no row has data here",
 };
 
 const THEIR_SKIP_LABELS: SkipLabels = {
@@ -72,7 +65,7 @@ const THEIR_SKIP_LABELS: SkipLabels = {
   not_a_member: "Skipped: they are no longer a member",
   deactivated: "Skipped: their account is deactivated, so nothing was sent to them",
   no_address: "Skipped: they have no email address, so nothing was sent to them",
-  no_data_for_template: "Skipped: no data for this digest",
+  no_data_for_template: "Skipped: no row has data here",
 };
 
 export function EmailPreferencesSection() {
@@ -221,7 +214,8 @@ function SendTestFor() {
         </HStack>
         <Text textStyle="sm" color="fg.muted">
           Emails, marked [Test], a person's digest for each organization they are in: what they'd
-          get this week, or one digest forced. It goes to you unless you choose to send it to them.
+          get this week, or every row with data, past the thresholds. It goes to you unless you
+          choose to send it to them.
         </Text>
       </Stack>
       <HStack gap={2}>
@@ -236,7 +230,7 @@ function SendTestFor() {
         />
         <NativeSelect.Root size="sm" width="auto" flexShrink={0}>
           <NativeSelect.Field
-            aria-label="Which digest"
+            aria-label="Which rows"
             value={template}
             onChange={(event) => setTemplate(event.target.value as DigestTestTemplate)}
             data-testid="send-test-for-template"

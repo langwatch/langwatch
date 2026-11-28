@@ -1,6 +1,6 @@
 # @langwatch/enterprise-digest-process
 
-The server half of [digest](../README.md). Weekly digest emails: folds the week's usage, picks a template per person and sends it.
+The server half of [digest](../README.md). Weekly digest emails: folds the week's usage, picks each person's rows and sends one feed email.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -40,7 +40,7 @@ sendMyTests(input: Operated): Promise<DigestMyTests>;
 
 #### `sendTestFor`
 
-Mails the operator, or with `deliverTo: "person"` the person at their own address, as tests, the person's week in each organization they are an active member of: what they would get, or the template forced, skipped where it has no data. An address no account has is refused with `digest_person_not_found`.
+Mails the operator, or with `deliverTo: "person"` the person at their own address, as tests, the person's week in each organization they are an active member of: what they would get, or every row with data ("every-row"), skipped where it has none. An address no account has is refused with `digest_person_not_found`.
 
 ```typescript
 sendTestFor(input: DigestSendTestForInput & Operated): Promise<DigestTestsFor>;
@@ -106,7 +106,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-// Query: digestTokenQuerySchema, ../contract/src/digest.ts:153
+// Query: digestTokenQuerySchema, ../contract/src/digest.ts:142
 interface Query {
   token: string;
 }
@@ -123,7 +123,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:153
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:142
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:76
 type Response = unknown;
 ```
@@ -137,7 +137,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:153
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:142
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:94
 type Response = unknown;
 ```
@@ -159,55 +159,50 @@ Contract `../contract/src/digest.trpc.ts:20`, router `src/transport/digest.trpc.
 
 ```typescript
 // digest.setArmed
-// Input: digestSetArmedInputSchema, ../contract/src/digest.ts:42
+// Input: digestSetArmedInputSchema, ../contract/src/digest.ts:31
 interface Input {
   armed: boolean;
 }
-// Output: digestSettingsSchema, ../contract/src/digest.ts:34
+// Output: digestSettingsSchema, ../contract/src/digest.ts:23
 interface Output {
   armed: boolean;
 }
 
 // digest.sendTest
-// Input: digestSendTestInputSchema, ../contract/src/digest.ts:65
+// Input: digestSendTestInputSchema, ../contract/src/digest.ts:54
 interface Input {
   organizationId: string;
   userId: string;
 }
-// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:148
+// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:137
 interface Output {
   ok: true;
 }
 
 // digest.sendMyTests
-// Input: digestNoInputSchema, ../contract/src/digest.ts:48
+// Input: digestNoInputSchema, ../contract/src/digest.ts:37
 type Input = Record<string, unknown>;
-type Output = z.infer<typeof digestMyTestsSchema>; // ../contract/src/digest.ts:111
+type Output = z.infer<typeof digestMyTestsSchema>; // ../contract/src/digest.ts:100
 
 // digest.sendTestFor
-// Input: digestSendTestForInputSchema, ../contract/src/digest.ts:131
+// Input: digestSendTestForInputSchema, ../contract/src/digest.ts:120
 interface Input {
   email: string;
-  template:
-    | "auto"
-    | "digest-plan-pressure"
-    | "digest-scenarios-trend"
-    | "digest-coding-agent-week"
-    | "digest-traces-week";
+  template: "auto" | "every-row";
   deliverTo?: "me" | "person";
 }
-type Output = z.infer<typeof digestTestsForSchema>; // ../contract/src/digest.ts:140
+type Output = z.infer<typeof digestTestsForSchema>; // ../contract/src/digest.ts:129
 
 // digest.getMyPreference
-type Input = z.infer<typeof digestNoInputSchema>; // ../contract/src/digest.ts:48
-// Output: digestPreferenceSchema, ../contract/src/digest.ts:53
+type Input = z.infer<typeof digestNoInputSchema>; // ../contract/src/digest.ts:37
+// Output: digestPreferenceSchema, ../contract/src/digest.ts:42
 interface Output {
   subscribed: boolean;
 }
 
 // digest.setMyPreference
-type Input = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:53
-type Output = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:53
+type Input = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:42
+type Output = z.infer<typeof digestPreferenceSchema>; // ../contract/src/digest.ts:42
 ```
 
 ## Sockets

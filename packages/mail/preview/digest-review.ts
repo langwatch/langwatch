@@ -25,61 +25,22 @@ const whatSendsToday = (templateId: string): DigestVersion => ({
 });
 
 /**
- * The digests that send, in the order the sender tries them (digest-template.rules.ts in
- * enterprise/modules/digest/process): a person gets the first they qualify for, once a week
- * per organisation. Keep this list in that order when the rules change.
+ * The digest that sends (digest-rows.rules.ts in enterprise/modules/digest/process picks its
+ * rows): one email a week per person per organisation. Keep this list in step with the sender.
  */
 export const DIGEST_REVIEW: readonly DigestReviewEntry[] = [
   {
-    templateId: "digest-plan-pressure",
+    templateId: "digest-week",
     whoGetsThis:
-      "Organisation admins, when this month's usage is at 80% or more of a plan with a limit.",
-    notFilledToday: ["whatsNew", "filler"],
-    versionA: whatSendsToday("digest-plan-pressure"),
-    versionB: null,
-  },
-  {
-    templateId: "digest-scenarios-trend",
-    whoGetsThis:
-      "Members whose busiest project's scenario failure rate moved 10 points or more against the four weeks before, either way.",
-    notFilledToday: ["whatsNew", "topFailing"],
-    versionA: whatSendsToday("digest-scenarios-trend"),
-    versionB: null,
-  },
-  {
-    templateId: "digest-coding-agent-week",
-    whoGetsThis: "Members who ran 5 or more coding-agent sessions this week.",
-    notFilledToday: ["whatsNew"],
-    versionA: whatSendsToday("digest-coding-agent-week"),
-    versionB: null,
-  },
-  {
-    templateId: "digest-traces-week",
-    whoGetsThis: "Members whose busiest project recorded 1,000 or more traces this week.",
-    notFilledToday: ["whatsNew"],
-    versionA: whatSendsToday("digest-traces-week"),
-    versionB: null,
-  },
-];
-
-/** Registered digests the sender never picks, listed after the sending ones for review. */
-export const DIGEST_NOT_SENT: readonly DigestReviewEntry[] = [
-  {
-    templateId: "digest-whats-new",
-    whoGetsThis: "Nobody yet.",
+      "Every member, once a week for each organisation: up to five rows from their own data (the plan for admins, scenario and eval moves, quiet projects, setup, their own coding agents, the busiest project's traces, then one New row). Sent only when a row besides New has something to say.",
     notFilledToday: [],
-    versionA: { label: "Its fixtures", templateId: "digest-whats-new" },
+    versionA: whatSendsToday("digest-week"),
     versionB: null,
-    notSentBecause: "Not sent yet: nothing feeds it news",
   },
 ];
 
 /** The left-out props in plain words, for the review page. */
-const NOT_FILLED_LABELS: Record<string, string> = {
-  whatsNew: "the What's new card",
-  filler: "what fills the plan",
-  topFailing: "the most-failing scenario",
-};
+const NOT_FILLED_LABELS: Record<string, string> = {};
 
 export const describeNotFilled = (prop: string): string => NOT_FILLED_LABELS[prop] ?? prop;
 
@@ -148,7 +109,7 @@ export const buildDigestReview = async ({
   };
 
   return Promise.all(
-    [...DIGEST_REVIEW, ...DIGEST_NOT_SENT].map(async (entry) => {
+    DIGEST_REVIEW.map(async (entry) => {
       const versionA = await renderVersion({
         version: entry.versionA,
         notFilledToday: entry.notFilledToday,

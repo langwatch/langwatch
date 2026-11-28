@@ -2,11 +2,7 @@ import { addressConfirmationEmailTemplate } from "./address-confirmation-email.t
 import { automationLimitEmailTemplate } from "./automation-limit-email.tsx";
 import { budgetIncreaseRequestEmailTemplate } from "./budget-increase-request-email.tsx";
 import { connectedStatementEmailTemplate } from "./connected-statement-email.tsx";
-import { digestCodingAgentWeekTemplate } from "./digest-coding-agent-week.tsx";
-import { digestPlanPressureTemplate } from "./digest-plan-pressure.tsx";
-import { digestScenariosTrendTemplate } from "./digest-scenarios-trend.tsx";
-import { digestTracesWeekTemplate } from "./digest-traces-week.tsx";
-import { digestWhatsNewTemplate } from "./digest-whats-new.tsx";
+import { digestWeekTemplate } from "./digest-week.tsx";
 import { inviteEmailTemplate } from "./invite-email.tsx";
 import { inviteReRequestEmailTemplate } from "./invite-re-request-email.tsx";
 import {
@@ -67,14 +63,8 @@ export const mailTemplates: readonly MailTemplate[] = [
   automationLimitEmailTemplate,
   monitorAutoPausedEmailTemplate,
   triggerDigestEmailTemplate,
-  digestPlanPressureTemplate,
-  digestScenariosTrendTemplate,
-  digestCodingAgentWeekTemplate,
-  digestTracesWeekTemplate,
-  digestWhatsNewTemplate,
+  digestWeekTemplate,
 ];
 
 export { defineTemplate, propsFormSchema, renderMailTemplate } from "./registry.ts";
 export type { MailFixture, MailTemplate } from "./registry.ts";
-export { digestUpdateSchema } from "./digest-parts.tsx";
-export type { DigestUpdate } from "./digest-parts.tsx";

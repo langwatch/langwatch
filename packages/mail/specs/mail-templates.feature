@@ -98,11 +98,10 @@ Feature: The transactional messages LangWatch sends
     And a template no heading names sits under Other, last
 
   @unit
-  Scenario: Digest review lists the digests that send, in the order the sender tries them
+  Scenario: Digest review shows the one weekly digest that sends
     Given the studio's Weekly digests tab
-    Then it lists plan pressure, scenarios trend, coding-agent week and traces week, in that order
-    And each says who gets it and has a version A that sends today and a slot for a version B
-    And What's new follows them with its fixtures, marked "Not sent yet: nothing feeds it news"
+    Then it lists the weekly digest alone, with every fixture: thin, moderate and flooded organisations read as an admin and as a member, and the edge cases
+    And it says who gets it and has a version A that sends today and a slot for a version B
 
   @unit
   Scenario: Digest review shows each digest as it would arrive today

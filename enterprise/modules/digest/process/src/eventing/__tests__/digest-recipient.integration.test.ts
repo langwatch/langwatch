@@ -96,7 +96,9 @@ describe("a member's send", () => {
 
       await sendFor({ userId: ADMIN });
 
-      expect(digest.mail.map((mail) => mail.templateId)).not.toContain("digest-plan-pressure");
+      expect(digest.mail.flatMap((mail) => mail.props.rows.map((row) => row.kind))).not.toContain(
+        "plan",
+      );
     });
   });
 
@@ -115,10 +117,13 @@ describe("a member's send", () => {
       await sendFor({ userId: OTHER_MEMBER });
 
       expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(OTHER_MEMBER)]);
-      expect(digest.mail[0]).toMatchObject({
-        templateId: "digest-scenarios-trend",
-        props: { projectName: "Support bot" },
-      });
+      expect(digest.mail[0]?.props.rows).toEqual([
+        expect.objectContaining({
+          kind: "scenarios",
+          direction: "worse",
+          projectName: "Support bot",
+        }),
+      ]);
     });
   });
 });
