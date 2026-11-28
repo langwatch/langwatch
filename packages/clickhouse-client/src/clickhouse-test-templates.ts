@@ -29,6 +29,7 @@ export async function cloneClickHouseTemplate({
   template,
   target,
   build,
+  supersedes,
   lock = ClickHouseSchemaLock.create(),
 }: {
   /** An administrative client on the server, not bound to either database. */
@@ -37,12 +38,15 @@ export async function cloneClickHouseTemplate({
   template: string;
   target: string;
   build: (input: { database: string; lock: ClickHouseSchemaLock }) => Promise<void>;
+  /** The name every version of this template starts with; building drops the other versions. */
+  supersedes?: string;
   lock?: ClickHouseSchemaLock;
 }): Promise<void> {
   if (!(await isTemplateReady({ client, template }))) {
     const release = await lock.acquire();
     try {
       if (!(await isTemplateReady({ client, template }))) {
+        if (supersedes) await dropOtherVersions({ client, template, prefix: supersedes });
         await client.command({ query: `DROP DATABASE IF EXISTS ${template} SYNC` });
         await client.command({ query: `CREATE DATABASE ${template}` });
         await build({ database: template, lock });
@@ -55,6 +59,27 @@ export async function cloneClickHouseTemplate({
     }
   }
   await cloneClickHouseDatabase({ client, from: template, to: target });
+}
+
+/** Drops the databases named like `prefix` other than `template`: schemas no checkout builds. */
+async function dropOtherVersions({
+  client,
+  template,
+  prefix,
+}: {
+  client: ClickHouseClient;
+  template: string;
+  prefix: string;
+}): Promise<void> {
+  const result = await client.query({
+    query:
+      "SELECT name FROM system.databases WHERE startsWith(name, {prefix:String}) AND name != {template:String}",
+    query_params: { prefix, template },
+    format: "JSONEachRow",
+  });
+  for (const { name } of await result.json<{ name: string }>()) {
+    await client.command({ query: `DROP DATABASE IF EXISTS \`${name}\` SYNC` });
+  }
 }
 
 async function isTemplateReady({

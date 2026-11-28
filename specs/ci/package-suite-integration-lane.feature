@@ -300,3 +300,16 @@ Feature: A package's integration suite runs in CI when it declares one
       Given the shipped migration files
       When one file's content changes
       Then the digest naming the template changes
+
+    @unit
+    Scenario: The template is named by the code that shapes it too
+      Given the migration runner, TTL reconciler and migrate task sources
+      When one of them changes
+      Then the digest naming the template changes
+
+    @integration
+    Scenario: Building a template drops its older versions
+      Given a template built from older migrations is still on the server
+      When a template built from the current migrations is built
+      Then the older template is dropped
+      And databases that are not a version of that template stay

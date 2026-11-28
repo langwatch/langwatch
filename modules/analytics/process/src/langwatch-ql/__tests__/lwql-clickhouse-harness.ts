@@ -53,6 +53,8 @@ import {
   LangWatchQLServerConfigService,
 } from "./support/langwatch-ql-server-config.service.ts";
 
+/** Every version of the migrated template starts with this; building one drops the others. */
+const MIGRATED_TEMPLATE_PREFIX = "lwql_migrated_template_";
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -448,7 +450,8 @@ export async function startLangWatchQLClickHouse({
   if (facts === "migrated") {
     await cloneClickHouseTemplate({
       client: admin,
-      template: `lwql_migrated_template_${shippedMigrationsDigest()}`,
+      template: `${MIGRATED_TEMPLATE_PREFIX}${shippedMigrationsDigest()}`,
+      supersedes: MIGRATED_TEMPLATE_PREFIX,
       target: factDatabase,
       build: ({ database, lock }) => runShippedMigrations({ container, database, lock }),
     });
