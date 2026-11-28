@@ -838,7 +838,8 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (serve
 		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 		}
-		return served{bundle: e.bundle, authStart: e.authStart()}, nil
+		_, soft, hard := e.snapshot()
+		return served{bundle: e.bundle, authStart: e.authStart(), until: later(soft, hard)}, nil
 
 	case entryStale:
 		// Soft-expired but within hard grace. A foreground refresh is
@@ -1076,7 +1077,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 			zap.Bool("cached", false),
 			zap.Error(cause),
 		)
-		return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown}
+		return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown, until: hard}
 	}
 	s.lastKnown.Remove(h)
 	s.logger.Warn("auth_cache_serve_last_known",
@@ -1085,7 +1086,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 		zap.Time("serve_until", hard),
 		zap.Error(cause),
 	)
-	return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown}
+	return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown, until: hard}
 }
 
 // refreshOrServeStale tries to resolve fresh against the control plane.
@@ -1197,7 +1198,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, f staleFailure) (s
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.String("refresh_error_class", classLabel),
 	)
-	return served{bundle: staleBundle, authStart: f.authStart, stale: staleServeWhileError}, nil
+	return served{bundle: staleBundle, authStart: f.authStart, stale: staleServeWhileError, until: hardExpiresAt}, nil
 }
 
 // populateConfig eagerly fetches the bundle's config and merges it into the

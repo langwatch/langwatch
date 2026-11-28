@@ -304,13 +304,33 @@ type served struct {
 	bundle    *domain.Bundle
 	authStart time.Time
 	stale     string
+	// until is the last moment a cached answer may serve; zero derives it
+	// from the bundle (servesUntil).
+	until time.Time
+}
+
+// servesUntil is the later of the answer's soft expiry and hard cap, as
+// classifyEntry reads them: past both, nothing serves it.
+func (s *Service) servesUntil(in served) time.Time {
+	if !in.until.IsZero() {
+		return in.until
+	}
+	soft, hard := entryDeadlines(in.bundle, s.hardGrace)
+	return later(soft, hard)
+}
+
+func later(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
 }
 
 // admit is the last check before a resolved bundle serves. It refuses a key
-// past its expiration date or a previous secret past its grace, one the change
-// feed revoked after its confirmation began, and, when FailClosedAfter is set,
-// a key nothing confirmed recently while its org's feed is silent. A key past
-// KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
+// past its expiration date, a previous secret past its grace, an answer past
+// its own lifetime, one the feed revoked after its confirmation began, and,
+// with FailClosedAfter, a key unconfirmed while its org's feed is silent. A key
+// past KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
 	now := time.Now()
@@ -319,6 +339,9 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	}
 	if b.SecretEnded(now) {
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+	}
+	if now.After(s.servesUntil(in)) {
+		return nil, errCachedUnservable(ctx)
 	}
 	if b.VirtualKeyID != "" {
 		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
@@ -359,12 +382,7 @@ var errKeyRecheckDue = errors.New("key re-check due")
 // answer was read (k.readAt). A check that cannot reach the control plane, or runs
 // past keyRecheckWait, hands back the cached answer for Resolve to admit again.
 func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (served, error) {
-	keepCached := func() (served, error) {
-		if s.rejectedSince(k.h, k.readAt) {
-			return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
-		}
-		return cached, nil
-	}
+	keepCached := func() (served, error) { return s.cachedAfterRecheck(ctx, k, cached) }
 	call := s.joinReconfirm(k.key, k.h)
 	if call == nil {
 		return keepCached()
@@ -389,6 +407,29 @@ func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served)
 	default:
 		return served{}, call.err
 	}
+}
+
+// cachedAfterRecheck hands back the cached answer once the key check could not
+// settle it. A refusal recorded since the read stands; one the bounded record
+// can no longer rule out fails as the control plane being unreachable, with
+// the answer kept for Resolve's bookkeeping.
+func (s *Service) cachedAfterRecheck(ctx context.Context, k presentedKey, cached served) (served, error) {
+	refused, unknown := s.refusalSince(k.h, k.readAt)
+	if refused {
+		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+	}
+	if unknown {
+		return cached, errCachedUnservable(ctx)
+	}
+	return cached, nil
+}
+
+// errCachedUnservable is the fail-closed answer for a cached key nothing can
+// vouch for while the control plane is unreachable.
+func errCachedUnservable(ctx context.Context) error {
+	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+		"message": "control plane unreachable and this key's cached answer cannot be served; retry shortly",
+	}).WithRetryable(true)
 }
 
 // errPendingDenial is admit's answer when a pending denial voided the
@@ -564,7 +605,7 @@ func (s *Service) keepCachedConfig(h [64]byte, in cachedConfigKeep) served {
 	}
 	e.mu.Unlock()
 	s.publishFetched(h, kept, since)
-	return served{bundle: &merged, authStart: start}
+	return served{bundle: &merged, authStart: start, until: later(soft, hard)}
 }
 
 // dropRejected evicts both cached copies of a key the control plane refused,

@@ -289,3 +289,72 @@ func TestKeyRecheck_RefusalRecordedAfterTheCachedReadIsRefused(t *testing.T) {
 		t.Fatalf("a refusal recorded after the cached answer was read must refuse it, got %v", err)
 	}
 }
+
+// @scenario "a refusal recorded after a request read its cached key is refused"
+func TestKeyRecheck_RefusalPushedOutOfTheStampsIsNotServedAsValid(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &hookResolver{}, ConfigFetcher: &hookResolver{}, LRUSize: 2})
+	key := domain.PresentedKey{Token: "vk-lw-refusal-pushed-out"}
+	h := hashKey(key)
+	staleKeyCheck(t, svc, key, "vk_refusal_pushed_out")
+	readAt := svc.fetchGeneration()
+	e, _ := svc.l1.Peek(h)
+	cached := served{bundle: e.bundle, authStart: e.authStart()}
+
+	svc.dropRejected(h, herr.New(context.Background(), domain.ErrKeyRevoked, nil))
+	// Unrelated changes push the refusal's stamp out of the bounded set.
+	for _, id := range []string{"vk_other_1", "vk_other_2", "vk_other_3"} {
+		svc.recordInvalidation(invalidation{keys: []string{keyScope(id)}}, func() {})
+	}
+
+	_, err := svc.recheckKey(context.Background(), presentedKey{key: key, h: h, readAt: readAt}, cached)
+	if err == nil {
+		t.Fatalf("a refusal whose stamp was pushed out must not let the cached answer serve")
+	}
+	if errors.Is(err, domain.ErrInvalidAPIKey) {
+		t.Fatalf("an unknown refusal must not be reported as an invalid key, got %v", err)
+	}
+}
+
+// @scenario "with the change feed and the control plane down, a cached key keeps serving"
+func TestKeyRecheck_UnrelatedChangesKeepTheCachedAnswer(t *testing.T) {
+	down := &hookResolver{err: errControlPlaneDown}
+	svc, _ := newService(t, Options{Resolver: down, ConfigFetcher: down, LRUSize: 2})
+	key := domain.PresentedKey{Token: "vk-lw-unrelated-changes"}
+	h := hashKey(key)
+	staleKeyCheck(t, svc, key, "vk_unrelated_changes")
+	readAt := svc.fetchGeneration()
+	e, _ := svc.l1.Peek(h)
+	cached := served{bundle: e.bundle, authStart: e.authStart()}
+
+	for _, id := range []string{"vk_other_1", "vk_other_2"} {
+		svc.recordInvalidation(invalidation{keys: []string{keyScope(id)}}, func() {})
+	}
+
+	if _, err := svc.recheckKey(context.Background(), presentedKey{key: key, h: h, readAt: readAt}, cached); err != nil {
+		t.Fatalf("changes that never touched this key must keep its cached answer, got %v", err)
+	}
+}
+
+// @scenario "a cached key whose hard cap passes while the key check waits is not served"
+func TestKeyRecheck_AnswerPastItsHardCapDuringTheWaitIsNotServed(t *testing.T) {
+	expires := time.Now().Add(50 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	res := &blockingResolver{hook: func() {
+		time.Sleep(time.Until(expires) + 10*time.Millisecond)
+		cancel()
+		<-release
+	}}
+	// A negative grace puts the cap before the JWT expiry: fresh at the read,
+	// past both once the wait ends.
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, HardGrace: -time.Second})
+	key := domain.PresentedKey{Token: "vk-lw-past-cap"}
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_past_cap", expires), "", time.Now().Add(-2*time.Minute)))
+	staleFeed(svc)
+
+	if _, err := svc.Resolve(ctx, key); !errors.Is(err, domain.ErrAuthUpstream) {
+		t.Fatalf("an answer past its expiry and hard cap after the wait must not serve, got %v", err)
+	}
+}

@@ -153,14 +153,17 @@ func (s *Service) publishFetched(h [64]byte, stored *entry, since uint64) bool {
 	return true
 }
 
-// rejectedSince reports whether the control plane refused the presented
-// credential h after generation since (dropRejected).
-func (s *Service) rejectedSince(h [64]byte, since uint64) bool {
+// refusalSince reports whether the control plane refused the presented
+// credential h after generation since (dropRejected). unknown means its stamp
+// may have been pushed out of the bounded set since, so it cannot tell.
+func (s *Service) refusalSince(h [64]byte, since uint64) (refused, unknown bool) {
 	g := s.invalidations
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	gen, ok := g.evicted.stamps.Peek(presentedScope(h))
-	return ok && gen > since
+	if gen, ok := g.evicted.stamps.Peek(presentedScope(h)); ok {
+		return gen > since, false
+	}
+	return false, g.evicted.epoch > since
 }
 
 // revokedSince reports whether an event after since made the bundle's key

@@ -658,6 +658,14 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a request has read the key from the cache
       When another request's key check refuses the key and evicts it, leaving no check to wait on
       Then the first request is refused, not served from the cache
+      And when later changes have pushed that refusal out of the gateway's bounded record, the request fails as the control plane being unreachable rather than serving the cached key
+
+    @unit
+    Scenario: a cached key whose hard cap passes while the key check waits is not served
+      Given a key re-check grace that puts the hard cap before the key's token expiry
+      And a cached key last confirmed 2 minutes ago under a silent change feed
+      When the token expiry and the hard cap pass while its key check is still waiting
+      Then the request fails as the control plane being unreachable, not served from the cache
 
   Rule: A change-feed backlog refuses a key locally only for the state it ends in
 
