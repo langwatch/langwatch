@@ -248,10 +248,12 @@ func (p *Permissions) UnmarshalYAML(node *yaml.Node) error {
 type Workflow struct {
 	// Path is repo-relative, so guard output is copy-pasteable.
 	Path        string
-	On          On             `yaml:"on"`
-	Permissions Permissions    `yaml:"permissions"`
-	Concurrency Concurrency    `yaml:"concurrency"`
-	Jobs        map[string]Job `yaml:"jobs"`
+	On          On          `yaml:"on"`
+	Permissions Permissions `yaml:"permissions"`
+	Concurrency Concurrency `yaml:"concurrency"`
+	// Env is the workflow-level env every step of every job can read.
+	Env  map[string]string `yaml:"env"`
+	Jobs map[string]Job    `yaml:"jobs"`
 }
 
 // WorkflowDir is where GitHub requires workflows to live.

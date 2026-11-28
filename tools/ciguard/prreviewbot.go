@@ -67,7 +67,8 @@ var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // the invariants specs/ci/pr-review-bot.feature describes: the wait for
 // ci-complete, the wait for every other check, the skip gate, the trigger
 // types that can run a review, single-review-in-flight concurrency, full-SHA
-// pinning on every action it uses, and the required permissions block.
+// pinning on every action it uses, the required permissions block, and the
+// Laze wake step with its key scoped to that step.
 func PRReviewBot(repoRoot string) ([]string, error) {
 	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
 	if err != nil {
@@ -78,6 +79,7 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	problems = append(problems, prReviewBotNeeds(workflow)...)
 	problems = append(problems, prReviewBotGates(workflow)...)
 	problems = append(problems, prReviewBotWaitsForChecks(workflow)...)
+	problems = append(problems, prReviewBotWake(workflow)...)
 	problems = append(problems, prReviewBotTriggers(workflow)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
 	problems = append(problems, prReviewBotPermissions(workflow)...)
@@ -274,6 +276,140 @@ func botOrderProblems(steps []ciscan.Step, waits int) []string {
 	}
 
 	return nil
+}
+
+// prReviewBotWakeEndpoint is where the wake step posts; the guard finds that step by it.
+const prReviewBotWakeEndpoint = "https://laze.so/api/agents/me/messages"
+
+// prReviewBotWakeKey is the secret the wake step posts with.
+const prReviewBotWakeKey = "LAZE_WAKE_KEY"
+
+// prReviewBotWakeSkip opens the wake script: with no key it exits 0 before posting.
+const prReviewBotWakeSkip = `[ -n "$LAZE_WAKE_KEY" ] ||`
+
+// prReviewBotWakeMention is the plain-text Laze mention that wakes the bot.
+const prReviewBotWakeMention = "@LangWatch PR Review Bot"
+
+// prReviewBotWake checks the step that wakes the Laze review bot: it posts
+// after the wait and before the bot, mentions the bot, skips in its script
+// when the key is empty, cannot fail the job, and alone can read the key. The
+// bot step runs an LLM agent with a shell over untrusted PR content, so a key
+// in the workflow or job env, or on any other step, would be readable by it.
+func prReviewBotWake(workflow *ciscan.Workflow) []string {
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok { // prReviewBotGates reports a missing job
+		return nil
+	}
+
+	wake := slices.IndexFunc(job.Steps, func(step ciscan.Step) bool {
+		return strings.Contains(step.Run, prReviewBotWakeEndpoint)
+	})
+	if wake < 0 {
+		return []string{fmt.Sprintf(
+			"%s review job has no step posting to %s to wake the Laze review bot", PRReviewBotWorkflow, prReviewBotWakeEndpoint)}
+	}
+
+	problems := wakeOrderProblems(job.Steps, wake)
+	problems = append(problems, wakeStepProblems(job.Steps[wake])...)
+
+	return append(problems, wakeKeyLeaks(workflow, job, wake)...)
+}
+
+// wakeOrderProblems requires the wake after the wait and before the bot. A
+// missing wait or bot is prReviewBotWaitsForChecks's to report.
+func wakeOrderProblems(steps []ciscan.Step, wake int) []string {
+	waits := slices.IndexFunc(steps, func(step ciscan.Step) bool {
+		return strings.Contains(step.Run, prReviewBotWaitCommand)
+	})
+	bot := slices.IndexFunc(steps, func(step ciscan.Step) bool {
+		return strings.HasPrefix(step.Uses, prReviewBotBotAction)
+	})
+	switch {
+	case waits >= 0 && wake < waits:
+		return []string{fmt.Sprintf("%s review job wakes the Laze review bot before the wait for the other checks", PRReviewBotWorkflow)}
+	case bot >= 0 && wake > bot:
+		return []string{fmt.Sprintf("%s review job wakes the Laze review bot after the bot step", PRReviewBotWorkflow)}
+	}
+
+	return nil
+}
+
+// wakeStepProblems reports a wake step that can fail the job, skips the wrong
+// way, mentions nobody, or does not carry the key itself.
+func wakeStepProblems(step ciscan.Step) []string {
+	var problems []string
+	if fmt.Sprint(step.ContinueOnError) != "true" {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wake step does not set continue-on-error: true, so a Laze outage would fail the review", PRReviewBotWorkflow))
+	}
+	if strings.Contains(step.If, prReviewBotWakeKey) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wake step gates on %s in its `if:`: the key belongs in the step's own env, which an `if:` cannot see, so the skip goes in the script",
+			PRReviewBotWorkflow, prReviewBotWakeKey))
+	}
+	if !strings.HasPrefix(strings.TrimSpace(step.Run), prReviewBotWakeSkip) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wake step script does not start with %s, so an empty key fails the post instead of skipping it",
+			PRReviewBotWorkflow, prReviewBotWakeSkip))
+	}
+	if !strings.Contains(step.Run, prReviewBotWakeMention) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wake message does not mention %s, so Laze wakes nobody", PRReviewBotWorkflow, prReviewBotWakeMention))
+	}
+	if !strings.Contains(step.Env[prReviewBotWakeKey], "secrets."+prReviewBotWakeKey) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wake step does not set %s from secrets.%s in its own env",
+			PRReviewBotWorkflow, prReviewBotWakeKey, prReviewBotWakeKey))
+	}
+
+	return problems
+}
+
+// wakeKeyLeaks reports every place outside the wake step that can read the key.
+func wakeKeyLeaks(workflow *ciscan.Workflow, job ciscan.Job, wake int) []string {
+	var problems []string
+	if envCarriesWakeKey(workflow.Env) {
+		problems = append(problems, fmt.Sprintf(
+			"%s workflow env carries %s, so every step, the bot's included, can read it", PRReviewBotWorkflow, prReviewBotWakeKey))
+	}
+	if envCarriesWakeKey(job.Env) {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job env carries %s, so every step, the bot's included, can read it", PRReviewBotWorkflow, prReviewBotWakeKey))
+	}
+	for i := range job.Steps {
+		step := &job.Steps[i]
+		if i == wake || (!envCarriesWakeKey(step.Env) && !strings.Contains(fmt.Sprint(step.With), prReviewBotWakeKey)) {
+			continue
+		}
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's step %q can read %s; only the wake step may", PRReviewBotWorkflow, stepLabel(step), prReviewBotWakeKey))
+	}
+
+	return problems
+}
+
+// envCarriesWakeKey reports whether an env block names the wake key or passes its secret.
+func envCarriesWakeKey(env map[string]string) bool {
+	for name, value := range env {
+		if name == prReviewBotWakeKey || strings.Contains(value, prReviewBotWakeKey) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// stepLabel names a step in a message: its name, else its action, else its command's first line.
+func stepLabel(step *ciscan.Step) string {
+	switch {
+	case step.Name != "":
+		return step.Name
+	case step.Uses != "":
+		return step.Uses
+	}
+	line, _, _ := strings.Cut(strings.TrimSpace(step.Run), "\n")
+
+	return line
 }
 
 // prReviewBotTriggers checks the pull_request trigger still fires on every
