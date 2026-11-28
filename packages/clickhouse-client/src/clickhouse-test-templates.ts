@@ -201,11 +201,22 @@ async function inParallel<T>({
   run: (item: T) => Promise<void>;
 }): Promise<void> {
   let next = 0;
+  let failed = false;
   const worker = async (): Promise<void> => {
-    while (next < items.length) {
+    while (!failed && next < items.length) {
       const item = items[next++] as T;
-      await run(item);
+      try {
+        await run(item);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(CLONE_CONCURRENCY, items.length) }, worker));
+  // Every worker settles before this returns, so none still writes once the caller's lock is gone.
+  const settled = await Promise.allSettled(
+    Array.from({ length: Math.min(CLONE_CONCURRENCY, items.length) }, worker),
+  );
+  const rejected = settled.find((result) => result.status === "rejected");
+  if (rejected) throw rejected.reason;
 }
