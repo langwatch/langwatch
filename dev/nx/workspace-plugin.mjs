@@ -25,7 +25,7 @@ export const createNodes = [
       const inputs = [
         "{workspaceRoot}/tsconfig.*json",
         "{workspaceRoot}/pnpm-lock.yaml",
-        { runtime: "node --version" },
+        "nodeMajor",
         { externalDependencies: ["typescript"] },
         { dependentTasksOutputFiles: "**/*.d.ts" },
         ...dirs.flatMap((dir) => [
@@ -83,7 +83,7 @@ export const createNodes = [
           "{workspaceRoot}/skills/**/*",
           "{workspaceRoot}/pnpm-lock.yaml",
           { env: "LANGWATCH_SKILLS_RENDER" },
-          { runtime: "node --version" },
+          "nodeMajor",
         ],
         outputs: [
           ...solutionDirs.flatMap((dir) => declarationOutputs(workspaceRoot, dir)),
@@ -99,7 +99,7 @@ export const createNodes = [
         executor: "nx:run-commands",
         options: { cwd: "{workspaceRoot}", command: "node dev/nx/lint.mjs" },
         cache: true,
-        inputs: [...everything, { env: "LANGWATCH_SKILLS_RENDER" }, { runtime: "node --version" }],
+        inputs: [...everything, { env: "LANGWATCH_SKILLS_RENDER" }, "nodeMajor"],
         outputs: [],
         dependsOn: prepared,
       };

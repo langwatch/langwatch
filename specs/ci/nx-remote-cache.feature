@@ -127,3 +127,20 @@ Feature: Nx remote cache shared by CI and laptops
     Given AWS's published S3 GET example
     When the request is signed
     Then the signature matches AWS's
+
+  Scenario: Concurrent lookups share one gate call
+    Given a laptop whose Nx run looks up several tasks at once
+    When the cache server asks the gate for URLs
+    Then the lookups' keys go in one gate call, up to the gate's per-call limit
+
+  Scenario: A rate-limited gate rests only a few seconds
+    Given the cache gate answers 429 for a laptop's token
+    When Nx asks for an entry a few seconds later
+    Then the cache server asks the gate again instead of staying quiet for a minute
+
+  Scenario: A laptop and CI hash a task alike
+    Given a laptop and a CI job on the same tree, on the same Node.js major version
+    And both point the tests at their own test Postgres, Redis and ClickHouse
+    When Nx hashes a build, test or type-aware lint task
+    Then both compute the same hash
+    And a run with a test datastore URL unset hashes differently from one with it set

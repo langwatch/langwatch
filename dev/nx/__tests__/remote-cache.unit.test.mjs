@@ -417,6 +417,53 @@ describe("Nx remote cache", () => {
     });
   });
 
+  /** @scenario "Concurrent lookups share one gate call" */
+  it("asks the gate once for lookups that arrive together", async () => {
+    await withGate(async (gate) => {
+      gate.objects.set("pr/1", Buffer.from("one"));
+      gate.objects.set("main/2", Buffer.from("two"));
+      const store = gateStore({ url: gate.url, token: "member" });
+      const scope = cacheScope({ env: {}, localBranch: "feat/x" });
+      await withServer({ scope, store }, async (port) => {
+        const [one, two] = await Promise.all([
+          call({ port, method: "GET", path: "/v1/cache/1" }),
+          call({ port, method: "GET", path: "/v1/cache/2" }),
+        ]);
+        assert.deepEqual([one.body, two.body], ["one", "two"]);
+      });
+      assert.equal(gate.asked.length, 1);
+      assert.equal(gate.asked[0].get.length, 6);
+    });
+  });
+
+  /** @scenario "A rate-limited gate rests only a few seconds" */
+  it("asks the gate again seconds after a 429, not a minute", async () => {
+    let calls = 0;
+    const server = createServer((req, res) => {
+      req.resume();
+      calls += 1;
+      if (calls === 1) return res.writeHead(429).end("{}");
+      return res.writeHead(200).end(JSON.stringify({ expiresIn: 300, get: {}, put: {} }));
+    });
+    const port = await listen(server);
+    let clock = 0;
+    const store = gateStore({
+      url: `http://127.0.0.1:${port}/gate`,
+      token: "member",
+      now: () => clock,
+    });
+    try {
+      assert.equal(await store.get("main/1"), null);
+      assert.equal(await store.get("main/1"), null);
+      assert.equal(calls, 1);
+      clock += 6_000;
+      assert.equal(await store.get("main/1"), null);
+      assert.equal(calls, 2);
+    } finally {
+      server.close();
+    }
+  });
+
   /** @scenario "A token the gate refuses turns the cache off" */
   it("misses and stops asking the gate after it refuses the token", async () => {
     await withGate(async (gate) => {

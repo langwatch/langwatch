@@ -38,6 +38,8 @@ Release images build in Docker from source and do not use this cache. The merge 
 
 Each CI job that uses the cache prints the server's log in an `Nx remote cache log` step and raises one warning when requests failed, so a cache that only misses shows on the run page. On a laptop the log is `.nx/remote-cache/server.log` in the worktree.
 
+A laptop entry helps only if the laptop and the pull request job compute the same hash, so no task input may name the machine. Tasks hash the Node.js major version, not `node --version`, and whether each `LANGWATCH_TEST_*` datastore URL is set, not its address: CI and every worktree point at their own test databases, and a test run with a URL unset skips what a run with it set exercises. The local server batches the keys of concurrent lookups and writes into one gate call (the gate takes 32 keys a call and refills a token's budget at two calls a second) and rests five seconds after a 429, so a full `pnpm typecheck` no longer drops its uploads.
+
 Traffic from S3 to GitHub-hosted runners is internet egress. Test results are a few kilobytes; `dist` outputs are larger, so uploads above 200 MB are skipped (`LANGWATCH_NX_REMOTE_CACHE_MAX_MB`).
 
 ## Consequences
