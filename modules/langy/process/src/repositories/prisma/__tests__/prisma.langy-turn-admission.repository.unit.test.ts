@@ -160,7 +160,11 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
       const { database, calls } = fakeDatabase([driverAdapterWriteConflict()], tx);
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
 
-      await expect(repository.claim(CLAIM_INPUT)).resolves.toEqual({ kind: "busy" });
+      await expect(repository.claim(CLAIM_INPUT)).resolves.toEqual({
+        kind: "busy",
+        conversationId: CLAIM_INPUT.conversationId,
+        heldTurnId: "turn-other",
+      });
       expect(calls()).toBe(2);
       expect(deleteReceipt).toHaveBeenCalledOnce();
     });

@@ -4,6 +4,7 @@
  * ever touching the worker, session keys, or the acceptance command.
  */
 import {
+  LangyAgentUnavailableError,
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
   LangyModelNotConfiguredError,
