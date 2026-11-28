@@ -1,7 +1,6 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
   AiCallFailedError,
-  ModelExecutionUnavailableError,
   ModelNotConfiguredError,
   ModelProviderUnavailableError,
   type ModelProviderApi,
@@ -17,7 +16,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
-import { executionProvider } from "./execution-provider.fixture.ts";
 
 const records: LangyMessageRecord[] = [
   { id: "msg_1", role: "user", content: "instrument my traces with langwatch" },
@@ -67,9 +65,6 @@ function modelProviders(
   const generateText = vi.fn(answers.generateText ?? (async () => ({ text: "A title" })));
   const api = createApiFixture<ModelProviderApi>({
     resolveModelForFeature: answers.resolveModelForFeature ?? (async () => RESOLVED),
-    getExecutionProviders: async () => ({
-      openai: executionProvider({ provider: "openai", enabled: true }),
-    }),
     generateText,
   });
   return { api, generateText };
@@ -173,15 +168,17 @@ describe("LangyTitleGeneratorService", () => {
     });
   });
 
-  describe("when the title model is a codex model this deployment cannot execute", () => {
-    /** @scenario "A title model this deployment cannot execute is not retried" */
-    it("keeps the placeholder title and raises nothing, so the outbox does not retry", async () => {
+  describe("when no title model is configured and the cheap default's provider is unavailable", () => {
+    /** @scenario "A project with no model for titles whose cheap default provider is unavailable is not retried" */
+    it("produces no title and raises nothing", async () => {
       const { api } = modelProviders({
-        resolveModelForFeature: async () => ({ ...RESOLVED, model: "openai_codex/gpt-5.6-terra" }),
+        resolveModelForFeature: async () => {
+          throw unconfigured();
+        },
         generateText: async () => {
-          throw new ModelExecutionUnavailableError({
-            model: "openai_codex/gpt-5.6-terra",
-            featureKey: "langy.conversation_title",
+          throw new ModelProviderUnavailableError({
+            providerKey: "openai",
+            reason: "not_configured",
           });
         },
       });
@@ -191,6 +188,27 @@ describe("LangyTitleGeneratorService", () => {
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
+    });
+  });
+
+  describe("when the title model is a codex model and the cheap default cannot run either", () => {
+    /** @scenario "A Codex title model whose cheap default cannot run is not retried" */
+    it("keeps the placeholder title and raises nothing, so the outbox does not retry", async () => {
+      const { api, generateText } = modelProviders({
+        resolveModelForFeature: async () => ({ ...RESOLVED, model: "openai_codex/gpt-5.6-terra" }),
+        generateText: async () => {
+          throw new ModelProviderUnavailableError({ providerKey: "openai", reason: "disabled" });
+        },
+      });
+      const generate = LangyTitleGeneratorService.create({
+        messages: messages(),
+        models: api,
+      }).generator();
+
+      await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({ model: LANGY_TITLE_GENERATION.MODEL }),
+      );
     });
   });
 

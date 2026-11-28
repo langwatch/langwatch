@@ -50,11 +50,8 @@ const TITLE_SYSTEM_PROMPT = [
 type LangyTitleGeneratorDeps = Readonly<{
   /** The transcript, off the conversation's own message projection. */
   messages: LangyTrustedMessageReader;
-  /** The title model, the completion run on it, and the connected providers. */
-  models: Pick<
-    ModelProviderApi,
-    "resolveModelForFeature" | "generateText" | "getExecutionProviders"
-  >;
+  /** The title model and the completion run on it. */
+  models: Pick<ModelProviderApi, "resolveModelForFeature" | "generateText">;
 }>;
 
 /** Nothing to retry: this project has no model to ask. */
@@ -108,18 +105,6 @@ export class LangyTitleGeneratorService {
           "Langy title model is a Codex model this process cannot run; using the cheap default instead",
         );
       }
-      if (model.fallback && !(await this.providerAvailable({ projectId, model: model.name }))) {
-        logger.warn(
-          {
-            projectId,
-            conversationId,
-            reason: model.steppedOverCodexModel ? "codex_stepped_over" : "no_model_configured",
-          },
-          "cheap default model's provider is not available for Langy titles; leaving title unchanged",
-        );
-
-        return UNCHANGED;
-      }
       const { text } = await this.deps.models.generateText({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
@@ -141,14 +126,6 @@ export class LangyTitleGeneratorService {
 
       return UNCHANGED;
     }
-  }
-
-  /** Whether the project has the model's provider connected and enabled. */
-  private async providerAvailable(input: { projectId: string; model: string }): Promise<boolean> {
-    const providers = await this.deps.models.getExecutionProviders({ projectId: input.projectId });
-    const provider = providers[input.model.split("/")[0] ?? ""];
-
-    return Boolean(provider?.enabled);
   }
 
   /**
