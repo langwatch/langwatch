@@ -113,7 +113,15 @@ const batcher = ({ send, waitMs, maxKeys }) => {
       .then(batch.resolve)
       .catch(() => batch.resolve(null));
   };
-  return ({ get = [], put = [] }) => {
+  const chunks = (list) =>
+    Array.from({ length: Math.ceil(list.length / maxKeys) }, (_, i) =>
+      list.slice(i * maxKeys, (i + 1) * maxKeys),
+    );
+  const merge = (answers) => ({
+    get: Object.assign({}, ...answers.map((a) => a?.get ?? {})),
+    put: Object.assign({}, ...answers.map((a) => a?.put ?? {})),
+  });
+  const add = ({ get = [], put = [] }) => {
     const fresh = get.filter((key) => !open?.get.has(key)).length + put.length;
     if (open && open.get.size + open.put.size + fresh > maxKeys) flush();
     if (!open) {
@@ -126,6 +134,15 @@ const batcher = ({ send, waitMs, maxKeys }) => {
     for (const entry of put) batch.put.set(entry.key, entry);
     if (batch.get.size + batch.put.size >= maxKeys) flush();
     return batch.done;
+  };
+  // A request larger than one call is split, so no call carries more than `maxKeys` keys.
+  return ({ get = [], put = [] }) => {
+    if (get.length + put.length <= maxKeys) return add({ get, put });
+    const parts = [
+      ...chunks(get).map((g) => add({ get: g })),
+      ...chunks(put).map((p) => add({ put: p })),
+    ];
+    return Promise.all(parts).then(merge);
   };
 };
 

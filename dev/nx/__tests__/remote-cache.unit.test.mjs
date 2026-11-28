@@ -433,6 +433,14 @@ describe("Nx remote cache", () => {
       });
       assert.equal(gate.asked.length, 1);
       assert.equal(gate.asked[0].get.length, 6);
+
+      const many = Array.from({ length: 33 }, (_, i) => `main/many-${i}`);
+      await store.prepare(many);
+      const after = gate.asked.slice(1);
+      assert.deepEqual(
+        after.map((ask) => ask.get.length).toSorted((a, b) => a - b),
+        [1, 32],
+      );
     });
   });
 
