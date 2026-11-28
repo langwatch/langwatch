@@ -48,10 +48,9 @@ export const DigestFrame = ({
 );
 
 /**
- * A row's kind, as a small label. Its text takes no `lw-*` class, which the dark cut would turn
- * pale on pale. An outlined chip has no ground of its own, so it shows the card's in either
- * scheme; `darkClass` names its own dark-mode colour when its light one is too faint on the dark
- * card. Solid means it needs you.
+ * A row's kind, as a small label; solid means it needs you. No `lw-*` text class (the dark cut
+ * would turn it pale on pale). An outlined chip shows the card's ground; `darkClass` gives it a
+ * dark-mode colour when its light one is too faint on the dark card.
  */
 export const Chip = ({
   label,
