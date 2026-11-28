@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.6.0](https://github.com/langwatch/langwatch/compare/skills@v1.5.0...skills@v1.6.0) (2026-11-28)
+
+
+### Features
+
+* **langy:** measured changes, CI as the lab, traces always found, and a judge that reads long traces ([#9536](https://github.com/langwatch/langwatch/issues/9536)) ([a697ebd](https://github.com/langwatch/langwatch/commit/a697ebdf2403dc0aad86e3240fa7e00620d2395d))
+* **navigation:** rename Me to Coding agents, with /me redirects ([#9698](https://github.com/langwatch/langwatch/issues/9698)) ([871c08d](https://github.com/langwatch/langwatch/commit/871c08d13825099e4f7fad4b0af8d69d650a8035))
+* **nurturing:** send langy_start, backfill the onboarding path, and retry a key's first request ([#9893](https://github.com/langwatch/langwatch/issues/9893)) ([fbb0277](https://github.com/langwatch/langwatch/commit/fbb0277e6592191cda34928f4f2bc42b26706714))
+* **skills:** owasp red team pack for code scenario tests ([#9637](https://github.com/langwatch/langwatch/issues/9637)) ([257ddea](https://github.com/langwatch/langwatch/commit/257ddeaebf87b20805d8112f9c9f43bdc297b872))
+
+
+### Bug Fixes
+
+* **dashboards:** langy widgets follow the theme, fill their card and come from a dashboard question ([#9869](https://github.com/langwatch/langwatch/issues/9869)) ([af7953d](https://github.com/langwatch/langwatch/commit/af7953db2ec84d3c3c943340d4e0a234a8e7631d))
+* **dashboards:** store a new dashboard on its first edit, not on + ([#9847](https://github.com/langwatch/langwatch/issues/9847)) ([4a36e5b](https://github.com/langwatch/langwatch/commit/4a36e5bfb9d798627e9c702e40c6aca8de675517))
+* **langy:** never show sign-in steps for Langy's own key and refuse a blank sandbox key ([#9495](https://github.com/langwatch/langwatch/issues/9495)) ([71c0cca](https://github.com/langwatch/langwatch/commit/71c0cca7a155c46140eed3b5917918e6eaab611b))
+* **langy:** put a chart on the board the user is on, and open a board Langy makes ([#9956](https://github.com/langwatch/langwatch/issues/9956)) ([2a5d783](https://github.com/langwatch/langwatch/commit/2a5d783cc18a4ac8696b1bc7414e6cc49583b898))
+* **lwql,docs:** bare view names, keyset cursor aliases, SSO tier wording ([#8842](https://github.com/langwatch/langwatch/issues/8842)) ([f053227](https://github.com/langwatch/langwatch/commit/f05322776206d953afaf33a3ab05aa3275e5d974))
+* **skills:** the CLI skills bundle keeps the login steps Langy's render leaves out ([#9829](https://github.com/langwatch/langwatch/issues/9829)) ([cad58b0](https://github.com/langwatch/langwatch/commit/cad58b0dbe761ba531e33d3900efee0ff1b18b51))
+
+
+### Miscellaneous
+
+* **main:** release langwatch 3.31.0 ([#10004](https://github.com/langwatch/langwatch/issues/10004)) ([1edc0e5](https://github.com/langwatch/langwatch/commit/1edc0e59ff48ffe7704527abe0d741d21a45604c))
+
 ## [1.5.0](https://github.com/langwatch/langwatch/compare/skills@v1.4.0...skills@v1.5.0) (2026-09-30)
 
 
