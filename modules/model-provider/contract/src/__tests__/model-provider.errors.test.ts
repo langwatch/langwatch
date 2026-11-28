@@ -1,4 +1,5 @@
 import type { HandledError } from "@langwatch/handled-error";
+import { explainSerializedError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -164,6 +165,7 @@ describe("model provider handled errors", () => {
         code: "validation_error",
         message: "Pick at least one model.",
         httpStatus: 422,
+        meta: { formErrors: ["Pick at least one model."] },
       });
       expectHandledWire(new ModelCostNotFoundError(), {
         code: "model_cost_not_found",
@@ -213,6 +215,15 @@ describe("model provider handled errors", () => {
         },
       );
     }).not.toThrow();
+  });
+
+  it("shows the reason a default-models save was refused, not the generic validation copy", () => {
+    const reason = "Pick at least one model.";
+    const { title, description } = explainSerializedError(
+      new ModelDefaultValidationError(reason).serialize(),
+    );
+    expect(title).toBe("Check your input");
+    expect(description).toBe(reason);
   });
 
   it("words the execution refusal for whichever path caught it", () => {
